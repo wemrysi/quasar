@@ -16,7 +16,6 @@
 
 package quasar.precog.util
 
-import quasar.blueeyes._
 import quasar.time.OffsetDate
 
 import org.slf4s.Logging
@@ -25,17 +24,15 @@ import scalaz._
 import scalaz.effect.IO
 
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
 import scala.{ collection => sc }
 import scala.reflect.ClassTag
 
-import java.io.{File, FileReader, IOException}
+import java.io.File
 import java.nio.file.Files
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 import java.util.Arrays.fill
-import java.util.Properties
 
 
 // Once we move to 2.10, we can abstract this to a specialized-list. In 2.9,
@@ -120,29 +117,11 @@ object IntList {
 
 
 object IOUtils extends Logging {
-  val dotDirs = "." :: ".." :: Nil
-
-  def isNormalDirectory(f: File) = f.isDirectory && !dotDirs.contains(f.getName)
-
-  def readFileToString(f: File): IO[String] = IO {
-    new String(Files.readAllBytes(f.toPath), Utf8Charset)
-  }
-
-  def readPropertiesFile(s: String): IO[Properties] = readPropertiesFile { new File(s) }
-
-  def readPropertiesFile(f: File): IO[Properties] = IO {
-    val props = new Properties
-    props.load(new FileReader(f))
-    props
-  }
 
   def overwriteFile(s: String, f: File): IO[Unit] = writeToFile(s, f, append = false)
+
   def writeToFile(s: String, f: File, append: Boolean): IO[Unit] = IO {
     Files.write(f.toPath, s.getBytes)
-  }
-
-  def writeSeqToFile[A](s0: Seq[A], f: File): IO[Unit] = IO {
-    Files.write(f.toPath, s0.map("" + _: CharSequence).asJava, Utf8Charset)
   }
 
   /** Performs a safe write to the file. Returns true
@@ -154,13 +133,6 @@ object IOUtils extends Logging {
     overwriteFile(s, tmpFile) flatMap { _ =>
       IO(tmpFile.renameTo(f)) // TODO: This is only atomic on POSIX systems
     }
-  }
-
-  def makeDirectory(dir: File): IO[Unit] = IO {
-    if (dir.isDirectory || dir.mkdirs)
-      ()
-    else
-      throw new IOException("Failed to create directory " + dir)
   }
 
   def recursiveDelete(files: Seq[File]): IO[Unit] = {
@@ -212,14 +184,7 @@ object IOUtils extends Logging {
   def createTmpDir(prefix: String): IO[File] = IO {
     Files.createTempDirectory(prefix).toFile
   }
-
-  def copyFile(src: File, dest: File): IO[Unit] = IO {
-    Files.copy(src.toPath, dest.toPath)
-  }
 }
-
-
-
 
 /**
   * Implicit container trait
