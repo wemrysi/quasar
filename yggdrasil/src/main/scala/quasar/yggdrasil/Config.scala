@@ -20,7 +20,6 @@ object yggConfig {
   val idSource = new FreshAtomicIdSource
 
   def hashJoins         = true
-  def sortBufferSize    = 1000
   def maxSliceSize: Int = 20000
 
   // This is a slice size that we'd like our slices to be at least as large as.
