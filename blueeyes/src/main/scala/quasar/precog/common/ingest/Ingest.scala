@@ -31,7 +31,6 @@ import java.time.Instant
 sealed trait Event {
   def fold[A](ingest: Ingest => A): A
   def split(n: Int): List[Event]
-  def length: Int
 }
 
 object Event {
@@ -53,8 +52,6 @@ case class Ingest(path: Path, data: Seq[JValue], jobId: Option[JobId], timestamp
       case (d, ref) => this.copy(data = d, streamRef = ref)
     })(collection.breakOut)
   }
-
-  def length = data.length
 }
 
 object Ingest {
