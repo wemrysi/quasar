@@ -225,11 +225,11 @@ object IOUtils extends Logging {
   * Implicit container trait
   */
 trait MapUtils {
-  implicit def pimpMapUtils[A, B, CC[B] <: sc.GenTraversable[B]](self: sc.GenMap[A, CC[B]]): MapPimp[A, B, CC] =
-    new MapPimp(self)
+  implicit def mapUtils[A, B, CC[B] <: sc.GenTraversable[B]](self: sc.GenMap[A, CC[B]]): MapExtras[A, B, CC] =
+    new MapExtras(self)
 }
 
-class MapPimp[A, B, CC[B] <: sc.GenTraversable[B]](left: sc.GenMap[A, CC[B]]) {
+class MapExtras[A, B, CC[B] <: sc.GenTraversable[B]](left: sc.GenMap[A, CC[B]]) {
   def cogroup[C, CC2[C] <: sc.GenTraversable[C], Result](right: sc.GenMap[A, CC2[C]])(
       implicit cbf: CanBuildFrom[Nothing, (A, Either3[B, (CC[B], CC2[C]), C]), Result],
       cbfLeft: CanBuildFrom[CC[B], B, CC[B]],
