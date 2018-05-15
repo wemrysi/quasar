@@ -30,7 +30,6 @@ import java.time.Instant
 
 sealed trait Event {
   def fold[A](ingest: Ingest => A): A
-  def split(n: Int): List[Event]
 }
 
 object Event {
@@ -44,14 +43,6 @@ object Event {
 case class Ingest(path: Path, data: Seq[JValue], jobId: Option[JobId], timestamp: Instant, streamRef: StreamRef)
     extends Event {
   def fold[A](ingest: Ingest => A): A = ingest(this)
-
-  def split(n: Int): List[Event] = {
-    val splitSize = (data.length / n) max 1
-    val splitData = data.grouped(splitSize).toSeq
-    (splitData zip streamRef.split(splitData.size)).map({
-      case (d, ref) => this.copy(data = d, streamRef = ref)
-    })(collection.breakOut)
-  }
 }
 
 object Ingest {
