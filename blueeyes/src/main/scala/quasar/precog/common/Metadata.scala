@@ -16,16 +16,8 @@
 
 package quasar.precog.common
 
-import quasar.blueeyes._, json._
-import quasar.blueeyes.json.serialization.{ Extractor, Decomposer }
-import quasar.blueeyes.json.serialization.DefaultSerialization._
-import quasar.blueeyes.json.serialization.Extractor._
-import quasar.blueeyes.json.serialization.Versioned._
-
 import scalaz._
 import scalaz.std.string._
-
-import shapeless.HNil
 
 sealed trait MetadataType
 
@@ -87,11 +79,7 @@ case class BooleanValueStats(count: Long, trueCount: Long) extends MetadataStats
   }
 }
 
-object BooleanValueStats extends MetadataType {
-  val schemaV1                                             = "count" :: "trueCount" :: HNil
-  implicit val decomposerV1: Decomposer[BooleanValueStats] = decomposerV[BooleanValueStats](schemaV1, Some("1.0".v))
-  implicit val extractorV1: Extractor[BooleanValueStats]   = extractorV[BooleanValueStats](schemaV1, Some("1.0".v))
-}
+object BooleanValueStats extends MetadataType
 
 case class LongValueStats(count: Long, min: Long, max: Long) extends MetadataStats {
   def metadataType = LongValueStats
@@ -105,11 +93,7 @@ case class LongValueStats(count: Long, min: Long, max: Long) extends MetadataSta
   }
 }
 
-object LongValueStats extends MetadataType {
-  val schemaV1                                          = "count" :: "min" :: "max" :: HNil
-  implicit val decomposerV1: Decomposer[LongValueStats] = decomposerV[LongValueStats](schemaV1, Some("1.0".v))
-  implicit val extractorV1: Extractor[LongValueStats]   = extractorV[LongValueStats](schemaV1, Some("1.0".v))
-}
+object LongValueStats extends MetadataType
 
 case class DoubleValueStats(count: Long, min: Double, max: Double) extends MetadataStats {
   def metadataType = DoubleValueStats
@@ -123,11 +107,7 @@ case class DoubleValueStats(count: Long, min: Double, max: Double) extends Metad
   }
 }
 
-object DoubleValueStats extends MetadataType {
-  val schemaV1                                            = "count" :: "min" :: "max" :: HNil
-  implicit val decomposerV1: Decomposer[DoubleValueStats] = decomposerV[DoubleValueStats](schemaV1, Some("1.0".v))
-  implicit val extractorV1: Extractor[DoubleValueStats]   = extractorV[DoubleValueStats](schemaV1, Some("1.0".v))
-}
+object DoubleValueStats extends MetadataType
 
 case class BigDecimalValueStats(count: Long, min: BigDecimal, max: BigDecimal) extends MetadataStats {
   def metadataType = BigDecimalValueStats
@@ -141,11 +121,7 @@ case class BigDecimalValueStats(count: Long, min: BigDecimal, max: BigDecimal) e
   }
 }
 
-object BigDecimalValueStats extends MetadataType {
-  val schemaV1                                                = "count" :: "min" :: "max" :: HNil
-  implicit val decomposerV1: Decomposer[BigDecimalValueStats] = decomposerV[BigDecimalValueStats](schemaV1, Some("1.0".v))
-  implicit val extractorV1: Extractor[BigDecimalValueStats]   = extractorV[BigDecimalValueStats](schemaV1, Some("1.0".v))
-}
+object BigDecimalValueStats extends MetadataType
 
 case class StringValueStats(count: Long, min: String, max: String) extends MetadataStats {
   def metadataType = StringValueStats
@@ -160,8 +136,4 @@ case class StringValueStats(count: Long, min: String, max: String) extends Metad
   }
 }
 
-object StringValueStats extends MetadataType {
-  val schemaV1                                            = "count" :: "min" :: "max" :: HNil
-  implicit val decomposerV1: Decomposer[StringValueStats] = decomposerV[StringValueStats](schemaV1, Some("1.0".v))
-  implicit val extractorV1: Extractor[StringValueStats]   = extractorV[StringValueStats](schemaV1, Some("1.0".v))
-}
+object StringValueStats extends MetadataType
