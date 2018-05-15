@@ -24,7 +24,6 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.qscript._
-import quasar.sql.CompilerHelpers
 
 import scala.Predef.implicitly
 import matryoshka._
@@ -33,7 +32,7 @@ import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
+class RewriteSpec extends quasar.Qspec with QScriptHelpers {
   val rewrite = new Rewrite[Fix]
 
   def normalizeFExpr(expr: Fix[QS]): Fix[QS] =
