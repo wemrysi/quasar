@@ -236,28 +236,32 @@ lazy val root = project.in(file("."))
   .aggregate(
 
        foundation, //___
-//    /    \      \     \
+//    /    |      \     \
     api, effect, ejson, js, //______
 //  /      |        \   /           \
                   common,
-// /       |     /  |   \             \
+// |       |     /  |   \             \
         frontend,  sql, precog,
-// |   /    |  \    |    |             |
-     fs,  sst,            blueeyes,
-// |  |     |   |   |    |             |
-// |  |     |   \   /    |             |
+// |   /   |    \   |     |            |
+// |  /    |     \_____   |            |
+     fs,  sst,         blueeyes,
+// |  |    |        |     |            |
+// |  |    |        /     |            |
         datagen,
-// |  |__________||      |             |
-// |__|__________||      |             |
-     qscript,         niflheim,
-// |  |          ||      |_____________|__
-     qsu,      core,
-// \____\            \   |             | |
-         connector,   yggdrasil,
-//     /     |   \______|______________|_|_______
-//     |     |         /     \         \ |       \
+// |__|___________/       |            |
+// |  |          /        |            |
+     qscript,          niflheim,
+// |  |      \ /          |            |
+     qsu,   core, //______|____________|
+// |   \    /             |            |
+//  \___\_____            |            |
+//        /   \           |            |
+           connector,  yggdrasil,
+//      /     |  \       |             |
+//      |     |   \______|_____________|__________
+//      |     |      \  /     \         \         \
           skeleton, mimir, marklogic, mongodb, couchbase,
-//     \     |     /          |          |         |
+//      \    |     /          |          |         |
           interface,
 //          /  \              |          |         |
          repl, web,
@@ -440,9 +444,9 @@ lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(
     api     % BothScopes,
-    fs      % BothScopes,
     qscript % BothScopes,
     sql     % BothScopes,
+    fs      % "test->test",
     effect  % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
