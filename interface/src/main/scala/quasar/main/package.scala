@@ -64,6 +64,7 @@ package object main extends Logging {
   // all of the backends which are included in the core distribution
   private val CoreFS = IList(
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
+    mimir.LocalLWC.definition translate injectFT[Task, PhysFsEff],
     skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff]
   ).fold
 

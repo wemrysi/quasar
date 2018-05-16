@@ -41,7 +41,7 @@ object LightweightTester extends BackendModule with DefaultAnalyzeModule {
 
   object TestConnector extends SlamEngine {
     val Type: FileSystemType = FileSystemType("") // never referred to by its FileSystemType
-    val lwc: LightweightConnector = LightweightLocal
+    val lwc: LightweightConnector = LocalLightweight
   }
 
   type QS[T[_[_]]] = TestConnector.QS[T]
