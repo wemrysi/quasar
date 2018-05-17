@@ -14,23 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
+package quasar.api
 
-package object jobs {
-  type ChannelId = String
-  type JobId = String
-  type MessageId = Long
-  type StatusId = Long
+import quasar.pkg.tests._
 
-  trait IdExtractor {
-    val NonNegInt = """(\d+)""".r
-
-    def unapply(str: String): Option[Long] = str match {
-      case NonNegInt(str) => Some(str.toLong)
-      case _ => None
-    }
-  }
-
-  object StatusId extends IdExtractor
-  object MessageId extends IdExtractor
+trait ResourceNameGenerator {
+  implicit val resourceNameArbitrary: Arbitrary[ResourceName] =
+    Arbitrary(genString map (ResourceName(_)))
 }
+
+object ResourceNameGenerator extends ResourceNameGenerator

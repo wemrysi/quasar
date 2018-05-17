@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.precog.common.ingest
+package quasar.api
 
-import org.scalacheck.Gen
-import quasar.precog.TestSupport._
+import quasar.contrib.pathy.AFile
+import quasar.pkg.tests._
 
-object EventIdSpecs extends Specification with ScalaCheck {
-  implicit val idRange = Gen.chooseNum[Int](0, Int.MaxValue)
+import pathy.scalacheck.PathyArbitrary._
 
-  "EventId" should {
-    "support round-trip encap/decap of producer/sequence ids" in prop { (prod: Int, seq: Int) =>
-      val uid = EventId(prod, seq).uid
-
-      EventId.producerId(uid) mustEqual prod
-      EventId.sequenceId(uid) mustEqual seq
-    }
-  }
+trait ResourcePathGenerator {
+  implicit val resourcePathArbitrary: Arbitrary[ResourcePath] =
+    Arbitrary(for {
+      n <- choose(1, 10)
+      p <- if (n > 2) arbitrary[AFile].map(ResourcePath.leaf(_))
+           else const(ResourcePath.root())
+    } yield p)
 }
+
+object ResourcePathGenerator extends ResourcePathGenerator

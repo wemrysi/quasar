@@ -26,7 +26,7 @@ import scalaz._, Scalaz._
 trait MergeSpec[M[_]] extends
   ColumnarTableModuleTestSupport[M] with
   TableModuleSpec[M] with
-  IndicesModule[M] {
+  IndicesModule[M] { self =>
 
   type GroupId = Int
   import trans._
@@ -38,6 +38,7 @@ trait MergeSpec[M[_]] extends
 
   class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
+    override def M: Monad[M] = self.M
     def load(jtpe: JType) = sys.error("todo")
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = M.point(this)
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = sys.error("todo")
@@ -52,7 +53,9 @@ trait MergeSpec[M[_]] extends
         M[(Table, Table)] = sys.error("not implemented here")
   }
 
-  object Table extends TableCompanion
+  object Table extends TableCompanion {
+    override def M: Monad[M] = self.M
+  }
 
   // these tests seem to rely on broken object concat behavior, which I have now fixed
   // we also don't really use Table.merge anymore, so we might be able to rip these out

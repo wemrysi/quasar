@@ -27,7 +27,6 @@ import _root_.fs2.{Strategy, Task}
 import _root_.scalaz.{~>, Functor}
 import _root_.scalaz.syntax.functor._
 
-// import _root_.scalaz.Monad
 import shims._
 
 package object fs2 {

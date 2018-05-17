@@ -16,7 +16,6 @@
 
 package quasar.mimir
 
-import quasar.blueeyes.util.Clock
 import quasar.contrib.fs2._
 import quasar.contrib.scalaz.concurrent._
 import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
@@ -110,8 +109,6 @@ final class Precog private (dataDir0: File)
   // needed for nihdb
   val masterChef: ActorRef =
     actorSystem.actorOf(props.withRouter(routerConfig))
-
-  private val clock: Clock[IO] = Clock.System
 
   // Members declared in quasar.yggdrasil.TableModule
   sealed trait TableCompanion extends VFSColumnarTableCompanion

@@ -47,7 +47,6 @@ trait EvaluatorTestSupport[M[_]] extends StdLibEvaluatorStack[M]
       val report = new LoggingQueryLogger[N, Unit] with ExceptionQueryLogger[N, Unit] with TimingQueryLogger[N, Unit] {
         val M = N0
       }
-      def freshIdScanner = outer.freshIdScanner
     }
 
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
@@ -99,7 +98,9 @@ trait EvaluatorTestSupport[M[_]] extends StdLibEvaluatorStack[M]
     }
   }
 
-  object Table extends TableCompanion
+  object Table extends TableCompanion {
+    override def M: Monad[M] = outer.M
+  }
 
   private var initialIndices = mutable.Map[Path, Int]()    // if we were doing this for real: j.u.c.HashMap
   private var currentIndex   = 0                      // if we were doing this for real: j.u.c.a.AtomicInteger

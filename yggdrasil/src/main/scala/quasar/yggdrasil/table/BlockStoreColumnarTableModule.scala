@@ -890,7 +890,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
           M.point(CellState(index, new Array[Byte](0), slice, (k: SortingKey) => M.point(none)).some)
 
         case (SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
-          val sortProjection                                       = new JDBMRawSortProjection[M](dbFile, name, keyColumns, valColumns, sortOrder, yggConfig.maxSliceSize, count)
+          val sortProjection                                       = new JDBMRawSortProjection[M](dbFile, name, keyColumns, valColumns, sortOrder, Config.maxSliceSize, count)
           val succ: Option[SortingKey] => M[Option[SortBlockData]] = (key: Option[SortingKey]) => sortProjection.getBlockAfter(key)
 
           succ(none) map {
@@ -977,7 +977,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       val left1  = left0.compact(leftKeySpec)
       val right1 = right0.compact(rightKeySpec)
 
-      if (yggConfig.hashJoins) {
+      if (Config.hashJoins) {
         (left1.toInternalTable().toEither |@| right1.toInternalTable().toEither).tupled flatMap {
           case (Right(left), Right(right)) =>
             orderHint match {
@@ -1018,7 +1018,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       * less than `limit` rows, it will be converted to an `InternalTable`,
       * otherwise it will stay an `ExternalTable`.
       */
-    def toInternalTable(limit: Int = yggConfig.maxSliceSize): EitherT[M, ExternalTable, InternalTable]
+    def toInternalTable(limit: Int = Config.maxSliceSize): EitherT[M, ExternalTable, InternalTable]
 
     /**
       * Forces a table to an external table, possibly de-optimizing it.

@@ -24,7 +24,7 @@ import scalaz._, Scalaz._
 
 import scala.annotation.tailrec
 
-trait BlockStoreTestModule[M[_]] extends BaseBlockStoreTestModule[M] {
+trait BlockStoreTestModule[M[_]] extends BaseBlockStoreTestModule[M] { self =>
   implicit def M: Monad[M] with Comonad[M]
 
   type GroupId = String
@@ -33,7 +33,9 @@ trait BlockStoreTestModule[M[_]] extends BaseBlockStoreTestModule[M] {
 
   trait TableCompanion extends BaseBlockStoreTestTableCompanion
 
-  object Table extends TableCompanion
+  object Table extends TableCompanion {
+    override def M: Monad[M] = self.M
+  }
 }
 
 trait BaseBlockStoreTestModule[M[_]] extends ColumnarTableModuleTestSupport[M]
@@ -57,7 +59,7 @@ trait BaseBlockStoreTestModule[M[_]] extends ColumnarTableModuleTestSupport[M]
     }
     def structure = xyz
 
-    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]])(implicit M: Monad[M]) = M.point {
+    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]]) = M.point {
       @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {
         blocks.filterNot(_.isEmpty) match {
           case x #:: xs =>

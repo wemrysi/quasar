@@ -14,22 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.precog.common.jobs
+package quasar.mimir
 
-import quasar.precog.MimeType
+import quasar.Data
+import quasar.contrib.pathy.{ADir, AFile, PathSegment}
+import quasar.fs.mount.ConnectionUri
 
-import scalaz.StreamT
+import fs2.Stream
+import scalaz.EitherT
+import scalaz.concurrent.Task
 
-// FIXME include FileStorageSpec
+trait LightweightFileSystem {
+  def children(dir: ADir): Task[Option[Set[PathSegment]]]
+  def exists(file: AFile): Task[Boolean] // TODO delegate to `children`
+  def read(file: AFile): Task[Option[Stream[Task, Data]]]
+}
 
-case class FileData[M[_]](mimeType: Option[MimeType], data: StreamT[M, Array[Byte]])
-
-/**
- * An abstraction for storing/manipulating/retrieving files.
- */
-trait FileStorage[M[_]] {
-  def exists(file: String): M[Boolean]
-  def save(file: String, data: FileData[M]): M[Unit]
-  def load(file: String): M[Option[FileData[M]]]
-  def remove(file: String): M[Unit]
+trait LightweightConnector {
+  def init(uri: ConnectionUri): EitherT[Task, String, (LightweightFileSystem, Task[Unit])]
 }

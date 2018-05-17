@@ -2,6 +2,7 @@
     "name": "use type_of function",
     "backends": {
         "couchbase":         "pending",
+        "lwc_local":         "pendingIgnoreFieldOrder",
         "mimir":             "pendingIgnoreFieldOrder",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",

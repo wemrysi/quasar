@@ -31,7 +31,7 @@ import SampleData._
 
 import java.nio.CharBuffer
 
-trait TestColumnarTableModule[M[_]] extends ColumnarTableModuleTestSupport[M] {
+trait TestColumnarTableModule[M[_]] extends ColumnarTableModuleTestSupport[M] { self =>
   type GroupId = Int
   import trans._
 
@@ -50,6 +50,7 @@ trait TestColumnarTableModule[M[_]] extends ColumnarTableModuleTestSupport[M] {
 
   class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
+    override def M: Monad[M] = self.M
     def load(jtpe: JType) = sys.error("todo")
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = M.point(this)
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = sys.error("todo")
@@ -64,7 +65,9 @@ trait TestColumnarTableModule[M[_]] extends ColumnarTableModuleTestSupport[M] {
       sys.error("not implemented here")
   }
 
-  object Table extends TableCompanion
+  object Table extends TableCompanion {
+    override def M: Monad[M] = self.M
+  }
 }
 
 trait ColumnarTableModuleSpec[M[_]] extends TestColumnarTableModule[M]
@@ -314,7 +317,7 @@ trait ColumnarTableModuleSpec[M[_]] extends TestColumnarTableModule[M]
         val dataset2 = fromJson(sample.toStream, Some(3))
 
         dataset1.cross(dataset1)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight))).slices.uncons.copoint must beLike {
-          case Some((head, _)) => head.size must beLessThanOrEqualTo(yggConfig.maxSliceSize)
+          case Some((head, _)) => head.size must beLessThanOrEqualTo(Config.maxSliceSize)
         }
       }
 

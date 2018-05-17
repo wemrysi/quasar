@@ -2,6 +2,7 @@
     "name": "left key join with multiple fields selected (Couchbase)",
     "backends": {
         "couchbase":         "pendingIgnoreFieldOrder",
+        "lwc_local":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "mimir":             "skip",

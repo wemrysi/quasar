@@ -2,9 +2,10 @@
     "name": "expressions with `= null` and `is null`",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir":"ignoreFieldOrder",
+        "lwc_local":"ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
-        "marklogic_xml":  "ignoreFieldOrder"
+        "marklogic_xml":  "ignoreFieldOrder",
+        "mimir":"ignoreFieldOrder"
     },
     "data": "nulls.data",
     "query": "select name,

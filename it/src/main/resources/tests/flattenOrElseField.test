@@ -2,6 +2,7 @@
     "name": "flatten or else field",
     "backends": {
         "couchbase":         "pending",
+        "lwc_local":         "pending",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",
         "mimir":             "pending"

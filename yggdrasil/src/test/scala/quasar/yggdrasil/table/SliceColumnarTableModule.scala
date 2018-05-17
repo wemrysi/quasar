@@ -46,9 +46,8 @@ trait SliceColumnarTableModule[M[_]] extends BlockStoreColumnarTableModule[M] wi
 
         val stream = projections.foldLeft(StreamT.empty[M, Slice]) { (acc, proj) =>
           // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
-          val constraints: M[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
-            Some(Schema.flatten(tpe, struct.toList).toSet)
-          }
+          val constraints: M[Option[Set[ColumnRef]]] =
+            M.point(Some(Schema.flatten(tpe, proj.structure.toList).toSet))
 
           acc ++ StreamT.wrapEffect(constraints map { c =>
             slices(proj, c)

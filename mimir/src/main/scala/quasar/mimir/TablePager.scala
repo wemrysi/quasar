@@ -66,6 +66,7 @@ trait TablePagerModule extends ColumnarTableModule[IO] {
         } yield ()
       }
 
+      // enqueue the empty vector so ReadFile.scan knows when to stop scanning
       val ta = driver >> queue.enqueue1(\/-(Vector.empty))
 
       ta unsafePerformAsync {

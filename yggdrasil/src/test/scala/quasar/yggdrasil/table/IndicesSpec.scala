@@ -25,7 +25,7 @@ import scalaz._, Scalaz._
 
 // TODO: mix in a trait rather than defining Table directly
 
-trait IndicesSpec[M[_]] extends ColumnarTableModuleTestSupport[M] with TableModuleSpec[M] with IndicesModule[M] {
+trait IndicesSpec[M[_]] extends ColumnarTableModuleTestSupport[M] with TableModuleSpec[M] with IndicesModule[M] { self =>
   type GroupId = Int
 
   import TableModule._
@@ -36,6 +36,7 @@ trait IndicesSpec[M[_]] extends ColumnarTableModuleTestSupport[M] with TableModu
 
   class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
+    override def M: Monad[M] = self.M
     def load(jtpe: JType) = sys.error("todo")
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = sys.error("todo")
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = sys.error("todo")
@@ -50,7 +51,9 @@ trait IndicesSpec[M[_]] extends ColumnarTableModuleTestSupport[M] with TableModu
         M[(Table, Table)] = sys.error("not implemented here")
   }
 
-  object Table extends TableCompanion
+  object Table extends TableCompanion {
+    override def M: Monad[M] = self.M
+  }
 
   def groupkey(s: String) = DerefObjectStatic(Leaf(Source), CPathField(s))
   def valuekey(s: String) = DerefObjectStatic(Leaf(Source), CPathField(s))

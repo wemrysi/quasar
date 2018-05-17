@@ -14,15 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
+package quasar.yggdrasil
 
-import quasar.blueeyes.json.serialization.{Decomposer, Extractor}
-import quasar.blueeyes.json.serialization.DefaultDecomposers._
-import quasar.blueeyes.json.serialization.DefaultExtractors._
+object Config {
+  val idSource = new FreshAtomicIdSource
 
-import java.util.UUID
+  def hashJoins         = true
+  def maxSliceSize: Int = 20000
 
-object JavaSerialization {
-  implicit val uuidDecomposer: Decomposer[UUID] = implicitly[Decomposer[String]].contramap((_: UUID).toString)
-  implicit val uuidExtractor: Extractor[UUID] = implicitly[Extractor[String]].map(UUID.fromString)
+  // This is a slice size that we'd like our slices to be at least as large as.
+  def minIdealSliceSize: Int = maxSliceSize / 4
+
+  // This is what we consider a "small" slice. This may affect points where
+  // we take proactive measures to prevent problems caused by small slices.
+  def smallSliceSize: Int = 50
 }
