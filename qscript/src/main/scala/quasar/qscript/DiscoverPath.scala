@@ -31,7 +31,9 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import pathy.Path.{dir1, file1, rootDir}
 import scalaz._, Scalaz._, \&/._
-import iotaz.{CopK, TListK}
+
+import iotaz.TListK.:::
+import iotaz.{ CopK, TListK, TNilK }
 
 /** This extracts statically-known paths from QScript queries to make it easier
   * for connectors to map queries to their own filesystems.
@@ -149,9 +151,38 @@ abstract class DiscoverPathInstances {
         _.run.fold(F.discoverPath(g), G.discoverPath(g))
     }
 
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def copkDiscoverPath[T[_[_]], X <: TListK, H[_]]: DiscoverPath.Aux[T, CopK[X, ?], H] = null
+  implicit def copk[T[_[_]], LL <: TListK, H[_]](implicit M: Materializer[T, LL, H]): DiscoverPath.Aux[T, CopK[LL, ?], H] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T[_[_]], LL <: TListK, H[_]] {
+    def materialize(offset: Int): DiscoverPath.Aux[T, CopK[LL, ?], H]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T[_[_]], H[_]]: Materializer[T, TNilK, H] = new Materializer[T, TNilK, H] {
+      override def materialize(offset: Int): DiscoverPath.Aux[T, CopK[TNilK, ?], H] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], F[_], LL <: TListK, H[_]](
+      implicit
+      F: DiscoverPath.Aux[T, F, H],
+      LL: Materializer[T, LL, H]
+    ): Materializer[T, F ::: LL, H] = new Materializer[T, F ::: LL, H] {
+      override def materialize(offset: Int): DiscoverPath.Aux[T, CopK[F ::: LL, ?], H] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new DiscoverPath[CopK[F ::: LL, ?]] {
+          type IT[X[_]] = T[X]
+          type OUT[A] = H[A]
+          override def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
+            case I(fa) => F.discoverPath(g).apply(fa)
+            case other => LL.materialize(offset + 1).discoverPath(g).apply(other.asInstanceOf[CopK[LL, List[ADir] \&/ IT[OUT]]])
+          }
+        }
+      }
+    }
+  }
 
   implicit def read[T[_[_]]: BirecursiveT, F[a] <: ACopK[a] : Functor, A]
     (implicit
