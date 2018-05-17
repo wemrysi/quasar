@@ -303,7 +303,7 @@ lazy val foundation = project
 
 lazy val qdata = project
   .settings(name := "quasar-qdata-internal")
-  .dependsOn(foundation % BothScopes)
+  .dependsOn(foundation)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
