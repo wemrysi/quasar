@@ -22,9 +22,10 @@ import cats.effect._
 
 import scala.util.{Failure, Success}
 
-import scalaz.{-\/, \/-} // \/}
+import scalaz.{-\/, \/-}
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.syntax.apply._
+import scalaz.syntax.either._
 
 package object concurrent {
 
@@ -37,6 +38,15 @@ package object concurrent {
     }
   }
 
+  implicit class toOps[F[_], A](fa: F[A]) {
+    def to[G[_]](implicit F: Effect[F], G: Async[G], ec: scala.concurrent.ExecutionContext): G[A] =
+      Async[G].async { l =>
+        Effect[F].runAsync(fa)(c =>
+          IO(l(c))
+        ).unsafeRunSync
+      }
+  }
+
   implicit def taskEffect: Effect[Task] = new Effect[Task] {
     def pure[A](x: A): Task[A] = Task.now(x)
     def handleErrorWith[A](fa: Task[A])(f: Throwable => Task[A]): Task[A] =
@@ -45,8 +55,7 @@ package object concurrent {
 
     def raiseError[A](e: Throwable): Task[A] = Task.fail(e)
     def async[A](k: (Either[Throwable, A] => Unit) => Unit): Task[A] =
-      // Task.async(r => k(r))
-      Task.fail(new Exception())
+      Task.async(r => k(r.compose(_.fold(_.left, _.right))))
     def bracketCase[A, B](acquire: Task[A])(use: A => Task[B])(release: (A, ExitCase[Throwable]) => Task[Unit]): Task[B] = for {
       res <- acquire
       u <- use(res).attempt.flatMap {

@@ -42,13 +42,14 @@ class JDBMRawSortProjection[M[_]] private[yggdrasil] (dbFile: File,
                                                         valRefs: Seq[ColumnRef],
                                                         sortOrder: DesiredSortOrder,
                                                         sliceSize: Int,
-                                                        val length: Long)
-    extends ProjectionLike[M, Slice]
+                                                        val length: Long)(
+    implicit M: Monad[M]
+  ) extends ProjectionLike[M, Slice]
     with Logging {
   import JDBMProjection._
   type Key = Array[Byte]
 
-  def structure(implicit M: Monad[M]) = M.point((sortKeyRefs ++ valRefs).toSet)
+  def structure = (sortKeyRefs ++ valRefs).toSet
 
   def foreach(f: java.util.Map.Entry[Array[Byte], Array[Byte]] => Unit) {
     val DB                                         = DBMaker.openFile(dbFile.getCanonicalPath).make()
@@ -62,8 +63,8 @@ class JDBMRawSortProjection[M[_]] private[yggdrasil] (dbFile: File,
   val rowFormat = RowFormat.forValues(valRefs)
   val keyFormat = RowFormat.forSortingKey(sortKeyRefs)
 
-  override def getBlockAfter(id: Option[Array[Byte]], columns: Option[Set[ColumnRef]])(
-      implicit M: Monad[M]): M[Option[BlockProjectionData[Array[Byte], Slice]]] = M.point {
+  override def getBlockAfter(id: Option[Array[Byte]], columns: Option[Set[ColumnRef]])
+  : M[Option[BlockProjectionData[Array[Byte], Slice]]] = M.point {
     // TODO: Make this far, far less ugly
     if (columns.nonEmpty) {
       throw new IllegalArgumentException("JDBM Sort Projections may not be constrained by column descriptor")

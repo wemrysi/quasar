@@ -55,6 +55,8 @@ import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 
 trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[IO] with Logging {
+  protected def M: Monad[IO] = Monad[IO]
+
   private type ET[F[_], A] = EitherT[F, ResourceError, A]
 
   private val dbs = new ConcurrentHashMap[(Blob, Version), NIHDB]
@@ -128,19 +130,19 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[IO] with Logg
   def createDB(path: AFile): IO[ResourceError \/ (Blob, Version, NIHDB)] = {
     val failure = ResourceError.fromExtractorError(s"Failed to create NIHDB in $path")
 
-    val createBlob: IO[Blob] = for {
+    val createBlob: Task[Blob] = for {
       blob <- vfs.scratch
       _ <- vfs.link(blob, path)   // should be `true` because we already looked for path
     } yield blob
 
-    for {
+    runToIO(for {
       maybeBlob <- vfs.readPath(path)
-      blob <- maybeBlob.map(IO(_)).getOrElse(createBlob)
+      blob <- maybeBlob.map(Task.now(_)).getOrElse(createBlob)
 
       version <- vfs.fresh(blob)    // overwrite any previously-existing HEAD
       dir <- vfs.underlyingDir(blob, version)
 
-      validation <- IO {
+      validation <- Task.delay {
         NIHDB.create(
           masterChef,
           dir,
@@ -150,13 +152,13 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[IO] with Logg
       }
 
       disj = validation.disjunction.leftMap(failure)
-    } yield disj.map(n => (blob, version, n))
+    } yield disj.map(n => (blob, version, n)))
   }
 
   def commitDB(blob: Blob, version: Version, db: NIHDB): IO[Unit] = {
     // last-wins semantics
     lazy val replaceM: OptionT[IO, Unit] = for {
-      oldHead <- OptionT(vfs.headOfBlob(blob))
+      oldHead <- OptionT(runToIO(vfs.headOfBlob(blob)))
       oldDB <- OptionT(IO(Option(dbs.get((blob, oldHead)))))
 
       check <- IO(dbs.replace((blob, oldHead), oldDB, db)).liftM[OptionT]
@@ -171,7 +173,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[IO] with Logg
       check <- IO(dbs.putIfAbsent((blob, version), db))
 
       _ <- if (check == null)
-        vfs.commit(blob, version)
+        runToIO(vfs.commit(blob, version))
       else
         commitDB(blob, version, db)
     } yield ()
@@ -209,7 +211,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[IO] with Logg
       _ <- IO.fromFuture(IO(db.cook)).liftM[OptionT]
     } yield ()
 
-    ot.getOrElse(IO.unit)
+    ot.getOrElseF(IO.unit)
   }
 
   object fs {
@@ -287,6 +289,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[IO] with Logg
 
   trait VFSColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
 
+    override def M: Monad[IO] = Monad[IO]
+
     def load(table: Table, tpe: JType): EitherT[IO, ResourceError, Table] = {
       for {
         _ <- EitherT.rightT(table.toJson.map(json => log.trace("Starting load from " + json.toList.map(_.toJValue.renderCompact))))
@@ -302,19 +306,18 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[IO] with Logg
               opt.getOrElse(-\/(ResourceError.notFound(s"unable to locate dataset at path $path")))
             })
 
-            projection <- NIHDBProjection.wrap(nihdb).toTask.liftM[ET]
+            projection <- NIHDBProjection.wrap(nihdb).liftM[ET]
           } yield projection
         }
       } yield {
         val length = projections.map(_.length).sum
         val stream = projections.foldLeft(StreamT.empty[IO, Slice]) { (acc, proj) =>
           // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
-          val constraints = proj.structure.map { struct =>
-            Some(Schema.flatten(tpe, struct.toList))
-          }
+          val constraints =
+            Some(Schema.flatten(tpe, proj.structure.toList))
 
           log.debug("Appending from projection: " + proj)
-          acc ++ StreamT.wrapEffect(constraints map { c => proj.getBlockStream(c) })
+          acc ++ proj.getBlockStream(constraints)
         }
 
         Table(stream, ExactSize(length))

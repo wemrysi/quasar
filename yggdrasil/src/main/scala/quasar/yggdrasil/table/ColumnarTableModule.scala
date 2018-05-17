@@ -39,6 +39,7 @@ import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTim
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.collection.immutable.Set
 
 trait ColumnarTableTypes[M[_]] {
   type F1         = CF1
@@ -298,7 +299,7 @@ object ColumnarTableModule extends Logging {
     }
   }
 
-  def toCharBuffers[N[+ _]: Monad](output: MimeType, slices: StreamT[N, Slice]): StreamT[N, CharBuffer] = {
+  def toCharBuffers[N[_]: Monad](output: MimeType, slices: StreamT[N, Slice]): StreamT[N, CharBuffer] = {
     import FileContent._
     import MimeTypes._
     val AnyMimeType = anymaintype / anysubtype
@@ -347,6 +348,8 @@ trait ColumnarTableModule[M[_]]
   }
 
   trait ColumnarTableCompanion extends TableCompanionLike {
+    implicit protected def M: Monad[M]
+
     def apply(slices: StreamT[M, Slice], size: TableSize): Table
 
     def singleton(slice: Slice): Table
@@ -358,72 +361,71 @@ trait ColumnarTableModule[M[_]]
     def uniformDistribution(init: MmixPrng): Table = {
       val gen: StreamT[M, Slice] = StreamT.unfoldM[M, Slice, MmixPrng](init) { prng =>
         val (column, nextGen) = Column.uniformDistribution(prng)
-        Some((Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), yggConfig.maxSliceSize), nextGen)).point[M]
+        M.point(((Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), yggConfig.maxSliceSize), nextGen)).some)
       }
 
       Table(gen, InfiniteSize)
     }
 
-    def constBoolean(v: collection.Set[Boolean]): Table = {
+    def constBoolean(v: Set[Boolean]): Table = {
       val column = ArrayBoolColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CBoolean) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constLong(v: collection.Set[Long]): Table = {
+    def constLong(v: Set[Long]): Table = {
       val column = ArrayLongColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CLong) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constDouble(v: collection.Set[Double]): Table = {
+    def constDouble(v: Set[Double]): Table = {
       val column = ArrayDoubleColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constDecimal(v: collection.Set[BigDecimal]): Table = {
+    def constDecimal(v: Set[BigDecimal]): Table = {
       val column = ArrayNumColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CNum) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constString(v: collection.Set[String]): Table = {
+    def constString(v: Set[String]): Table = {
       val column = ArrayStrColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CString) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constOffsetDateTime(v: collection.Set[OffsetDateTime]): Table = {
+    def constOffsetDateTime(v: Set[OffsetDateTime]): Table = {
       val column = ArrayOffsetDateTimeColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, COffsetDateTime) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constOffsetTime(v: collection.Set[OffsetTime]): Table = {
+    def constOffsetTime(v: Set[OffsetTime]): Table = {
       val column = ArrayOffsetTimeColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, COffsetTime) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constOffsetDate(v: collection.Set[OffsetDate]): Table = {
+    def constOffsetDate(v: Set[OffsetDate]): Table = {
       val column = ArrayOffsetDateColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, COffsetDate) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constLocalDateTime(v: collection.Set[LocalDateTime]): Table = {
+    def constLocalDateTime(v: Set[LocalDateTime]): Table = {
       val column = ArrayLocalDateTimeColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CLocalDateTime) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constLocalTime(v: collection.Set[LocalTime]): Table = {
+    def constLocalTime(v: Set[LocalTime]): Table = {
       val column = ArrayLocalTimeColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CLocalTime) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constLocalDate(v: collection.Set[LocalDate]): Table = {
+    def constLocalDate(v: Set[LocalDate]): Table = {
       val column = ArrayLocalDateColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CLocalDate) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constInterval(v: collection.Set[DateTimeInterval]): Table = {
+    def constInterval(v: Set[DateTimeInterval]): Table = {
       val column = ArrayIntervalColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CInterval) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
-
 
     def constNull: Table =
       Table(Slice(Map(ColumnRef(CPath.Identity, CNull) -> new InfiniteColumn with NullColumn), 1) :: StreamT.empty[M, Slice], ExactSize(1))
@@ -460,7 +462,7 @@ trait ColumnarTableModule[M[_]]
     /**
       * Merge controls the iteration over the table of group key values.
       */
-    def merge[N[+ _]](grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => N[Table])(implicit nt: N ~> M): M[Table] = {
+    def merge(grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => M[Table]): M[Table] = {
       import GroupKeySpec.{ dnf, toVector }
 
       type Key       = Seq[RValue]
@@ -505,13 +507,13 @@ trait ColumnarTableModule[M[_]]
             }
           }
 
-          def normalizedKeys(index: TableIndex, keySchema: KeySchema): collection.Set[Key] = {
+          def normalizedKeys(index: TableIndex, keySchema: KeySchema): Set[Key] = {
             val schemaMap = for (k <- fullSchema) yield keySchema.indexOf(k)
             for (key <- index.getUniqueKeys)
               yield for (k <- schemaMap) yield if (k == -1) CUndefined else key(k)
           }
 
-          def intersect(keys0: collection.Set[Key], keys1: collection.Set[Key]): collection.Set[Key] = {
+          def intersect(keys0: Set[Key], keys1: Set[Key]): Set[Key] = {
             def consistent(key0: Key, key1: Key): Boolean =
               (key0 zip key1).forall {
                 case (k0, k1) => k0 == k1 || k0 == CUndefined || k1 == CUndefined
@@ -572,7 +574,7 @@ trait ColumnarTableModule[M[_]]
             M.point(TableIndex.joinSubTables(subTableProjections).normalize) // TODO: normalize necessary?
           }
 
-          nt(body(groupKeyTable, map))
+          body(groupKeyTable, map)
         }
 
         // TODO: this can probably be done as one step, but for now
@@ -654,20 +656,22 @@ trait ColumnarTableModule[M[_]]
     }
   }
 
-  abstract class ColumnarTable(slices0: StreamT[M, Slice], val size: TableSize) extends TableLike with SamplableColumnarTable { self: Table =>
+  abstract class ColumnarTable(slices0: StreamT[M, Slice], val size: TableSize)
+    extends TableLike with SamplableColumnarTable { self: Table =>
     import SliceTransform._
+
+    implicit def M: Monad[M]
 
     private final val readStarts = new java.util.concurrent.atomic.AtomicInteger
     private final val blockReads = new java.util.concurrent.atomic.AtomicInteger
 
-    val slices = StreamT(
+    val slices: StreamT[M, Slice] = StreamT(M.point(
       StreamT
         .Skip({
           readStarts.getAndIncrement
           slices0.map(s => { blockReads.getAndIncrement; s })
         })
-        .point[M]
-    )
+    ))
 
     /**
       * Folds over the table to produce a single value (stored in a singleton table).
@@ -856,7 +860,8 @@ trait ColumnarTableModule[M[_]]
       */
     def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1,
                                                                         rightResultTrans: TransSpec1,
-                                                                        bothResultTrans: TransSpec2): Table = {
+                                                                        bothResultTrans: TransSpec2)
+    : Table = {
 
       // println("Cogrouping with respect to\nleftKey: " + leftKey + "\nrightKey: " + rightKey)
       class IndexBuffers(lInitialSize: Int, rInitialSize: Int) {
@@ -1260,15 +1265,20 @@ trait ColumnarTableModule[M[_]]
           }
         } // end of step
 
+        val leftUnconsed = none[(Slice, StreamT[M, Slice])]
+        val rightUnconsed = none[(Slice, StreamT[M, Slice])]
+
         val initialState = for {
           // We have to compact both sides to avoid any rows for which the key is completely undefined
-          leftUnconsed <- self.compact(leftKey).slices.uncons
-          rightUnconsed <- that.compact(rightKey).slices.uncons
+          // leftUnconsed <- self.compact(leftKey).slices.uncons
+          // rightUnconsed <- that.compact(rightKey).slices.uncons
 
           back <- {
             val cogroup = for {
-              (leftHead, leftTail) <- leftUnconsed
-              (rightHead, rightTail) <- rightUnconsed
+              lp <- leftUnconsed
+              rp <- rightUnconsed
+              (leftHead, leftTail) = lp
+              (rightHead, rightTail) = rp
             } yield {
               for {
                 pairL <- stlk(leftHead)
@@ -1299,15 +1309,16 @@ trait ColumnarTableModule[M[_]]
             }
 
             optM map { m =>
-              m map { Some(_) }
+              m map { _.some }
             } getOrElse {
-              M.point(None)
+              M.point(none)
             }
           }
         } yield back
 
         Table(StreamT.wrapEffect(initialState map { state =>
-          StreamT.unfoldM[M, Slice, CogroupState](state getOrElse CogroupDone)(step)
+          // StreamT.unfoldM[M, Slice, CogroupState](state getOrElse CogroupDone)(step(_))
+          ???
         }), UnknownSize)
       }
 
@@ -1997,20 +2008,23 @@ trait ColumnarTableModule[M[_]]
     def slicePrinter(prelude: String)(f: Slice => String): Table = {
       Table(
         StreamT(
-          StreamT
-            .Skip({
-            println(prelude);
-            slices map { s =>
-              println(f(s)); s
-            }
-          })
-            .point[M]),
-        size)
+          M.point(
+            StreamT.Skip({
+              println(prelude);
+              slices map { s =>
+                println(f(s)); s
+              }
+            })
+          )
+        ),
+      size)
     }
 
     def logged(logger: Logger, logPrefix: String = "", prelude: String = "", appendix: String = "")(f: Slice => String): Table = {
-      val preludeEffect  = StreamT(StreamT.Skip({ logger.debug(logPrefix + " " + prelude); StreamT.empty[M, Slice] }).point[M])
-      val appendixEffect = StreamT(StreamT.Skip({ logger.debug(logPrefix + " " + appendix); StreamT.empty[M, Slice] }).point[M])
+      val preludeEffect: StreamT[M, Slice] =
+        StreamT(M.point(StreamT.Skip({ logger.debug(logPrefix + " " + prelude); StreamT.empty[M, Slice] })))
+      val appendixEffect: StreamT[M, Slice] =
+        StreamT(M.point(StreamT.Skip({ logger.debug(logPrefix + " " + appendix); StreamT.empty[M, Slice] })))
       val sliceEffect = if (logger.isTraceEnabled) slices map { s =>
         logger.trace(logPrefix + " " + f(s)); s
       } else slices

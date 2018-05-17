@@ -18,15 +18,19 @@ package quasar.mimir
 
 import quasar.Data
 import quasar.blueeyes.json.JValue
+import quasar.contrib.fs2._
+import quasar.contrib.scalaz.concurrent._
 import quasar.yggdrasil.table.{ColumnarTableModule, Slice}
 
 import delorean._
+
+import cats.effect.IO
 
 import fs2.async
 import fs2.async.mutable.Queue
 import fs2.interop.scalaz._
 
-import scalaz.{\/, -\/, \/-, ~>, StreamT}
+import scalaz.{\/, -\/, \/-, ~>, Functor, StreamT}
 import scalaz.concurrent.Task
 import scalaz.syntax.monad._
 
@@ -35,7 +39,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-trait TablePagerModule extends ColumnarTableModule[Future] {
+trait TablePagerModule extends ColumnarTableModule[IO] {
 
   final class TablePager private (
       slices: StreamT[Task, Slice],
@@ -77,11 +81,12 @@ trait TablePagerModule extends ColumnarTableModule[Future] {
   }
 
   object TablePager {
-    def apply(table: Table, lookahead: Int = 1): Task[TablePager] = {
+    def apply(table: Table, lookahead: Int = 1): IO[TablePager] = {
       for {
-        q <- async.boundedQueue[Task, Throwable \/ Vector[Data]](lookahead)
-        slices = table.slices.trans(λ[Future ~> Task](_.toTask))
-        back <- Task.delay(new TablePager(slices, q))
+        q <- async.boundedQueue[Task, Throwable \/ Vector[Data]](lookahead).to[IO]
+        // ambiguity between M and effect-derived monad
+        slices = table.slices.trans(λ[IO ~> Task](_.to[Task]))(M, Functor[Task])
+        back <- IO(new TablePager(slices, q))
       } yield back
     }
   }

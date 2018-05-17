@@ -56,8 +56,13 @@ class ViewReadQueryRegressionSpec
         KvsMounter.interpreter[Task, FsAskPhysFsEff](
           KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
 
-      foldMapNT(Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
-        .compose(mnt)
+      foldMapNT(
+        Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+:
+        reflNT[Task] :+:
+        Failure.toRuntimeError[Task, PhysicalError] {
+          case UnhandledFSError(e) => e
+        }
+      ).compose(mnt)
     }
 
   val seq = TaskRef(0L).map(MonotonicSeq.fromTaskRef)

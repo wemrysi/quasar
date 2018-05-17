@@ -32,7 +32,6 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
   import Q.transforms._
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-  import EitherT.eitherTMonad
 
   /** Returns the source of values from the result of executing the given
     * SQL^2 query.

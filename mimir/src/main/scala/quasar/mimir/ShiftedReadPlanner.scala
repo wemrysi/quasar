@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
+import quasar.contrib.scalaz.concurrent._
 import quasar.fs._
 import quasar.mimir.MimirCake._
 import quasar.qscript._
@@ -29,6 +30,7 @@ import delorean._
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -48,9 +50,9 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
               new DepFn1[Cake, λ[`P <: Cake` => EitherT[CakeM, FileSystemError, P#Table]]] {
                 def apply(P: Cake): EitherT[CakeM, FileSystemError, P.Table] = {
                   val et =
-                    P.Table.constString(Set(pathStr)).load(JType.JUniverseT).mapT(_.toTask)
+                    P.Table.constString(Set(pathStr)).load(JType.JUniverseT)
 
-                  et.mapT(_.liftM[MT]) leftMap { err =>
+                  et.mapT(_.to[Task].liftM[MT]) leftMap { err =>
                     val msg = err.messages.toList.reduce(_ + ";" + _)
                     FileSystemError.readFailed(posixCodec.printPath(path), msg)
                   }

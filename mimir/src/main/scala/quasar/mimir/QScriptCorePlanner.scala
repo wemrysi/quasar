@@ -32,20 +32,19 @@ import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
 import cats.effect.IO
 import delorean._
-import fs2.interop.scalaz._
+// import fs2.interop.scalaz._
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import matryoshka.data._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 import shims._
 
 import scala.collection.immutable.{Map => ScalaMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
-    liftF: Task ~> F, liftFCake: CakeM ~> F) {
+    liftF: IO ~> F, liftFCake: CakeM ~> F) {
 
   def mapFuncPlanner[G[_]: Monad] = MapFuncPlanner[T, G, MapFunc[T, ?]]
 
@@ -70,7 +69,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
       } yield MimirRepr.withSort(src.P)(src.table.transform(trans))(newSort)
 
     // special-case for distinct (TODO this should be a new node in qscript)
-    case qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, repair) if bucket === arb =>
+    case qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, repair) if bucket == arb =>
       import src.P.trans._
 
       for {
@@ -200,16 +199,16 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
           }
 
           if (buckets.isEmpty) {
-            liftF.apply(reduceAll(false)(src.table).toTask)
+            liftF(reduceAll(false)(src.table))
           } else {
             for {
               bucketTranses <- buckets.traverse(interpretMapFunc[T, F](src.P, mapFuncPlanner[F]))
               bucketTrans = combineTransSpecs(src.P)(bucketTranses)
 
-              prepared <- liftF.apply(sortT[src.P.type](MimirRepr.single[src.P](src))(src.table, bucketTrans))
+              prepared <- liftF(sortT[src.P.type](MimirRepr.single[src.P](src))(src.table, bucketTrans))
                 .map(r => src.unsafeMergeTable(r.table))
 
-              table <- liftF.apply(prepared.partitionMerge(bucketTrans, keepKey = true)(reduceAll(true)).toTask)
+              table <- liftF(prepared.partitionMerge(bucketTrans, keepKey = true)(reduceAll(true)))
             } yield table
           }
         }
@@ -304,12 +303,12 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
             sortedTable <- {
               if (sortNeeded) {
                 if (buckets.isEmpty) {
-                  liftF.apply(sortAll(src.table).toTask)
+                  liftF(sortAll(src.table))
                 } else {
                   for {
-                    prepared <- liftF.apply(sortT[src.P.type](MimirRepr.single[src.P](src))(src.table, bucketTrans))
+                    prepared <- liftF(sortT[src.P.type](MimirRepr.single[src.P](src))(src.table, bucketTrans))
                       .map(r => src.unsafeMergeTable(r.table))
-                    table <- liftF.apply(prepared.partitionMerge(bucketTrans)(sortAll).toTask)
+                    table <- liftF(prepared.partitionMerge(bucketTrans)(sortAll))
                   } yield table
                 }
               } else {
@@ -350,10 +349,10 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
             retainsOrder = op != Sample
             back <- op match {
               case Take =>
-                IO.now(compacted.take(number))
+                IO.pure(compacted.take(number))
 
               case Drop =>
-                IO.now(compacted.drop(number))
+                IO.pure(compacted.drop(number))
 
               case Sample =>
                 compacted.sample(number, List(fromRepr.P.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs
@@ -364,7 +363,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
             MimirRepr(fromRepr.P)(back)
           }
 
-          liftF.apply(result.toTask)
+          liftF.apply(result)
         }
       } yield back
 

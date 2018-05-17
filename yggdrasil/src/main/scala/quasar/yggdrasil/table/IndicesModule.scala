@@ -55,7 +55,9 @@ trait IndicesModule[M[_]] extends Logging with TransSpecModule with ColumnarTabl
       * Return the subtable where each group key in keyIds is set to
       * the corresponding value in keyValues.
       */
-    def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue]): Table = {
+    def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue])(
+      implicit M: Monad[M]
+    ): Table = {
       // Each slice index will build us a slice, so we just return a
       // table of those slices.
       //
@@ -93,7 +95,9 @@ trait IndicesModule[M[_]] extends Logging with TransSpecModule with ColumnarTabl
       * Despite being in M, the TableIndex will be eagerly constructed
       * as soon as the underlying slices are available.
       */
-    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): M[TableIndex] = {
+    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1)(
+      implicit M: Monad[M]
+    ): M[TableIndex] = {
 
       def accumulate(buf: mutable.ListBuffer[SliceIndex], stream: StreamT[M, SliceIndex]): M[TableIndex] =
         stream.uncons flatMap {
@@ -126,7 +130,9 @@ trait IndicesModule[M[_]] extends Logging with TransSpecModule with ColumnarTabl
       * the table, since it's assumed that all indices have the same
       * value spec.
       */
-    def joinSubTables(tpls: List[(TableIndex, Seq[Int], Seq[RValue])]): Table = {
+    def joinSubTables(tpls: List[(TableIndex, Seq[Int], Seq[RValue])])(
+      implicit M: Monad[M]
+    ): Table = {
 
       // Filter out negative integers. This allows the caller to do
       // arbitrary remapping of their own Seq[RValue] by filtering
@@ -195,7 +201,7 @@ trait IndicesModule[M[_]] extends Logging with TransSpecModule with ColumnarTabl
       * Return the subtable where each group key in keyIds is set to
       * the corresponding value in keyValues.
       */
-    def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue]): Table =
+    def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue])(implicit M: Monad[M]): Table =
       buildSubTable(getRowsForKeys(keyIds, keyValues))
 
     private def intersectBuffers(as: ArrayIntList, bs: ArrayIntList): ArrayIntList = {
@@ -240,7 +246,9 @@ trait IndicesModule[M[_]] extends Logging with TransSpecModule with ColumnarTabl
     /**
       * Given a set of rows, builds the appropriate subslice.
       */
-    private[table] def buildSubTable(rows: ArrayIntList): Table = {
+    private[table] def buildSubTable(rows: ArrayIntList)(
+      implicit M: Monad[M]
+    ): Table = {
       val slices = buildSubSlice(rows) :: StreamT.empty[M, Slice]
       Table(slices, ExactSize(rows.size))
     }
@@ -284,7 +292,9 @@ trait IndicesModule[M[_]] extends Logging with TransSpecModule with ColumnarTabl
       * Despite being in M, the SliceIndex will be eagerly constructed
       * as soon as the underlying Slice is available.
       */
-    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): M[SliceIndex] = {
+    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1)(
+      implicit M: Monad[M]
+    ): M[SliceIndex] = {
 
       val sts = groupKeys.map(composeSliceTransform).toArray
       val vt  = composeSliceTransform(valueSpec)
@@ -304,7 +314,9 @@ trait IndicesModule[M[_]] extends Logging with TransSpecModule with ColumnarTabl
       * necessary to associate them into the maps and sets we
       * ultimately need to construct the SliceIndex.
       */
-    private[table] def createFromSlice(slice: Slice, sts: Array[SliceTransform1[_]], vt: SliceTransform1[_]): M[SliceIndex] = {
+    private[table] def createFromSlice(slice: Slice, sts: Array[SliceTransform1[_]], vt: SliceTransform1[_])(
+      implicit M: Monad[M]
+    ): M[SliceIndex] = {
       val numKeys = sts.length
       val n       = slice.size
       val vals    = mutable.Map[Int, mutable.Set[RValue]]()
@@ -366,7 +378,9 @@ trait IndicesModule[M[_]] extends Logging with TransSpecModule with ColumnarTabl
       * data store is column-oriented but the associations we want to
       * perform are row-oriented.
       */
-    private[table] def readKeys(slice: Slice, sts: Array[SliceTransform1[_]]): M[Array[Array[RValue]]] = {
+    private[table] def readKeys(slice: Slice, sts: Array[SliceTransform1[_]])(
+      implicit M: Monad[M]
+    ): M[Array[Array[RValue]]] = {
       val n       = slice.size
       val numKeys = sts.length
       val keys    = new mutable.ArrayBuffer[M[Array[RValue]]](numKeys)

@@ -36,6 +36,8 @@ trait SliceTransforms[M[_]] extends TableModule[M] with ColumnarTableTypes[M] wi
 
   import trans._
 
+  protected implicit def M: Monad[M]
+
   protected object SliceTransform {
     def identity[A](initial: A) = SliceTransform1.liftM[A](initial, (a: A, s: Slice) => (a, s))
     def left[A](initial: A)     = SliceTransform2.liftM[A](initial, (a: A, sl: Slice, sr: Slice) => (a, sl))

@@ -85,7 +85,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
         slice0.sparsen(remap, if (position > 0) remap(position - 1) + 1 else 0)
       }
 
-      def succ(implicit M: Monad[M]): M[Option[CellState]] = {
+      def succ: M[Option[CellState]] = {
         for (blockOpt <- succf(maxKey)) yield {
           blockOpt map { block =>
             CellState(index, block.maxKey, block.data, succf)
@@ -145,9 +145,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       }
     }
 
-    def mergeProjections(inputSortOrder: DesiredSortOrder, cellStates: Stream[CellState])(keyf: Slice => Iterable[CPath])(
-      implicit M: Monad[M]
-    ): StreamT[M, Slice] = {
+    def mergeProjections(inputSortOrder: DesiredSortOrder, cellStates: Stream[CellState])(keyf: Slice => Iterable[CPath]): StreamT[M, Slice] = {
 
       // dequeues all equal elements from the head of the queue
       @inline
@@ -342,12 +340,10 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       }
     }
 
-    def singleton(slice: Slice)(implicit M: Monad[M]) =
+    def singleton(slice: Slice) =
       new SingletonTable(slice :: StreamT.empty[M, Slice])
 
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1)(
-      implicit M: Monad[M]
-    ): M[(Table, Table)] = {
+    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[(Table, Table)] = {
       sealed trait AlignState
       case class RunLeft(rightRow: Int, rightKey: Slice, rightAuthority: Option[Slice]) extends AlignState
       case class RunRight(leftRow: Int, leftKey: Slice, rightAuthority: Option[Slice])  extends AlignState
@@ -705,7 +701,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       */
     protected def reduceSlices
       (slices: StreamT[M, Slice])
-      (implicit M: Monad[M]): StreamT[M, Slice] = {
+      : StreamT[M, Slice] = {
       def rec(ss: List[Slice], slices: StreamT[M, Slice]): StreamT[M, Slice] = {
         StreamT[M, Slice](slices.uncons map {
           case Some((head, tail)) => StreamT.Skip(rec(head :: ss, tail))
@@ -720,9 +716,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
     def writeTables(slices: StreamT[M, Slice],
                     valueTrans: SliceTransform1[_],
                     keyTrans: Seq[SliceTransform1[_]],
-                    sortOrder: DesiredSortOrder)(
-                    implicit M: Monad[M]
-                    ): M[(List[String], IndexMap)] = {
+                    sortOrder: DesiredSortOrder): M[(List[String], IndexMap)] = {
       def write0(slices: StreamT[M, Slice], state: WriteState): M[(List[String], IndexMap)] = {
         slices.uncons flatMap {
           case Some((slice, tail)) =>
@@ -739,8 +733,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       write0(reduceSlices(slices), WriteState(JDBMState.empty("writeSortedSpace"), valueTrans, identifiedKeyTrans.toList))
     }
 
-    protected def writeSlice(slice: Slice, state: WriteState, sortOrder: DesiredSortOrder, source: String = "")(
-      implicit M: Monad[M])
+    protected def writeSlice(slice: Slice, state: WriteState, sortOrder: DesiredSortOrder, source: String = "")
     : M[WriteState] = {
       val WriteState(jdbmState, valueTrans, keyTrans) = state
 
@@ -783,9 +776,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       }
     }
 
-    protected def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder)(
-      implicit M: Monad[M]
-    ) = {
+    protected def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) = {
       val (vColumnRefs, vColumns) = vslice.columns.toList.sortBy(_._1).unzip
       val dataRowFormat           = RowFormat.forValues(vColumnRefs)
       val dataColumnEncoder       = dataRowFormat.ColumnEncoder(vColumns)
@@ -805,9 +796,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
                                  vrefs: List[ColumnRef],
                                  vEncoder: ColumnEncoder,
                                  indexNamePrefix: String,
-                                 jdbmState: JDBMState)(
-                                 implicit M: Monad[M]
-                                 ): M[JDBMState] = M.point {
+                                 jdbmState: JDBMState): M[JDBMState] = M.point {
 
       // Iterate over the slice, storing each row
       // FIXME: Determine whether undefined sort keys are valid
@@ -884,9 +873,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       }
     }
 
-    def loadTable(mergeEngine: MergeEngine[SortingKey, SortBlockData], indices: IndexMap, sortOrder: DesiredSortOrder)(
-      implicit M: Monad[M]
-    ): Table = {
+    def loadTable(mergeEngine: MergeEngine[SortingKey, SortBlockData], indices: IndexMap, sortOrder: DesiredSortOrder): Table = {
       import mergeEngine._
 
       val totalCount = indices.toList.map { case (_, sliceIndex) => sliceIndex.count }.sum
@@ -913,25 +900,25 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
           }
       }
 
-      val head = StreamT.Skip(
-        StreamT.wrapEffect(
-          for (cellOptions <- cellsMs.sequence) yield {
-            mergeProjections(sortOrder, cellOptions.flatMap(a => a)) { slice =>
-              // only need to compare on the group keys (0th element of resulting table) between projections
-              slice.columns.keys collect { case ColumnRef(path @ CPath(CPathIndex(0), _ @_ *), _) => path }
-            }
+      val stream: StreamT[M, Slice] = StreamT.wrapEffect[M, Slice](
+        for (cellOptions <- cellsMs.sequence) yield {
+          mergeProjections(sortOrder, cellOptions.flatMap(a => a)) { slice =>
+            // only need to compare on the group keys (0th element of resulting table) between projections
+            slice.columns.keys collect { case ColumnRef(path @ CPath(CPathIndex(0), _ @_ *), _) => path }
           }
-        )
+        }
       )
 
-      Table(StreamT(M.point(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1)
+      Table(
+        StreamT[M, Slice](
+          M.point(StreamT.Skip(stream))
+        ), ExactSize(totalCount))
+        .transform(TransSpec1.DerefArray1)
     }
 
     override def join(left0: Table, right0: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
                                                                                         rightKeySpec: TransSpec1,
-                                                                                        joinSpec: TransSpec2)(
-                                                                                        implicit M: Monad[M]
-                                                                                        ): M[(JoinOrder, Table)] = {
+                                                                                        joinSpec: TransSpec2): M[(JoinOrder, Table)] = {
 
       def hashJoin(index: Slice, table: Table, flip: Boolean): M[Table] = {
         val (indexKeySpec, tableKeySpec) = if (flip) (rightKeySpec, leftKeySpec) else (leftKeySpec, rightKeySpec)
@@ -1020,7 +1007,9 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
     def load(table: Table, tpe: JType): EitherT[M, vfs.ResourceError, Table]
   }
 
-  abstract class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
+  abstract class Table(slices: StreamT[M, Slice], size: TableSize)(
+    implicit override val M: Monad[M]
+  ) extends ColumnarTable(slices, size) {
 
     /**
       * Converts a table to an internal table, if possible. If the table is
@@ -1037,7 +1026,9 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
     def toExternalTable: ExternalTable = new ExternalTable(slices, size)
   }
 
-  class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) {
+  class SingletonTable(slices0: StreamT[M, Slice])(
+    implicit override val M: Monad[M]
+  ) extends Table(slices0, ExactSize(1)) {
     import TableModule._
     import TransSpecModule._
 
@@ -1059,24 +1050,18 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       loop(slices)
     }
 
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false)(
-      implicit M: Monad[M]
-    ): M[Seq[Table]] = {
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = {
       val xform = transform(valueSpec)
       M.point(List.fill(groupKeys.size)(xform))
     }
 
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false)(
-      implicit M: Monad[M]
-    ): M[Table] = M.point(this)
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] = M.point(this)
 
     def load(tpe: JType) = Table.load(this, tpe)
 
     override def compact(spec: TransSpec1, definedness: Definedness = AnyDefined): Table = this
 
-    override def force(
-      implicit M: Monad[M]
-    ): M[Table] = M.point(this)
+    override def force: M[Table] = M.point(this)
 
     override def paged(limit: Int): Table = this
 
@@ -1092,30 +1077,22 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
     * allowed more optimizations when doing things like joins.
     */
   class InternalTable(val slice: Slice)(
-      implicit M: Monad[M]
-  ) extends Table(slice :: StreamT.empty[M, Slice], ExactSize(slice.size)) {
+    implicit override val M: Monad[M]
+  ) extends Table(StreamT.empty[M, Slice](M).::(slice)(M), ExactSize(slice.size)) {
     import TableModule._
 
-    def toInternalTable(limit: Int)(
-      M: Monad[M]
-    ): EitherT[M, ExternalTable, InternalTable] =
+    def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] =
       EitherT[M, ExternalTable, InternalTable](M point \/-(this))
 
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false)(
-      M: Monad[M]
-    ): M[Seq[Table]] =
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
 
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false)(
-      M: Monad[M]
-    ): M[Table] =
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] =
       toExternalTable.sort(sortKey, sortOrder, unique)
 
     def load(tpe: JType): EitherT[M, vfs.ResourceError, Table] = Table.load(this, tpe)
 
-    override def force(
-      M: Monad[M]
-    ): M[Table] = M.point(this)
+    override def force: M[Table] = M.point(this)
 
     override def paged(limit: Int): Table = this
 
@@ -1130,15 +1107,15 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
     }
   }
 
-  class ExternalTable(slices: StreamT[M, Slice], size: TableSize) extends Table(slices, size) {
+  class ExternalTable(slices: StreamT[M, Slice], size: TableSize)(
+    implicit override val M: Monad[M]
+  ) extends Table(slices, size) {
     import Table._
     import SliceTransform._
 
     def load(tpe: JType) = Table.load(this, tpe)
 
-    def toInternalTable(limit0: Int)(
-      implicit M: Monad[M]
-    ): EitherT[M, ExternalTable, InternalTable] = {
+    def toInternalTable(limit0: Int): EitherT[M, ExternalTable, InternalTable] = {
       val limit = limit0.toLong
 
       def acc(slices: StreamT[M, Slice], buffer: List[Slice], size: Long): M[ExternalTable \/ InternalTable] = {
@@ -1170,9 +1147,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       *
       * @see quasar.yggdrasil.TableModule#sort(TransSpec1, DesiredSortOrder, Boolean)
       */
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false)(
-      implicit M: Monad[M]
-    ): M[Table] = {
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] = {
       for {
         tables <- groupByN(Seq(sortKey), Leaf(Source), sortOrder, unique)
       } yield (tables.headOption getOrElse Table.empty)
@@ -1184,9 +1159,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       *
       * @see quasar.yggdrasil.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
       */
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false)(
-      implicit M: Monad[M]
-    ): M[Seq[Table]] = {
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = {
       writeSorted(groupKeys, valueSpec, sortOrder, unique) map {
         case (streamIds, indices) =>
           val streams = indices.groupBy(_._1.streamId)
@@ -1199,9 +1172,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
     protected def writeSorted(groupKeys: Seq[TransSpec1],
                               valueSpec: TransSpec1,
                               sortOrder: DesiredSortOrder = SortAscending,
-                              unique: Boolean = false)(
-                              implicit M: Monad[M]
-                              ): M[(List[String], IndexMap)] = {
+                              unique: Boolean = false): M[(List[String], IndexMap)] = {
 
       // If we don't want unique key values (e.g. preserve duplicates), we need to add
       // in a distinct "row id" for each value to disambiguate it

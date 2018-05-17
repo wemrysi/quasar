@@ -28,7 +28,7 @@ import java.time._
 
 trait TableLibModule[M[_]] extends TableModule[M] with TransSpecModule {
   type Lib <: TableLib
-  implicit def M: Monad[M]
+  implicit protected def M: Monad[M]
 
   object TableLib {
     private val defaultMorphism1Opcode = new java.util.concurrent.atomic.AtomicInteger(0)

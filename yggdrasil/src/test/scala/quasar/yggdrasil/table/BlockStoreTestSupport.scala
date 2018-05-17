@@ -55,7 +55,7 @@ trait BaseBlockStoreTestModule[M[_]] extends ColumnarTableModuleTestSupport[M]
     val xyz = slices.foldLeft(Set.empty[ColumnRef]) {
       case (acc, slice) => acc ++ slice.columns.keySet
     }
-    def structure(implicit M: Monad[M]) = M.point(xyz)
+    def structure = xyz
 
     def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]])(implicit M: Monad[M]) = M.point {
       @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {

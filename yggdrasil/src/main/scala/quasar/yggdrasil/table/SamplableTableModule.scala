@@ -43,6 +43,8 @@ trait SamplableColumnarTableModule[M[_]] extends SamplableTableModule[M] { self:
 
   trait SamplableColumnarTable extends SamplableTable { self: Table =>
 
+    implicit protected def M: Monad[M]
+
     /**
       * A one-pass algorithm for sampling. This runs in time O(H_n*m^2 + n) =
       * O(m^2 lg n + n), so it is not super optimal. Another good option is to
@@ -56,7 +58,7 @@ trait SamplableColumnarTableModule[M[_]] extends SamplableTableModule[M] { self:
     def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = {
       case class SampleState(rowInserters: Option[RowInserter], length: Int, transform: SliceTransform1[_])
 
-      def build(states: List[SampleState], slices: StreamT[M, Slice]): M[List[Table]] = {
+      def build(states: List[SampleState], slices: StreamT[M, Slice]): M[Seq[Table]] = {
         slices.uncons flatMap {
           case Some((origSlice, tail)) =>
             val nextStates = states map {

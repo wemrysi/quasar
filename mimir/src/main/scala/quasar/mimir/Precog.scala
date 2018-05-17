@@ -17,6 +17,8 @@
 package quasar.mimir
 
 import quasar.blueeyes.util.Clock
+import quasar.contrib.fs2._
+import quasar.contrib.scalaz.concurrent._
 import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
 
 import quasar.yggdrasil.table.VFSColumnarTableModule
@@ -32,15 +34,12 @@ import akka.routing.{
   Router
 }
 
-import delorean._
-
 import cats.effect.IO
 import fs2.async
 import fs2.interop.scalaz._
 
 import org.slf4s.Logging
 
-import scalaz.Monad
 import scalaz.concurrent.Task
 
 import java.io.File
@@ -120,8 +119,8 @@ final class Precog private (dataDir0: File)
 
   def shutdown: IO[Unit] = {
     for {
-      _ <- IO(()) // vfsShutdownSignal.set(None).to[IO]
-      _ <- actorSystem.terminate.map(_ => ())
+      _ <- runToIO(vfsShutdownSignal.set(None))
+      _ <- IO.fromFuture(IO(actorSystem.terminate.map(_ => ())))
     } yield ()
   }
 }

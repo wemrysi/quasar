@@ -21,7 +21,7 @@ import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 import quasar.time.{DateTimeInterval, OffsetDate}
 
-import scala.collection.Set
+import scala.collection.immutable.Set
 
 import scalaz._
 import scalaz.syntax.monad._
@@ -126,6 +126,8 @@ trait TableModule[M[_]] extends TransSpecModule {
   type Table <: TableLike
   type TableCompanion <: TableCompanionLike
 
+  implicit protected def M: Monad[M]
+
   val Table: TableCompanion
 
   trait TableCompanionLike {
@@ -151,7 +153,7 @@ trait TableModule[M[_]] extends TransSpecModule {
 
     def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int] = None): Table
 
-    def merge[N[_]](grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => N[Table])(implicit nt: N ~> M): M[Table]
+    def merge(grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => M[Table]): M[Table]
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[(Table, Table)]
 
     /**
@@ -328,10 +330,11 @@ trait TableModule[M[_]] extends TransSpecModule {
                                   idTrans: trans.TransSpec1,
                                   targetTrans: Option[trans.TransSpec1],
                                   groupId: GroupId,
-                                  groupKeySpec: trans.GroupKeySpec)
-      extends GroupingSpec {
+                                  groupKeySpec: trans.GroupKeySpec)(
+    implicit M: Monad[M]
+  ) extends GroupingSpec {
     def sources: Vector[GroupingSource] = Vector(this)
-    def sorted: M[GroupingSource] =
+    def sorted: M[GroupingSpec] =
       for {
         t <- table.sort(trans.DerefObjectStatic(trans.Leaf(trans.Source), CPathField("key")))
       } yield {
@@ -343,10 +346,11 @@ trait TableModule[M[_]] extends TransSpecModule {
                                      groupKeyRightTrans: trans.TransSpec1,
                                      left: GroupingSpec,
                                      right: GroupingSpec,
-                                     alignment: GroupingSpec.Alignment)
-      extends GroupingSpec {
+                                     alignment: GroupingSpec.Alignment)(
+    implicit M: Monad[M]
+  ) extends GroupingSpec {
     def sources: Vector[GroupingSource] = left.sources ++ right.sources
-    def sorted: M[GroupingAlignment] = (left.sorted |@| right.sorted) { (t1, t2) =>
+    def sorted: M[GroupingSpec] = (left.sorted |@| right.sorted) { (t1, t2) =>
       GroupingAlignment(groupKeyLeftTrans, groupKeyRightTrans, t1, t2, alignment)
     }
   }
