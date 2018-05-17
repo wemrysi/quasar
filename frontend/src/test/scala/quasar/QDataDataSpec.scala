@@ -56,7 +56,7 @@ object QDataDataSpec extends Qspec with DataGenerators {
     case d => Some(d)
   }
 
-  "roundtrip arbitray Data" >> prop { data: Data =>
+  "roundtrip arbitrary Data" >> prop { data: Data =>
     roundtrip(data) must_=== adjustExpected(data)
   }.set(minTestsOk = 1000)
 }
