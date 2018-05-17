@@ -255,10 +255,9 @@ package object fp
 
   }
 
-  implicit def copkEqual[LL <: TListK](implicit M: EqualKMaterializer[LL]): Delay[Equal, CopK[LL, ?]] = M.materialize(offset = 0)
   implicit def copkTraverse[LL <: TListK](implicit M: TraverseMaterializer[LL]): Traverse[CopK[LL, ?]] = M.materialize(offset = 0)
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def copkShow[X <: TListK]: Delay[Show, CopK[X, ?]] = null
+  implicit def copkEqual[LL <: TListK](implicit M: EqualKMaterializer[LL]): Delay[Equal, CopK[LL, ?]] = M.materialize(offset = 0)
+  implicit def copkShow[LL <: TListK](implicit M: ShowKMaterializer[LL]): Delay[Show, CopK[LL, ?]] = M.materialize(offset = 0)
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   implicit def copKRenderTree[X <: TListK]: Delay[RenderTree, CopK[X, ?]] = null
 

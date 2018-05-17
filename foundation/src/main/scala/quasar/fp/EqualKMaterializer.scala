@@ -48,7 +48,7 @@ object EqualKMaterializer {
         override def apply[A](eq: Equal[A]): Equal[CopK[F ::: LL, A]] = {
           Equal equal {
             case (I(left), I(right)) => F(eq).equal(left, right)
-            case (left, right) => LL.materialize(offset + 1).apply(eq).equal(left.asInstanceOf[CopK[LL, A]], right.asInstanceOf[CopK[LL, A]])
+            case (left, right) => LL.materialize(offset + 1)(eq).equal(left.asInstanceOf[CopK[LL, A]], right.asInstanceOf[CopK[LL, A]])
           }
         }
       })
