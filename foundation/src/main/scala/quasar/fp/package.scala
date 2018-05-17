@@ -257,8 +257,7 @@ package object fp
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   implicit def copkEqual[X <: TListK]: Delay[Equal, CopK[X, ?]] = null
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def copkTraverse[X <: TListK]: Traverse[CopK[X, ?]] = null
+  implicit def copkTraverse[LL <: TListK](implicit TM: TraverseMaterializer[LL]): Traverse[CopK[LL, ?]] = TM.materialize(0)
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   implicit def copkShow[X <: TListK]: Delay[Show, CopK[X, ?]] = null
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
@@ -329,6 +328,15 @@ package object fp
     modify: T[CoEnv[A, F, ?]] => T[CoEnv[A, F, ?]]):
       Free[F, A] => Free[F, A] =
     applyFrom[Free[F, A], T[CoEnv[A, F, ?]]](coenvBijection[T, F, A])(modify)
+
+  def mkInject[F[_], LL <: TListK](i: Int): CopK.Inject[F, CopK[LL, ?]] = {
+    CopK.Inject.injectFromInjectL[F, LL](
+      CopK.InjectL.makeInjectL[F, LL](
+        new TListK.Pos[LL, F] { val index: Int = i }
+      )
+    )
+  }
+
 }
 
 package fp {
