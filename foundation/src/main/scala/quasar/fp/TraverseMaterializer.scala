@@ -38,7 +38,7 @@ object TraverseMaterializer {
     F: Traverse[F],
     LL: TraverseMaterializer[LL]
   ): TraverseMaterializer[F ::: LL] = new TraverseMaterializer[F ::: LL] {
-    override def materialize(offset: Int): Traverse[CopK[TListK.:::[F, LL], ?]] = {
+    override def materialize(offset: Int): Traverse[CopK[F ::: LL, ?]] = {
       val I = mkInject[F, F ::: LL](offset)
 
       new Traverse[CopK[F ::: LL, ?]] {
