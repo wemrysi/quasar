@@ -28,14 +28,10 @@ sealed trait EqualKMaterializer[LL <: TListK] {
 
 object EqualKMaterializer {
 
-  implicit def base[F[_]](implicit F: Delay[Equal, F]): EqualKMaterializer[F ::: TNilK] = new EqualKMaterializer[F ::: TNilK] {
-    override def materialize(offset: Int): Delay[Equal, CopK[F ::: TNilK, ?]] = {
-      val I = mkInject[F, F ::: TNilK](offset)
-      Delay.fromNT(λ[Equal ~> λ[a => Equal[CopK[F ::: TNilK, a]]]] { eq =>
-        Equal equal {
-          case (I(left), I(right)) => F(eq).equal(left, right)
-          case _ => false
-        }
+  implicit def base: EqualKMaterializer[TNilK] = new EqualKMaterializer[TNilK] {
+    override def materialize(offset: Int): Delay[Equal, CopK[TNilK, ?]] = {
+      Delay.fromNT(λ[Equal ~> λ[a => Equal[CopK[TNilK, a]]]] { _ =>
+        Equal equal ((_, _) => false)
       })
     }
   }
