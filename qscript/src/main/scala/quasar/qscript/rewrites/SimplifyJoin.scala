@@ -62,8 +62,8 @@ object SimplifyJoin {
     applyCoEnvFrom[T, QScriptTotal[T, ?], Hole](modify).apply(branch)
   }
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]]
-    (implicit EJ: EquiJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
+  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]]
+    (implicit EJ: EquiJoin[T, ?] :<<: F, QC: QScriptCore[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, ThetaJoin[T, ?], F] =
     new SimplifyJoin[ThetaJoin[T, ?]] {
 //      import MapFuncCore._
@@ -126,8 +126,8 @@ object SimplifyJoin {
         }
     }
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[_]]
-    (implicit QC: QScriptCore[T, ?] :<: F)
+  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]]
+    (implicit QC: QScriptCore[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, QScriptCore[T, ?], F] =
     new SimplifyJoin[QScriptCore[T, ?]] {
       type IT[F[_]] = T [F]
@@ -142,8 +142,8 @@ object SimplifyJoin {
           }))
     }
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT, F[_]]
-    (implicit EJ: EquiJoin[T, ?] :<: F)
+  implicit def equiJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]]
+    (implicit EJ: EquiJoin[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, EquiJoin[T, ?], F] =
     new SimplifyJoin[EquiJoin[T, ?]] {
       type IT[F[_]] = T [F]
@@ -173,7 +173,7 @@ object SimplifyJoin {
         _.run.fold(I.simplifyJoin(GtoH), J.simplifyJoin(GtoH))
     }
 
-  def default[T[_[_]], F[_], I[_]](implicit F: F :<: I)
+  def default[T[_[_]], F[_], I[a] <: ACopK[a]](implicit F: F :<<: I)
       : SimplifyJoin.Aux[T, F, I] =
     new SimplifyJoin[F] {
       type IT[F[_]] = T[F]
@@ -183,21 +183,21 @@ object SimplifyJoin {
         fa => GtoH(F.inj(fa))
     }
 
-  implicit def deadEnd[T[_[_]], F[_]](implicit DE: Const[DeadEnd, ?] :<: F)
+  implicit def deadEnd[T[_[_]], F[a] <: ACopK[a]](implicit DE: Const[DeadEnd, ?] :<<: F)
       : SimplifyJoin.Aux[T, Const[DeadEnd, ?], F] =
     default
 
-  implicit def read[T[_[_]], F[_], A](implicit R: Const[Read[A], ?] :<: F)
+  implicit def read[T[_[_]], F[a] <: ACopK[a], A](implicit R: Const[Read[A], ?] :<<: F)
       : SimplifyJoin.Aux[T, Const[Read[A], ?], F] =
     default
 
-  implicit def shiftedRead[T[_[_]], F[_], A]
-    (implicit SR: Const[ShiftedRead[A], ?] :<: F)
+  implicit def shiftedRead[T[_[_]], F[a] <: ACopK[a], A]
+    (implicit SR: Const[ShiftedRead[A], ?] :<<: F)
       : SimplifyJoin.Aux[T, Const[ShiftedRead[A], ?], F] =
     default
 
-  implicit def projectBucket[T[_[_]], F[_]]
-    (implicit PB: ProjectBucket[T, ?] :<: F)
+  implicit def projectBucket[T[_[_]], F[a] <: ACopK[a]]
+    (implicit PB: ProjectBucket[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, ProjectBucket[T, ?], F] =
     default
 }
