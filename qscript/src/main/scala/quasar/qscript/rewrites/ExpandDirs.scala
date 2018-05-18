@@ -29,7 +29,8 @@ import matryoshka.data._
 import matryoshka.implicits._
 import pathy.Path.{dir1, file1}
 import scalaz._, Scalaz._
-import iotaz.{CopK, TListK}
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 /** Converts any {Shifted}Read containing a directory to a union of all the
   * files in that directory.
@@ -96,10 +97,6 @@ abstract class ExpandDirsInstances {
       : ExpandDirs.Aux[T, EquiJoin[T, ?], F] =
     expandDirsBranch[T].equiJoin[F]
 
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def expandDirsCopK[T[_[_]], X <: TListK, H[_]]: ExpandDirs.Aux[T, CopK[X, ?], H] = null
-
   implicit def coproduct[T[_[_]], F[_], G[_], H[_]]
     (implicit F: ExpandDirs.Aux[T, F, H], G: ExpandDirs.Aux[T, G, H])
       : ExpandDirs.Aux[T, Coproduct[F, G, ?], H] =
@@ -111,6 +108,42 @@ abstract class ExpandDirsInstances {
         (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
         _.run.fold(F.expandDirs(OutToF, g), G.expandDirs(OutToF, g))
     }
+
+
+  implicit def copk[T[_[_]], LL <: TListK, H[_]](implicit M: Materializer[T, LL, H]): ExpandDirs.Aux[T, CopK[LL, ?], H] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T[_[_]], LL <: TListK, H[_]] {
+    def materialize(offset: Int): ExpandDirs.Aux[T, CopK[LL, ?], H]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T[_[_]], H[_]]: Materializer[T, TNilK, H] = new Materializer[T, TNilK, H] {
+      override def materialize(offset: Int): ExpandDirs.Aux[T, CopK[TNilK, ?], H] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], G[_], LL <: TListK, H[_]](
+      implicit
+      G: ExpandDirs.Aux[T, G, H],
+      LL: Materializer[T, LL, H]
+    ): Materializer[T, G ::: LL, H] = new Materializer[T, G ::: LL, H] {
+      override def materialize(offset: Int): ExpandDirs.Aux[T, CopK[G ::: LL, ?], H] = {
+        val I = mkInject[G, G ::: LL](offset)
+        new ExpandDirs[CopK[G ::: LL, ?]] {
+          type IT[F[_]] = T[F]
+          type OUT[A] = H[A]
+
+          def expandDirs[M[_]: Monad: PlannerErrorME, F[_]: Functor](OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) = {
+            case I(fa) => G.expandDirs(OutToF, g).apply(fa)
+            case other => LL.materialize(offset + 1).expandDirs(OutToF, g).apply(other.asInstanceOf[CopK[LL, T[F]]])
+          }
+
+        }
+      }
+    }
+  }
 
   def default[T[_[_]], F[_], G[a] <: ACopK[a]](implicit F: F :<<: G)
       : ExpandDirs.Aux[T, F, G] =
