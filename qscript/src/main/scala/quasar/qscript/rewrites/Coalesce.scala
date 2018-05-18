@@ -33,7 +33,8 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import iotaz.{CopK, TListK}
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 /** Rewrites adjacent nodes. */
 trait Coalesce[IN[_]] {
@@ -113,10 +114,6 @@ trait CoalesceInstances {
       : Coalesce.Aux[T, EquiJoin[T, ?], G] =
     coalesce[T].equiJoin[G]
 
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def coalesceCopK[T[_[_]], X <: TListK, I[_]]: Coalesce.Aux[T, CopK[X, ?], I] = null
-
   implicit def coproduct[T[_[_]], G[_], H[_], I[a] <: ACopK[a]]
     (implicit G: Coalesce.Aux[T, G, I],
               H: Coalesce.Aux[T, H, I])
@@ -145,6 +142,58 @@ trait CoalesceInstances {
         (implicit TJ: ThetaJoin[IT, ?] :<<: OUT) =
         _.run.fold(G.coalesceTJ(FToOut), H.coalesceTJ(FToOut))
     }
+
+  implicit def copk[T[_[_]], LL <: TListK, I[a] <: ACopK[a]](implicit M: Materializer[T, LL, I]): Coalesce.Aux[T, CopK[LL, ?], I] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T[_[_]], LL <: TListK, I[a] <: ACopK[a]] {
+    def materialize(offset: Int): Coalesce.Aux[T, CopK[LL, ?], I]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T[_[_]], I[a] <: ACopK[a]]: Materializer[T, TNilK, I] = new Materializer[T, TNilK, I] {
+      override def materialize(offset: Int): Coalesce.Aux[T, CopK[TNilK, ?], I] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], C[_], LL <: TListK, I[a] <: ACopK[a]](
+      implicit
+      C: Coalesce.Aux[T, C, I],
+      LL: Materializer[T, LL, I]
+    ): Materializer[T, C ::: LL, I] = new Materializer[T, C ::: LL, I] {
+      override def materialize(offset: Int): Coalesce.Aux[T, CopK[C ::: LL, ?], I] = {
+        val I = mkInject[C, C ::: LL](offset)
+        new Coalesce[CopK[C ::: LL, ?]] {
+          type IT[F[_]] = T[F]
+          type OUT[A] = I[A]
+
+          def coalesceQC[F[_]: Functor](FToOut: PrismNT[F, OUT])(implicit QC: QScriptCore[IT, ?] :<<: OUT) = {
+            case I(ca) => C.coalesceQC(FToOut).apply(ca).map(I(_))
+            case other => LL.materialize(offset + 1).coalesceQC(FToOut)
+              .apply(other.asInstanceOf[CopK[LL, T[F]]]).asInstanceOf[Option[CopK[C ::: LL, T[F]]]]
+          }
+
+          def coalesceSR[F[_]: Functor, A](FToOut: PrismNT[F, OUT])
+            (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT) = {
+            case I(ca) => C.coalesceSR(FToOut).apply(ca).map(I(_))
+            case other => LL.materialize(offset + 1).coalesceSR(FToOut)
+              .apply(other.asInstanceOf[CopK[LL, T[F]]]).asInstanceOf[Option[CopK[C ::: LL, T[F]]]]
+          }
+
+          def coalesceEJ[F[_]: Functor](FToOut: F ~> λ[α => Option[OUT[α]]])(implicit EJ: EquiJoin[IT, ?] :<<: OUT) = {
+            case I(ca) => C.coalesceEJ(FToOut).apply(ca)
+            case other => LL.materialize(offset + 1).coalesceEJ(FToOut).apply(other.asInstanceOf[CopK[LL, T[F]]])
+          }
+
+          def coalesceTJ[F[_]: Functor](FToOut: F ~> λ[α => Option[OUT[α]]])(implicit TJ: ThetaJoin[IT, ?] :<<: OUT) = {
+            case I(ca) => C.coalesceTJ(FToOut).apply(ca)
+            case other => LL.materialize(offset + 1).coalesceTJ(FToOut).apply(other.asInstanceOf[CopK[LL, T[F]]])
+          }
+        }
+      }
+    }
+  }
 
   def default[T[_[_]], IN[_], G[a] <: ACopK[a]]: Coalesce.Aux[T, IN, G] =
     new Coalesce[IN] {
