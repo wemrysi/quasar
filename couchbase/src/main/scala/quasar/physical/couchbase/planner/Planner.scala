@@ -16,14 +16,19 @@
 
 package quasar.physical.couchbase.planner
 
+import slamdata.Predef._
+
 import quasar.effect.NameGenerator
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.couchbase._, common._
 import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript._
+import quasar.fp.mkInject
 
 import matryoshka._
 import scalaz._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 abstract class Planner[T[_[_]], F[_], QS[_]] {
   def plan: AlgebraM[F, QS, T[N1QL]]
@@ -32,11 +37,6 @@ abstract class Planner[T[_[_]], F[_], QS[_]] {
 object Planner {
   def apply[T[_[_]], F[_], QS[_]](implicit ev: Planner[T, F, QS]): Planner[T, F, QS] = ev
 
-  import iotaz.{CopK, TListK}
-  // TODO provide actual instance
-  @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Null"))
-  implicit def copKMapFuncPlanner[T[_[_]], N[_], X <: TListK]: Planner[T, N, CopK[X, ?]] = null
-
   implicit def coproduct[T[_[_]], N[_], F[_], G[_]](
     implicit F: Planner[T, N, F], G: Planner[T, N, G]
   ): Planner[T, N, Coproduct[F, G, ?]] =
@@ -44,6 +44,37 @@ object Planner {
       val plan: AlgebraM[N, Coproduct[F, G, ?], T[N1QL]] =
         _.run.fold(F.plan, G.plan)
     }
+
+  implicit def copk[T[_[_]], N[_], LL <: TListK](implicit M: Materializer[T, N, LL]): Planner[T, N, CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T[_[_]], N[_], LL <: TListK] {
+    def materialize(offset: Int): Planner[T, N, CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T[_[_]], N[_]]: Materializer[T, N, TNilK] = new Materializer[T, N, TNilK] {
+      override def materialize(offset: Int): Planner[T, N, CopK[TNilK, ?]] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], N[_], F[_], LL <: TListK](
+      implicit
+      F: Planner[T, N, F],
+      LL: Materializer[T, N, LL]
+    ): Materializer[T, N, F ::: LL] = new Materializer[T, N, F ::: LL] {
+      override def materialize(offset: Int): Planner[T, N, CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new Planner[T, N, CopK[F ::: LL, ?]] {
+          val plan: AlgebraM[N, CopK[F ::: LL, ?], T[N1QL]] = {
+            case I(fa) => F.plan(fa)
+            case other => LL.materialize(offset + 1).plan(other.asInstanceOf[CopK[LL, T[N1QL]]])
+          }
+        }
+      }
+    }
+  }
 
   implicit def constDeadEndPlanner[T[_[_]], F[_]: PlannerErrorME]
     : Planner[T, F, Const[DeadEnd, ?]] =
@@ -71,9 +102,9 @@ object Planner {
 
   def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: Monad: NameGenerator: PlannerErrorME]
     : Planner[T, F, MapFunc[T, ?]] = {
-//    val core = new MapFuncCorePlanner[T, F]
-//    coproduct(core, new MapFuncDerivedPlanner(core))
-    copKMapFuncPlanner
+    val core = new MapFuncCorePlanner[T, F]
+    val derived = new MapFuncDerivedPlanner(core)
+    copk(Materializer.induct(core, Materializer.induct(derived, Materializer.base)))
   }
 
   implicit def projectBucketPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorME]
