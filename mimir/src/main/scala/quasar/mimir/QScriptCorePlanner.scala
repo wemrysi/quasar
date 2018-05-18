@@ -241,7 +241,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
             },
             mapFuncPlanner[F].plan(src.P)[Source1](TransSpec1.Id)))
 
-        shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ 1)
+        shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ 1, onUndef === OnUndefined.Emit)
         repaired = shifted.transform(repairTrans)
       } yield MimirRepr(src.P)(repaired)
 

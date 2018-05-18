@@ -21,7 +21,7 @@ import quasar.blueeyes._
 import quasar.precog.{BitSet, MimeType, MimeTypes}
 import quasar.precog.common._
 import quasar.precog.common.ingest.FileContent
-import quasar.precog.util.RawBitSet
+import quasar.precog.util.{BitSetUtil, RawBitSet}
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
@@ -1470,29 +1470,39 @@ trait ColumnarTableModule[M[+ _]]
       }), newSize)
     }
 
-    def leftShift(focus: CPath): Table = {
-      def lens(columns: Map[ColumnRef, Column]): (Map[ColumnRef, Column], Map[ColumnRef, Column]) = {
-        val (focused, unfocused) = columns.partition(_._1.selector.hasPrefix(focus))
+    def leftShift(focus: CPath, emitOnUndef: Boolean): Table = {
 
-        // discard scalar values at focus
-        val typed = focused filter {
-          case (ColumnRef(`focus`, CArrayType(_)), _) => true
-          case (ColumnRef(`focus`, _), _) => false
-          case _ => true
-        }
+      def lens(slice: Slice): (Map[ColumnRef, Column], Option[BitSet], Map[ColumnRef, Column]) = {
 
-        // remap focused to be at "root"
-        val remapped = typed map {
+        val (focused: Map[ColumnRef, Column], unfocused: Map[ColumnRef, Column]) =
+          slice.columns.partition(_._1.selector.hasPrefix(focus))
+
+        val (scalars, nonScalars) = focused.partition(_ match {
+          case (ColumnRef(`focus`, CArrayType(_)), _) => false
+          case (ColumnRef(`focus`, _), _) => true
+          case _ => false
+        })
+
+        // remap focused, non-scalars to be at "root"
+        val remappedNonScalars = nonScalars map {
           case (ColumnRef(path, tpe), col) =>
             (ColumnRef(path.dropPrefix(focus).get, tpe), col)
         }
 
-        (remapped, unfocused)
+        // keep scalars as a bitset
+        // their contents is not relevant, just their location
+        val emit =
+          if (emitOnUndef)
+            Some(scalars.values.map(_.definedAt(0, slice.size)).reduceOption(_ | _).getOrElse(new BitSet()))
+          else
+            None
+
+        (remappedNonScalars, emit, unfocused)
       }
 
       // eagerly force the slices, since we'll be backtracking within each
-      val slices2 = slices.map(_.materialized) flatMap { slice =>
-        val (focused, unfocused) = lens(slice.columns)
+      val slices2: StreamT[M, Slice] = slices.map(_.materialized) flatMap { slice =>
+        val (focused, emit, unfocused) = lens(slice)
 
         val innerHeads = {
           val unsorted = focused.keys.toVector flatMap {
@@ -1517,8 +1527,12 @@ trait ColumnarTableModule[M[+ _]]
         val primitiveMax = primitiveWaterMarks.fold(0)(math.max)
 
         // TODO doesn't handle the case where we have a sparse array with a missing column!
-        // this value may be 0 if we're looking at CEmptyObject | CEmptyArray
-        val highWaterMark = math.max(innerHeads.length, primitiveMax)
+        val highWaterMark =
+          math.max(
+            // this value may be 0 if we're looking at CEmptyObject | CEmptyArray
+            math.max(innerHeads.length, primitiveMax),
+            // .. but in case of emitOnUndef we need it to be at least 1
+            if (emitOnUndef) 1 else 0)
 
         val resplit = if (slice.size * highWaterMark > Config.maxSliceSize) {
           val numSplits =
@@ -1540,7 +1554,7 @@ trait ColumnarTableModule[M[+ _]]
         // shadow the outer `slice`
         StreamT.fromIterable(resplit).trans(λ[Id.Id ~> M](M.point(_))) map { slice =>
           // ...and the outer `focused` and `unfocused`
-          val (focused, unfocused) = lens(slice.columns)
+          val (focused, emit, unfocused) = lens(slice)
 
           // a CF1 for inflating column sizes to account for shifting
           val expansion = cf.util.Remap(_ / highWaterMark)
@@ -1647,11 +1661,18 @@ trait ColumnarTableModule[M[+ _]]
               ColumnRef(focus \ path, tpe) -> col
           }
 
+          // if emit is defined then we need to keep every first expanded
+          // row that's marked to be kept according to the emit bitset
+          val keep =
+            emit map (em =>
+              BitSetUtil.filteredRange(0, slice.size * highWaterMark)(i =>
+                (i % highWaterMark == 0) && em(i / highWaterMark))) getOrElse(new BitSet())
+
           // we need to go back to our original columns and filter them by results
           // if we don't do this, the data will be highly sparse (like an outer join)
           val unfocusedTransformed = unfocusedExpanded map {
             case (ref, col) =>
-              ref -> cf.util.filter(0, slice.size * highWaterMark, definedness)(col).get
+              ref -> cf.util.filter(0, slice.size * highWaterMark, definedness | keep)(col).get
           }
 
           // glue everything back together with the unfocused and compute the new size
