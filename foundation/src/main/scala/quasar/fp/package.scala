@@ -231,6 +231,7 @@ package object fp
         })))
 
   type ACopK[a] = CopK[_, a]
+  type JustK[F[_], a] = CopK[F ::: TNilK, a]
   type :<<:[F[_], G[a] <: ACopK[a]] = CopK.Inject[F, G]
 
   implicit class TwoElemCopKOps[F[_], G[_], A](val copK: CopK[F ::: G ::: TNilK, A])(
