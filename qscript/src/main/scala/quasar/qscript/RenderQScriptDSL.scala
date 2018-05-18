@@ -36,6 +36,8 @@ import scalaz.syntax.std.tuple._
 import scalaz.std.anyVal._
 import scalaz.std.option._
 import scalaz.std.tuple._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
 object RenderQScriptDSL {
@@ -79,6 +81,37 @@ object RenderQScriptDSL {
       }
     }
 
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): Delay[RenderQScriptDSL, CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int): Delay[RenderQScriptDSL, CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
+      override def materialize(offset: Int): Delay[RenderQScriptDSL, CopK[TNilK, ?]] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: Delay[RenderQScriptDSL, F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int): Delay[RenderQScriptDSL, CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new Delay[RenderQScriptDSL, CopK[F ::: LL, ?]] {
+          override def apply[A](rec: RenderQScriptDSL[A]): RenderQScriptDSL[CopK[F ::: LL, A]] = {
+            case (base, I(fa)) => F(rec)(base, fa)
+            case (base, other) => LL.materialize(offset + 1)(rec)(base, other.asInstanceOf[CopK[LL, A]])
+          }
+        }
+      }
+    }
+  }
+  
   def ejsonRenderQScriptDSLDelay: Delay[RenderQScriptDSL, EJson] = new Delay[RenderQScriptDSL, EJson] {
     def apply[A](fa: RenderQScriptDSL[A]): RenderQScriptDSL[EJson[A]] = {
       (base: String, a: EJson[A]) =>
@@ -289,19 +322,18 @@ object RenderQScriptDSL {
       DSLTree(base, "ReduceIndex", ((idx.toString + suffix).left :: Nil).some)
   }
 
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def qscriptTotalRenderDelay[T[_[_]]: RecursiveT]: Delay[RenderQScriptDSL, QScriptTotal[T, ?]] = {
-    /*coproduct(qscriptCoreRenderDelay[T],
-      coproduct(projectBucketRenderDelay[T],
-        coproduct(thetaJoinRenderDelay[T],
-          coproduct(equiJoinRenderDelay[T],
-            coproduct(shiftedReadDirRenderDelay,
-              coproduct(shiftedReadFileRenderDelay,
-                coproduct(readDirRenderDelay,
-                  coproduct(readFileRenderDelay,
-                    deadEndRenderDelay))))))))*/
-    null
+    copk(
+      Materializer.induct(qscriptCoreRenderDelay[T],
+      Materializer.induct(projectBucketRenderDelay[T],
+      Materializer.induct(thetaJoinRenderDelay[T],
+      Materializer.induct(equiJoinRenderDelay[T],
+      Materializer.induct(shiftedReadDirRenderDelay,
+      Materializer.induct(shiftedReadFileRenderDelay,
+      Materializer.induct(readDirRenderDelay,
+      Materializer.induct(readFileRenderDelay,
+      Materializer.induct(deadEndRenderDelay,
+      Materializer.base))))))))))
   }
 
   def freeQSRender[T[_[_]]: RecursiveT]: RenderQScriptDSL[FreeQS[T]] =
