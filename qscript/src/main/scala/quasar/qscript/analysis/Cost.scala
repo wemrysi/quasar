@@ -28,7 +28,8 @@ import matryoshka.implicits._
 import matryoshka.data._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
-import iotaz.{CopK, TListK}
+import iotaz.{CopK, TListK, TNilK}
+import iotaz.TListK.:::
 
 @typeclass
 trait Cost[F[_]] {
@@ -108,9 +109,36 @@ object Cost {
         _.run.fold(F.evaluate(pathCard), G.evaluate(pathCard))
     }
 
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def costCopK[X <: TListK]: Cost[CopK[X, ?]] = null
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): Cost[CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int): Cost[CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T[_[_]]]: Materializer[TNilK] = new Materializer[TNilK] {
+      override def materialize(offset: Int): Cost[CopK[TNilK, ?]] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: Cost[F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int): Cost[CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new Cost[CopK[F ::: LL, ?]] {
+          def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, CopK[F ::: LL, ?], Int] = {
+            case I(fa) => F.evaluate(pathCard).apply(fa)
+            case other => LL.materialize(offset + 1).evaluate(pathCard).apply(other.asInstanceOf[CopK[LL, (Int, Int)]])
+          }
+        }
+      }
+    }
+  }
 
   ////////
 
