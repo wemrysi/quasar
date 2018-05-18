@@ -54,10 +54,10 @@ object ExpandDirs extends ExpandDirsInstances {
 }
 
 abstract class ExpandDirsInstances {
-  def expandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor](
+  def expandDirsPath[T[_[_]]: BirecursiveT, O[a] <: ACopK[a]: Functor](
     implicit
     FI: Injectable.Aux[O, QScriptTotal[T, ?]],
-    QC: QScriptCore[T, ?] :<: O
+    QC: QScriptCore[T, ?] :<<: O
   ): ExpandDirsPath[T, O] =
     new ExpandDirsPath[T, O]
 
@@ -66,33 +66,33 @@ abstract class ExpandDirsInstances {
 
   // real instances
 
-  implicit def readDir[T[_[_]]: BirecursiveT, F[_]: Functor]
+  implicit def readDir[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]: Functor]
     (implicit
-      R: Const[Read[AFile], ?] :<: F,
-      QC:    QScriptCore[T, ?] :<: F,
+      R: Const[Read[AFile], ?] :<<: F,
+      QC:    QScriptCore[T, ?] :<<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : ExpandDirs.Aux[T, Const[Read[ADir], ?], F] =
     expandDirsPath[T, F].readDir
 
-  implicit def shiftedReadDir[T[_[_]]: BirecursiveT, F[_]: Functor]
+  implicit def shiftedReadDir[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]: Functor]
     (implicit
-      SR: Const[ShiftedRead[AFile], ?] :<: F,
-      QC:            QScriptCore[T, ?] :<: F,
+      SR: Const[ShiftedRead[AFile], ?] :<<: F,
+      QC:            QScriptCore[T, ?] :<<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : ExpandDirs.Aux[T, Const[ShiftedRead[ADir], ?], F] =
     expandDirsPath[T, F].shiftedReadDir
 
   // branch handling
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[_]](implicit QC: QScriptCore[T, ?] :<: F)
+  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]](implicit QC: QScriptCore[T, ?] :<<: F)
       : ExpandDirs.Aux[T, QScriptCore[T, ?], F] =
     expandDirsBranch[T].qscriptCore[F]
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]](implicit TJ: ThetaJoin[T, ?] :<: F)
+  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]](implicit TJ: ThetaJoin[T, ?] :<<: F)
       : ExpandDirs.Aux[T, ThetaJoin[T, ?], F] =
     expandDirsBranch[T].thetaJoin[F]
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT, F[_]](implicit EJ: EquiJoin[T, ?] :<: F)
+  implicit def equiJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]](implicit EJ: EquiJoin[T, ?] :<<: F)
       : ExpandDirs.Aux[T, EquiJoin[T, ?], F] =
     expandDirsBranch[T].equiJoin[F]
 
@@ -112,7 +112,7 @@ abstract class ExpandDirsInstances {
         _.run.fold(F.expandDirs(OutToF, g), G.expandDirs(OutToF, g))
     }
 
-  def default[T[_[_]], F[_], G[_]](implicit F: F :<: G)
+  def default[T[_[_]], F[_], G[a] <: ACopK[a]](implicit F: F :<<: G)
       : ExpandDirs.Aux[T, F, G] =
     new ExpandDirs[F] {
       type IT[F[_]] = T[F]
@@ -123,27 +123,27 @@ abstract class ExpandDirsInstances {
         fa => OutToF(F.inj(fa)).point[M]
     }
 
-  implicit def deadEnd[T[_[_]], F[_]](implicit DE: Const[DeadEnd, ?] :<: F)
+  implicit def deadEnd[T[_[_]], F[a] <: ACopK[a]](implicit DE: Const[DeadEnd, ?] :<<: F)
       : ExpandDirs.Aux[T, Const[DeadEnd, ?], F] =
     default
 
-  implicit def readFile[T[_[_]], F[_]](implicit R: Const[Read[AFile], ?] :<: F)
+  implicit def readFile[T[_[_]], F[a] <: ACopK[a]](implicit R: Const[Read[AFile], ?] :<<: F)
       : ExpandDirs.Aux[T, Const[Read[AFile], ?], F] =
     default
 
-  implicit def shiftedReadFile[T[_[_]], F[_]]
-    (implicit SR: Const[ShiftedRead[AFile], ?] :<: F)
+  implicit def shiftedReadFile[T[_[_]], F[a] <: ACopK[a]]
+    (implicit SR: Const[ShiftedRead[AFile], ?] :<<: F)
       : ExpandDirs.Aux[T, Const[ShiftedRead[AFile], ?], F] =
     default
 
-  implicit def projectBucket[T[_[_]], F[_]]
-    (implicit PB: ProjectBucket[T, ?] :<: F)
+  implicit def projectBucket[T[_[_]], F[a] <: ACopK[a]]
+    (implicit PB: ProjectBucket[T, ?] :<<: F)
       : ExpandDirs.Aux[T, ProjectBucket[T, ?], F] =
     default
 }
 
-private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor](
-  implicit FI: Injectable.Aux[O, QScriptTotal[T, ?]], QC: QScriptCore[T, ?] :<: O
+private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[a] <: ACopK[a]: Functor](
+  implicit FI: Injectable.Aux[O, QScriptTotal[T, ?]], QC: QScriptCore[T, ?] :<<: O
 ) extends TTypes[T] {
   val recFunc = construction.RecFunc[T]
 
@@ -182,7 +182,7 @@ private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor
       nel => OutToF(union(nel) ∘ (_.transAna[T[F]](OutToF))).point[M]))
 
 
-  def readDir(implicit R: Const[Read[AFile], ?] :<: O): ExpandDirs.Aux[T, Const[Read[ADir], ?], O] =
+  def readDir(implicit R: Const[Read[AFile], ?] :<<: O): ExpandDirs.Aux[T, Const[Read[ADir], ?], O] =
     new ExpandDirs[Const[Read[ADir], ?]] {
       type IT[F[_]] = T[F]
       type OUT[A] = O[A]
@@ -195,7 +195,7 @@ private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor
         r => unionAll(OutToF, g, wrapRead[OUT]) apply r.getConst.path
     }
 
-  def shiftedReadDir(implicit SR: Const[ShiftedRead[AFile], ?] :<: O): ExpandDirs.Aux[T, Const[ShiftedRead[ADir], ?], O] =
+  def shiftedReadDir(implicit SR: Const[ShiftedRead[AFile], ?] :<<: O): ExpandDirs.Aux[T, Const[ShiftedRead[ADir], ?], O] =
     new ExpandDirs[Const[ShiftedRead[ADir], ?]] {
       type IT[F[_]] = T[F]
       type OUT[A] = O[A]
@@ -223,7 +223,7 @@ private[qscript] final class ExpandDirsBranch[T[_[_]]: BirecursiveT] extends TTy
     ) ∘ (_.convertTo[FreeQS])
 
 
-  def qscriptCore[O[_]](implicit QC: QScriptCore :<: O)
+  def qscriptCore[O[a] <: ACopK[a]](implicit QC: QScriptCore :<<: O)
       : ExpandDirs.Aux[T, QScriptCore, O] =
     new ExpandDirs[QScriptCore] {
       type IT[F[_]] = T[F]
@@ -237,10 +237,10 @@ private[qscript] final class ExpandDirsBranch[T[_[_]]: BirecursiveT] extends TTy
           case Subset(src, lb, o, rb) =>
             (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(Subset(src, _, o, _))
           case x => x.point[M]
-        }) ∘ (OutToF.compose(QC))
+        }) ∘ (OutToF.compose(QC.inj))
     }
 
-  def thetaJoin[O[_]](implicit TJ: ThetaJoin :<: O)
+  def thetaJoin[O[a] <: ACopK[a]](implicit TJ: ThetaJoin :<<: O)
       : ExpandDirs.Aux[T, ThetaJoin, O] =
     new ExpandDirs[ThetaJoin] {
       type IT[F[_]] = T[F]
@@ -252,10 +252,10 @@ private[qscript] final class ExpandDirsBranch[T[_[_]]: BirecursiveT] extends TTy
           case ThetaJoin(src, lb, rb, on, jType, combine) =>
             (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(
               ThetaJoin(src, _, _, on, jType, combine))
-        }) ∘ (OutToF.compose(TJ))
+        }) ∘ (OutToF.compose(TJ.inj))
     }
 
-  def equiJoin[O[_]](implicit EJ: EquiJoin :<: O)
+  def equiJoin[O[a] <: ACopK[a]](implicit EJ: EquiJoin :<<: O)
       : ExpandDirs.Aux[T, EquiJoin, O] =
     new ExpandDirs[EquiJoin] {
       type IT[F[_]] = T[F]
@@ -267,6 +267,6 @@ private[qscript] final class ExpandDirsBranch[T[_[_]]: BirecursiveT] extends TTy
           case EquiJoin(src, lb, rb, k, jType, combine) =>
             (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(
               EquiJoin(src, _, _, k, jType, combine))
-        }) ∘ (OutToF.compose(EJ))
+        }) ∘ (OutToF.compose(EJ.inj))
     }
 }
