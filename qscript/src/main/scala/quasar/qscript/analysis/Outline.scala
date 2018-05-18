@@ -34,7 +34,8 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
-import iotaz.{CopK, TListK}
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 /** Computes the statically known shape of `F[_]`.
   *
@@ -150,11 +151,6 @@ object Outline extends OutlineInstances {
 sealed abstract class OutlineInstances {
   import Outline._
 
-
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def deepShapeCopK[X <: TListK]: Outline[CopK[X, ?]] = null
-
   implicit def coproduct[F[_], G[_]]
       (implicit F: Outline[F], G: Outline[G])
       : Outline[Coproduct[F, G, ?]] =
@@ -162,6 +158,37 @@ sealed abstract class OutlineInstances {
       def outlineƒ: Algebra[Coproduct[F, G, ?], Shape] =
         _.run.fold(F.outlineƒ, G.outlineƒ)
     }
+
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): Outline[CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int): Outline[CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T[_[_]]]: Materializer[TNilK] = new Materializer[TNilK] {
+      override def materialize(offset: Int): Outline[CopK[TNilK, ?]] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: Outline[F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int): Outline[CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new Outline[CopK[F ::: LL, ?]] {
+          override def outlineƒ: Algebra[CopK[F ::: LL, ?], Shape] = {
+            case I(fa) => F.outlineƒ(fa)
+            case other => LL.materialize(offset + 1).outlineƒ(other.asInstanceOf[CopK[LL, Shape]])
+          }
+        }
+      }
+    }
+  }
 
   implicit def mapFuncCore[T[_[_]]: BirecursiveT]: Outline[MapFuncCore[T, ?]] =
     new Outline[MapFuncCore[T, ?]] {
