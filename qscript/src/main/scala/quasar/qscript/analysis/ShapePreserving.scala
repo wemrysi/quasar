@@ -88,7 +88,7 @@ object ShapePreserving {
 
   object Materializer {
     @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]]]: Materializer[TNilK] = new Materializer[TNilK] {
+    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
       override def materialize(offset: Int): ShapePreserving[CopK[TNilK, ?]] = ???
     }
 
