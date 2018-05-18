@@ -28,7 +28,8 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 import simulacrum._
-import iotaz.{CopK, TListK}
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 /** Determines if `IN[_]` preserves the shape of its underlying `ShiftedRead`.
   * If it does preserve that shape then it returns the `IdStatus` of that
@@ -70,10 +71,6 @@ object ShapePreserving {
         x => GtoF.get(x).flatMap(F.shapePreservingƒ)
     }
 
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def shapePreservingCopK[X <: TListK]: ShapePreserving[CopK[X, ?]] = null
-
   implicit def coproduct[F[_], G[_]]
     (implicit F: ShapePreserving[F], G: ShapePreserving[G])
       : ShapePreserving[Coproduct[F, G, ?]] =
@@ -81,6 +78,37 @@ object ShapePreserving {
       def shapePreservingƒ: Algebra[Coproduct[F, G, ?], Option[IdStatus]] =
         _.run.fold(F.shapePreservingƒ, G.shapePreservingƒ)
     }
+
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): ShapePreserving[CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int): ShapePreserving[CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T[_[_]]]: Materializer[TNilK] = new Materializer[TNilK] {
+      override def materialize(offset: Int): ShapePreserving[CopK[TNilK, ?]] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: ShapePreserving[F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int): ShapePreserving[CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new ShapePreserving[CopK[F ::: LL, ?]] {
+          def shapePreservingƒ: Algebra[CopK[F ::: LL, ?], Option[IdStatus]] = {
+            case I(fa) => F.shapePreservingƒ(fa)
+            case other => LL.materialize(offset + 1).shapePreservingƒ(other.asInstanceOf[CopK[LL, Option[IdStatus]]])
+          }
+        }
+      }
+    }
+  }
 
   implicit def constShiftedRead[A]: ShapePreserving[Const[ShiftedRead[A], ?]] =
     new ShapePreserving[Const[ShiftedRead[A], ?]] {
