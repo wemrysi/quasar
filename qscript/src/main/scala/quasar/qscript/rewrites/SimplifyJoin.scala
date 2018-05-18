@@ -24,7 +24,8 @@ import slamdata.Predef.{Map => _, _}
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import scalaz._, Scalaz._
-import iotaz.{CopK, TListK}
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 /** Replaces [[ThetaJoin]] with [[EquiJoin]], which is often more feasible for
   * connectors to implement. It potentially adds a [[Filter]] iff there are
@@ -158,10 +159,6 @@ object SimplifyJoin {
           ej.combine)))
     }
 
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def copkSimplifyJson[T[_[_]], X <: TListK, F[_]]: SimplifyJoin.Aux[T, CopK[X, ?], F] = null
-
   implicit def coproduct[T[_[_]], F[_], I[_], J[_]]
     (implicit I: SimplifyJoin.Aux[T, I, F], J: SimplifyJoin.Aux[T, J, F])
       : SimplifyJoin.Aux[T, Coproduct[I, J, ?], F] =
@@ -172,6 +169,40 @@ object SimplifyJoin {
           : Coproduct[I, J, T[H]] => H[T[H]] =
         _.run.fold(I.simplifyJoin(GtoH), J.simplifyJoin(GtoH))
     }
+
+  implicit def copk[T[_[_]], LL <: TListK, S[_]](implicit M: Materializer[T, LL, S]): SimplifyJoin.Aux[T, CopK[LL, ?], S] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T[_[_]], LL <: TListK, S[_]] {
+    def materialize(offset: Int): SimplifyJoin.Aux[T, CopK[LL, ?], S]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T[_[_]], S[_]]: Materializer[T, TNilK, S] = new Materializer[T, TNilK, S] {
+      override def materialize(offset: Int): SimplifyJoin.Aux[T, CopK[TNilK, ?], S] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], F[_], LL <: TListK, S[_]](
+      implicit
+      S: SimplifyJoin.Aux[T, F, S],
+      LL: Materializer[T, LL, S]
+    ): Materializer[T, F ::: LL, S] = new Materializer[T, F ::: LL, S] {
+      override def materialize(offset: Int): SimplifyJoin.Aux[T, CopK[F ::: LL, ?], S] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new SimplifyJoin[CopK[F ::: LL, ?]] {
+          type IT[F[_]] = T[F]
+          type G[A] = S[A]
+
+          def simplifyJoin[H[_]: Functor](GtoH: G ~> H): CopK[F ::: LL, T[H]] => H[T[H]] = {
+            case I(fa) => S.simplifyJoin(GtoH).apply(fa)
+            case other => LL.materialize(offset + 1).simplifyJoin(GtoH).apply(other.asInstanceOf[CopK[LL, T[H]]])
+          }
+        }
+      }
+    }
+  }
 
   def default[T[_[_]], F[_], I[a] <: ACopK[a]](implicit F: F :<<: I)
       : SimplifyJoin.Aux[T, F, I] =
