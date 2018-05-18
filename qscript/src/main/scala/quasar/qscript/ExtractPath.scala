@@ -18,7 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 import quasar.fp.ski.κ
-import quasar.fp.copkTraverse
+import quasar.fp.{copkTraverse, mkInject}
 
 import matryoshka._
 import matryoshka.data._
@@ -26,7 +26,8 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 import shapeless.Lazy
-import iotaz.{CopK, TListK}
+import iotaz.{CopK, TListK, TNilK}
+import iotaz.TListK.:::
 
 /** Extracts paths of particular type from QScript, collecting them in the
   * provided `ApplicativePlus`.
@@ -50,10 +51,35 @@ sealed abstract class ExtractPathInstances extends ExtractPathInstances0 {
         _.run.fold(F.value.extractPath[H], G.value.extractPath[H])
     }
 
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def copkExtractPath[X <: TListK, P]: ExtractPath[CopK[X, ?], P] = null
+  implicit def copk[LL <: TListK, P](implicit M: Materializer[LL, P]): ExtractPath[CopK[LL, ?], P] = M.materialize(offset = 0)
 
+  sealed trait Materializer[LL <: TListK, P] {
+    def materialize(offset: Int): ExtractPath[CopK[LL, ?], P]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[P]: Materializer[TNilK, P] = new Materializer[TNilK, P] {
+      override def materialize(offset: Int): ExtractPath[CopK[TNilK, ?], P] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK, P](
+      implicit
+      F: Lazy[ExtractPath[F, P]],
+      LL: Materializer[LL, P]
+    ): Materializer[F ::: LL, P] = new Materializer[F ::: LL, P] {
+      override def materialize(offset: Int): ExtractPath[CopK[F ::: LL, ?], P] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new ExtractPath[CopK[F ::: LL, ?], P] {
+          override def extractPath[G[_] : ApplicativePlus]: Algebra[CopK[F ::: LL, ?], G[P]] = {
+            case I(fa) => F.value.extractPath[G].apply(fa)
+            case other => LL.materialize(offset + 1).extractPath[G].apply(other.asInstanceOf[CopK[LL, G[P]]])
+          }
+        }
+      }
+    }
+  }
 
   implicit def constRead[A, P >: A]: ExtractPath[Const[Read[A], ?], P] =
     new ExtractPath[Const[Read[A], ?], P] {
