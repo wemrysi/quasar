@@ -49,20 +49,6 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
 
       val loaded: X[MimirRepr] =
         for {
-// <<<<<<< HEAD
-//           precog <- cake[EitherT[CakeM, FileSystemError, ?]]
-
-//           repr <-
-//             MimirRepr.meld[EitherT[CakeM, FileSystemError, ?]](
-//               new DepFn1[Cake, λ[`P <: Cake` => EitherT[CakeM, FileSystemError, P#Table]]] {
-//                 def apply(P: Cake): EitherT[CakeM, FileSystemError, P.Table] = {
-//                   val et =
-//                     P.Table.constString(Set(pathStr)).load(JType.JUniverseT)
-
-//                   et.mapT(_.to[Task].liftM[MT]) leftMap { err =>
-//                     val msg = err.messages.toList.reduce(_ + ";" + _)
-//                     FileSystemError.readFailed(posixCodec.printPath(path), msg)
-// =======
           connectors <- cake[X]
           (_, lwfs) = connectors
 
@@ -114,7 +100,6 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                             posixCodec.printPath(path),
                             "read from lightweight connector failed").left[P.Table])
                       }
-// >>>>>>> alissapajer/misc-cleanup
                   }
                 } yield et
 

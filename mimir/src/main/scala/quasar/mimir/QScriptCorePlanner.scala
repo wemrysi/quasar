@@ -69,7 +69,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
       } yield MimirRepr.withSort(src.P)(src.table.transform(trans))(newSort)
 
     // special-case for distinct (TODO this should be a new node in qscript)
-    case qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, repair) if bucket == arb =>
+    case qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, repair) if bucket === arb =>
       import src.P.trans._
 
       for {
