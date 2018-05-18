@@ -16,11 +16,16 @@
 
 package quasar.mimir
 
+import slamdata.Predef._
+
 import quasar.qscript.{MapFuncCore, MapFuncDerived}
+import quasar.fp.mkInject
 
 import matryoshka.{AlgebraM, BirecursiveT, RecursiveT}
 import matryoshka.{AlgebraM, RecursiveT}
 import scalaz.{Applicative, Coproduct, Monad}
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 abstract class MapFuncPlanner[T[_[_]], F[_]: Applicative, MF[_]] {
   def plan(cake: Precog): PlanApplicator[cake.type]
@@ -38,11 +43,6 @@ object MapFuncPlanner {
     (implicit ev: MapFuncPlanner[T, F, MF]): MapFuncPlanner[T, F, MF] =
     ev
 
-  import iotaz.{CopK, TListK}
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def copKMapFuncPlanner[T[_[_]], X <: TListK, F[_]]: MapFuncPlanner[T, F, CopK[X, ?]] = null
-
   implicit def coproduct[T[_[_]], F[_]: Applicative, G[_], H[_]]
     (implicit G: MapFuncPlanner[T, F, G], H: MapFuncPlanner[T, F, H])
       : MapFuncPlanner[T, F, Coproduct[G, H, ?]] =
@@ -59,6 +59,45 @@ object MapFuncPlanner {
       }
 
     }
+
+  implicit def copk[T[_[_]], G[_], LL <: TListK](implicit M: Materializer[T, G, LL]): MapFuncPlanner[T, G, CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T[_[_]], G[_], LL <: TListK] {
+    def materialize(offset: Int): MapFuncPlanner[T, G, CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T[_[_]], G[_]]: Materializer[T, G, TNilK] = new Materializer[T, G, TNilK] {
+      override def materialize(offset: Int): MapFuncPlanner[T, G, CopK[TNilK, ?]] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], G[_]: Applicative, F[_], LL <: TListK](
+      implicit
+      F: MapFuncPlanner[T, G, F],
+      LL: Materializer[T, G, LL]
+    ): Materializer[T, G, F ::: LL] = new Materializer[T, G, F ::: LL] {
+      override def materialize(offset: Int): MapFuncPlanner[T, G, CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new MapFuncPlanner[T, G, CopK[F ::: LL, ?]] {
+          def plan(cake: Precog): PlanApplicator[cake.type] =
+            new PlanApplicatorCopK(cake)
+
+          final class PlanApplicatorCopK[P <: Precog](override val cake: P)
+            extends PlanApplicator[P](cake) {
+            import cake.trans._
+
+            def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[G, CopK[F ::: LL, ?], TransSpec[A]] = {
+              case I(fa) => F.plan(cake).apply(id)(fa)
+              case other => LL.materialize(offset + 1).plan(cake).apply(id)(other.asInstanceOf[CopK[LL, TransSpec[A]]])
+            }
+          }
+        }
+      }
+    }
+  }
 
   implicit def mapFuncCore[T[_[_]]: RecursiveT, F[_]: Applicative]
     : MapFuncPlanner[T, F, MapFuncCore[T, ?]] =
