@@ -20,7 +20,7 @@ import slamdata.Predef.{Map => _, _}
 
 import quasar.ejson
 import quasar.ejson.{EJson, ExtEJson}
-import quasar.fp.{copkTraverse, :<<:, ACopK, PrismNT}
+import quasar.fp.{copkTraverse, :<<:, ACopK, PrismNT, mkInject}
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.analysis.Outline
@@ -31,7 +31,9 @@ import matryoshka.data.free._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import iotaz.{CopK, TListK}
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
+
 
 /** A rewrite that, where possible, replaces map key deletion with construction
   * of a new map containing the keys in the complement of the singleton set consisting
@@ -134,11 +136,6 @@ object PreferProjection extends PreferProjectionInstances {
 sealed abstract class PreferProjectionInstances {
   import PreferProjection.projectComplement
 
-
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def preferProjectionCopK[X <: TListK, T, B[_]]: PreferProjection[CopK[X, ?], T, B] = null
-
   implicit def coproduct[F[_], G[_], T, B[_]](
       implicit
       F: PreferProjection[F, T, B],
@@ -152,6 +149,41 @@ sealed abstract class PreferProjectionInstances {
           F.preferProjectionƒ(BtoC andThen PrismNT.inject[F, C]),
           G.preferProjectionƒ(BtoC andThen PrismNT.inject[G, C]))
     }
+
+  implicit def copk[T, B[_], LL <: TListK](implicit M: Materializer[T, B, LL]): PreferProjection[CopK[LL, ?], T, B] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T, B[_], LL <: TListK] {
+    def materialize(offset: Int): PreferProjection[CopK[LL, ?], T, B]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T, B[_]]: Materializer[T, B, TNilK] = new Materializer[T, B, TNilK] {
+      override def materialize(offset: Int): PreferProjection[CopK[TNilK, ?], T, B] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T, B[_], F[_], LL <: TListK](
+      implicit
+      F: PreferProjection[F, T, B],
+      LL: Materializer[T, B, LL]
+    ): Materializer[T, B, F ::: LL] = new Materializer[T, B, F ::: LL] {
+      override def materialize(offset: Int): PreferProjection[CopK[F ::: LL, ?], T, B] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new PreferProjection[CopK[F ::: LL, ?], T, B] {
+          type C[A] = CopK[F ::: LL, A]
+          type D[A] = CopK[LL, A]
+
+          def preferProjectionƒ(BtoC: PrismNT[B, C]): C[(Outline.Shape, T)] => B[T] = {
+            case I(fa) => F.preferProjectionƒ(BtoC andThen PrismNT.injectCopK[F, C](I))(fa)
+            case other => LL.materialize(offset + 1).preferProjectionƒ(BtoC.asInstanceOf[PrismNT[B, D]])(other.asInstanceOf[D[(Outline.Shape, T)]])
+          }
+
+        }
+      }
+    }
+  }
 
   implicit def qScriptCore[T[_[_]]: BirecursiveT: EqualT, U, B[_]: Functor](
       implicit
