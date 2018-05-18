@@ -27,7 +27,8 @@ import matryoshka.implicits._
 import matryoshka.patterns.CoEnv
 import scalaz._, Scalaz._
 import ShiftRead._
-import iotaz.{CopK, TListK}
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 /** This optional transformation changes the semantics of [[Read]]. The default
   * semantics return a single value, whereas the transformed version has an
@@ -125,10 +126,6 @@ object ShiftRead {
     }
 
 
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def copkShiftRead[T[_[_]], X <: TListK, F[_]]: ShiftRead.Aux[T, CopK[X, ?], F] = null
-
   implicit def coproduct[T[_[_]], F[_], I[_], J[_]]
     (implicit I: ShiftRead.Aux[T, I, F], J: ShiftRead.Aux[T, J, F])
       : ShiftRead.Aux[T, Coproduct[I, J, ?], F] =
@@ -138,6 +135,41 @@ object ShiftRead {
           λ[Coproduct[I, J, ?] ~> FixFreeH[H, ?]](
             _.run.fold(I.shiftRead(GtoH)(_), J.shiftRead(GtoH)(_)))
       }
+
+  implicit def copk[T[_[_]], LL <: TListK, I[_]](implicit M: Materializer[T, LL, I]): ShiftRead.Aux[T, CopK[LL, ?], I] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T[_[_]], LL <: TListK, I[_]] {
+    def materialize(offset: Int): ShiftRead.Aux[T, CopK[LL, ?], I]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T[_[_]], I[_]]: Materializer[T, TNilK, I] = new Materializer[T, TNilK, I] {
+      override def materialize(offset: Int): ShiftRead.Aux[T, CopK[TNilK, ?], I] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], F[_], LL <: TListK, I[_]](
+      implicit
+      F: ShiftRead.Aux[T, F, I],
+      LL: Materializer[T, LL, I]
+    ): Materializer[T, F ::: LL, I] = new Materializer[T, F ::: LL, I] {
+      override def materialize(offset: Int): ShiftRead.Aux[T, CopK[F ::: LL, ?], I] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new ShiftRead[CopK[F ::: LL, ?]] {
+          type G[A] = I[A]
+
+          def shiftRead[H[_]](GtoH: G ~> H) = new (CopK[F ::: LL, ?] ~> FixFreeH[H, ?]) {
+            override def apply[A](cfa: CopK[F ::: LL, A]): FixFreeH[H, A] = cfa match {
+              case I(fa) => F.shiftRead(GtoH)(fa)
+              case other => LL.materialize(offset + 1).shiftRead(GtoH)(other.asInstanceOf[CopK[LL, A]])
+            }
+          }
+        }
+      }
+    }
+  }
 
   def default[T[_[_]], F[_]: Functor, I[a] <: ACopK[a]](implicit F: F :<<: I):
       ShiftRead.Aux[T, F, I] =
