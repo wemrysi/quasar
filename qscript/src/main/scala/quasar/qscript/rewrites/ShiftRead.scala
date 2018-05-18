@@ -61,8 +61,8 @@ object ShiftRead {
         h => CoEnv(h.left[QScriptTotal[T, Free[CoEnvQS[T, ?], FreeQS[T]]]]),
         ShiftTotal.shiftRead(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
 
-  implicit def read[T[_[_]]: BirecursiveT, F[_], A]
-    (implicit SR: Const[ShiftedRead[A], ?] :<: F, QC: QScriptCore[T, ?] :<: F)
+  implicit def read[T[_[_]]: BirecursiveT, F[a] <: ACopK[a], A]
+    (implicit SR: Const[ShiftedRead[A], ?] :<<: F, QC: QScriptCore[T, ?] :<<: F)
       : ShiftRead.Aux[T, Const[Read[A], ?], F] =
     new ShiftRead[Const[Read[A], ?]] {
       type G[A] = F[A]
@@ -79,7 +79,7 @@ object ShiftRead {
        )
     }
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[_]](implicit QC: QScriptCore[T, ?] :<: F):
+  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]](implicit QC: QScriptCore[T, ?] :<<: F):
       ShiftRead.Aux[T, QScriptCore[T, ?], F] =
     new ShiftRead[QScriptCore[T, ?]] {
       type G[A] = F[A]
@@ -94,7 +94,7 @@ object ShiftRead {
       )
     }
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]](implicit TJ: ThetaJoin[T, ?] :<: F):
+  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]](implicit TJ: ThetaJoin[T, ?] :<<: F):
       ShiftRead.Aux[T, ThetaJoin[T, ?], F] =
     new ShiftRead[ThetaJoin[T, ?]] {
       type G[A] = F[A]
@@ -109,7 +109,7 @@ object ShiftRead {
       )
     }
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT, F[_]](implicit EJ: EquiJoin[T, ?] :<: F):
+  implicit def equiJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]](implicit EJ: EquiJoin[T, ?] :<<: F):
       ShiftRead.Aux[T, EquiJoin[T, ?], F] =
     new ShiftRead[EquiJoin[T, ?]] {
       type G[A] = F[A]
@@ -139,24 +139,24 @@ object ShiftRead {
             _.run.fold(I.shiftRead(GtoH)(_), J.shiftRead(GtoH)(_)))
       }
 
-  def default[T[_[_]], F[_]: Functor, I[_]](implicit F: F :<: I):
+  def default[T[_[_]], F[_]: Functor, I[a] <: ACopK[a]](implicit F: F :<<: I):
       ShiftRead.Aux[T, F, I] =
     new ShiftRead[F] {
       type G[A] = I[A]
       def shiftRead[H[_]](GtoH: G ~> H) = λ[F ~> FixFreeH[H, ?]](fa => GtoH(F inj (fa map Free.point)))
     }
 
-  implicit def deadEnd[T[_[_]], F[_]](implicit DE: Const[DeadEnd, ?] :<: F)
+  implicit def deadEnd[T[_[_]], F[a] <: ACopK[a]](implicit DE: Const[DeadEnd, ?] :<<: F)
       : ShiftRead.Aux[T, Const[DeadEnd, ?], F] =
     default
 
-  implicit def shiftedRead[T[_[_]], F[_], A]
-    (implicit SR: Const[ShiftedRead[A], ?] :<: F)
+  implicit def shiftedRead[T[_[_]], F[a] <: ACopK[a], A]
+    (implicit SR: Const[ShiftedRead[A], ?] :<<: F)
       : ShiftRead.Aux[T, Const[ShiftedRead[A], ?], F] =
     default
 
-  implicit def projectBucket[T[_[_]], F[_]]
-    (implicit PB: ProjectBucket[T, ?] :<: F)
+  implicit def projectBucket[T[_[_]], F[a] <: ACopK[a]]
+    (implicit PB: ProjectBucket[T, ?] :<<: F)
       : ShiftRead.Aux[T, ProjectBucket[T, ?], F] =
     default
 }
