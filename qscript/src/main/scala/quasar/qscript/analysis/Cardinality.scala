@@ -28,7 +28,8 @@ import matryoshka.implicits._
 import matryoshka.data._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
-import iotaz.{CopK, TListK}
+import iotaz.{ CopK, TListK, TNilK }
+import iotaz.TListK.:::
 
 @typeclass
 trait Cardinality[F[_]] {
@@ -123,9 +124,36 @@ object Cardinality {
         _.run.fold(F.calculate(pathCard), G.calculate(pathCard))
     }
 
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def cardinalityCopK[X <: TListK]: Cardinality[CopK[X, ?]] = null
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): Cardinality[CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int): Cardinality[CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit def base[T[_[_]]]: Materializer[TNilK] = new Materializer[TNilK] {
+      override def materialize(offset: Int): Cardinality[CopK[TNilK, ?]] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: Cardinality[F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int): Cardinality[CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new Cardinality[CopK[F ::: LL, ?]] {
+          override def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, CopK[F ::: LL, ?], Int] = {
+            case I(fa) => F.calculate(pathCard).apply(fa)
+            case other => LL.materialize(offset + 1).calculate(pathCard).apply(other.asInstanceOf[CopK[LL, Int]])
+          }
+        }
+      }
+    }
+  }
 
   ////////
 
