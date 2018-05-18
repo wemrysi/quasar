@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, APath}
 import quasar.effect._
 import quasar.fp._ , free._
-import quasar.fs.{Empty, PhysicalError, ReadFile}
+import quasar.fs.{Empty, PhysicalError, ReadFile, UnhandledFSError}
 import quasar.fs.mount._, BackendDef.DefinitionResult
 import quasar.fs.mount.cache.VCache, VCache.VCacheKVS
 import quasar.fs.mount.Fixture.runConstantVCache

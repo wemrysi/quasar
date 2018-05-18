@@ -723,9 +723,9 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
             writeSlice(slice, state, sortOrder) flatMap { write0(tail, _) }
 
           case None =>
-            M.point {
+            M.point(()).flatMap { _ =>
               val closedJDBMState = state.jdbmState.closed()
-              (state.keyTransformsWithIds map (_._2), closedJDBMState.indices)
+              M.point((state.keyTransformsWithIds map (_._2), closedJDBMState.indices))
             }
         }
       }
@@ -796,7 +796,7 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
                                  vrefs: List[ColumnRef],
                                  vEncoder: ColumnEncoder,
                                  indexNamePrefix: String,
-                                 jdbmState: JDBMState): M[JDBMState] = M.point {
+                                 jdbmState: JDBMState): M[JDBMState] = M.point(()).flatMap { _ =>
 
       // Iterate over the slice, storing each row
       // FIXME: Determine whether undefined sort keys are valid
@@ -834,43 +834,45 @@ trait BlockStoreColumnarTableModule[M[_]] extends ColumnarTableModule[M] {
       //  3) A SliceIndex entry in the index: We add the current slice in the JDBM
       //     index and update the SliceIndex entry.
 
-      jdbmState.indices.get(indexMapKey) map {
-        case sliceIndex: SliceIndex =>
-          (sliceIndex, jdbmState)
+      M.point(
+        jdbmState.indices.get(indexMapKey) map {
+          case sliceIndex: SliceIndex =>
+            (sliceIndex, jdbmState)
 
-        case SortedSlice(indexName, kslice0, vslice0, vEncoder0, keyRefs, valRefs, count) =>
-          val keyRowFormat                  = RowFormat.forSortingKey(krefs)
-          val keyComparator                 = SortingKeyComparator(keyRowFormat, sortOrder.isAscending)
-          val (dbFile, db, openedJdbmState) = jdbmState.opened()
-          val storage                       = db.createTreeMap(indexName, keyComparator, ByteArraySerializer, ByteArraySerializer)
-          val count                         = storeRows(kslice0, vslice0, keyRowFormat, vEncoder0, storage, 0)
-          val sliceIndex                    = SliceIndex(indexName, dbFile, storage, keyRowFormat, keyComparator, keyRefs, valRefs, count)
+          case SortedSlice(indexName, kslice0, vslice0, vEncoder0, keyRefs, valRefs, count) =>
+            val keyRowFormat                  = RowFormat.forSortingKey(krefs)
+            val keyComparator                 = SortingKeyComparator(keyRowFormat, sortOrder.isAscending)
+            val (dbFile, db, openedJdbmState) = jdbmState.opened()
+            val storage                       = db.createTreeMap(indexName, keyComparator, ByteArraySerializer, ByteArraySerializer)
+            val count                         = storeRows(kslice0, vslice0, keyRowFormat, vEncoder0, storage, 0)
+            val sliceIndex                    = SliceIndex(indexName, dbFile, storage, keyRowFormat, keyComparator, keyRefs, valRefs, count)
 
-          (sliceIndex, openedJdbmState.copy(indices = openedJdbmState.indices + (indexMapKey -> sliceIndex), insertCount = count))
+            (sliceIndex, openedJdbmState.copy(indices = openedJdbmState.indices + (indexMapKey -> sliceIndex), insertCount = count))
 
-      } map {
-        case (index, jdbmState) =>
-          val newInsertCount = storeRows(kslice, vslice, index.keyRowFormat, vEncoder, index.storage, jdbmState.insertCount)
+        } map {
+          case (index, jdbmState) =>
+            val newInsertCount = storeRows(kslice, vslice, index.keyRowFormat, vEncoder, index.storage, jdbmState.insertCount)
 
-          // Although we have a global count of inserts, we also want to
-          // specifically track counts on the index since some operations
-          // may not use all indices (e.g. groupByN)
-          val newIndex = index.copy(count = index.count + (newInsertCount - jdbmState.insertCount))
+            // Although we have a global count of inserts, we also want to
+            // specifically track counts on the index since some operations
+            // may not use all indices (e.g. groupByN)
+            val newIndex = index.copy(count = index.count + (newInsertCount - jdbmState.insertCount))
 
-          jdbmState.copy(indices = jdbmState.indices + (indexMapKey -> newIndex), insertCount = newInsertCount)
+            jdbmState.copy(indices = jdbmState.indices + (indexMapKey -> newIndex), insertCount = newInsertCount)
 
-      } getOrElse {
-        // sort k/vslice and shove into SortedSlice.
-        val indexName = indexMapKey.name
-        val mvslice   = vslice.materialized
-        val mkslice   = kslice.materialized
+        } getOrElse {
+          // sort k/vslice and shove into SortedSlice.
+          val indexName = indexMapKey.name
+          val mvslice   = vslice.materialized
+          val mkslice   = kslice.materialized
 
-        // TODO Materializing after a sort may help w/ cache hits when traversing a column.
-        val (vslice0, kslice0) = mvslice.sortWith(mkslice, sortOrder)
-        val sortedSlice        = SortedSlice(indexName, kslice0, vslice0, vEncoder, krefs.toArray, vrefs.toArray, vslice0.size)
+          // TODO Materializing after a sort may help w/ cache hits when traversing a column.
+          val (vslice0, kslice0) = mvslice.sortWith(mkslice, sortOrder)
+          val sortedSlice        = SortedSlice(indexName, kslice0, vslice0, vEncoder, krefs.toArray, vrefs.toArray, vslice0.size)
 
-        jdbmState.copy(indices = jdbmState.indices + (indexMapKey -> sortedSlice), insertCount = 0)
-      }
+          jdbmState.copy(indices = jdbmState.indices + (indexMapKey -> sortedSlice), insertCount = 0)
+        }
+      )
     }
 
     def loadTable(mergeEngine: MergeEngine[SortingKey, SortBlockData], indices: IndexMap, sortOrder: DesiredSortOrder): Table = {

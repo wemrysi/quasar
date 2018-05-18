@@ -764,7 +764,7 @@ trait Slice { source =>
     val order: Array[Int] = Array.range(0, source.size) filter { row =>
       keySlice.isDefinedAt(row) && source.isDefinedAt(row)
     }
-    val rowOrder = if (sortOrder == SortAscending) keySlice.order else ??? // keySlice.order.reversed
+    val rowOrder = if (sortOrder == SortAscending) keySlice.order else cats.kernel.Order.reverse(keySlice.order)
     spire.math.MergeSort.sort(order)(rowOrder, implicitly)
 
     val remapOrder = new ArrayIntList(order.size)

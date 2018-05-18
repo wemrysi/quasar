@@ -64,7 +64,7 @@ class JDBMRawSortProjection[M[_]] private[yggdrasil] (dbFile: File,
   val keyFormat = RowFormat.forSortingKey(sortKeyRefs)
 
   override def getBlockAfter(id: Option[Array[Byte]], columns: Option[Set[ColumnRef]])
-  : M[Option[BlockProjectionData[Array[Byte], Slice]]] = M.point {
+  : M[Option[BlockProjectionData[Array[Byte], Slice]]] = M.bind(M.point(())) { _ =>
     // TODO: Make this far, far less ugly
     if (columns.nonEmpty) {
       throw new IllegalArgumentException("JDBM Sort Projections may not be constrained by column descriptor")
@@ -110,7 +110,7 @@ class JDBMRawSortProjection[M[_]] private[yggdrasil] (dbFile: File,
         }
       }
 
-      if (iterator.isEmpty) {
+      M.point(if (iterator.isEmpty) {
         None
       } else {
         val keyColumns = sortKeyRefs.map(JDBMSlice.columnFor(CPath("[0]"), sliceSize))
@@ -127,7 +127,7 @@ class JDBMRawSortProjection[M[_]] private[yggdrasil] (dbFile: File,
         }
 
         Some(BlockProjectionData(firstKey, lastKey, slice))
-      }
+      })
     } finally {
       db.close() // creating the slice should have already read contents into memory
     }

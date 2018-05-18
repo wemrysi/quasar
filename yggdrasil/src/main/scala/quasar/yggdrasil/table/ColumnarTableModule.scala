@@ -571,7 +571,8 @@ trait ColumnarTableModule[M[_]]
               })
               .toList
 
-            M.point(TableIndex.joinSubTables(subTableProjections).normalize) // TODO: normalize necessary?
+            // TODO: normalize necessary?
+            M.point(()).flatMap(_ => M.point(TableIndex.joinSubTables(subTableProjections).normalize))
           }
 
           body(groupKeyTable, map)
@@ -622,10 +623,12 @@ trait ColumnarTableModule[M[_]]
 
       Table(
         StreamT.unfoldM(values) { events =>
-          M.point {
-            (!events.isEmpty) option {
-              makeSlice(events.toStream)
-            }
+          M.point(()).flatMap { _ =>
+            M.point(
+              (!events.isEmpty) option {
+                makeSlice(events.toStream)
+              }
+            )
           }
         },
         ExactSize(values.length))
@@ -664,12 +667,13 @@ trait ColumnarTableModule[M[_]]
     private final val readStarts = new java.util.concurrent.atomic.AtomicInteger
     private final val blockReads = new java.util.concurrent.atomic.AtomicInteger
 
-    val slices: StreamT[M, Slice] = StreamT(M.point(
-      StreamT
-        .Skip({
+    val slices: StreamT[M, Slice] = StreamT(M.point(()).flatMap(_ =>
+      M.point(
+        StreamT.Skip({
           readStarts.getAndIncrement
           slices0.map(s => { blockReads.getAndIncrement; s })
         })
+      )
     ))
 
     /**
@@ -679,7 +683,7 @@ trait ColumnarTableModule[M[_]]
       def rec(stream: StreamT[M, A], acc: A): M[A] = {
         stream.uncons flatMap {
           case Some((head, tail)) => rec(tail, head |+| acc)
-          case None               => M.point(acc)
+          case None               => M.point(()).flatMap(_ => M.point(acc))
         }
       }
 
@@ -728,7 +732,7 @@ trait ColumnarTableModule[M[_]]
         case None =>
           M.point((acc.reverse, size))
       }
-      val former = new (Id.Id ~> M) { def apply[A](a: Id.Id[A]): M[A] = M.point(a) }
+      val former = λ[Id.Id ~> M](M.point(_))
       loop(slices, Nil, 0L).map {
         case (stream, size) =>
           Table(StreamT.fromIterable(stream).trans(former), ExactSize(size))
@@ -1316,8 +1320,7 @@ trait ColumnarTableModule[M[_]]
         } yield back
 
         Table(StreamT.wrapEffect(initialState map { state =>
-          // StreamT.unfoldM[M, Slice, CogroupState](state getOrElse CogroupDone)(step(_))
-          ???
+          StreamT.unfoldM[M, Slice, CogroupState](state getOrElse CogroupDone)(step(_))
         }), UnknownSize)
       }
 
