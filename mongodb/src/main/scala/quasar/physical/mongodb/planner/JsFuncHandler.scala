@@ -35,6 +35,8 @@ import scala.Predef.implicitly
 import matryoshka._
 import matryoshka.implicits._
 import scalaz.{Divide => _, _}, Scalaz._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 trait JsFuncHandler[IN[_]] {
   def handle[M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, IN, JsCore]
@@ -565,11 +567,6 @@ object JsFuncHandler {
         ExpandMapFunc.expand(core.handle[M], κ[MapFuncDerived[T, JsCore], Option[M[JsCore]]](None))
     }
 
-  import iotaz.{CopK, TListK}
-  // TODO provide actual instance
-  @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Null"))
-  implicit def copKJsFuncHandler[X <: TListK]: JsFuncHandler[CopK[X, ?]] = null
-
   implicit def mapFuncCoproduct[F[_], G[_]]
       (implicit F: JsFuncHandler[F], G: JsFuncHandler[G])
       : JsFuncHandler[Coproduct[F, G, ?]] =
@@ -578,6 +575,37 @@ object JsFuncHandler {
         _.run.fold(F.handle[M], G.handle[M])
     }
 
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): JsFuncHandler[CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int): JsFuncHandler[CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
+      override def materialize(offset: Int): JsFuncHandler[CopK[TNilK, ?]] = ???
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: JsFuncHandler[F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int): JsFuncHandler[CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new JsFuncHandler[CopK[F ::: LL, ?]] {
+          def handle[M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, CopK[F ::: LL, ?], JsCore] = {
+            case I(fa) => F.handle[M].apply(fa)
+            case other => LL.materialize(offset + 1).handle[M].apply(other.asInstanceOf[CopK[LL, JsCore]])
+          }
+        }
+      }
+    }
+  }
+  
   def handle[F[_]: JsFuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, F, JsCore] =
     implicitly[JsFuncHandler[F]].handle[M]
 }
