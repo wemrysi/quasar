@@ -36,6 +36,7 @@ import java.time.{
 import scala.sys.error
 
 object QDataData extends QData[Data] {
+  import QType._
 
   def tpe(a: Data): QType = a match {
     case Data.Null => QNull

@@ -24,6 +24,7 @@ import scalaz.\/
 
 object QDataDataSpec extends Qspec with DataGenerators {
   import QDataData._
+  import QType._
 
   def roundtripUnsafe(data: Data): Data =
     tpe(data) match {
