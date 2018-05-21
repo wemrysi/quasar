@@ -24,20 +24,20 @@ import scalaz.{Cord, Show}
 import scalaz.syntax.show._
 
 @Lenses
-final case class ExternalMetadata(
+final case class DataSourceMetadata(
     kind: DataSourceType,
     condition: Condition[Exception])
 
-object ExternalMetadata extends ExternalMetadataInstances
+object DataSourceMetadata extends DataSourceMetadataInstances
 
-sealed abstract class ExternalMetadataInstances {
-  implicit val show: Show[ExternalMetadata] = {
+sealed abstract class DataSourceMetadataInstances {
+  implicit val show: Show[DataSourceMetadata] = {
     implicit val exShow: Show[Exception] =
       Show.shows(_.getMessage)
 
     Show.show {
-      case ExternalMetadata(k, s) =>
-        Cord("ExternalMetadata(") ++ k.show ++ Cord(", ") ++ s.show ++ Cord(")")
+      case DataSourceMetadata(k, s) =>
+        Cord("DataSourceMetadata(") ++ k.show ++ Cord(", ") ++ s.show ++ Cord(")")
     }
   }
 }
