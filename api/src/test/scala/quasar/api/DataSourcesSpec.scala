@@ -16,7 +16,7 @@
 
 package quasar.api
 
-import slamdata.Predef.{None, Some, String}
+import slamdata.Predef.{Some, String}
 import quasar.{Condition, ConditionMatchers, Qspec}
 
 import scala.Predef.assert
@@ -75,7 +75,7 @@ abstract class DataSourcesSpec[F[_]: Monad, C: Equal: Show]
         cond must beNormal
 
         m.lookup(foo) must beLike {
-          case Some(DataSourceMetadata(t, None)) =>
+          case Some(DataSourceMetadata(t, Condition.Normal())) =>
             t must_= supportedType
         }
       }
@@ -309,12 +309,9 @@ abstract class DataSourcesSpec[F[_]: Monad, C: Equal: Show]
   def configB: C =
     validConfigs._2
 
-  def nominalMeta: DataSourceMetadata =
-    DataSourceMetadata(supportedType, Condition.normal())
-
   def beConfigured(cfg: C): Matcher[CommonError \/ (DataSourceMetadata, C)] =
     beLike {
-      case \/-((DataSourceMetadata(t, None), c)) =>
+      case \/-((DataSourceMetadata(t, Condition.Normal()), c)) =>
         (t must_= supportedType) and (c must_= cfg)
     }
 

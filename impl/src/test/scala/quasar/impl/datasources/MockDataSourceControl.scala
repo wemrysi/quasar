@@ -30,7 +30,7 @@ import scalaz.syntax.std.boolean._
 /** Provides for control over the lifecycle of external DataSources. */
 final class MockDataSourceControl[F[_]: Monad: MonadInit: MonadShutdown, C] private (
     supportedTypes: ISet[DataSourceType],
-    initErrors: ResourceName => Option[InitializationError[C]])
+    initErrors: C => Option[InitializationError[C]])
     extends DataSourceControl[F, C] {
 
   private val initd = MonadState_[F, Initialized]
@@ -41,7 +41,7 @@ final class MockDataSourceControl[F[_]: Monad: MonadInit: MonadShutdown, C] priv
       config: DataSourceConfig[C])
       : F[Condition[CreateError[C]]] =
     if (supportedTypes.member(config.kind))
-      initErrors(name) match {
+      initErrors(config.config) match {
         case Some(err) =>
           Condition.abnormal[CreateError[C]](err).point[F]
 
@@ -80,7 +80,7 @@ object MockDataSourceControl {
 
   def apply[F[_]: Monad: MonadInit: MonadShutdown, C](
       supportedTypes: ISet[DataSourceType],
-      initErrors: ResourceName => Option[InitializationError[C]])
+      initErrors: C => Option[InitializationError[C]])
       : DataSourceControl[F, C] =
     new MockDataSourceControl[F, C](supportedTypes, initErrors)
 }

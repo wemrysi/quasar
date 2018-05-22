@@ -551,7 +551,7 @@ lazy val interface = project
 /** Implementations of the Quasar API. */
 lazy val impl = project
   .settings(name := "quasar-impl-internal")
-  .dependsOn(api)
+  .dependsOn(api % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)

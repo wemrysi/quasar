@@ -25,7 +25,7 @@ import scalaz.{\/, EitherT, IMap, ISet, Liskov, Monad, OptionT}, Liskov.<~<
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 
-final class DefaultDataSources[F[_]: Monad, C](
+final class DefaultDataSources[F[_]: Monad, C] private (
     configs: DataSourceConfigs[F, C],
     errors: DataSourceErrors[F],
     control: DataSourceControl[F, C])
@@ -117,4 +117,13 @@ final class DefaultDataSources[F[_]: Monad, C](
     OptionT(configs.lookup(name))
       .toRight(DataSourceNotFound(name): CommonError)
       .run
+}
+
+object DefaultDataSources {
+  def apply[F[_]: Monad, C](
+      configs: DataSourceConfigs[F, C],
+      errors: DataSourceErrors[F],
+      control: DataSourceControl[F, C])
+      : DataSources[F, C] =
+    new DefaultDataSources(configs, errors, control)
 }
