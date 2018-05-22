@@ -26,7 +26,7 @@ import quasar.fp.numeric._
 import quasar.fp.ski.κ
 import quasar.precog.common.{CNumericValue, ColumnRef, CPath, CPathField, CPathIndex}
 import quasar.mimir.MimirCake._
-import quasar.qscript._
+import quasar.qscript._, MapFuncCore._, MapFuncsCore._
 import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
@@ -219,17 +219,19 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
       import src.P.trans._
 
       for {
-        structTrans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(struct.linearize)
-        wrappedStructTrans = InnerArrayConcat(WrapArray(TransSpec1.Id), WrapArray(structTrans))
+
+        structTrans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(struct)
+        wrappedStructTrans =
+          OuterObjectConcat(WrapObject(TransSpec1.Id, "src"), WrapObject(structTrans, "f"))
 
         repairTrans <- repair.cataM[F, TransSpec1](
           interpretM[F, MapFunc[T, ?], JoinSide, TransSpec1](
             {
               case qscript.LeftSide =>
-                (DerefArrayStatic(TransSpec1.Id, CPathIndex(0)): TransSpec1).point[F]
+                (DerefObjectStatic(TransSpec1.Id, CPathField("src")): TransSpec1).point[F]
 
               case qscript.RightSide =>
-                val target = DerefArrayStatic(TransSpec1.Id, CPathIndex(1))
+                val target = DerefObjectStatic(TransSpec1.Id, CPathField("f"))
 
                 val back: TransSpec1 = idStatus match {
                   case IdOnly => DerefArrayStatic(target, CPathIndex(0))
@@ -241,7 +243,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
             },
             mapFuncPlanner[F].plan(src.P)[Source1](TransSpec1.Id)))
 
-        shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ 1, onUndef === OnUndefined.Emit)
+        shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ "f", onUndef === OnUndefined.Emit)
         repaired = shifted.transform(repairTrans)
       } yield MimirRepr(src.P)(repaired)
 
