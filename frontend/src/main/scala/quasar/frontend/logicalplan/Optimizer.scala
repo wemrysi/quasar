@@ -20,12 +20,11 @@ import slamdata.Predef._
 import quasar._
 import quasar.common.JoinType
 import quasar.contrib.shapeless._
+import quasar.effect.NameGenerator
 import quasar.fp._
 import quasar.fp.binder._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
-import quasar.namegen._
-import quasar.sql.JoinDir
 
 import scala.Predef.$conforms
 
@@ -230,7 +229,7 @@ final class Optimizer[T: Equal]
     *
     * TODO: Separate the combining of filter and join from ...
     */
-  val rewriteCrossJoinsƒ: LP[(T, T)] => State[NameGen, T] = { node =>
+  def rewriteCrossJoinsƒ[F[_]: Monad: NameGenerator]: LP[(T, T)] => F[T] = { node =>
     def preserveFree(x: (T, T)) = preserveFree0(x)(ι)
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -240,8 +239,7 @@ final class Optimizer[T: Equal]
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Equals"))
-    def toComp(left: T, right: T)(c: T):
-        (List[Component[T, T]], Component[T, T]) = {
+    def toComp(left: T, right: T)(c: T): (List[Component[T, T]], Component[T, T]) = {
 
       def typecheckCond(cond: T => T, tpe: Type, cont: Component[T, T], f: (T => T) => Component[T, T])
           : (List[Component[T, T]], Component[T, T]) = {
@@ -307,14 +305,13 @@ final class Optimizer[T: Equal]
 
         case t =>
           (Nil, NeitherCond(t.map(_._1).embed))
+      }
     }
-  }
 
     def assembleCond(conds: List[T]): T =
       conds.foldLeft(lpr.constant(Data.True))(relations.And(_, _).embed)
 
-    def newJoin(lSrc: T, rSrc: T, comps: List[Component[T, T]])
-        : State[NameGen, T] = {
+    def newJoin(lSrc: T, rSrc: T, comps: List[Component[T, T]]): F[T] = {
       val equis    = comps.collect { case c @ EquiCond(_) => c }
       val lefts    = comps.collect { case c @ LeftCond(_) => c }
       val rights   = comps.collect { case c @ RightCond(_) => c }
@@ -322,13 +319,13 @@ final class Optimizer[T: Equal]
       val neithers = comps.collect { case c @ NeitherCond(_) => c }
 
       for {
-        lName     <- freshName("leftSrc")
-        rName     <- freshName("rightSrc")
-        lJoinName <- freshName("leftJoin")
-        rJoinName <- freshName("rightJoin")
-        lFName    <- freshName("left")
-        rFName    <- freshName("right")
-        jName     <- freshName("joined")
+        lName     <- freshSym[F]("leftSrc")
+        rName     <- freshSym[F]("rightSrc")
+        lJoinName <- freshSym[F]("leftJoin")
+        rJoinName <- freshSym[F]("rightJoin")
+        lFName    <- freshSym[F]("left")
+        rFName    <- freshSym[F]("right")
+        jName     <- freshSym[F]("joined")
       } yield {
         // NB: simplifying eagerly to make matching easier up the tree
         simplify(
@@ -347,7 +344,6 @@ final class Optimizer[T: Equal]
       }
     }
 
-
     node match {
       case InvokeUnapply(Filter, Sized((src, Embed(Join(joinL, joinR, JoinType.Inner, JoinCondition(lName, rName, joinCond0)))), (cond0, _))) =>
         val joinCond = joinCond0.transCata[T](orOriginal(elideLets))
@@ -358,10 +354,12 @@ final class Optimizer[T: Equal]
             JoinDir.Left.projectFrom(src),
             JoinDir.Right.projectFrom(src))).bifoldMap(ι)(ι)
         newJoin(joinL, joinR, comps)
+
       case Join((srcL, _), (srcR, _), JoinType.Inner, JoinCondition(lName, rName, (_, joinCond0))) =>
         val joinCond = joinCond0.transCata[T](orOriginal(elideLets))
         newJoin(srcL, srcR, flattenAnd(joinCond).traverse(toComp(lpr.joinSideName(lName), lpr.joinSideName(rName))(_)).bifoldMap(ι)(ι))
-      case _ => State.state(node.map(preserveFree).embed)
+
+      case _ => node.map(preserveFree).embed.point[F]
     }
   }
 
@@ -382,7 +380,7 @@ final class Optimizer[T: Equal]
       lpr.normalizeLets,
 
       // Now for the big one:
-      boundParaS(_)(rewriteCrossJoinsƒ).evalZero,
+      boundParaS(_)(rewriteCrossJoinsƒ[State[Long, ?]]).evalZero[Long],
 
       // Eliminate trivial bindings introduced in rewriteCrossJoins:
       simplify,
@@ -409,7 +407,7 @@ final class Optimizer[T: Equal]
       lpr.normalizeTempNames,
 
       // Now for the big one:
-      boundParaS(_)(rewriteCrossJoinsƒ).evalZero,
+      boundParaS(_)(rewriteCrossJoinsƒ[State[Long, ?]]).evalZero[Long],
 
       // Eliminate trivial bindings introduced in rewriteCrossJoins:
       simplify,

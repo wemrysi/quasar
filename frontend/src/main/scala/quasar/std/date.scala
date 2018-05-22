@@ -19,7 +19,7 @@ package quasar.std
 import slamdata.Predef._
 import quasar._
 import quasar.DataDateTimeExtractors._
-import quasar.SemanticError._
+import quasar.ArgumentError._
 import quasar.fp.ski._
 import quasar.time.{OffsetDate => QOffsetDate, _}
 
@@ -41,45 +41,45 @@ import shapeless.{Data => _, _}
 trait DateLib extends Library with Serializable {
 
   // legacy function for parsing Instants
-  def parseTimestamp(str: String): SemanticError \/ Data.OffsetDateTime =
+  def parseTimestamp(str: String): ArgumentError \/ Data.OffsetDateTime =
     \/.fromTryCatchNonFatal(Instant.parse(str).atOffset(ZoneOffset.UTC)).bimap(
-      κ(DateFormatError(OffsetDateTime, str, None)),
+      κ(temporalFormatError(OffsetDateTime, str, None)),
       Data.OffsetDateTime.apply)
 
-  def parseOffsetDateTime(str: String): SemanticError \/ Data.OffsetDateTime =
+  def parseOffsetDateTime(str: String): ArgumentError \/ Data.OffsetDateTime =
     \/.fromTryCatchNonFatal(JOffsetDateTime.parse(str)).bimap(
-      κ(DateFormatError(OffsetDateTime, str, None)),
+      κ(temporalFormatError(OffsetDateTime, str, None)),
       Data.OffsetDateTime.apply)
 
-  def parseOffsetTime(str: String): SemanticError \/ Data.OffsetTime =
+  def parseOffsetTime(str: String): ArgumentError \/ Data.OffsetTime =
     \/.fromTryCatchNonFatal(JOffsetTime.parse(str)).bimap(
-      κ(DateFormatError(OffsetTime, str, None)),
+      κ(temporalFormatError(OffsetTime, str, None)),
       Data.OffsetTime.apply)
 
-  def parseOffsetDate(str: String): SemanticError \/ Data.OffsetDate =
+  def parseOffsetDate(str: String): ArgumentError \/ Data.OffsetDate =
     \/.fromTryCatchNonFatal(QOffsetDate.parse(str)).bimap(
-      κ(DateFormatError(OffsetDate, str, None)),
+      κ(temporalFormatError(OffsetDate, str, None)),
       Data.OffsetDate.apply)
 
-  def parseLocalDateTime(str: String): SemanticError \/ Data.LocalDateTime =
+  def parseLocalDateTime(str: String): ArgumentError \/ Data.LocalDateTime =
     \/.fromTryCatchNonFatal(JLocalDateTime.parse(str)).bimap(
-      κ(DateFormatError(OffsetDate, str, None)),
+      κ(temporalFormatError(OffsetDate, str, None)),
       Data.LocalDateTime.apply)
 
-  def parseLocalTime(str: String): SemanticError \/ Data.LocalTime =
+  def parseLocalTime(str: String): ArgumentError \/ Data.LocalTime =
     \/.fromTryCatchNonFatal(JLocalTime.parse(str)).bimap(
-      κ(DateFormatError(LocalTime, str, None)),
+      κ(temporalFormatError(LocalTime, str, None)),
       Data.LocalTime.apply)
 
-  def parseLocalDate(str: String): SemanticError \/ Data.LocalDate =
+  def parseLocalDate(str: String): ArgumentError \/ Data.LocalDate =
     \/.fromTryCatchNonFatal(JLocalDate.parse(str)).bimap(
-      κ(DateFormatError(LocalDate, str, None)),
+      κ(temporalFormatError(LocalDate, str, None)),
       Data.LocalDate.apply)
 
-  def parseInterval(str: String): SemanticError \/ Data.Interval =
+  def parseInterval(str: String): ArgumentError \/ Data.Interval =
     DateTimeInterval.parse(str) match {
       case Some(i) => Data.Interval(i).right
-      case None => DateFormatError(Interval, str, Some("expected, e.g. P3DT12H30M15.0S")).left
+      case None => temporalFormatError(Interval, str, Some("expected, e.g. P3DT12H30M15.0S")).left
     }
 
   def startOfDayInstant(date: JLocalDate): Instant =

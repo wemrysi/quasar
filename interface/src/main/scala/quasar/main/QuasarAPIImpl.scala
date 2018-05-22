@@ -17,13 +17,14 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.{Data, resolveImports, Variables, SemanticError}
+import quasar.{Data, Variables}
+import quasar.compile.SemanticErrors
 import quasar.contrib.pathy._
 import quasar.sql._
 import quasar.fp.free.foldMapNT
 import quasar.fs.{FileSystemError, QueryFile, ReadFile, Node}
 import quasar.fs.mount.{Mounting, MountConfig, MountingError}
-import quasar.fs.mount.module.Module
+import quasar.fs.mount.module.{resolveImports, Module}
 
 import matryoshka.data.Fix
 import eu.timepit.refined.auto._
@@ -57,12 +58,12 @@ final case class QuasarAPIImpl[F[_]: Monad](inter: CoreEff ~> F) {
   def readFile(path: AFile): Process[F, Data] =
     ReadFile.Ops[CoreEff].scanAll_(path).translate(foldMapNT(inter))
 
-  def query(workingDir: ADir, sql: ScopedExpr[Fix[Sql]]): F[NonEmptyList[SemanticError] \/ (FileSystemError \/ Process0[Data])] =
+  def query(workingDir: ADir, sql: ScopedExpr[Fix[Sql]]): F[SemanticErrors \/ (FileSystemError \/ Process0[Data])] =
     (for {
       expr   <- resolveImports[CoreEff](sql, workingDir).leftMap(_.wrapNel)
       stream <- EitherT(fsQ.queryResults(expr, Variables.empty, workingDir, off = 0L, lim = None).run.run.value)
     } yield stream).run.foldMap(inter)
 
-  def queryVec(workingDir: ADir, sql: ScopedExpr[Fix[Sql]]): F[NonEmptyList[SemanticError] \/ (FileSystemError \/ Vector[Data])] =
+  def queryVec(workingDir: ADir, sql: ScopedExpr[Fix[Sql]]): F[SemanticErrors \/ (FileSystemError \/ Vector[Data])] =
     query(workingDir, sql).map(x => x.map(y => y.map(_.toVector)))
 }

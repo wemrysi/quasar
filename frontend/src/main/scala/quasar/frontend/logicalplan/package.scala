@@ -18,16 +18,19 @@ package quasar.frontend
 
 import slamdata.Predef._
 import quasar._
-import quasar.common.{JoinType, SortDir}
+import quasar.common.{phase, phaseM, JoinType, PhaseResultTell, SortDir}
 import quasar.contrib.pathy.FPath
-import quasar.namegen.NameGen
+import quasar.contrib.scalaz.MonadError_
+import quasar.effect.NameGenerator
 import quasar.time.TemporalPart
 
 import scala.Symbol
 
+import matryoshka.{Corecursive, Recursive}
 import monocle.Prism
 import shapeless.Nat
 import scalaz._
+import scalaz.syntax.monad._
 
 package object logicalplan {
   def read[A] =
@@ -74,6 +77,32 @@ package object logicalplan {
       case Typecheck(e, t, c, f) => (e, t, c, f)
     } ((Typecheck[A](_, _, _, _)).tupled)
 
-  def freshName(prefix: String): State[NameGen, Symbol] =
-    quasar.namegen.freshName(prefix).map(Symbol(_))
+  type ArgumentErrors = NonEmptyList[ArgumentError]
+
+  type MonadArgumentErrs[F[_]] = MonadError_[F, ArgumentErrors]
+
+  def MonadArgumentErrs[F[_]](implicit ev: MonadArgumentErrs[F]): MonadArgumentErrs[F] = ev
+
+  def freshSym[F[_]: Functor: NameGenerator](prefix: String): F[Symbol] =
+    NameGenerator[F].prefixedName("__" + prefix).map(Symbol(_))
+
+  /** Optimizes and typechecks a `LogicalPlan` returning the improved plan. */
+  def preparePlan[
+      F[_]: Monad: MonadArgumentErrs: PhaseResultTell,
+      T: Equal: RenderTree](
+      t: T)(
+      implicit
+      TC: Corecursive.Aux[T, LogicalPlan],
+      TR: Recursive.Aux[T, LogicalPlan])
+      : F[T] = {
+
+    val optimizer = new Optimizer[T]
+    val lpr = optimizer.lpr
+
+    for {
+      optimized   <- phase[F]("Optimized", optimizer.optimize(t))
+      typechecked <- phaseM[F]("Typechecked", lpr.ensureCorrectTypes[F](optimized))
+      rewritten   <- phase[F]("Rewritten Joins", optimizer.rewriteJoins(typechecked))
+    } yield rewritten
+  }
 }

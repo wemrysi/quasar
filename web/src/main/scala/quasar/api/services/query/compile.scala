@@ -20,11 +20,14 @@ import slamdata.Predef.{ -> => _, _ }
 import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
+import quasar.compile.queryPlan
 import quasar.contrib.pathy._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount.Mounting
+import quasar.fs.mount.module.resolveImports
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
+import quasar.main.CompExec
 
 import argonaut._, Argonaut._
 import matryoshka._
@@ -43,6 +46,11 @@ object compile {
     S0: Mounting :<: S,
     S1: FileSystemFailure :<: S
   ): QHttpService[S] = {
+    val CE = CompExec[Free[S, ?]]
+    import CE.CompileM
+
+    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+    import EitherT.eitherTMonad
 
     def explainQuery(
       scopedExpr: sql.ScopedExpr[Fix[sql.Sql]],
@@ -55,7 +63,7 @@ object compile {
         block.fold(
           semErr => semErr.toApiError.left[Json].point[Free[S, ?]],
           block =>
-            queryPlan(block, vars, basePath, offset, limit)
+            queryPlan[CompileM, Fix, Fix[LogicalPlan]](block, vars, basePath, offset, limit)
               .run.value
               .traverse(lp => Q.explain(lp).run.value.map(_.bimap(_.toApiError, _.asJson)))
               .map(_.valueOr(_.toApiError.left[Json])))

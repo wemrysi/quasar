@@ -16,178 +16,29 @@
 
 package quasar.precog.util
 
-import quasar.blueeyes._
-import quasar.blueeyes.json.JValue
-import quasar.blueeyes.json.serialization.{Decomposer, Extractor}
-import quasar.blueeyes.json.serialization.DefaultSerialization._
-import quasar.blueeyes.json.serialization.Extractor._
 import quasar.time.OffsetDate
 
 import org.slf4s.Logging
 
 import scalaz._
 import scalaz.effect.IO
-import scalaz.Ordering.{LT, EQ, GT}
 
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
 import scala.collection.generic.CanBuildFrom
-import scala.collection.mutable.Builder
 import scala.{ collection => sc }
 import scala.reflect.ClassTag
 
-import java.io.{File, FileReader, IOException}
-import java.io.RandomAccessFile
-import java.nio.channels.{ FileChannel, FileLock => JFileLock }
+import java.io.File
 import java.nio.file.Files
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 import java.util.Arrays.fill
-import java.util.Properties
-
-trait FileLock {
-  def release: Unit
-}
-
-class FileLockException(message: String) extends Exception(message)
-
-object FileLock {
-  private case class LockHolder(channel: FileChannel, lock: JFileLock, lockFile: Option[File]) extends FileLock {
-    def release = {
-      lock.release
-      channel.close
-
-      lockFile.foreach(_.delete)
-    }
-  }
-
-  def apply(target: File, lockPrefix: String = "LOCKFILE"): FileLock = {
-    val (lockFile, removeFile) = if (target.isDirectory) {
-      val lockFile = new File(target, lockPrefix + ".lock")
-      lockFile.createNewFile
-      (lockFile, true)
-    } else {
-      (target, false)
-    }
-
-    val channel = new RandomAccessFile(lockFile, "rw").getChannel
-    val lock    = channel.tryLock
-
-    if (lock == null) {
-      throw new FileLockException("Could not lock. Previous lock exists on " + target)
-    }
-
-    LockHolder(channel, lock, if (removeFile) Some(lockFile) else None)
-  }
-}
-
-
-
-// Once we move to 2.10, we can abstract this to a specialized-list. In 2.9,
-// specialization is just too buggy to get it working (tried).
-
-sealed trait IntList extends sc.LinearSeq[Int] with sc.LinearSeqOptimized[Int, IntList] { self =>
-  def head: Int
-  def tail: IntList
-
-  def ::(head: Int): IntList = IntCons(head, this)
-
-  override def foreach[@specialized B](f: Int => B): Unit = {
-    @tailrec def loop(xs: IntList): Unit = xs match {
-      case IntCons(h, t) => f(h); loop(t)
-      case _             =>
-    }
-    loop(this)
-  }
-
-  override def apply(idx: Int): Int = {
-    @tailrec def loop(xs: IntList, row: Int): Int = xs match {
-      case IntCons(x, xs0) =>
-        if (row == idx) x else loop(xs0, row + 1)
-      case IntNil =>
-        throw new IndexOutOfBoundsException("%d is larger than the IntList")
-    }
-    loop(this, 0)
-  }
-
-  override def length: Int = {
-    @tailrec def loop(xs: IntList, len: Int): Int = xs match {
-      case IntCons(x, xs0) => loop(xs0, len + 1)
-      case IntNil          => len
-    }
-    loop(this, 0)
-  }
-
-  override def iterator: Iterator[Int] = new Iterator[Int] {
-    private var xs: IntList = self
-    def hasNext: Boolean = xs != IntNil
-    def next(): Int = {
-      val result = xs.head
-      xs = xs.tail
-      result
-    }
-  }
-
-  override def reverse: IntList = {
-    @tailrec def loop(xs: IntList, ys: IntList): IntList = xs match {
-      case IntCons(x, xs0) => loop(xs0, x :: ys)
-      case IntNil          => ys
-    }
-    loop(this, IntNil)
-  }
-
-  override protected def newBuilder = new IntListBuilder
-}
-
-final case class IntCons(override val head: Int, override val tail: IntList) extends IntList {
-  override def isEmpty: Boolean = false
-}
-
-final case object IntNil extends IntList {
-  override def head: Int        = sys.error("no head on empty IntList")
-  override def tail: IntList    = IntNil
-  override def isEmpty: Boolean = true
-}
-
-final class IntListBuilder extends Builder[Int, IntList] {
-  private var xs: IntList = IntNil
-  def +=(x: Int) = { xs = x :: xs; this }
-  def clear() { xs = IntNil }
-  def result() = xs.reverse
-}
-
-object IntList {
-  implicit def cbf = new CanBuildFrom[IntList, Int, IntList] {
-    def apply(): Builder[Int, IntList]              = new IntListBuilder
-    def apply(from: IntList): Builder[Int, IntList] = apply()
-  }
-}
-
-
 
 object IOUtils extends Logging {
-  val dotDirs = "." :: ".." :: Nil
-
-  def isNormalDirectory(f: File) = f.isDirectory && !dotDirs.contains(f.getName)
-
-  def readFileToString(f: File): IO[String] = IO {
-    new String(Files.readAllBytes(f.toPath), Utf8Charset)
-  }
-
-  def readPropertiesFile(s: String): IO[Properties] = readPropertiesFile { new File(s) }
-
-  def readPropertiesFile(f: File): IO[Properties] = IO {
-    val props = new Properties
-    props.load(new FileReader(f))
-    props
-  }
 
   def overwriteFile(s: String, f: File): IO[Unit] = writeToFile(s, f, append = false)
+
   def writeToFile(s: String, f: File, append: Boolean): IO[Unit] = IO {
     Files.write(f.toPath, s.getBytes)
-  }
-
-  def writeSeqToFile[A](s0: Seq[A], f: File): IO[Unit] = IO {
-    Files.write(f.toPath, s0.map("" + _: CharSequence).asJava, Utf8Charset)
   }
 
   /** Performs a safe write to the file. Returns true
@@ -199,13 +50,6 @@ object IOUtils extends Logging {
     overwriteFile(s, tmpFile) flatMap { _ =>
       IO(tmpFile.renameTo(f)) // TODO: This is only atomic on POSIX systems
     }
-  }
-
-  def makeDirectory(dir: File): IO[Unit] = IO {
-    if (dir.isDirectory || dir.mkdirs)
-      ()
-    else
-      throw new IOException("Failed to create directory " + dir)
   }
 
   def recursiveDelete(files: Seq[File]): IO[Unit] = {
@@ -257,24 +101,17 @@ object IOUtils extends Logging {
   def createTmpDir(prefix: String): IO[File] = IO {
     Files.createTempDirectory(prefix).toFile
   }
-
-  def copyFile(src: File, dest: File): IO[Unit] = IO {
-    Files.copy(src.toPath, dest.toPath)
-  }
 }
-
-
-
 
 /**
   * Implicit container trait
   */
 trait MapUtils {
-  implicit def pimpMapUtils[A, B, CC[B] <: sc.GenTraversable[B]](self: sc.GenMap[A, CC[B]]): MapPimp[A, B, CC] =
-    new MapPimp(self)
+  implicit def mapUtils[A, B, CC[B] <: sc.GenTraversable[B]](self: sc.GenMap[A, CC[B]]): MapExtras[A, B, CC] =
+    new MapExtras(self)
 }
 
-class MapPimp[A, B, CC[B] <: sc.GenTraversable[B]](left: sc.GenMap[A, CC[B]]) {
+class MapExtras[A, B, CC[B] <: sc.GenTraversable[B]](left: sc.GenMap[A, CC[B]]) {
   def cogroup[C, CC2[C] <: sc.GenTraversable[C], Result](right: sc.GenMap[A, CC2[C]])(
       implicit cbf: CanBuildFrom[Nothing, (A, Either3[B, (CC[B], CC2[C]), C]), Result],
       cbfLeft: CanBuildFrom[CC[B], B, CC[B]],
@@ -609,55 +446,3 @@ final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: 
     back = rotate(back, delta)
   }
 }
-
-
-
-
-case class VectorClock(map: Map[Int, Int]) {
-  def get(producerId: Int): Option[Int] = map.get(producerId)
-
-  def update(producerId: Int, sequenceId: Int): VectorClock =
-    if (map.get(producerId) forall { _ <= sequenceId }) {
-      VectorClock(map + (producerId -> sequenceId))
-    } else {
-      this
-    }
-
-  def isDominatedBy(other: VectorClock): Boolean = map forall {
-    case (prodId, maxSeqId) => other.get(prodId).forall(_ >= maxSeqId)
-  }
-}
-
-trait VectorClockSerialization {
-  implicit val VectorClockDecomposer: Decomposer[VectorClock] = new Decomposer[VectorClock] {
-    override def decompose(clock: VectorClock): JValue = clock.map.serialize
-  }
-
-  implicit val VectorClockExtractor: Extractor[VectorClock] = new Extractor[VectorClock] {
-    override def validated(obj: JValue): Validation[Error, VectorClock] =
-      (obj.validated[Map[Int, Int]]).map(VectorClock(_))
-  }
-}
-
-object VectorClock extends VectorClockSerialization {
-  def empty = apply(Map.empty)
-
-  implicit object order extends scalaz.Order[VectorClock] {
-    def order(c1: VectorClock, c2: VectorClock) =
-      if (c2.isDominatedBy(c1)) {
-        if (c1.isDominatedBy(c2)) EQ else GT
-      } else {
-        LT
-      }
-  }
-
-  // Computes the maximal merge of two clocks
-  implicit object semigroup extends Semigroup[VectorClock] {
-    def append(c1: VectorClock, c2: => VectorClock) = {
-      c2.map.foldLeft(c1) {
-        case (acc, (producerId, sequenceId)) => acc.update(producerId, sequenceId)
-      }
-    }
-  }
-}
-

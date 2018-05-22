@@ -24,7 +24,6 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.qscript._
-import quasar.sql.CompilerHelpers
 
 import scala.Predef.implicitly
 import matryoshka._
@@ -36,7 +35,7 @@ import scalaz._, Scalaz._
 import iotaz.{CopK, TNilK}
 import iotaz.TListK.:::
 
-class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
+class RewriteSpec extends quasar.Qspec with QScriptHelpers {
   val rewrite = new Rewrite[Fix]
 
   def normalizeFExpr(expr: Fix[QS]): Fix[QS] =
@@ -95,9 +94,6 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     //    .some)
     //}
 
-    // TODO instance for Coalesce is not found. It was provided by
-    // def qscriptCore[G[_]](implicit QC: QScriptCore :<<: G): Coalesce.Aux[T, QScriptCore, G]
-    // but there is no reflexive instance for CopK.Inject
     "coalesce a Map into a subsequent LeftShift" in {
       import qsidsl._
       val exp: QSI[Fix[QSI]] =

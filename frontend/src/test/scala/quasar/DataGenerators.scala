@@ -70,7 +70,7 @@ object DataGenerators extends DataGenerators {
   // TODO: make this very conservative so as likely to work with as many backends as possible
   val simpleData: Gen[Data] = genAtomicData(Gen.alphaStr, defaultInt, defaultDec, defaultId)
 
-  val data: Gen[Data] =Gen.oneOf(
+  val data: Gen[Data] = Gen.oneOf(
     simpleData,
     genNested(genKey, simpleData))
 

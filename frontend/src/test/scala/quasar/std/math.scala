@@ -18,7 +18,7 @@ package quasar.std
 
 import slamdata.Predef._
 
-import quasar.{Func, SemanticError, Type, TypeGenerators}, Type.Const
+import quasar.{ArgumentError, Func, Type, TypeGenerators}, Type.Const
 import quasar.frontend.logicalplan._
 import quasar.time.DateTimeInterval
 
@@ -206,7 +206,7 @@ class MathSpec extends quasar.Qspec with TypeGenerators {
       expr should beSuccessful(Type.Const(OffsetDateTime(JOffsetDateTime.parse("2015-01-21T09:00:00Z"))))
     }
 
-    def permute(f: quasar.Func.Input[Type, nat._2] => ValidationNel[SemanticError, Type], t1: Const, t2: Const)(exp1: Const, exp2: Type) = {
+    def permute(f: quasar.Func.Input[Type, nat._2] => ValidationNel[ArgumentError, Type], t1: Const, t2: Const)(exp1: Const, exp2: Type) = {
       f(Func.Input2(t1, t2)) should beSuccessful(exp1)
       f(Func.Input2(t1, t2.value.dataType)) should beSuccessful(exp2)
       f(Func.Input2(t1.value.dataType, t2)) should beSuccessful(exp2)

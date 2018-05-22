@@ -19,7 +19,7 @@ package quasar.mimir
 import quasar.Data
 import quasar.contrib.pathy.{ADir, AFile, PathSegment}
 import quasar.fp.PrismNT
-import quasar.fs.{FileSystem, Local, QueryFile, ReadFile}
+import quasar.fs.{FileSystem, FileSystemType, Local, QueryFile, ReadFile}
 import quasar.fs.mount.ConnectionUri
 
 import eu.timepit.refined.auto._
@@ -28,7 +28,7 @@ import scalaz.{:<:, EitherT, OptionT}
 import scalaz.Scalaz._
 import scalaz.concurrent.Task
 
-object LightweightLocalFileSystem extends LightweightFileSystem {
+object LocalLightweightFileSystem extends LightweightFileSystem {
 
   def children(dir: ADir): Task[Option[Set[PathSegment]]] =
     for {
@@ -74,9 +74,14 @@ object LightweightLocalFileSystem extends LightweightFileSystem {
     PrismNT.inject[FS, FileSystem].apply(fs)
 }
 
-object LightweightLocal extends LightweightConnector {
+object LocalLightweight extends LightweightConnector {
   def init(uri: ConnectionUri): EitherT[Task, String, (LightweightFileSystem, Task[Unit])] =
     EitherT.rightT(Task.delay {
-      (LightweightLocalFileSystem, Task.now(()))
+      (LocalLightweightFileSystem, Task.now(()))
     })
+}
+
+object LocalLWC extends SlamEngine {
+  val Type: FileSystemType = FileSystemType("local_file_system")
+  val lwc: LightweightConnector = LocalLightweight
 }

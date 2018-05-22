@@ -17,17 +17,18 @@
 package quasar.fs.mount
 
 import slamdata.Predef._
-import quasar._
+import quasar.common.PhaseResultT
+import quasar.compile.{addOffsetLimit, precompile, SemanticError, SemanticErrors, SemanticErrsT}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
-import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.fs.mount.cache.{VCache, ViewCache}, VCache.VCacheKVS
-import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
+import quasar.fs.mount.module.resolveImports_
+import quasar.frontend.{logicalplan => lp}, lp.{preparePlan, ArgumentErrors, LogicalPlan => LP, Optimizer}
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -258,9 +259,7 @@ object view {
         block        <- EitherT(EitherT(
                           resolveImports_(viewConfig.query, fileParent(loc)).run.run.liftM[OptionT]
                         )).leftMap(_.wrapNel)
-        r            <- EitherT(EitherT(
-                          precompile[Fix[LP]](block, viewConfig.vars, fileParent(loc))
-                            .run.value.right[FileSystemError].η[Free[S, ?]].liftM[OptionT]))
+        r            <- precompile[PhaseResultT[SemanticErrsT[FileSystemErrT[OptionT[Free[S, ?], ?], ?], ?], ?], Fix, Fix[LP]](block, viewConfig.vars, fileParent(loc)).value
       } yield r).run.run
 
     def vcacheRead(loc: AFile): OptionT[Free[S, ?], FileSystemError \/ (SemanticErrors \/ Fix[LP])] =
@@ -293,8 +292,11 @@ object view {
           }.getOrElse(lift(e, i))
 
         case (e, i) => lift(e, i)
-      } flatMap (resolved => EitherT(preparePlan(resolved).run.value.point[FileSystemErrT[Free[S, ?], ?]]))
+      } flatMap (resolved => EitherT {
+        preparePlan[PhaseResultT[EitherT[FileSystemErrT[Free[S, ?], ?], ArgumentErrors, ?], ?], Fix[LP]](resolved)
+          .value.leftMap(_.map(SemanticError.argError(_))).run
+      })
 
-    newLP.leftMap(e => planningFailed(plan, Planner.CompilationFailed(e))).flattenLeft
+    newLP.leftMap(e => planningFailed(plan, Planner.InternalError.fromMsg(e.toList.mkString(", ")))).flattenLeft
   }
 }

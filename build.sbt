@@ -235,27 +235,37 @@ lazy val root = project.in(file("."))
   .settings(excludeTypelevelScalaLibrary)
   .aggregate(
 
-       foundation, //___
-//    /    \      \     \
-    api, effect, ejson, js, //______
-//       /     \   /                \
-               common,
-//     /      /      \                \
-        frontend,    precog,
-//    |/    /    \       |             |
-     fs, sql, datagen, blueeyes,
-//    |   |              |             |
-// ___|___|              |             |
-// |  |                  |             |
-     qscript,         niflheim,
-// |  |                  |             |
-     qsu,
-// |     \               |             |
-         connector,   yggdrasil,
-// |     /   |   \______|______________|_________
-//  \   /    |         /     \         \         \
-    core, skeleton, mimir, marklogic, mongodb, couchbase,
-//      \     |    /          |          |         |
+       foundation, //________
+//    /    |      \     \    \
+    api, effect, ejson, js, qdata,
+//  /      |        \  /  \   |
+// /       |        |  |   \  |
+// |       |    ______________/
+// |       |   /    |  |     \_______
+                  common,
+// |       | /   /  |   \             \
+        frontend,  sql, precog,
+// |   /   |    \   |     |            |
+// |  /    |     \_____   |            |
+// |  |    |        |  \  |            |
+     fs,  sst,         blueeyes,
+// |  |    |        |     |            |
+// |  |    |        /     |            |
+        datagen,
+// |__|___________/       |            |
+// |  |          /        |            |
+     qscript,          niflheim,
+// |  |      \ /          |            |
+     qsu,   core, //______|____________|
+// |   \    /             |            |
+//  \___\_____            |            |
+//        /   \           |            |
+           connector,  yggdrasil,
+//      /     |  \       |             |
+//      |     |   \______|_____________|__________
+//      |     |      \  /     \         \         \
+          skeleton, mimir, marklogic, mongodb, couchbase,
+//      \    |     /          |          |         |
           interface,
 //          /  \              |          |         |
          repl, web,
@@ -290,6 +300,14 @@ lazy val foundation = project
     libraryDependencies ++= Dependencies.foundation)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+
+lazy val qdata = project
+  .settings(name := "quasar-qdata-internal")
+  .dependsOn(foundation)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
 lazy val api = project
@@ -352,7 +370,10 @@ lazy val common = project
   */
 lazy val frontend = project
   .settings(name := "quasar-frontend-internal")
-  .dependsOn(common % BothScopes)
+  .dependsOn(
+    qdata,
+    common % BothScopes,
+    effect)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -361,9 +382,17 @@ lazy val frontend = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val sst = project
+  .settings(name := "quasar-sst-internal")
+  .dependsOn(frontend % BothScopes)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val datagen = project
   .settings(name := "quasar-datagen")
-  .dependsOn(frontend % BothScopes)
+  .dependsOn(sst % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -376,17 +405,17 @@ lazy val datagen = project
   */
 lazy val sql = project
   .settings(name := "quasar-sql-internal")
-  .dependsOn(frontend % BothScopes)
+  .dependsOn(common % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
+  .settings(
+    libraryDependencies ++= Dependencies.sql)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val fs = project
   .settings(name := "quasar-fs-internal")
-  .dependsOn(
-    effect,
-    frontend % BothScopes)
+  .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(publishTestsSettings)
@@ -396,8 +425,8 @@ lazy val fs = project
 lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
   .dependsOn(
-    sql % "test->test",
-    fs)
+    fs,
+    frontend % "test->test")
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -415,7 +444,6 @@ lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
     api,
-    sql % "test->test",
     qsu)
   .settings(commonSettings)
   .settings(publishTestsSettings)
@@ -428,11 +456,11 @@ lazy val connector = project
 lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(
-    connector % BothScopes,
-    sql,
-    api       % "test->test",
-    effect    % "test->test",
-    fs        % "test->test")
+    api     % BothScopes,
+    qscript % BothScopes,
+    sql     % BothScopes,
+    fs      % "test->test",
+    effect  % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -447,6 +475,7 @@ lazy val couchbase = project
   .settings(name := "quasar-couchbase-internal")
   .dependsOn(
     connector % BothScopes,
+    core      % "test->test",
     qscript   % "test->test")
   .settings(commonSettings)
   .settings(targetSettings)
@@ -459,7 +488,10 @@ lazy val couchbase = project
   */
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
-  .dependsOn(connector % BothScopes)
+  .dependsOn(
+    connector % BothScopes,
+    core      % "test->test",
+    qscript   % "test->test")
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
@@ -476,7 +508,7 @@ lazy val mongodb = project
     fs        % "test->test",
     connector % BothScopes,
     js        % BothScopes,
-    core      % "test->compile")
+    core      % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(
@@ -506,8 +538,9 @@ lazy val interface = project
   .settings(name := "quasar-interface-internal")
   .dependsOn(
     core % BothScopes,
+    mimir,
     skeleton,
-    mimir)
+    sst)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)

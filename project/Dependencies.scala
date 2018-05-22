@@ -70,9 +70,8 @@ object Dependencies {
   )
 
   def frontend = Seq(
-    "com.github.julien-truffaut" %% "monocle-macro"            % monocleVersion,
-    "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6",
-    "org.typelevel"              %% "algebra-laws"             % algebraVersion  % Test
+    "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
+    "org.typelevel"              %% "algebra-laws"  % algebraVersion  % Test
   )
 
   def ejson = Seq(
@@ -93,6 +92,11 @@ object Dependencies {
 
   def connector = Seq(
     "co.fs2" %% "fs2-core" % fs2Version
+  )
+
+  def sql = Seq(
+    "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
+    "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6"
   )
 
   def core = Seq(

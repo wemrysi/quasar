@@ -69,9 +69,9 @@ class ViewReadQueryRegressionSpec
     val prg: Process[RF.unsafe.M, Data] = RF.scanAll(path)
     val interp = mounts(path, query, vars).flatMap(interpViews).unsafePerformSync
 
-    def t: RF.unsafe.M ~> qfTransforms.CompExecM =
-      new (RF.unsafe.M ~> qfTransforms.CompExecM) {
-        def apply[A](fa: RF.unsafe.M[A]): qfTransforms.CompExecM[A] = {
+    def t: RF.unsafe.M ~> CE.CompExecM =
+      new (RF.unsafe.M ~> CE.CompExecM) {
+        def apply[A](fa: RF.unsafe.M[A]): CE.CompExecM[A] = {
           val u: ReadFile ~> Free[BackendEffectIO, ?] =
             mapSNT(interp) compose view.readFile[ViewFS]
 
