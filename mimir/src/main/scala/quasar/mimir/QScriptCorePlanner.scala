@@ -26,7 +26,7 @@ import quasar.fp.numeric._
 import quasar.fp.ski.κ
 import quasar.precog.common.{CNumericValue, ColumnRef, CPath, CPathField, CPathIndex}
 import quasar.mimir.MimirCake._
-import quasar.qscript._, MapFuncCore._, MapFuncsCore._
+import quasar.qscript._, MapFuncCore._
 import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
@@ -220,7 +220,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
 
       for {
 
-        structTrans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(struct)
+        structTrans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(struct.linearize)
         wrappedStructTrans =
           OuterObjectConcat(WrapObject(TransSpec1.Id, "src"), WrapObject(structTrans, "f"))
 
