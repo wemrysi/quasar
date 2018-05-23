@@ -1472,32 +1472,35 @@ trait ColumnarTableModule[M[+ _]]
 
     def leftShift(focus: CPath, emitOnUndef: Boolean): Table = {
 
-      def lens(slice: Slice): (Map[ColumnRef, Column], Option[BitSet], Map[ColumnRef, Column]) = {
+      def lens(slice: Slice): (Map[ColumnRef, Column], BitSet, Map[ColumnRef, Column]) = {
 
         val (focused: Map[ColumnRef, Column], unfocused: Map[ColumnRef, Column]) =
           slice.columns.partition(_._1.selector.hasPrefix(focus))
 
-        val (scalars, nonScalars) = focused.partition(_ match {
-          case (ColumnRef(`focus`, CArrayType(_)), _) => false
-          case (ColumnRef(`focus`, _), _) => true
-          case _ => false
-        })
+        // discard scalar values at focus
+        val typed = focused filter {
+          case (ColumnRef(`focus`, CArrayType(_)), _) => true
+          case (ColumnRef(`focus`, _), _) => false
+          case _ => true
+        }
 
         // remap focused, non-scalars to be at "root"
-        val remappedNonScalars = nonScalars map {
+        val remapped = typed map {
           case (ColumnRef(path, tpe), col) =>
             (ColumnRef(path.dropPrefix(focus).get, tpe), col)
         }
 
-        // keep scalars as a bitset
-        // their contents is not relevant, just their location
         val emit =
-          if (emitOnUndef)
-            Some(scalars.values.map(_.definedAt(0, slice.size)).reduceOption(_ | _).getOrElse(new BitSet()))
+          if (emitOnUndef) {
+            val bitset = remapped.values.map(i => i.definedAt(0, slice.size)).
+              reduceOption(_ | _).getOrElse(new BitSet())
+            bitset.flip(0, slice.size) // mutation!
+            bitset
+          }
           else
-            None
+            new BitSet()
 
-        (remappedNonScalars, emit, unfocused)
+        (remapped, emit, unfocused)
       }
 
       // eagerly force the slices, since we'll be backtracking within each
@@ -1509,9 +1512,19 @@ trait ColumnarTableModule[M[+ _]]
             case ColumnRef(path, _) => path.head.toVector
           }
 
+          // make sure there's at least 1 element when emitOnUndef
+          val unsorted0 =
+            if (unsorted.isEmpty && emitOnUndef)
+              Vector(CPathIndex(0))
+            else
+              unsorted
+
           // sort the index lexicographically except in the case of indices
-          unsorted sortWith {
+          // also: indices come first
+          unsorted0 sortWith {
             case (CPathIndex(i1), CPathIndex(i2)) => i1 < i2
+            case (CPathIndex(i1), p2) => true
+            case (p1, CPathIndex(i2)) => false
             case (p1, p2) => p1.toString < p2.toString
           }
         }
@@ -1527,12 +1540,10 @@ trait ColumnarTableModule[M[+ _]]
         val primitiveMax = primitiveWaterMarks.fold(0)(math.max)
 
         // TODO doesn't handle the case where we have a sparse array with a missing column!
+        // this value may be 0 if we're looking at CEmptyObject | CEmptyArray
+        // and emitOnUndef = false
         val highWaterMark =
-          math.max(
-            // this value may be 0 if we're looking at CEmptyObject | CEmptyArray
-            math.max(innerHeads.length, primitiveMax),
-            // .. but in case of emitOnUndef we need it to be at least 1
-            if (emitOnUndef) 1 else 0)
+          math.max(innerHeads.length, primitiveMax)
 
         val resplit = if (slice.size * highWaterMark > Config.maxSliceSize) {
           val numSplits =
@@ -1589,8 +1600,17 @@ trait ColumnarTableModule[M[+ _]]
 
           // figure out the definedness of the exploded, filtered result
           // this is necessary so we can implement inner-concat semantics
-          val definedness: BitSet =
-            merged.values.map(_.definedAt(0, slice.size * highWaterMark)).reduceOption(_ | _).getOrElse(new BitSet)
+          val definedness: BitSet = {
+            // the regular definedness bitset
+            val d = merged.values.map(_.definedAt(0, slice.size * highWaterMark)).reduceOption(_ | _).getOrElse(new BitSet)
+            // additional definedness bitset:
+            // we need to keep every first expanded
+            // row that's marked to be kept according to the emit bitset
+            val keep: BitSet =
+              BitSetUtil.filteredRange(0, slice.size * highWaterMark)(i =>
+                (i % highWaterMark == 0) && emit(i / highWaterMark))
+            d | keep
+          }
 
           // move all of our results into second index of an array
           val indexed = merged map {
@@ -1661,18 +1681,11 @@ trait ColumnarTableModule[M[+ _]]
               ColumnRef(focus \ path, tpe) -> col
           }
 
-          // if emit is defined then we need to keep every first expanded
-          // row that's marked to be kept according to the emit bitset
-          val keep =
-            emit map (em =>
-              BitSetUtil.filteredRange(0, slice.size * highWaterMark)(i =>
-                (i % highWaterMark == 0) && em(i / highWaterMark))) getOrElse(new BitSet())
-
           // we need to go back to our original columns and filter them by results
           // if we don't do this, the data will be highly sparse (like an outer join)
           val unfocusedTransformed = unfocusedExpanded map {
             case (ref, col) =>
-              ref -> cf.util.filter(0, slice.size * highWaterMark, definedness | keep)(col).get
+              ref -> cf.util.filter(0, slice.size * highWaterMark, definedness)(col).get
           }
 
           // glue everything back together with the unfocused and compute the new size

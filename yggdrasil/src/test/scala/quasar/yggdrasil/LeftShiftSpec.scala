@@ -42,7 +42,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     val table = fromSample(SampleData(Stream(rec)))
 
     val expected =
-      if (emit) Vector(toRecord0(Array(0)))
+      if (emit) Vector(toRecord(Array(0), JArray(JNum(0))))
       else Vector()
 
     toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
@@ -53,7 +53,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     val table = fromSample(SampleData(Stream(rec)))
 
     val expected =
-      if (emit) Vector(toRecord0(Array(0)))
+      if (emit) Vector(toRecord(Array(0), JArray(JNum(0))))
       else Vector()
 
     toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
@@ -76,7 +76,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     val table = fromSample(SampleData(Stream(rec)))
 
     val expected =
-      if (emit) Vector(toRecord0(Array(0)))
+      if (emit) Vector(toRecord(Array(0), JArray(JNum(0))))
       else Vector()
 
     toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
@@ -112,15 +112,15 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
             toRecord(Array(4), JObject()))))
 
     val expected =
-      (if (emit) Vector(toRecord0(Array(0))) else Vector()) ++
+      (if (emit) Vector(toRecord(Array(0), JArray(JNum(0)))) else Vector()) ++
       Vector(
         toRecord(Array(1), JArray(JString("bar"), JNum(13))),
         toRecord(Array(1), JArray(JString("foo"), JNum(12)))) ++
-      (if (emit) Vector(toRecord0(Array(2))) else Vector()) ++
+      (if (emit) Vector(toRecord(Array(2), JArray(JNum(0)))) else Vector()) ++
       Vector(
         toRecord(Array(3), JArray(JNum(0), JNum(42))),
         toRecord(Array(3), JArray(JNum(1), JNum(43)))) ++
-      (if (emit) Vector(toRecord0(Array(4))) else Vector())
+      (if (emit) Vector(toRecord(Array(4), JArray(JNum(0)))) else Vector())
 
     toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).copoint.toVector.map(_.toJValueRaw) mustEqual expected
   }
@@ -159,7 +159,9 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         toRecord(Array(1), JArray(JNum(1), JNum(23))),
         toRecord(Array(1), JArray(JNum(2), JNum(24))),
         toRecord(Array(1), JArray(JNum(3), JNum(25)))) ++ (
-      if (emit) Vector(toRecord0(Array(2)), toRecord0(Array(3)))
+      if (emit) Vector(
+        toRecord(Array(2), JArray(JNum(0))),
+        toRecord(Array(3), JArray(JNum(0))))
       else Vector())
 
     toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
@@ -181,7 +183,4 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
   // replaces SampleData.toRecord to avoid ordering issues
   def toRecord(indices: Array[Int], jv: JValue): JValue =
     JArray(JArray(indices.map(JNum(_)).toList) :: jv :: Nil)
-
-  def toRecord0(indices: Array[Int]): JValue =
-    JArray(JArray(indices.map(JNum(_)).toList) :: Nil)
 }
