@@ -58,9 +58,9 @@ object Dependencies {
     "org.typelevel"              %% "spire-laws"                % spireVersion                         % Test,
     "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
     "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
+    "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
     "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") % Test,
-    "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                              % Test,
-    "org.typelevel"              %% "scalaz-specs2"             % "0.5.2"                              % Test
+    "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                              % Test
   )
 
   def api = Seq(
