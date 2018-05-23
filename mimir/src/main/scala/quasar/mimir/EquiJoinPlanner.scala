@@ -140,8 +140,9 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
                   TransSpec1.Undef.point[F]
               }
               newSortOrder = rephrase2(transMiddle, transLKey, transRKey)
-            } yield (lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle),
-                newSortOrder.map(order => SortState(None, order :: Nil)))
+              newSortState = newSortOrder.map(order => SortState(None, order :: Nil))
+              joinedTable = lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle)
+            } yield (joinedTable, newSortState)
           }
         }
 
