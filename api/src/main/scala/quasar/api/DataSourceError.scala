@@ -16,11 +16,10 @@
 
 package quasar.api
 
-import slamdata.Predef.{Nothing, Option, Product, Serializable, String, Throwable}
+import slamdata.Predef.{Nothing, Product, Serializable, String}
 
 import scalaz.{Cord, ISet, NonEmptyList, Show}
 import scalaz.std.string._
-import scalaz.std.option._
 import scalaz.syntax.show._
 
 sealed trait DataSourceError[+C] extends QuasarErrorNG
@@ -28,12 +27,12 @@ sealed trait DataSourceError[+C] extends QuasarErrorNG
     with Serializable
 
 object DataSourceError extends DataSourceErrorInstances {
-  sealed trait ExternalError[C] extends DataSourceError[C]
+  sealed trait CreateError[+C] extends DataSourceError[C]
 
-  final case class DataSourceUnsupported[C](kind: DataSourceType, supported: ISet[DataSourceType])
-      extends ExternalError[C]
+  final case class DataSourceUnsupported(kind: DataSourceType, supported: ISet[DataSourceType])
+      extends CreateError[Nothing]
 
-  sealed trait InitializationError[C] extends ExternalError[C]
+  sealed trait InitializationError[C] extends CreateError[C]
 
   final case class MalformedConfiguration[C](kind: DataSourceType, config: C, reason: String)
       extends InitializationError[C]
@@ -41,23 +40,15 @@ object DataSourceError extends DataSourceErrorInstances {
   final case class InvalidConfiguration[C](kind: DataSourceType, config: C, reasons: NonEmptyList[String])
       extends InitializationError[C]
 
-  final case class ConnectionFailed[C](message: String, cause: Option[Throwable])
-      extends InitializationError[C]
+  sealed trait ExistentialError extends CreateError[Nothing]
 
-  sealed trait StaticError extends DataSourceError[Nothing]
+  final case class DataSourceExists(name: ResourceName)
+      extends ExistentialError
 
-  final case class MalformedContent(reason: String)
-      extends StaticError
+  sealed trait CommonError extends ExistentialError
 
-  sealed trait CreateError[C] extends ExternalError[C] with StaticError
-
-  final case class DataSourceExists[C](name: ResourceName)
-      extends CreateError[C]
-
-  sealed trait CommonError[C] extends CreateError[C]
-
-  final case class DataSourceNotFound[C](name: ResourceName)
-      extends CommonError[C]
+  final case class DataSourceNotFound(name: ResourceName)
+      extends CommonError
 }
 
 sealed abstract class DataSourceErrorInstances {
@@ -79,11 +70,5 @@ sealed abstract class DataSourceErrorInstances {
 
       case InvalidConfiguration(k, c, rs) =>
         Cord("InvalidConfiguration(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ rs.show ++ Cord(")")
-
-      case MalformedContent(r) =>
-        Cord("MalformedContent(") ++ r.show ++ Cord(")")
-
-      case ConnectionFailed(m, t) =>
-        Cord("ConnectionFailed(") ++ m.show ++ Cord(", ") ++ t.map(_.getMessage).show ++ Cord(")")
     }
 }
