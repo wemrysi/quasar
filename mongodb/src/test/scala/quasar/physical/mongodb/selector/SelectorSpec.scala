@@ -30,11 +30,11 @@ class SelectorSpec extends quasar.Qspec  {
 
     "bson" should {
       "render simple expr" in {
-        Expr(Lt(10)).bson must_== Bson.Doc("$lt" -> Bson.Int32(10))
+        CondExpr(Lt(10)).bson must_== Bson.Doc("$lt" -> Bson.Int32(10))
       }
 
       "render $not expr" in {
-        NotExpr(Lt(10)).bson must_== Bson.Doc(ListMap("$not" -> Bson.Doc("$lt" -> Bson.Int32(10))))
+        NotCondExpr(Lt(10)).bson must_== Bson.Doc(ListMap("$not" -> Bson.Doc("$lt" -> Bson.Int32(10))))
       }
 
       "render simple selector" in {
@@ -67,7 +67,7 @@ class SelectorSpec extends quasar.Qspec  {
       }
 
       "render not(eq(...))" in {
-        val cond = NotExpr(Eq(10))
+        val cond = NotCondExpr(Eq(10))
         cond.bson must_== Bson.Doc("$ne" -> Bson.Int32(10))
       }
 
@@ -97,8 +97,8 @@ class SelectorSpec extends quasar.Qspec  {
           BsonField.Name("x") -> Lt(10),
           BsonField.Name("y") -> Gt(10))
         sel.negate must_== Or(
-          Doc(ListMap(("x": BsonField) -> NotExpr(Lt(10)))),
-          Doc(ListMap(("y": BsonField) -> NotExpr(Gt(10)))))
+          Doc(ListMap(("x": BsonField) -> NotCondExpr(Lt(10)))),
+          Doc(ListMap(("y": BsonField) -> NotCondExpr(Gt(10)))))
       }
 
       "rewrite And" in {
@@ -107,8 +107,8 @@ class SelectorSpec extends quasar.Qspec  {
             Doc(BsonField.Name("x") -> Lt(10)),
             Doc(BsonField.Name("y") -> Gt(10)))
         sel.negate must_== Or(
-          Doc(ListMap(("x": BsonField) -> NotExpr(Lt(10)))),
-          Doc(ListMap(("y": BsonField) -> NotExpr(Gt(10)))))
+          Doc(ListMap(("x": BsonField) -> NotCondExpr(Lt(10)))),
+          Doc(ListMap(("y": BsonField) -> NotCondExpr(Gt(10)))))
       }
 
       "rewrite Doc" in {
@@ -116,8 +116,8 @@ class SelectorSpec extends quasar.Qspec  {
           BsonField.Name("x") -> Lt(10),
           BsonField.Name("y") -> Gt(10))
         sel.negate must_== Or(
-          Doc(ListMap(("x": BsonField) -> NotExpr(Lt(10)))),
-          Doc(ListMap(("y": BsonField) -> NotExpr(Gt(10)))))
+          Doc(ListMap(("x": BsonField) -> NotCondExpr(Lt(10)))),
+          Doc(ListMap(("y": BsonField) -> NotCondExpr(Gt(10)))))
       }
     }
   }

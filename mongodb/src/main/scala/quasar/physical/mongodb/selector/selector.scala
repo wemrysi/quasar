@@ -52,9 +52,9 @@ sealed abstract class Selector {
     }
 
   def negate: Selector = {
-    def expr(x: Selector.SelectorExpr): Selector.SelectorExpr = x match {
-      case Selector.Expr(cond) => Selector.NotExpr(cond)
-      case Selector.NotExpr(cond) => Selector.Expr(cond)
+    def expr(x: Selector.ConditionExpr): Selector.ConditionExpr = x match {
+      case Selector.CondExpr(cond) => Selector.NotCondExpr(cond)
+      case Selector.NotCondExpr(cond) => Selector.CondExpr(cond)
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -87,10 +87,10 @@ object Selector {
         case where: Where => Terminal("Where" :: SelectorNodeType, Some(where.bson.toJs.pprint(0)))
         case Doc(pairs)   => {
           val children = pairs.map {
-            case (field, Expr(expr)) =>
-              Terminal("Expr" :: SelectorNodeType, Some(field.asField + " -> " + expr.shows))
-            case (field, NotExpr(expr)) =>
-              Terminal("NotExpr" :: SelectorNodeType, Some(field.asField + " -> " + expr.shows))
+            case (field, CondExpr(expr)) =>
+              Terminal("CondExpr" :: SelectorNodeType, Some(field.asField + " -> " + expr.shows))
+            case (field, NotCondExpr(expr)) =>
+              Terminal("NotCondExpr" :: SelectorNodeType, Some(field.asField + " -> " + expr.shows))
           }
           NonTerminal("Doc" :: SelectorNodeType, None, children.toList)
         }
@@ -201,17 +201,17 @@ object Selector {
     protected def rhs = Bson.Int32(size)
   }
 
-  sealed abstract class SelectorExpr {
+  sealed abstract class ConditionExpr {
     def bson: Bson
   }
 
-  implicit val showSelectorExpr: Show[SelectorExpr] = Show.showFromToString
+  implicit val showSelectorExpr: Show[ConditionExpr] = Show.showFromToString
 
-  final case class Expr(value: Condition) extends SelectorExpr {
+  final case class CondExpr(value: Condition) extends ConditionExpr {
     def bson = value.bson
   }
 
-  final case class NotExpr(value: Condition) extends SelectorExpr {
+  final case class NotCondExpr(value: Condition) extends ConditionExpr {
     def bson = value match {
       // NB: there is no $eq operator, and MongoDB does not allow $not around
       // a simple value, so this pattern _must_ be rewritten with $ne.
@@ -220,7 +220,7 @@ object Selector {
     }
   }
 
-  final case class Doc(pairs: ListMap[BsonField, SelectorExpr]) extends Selector {
+  final case class Doc(pairs: ListMap[BsonField, ConditionExpr]) extends Selector {
     def bson = Bson.Doc(pairs.map { case (f, e) => f.asText -> e.bson })
 
     override def toString = {
@@ -233,7 +233,7 @@ object Selector {
 
   object Doc {
     def apply(pairs: (BsonField, Condition)*): Doc =
-      Doc(ListMap(pairs.map(t => t._1 -> Expr(t._2)): _*))
+      Doc(ListMap(pairs.map(t => t._1 -> CondExpr(t._2)): _*))
   }
 
   sealed abstract class CompoundSelector extends Selector {
