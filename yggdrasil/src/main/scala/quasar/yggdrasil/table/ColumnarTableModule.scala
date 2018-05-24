@@ -1492,10 +1492,9 @@ trait ColumnarTableModule[M[+ _]]
 
         val emit =
           if (emitOnUndef) {
-            val bitset = remapped.values.map(i => i.definedAt(0, slice.size)).
-              reduceOption(_ | _).getOrElse(new BitSet())
-            bitset.flip(0, slice.size) // mutation!
-            bitset
+            val undefineds = focused.values.map(_.definedAt(0, slice.size)).reduceOption(_ | _).getOrElse(new BitSet())
+            undefineds.flip(0, slice.size) //mutation!
+            undefineds
           }
           else
             new BitSet()

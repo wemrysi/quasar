@@ -329,6 +329,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     List(true, false).foreach { emit =>
       s"in leftShift (${emitToString(emit)} on undefined)" >> {
         "shift a string" in testTrivialStringLeftShift(emit)
+        "shift undefined" in testTrivialUndefinedLeftShift(emit)
         "shift a simple array" in testTrivialArrayLeftShift(emit)
         "shift a simple empty array" in testTrivialEmptyArrayLeftShift(emit)
         "shift a simple object" in testTrivialObjectLeftShift(emit)
