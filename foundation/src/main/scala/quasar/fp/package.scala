@@ -18,8 +18,7 @@ package quasar
 
 import slamdata.Predef._
 
-import iotaz.{CopK, TListK, TNilK}
-import iotaz.TListK.:::
+import iotaz.{CopK, TListK}
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -228,28 +227,6 @@ package object fp
 
   type ACopK[a] = CopK[_, a]
   type :<<:[F[_], G[a] <: ACopK[a]] = CopK.Inject[F, G]
-
-  implicit class TwoElemCopKOps[F[_], G[_], A](val copK: CopK[F ::: G ::: TNilK, A])(
-    implicit
-    IF: CopK.Inject[F, CopK[F ::: G ::: TNilK, ?]],
-    IG: CopK.Inject[G, CopK[F ::: G ::: TNilK, ?]]
-  ) {
-
-    def map[B](f: A => B)(implicit F: Functor[F], G: Functor[G]): CopK[F ::: G ::: TNilK, B] = {
-      copK match {
-        case IF(fa) => IF(F.map(fa)(f))
-        case IG(ga) => IG(G.map(ga)(f))
-      }
-    }
-
-    def toDisjunction: F[A] \/ G[A] = {
-      copK match {
-        case IF(fa) => -\/(fa)
-        case IG(ga) => \/-(ga)
-      }
-    }
-
-  }
 
   implicit def copkFunctor[LL <: TListK](implicit M: FunctorMaterializer[LL]): Functor[CopK[LL, ?]] = M.materialize(offset = 0)
   implicit def copkTraverse[LL <: TListK](implicit M: TraverseMaterializer[LL]): Traverse[CopK[LL, ?]] = M.materialize(offset = 0)

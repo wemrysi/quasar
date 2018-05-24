@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.scalacheck.gen
 import quasar.fp.ski.κ
-import quasar.fp.{copkTraverse, TwoElemCopKOps}
+import quasar.fp.copkTraverse
 import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
 import quasar.precog.common.RValue
 import quasar.qscript._
@@ -102,7 +102,11 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
   private def check[A](fm: FreeMapA[Fix, A]): Option[Result] =
     fm.cataM(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](
       κ(().right),
-      _.toDisjunction.fold(shortCircuitCore, shortCircuitDerived))).swap.toOption
+      {
+        case MFC(mfc) => shortCircuitCore(mfc)
+        case MFD(mfd) => shortCircuitDerived(mfd)
+      }
+    )).swap.toOption
 
   private def run[A](
     freeMap: FreeMapA[Fix, A],
