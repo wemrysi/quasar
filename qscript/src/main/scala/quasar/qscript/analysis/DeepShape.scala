@@ -208,9 +208,12 @@ sealed abstract class DeepShapeInstances {
     val proj = new rewrites.SimplifiableProjectionT[T]
 
     new DeepShape[T, ProjectBucket[T, ?]] {
+      private type QSC[A] = CopK[QScriptCore[T, ?] ::: TNilK, A]
+      private val QSC = CopK.Inject[QScriptCore[T, ?], QSC]
+
       def deepShapeƒ: Algebra[ProjectBucket[T, ?], FreeShape[T]] = {
         qs => QS.deepShapeƒ(
-          proj.ProjectBucket[CopK[QScriptCore[T, ?] ::: TNilK, ?]].simplifyProjection(qs).value.asInstanceOf[QScriptCore[T, FreeShape[T]]])
+          proj.ProjectBucket[QSC].simplifyProjection(qs) match { case QSC(qc) => qc })
       }
     }
   }
