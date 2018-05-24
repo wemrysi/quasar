@@ -22,7 +22,7 @@ import quasar.api.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.api.ResourceError.ReadError
 import quasar.contrib.pathy._
 import quasar.connector.DataSource
-import quasar.fp.{copkTraverse => _, _}
+import quasar.fp._
 import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript._
 import quasar.qscript.rewrites._

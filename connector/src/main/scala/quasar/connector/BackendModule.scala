@@ -27,7 +27,7 @@ import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.contrib.scalaz.concurrent._
-import quasar.fp.:<<:
+import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.frontend.logicalplan.LogicalPlan
@@ -162,10 +162,7 @@ trait BackendModule {
     for {
       qs <- MonadFsErr[M].unattempt(
         LPtoQS[T].apply[X](lp).leftMap(qscriptPlanningFailed(_)).run.eval(0))
-      _ <- logPhase[M]{
-        import quasar.fp.copkTraverse
-        PhaseResult.tree("QScript (Educated)", qs)
-      }
+      _ <- logPhase[M](PhaseResult.tree("QScript (Educated)", qs))
 
       shifted <- MonadFsErr[M].unattempt(
         Unirewrite[T, QS[T], PlannerErrT[M, ?]](R, d => lc(d).liftM[PlannerErrT])
