@@ -218,7 +218,7 @@ sealed abstract class DeepShapeInstances {
     new DeepShape[T, ProjectBucket[T, ?]] {
       def deepShapeƒ: Algebra[ProjectBucket[T, ?], FreeShape[T]] = {
         qs => QS.deepShapeƒ(
-          proj.ProjectBucket[JustK[QScriptCore[T, ?], ?]].simplifyProjection(qs).value.asInstanceOf[QScriptCore[T, FreeShape[T]]])
+          proj.ProjectBucket[CopK[QScriptCore[T, ?] ::: TNilK, ?]].simplifyProjection(qs).value.asInstanceOf[QScriptCore[T, FreeShape[T]]])
       }
     }
   }
