@@ -287,21 +287,23 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
         existsPrecog <- precog.fs.exists(dir).liftM[MT].liftB
 
-        back <- if (existsPrecog) {
-          // if the dir exsits in precog, return the contents
-          precog.fs.listContents(dir).liftM[MT].liftB
+        backPrecog <- if (existsPrecog) {
+          precog.fs.listContents(dir).map(_.some).liftM[MT].liftB
         } else {
-          for {
-            existsLwfs <- lwfs.children(dir).liftM[MT].liftB
-            back <- existsLwfs match {
-              case Some(segments) =>
-                // if the dir exsits in the lwc, return the contents
-                segments.point[Backend]
-              case None =>
-                // if the dir doesn't exist, raise an error
-                MonadError_[Backend, FileSystemError].raiseError[Set[PathSegment]](pathErr(pathNotFound(dir)))
-            }
-          } yield back
+          none[Set[PathSegment]].point[Backend]
+        }
+
+        backLwfs <- lwfs.children(dir).liftM[MT].liftB
+
+        appended <- Task.delay(backPrecog |+| backLwfs).liftM[MT].liftB
+
+        back <- appended match {
+          case Some(segments) =>
+            // if the dir exists in the lwc and/xor mimir, return the union of the results
+            segments.point[Backend]
+          case None =>
+            // if the dir doesn't exist in either the lwc or mimir, raise an error
+            MonadError_[Backend, FileSystemError].raiseError[Set[PathSegment]](pathErr(pathNotFound(dir)))
         }
       } yield back
     }
