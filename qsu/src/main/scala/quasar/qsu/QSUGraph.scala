@@ -308,7 +308,7 @@ object QSUGraph extends QSUGraphInstances {
     for {
       reverse <- MS.get
 
-      back <- reverse.get(node) match {
+      back <- reverse.collectFirst { case (`node`, x) => x } match {
         case Some(sym) =>
           QSUGraph[T](root = sym, SMap(sym -> node)).point[F]
 
