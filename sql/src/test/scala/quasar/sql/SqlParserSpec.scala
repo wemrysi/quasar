@@ -637,13 +637,13 @@ class SQLParserSpec extends quasar.Qspec {
     "parse function declaration" in {
       val funcDeclString = "CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END"
       fixParser.parseWithParser(funcDeclString, fixParser.func_def) must be_\/-(
-        equalTo(FunctionDecl(CIName("ARRAY_LENGTH"),List(CIName("foo")),Fix(invokeFunction(CIName("count"),List(Fix(Unop(Fix(vari[Fix[Sql]]("foo")),ShiftArrayValues))))))))
+        FunctionDecl(CIName("ARRAY_LENGTH"),List(CIName("foo")),Fix(invokeFunction(CIName("count"),List(Fix(Unop(Fix(vari[Fix[Sql]]("foo")),ShiftArrayValues)))))))
     }
 
     "parse import statement" in {
       val importString = "import `/foo/bar/baz/`"
       fixParser.parseWithParser(importString, fixParser.import_) must be_\/-(
-        equalTo(Import(rootDir </> dir("foo") </> dir("bar") </> dir("baz"))))
+        Import[Fix[Sql]](rootDir </> dir("foo") </> dir("bar") </> dir("baz")))
     }
 
     "parse module" >> {
