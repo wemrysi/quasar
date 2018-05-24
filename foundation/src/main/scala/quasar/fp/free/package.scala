@@ -17,7 +17,7 @@
 package quasar.fp
 
 import scalaz._
-import scala.Option
+import slamdata.Predef.Option
 
 package object free {
   sealed abstract class :+:[F[_], G[_]] {

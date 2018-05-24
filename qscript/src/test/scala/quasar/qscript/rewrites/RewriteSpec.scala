@@ -48,7 +48,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
     expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
 
   def compactLeftShiftExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](liftFGCopK[QScriptCore, QS, Fix[QS]](
+    expr.transCata[Fix[QS]](liftFG[QScriptCore, QS, Fix[QS]](
       injectRepeatedly[QScriptCore, QS, Fix[QS]](
         rewrite.compactLeftShift[QS](PrismNT.injectCopK).apply(_: QScriptCore[Fix[QS]]))))
 

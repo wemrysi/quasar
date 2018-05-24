@@ -169,11 +169,7 @@ package object fp
 
   def evalNT[F[_]: Monad, S](initial: S) = λ[StateT[F, S, ?] ~> F](_ eval initial)
 
-  def liftFG[F[_], G[_], A](orig: F[A] => G[A])(implicit F: F :<: G):
-      G[A] => G[A] =
-    ftf => F.prj(ftf).fold(ftf)(orig)
-
-  def liftFGCopK[F[_], G[a] <: ACopK[a], A](orig: F[A] => G[A])(implicit F: F :<<: G):
+  def liftFG[F[_], G[a] <: ACopK[a], A](orig: F[A] => G[A])(implicit F: F :<<: G):
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig)
 
