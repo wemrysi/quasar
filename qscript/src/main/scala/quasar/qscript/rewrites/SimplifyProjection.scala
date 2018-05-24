@@ -62,9 +62,6 @@ object SimplifyProjection {
   implicit def shiftedRead[F[a] <: ACopK[a], A](implicit SR: Const[ShiftedRead[A], ?] :<<: F): Aux[Const[ShiftedRead[A], ?], F] =
     default[Const[ShiftedRead[A], ?], F]
 
-  implicit def coproduct[T[_[_]], G[_], I[_], J[_]](implicit I: Aux[I, G], J: Aux[J, G]): Aux[Coproduct[I, J, ?], G] =
-    make(λ[Coproduct[I, J, ?] ~> G](fa => fa.run.fold(I.simplifyProjection, J.simplifyProjection)))
-
   implicit def copk[G[_], LL <: TListK](implicit M: Materializer[G, LL]): Aux[CopK[LL, ?], G] =
     M.materialize(offset = 0)
 

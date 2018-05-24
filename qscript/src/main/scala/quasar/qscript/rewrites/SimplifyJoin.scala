@@ -159,17 +159,6 @@ object SimplifyJoin {
           ej.combine)))
     }
 
-  implicit def coproduct[T[_[_]], F[_], I[_], J[_]]
-    (implicit I: SimplifyJoin.Aux[T, I, F], J: SimplifyJoin.Aux[T, J, F])
-      : SimplifyJoin.Aux[T, Coproduct[I, J, ?], F] =
-    new SimplifyJoin[Coproduct[I, J, ?]] {
-      type IT[F[_]] = T[F]
-      type G[A] = F[A]
-      def simplifyJoin[H[_]: Functor](GtoH: G ~> H)
-          : Coproduct[I, J, T[H]] => H[T[H]] =
-        _.run.fold(I.simplifyJoin(GtoH), J.simplifyJoin(GtoH))
-    }
-
   implicit def copk[T[_[_]], LL <: TListK, S[_]](implicit M: Materializer[T, LL, S]): SimplifyJoin.Aux[T, CopK[LL, ?], S] =
     M.materialize(offset = 0)
 

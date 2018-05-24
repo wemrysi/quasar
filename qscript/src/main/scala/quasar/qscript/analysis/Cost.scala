@@ -102,13 +102,6 @@ object Cost {
       }
     }
 
-  implicit def coproduct[F[_], G[_]](implicit F: Cost[F], G: Cost[G]):
-      Cost[Coproduct[F, G, ?]] =
-    new Cost[Coproduct[F, G, ?]] {
-      def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, Coproduct[F, G, ?], Int] =
-        _.run.fold(F.evaluate(pathCard), G.evaluate(pathCard))
-    }
-
   implicit def copk[LL <: TListK](implicit M: Materializer[LL]): Cost[CopK[LL, ?]] =
     M.materialize(offset = 0)
 

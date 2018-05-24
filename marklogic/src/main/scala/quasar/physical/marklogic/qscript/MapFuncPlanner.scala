@@ -34,14 +34,6 @@ abstract class MapFuncPlanner[F[_], FMT, MF[_]] {
 object MapFuncPlanner {
 
   def apply[F[_], FMT, MF[_]](implicit ev: MapFuncPlanner[F, FMT, MF]): MapFuncPlanner[F, FMT, MF] = ev
-
-  implicit def coproduct[F[_], FMT, G[_], H[_], T[_[_]]: RecursiveT](
-    implicit G: MapFuncPlanner[F, FMT, G], H: MapFuncPlanner[F, FMT, H]
-  ): MapFuncPlanner[F, FMT, Coproduct[G, H, ?]] =
-    new MapFuncPlanner[F, FMT, Coproduct[G, H, ?]] {
-      def plan: AlgebraM[F, Coproduct[G, H, ?], XQuery] =
-        _.run.fold(G.plan, H.plan)
-    }
   
   implicit def copk[M[_], FMT, LL <: TListK](implicit M: Materializer[M, FMT, LL]): MapFuncPlanner[M, FMT, CopK[LL, ?]] =
     M.materialize(offset = 0)

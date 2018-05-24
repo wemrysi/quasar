@@ -140,17 +140,6 @@ abstract class DiscoverPathInstances {
       : DiscoverPath.Aux[T, EquiJoin[T, ?], F] =
     discoverPath[T, F].equiJoin
 
-  implicit def coproduct[T[_[_]], F[_], G[_], H[_]]
-    (implicit F: DiscoverPath.Aux[T, F, H], G: DiscoverPath.Aux[T, G, H])
-      : DiscoverPath.Aux[T, Coproduct[F, G, ?], H] =
-    new DiscoverPath[Coproduct[F, G, ?]] {
-      type IT[F[_]] = T[F]
-      type OUT[A] = H[A]
-
-      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) =
-        _.run.fold(F.discoverPath(g), G.discoverPath(g))
-    }
-
   implicit def copk[T[_[_]], LL <: TListK, H[_]](implicit M: Materializer[T, LL, H]): DiscoverPath.Aux[T, CopK[LL, ?], H] =
     M.materialize(offset = 0)
 

@@ -97,19 +97,6 @@ abstract class ExpandDirsInstances {
       : ExpandDirs.Aux[T, EquiJoin[T, ?], F] =
     expandDirsBranch[T].equiJoin[F]
 
-  implicit def coproduct[T[_[_]], F[_], G[_], H[_]]
-    (implicit F: ExpandDirs.Aux[T, F, H], G: ExpandDirs.Aux[T, G, H])
-      : ExpandDirs.Aux[T, Coproduct[F, G, ?], H] =
-    new ExpandDirs[Coproduct[F, G, ?]] {
-      type IT[F[_]] = T[F]
-      type OUT[A] = H[A]
-
-      def expandDirs[M[_]: Monad: PlannerErrorME, F[_]: Functor]
-        (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
-        _.run.fold(F.expandDirs(OutToF, g), G.expandDirs(OutToF, g))
-    }
-
-
   implicit def copk[T[_[_]], LL <: TListK, H[_]](implicit M: Materializer[T, LL, H]): ExpandDirs.Aux[T, CopK[LL, ?], H] =
     M.materialize(offset = 0)
 

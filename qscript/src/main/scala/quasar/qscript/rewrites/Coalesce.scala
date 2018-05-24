@@ -114,35 +114,6 @@ trait CoalesceInstances {
       : Coalesce.Aux[T, EquiJoin[T, ?], G] =
     coalesce[T].equiJoin[G]
 
-  implicit def coproduct[T[_[_]], G[_], H[_], I[a] <: ACopK[a]]
-    (implicit G: Coalesce.Aux[T, G, I],
-              H: Coalesce.Aux[T, H, I])
-      : Coalesce.Aux[T, Coproduct[G, H, ?], I] =
-    new Coalesce[Coproduct[G, H, ?]] {
-      type IT[F[_]] = T[F]
-      type OUT[A] = I[A]
-
-      def coalesceQC[F[_]: Functor]
-        (FToOut: PrismNT[F, OUT])
-        (implicit QC: QScriptCore[IT, ?] :<<: OUT) =
-        _.run.bitraverse(G.coalesceQC(FToOut), H.coalesceQC(FToOut)) ∘ (Coproduct(_))
-
-      def coalesceSR[F[_]: Functor, A]
-        (FToOut: PrismNT[F, OUT])
-        (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT) =
-        _.run.bitraverse(G.coalesceSR(FToOut), H.coalesceSR(FToOut)) ∘ (Coproduct(_))
-
-      def coalesceEJ[F[_]: Functor]
-        (FToOut: F ~> λ[α => Option[OUT[α]]])
-        (implicit EJ: EquiJoin[IT, ?] :<<: OUT) =
-        _.run.fold(G.coalesceEJ(FToOut), H.coalesceEJ(FToOut))
-
-      def coalesceTJ[F[_]: Functor]
-        (FToOut: F ~> λ[α => Option[OUT[α]]])
-        (implicit TJ: ThetaJoin[IT, ?] :<<: OUT) =
-        _.run.fold(G.coalesceTJ(FToOut), H.coalesceTJ(FToOut))
-    }
-
   implicit def copk[T[_[_]], LL <: TListK, I[a] <: ACopK[a]](implicit M: Materializer[T, LL, I]): Coalesce.Aux[T, CopK[LL, ?], I] =
     M.materialize(offset = 0)
 

@@ -102,18 +102,6 @@ sealed abstract class ShiftReadDirInstances extends ShiftReadDirInstances0 {
           ej.combine))))
     }
 
-  implicit def coproduct[T[_[_]], F[_], I[_], J[_]](
-    implicit
-    I: ShiftReadDir.Aux[T, I, F],
-    J: ShiftReadDir.Aux[T, J, F]
-  ): ShiftReadDir.Aux[T, Coproduct[I, J, ?], F] =
-    new ShiftReadDir[Coproduct[I, J, ?]] {
-      type G[A] = F[A]
-      def shiftReadDir[H[_]](GtoH: G ~> H) =
-        λ[Coproduct[I, J, ?] ~> FixFreeH[H, ?]](
-          _.run.fold(I.shiftReadDir(GtoH)(_), J.shiftReadDir(GtoH)(_)))
-    }
-
   implicit def copk[T[_[_]], LL <: TListK, M[_]](implicit M: Materializer[T, LL, M]): ShiftReadDir.Aux[T, CopK[LL, ?], M] =
     M.materialize(offset = 0)
   

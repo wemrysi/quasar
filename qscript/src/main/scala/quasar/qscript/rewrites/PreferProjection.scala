@@ -136,20 +136,6 @@ object PreferProjection extends PreferProjectionInstances {
 sealed abstract class PreferProjectionInstances {
   import PreferProjection.projectComplement
 
-  implicit def coproduct[F[_], G[_], T, B[_]](
-      implicit
-      F: PreferProjection[F, T, B],
-      G: PreferProjection[G, T, B])
-      : PreferProjection[Coproduct[F, G, ?], T, B] =
-    new PreferProjection[Coproduct[F, G, ?], T, B] {
-      type C[A] = Coproduct[F, G, A]
-
-      def preferProjectionƒ(BtoC: PrismNT[B, C]) =
-        _.run.fold(
-          F.preferProjectionƒ(BtoC andThen PrismNT.inject[F, C]),
-          G.preferProjectionƒ(BtoC andThen PrismNT.inject[G, C]))
-    }
-
   implicit def copk[T, B[_], LL <: TListK](implicit M: Materializer[T, B, LL]): PreferProjection[CopK[LL, ?], T, B] =
     M.materialize(offset = 0)
 

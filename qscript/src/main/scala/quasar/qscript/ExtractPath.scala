@@ -41,16 +41,6 @@ object ExtractPath extends ExtractPathInstances {
 }
 
 sealed abstract class ExtractPathInstances extends ExtractPathInstances0 {
-  implicit def coproduct[F[_], G[_], P](
-    implicit
-    F: Lazy[ExtractPath[F, P]],
-    G: Lazy[ExtractPath[G, P]]
-  ): ExtractPath[Coproduct[F, G, ?], P] =
-    new ExtractPath[Coproduct[F, G, ?], P] {
-      def extractPath[H[_]: ApplicativePlus]: Algebra[Coproduct[F, G, ?], H[P]] =
-        _.run.fold(F.value.extractPath[H], G.value.extractPath[H])
-    }
-
   implicit def copk[LL <: TListK, P](implicit M: Materializer[LL, P]): ExtractPath[CopK[LL, ?], P] = M.materialize(offset = 0)
 
   sealed trait Materializer[LL <: TListK, P] {

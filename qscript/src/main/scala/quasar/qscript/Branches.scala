@@ -77,21 +77,6 @@ object Branches {
     }
   }
 
-  implicit def coproduct[T[_[_]], G[_], H[_]]
-    (implicit G: Branches[T, G], H: Branches[T, H])
-      : Branches[T, Coproduct[G, H, ?]] =
-    new Branches[T, Coproduct[G, H, ?]] {
-      def branches[A]: Traversal[Coproduct[G, H, A], FreeQS[T]] =
-        new Traversal[Coproduct[G, H, A], FreeQS[T]] {
-          def modifyF[F[_]: Applicative](f: FreeQS[T] => F[FreeQS[T]])(s: Coproduct[G, H, A]): F[Coproduct[G, H, A]] = {
-            s.run.bitraverse[F, G[A], H[A]](
-              G.branches.modifyF(f),
-              H.branches.modifyF(f)
-            ).map(Coproduct(_))
-          }
-        }
-    }
-
   implicit def qscriptCore[T[_[_]]]: Branches[T, QScriptCore[T, ?]] =
     new Branches[T, QScriptCore[T, ?]] {
       def branches[A]: Traversal[QScriptCore[T, A], FreeQS[T]] =

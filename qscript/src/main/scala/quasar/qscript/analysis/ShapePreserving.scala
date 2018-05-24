@@ -71,14 +71,6 @@ object ShapePreserving {
         x => GtoF.get(x).flatMap(F.shapePreservingƒ)
     }
 
-  implicit def coproduct[F[_], G[_]]
-    (implicit F: ShapePreserving[F], G: ShapePreserving[G])
-      : ShapePreserving[Coproduct[F, G, ?]] =
-    new ShapePreserving[Coproduct[F, G, ?]] {
-      def shapePreservingƒ: Algebra[Coproduct[F, G, ?], Option[IdStatus]] =
-        _.run.fold(F.shapePreservingƒ, G.shapePreservingƒ)
-    }
-
   implicit def copk[LL <: TListK](implicit M: Materializer[LL]): ShapePreserving[CopK[LL, ?]] =
     M.materialize(offset = 0)
 

@@ -116,14 +116,6 @@ object Cardinality {
       def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, Const[DeadEnd, ?], Int] = κ(1.point[M])
     }
 
-  implicit def coproduct[F[_], G[_]](
-    implicit F: Cardinality[F], G: Cardinality[G]):
-      Cardinality[Coproduct[F, G, ?]] =
-    new Cardinality[Coproduct[F, G, ?]] {
-      def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, Coproduct[F, G, ?], Int] =
-        _.run.fold(F.calculate(pathCard), G.calculate(pathCard))
-    }
-
   implicit def copk[LL <: TListK](implicit M: Materializer[LL]): Cardinality[CopK[LL, ?]] =
     M.materialize(offset = 0)
 

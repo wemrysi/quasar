@@ -64,15 +64,6 @@ trait NormalizableInstances {
       : Normalizable[EquiJoin[T, ?]] =
     normalizable[T].EquiJoin
 
-  implicit def coproduct[F[_], G[_]]
-    (implicit F: Normalizable[F], G: Normalizable[G])
-      : Normalizable[Coproduct[F, G, ?]] =
-    new Normalizable[Coproduct[F, G, ?]] {
-      def normalizeF =
-        λ[Coproduct[F, G, ?] ~> (Option ∘ Coproduct[F, G, ?])#λ](
-          _.run.bitraverse(F.normalizeF(_), G.normalizeF(_)) ∘ (Coproduct(_)))
-  }
-
   implicit def copk[LL <: TListK](implicit M: Materializer[LL]): Normalizable[CopK[LL, ?]] =
     M.materialize(offset = 0)
 

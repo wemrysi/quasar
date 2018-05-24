@@ -65,25 +65,6 @@ object Planner {
       Planner.Aux[T, EquiJoin[T, ?]] =
     new EquiJoinPlanner[T]
 
-  implicit def coproduct[T[_[_]], F[_], G[_]](
-    implicit F: Planner.Aux[T, F], G: Planner.Aux[T, G]):
-      Planner.Aux[T, Coproduct[F, G, ?]] =
-    new Planner[Coproduct[F, G, ?]] {
-      type IT[G[_]] = T[G]
-      def plan
-        [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
-        (cfg: PlannerConfig[T, EX, WF, M])
-        (implicit
-          ev0: WorkflowOpCoreF :<: WF,
-          ev1: RenderTree[WorkflowBuilder[WF]],
-          ev2: WorkflowBuilder.Ops[WF],
-          ev3: ExprOpCoreF :<: EX,
-          ev4: EX :<: ExprOp) =
-        _.run.fold(
-          F.plan[M, WF, EX](cfg),
-          G.plan[M, WF, EX](cfg))
-    }
-
   implicit def copk[T[_[_]], LL <: TListK](implicit M: Materializer[T, LL]): Planner.Aux[T, CopK[LL, ?]] =
     M.materialize(offset = 0)
 

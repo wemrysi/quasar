@@ -151,14 +151,6 @@ object Outline extends OutlineInstances {
 sealed abstract class OutlineInstances {
   import Outline._
 
-  implicit def coproduct[F[_], G[_]]
-      (implicit F: Outline[F], G: Outline[G])
-      : Outline[Coproduct[F, G, ?]] =
-    new Outline[Coproduct[F, G, ?]] {
-      def outlineƒ: Algebra[Coproduct[F, G, ?], Shape] =
-        _.run.fold(F.outlineƒ, G.outlineƒ)
-    }
-
   implicit def copk[LL <: TListK](implicit M: Materializer[LL]): Outline[CopK[LL, ?]] =
     M.materialize(offset = 0)
 

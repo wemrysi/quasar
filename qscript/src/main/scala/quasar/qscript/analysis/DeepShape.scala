@@ -111,14 +111,6 @@ object DeepShape extends DeepShapeInstances {
 sealed abstract class DeepShapeInstances {
   import DeepShape._
 
-  implicit def coproduct[T[_[_]], F[_], G[_]]
-    (implicit F: DeepShape[T, F], G: DeepShape[T, G])
-      : DeepShape[T, Coproduct[F, G, ?]] =
-    new DeepShape[T, Coproduct[F, G, ?]] {
-      def deepShapeƒ: Algebra[Coproduct[F, G, ?], FreeShape[T]] =
-        _.run.fold(F.deepShapeƒ, G.deepShapeƒ)
-    }
-
   implicit def copk[T[_[_]], LL <: TListK](implicit M: Materializer[T, LL]): DeepShape[T, CopK[LL, ?]] =
     M.materialize(offset = 0)
 

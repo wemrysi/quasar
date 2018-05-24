@@ -102,15 +102,6 @@ sealed abstract class PlannerInstances extends PlannerInstances0 {
     }
   }
 
-  implicit def coproduct[M[_], FMT, F[_], G[_], J](
-    implicit F: Lazy[Planner[M, FMT, F, J]], G: Lazy[Planner[M, FMT, G, J]]
-  ): Planner[M, FMT, Coproduct[F, G, ?], J] =
-    new Planner[M, FMT, Coproduct[F, G, ?], J] {
-      def plan[Q](
-        implicit Q: Birecursive.Aux[Q, Query[J, ?]]
-      ): AlgebraM[M, Coproduct[F, G, ?], Search[Q] \/ XQuery] =
-        _.run.fold(F.value.plan, G.value.plan)
-    }
 }
 
 sealed abstract class PlannerInstances0 extends PlannerInstances1 {

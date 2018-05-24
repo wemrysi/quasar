@@ -44,21 +44,6 @@ object UnaryFunctions {
         }
     }
 
-  implicit def coproduct[T[_[_]], G[_], H[_]]
-    (implicit G: UnaryFunctions[T, G], H: UnaryFunctions[T, H])
-      : UnaryFunctions[T, Coproduct[G, H, ?]] =
-    new UnaryFunctions[T, Coproduct[G, H, ?]] {
-      def unaryFunctions[A]: Traversal[Coproduct[G, H, A], FreeMap[T]] =
-        new Traversal[Coproduct[G, H, A], FreeMap[T]] {
-          def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: Coproduct[G, H, A]): F[Coproduct[G, H, A]] = {
-            s.run.bitraverse[F, G[A], H[A]](
-              G.unaryFunctions.modifyF(f),
-              H.unaryFunctions.modifyF(f)
-            ).map(Coproduct(_))
-          }
-        }
-    }
-
   implicit def copk[T[_[_]], LL <: TListK](implicit M: Materializer[T, LL]): UnaryFunctions[T, CopK[LL, ?]] =
     M.materialize(offset = 0)
 

@@ -125,17 +125,6 @@ object ShiftRead {
       )
     }
 
-
-  implicit def coproduct[T[_[_]], F[_], I[_], J[_]]
-    (implicit I: ShiftRead.Aux[T, I, F], J: ShiftRead.Aux[T, J, F])
-      : ShiftRead.Aux[T, Coproduct[I, J, ?], F] =
-      new ShiftRead[Coproduct[I, J, ?]] {
-        type G[A] = F[A]
-        def shiftRead[H[_]](GtoH: G ~> H) =
-          λ[Coproduct[I, J, ?] ~> FixFreeH[H, ?]](
-            _.run.fold(I.shiftRead(GtoH)(_), J.shiftRead(GtoH)(_)))
-      }
-
   implicit def copk[T[_[_]], LL <: TListK, I[_]](implicit M: Materializer[T, LL, I]): ShiftRead.Aux[T, CopK[LL, ?], I] =
     M.materialize(offset = 0)
 
