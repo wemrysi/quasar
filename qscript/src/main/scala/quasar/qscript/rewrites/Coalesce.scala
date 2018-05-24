@@ -321,9 +321,8 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
       }
 
       def fmIsCondUndef(jf: JoinFunc): Boolean = {
-        val MapFuncCore = CopK.Inject[MapFuncCore, MapFunc]
         jf.resumeTwice.fold({
-          case MapFuncCore(MapFuncsCore.Cond(_, _, -\/(MapFuncCore(MapFuncsCore.Undefined())))) => true
+          case MFC(MapFuncsCore.Cond(_, _, -\/(MFC(MapFuncsCore.Undefined())))) => true
           case _ => false
         }, _ => false)
       }
