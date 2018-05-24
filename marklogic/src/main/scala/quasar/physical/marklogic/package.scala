@@ -45,16 +45,16 @@ package object marklogic {
     SubInject[CopK[fs.MLQScriptCP[T], ?], QScriptTotal[T, ?]]
   
   implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[fs.MLQScriptCP[T], ?]] =
-    Injectable.injectCopK[QScriptCore[T, ?], CopK[fs.MLQScriptCP[T], ?]]
+    Injectable.inject[QScriptCore[T, ?], CopK[fs.MLQScriptCP[T], ?]]
 
   implicit def thetaJoinToQScript[T[_[_]]]: Injectable[ThetaJoin[T, ?], CopK[fs.MLQScriptCP[T], ?]] =
-    Injectable.injectCopK[ThetaJoin[T, ?], CopK[fs.MLQScriptCP[T], ?]]
+    Injectable.inject[ThetaJoin[T, ?], CopK[fs.MLQScriptCP[T], ?]]
 
   implicit def readToQScript[T[_[_]]]: Injectable[Const[Read[AFile], ?], CopK[fs.MLQScriptCP[T], ?]] =
-    Injectable.injectCopK[Const[Read[AFile], ?], CopK[fs.MLQScriptCP[T], ?]]
+    Injectable.inject[Const[Read[AFile], ?], CopK[fs.MLQScriptCP[T], ?]]
 
   implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[ADir], ?], CopK[fs.MLQScriptCP[T], ?]] =
-    Injectable.injectCopK[Const[ShiftedRead[ADir], ?], CopK[fs.MLQScriptCP[T], ?]]
+    Injectable.inject[Const[ShiftedRead[ADir], ?], CopK[fs.MLQScriptCP[T], ?]]
 
 
 }

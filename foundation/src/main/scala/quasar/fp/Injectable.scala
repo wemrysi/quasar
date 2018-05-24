@@ -44,7 +44,7 @@ object Injectable {
     val project = prj
   }
 
-  implicit def injectCopK[F[_], G[a] <: ACopK[a]](implicit IN: F :<<: G): Injectable[F, G] =
+  implicit def inject[F[_], G[a] <: ACopK[a]](implicit IN: F :<<: G): Injectable[F, G] =
     make[F, G](IN.inj, IN.prj)
 
 }

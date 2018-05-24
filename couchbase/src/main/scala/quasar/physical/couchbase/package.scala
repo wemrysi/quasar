@@ -34,11 +34,11 @@ package object couchbase {
     SubInject[CopK[CouchbaseQScriptCP[T], ?], QScriptTotal[T, ?]]
 
   implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[CouchbaseQScriptCP[T], ?]] =
-    Injectable.injectCopK[QScriptCore[T, ?], CopK[CouchbaseQScriptCP[T], ?]]
+    Injectable.inject[QScriptCore[T, ?], CopK[CouchbaseQScriptCP[T], ?]]
 
   implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], CopK[CouchbaseQScriptCP[T], ?]] =
-    Injectable.injectCopK[EquiJoin[T, ?], CopK[CouchbaseQScriptCP[T], ?]]
+    Injectable.inject[EquiJoin[T, ?], CopK[CouchbaseQScriptCP[T], ?]]
 
   implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], CopK[CouchbaseQScriptCP[T], ?]] =
-    Injectable.injectCopK[Const[ShiftedRead[AFile], ?], CopK[CouchbaseQScriptCP[T], ?]]
+    Injectable.inject[Const[ShiftedRead[AFile], ?], CopK[CouchbaseQScriptCP[T], ?]]
 }

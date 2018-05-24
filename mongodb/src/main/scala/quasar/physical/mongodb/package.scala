@@ -56,12 +56,12 @@ package object mongodb {
     SubInject[CopK[fs.MongoQScriptCP[T], ?], QScriptTotal[T, ?]]
 
   implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[fs.MongoQScriptCP[T], ?]] =
-    Injectable.injectCopK[QScriptCore[T, ?], CopK[fs.MongoQScriptCP[T], ?]]
+    Injectable.inject[QScriptCore[T, ?], CopK[fs.MongoQScriptCP[T], ?]]
 
   implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], CopK[fs.MongoQScriptCP[T], ?]] =
-    Injectable.injectCopK[EquiJoin[T, ?], CopK[fs.MongoQScriptCP[T], ?]]
+    Injectable.inject[EquiJoin[T, ?], CopK[fs.MongoQScriptCP[T], ?]]
 
   implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], CopK[fs.MongoQScriptCP[T], ?]] =
-    Injectable.injectCopK[Const[ShiftedRead[AFile], ?], CopK[fs.MongoQScriptCP[T], ?]]
+    Injectable.inject[Const[ShiftedRead[AFile], ?], CopK[fs.MongoQScriptCP[T], ?]]
 
 }

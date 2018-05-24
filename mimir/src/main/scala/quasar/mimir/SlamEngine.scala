@@ -76,13 +76,13 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
     mimir.qScriptToQScriptTotal[T]
 
   implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], QSM[T, ?]] =
-    Injectable.injectCopK[QScriptCore[T, ?], QSM[T, ?]]
+    Injectable.inject[QScriptCore[T, ?], QSM[T, ?]]
 
   implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], QSM[T, ?]] =
-    Injectable.injectCopK[EquiJoin[T, ?], QSM[T, ?]]
+    Injectable.inject[EquiJoin[T, ?], QSM[T, ?]]
 
   implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], QSM[T, ?]] =
-    Injectable.injectCopK[Const[ShiftedRead[AFile], ?], QSM[T, ?]]
+    Injectable.inject[Const[ShiftedRead[AFile], ?], QSM[T, ?]]
 
   type Repr = MimirRepr
   type MT[F[_], A] = CakeMT[F, A]

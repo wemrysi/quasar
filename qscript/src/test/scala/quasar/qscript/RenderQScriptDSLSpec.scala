@@ -64,15 +64,15 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       |type SRTD[A] = Const[ShiftedRead[ADir], A]
       |type SRTF[A] = Const[ShiftedRead[AFile], A]
       |implicit def idInj = Injectable.id[QT]
-      |implicit def QCT = Injectable.injectCopK(QScriptHelpers.QCT)
-      |implicit def TJT = Injectable.injectCopK(QScriptHelpers.TJT)
-      |implicit def EJT = Injectable.injectCopK(QScriptHelpers.EJT)
-      |implicit def PBT = Injectable.injectCopK(QScriptHelpers.PBT)
-      |implicit def RTD = Injectable.injectCopK[RTD, QT](QScriptHelpers.RTD)
-      |implicit def RTF = Injectable.injectCopK[RTF, QT](QScriptHelpers.RTF)
-      |implicit def SRTD = Injectable.injectCopK[SRTD, QT](QScriptHelpers.SRTD)
-      |implicit def SRTF = Injectable.injectCopK[SRTF, QT](QScriptHelpers.SRTF)
-      |implicit def DET = Injectable.injectCopK[DET, QT](QScriptHelpers.DET)
+      |implicit def QCT = Injectable.inject(QScriptHelpers.QCT)
+      |implicit def TJT = Injectable.inject(QScriptHelpers.TJT)
+      |implicit def EJT = Injectable.inject(QScriptHelpers.EJT)
+      |implicit def PBT = Injectable.inject(QScriptHelpers.PBT)
+      |implicit def RTD = Injectable.inject[RTD, QT](QScriptHelpers.RTD)
+      |implicit def RTF = Injectable.inject[RTF, QT](QScriptHelpers.RTF)
+      |implicit def SRTD = Injectable.inject[SRTD, QT](QScriptHelpers.SRTD)
+      |implicit def SRTF = Injectable.inject[SRTF, QT](QScriptHelpers.SRTF)
+      |implicit def DET = Injectable.inject[DET, QT](QScriptHelpers.DET)
       |val dsl = construction.mkDefaults[Fix, QT]
       |val json = Fixed[Fix[EJson]]
       |import dsl._
