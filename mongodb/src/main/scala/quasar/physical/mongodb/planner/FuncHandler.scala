@@ -501,46 +501,7 @@ object FuncHandler {
           : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
     }
 
-  implicit def mapFuncCoproduct[F[_], G[_]]
-      (implicit F: FuncHandler[F], G: FuncHandler[G])
-      : FuncHandler[Coproduct[F, G, ?]] =
-    new FuncHandler[Coproduct[F, G, ?]] {
-      def handleOpsCore[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
-        (v: BsonVersion)
-        (implicit e32: ExprOpCoreF :<: EX)
-          : AlgebraM[M, Coproduct[F, G, ?], Fix[EX]] =
-        _.run.fold(
-          F.handleOpsCore[EX, M](v).apply _,
-          G.handleOpsCore[EX, M](v).apply _)
-
-      def handleOps3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
-        (v: BsonVersion)
-        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
-          : AlgebraM[(Option ∘ M)#λ, Coproduct[F, G, ?], Fix[EX]] =
-        _.run.fold(
-          F.handleOps3_4[EX, M](v).apply _,
-          G.handleOps3_4[EX, M](v).apply _)
-
-      def handleOps3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
-        (v: BsonVersion)
-        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
-          : AlgebraM[(Option ∘ M)#λ, Coproduct[F, G, ?], Fix[EX]] =
-        _.run.fold(
-          F.handleOps3_4_4[EX, M](v).apply _,
-          G.handleOps3_4_4[EX, M](v).apply _)
-
-      def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
-        (v: BsonVersion)
-        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
-          : AlgebraM[(Option ∘ M)#λ, Coproduct[F, G, ?], Fix[EX]] =
-        _.run.fold(
-          F.handleOps3_6[EX, M](v).apply _,
-          G.handleOps3_6[EX, M](v).apply _)
-
-    }
-
-
-  implicit def mapFuncCopk[LL <: TListK](implicit M: Materializer[LL]): FuncHandler[CopK[LL, ?]] =
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): FuncHandler[CopK[LL, ?]] =
     M.materialize(offset = 0)
 
   sealed trait Materializer[LL <: TListK] {
