@@ -78,8 +78,10 @@ object PlannerHelpers {
 
   import fixExprOp._
 
-  val expr3_4Fp: ExprOp3_4F.fixpoint[Fix[ExprOp], ExprOp] =
+  val fp34: ExprOp3_4F.fixpoint[Fix[ExprOp], ExprOp] =
     new ExprOp3_4F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
+  val fp36: ExprOp3_6F.fixpoint[Fix[ExprOp], ExprOp] =
+    new ExprOp3_6F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
 
   implicit def toBsonField(name: String) = BsonField.Name(name)
   implicit def toLeftShape(shape: Reshape[ExprOp]): Reshape.Shape[ExprOp] = -\/ (shape)
@@ -264,8 +266,16 @@ object PlannerHelpers {
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, basePathDb, MongoQueryModel.`3.4.4`, stats, indexes, anyDoc)
 
+  def plan3_6(
+    query: Fix[Sql],
+    stats: Collection => Option[CollectionStatistics],
+    indexes: Collection => Option[Set[Index]],
+    anyDoc: Collection => OptionT[EitherWriter, BsonDocument]
+  ): Either[FileSystemError, Crystallized[WorkflowF]] =
+    plan0(query, basePathDb, MongoQueryModel.`3.6`, stats, indexes, anyDoc)
+
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan3_4_4(query, defaultStats, defaultIndexes, emptyDoc)
+    plan3_6(query, defaultStats, defaultIndexes, emptyDoc)
 
   def planMetal(query: Fix[Sql]): Option[String] =
     plan(query).disjunction.toOption >>= toMetalPlan

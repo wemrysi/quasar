@@ -62,7 +62,7 @@ class PlannerSql2ExactSpec extends
   import CollectionUtil._
 
   import fixExprOp._
-  import PlannerHelpers._, expr3_4Fp._
+  import PlannerHelpers._, fp34._, fp36._
 
   val dsl =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
@@ -546,8 +546,8 @@ class PlannerSql2ExactSpec extends
            ExcludeId)))
     }
 
-    "plan date field extraction: \"isodow\"" in {
-      plan(sqlE"""select date_part("isodow", ts) from days""") must
+    "plan date field extraction: \"isodow\" (3.4.4)" in {
+      plan3_4_4(sqlE"""select date_part("isodow", ts) from days""", defaultStats, defaultIndexes, emptyDoc) must
        beWorkflow(chain[Workflow](
          $read(collection("db", "days")),
          $project(
@@ -560,6 +560,24 @@ class PlannerSql2ExactSpec extends
                  $cond($eq($dayOfWeek($field("ts")), $literal(Bson.Int32(1))),
                    $literal(Bson.Int32(7)),
                    $subtract($dayOfWeek($field("ts")), $literal(Bson.Int32(1)))),
+                 $literal(Bson.Undefined))),
+           ExcludeId)))
+    }
+
+    "plan date field extraction: \"isodow\"" in {
+      plan(sqlE"""select date_part("isodow", ts) from days""") must
+       beWorkflow(chain[Workflow](
+         $read(collection("db", "days")),
+         $project(
+           reshape(
+             sigil.Quasar ->
+               $cond(
+                 $and(
+                   $lte($literal(Check.minDate), $field("ts")),
+                   $lt($field("ts"), $literal(Check.minTimestamp))),
+                 $let(ListMap(
+                   DocVar.Name("parts") -> $dateToParts($field("ts"), None, true.some)),
+                   $field("$parts", "isoDayOfWeek")),
                  $literal(Bson.Undefined))),
            ExcludeId)))
     }
