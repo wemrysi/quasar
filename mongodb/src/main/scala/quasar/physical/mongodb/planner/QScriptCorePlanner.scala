@@ -86,7 +86,8 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] exte
             cfg.funcHandler, cfg.staticHandler)(DocField(rootKey), DocField(structKey))
         val jsMerge: JoinFunc[T] => M[JsFn] =
           getJsMerge[T, M](
-            _, jscore.Select(jscore.Ident(JsFn.defaultName), rootKey.value), jscore.Select(jscore.Ident(JsFn.defaultName), structKey.value))
+            jscore.Select(jscore.Ident(JsFn.defaultName), rootKey.value),
+            jscore.Select(jscore.Ident(JsFn.defaultName), structKey.value))
 
         val struct0 = struct.linearize.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
         val repair0 = repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide]))
