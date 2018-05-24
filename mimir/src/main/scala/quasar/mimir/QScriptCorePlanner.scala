@@ -214,8 +214,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
         }
       } yield MimirRepr(src.P)(table)
 
-    // FIXME: Handle `onUndef`
-    case qscript.LeftShift(src, struct, idStatus, _, onUndef, repair) =>
+    case qscript.LeftShift(src, struct, idStatus, shiftType, onUndef, repair) =>
       import src.P.trans._
 
       for {
@@ -243,7 +242,8 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
             },
             mapFuncPlanner[F].plan(src.P)[Source1](TransSpec1.Id)))
 
-        shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ "f", onUndef === OnUndefined.Emit)
+        emit = (shiftType === ShiftType.Array) && (onUndef === OnUndefined.Emit)
+        shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ "f", emit)
         repaired = shifted.transform(repairTrans)
       } yield MimirRepr(src.P)(repaired)
 
