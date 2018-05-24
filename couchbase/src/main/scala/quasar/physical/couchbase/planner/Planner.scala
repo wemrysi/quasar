@@ -37,14 +37,6 @@ abstract class Planner[T[_[_]], F[_], QS[_]] {
 object Planner {
   def apply[T[_[_]], F[_], QS[_]](implicit ev: Planner[T, F, QS]): Planner[T, F, QS] = ev
 
-  implicit def coproduct[T[_[_]], N[_], F[_], G[_]](
-    implicit F: Planner[T, N, F], G: Planner[T, N, G]
-  ): Planner[T, N, Coproduct[F, G, ?]] =
-    new Planner[T, N, Coproduct[F, G, ?]] {
-      val plan: AlgebraM[N, Coproduct[F, G, ?], T[N1QL]] =
-        _.run.fold(F.plan, G.plan)
-    }
-
   implicit def copk[T[_[_]], N[_], LL <: TListK](implicit M: Materializer[T, N, LL]): Planner[T, N, CopK[LL, ?]] =
     M.materialize(offset = 0)
 
