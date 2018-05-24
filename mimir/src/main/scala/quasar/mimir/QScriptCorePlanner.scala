@@ -44,7 +44,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
-    liftF: Task ~> F, liftFCake: CakeM ~> F) {
+    liftFCake: ReaderT[Task, Cake, ?] ~> F) {
+
+  val liftF: Task ~> F =
+    liftFCake compose liftMT[Task, ReaderT[?[_], Cake, ?]]
 
   def mapFuncPlanner[G[_]: Monad] = MapFuncPlanner[T, G, MapFunc[T, ?]]
 
@@ -369,10 +372,10 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
 
     // FIXME look for Map(Unreferenced, Constant) and return constant table
     case qscript.Unreferenced() =>
-      liftFCake(MimirRepr.meld[CakeM, LightweightFileSystem](
-        new DepFn1[Cake, λ[`P <: Cake` => CakeM[P#Table]]] {
-          def apply(P: Cake): CakeM[P.Table] =
-            P.Table.constLong(Set(0)).point[CakeM]
+      liftFCake(MimirRepr.meldCake[ReaderT[Task, Cake, ?]](
+        new DepFn1[Cake, λ[`P <: Cake` => ReaderT[Task, Cake, P#Table]]] {
+          def apply(P: Cake): ReaderT[Task, Cake, P.Table] =
+            P.Table.constLong(Set(0)).point[ReaderT[Task, Cake, ?]]
         }))
   }
 

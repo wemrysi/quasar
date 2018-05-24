@@ -736,6 +736,7 @@ lazy val mimir = project.setup
   .settings(name := "quasar-mimir-internal")
   .dependsOn(
     yggdrasil % BothScopes,
+    core,
     connector)
   .scalacArgs("-Ypartial-unification")
   .withWarnings

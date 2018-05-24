@@ -20,7 +20,7 @@ import slamdata.Predef.{Throwable, Unit}
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.κ
 
-import scalaz.{Functor, Monad, Monoid, Semigroup, Zip}
+import scalaz.{~>, Functor, Monad, Monoid, Semigroup, Zip}
 import scalaz.syntax.monad._
 import scalaz.syntax.monoid._
 
@@ -47,6 +47,9 @@ final class Disposable[F[_], A](
 
   def map[B](f: A => B): Disposable[F, B] =
     Disposable(f(value), dispose)
+
+  def mapK[G[_]](f: F ~> G): Disposable[G, A] =
+    Disposable(value, f(dispose))
 
   def mappend(other: => Disposable[F, A])(
       implicit

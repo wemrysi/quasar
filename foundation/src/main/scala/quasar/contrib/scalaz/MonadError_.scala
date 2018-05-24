@@ -49,7 +49,10 @@ trait MonadError_[F[_], E] {
     handleError(fa)(e => pf.lift(e) getOrElse raiseError(e))
 
   def unattempt[A](fa: F[E \/ A])(implicit F: Monad[F]): F[A] =
-    fa >>= (_.fold(raiseError[A] _, _.point[F]))
+    fa >>= unattempt_
+
+  def unattempt_[A](ea: E \/ A)(implicit F: Applicative[F]): F[A] =
+    ea.fold(raiseError[A] _, _.point[F])
 }
 
 object MonadError_ extends MonadError_Instances {
