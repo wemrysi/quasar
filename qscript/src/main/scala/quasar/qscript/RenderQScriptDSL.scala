@@ -25,9 +25,8 @@ import quasar.contrib.pathy.{ADir, AFile}
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fp.ski._
-import slamdata.Predef
 
-import scalaz.{Const, Coproduct, Free, Functor}
+import scalaz.{Const, Free, Functor}
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.either._
 import scalaz.syntax.std.option._
@@ -69,15 +68,6 @@ object RenderQScriptDSL {
         def toDsl(base: String, a: Free[F, A]): DSLTree =
           a.resume.fold(D[Free[F, A]](toDsl)("free", _), A("free", _))
         toDsl
-      }
-    }
-
-  def coproduct[F[_], G[_]]
-  (delF: Delay[RenderQScriptDSL, F], delG: Delay[RenderQScriptDSL, G]): Delay[RenderQScriptDSL, Coproduct[F, G, ?]] =
-    new Delay[RenderQScriptDSL, Coproduct[F, G, ?]] {
-      def apply[A](rec: RenderQScriptDSL[A]) = {
-        (base: Predef.String, a: Coproduct[F, G, A]) =>
-          a.run.fold(delF(rec)(base, _), delG(rec)(base, _))
       }
     }
 
