@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 import iotaz.TListK.:::
-import iotaz.{ CopK, TListK, TNilK }
+import iotaz.{CopK, TListK, TNilK}
 import matryoshka.Delay
 import scalaz._
 import quasar.fp.mkInject
@@ -28,10 +28,6 @@ sealed trait RenderTreeKMaterializer[LL <: TListK] {
 }
 
 object RenderTreeKMaterializer {
-
-  //   implicit def coproductDelay[F[_], G[_]](implicit RF: Delay[RenderTree, F], RG: Delay[RenderTree, G]): Delay[RenderTree, Coproduct[F, G, ?]] =
-  //    Delay.fromNT(λ[RenderTree ~> DelayedFG[F, G]#RenderTree](ra =>
-  //      make(_.run.fold(RF(ra).render, RG(ra).render))))
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   implicit val base: RenderTreeKMaterializer[TNilK] = new RenderTreeKMaterializer[TNilK] {

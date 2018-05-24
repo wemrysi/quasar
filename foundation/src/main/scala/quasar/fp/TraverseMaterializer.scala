@@ -18,8 +18,8 @@ package quasar.fp
 
 import slamdata.Predef._
 import iotaz.TListK.:::
-import iotaz.{ CopK, TListK, TNilK }
-import scalaz.{ Applicative, Traverse }
+import iotaz.{CopK, TListK, TNilK}
+import scalaz.{Applicative, Traverse}
 
 sealed trait TraverseMaterializer[LL <: TListK] {
   def materialize(offset: Int): Traverse[CopK[LL, ?]]

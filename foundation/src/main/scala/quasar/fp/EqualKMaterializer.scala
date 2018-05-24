@@ -18,7 +18,7 @@ package quasar.fp
 
 import slamdata.Predef._
 import iotaz.TListK.:::
-import iotaz.{ CopK, TListK, TNilK }
+import iotaz.{CopK, TListK, TNilK}
 import matryoshka.Delay
 import scalaz._
 
