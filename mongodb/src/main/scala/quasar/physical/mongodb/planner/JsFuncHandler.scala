@@ -567,14 +567,6 @@ object JsFuncHandler {
         ExpandMapFunc.expand(core.handle[M], κ[MapFuncDerived[T, JsCore], Option[M[JsCore]]](None))
     }
 
-  implicit def mapFuncCoproduct[F[_], G[_]]
-      (implicit F: JsFuncHandler[F], G: JsFuncHandler[G])
-      : JsFuncHandler[Coproduct[F, G, ?]] =
-    new JsFuncHandler[Coproduct[F, G, ?]] {
-      def handle[M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, Coproduct[F, G, ?], JsCore] =
-        _.run.fold(F.handle[M], G.handle[M])
-    }
-
   implicit def copk[LL <: TListK](implicit M: Materializer[LL]): JsFuncHandler[CopK[LL, ?]] =
     M.materialize(offset = 0)
 
