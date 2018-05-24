@@ -57,7 +57,7 @@ object ExpandDirs extends ExpandDirsInstances {
 abstract class ExpandDirsInstances {
   def expandDirsPath[T[_[_]]: BirecursiveT, O[a] <: ACopK[a]: Functor](
     implicit
-    FI: Injectable.Aux[O, QScriptTotal[T, ?]],
+    FI: Injectable[O, QScriptTotal[T, ?]],
     QC: QScriptCore[T, ?] :<<: O
   ): ExpandDirsPath[T, O] =
     new ExpandDirsPath[T, O]
@@ -71,7 +71,7 @@ abstract class ExpandDirsInstances {
     (implicit
       R: Const[Read[AFile], ?] :<<: F,
       QC:    QScriptCore[T, ?] :<<: F,
-      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+      FI: Injectable[F, QScriptTotal[T, ?]])
       : ExpandDirs.Aux[T, Const[Read[ADir], ?], F] =
     expandDirsPath[T, F].readDir
 
@@ -79,7 +79,7 @@ abstract class ExpandDirsInstances {
     (implicit
       SR: Const[ShiftedRead[AFile], ?] :<<: F,
       QC:            QScriptCore[T, ?] :<<: F,
-      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+      FI: Injectable[F, QScriptTotal[T, ?]])
       : ExpandDirs.Aux[T, Const[ShiftedRead[ADir], ?], F] =
     expandDirsPath[T, F].shiftedReadDir
 
@@ -176,7 +176,7 @@ abstract class ExpandDirsInstances {
 }
 
 private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[a] <: ACopK[a]: Functor](
-  implicit FI: Injectable.Aux[O, QScriptTotal[T, ?]], QC: QScriptCore[T, ?] :<<: O
+  implicit FI: Injectable[O, QScriptTotal[T, ?]], QC: QScriptCore[T, ?] :<<: O
 ) extends TTypes[T] {
   val recFunc = construction.RecFunc[T]
 

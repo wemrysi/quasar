@@ -55,7 +55,7 @@ object assumeReadType {
   def isRewrite[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, G[_]: Functor, A](GtoF: PrismNT[G, F], qs: G[A])(implicit
     QC: QScriptCore[T, ?] :<<: F,
     SR: Const[ShiftedRead[AFile], ?] :<<: F,
-    FT: Injectable.Aux[F, QScriptTotal[T, ?]],
+    FT: Injectable[F, QScriptTotal[T, ?]],
     SP: ShapePreserving[F],
     RA: Recursive.Aux[A, G],
     CA: Corecursive.Aux[A, G])
@@ -103,7 +103,7 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, M[_]: Monad:
     QC: QScriptCore[T, ?] :<<: F,
     EJ: EquiJoin[T, ?] :<<: F,
     SR: Const[ShiftedRead[AFile], ?] :<<: F,
-    FT: Injectable.Aux[F, QScriptTotal[T, ?]],
+    FT: Injectable[F, QScriptTotal[T, ?]],
     SP: ShapePreserving[F])
     : Trans[F, M] =
   new Trans[F, M] {

@@ -72,16 +72,16 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
   type QS[T[_[_]]] = MimirQScriptCP[T]
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[QSM[T, ?], QScriptTotal[T, ?]] =
     mimir.qScriptToQScriptTotal[T]
 
-  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], QSM[T, ?]] =
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], QSM[T, ?]] =
     Injectable.injectCopK[QScriptCore[T, ?], QSM[T, ?]]
 
-  implicit def equiJoinToQScript[T[_[_]]]: Injectable.Aux[EquiJoin[T, ?], QSM[T, ?]] =
+  implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], QSM[T, ?]] =
     Injectable.injectCopK[EquiJoin[T, ?], QSM[T, ?]]
 
-  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[AFile], ?], QSM[T, ?]] =
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], QSM[T, ?]] =
     Injectable.injectCopK[Const[ShiftedRead[AFile], ?], QSM[T, ?]]
 
   type Repr = MimirRepr

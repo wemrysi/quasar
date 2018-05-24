@@ -59,17 +59,17 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
 
   type QSI[A] = CopK[QScriptCore ::: ProjectBucket ::: ThetaJoin ::: Const[DeadEnd, ?] ::: TNilK, A]
 
-  implicit val qsc: Injectable.Aux[QScriptCore, QSI] = Injectable.injectCopK[QScriptCore, QSI]
-  implicit val pb: Injectable.Aux[ProjectBucket, QSI] = Injectable.injectCopK[ProjectBucket, QSI]
-  implicit val tj: Injectable.Aux[ThetaJoin, QSI] = Injectable.injectCopK[ThetaJoin, QSI]
-  implicit val de: Injectable.Aux[Const[DeadEnd, ?], QSI] = Injectable.injectCopK[Const[DeadEnd, ?], QSI]
+  implicit val qsc: Injectable[QScriptCore, QSI] = Injectable.injectCopK[QScriptCore, QSI]
+  implicit val pb: Injectable[ProjectBucket, QSI] = Injectable.injectCopK[ProjectBucket, QSI]
+  implicit val tj: Injectable[ThetaJoin, QSI] = Injectable.injectCopK[ThetaJoin, QSI]
+  implicit val de: Injectable[Const[DeadEnd, ?], QSI] = Injectable.injectCopK[Const[DeadEnd, ?], QSI]
 
   val qsidsl = construction.mkDefaults[Fix, QSI]
 
   val DEI = implicitly[Const[DeadEnd, ?] :<<: QSI]
   val QCI = implicitly[QScriptCore :<<: QSI]
 
-  implicit def qsiToQscriptTotal: Injectable.Aux[QSI, QST] = SubInject[QSI, QST]
+  implicit def qsiToQscriptTotal: Injectable[QSI, QST] = SubInject[QSI, QST]
 
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too

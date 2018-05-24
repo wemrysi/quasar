@@ -54,7 +54,7 @@ trait Couchbase extends BackendModule with DefaultAnalyzeModule {
 
   type QS[T[_[_]]] = CouchbaseQScriptCP[T]
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[QSM[T, ?], QScriptTotal[T, ?]] =
     quasar.physical.couchbase.qScriptToQScriptTotal[T]
 
   type Repr = Mu[N1QL]

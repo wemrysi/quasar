@@ -46,7 +46,7 @@ object LightweightTester extends BackendModule with DefaultAnalyzeModule {
 
   type QS[T[_[_]]] = TestConnector.QS[T]
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[QSM[T, ?], QScriptTotal[T, ?]] =
     TestConnector.qScriptToQScriptTotal[T]
 
   type Repr = TestConnector.Repr

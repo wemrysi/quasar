@@ -43,7 +43,7 @@ import iotaz.TListK.:::
 object RenderQScriptDSL {
   type RenderQScriptDSL[A] = (String, A) => DSLTree
   implicit def qscriptInstance[T[_[_]]: RecursiveT, F[_]: Functor]
-  (implicit I: Injectable.Aux[F, QScriptTotal[T, ?]]): RenderDSL[T[F]] =
+  (implicit I: Injectable[F, QScriptTotal[T, ?]]): RenderDSL[T[F]] =
     new RenderDSL[T[F]] {
       // hard-coded here to fix.
       def toDsl(a: T[F]) = fixQSRender.apply("fix", a.transCata[Fix[QScriptTotal[T, ?]]](I.inject(_)))

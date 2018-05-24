@@ -198,7 +198,7 @@ trait BackendModule {
 
   type QS[T[_[_]]] <: TListK
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]]
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[QSM[T, ?], QScriptTotal[T, ?]]
 
   type Repr
   type M[A]

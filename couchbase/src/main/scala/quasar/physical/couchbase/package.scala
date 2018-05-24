@@ -30,15 +30,15 @@ package object couchbase {
     Const[ShiftedRead[AFile], ?] :::
     TNilK
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[CopK[CouchbaseQScriptCP[T], ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[CopK[CouchbaseQScriptCP[T], ?], QScriptTotal[T, ?]] =
     SubInject[CopK[CouchbaseQScriptCP[T], ?], QScriptTotal[T, ?]]
 
-  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], CopK[CouchbaseQScriptCP[T], ?]] =
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[CouchbaseQScriptCP[T], ?]] =
     Injectable.injectCopK[QScriptCore[T, ?], CopK[CouchbaseQScriptCP[T], ?]]
 
-  implicit def equiJoinToQScript[T[_[_]]]: Injectable.Aux[EquiJoin[T, ?], CopK[CouchbaseQScriptCP[T], ?]] =
+  implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], CopK[CouchbaseQScriptCP[T], ?]] =
     Injectable.injectCopK[EquiJoin[T, ?], CopK[CouchbaseQScriptCP[T], ?]]
 
-  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[AFile], ?], CopK[CouchbaseQScriptCP[T], ?]] =
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], CopK[CouchbaseQScriptCP[T], ?]] =
     Injectable.injectCopK[Const[ShiftedRead[AFile], ?], CopK[CouchbaseQScriptCP[T], ?]]
 }

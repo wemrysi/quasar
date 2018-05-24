@@ -41,7 +41,7 @@ object Skeleton extends BackendModule with DefaultAnalyzeModule {
   // default QS subset; change if you're cool/weird/unique!
   type QS[T[_[_]]] = QScriptCore[T, ?] ::: EquiJoin[T, ?] ::: Const[ShiftedRead[AFile], ?] ::: TNilK
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] = SubInject[QSM[T, ?], QScriptTotal[T, ?]]
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[QSM[T, ?], QScriptTotal[T, ?]] = SubInject[QSM[T, ?], QScriptTotal[T, ?]]
 
   // make this your repr and monad
   type Repr = Unit

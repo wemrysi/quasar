@@ -31,15 +31,15 @@ package object mimir {
     Const[ShiftedRead[AFile], ?] :::
     TNilK
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]] =
     SubInject[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]]
 
-  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], CopK[MimirQScriptCP[T], ?]] =
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[MimirQScriptCP[T], ?]] =
     Injectable.injectCopK[QScriptCore[T, ?], CopK[MimirQScriptCP[T], ?]]
 
-  implicit def equiJoinToQScript[T[_[_]]]: Injectable.Aux[EquiJoin[T, ?], CopK[MimirQScriptCP[T], ?]] =
+  implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], CopK[MimirQScriptCP[T], ?]] =
     Injectable.injectCopK[EquiJoin[T, ?], CopK[MimirQScriptCP[T], ?]]
 
-  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[AFile], ?], CopK[MimirQScriptCP[T], ?]] =
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], CopK[MimirQScriptCP[T], ?]] =
     Injectable.injectCopK[Const[ShiftedRead[AFile], ?], CopK[MimirQScriptCP[T], ?]]
 }

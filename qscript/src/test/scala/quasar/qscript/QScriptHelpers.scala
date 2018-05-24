@@ -44,10 +44,10 @@ trait QScriptHelpers extends TTypes[Fix] {
   val QC = implicitly[QScriptCore           :<<: QS]
   val TJ = implicitly[ThetaJoin             :<<: QS]
 
-  implicit val QS: Injectable.Aux[QS, QST] = SubInject[QS, QST]
+  implicit val QS: Injectable[QS, QST] = SubInject[QS, QST]
 
   type QST[A] = QScriptTotal[A]
-  def QST[F[_]](implicit ev: Injectable.Aux[F, QST]) = ev
+  def QST[F[_]](implicit ev: Injectable[F, QST]) = ev
 
   val DET  =            implicitly[Const[DeadEnd, ?] :<<: QST]
   val RTD  =        implicitly[Const[Read[ADir], ?]  :<<: QST]

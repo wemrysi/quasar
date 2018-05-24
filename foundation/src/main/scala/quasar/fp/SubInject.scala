@@ -24,7 +24,7 @@ package quasar.fp {
 
   object SubInject {
     @SuppressWarnings(Array("org.wartremover.warts.Null"))
-    def apply[Inner[a] <: CopK[_, a], Outer[a] <: CopK[_, a]]: Injectable.Aux[Inner, Outer] = macro iotaz.internal.SubInjectMacros.create[Inner, Outer]
+    def apply[Inner[a] <: CopK[_, a], Outer[a] <: CopK[_, a]]: Injectable[Inner, Outer] = macro iotaz.internal.SubInjectMacros.create[Inner, Outer]
   }
 
 }
@@ -49,7 +49,7 @@ package iotaz.internal {
       implicit
       evInner: c.WeakTypeTag[Inner[_]],
       evOuter: c.WeakTypeTag[Outer[_]]
-    ): c.Expr[Injectable.Aux[Inner, Outer]] = {
+    ): c.Expr[Injectable[Inner, Outer]] = {
       val Inner = evInner.tpe
       val Outer = evOuter.tpe
 

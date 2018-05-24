@@ -72,7 +72,7 @@ object DiscoverPath extends DiscoverPathInstances {
       RD:  Const[Read[ADir], ?] :<<: OUT,
       RF: Const[Read[AFile], ?] :<<: OUT,
       QC:     QScriptCore[T, ?] :<<: OUT,
-      FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
+      FI: Injectable[OUT, QScriptTotal[T, ?]])
       : List[ADir] \&/ T[OUT] => M[T[OUT]] =
     discoverPath[T, OUT].unionAll[M](g)
 }
@@ -85,7 +85,7 @@ abstract class DiscoverPathInstances {
       RD:  Const[Read[ADir], ?] :<<: O,
       RF: Const[Read[AFile], ?] :<<: O,
       QC:     QScriptCore[T, ?] :<<: O,
-      FI: Injectable.Aux[O, QScriptTotal[T, ?]]) =
+      FI: Injectable[O, QScriptTotal[T, ?]]) =
     new DiscoverPathT[T, O]
 
   // real instances
@@ -105,7 +105,7 @@ abstract class DiscoverPathInstances {
       RF: Const[Read[AFile], ?] :<<: F,
       QC:     QScriptCore[T, ?] :<<: F,
       PB:   ProjectBucket[T, ?] :<<: F,
-      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+      FI: Injectable[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, ProjectBucket[T, ?], F] =
     discoverPath[T, F].projectBucket
 
@@ -114,7 +114,7 @@ abstract class DiscoverPathInstances {
       RD:  Const[Read[ADir], ?] :<<: F,
       RF: Const[Read[AFile], ?] :<<: F,
       QC:     QScriptCore[T, ?] :<<: F,
-      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+      FI: Injectable[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, QScriptCore[T, ?], F] =
     discoverPath[T, F].qscriptCore
 
@@ -126,7 +126,7 @@ abstract class DiscoverPathInstances {
       RF: Const[Read[AFile], ?] :<<: F,
       QC:     QScriptCore[T, ?] :<<: F,
       TJ:       ThetaJoin[T, ?] :<<: F,
-      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+      FI: Injectable[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, ThetaJoin[T, ?], F] =
     discoverPath[T, F].thetaJoin
 
@@ -136,7 +136,7 @@ abstract class DiscoverPathInstances {
       RF: Const[Read[AFile], ?] :<<: F,
       QC:     QScriptCore[T, ?] :<<: F,
       EJ:        EquiJoin[T, ?] :<<: F,
-      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+      FI: Injectable[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, EquiJoin[T, ?], F] =
     discoverPath[T, F].equiJoin
 
@@ -190,7 +190,7 @@ abstract class DiscoverPathInstances {
       RF: Const[Read[AFile], ?] :<<: F,
       QC:     QScriptCore[T, ?] :<<: F,
       RA:     Const[Read[A], ?] :<<: F,
-      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+      FI: Injectable[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, Const[Read[A], ?], F] =
     discoverPath[T, F].default[Const[Read[A], ?]]
 
@@ -200,7 +200,7 @@ abstract class DiscoverPathInstances {
       RF:    Const[Read[AFile], ?] :<<: F,
       QC:        QScriptCore[T, ?] :<<: F,
       IN: Const[ShiftedRead[A], ?] :<<: F,
-      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+      FI: Injectable[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, Const[ShiftedRead[A], ?], F] =
     discoverPath[T, F].default[Const[ShiftedRead[A], ?]]
 }
@@ -210,7 +210,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[a] <: ACopK[
   RD:  Const[Read[ADir], ?] :<<: O,
   RF: Const[Read[AFile], ?] :<<: O,
   QC:     QScriptCore[T, ?] :<<: O,
-  FI: Injectable.Aux[O, QScriptTotal[T, ?]]
+  FI: Injectable[O, QScriptTotal[T, ?]]
 ) extends TTypes[T] {
   import DiscoverPath.ListContents
 

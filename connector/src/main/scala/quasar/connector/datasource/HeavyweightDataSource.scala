@@ -50,7 +50,7 @@ abstract class HeavyweightDataSource[
 
   def QSMFunctor: Functor[QSM]
   def QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM
-  def QSMToQScriptTotal: Injectable.Aux[QSM, QScriptTotal[T, ?]]
+  def QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]]
   def UnirewriteT: Unirewrite[T, QS[T]]
   def UnicoalesceCap: Unicoalesce.Capture[T, QS[T]]
 
@@ -89,7 +89,7 @@ abstract class HeavyweightDataSource[
 
   private final implicit def _QSMFunctor: Functor[QSM] = QSMFunctor
   private final implicit def _QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM = QSMFromQScriptCore
-  private final implicit def _QSMToQScriptTotal: Injectable.Aux[QSM, QScriptTotal[T, ?]] = QSMToQScriptTotal
+  private final implicit def _QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]] = QSMToQScriptTotal
   private final implicit def _UnirewriteT: Unirewrite[T, QS[T]] = UnirewriteT
   private final implicit def _UnicoalesceCap: Unicoalesce.Capture[T, QS[T]] = UnicoalesceCap
 }

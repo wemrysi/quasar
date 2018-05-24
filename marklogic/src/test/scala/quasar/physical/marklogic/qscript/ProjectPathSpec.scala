@@ -36,17 +36,17 @@ final class ProjectPathSpec extends quasar.Qspec {
   implicit val I = SubInject[MapFunc[Fix, ?], PathMapFunc[Fix, ?]]
 
   def projectKey[S[_]: Functor](src: Free[MapFunc[Fix, ?], Hole], str: String)(
-    implicit I: Injectable.Aux[MapFunc[Fix, ?], S]
+    implicit I: Injectable[MapFunc[Fix, ?], S]
   ): Free[S, Hole] =
     Free.roll[MapFunc[Fix, ?], Hole](MFC(ProjectKey(src, StrLit(str)))).mapSuspension(I.inject)
 
   def makeMap[S[_]: Functor](key: String, values: Free[MapFunc[Fix, ?], Hole])(
-    implicit I: Injectable.Aux[MapFunc[Fix, ?], S]
+    implicit I: Injectable[MapFunc[Fix, ?], S]
   ) : Free[S, Hole] =
     Free.roll[MapFunc[Fix, ?], Hole](MFC(MakeMap(StrLit(key), values))).mapSuspension(I.inject)
 
   def hole[S[_]: Functor](
-    implicit I: Injectable.Aux[MapFunc[Fix, ?], S]
+    implicit I: Injectable[MapFunc[Fix, ?], S]
   ): Free[S, Hole] =
     Free.point[MapFunc[Fix, ?], Hole](SrcHole).mapSuspension(I.inject)
 

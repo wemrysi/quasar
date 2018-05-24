@@ -72,7 +72,7 @@ sealed class MarkLogic protected (readChunkSize: Positive, writeChunkSize: Posit
 
   val Type = FsType
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[QSM[T, ?], QScriptTotal[T, ?]] =
     physical.marklogic.qScriptToQScriptTotal[T]
 
   // BackendModule

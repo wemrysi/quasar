@@ -84,7 +84,7 @@ package object qscript {
   type QScriptEducated[T[_[_]], A] =
     CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[Read[ADir], ?] ::: Const[Read[AFile], ?] ::: TNilK, A]
 
-  def educatedToTotal[T[_[_]]]: Injectable.Aux[QScriptEducated[T, ?], QScriptTotal[T, ?]] =
+  def educatedToTotal[T[_[_]]]: Injectable[QScriptEducated[T, ?], QScriptTotal[T, ?]] =
     SubInject[QScriptEducated[T, ?], QScriptTotal[T, ?]]
 
   object QCE {
@@ -100,7 +100,7 @@ package object qscript {
     CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[DeadEnd, ?] ::: TNilK, A]
 
   implicit def qScriptToQscriptTotal[T[_[_]]]
-      : Injectable.Aux[QScript[T, ?], QScriptTotal[T, ?]] = SubInject[QScript[T, ?], QScriptTotal[T, ?]]
+      : Injectable[QScript[T, ?], QScriptTotal[T, ?]] = SubInject[QScript[T, ?], QScriptTotal[T, ?]]
 
   /** QScript that has gone through Read conversion.
     *
@@ -109,7 +109,7 @@ package object qscript {
   type QScriptRead[T[_[_]], A] =
     CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[Read[ADir], ?] ::: Const[Read[AFile], ?] ::: TNilK, A]
 
-  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable.Aux[QScriptRead[T, ?], QScriptTotal[T, ?]] =
+  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable[QScriptRead[T, ?], QScriptTotal[T, ?]] =
     SubInject[QScriptRead[T, ?], QScriptTotal[T, ?]]
 
   /** QScript that has gone through Read conversion and shifted conversion.
@@ -119,7 +119,7 @@ package object qscript {
   type QScriptShiftRead[T[_[_]], A] =
     CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[ShiftedRead[ADir], ?] ::: Const[ShiftedRead[AFile], ?] ::: TNilK, A]
 
-  implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]: Injectable.Aux[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
+  implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]: Injectable[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
     SubInject[QScriptShiftRead[T, ?], QScriptTotal[T, ?]]
 
   type MapFunc[T[_[_]], A] = CopK[MapFuncCore[T, ?] ::: MapFuncDerived[T, ?] ::: TNilK, A]
@@ -178,14 +178,14 @@ package object qscript {
   def rebaseT[T[_[_]]: BirecursiveT, F[_]: Traverse](
     target: FreeQS[T])(
     src: T[F])(
-    implicit FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
+    implicit FI: Injectable[F, QScriptTotal[T, ?]]):
       Option[T[F]] =
     target.as(src.transAna[T[QScriptTotal[T, ?]]](FI.inject)).cata(recover(_.embed)).transAnaM(FI project _)
 
   def rebaseTCo[T[_[_]]: BirecursiveT, F[_]: Traverse]
     (target: FreeQS[T])
     (srcCo: T[CoEnv[Hole, F, ?]])
-    (implicit FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+    (implicit FI: Injectable[F, QScriptTotal[T, ?]])
       : Option[T[CoEnv[Hole, F, ?]]] =
     // TODO: with the right instances & types everywhere, this should look like
     //       target.transAnaM(_.htraverse(FI project _)) ∘ (_ >> srcCo)

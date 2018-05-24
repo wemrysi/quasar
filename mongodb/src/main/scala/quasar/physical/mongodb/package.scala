@@ -52,16 +52,16 @@ package object mongodb {
     case SortDir.Descending => Bson.Int32(-1)
   }
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[CopK[fs.MongoQScriptCP[T], ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[CopK[fs.MongoQScriptCP[T], ?], QScriptTotal[T, ?]] =
     SubInject[CopK[fs.MongoQScriptCP[T], ?], QScriptTotal[T, ?]]
 
-  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], CopK[fs.MongoQScriptCP[T], ?]] =
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[fs.MongoQScriptCP[T], ?]] =
     Injectable.injectCopK[QScriptCore[T, ?], CopK[fs.MongoQScriptCP[T], ?]]
 
-  implicit def equiJoinToQScript[T[_[_]]]: Injectable.Aux[EquiJoin[T, ?], CopK[fs.MongoQScriptCP[T], ?]] =
+  implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], CopK[fs.MongoQScriptCP[T], ?]] =
     Injectable.injectCopK[EquiJoin[T, ?], CopK[fs.MongoQScriptCP[T], ?]]
 
-  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[AFile], ?], CopK[fs.MongoQScriptCP[T], ?]] =
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], CopK[fs.MongoQScriptCP[T], ?]] =
     Injectable.injectCopK[Const[ShiftedRead[AFile], ?], CopK[fs.MongoQScriptCP[T], ?]]
 
 }
