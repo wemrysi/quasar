@@ -160,9 +160,9 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] exte
         .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
     case Filter(src0, cond) => {
       val selectors = getSelector[T, M, EX, Hole](
-        cond, defaultSelector[T].right, sel.selector[T](cfg.bsonVersion) ∘ (_ <+> defaultSelector[T].right))
+        cond, defaultSelector[T].some, sel.selector[T](cfg.bsonVersion) ∘ (_ <+> defaultSelector[T].some))
       val typeSelectors = getSelector[T, M, EX, Hole](
-        cond, InternalError.fromMsg(s"not a typecheck").left , typeSelector[T])
+        cond, none, typeSelector[T])
 
       def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T])
           : M[WorkflowBuilder[WF]] =
@@ -172,7 +172,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] exte
           partialSel,
           cond)
 
-      (selectors.toOption, typeSelectors.toOption) match {
+      (selectors, typeSelectors) match {
         case (None, Some(typeSel)) => filterBuilder(src0, typeSel)
         case (Some(sel), None) => filterBuilder(src0, sel)
         case (Some(sel), Some(typeSel)) => filterBuilder(src0, typeSel) >>= (filterBuilder(_, sel))

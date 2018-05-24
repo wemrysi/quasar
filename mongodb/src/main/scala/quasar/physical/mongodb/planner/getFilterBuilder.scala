@@ -19,9 +19,7 @@ package quasar.physical.mongodb.planner
 import slamdata.Predef._
 import quasar.RenderTreeT
 import quasar.contrib.matryoshka._
-import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{Planner => QPlanner}, QPlanner._
 import quasar.physical.mongodb.{BsonVersion, WorkflowBuilder}, WorkflowBuilder._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => sel}
@@ -100,7 +98,7 @@ object getFilterBuilder {
                | MFC(Lte(_, _))
                | MFC(Gt(_, _))
                | MFC(Gte(_, _))
-               | MFC(Undefined()) => defaultSelector[T].right
+               | MFC(Undefined()) => defaultSelector[T].some
             /** The cases here don't readily imply selectors, but
               *  still need to be handled in case a `Cond` is nested
               *  inside one of these.  For instance, if ConcatMaps
@@ -112,7 +110,7 @@ object getFilterBuilder {
             case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
             case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
             case MFC(Guard((_, if_), _, _, _)) => if_.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-            case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
+            case _ => none
           })
 
         case (false, wa) => wa match {
@@ -121,7 +119,7 @@ object getFilterBuilder {
           case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
           case MFC(Guard((_, if_), _, _, _)) => if_.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
           case MFC(Cond((_, pred), _, _)) => pred.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-          case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
+          case _ => none
         }
       }
     }
