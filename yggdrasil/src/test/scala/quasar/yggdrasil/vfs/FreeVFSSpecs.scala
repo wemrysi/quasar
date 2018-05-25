@@ -18,7 +18,6 @@ package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{ADir, RPath}
 import quasar.fs.MoveSemantics
-import quasar.fp.TwoElemCopKOps
 
 import fs2.{Stream, Sink}
 
@@ -30,6 +29,7 @@ import pathy.Path
 import scalaz.Need
 import scalaz.concurrent.Task
 import scalaz.syntax.monad._
+import iotaz.CopK
 
 import scodec.Codec
 import scodec.bits.ByteVector
@@ -1321,13 +1321,6 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
     } yield ()
   }
 
-  object CPR {
-    def unapply[A](cp: S[A]): Option[Task[A]] =
-      cp.toDisjunction.toOption
-  }
-
-  object CPL {
-    def unapply[A](cp: S[A]): Option[POSIXOp[A]] =
-      cp.toDisjunction.swap.toOption
-  }
+  val CPR = CopK.Inject[Task, S]
+  val CPL = CopK.Inject[POSIXOp, S]
 }

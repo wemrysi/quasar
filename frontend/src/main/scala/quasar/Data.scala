@@ -23,7 +23,9 @@ import quasar.ejson.{
   Extension,
   SizedType,
   Type => EType,
-  TypeTag
+  TypeTag,
+  ExtEJson,
+  CommonEJson
 }
 import quasar.fp._
 import quasar.javascript.Js
@@ -508,7 +510,10 @@ object Data {
 
   // TODO: Data should be replaced with EJson. These just exist to bridge the
   //       gap in the meantime.
-  val fromEJson: Algebra[EJson, Data] = _.toDisjunction.fold(fromExtension, fromCommon)
+  val fromEJson: Algebra[EJson, Data] = {
+    case ExtEJson(ext) => fromExtension(ext)
+    case CommonEJson(com) => fromCommon(com)
+  }
 
   /** Converts the parts of `Data` that it can, then stores the rest in,
     * effectively, `Free.Pure`.

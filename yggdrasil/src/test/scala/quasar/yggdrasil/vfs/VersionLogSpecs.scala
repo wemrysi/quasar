@@ -17,7 +17,6 @@
 package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.RPath
-import quasar.fp.TwoElemCopKOps
 
 import fs2.{Sink, Stream}
 import fs2.interop.scalaz._
@@ -28,6 +27,7 @@ import pathy.Path
 
 import scalaz.concurrent.Task
 import scalaz.syntax.monad._
+import iotaz.CopK
 
 import scodec.bits.ByteVector
 
@@ -336,13 +336,6 @@ object VersionLogSpecs extends Specification {
     }
   }
 
-  object CPR {
-    def unapply[A](cp: POSIXWithTaskCopK[A]): Option[Task[A]] =
-      cp.toDisjunction.toOption
-  }
-
-  object CPL {
-    def unapply[A](cp: POSIXWithTaskCopK[A]): Option[POSIXOp[A]] =
-      cp.toDisjunction.swap.toOption
-  }
+  val CPR = CopK.Inject[Task, POSIXWithTaskCopK]
+  val CPL = CopK.Inject[POSIXOp, POSIXWithTaskCopK]
 }
