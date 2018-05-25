@@ -873,7 +873,7 @@ trait ColumnarTableModule
         promise.future
       }
 
-      println("Cogrouping with respect to\nleftKey: " + leftKey + "\nrightKey: " + rightKey)
+      // println("Cogrouping with respect to\nleftKey: " + leftKey + "\nrightKey: " + rightKey)
       class IndexBuffers(lInitialSize: Int, rInitialSize: Int) {
         val lbuf   = new ArrayIntList(lInitialSize)
         val rbuf   = new ArrayIntList(rInitialSize)
@@ -895,7 +895,7 @@ trait ColumnarTableModule
         }
 
         @inline def advanceBoth(lpos: Int, rpos: Int): Unit = {
-          println("advanceBoth: lpos = %d, rpos = %d" format (lpos, rpos))
+          // println("advanceBoth: lpos = %d, rpos = %d" format (lpos, rpos))
           lbuf.add(-1)
           rbuf.add(-1)
           leqbuf.add(lpos)
@@ -976,8 +976,6 @@ trait ColumnarTableModule
                                        strr: SliceTransform1[RR],
                                        stbr: SliceTransform2[BR]) = {
 
-        println("cogroup0")
-
         sealed trait CogroupState
         case class EndLeft(lr: LR, lhead: Slice, ltail: StreamT[IO, Slice]) extends CogroupState
         case class Cogroup(lr: LR,
@@ -1024,11 +1022,11 @@ trait ColumnarTableModule
                                 rightStart: Option[SlicePosition[RK]],
                                 rightEnd: Option[SlicePosition[RK]],
                                 endRight: Boolean): NextStep[LK, RK] = {
-              println("lpos = %d, rpos = %d, rightStart = %s, rightEnd = %s, endRight = %s" format (lpos, rpos, rightStart, rightEnd, endRight))
-              println("Left key: " + lkey.toJson(lpos))
-              println("Right key: " + rkey.toJson(rpos))
-              println("Left data: " + lhead.toJson(lpos))
-              println("Right data: " + rhead.toJson(rpos))
+              // println("lpos = %d, rpos = %d, rightStart = %s, rightEnd = %s, endRight = %s" format (lpos, rpos, rightStart, rightEnd, endRight))
+              // println("Left key: " + lkey.toJson(lpos))
+              // println("Right key: " + rkey.toJson(rpos))
+              // println("Left data: " + lhead.toJson(lpos))
+              // println("Right data: " + rhead.toJson(rpos))
 
               rightStart match {
                 case Some(resetMarker @ SlicePosition(rightStartSliceId, rightStartPos, _, rightStartSlice, _, _)) =>
@@ -1044,8 +1042,8 @@ trait ColumnarTableModule
                         // catch input-out-of-order errors early
                         rightEnd match {
                           case None =>
-                            println("lhead\n" + lkey.toJsonString())
-                            println("rhead\n" + rkey.toJsonString())
+                            // println("lhead\n" + lkey.toJsonString())
+                            // println("rhead\n" + rkey.toJsonString())
                             sys.error(
                               "Inputs are not sorted; value on the left exceeded value on the right at the end of equal span. lpos = %d, rpos = %d"
                                 .format(lpos, rpos))
@@ -1063,7 +1061,7 @@ trait ColumnarTableModule
                     }
                   } else if (lpos < lhead.size) {
                     if (endRight) {
-                      println(s"Restarting right: lpos = ${lpos + 1}; rpos = $rpos")
+                      // println(s"Restarting right: lpos = ${lpos + 1}; rpos = $rpos")
                       RestartRight(leftPosition.copy(pos = lpos + 1), resetMarker, rightPosition.copy(pos = rpos))
                     } else {
                       // right slice is exhausted, so we need to emit that slice from the right tail
@@ -1195,7 +1193,6 @@ trait ColumnarTableModule
                         }
 
                       case _ =>
-                        println("wat?")
                         ibufs.cogrouped(
                           left.data,
                           right.data,
@@ -1242,7 +1239,7 @@ trait ColumnarTableModule
                   case (completeSlice, lr0, rr0, br0) => {
                     val nextState = Cogroup(lr0, rr0, br0, left, rightStart, Some(rightStart), Some(rightEnd))
 
-                    println(s"Computing restart state as $nextState")
+                    // println(s"Computing restart state as $nextState")
 
                     Some(completeSlice -> nextState)
                   }
@@ -1257,7 +1254,6 @@ trait ColumnarTableModule
               toFuture(stlr.f(lr, data) flatMap {
                 case (lr0, leftResult) => {
                   tail.uncons map { unconsed =>
-                    println("huh left?")
                     Some(leftResult -> (unconsed map { case (nhead, ntail) => EndLeft(lr0, nhead, ntail) } getOrElse CogroupDone))
                   }
                 }
@@ -1270,14 +1266,12 @@ trait ColumnarTableModule
               toFuture(strr.f(rr, data) flatMap {
                 case (rr0, rightResult) => {
                   tail.uncons map { unconsed =>
-                    println("huh left?")
                     Some(rightResult -> (unconsed map { case (nhead, ntail) => EndRight(rr0, nhead, ntail) } getOrElse CogroupDone))
                   }
                 }
               })
 
             case CogroupDone =>
-              println("done!")
               Future.successful(None)
           }
         } // end of step
@@ -1331,7 +1325,6 @@ trait ColumnarTableModule
         } yield back
 
         Table(StreamT.wrapEffect(initialState map { state =>
-          println(s"state: $state")
           StreamT.unfoldM[IO, Slice, CogroupState](state getOrElse CogroupDone)(s => IO.fromFuture(IO.pure(step(s))))
         }), UnknownSize)
       }
@@ -1456,7 +1449,7 @@ trait ColumnarTableModule
                   rempty <- rtail.isEmpty
 
                   back <- {
-                    println(s"checking cross: lempty = $lempty; rempty = $rempty")
+                    // println(s"checking cross: lempty = $lempty; rempty = $rempty")
 
                     if (lempty && rempty) {
                       // both are small sets, so find the cross in memory
