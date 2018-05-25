@@ -1,8 +1,9 @@
 {
     "name": "select string concatenation",
     "backends": {
-        "mimir": "ignoreFieldOrder",
-        "couchbase": "ignoreFieldOrder"
+        "couchbase": "ignoreFieldOrder",
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "otherpatients.data",
     "query": "SELECT

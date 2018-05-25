@@ -58,15 +58,19 @@ object Dependencies {
     "org.typelevel"              %% "spire-laws"                % spireVersion                         % Test,
     "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
     "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
+    "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
     "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") % Test,
-    "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                              % Test,
-    "org.typelevel"              %% "scalaz-specs2"             % "0.5.2"                              % Test
+    "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                              % Test
+  )
+
+  def api = Seq(
+    "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion,
+    "eu.timepit"                 %% "refined-scalaz" % refinedVersion
   )
 
   def frontend = Seq(
-    "com.github.julien-truffaut" %% "monocle-macro"            % monocleVersion,
-    "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6",
-    "org.typelevel"              %% "algebra-laws"             % algebraVersion  % Test
+    "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
+    "org.typelevel"              %% "algebra-laws"  % algebraVersion  % Test
   )
 
   def ejson = Seq(
@@ -78,10 +82,20 @@ object Dependencies {
   )
 
   def datagen = Seq(
-    "co.fs2" %% "fs2-core"        % fs2Version,
-    "co.fs2" %% "fs2-io"          % fs2Version,
-    "co.fs2" %% "fs2-scalaz"      % fs2ScalazVersion,
-    "com.github.scopt" %% "scopt" % scoptVersion
+    "co.fs2"           %% "fs2-core"       % fs2Version,
+    "co.fs2"           %% "fs2-io"         % fs2Version,
+    "co.fs2"           %% "fs2-scalaz"     % fs2ScalazVersion,
+    "com.github.scopt" %% "scopt"          % scoptVersion,
+    "eu.timepit"       %% "refined-scalaz" % refinedVersion
+  )
+
+  def connector = Seq(
+    "co.fs2" %% "fs2-core" % fs2Version
+  )
+
+  def sql = Seq(
+    "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
+    "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6"
   )
 
   def core = Seq(
@@ -132,6 +146,7 @@ object Dependencies {
     "log4j"                %  "log4j"       % "1.2.17" % Test
   )
   def web = Seq(
+    "eu.timepit"     %% "refined-scalaz"      % refinedVersion,
     "org.http4s"     %% "http4s-dsl"          % http4sVersion,
     "org.http4s"     %% "http4s-argonaut"     % http4sVersion,
     "org.http4s"     %% "http4s-client"       % http4sVersion,

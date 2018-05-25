@@ -39,7 +39,7 @@ abstract class BsonCodecSpec(v: BsonVersion) extends quasar.Qspec {
 
   "fromData" should {
     "fail with bad Id" in {
-      fromData(v, Data.Id("invalid")) must beLeftDisjunction
+      fromData(v, Data.Id("invalid")) must be_-\/
     }
 
     "of double does convert to Bson.Dec not Bson.Dec128" >> prop { (d: Double) =>
@@ -77,7 +77,7 @@ abstract class BsonCodecSpec(v: BsonVersion) extends quasar.Qspec {
       }
 
       preserved(data) ==> {
-        fromData(v, data).map(toData) must beRightDisjunction(data)
+        fromData(v, data).map(toData) must be_\/-(data)
       }
     }
 
@@ -87,7 +87,7 @@ abstract class BsonCodecSpec(v: BsonVersion) extends quasar.Qspec {
       // (toData >=> fromData >=> toData) == toData
 
       val data = toData(bson)
-      fromData(v, data).map(toData _) must beRightDisjunction(data)
+      fromData(v, data).map(toData _) must be_\/-(data)
     }
   }
 

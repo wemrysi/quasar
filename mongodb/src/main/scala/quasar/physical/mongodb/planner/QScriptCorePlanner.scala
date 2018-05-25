@@ -160,9 +160,9 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] exte
         .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
     case Filter(src0, cond) => {
       val selectors = getSelector[T, M, EX, Hole](
-        cond, defaultSelector[T].some, sel.selector[T](cfg.bsonVersion) ∘ (_ <+> defaultSelector[T].some))
+        cond.linearize, defaultSelector[T].some, sel.selector[T](cfg.bsonVersion) ∘ (_ <+> defaultSelector[T].some))
       val typeSelectors = getSelector[T, M, EX, Hole](
-        cond, none, typeSelector[T])
+        cond.linearize, none, typeSelector[T])
 
       def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T])
           : M[WorkflowBuilder[WF]] =
@@ -170,14 +170,14 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] exte
           { fm: FreeMap[T] => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, fm) },
           src,
           partialSel,
-          cond)
+          cond.linearize)
 
       (selectors, typeSelectors) match {
         case (None, Some(typeSel)) => filterBuilder(src0, typeSel)
         case (Some(sel), None) => filterBuilder(src0, sel)
         case (Some(sel), Some(typeSel)) => filterBuilder(src0, typeSel) >>= (filterBuilder(_, sel))
         case _ =>
-          handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond).map {
+          handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond.linearize).map {
             // TODO: Postpone decision until we know whether we are going to
             //       need mapReduce anyway.
             case cond @ HasThat(_) => WB.filter(src0, List(cond), {

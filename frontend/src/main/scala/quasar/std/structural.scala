@@ -17,13 +17,13 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar._, SemanticError._
+import quasar._, ArgumentError._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
 import matryoshka.implicits._
-import scalaz._, Scalaz._, Validation.{success, failure}
+import scalaz._, Scalaz._, Validation.{success, failureNel}
 import shapeless.{Data => _, :: => _, _}
 
 trait StructuralLib extends Library {
@@ -43,7 +43,7 @@ trait StructuralLib extends Library {
     partialUntyperV[nat._2] {
       case Obj(map, uk) => map.headOption.fold(
         uk.fold[Func.VDomain[nat._2]](
-          failure(NonEmptyList(GenericError("MAKE_MAP can’t result in an empty map"))))(
+          failureNel(invalidArgumentError("MAKE_MAP can’t result in an empty map")))(
           t => success(Func.Input2(Str, t)))) {
         case (key, value) => success(Func.Input2(Const(Data.Str(key)), value))
       }
@@ -126,7 +126,7 @@ trait StructuralLib extends Library {
             min1 + min2,
             (a1.arrayMaxLength |@| max2)(_ + _),
             Type.lub(typ1, elem2))))
-          .getOrElse(failure(NonEmptyList(GenericError(a1.shows + " is not an array."))))
+          .getOrElse(failureNel(invalidArgumentError(a1.shows + " is not an array.")))
 
       case Sized(FlexArr(min1, max1, elem1), a2) =>
         (a2.arrayMinLength |@| a2.arrayType)((min2, typ2) =>
@@ -134,12 +134,12 @@ trait StructuralLib extends Library {
             min1 + min2,
             (max1 |@| a2.arrayMaxLength)(_ + _),
             Type.lub(elem1, typ2))))
-          .getOrElse(failure(NonEmptyList(GenericError(a2.shows + " is not an array."))))
+          .getOrElse(failureNel(invalidArgumentError(a2.shows + " is not an array.")))
     },
     partialUntyperV[nat._2] {
       case x if x.arrayLike =>
         x.arrayType.fold[Func.VDomain[nat._2]](
-          failure(NonEmptyList(GenericError("internal error: " + x.shows + " is arrayLike, but no arrayType")))) {
+          failureNel(invalidArgumentError("internal error: " + x.shows + " is arrayLike, but no arrayType"))) {
           typ =>
             val t = FlexArr(0, x.arrayMaxLength, typ)
             success(Func.Input2(t, t))
@@ -192,7 +192,8 @@ trait StructuralLib extends Library {
         }
     },
     partialTyperV[nat._2] {
-      case Sized(v1, v2) => v1.mapKey(v2)
+      case Sized(v1, v2) =>
+        v1.mapKey(v2).leftMap(_.map(typeError(_)))
     },
     basicUntyper)
 
@@ -203,7 +204,8 @@ trait StructuralLib extends Library {
     Func.Input2(AnyArray, Int),
     noSimplification,
     partialTyperV[nat._2] {
-      case Sized(v1, v2) => v1.arrayElem(v2)
+      case Sized(v1, v2) =>
+        v1.arrayElem(v2).leftMap(_.map(typeError(_)))
     },
     basicUntyper)
 
@@ -232,7 +234,7 @@ trait StructuralLib extends Library {
     partialTyperV[nat._1] {
       case Sized(x) if x.objectLike =>
         x.objectType.fold[Func.VCodomain](
-          failure(NonEmptyList(GenericError("internal error: objectLike, but no objectType"))))(
+          failureNel(invalidArgumentError("internal error: objectLike, but no objectType")))(
           success)
     },
     untyper[nat._1](tpe => success(Func.Input1(Obj(Map(), Some(tpe))))))
@@ -246,7 +248,7 @@ trait StructuralLib extends Library {
     partialTyperV[nat._1] {
       case Sized(x) if x.arrayLike       =>
         x.arrayType.fold[Func.VCodomain](
-          failure(NonEmptyList(GenericError("internal error: arrayLike, but no arrayType"))))(
+          failureNel(invalidArgumentError("internal error: arrayLike, but no arrayType")))(
           success)
     },
     untyper[nat._1](tpe => success(Func.Input1(FlexArr(0, None, tpe)))))
@@ -283,8 +285,8 @@ trait StructuralLib extends Library {
     noSimplification,
     partialTyperV[nat._1] {
       case Sized(x) if x.objectLike =>
-        x.objectType.fold[ValidationNel[SemanticError, Type]](
-          failure(NonEmptyList(GenericError("internal error: objectLike, but no objectType"))))(
+        x.objectType.fold[ValidationNel[ArgumentError, Type]](
+          failureNel(invalidArgumentError("internal error: objectLike, but no objectType")))(
           success)
     },
     untyper[nat._1](tpe => success(Func.Input1(Obj(Map(), Some(tpe))))))
@@ -305,8 +307,8 @@ trait StructuralLib extends Library {
     },
     partialTyperV[nat._1] {
       case Sized(x) if x.arrayLike =>
-        x.arrayType.fold[ValidationNel[SemanticError, Type]](
-          failure(NonEmptyList(GenericError("internal error: arrayLike, but no arrayType"))))(
+        x.arrayType.fold[ValidationNel[ArgumentError, Type]](
+          failureNel(invalidArgumentError("internal error: arrayLike, but no arrayType")))(
           success)
     },
     untyper[nat._1](tpe => success(Func.Input1(FlexArr(0, None, tpe)))))
@@ -356,7 +358,7 @@ trait StructuralLib extends Library {
     partialUntyperV[nat._2] {
       case tpe if tpe.objectLike =>
         tpe.objectType.fold[Func.VDomain[nat._2]](
-          failure(NonEmptyList(GenericError("internal error: objectLike, but no objectType"))))(
+          failureNel(invalidArgumentError("internal error: objectLike, but no objectType")))(
           x => success(Func.Input2(Top, x)))
     })
 
@@ -386,7 +388,7 @@ trait StructuralLib extends Library {
     partialUntyperV[nat._1] {
       case tpe if tpe.arrayLike =>
         tpe.arrayType.fold[Func.VDomain[nat._1]](
-          failure(NonEmptyList(GenericError("internal error: arrayLike, but no arrayType"))))(
+          failureNel(invalidArgumentError("internal error: arrayLike, but no arrayType")))(
           x => success(Func.Input1(x)))
     })
 

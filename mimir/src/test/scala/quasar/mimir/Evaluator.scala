@@ -16,7 +16,6 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil._
@@ -60,8 +59,6 @@ trait EvaluatorModule[M[+ _]]
     private val monadState = stateTMonadState[EvaluatorState, N]
 
     def report: QueryLogger[N, Unit]
-
-    def freshIdScanner: Scanner
 
     def Forall: Reduction { type Result = Option[Boolean] }
     def Exists: Reduction { type Result = Option[Boolean] }
@@ -555,7 +552,7 @@ trait EvaluatorModule[M[+ _]]
       val resultState: StateT[N, EvaluatorState, Table] = fullEval(rewrittenDAG, Map(), Nil)
 
       val resultTable: N[Table] = resultState.eval(EvaluatorState())
-      resultTable map { _ paged yggConfig.maxSliceSize compact DerefObjectStatic(Leaf(Source), paths.Value) }
+      resultTable map { _ paged Config.maxSliceSize compact DerefObjectStatic(Leaf(Source), paths.Value) }
     }
 
     private[this] def stagedOptimizations(graph: DepGraph, ctx: EvaluationContext, optimize: Boolean) =

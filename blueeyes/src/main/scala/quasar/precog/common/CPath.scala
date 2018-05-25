@@ -16,8 +16,7 @@
 
 package quasar.precog.common
 
-import quasar.blueeyes._, json._, serialization._
-import DefaultSerialization._
+import quasar.blueeyes._, json._
 
 import scalaz.Ordering._
 import scalaz.syntax.std.boolean._
@@ -180,15 +179,6 @@ case object CPathArray extends CPathNode {
 
 object CPath {
   import quasar.blueeyes.json._
-
-  implicit val CPathDecomposer: Decomposer[CPath] = new Decomposer[CPath] {
-    def decompose(cpath: CPath): JValue = JString(cpath.toString)
-  }
-
-  implicit val CPathExtractor: Extractor[CPath] = new Extractor[CPath] {
-    override def validated(obj: JValue): scalaz.Validation[Extractor.Error, CPath] =
-      obj.validated[String].map(CPath(_))
-  }
 
   private[this] case class CompositeCPath(nodes: List[CPathNode]) extends CPath
 

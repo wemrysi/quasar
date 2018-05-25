@@ -127,9 +127,9 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   //       • coalesceMapJoin ⇒ no `Map(ThetaJoin(???, …), ???)`
 
   def elideNopQC[F[_]: Functor]: QScriptCore[T[F]] => Option[F[T[F]]] = {
-    case Filter(Embed(src), BoolLit(true)) => some(src)
-    case Map(Embed(src), mf) if mf ≟ HoleR => some(src)
-    case _                                 => none
+    case Filter(Embed(src), RecBoolLit(true)) => some(src)
+    case Map(Embed(src), mf) if mf ≟ HoleR    => some(src)
+    case _                                    => none
   }
 
   type Remap[A] = JoinFunc => Option[FreeMapA[A]]

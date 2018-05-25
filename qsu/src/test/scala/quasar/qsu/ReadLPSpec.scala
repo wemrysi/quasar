@@ -22,7 +22,7 @@ import quasar.{Data, DataGenerators, Type, Qspec}
 import quasar.fs.Planner.PlannerError
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.scalaz.{NonEmptyListE => NELE}
-import quasar.frontend.logicalplan.{JoinCondition, LogicalPlan}
+import quasar.frontend.logicalplan.{JoinCondition, LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.{
   Center,
   Drop,
@@ -38,7 +38,6 @@ import quasar.qscript.{
   Take
 }
 import quasar.qsu.{QScriptUniform => QSU}
-import quasar.sql.CompilerHelpers
 import quasar.std.{
   AggLib,
   IdentityLib,
@@ -57,7 +56,7 @@ import scalaz.syntax.bifunctor._
 import scalaz.syntax.show._
 import pathy.Path, Path.{file, Sandboxed}
 
-object ReadLPSpec extends Qspec with CompilerHelpers with DataGenerators with QSUTTypes[Fix] {
+object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]

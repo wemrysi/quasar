@@ -43,6 +43,11 @@ sealed abstract class MonadTell_Instances extends MonadTell_Instances0 {
       def writer[A](w: W1, a: A) = WriterT(T.writer(w, a) strengthL mzero[W2])
     }
 
+  implicit def writerMonadTell[W]: MonadTell_[Writer[W, ?], W] =
+    new MonadTell_[Writer[W, ?], W] {
+      def writer[A](w: W, a: A) = WriterT.writer((w, a))
+    }
+
   implicit def stateTMonadTell[F[_]: Monad, W, S](implicit T: MonadTell_[F, W]): MonadTell_[StateT[F, S, ?], W] =
     new MonadTell_[StateT[F, S, ?], W] {
       def writer[A](w: W, a: A) = StateT(T.writer(w, a) strengthL _)

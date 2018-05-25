@@ -2,6 +2,7 @@
     "name": "nested select with filter",
     "backends": {
         "couchbase":         "pending",
+        "lwc_local":         "pending",
         "mimir":             "pending"
     },
     "data": "olympics.data",

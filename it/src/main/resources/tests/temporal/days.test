@@ -2,6 +2,7 @@
     "name": "dow and isodow",
 
     "backends": {
+        "lwc_local":"pendingIgnoreFieldOrder",
         "marklogic_json": "pendingIgnoreFieldOrder",
         "mimir":"pendingIgnoreFieldOrder"
     },

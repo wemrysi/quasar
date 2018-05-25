@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.RenderTree
 import quasar.TreeMatchers
 import quasar.common.SortDir
+import quasar.contrib.specs2.Spec
 import quasar.fp._
 import quasar.javascript._
 import quasar.jscore, jscore._
@@ -36,7 +37,7 @@ import org.specs2.matcher.MustMatchers._
 import scalaz.{Name => _, _}, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 
-class WorkflowFSpec extends org.specs2.scalaz.Spec {
+class WorkflowFSpec extends Spec {
   implicit val arbIdHandling: Arbitrary[IdHandling] =
     Arbitrary(Gen.oneOf(ExcludeId, IncludeId, IgnoreId))
 

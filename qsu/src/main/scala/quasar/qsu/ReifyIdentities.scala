@@ -67,6 +67,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
   private val O = QSU.Optics[T]
   private val func = construction.Func[T]
+  private val recFunc = construction.RecFunc[T]
 
   private val IdentitiesK: String = "identities"
   private val ValueK: String = "value"
@@ -246,6 +247,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
     def rebaseV[A](fm: FreeMapA[A]): FreeMapA[A] =
       fm >>= (lookupValue as _)
 
+    def recRebaseV[A](rfm: RecFreeMapA[A]): RecFreeMapA[A] =
+      rfm >>= (r => recFunc.ProjectKeyS(recFunc.Hole, ValueK).as(r))
+
     def setStatus(root: Symbol, status: Boolean): G[Unit] =
       G.modify(reifyStatus.modify(_.insert(root, status)))
 
@@ -286,7 +290,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
               }
 
               g.overwriteAtRoot(
-                O.leftShift(source.root, rebaseV(struct.linearize).asRec, newStatus, onUndefined, newRepair, rot))
+                O.leftShift(source.root, recRebaseV(struct), newStatus, onUndefined, newRepair, rot))
             }
 
           case (true, false) =>
@@ -295,7 +299,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
                 makeIV(lookupIdentities >> LeftTarget[T], repair)
 
               g.overwriteAtRoot(
-                O.leftShift(source.root, rebaseV(struct.linearize).asRec, idStatus, onUndefined, newRepair, rot))
+                O.leftShift(source.root, recRebaseV(struct), idStatus, onUndefined, newRepair, rot))
             }
 
           case (false, true) =>
@@ -321,6 +325,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
         preserveIV(source, g) map { emitsIV =>
           if (emitsIV) {
             val newFunc = makeIV(lookupIdentities, rebaseV(fm.linearize))
+
             g.overwriteAtRoot(O.map(source.root, newFunc.asRec))
           } else g
         }
@@ -363,10 +368,10 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
             setStatus(g.root, false) as g
         }
 
-      case g @ E.QSFilter(source, p) =>
+      case g @ E.QSFilter(source, predicate) =>
         preserveIV(source, g) map { emitsIV =>
           if (emitsIV)
-            g.overwriteAtRoot(O.qsFilter(source.root, rebaseV(p)))
+            g.overwriteAtRoot(O.qsFilter(source.root, recRebaseV(predicate)))
           else
             g
         }

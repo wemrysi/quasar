@@ -18,7 +18,8 @@ package quasar.fs.mount
 
 import slamdata.Predef._
 import quasar._
-import quasar.common.JoinType
+import quasar.common.{JoinType, PhaseResultT}
+import quasar.compile.{precompile, queryPlan, SemanticErrors}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
@@ -70,6 +71,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import StateT.stateTMonadState
+  import WriterT.writerTMonad
 
   type Errs = MountingError \/ PathTypeMismatch
 
@@ -80,6 +82,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   type VSS[A]         = State[VS, A]
   type VFS[A]         = ErrsT[VSS, A]
+
+  type QP[A] = PhaseResultT[SemanticErrors \/ ?, A]
 
   def runMounting[F[_]](implicit F: MonadState[F, VS]): Mounting ~> F =
     free.foldMapNT(KeyValueStore.impl.toState[F](VS.mountConfigs)) compose Mounter.trivial[MountConfigs]
@@ -166,7 +170,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "translate simple read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = sqlE"select * from `/zips`"
-      val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2
+      val lp = queryPlan[QP, Fix, Fix[LogicalPlan]](expr, Variables.empty, rootDir, 0L, None).value
                  .valueOr(e => scala.sys.error("Unexpected semantic errors during compilation: " + e.shows))
 
       val views = Map(p -> expr)
@@ -608,14 +612,14 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     "no match" >> {
       resolvedRefs(Map(), lpf.read(rootDir </> file("zips"))) must
-        beRightDisjunction.like { case r => r must beTreeEqual(lpf.read(rootDir </> file("zips"))) }
+        be_\/-.like { case r => r must beTreeEqual(lpf.read(rootDir </> file("zips"))) }
     }
 
     "trivial read" >> {
       val p = rootDir </> dir("view") </> file("justZips")
       val vs = Map[AFile, Fix[Sql]](p -> sqlE"select * from `/zips`")
 
-      resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like {
+      resolvedRefs(vs, lpf.read(p)) must be_\/-.like {
         case r => r must beTreeEqual(
           Fix(Squash(lpf.read(rootDir </> file("zips"))))
         )
@@ -630,7 +634,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
           4.seconds.toSeconds, nineteenSixty, ViewCache.Status.Successful, None, fb, None)
 
-      resolvedRefsVC(Map.empty, Map(fa -> viewCache), lpf.read(fa)) must beRightDisjunction.like {
+      resolvedRefsVC(Map.empty, Map(fa -> viewCache), lpf.read(fa)) must be_\/-.like {
         case r => r must beTreeEqual(
           lpf.read(rootDir </> file("b")))
       }
@@ -640,7 +644,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val p = rootDir </> dir("foo") </> file("justZips")
       val vs = Map[AFile, Fix[Sql]](p -> sqlE"select * from zips")
 
-      resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like {
+      resolvedRefs(vs, lpf.read(p)) must be_\/-.like {
         case r => r must beTreeEqual(
           Fix(Squash(lpf.read(rootDir </> dir("foo") </> file("zips"))))
         )
@@ -660,17 +664,18 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           lpf.constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar.precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p)).run.value.toOption.get
+        precompile[QP, Fix, Fix[LogicalPlan]](inner, Variables.empty, fileParent(p))
+          .value.toOption.get
 
       val vs = Map[AFile, Fix[Sql]](p -> inner)
 
-      val exp = quasar.preparePlan(Take(
+      val exp = preparePlan[PhaseResultT[ArgumentErrors \/ ?, ?], Fix[LogicalPlan]](Take(
           Drop(
             innerLP,
             lpf.constant(Data.Int(5))).embed,
-          lpf.constant(Data.Int(10))).embed).run.value.toOption.get
+          lpf.constant(Data.Int(10))).embed).value.toOption.get
 
-      resolvedRefs(vs, outer) must beRightDisjunction.like {
+      resolvedRefs(vs, outer) must be_\/-.like {
         case r => r must beTreeEqual(exp)
       }
     }
@@ -683,7 +688,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           sqlE"select * from view1")
 
       resolvedRefs(vs, lpf.read(rootDir </> dir("view") </> file("view2"))) must
-        beRightDisjunction.like { case r => r must beTreeEqual(
+        be_\/-.like { case r => r must beTreeEqual(
           Squash(lpf.read(rootDir </> file("zips"))).embed)
         }
     }
@@ -700,7 +705,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
           4.seconds.toSeconds, nineteenSixty, ViewCache.Status.Successful, None, dest, None))
 
-      resolvedRefsVC(vs, vcache, lpf.read(rootDir </> file("view"))) must beRightDisjunction.like {
+      resolvedRefsVC(vs, vcache, lpf.read(rootDir </> file("view"))) must be_\/-.like {
         case r => r must beTreeEqual(
           Squash(lpf.read(dest)).embed)
       }
@@ -730,7 +735,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         JoinType.Inner,
         JoinCondition('__leftJoin2, '__rightJoin3, lpf.constant(Data.Bool(true))))
 
-      resolvedRefs(vs, q) must beRightDisjunction.like { case r => r must beTreeEqual(exp) }
+      resolvedRefs(vs, q) must be_\/-.like { case r => r must beTreeEqual(exp) }
     }
 
     "self reference" >> {
@@ -742,12 +747,12 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val q = unsafeParse(s"select * from `${posixCodec.printPath(p)}` limit 10")
 
       val qlp =
-        quasar.queryPlan(q, Variables.empty, rootDir, 0L, None)
-          .run.value.valueOr(e => scala.sys.error("Unexpected error compiling sql query: " + e.shows))
+        queryPlan[QP, Fix, Fix[LogicalPlan]](q, Variables.empty, rootDir, 0L, None)
+          .value.valueOr(e => scala.sys.error("Unexpected error compiling sql query: " + e.shows))
 
       val vs = Map[AFile, Fix[Sql]](p -> q)
 
-      resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like { case r => r must beTreeEqual(qlp) }
+      resolvedRefs(vs, lpf.read(p)) must be_\/-.like { case r => r must beTreeEqual(qlp) }
     }
 
     "circular reference" >> {
@@ -765,7 +770,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         v1p -> unsafeParse(s"select * from `${posixCodec.printPath(v2p)}` offset 5"),
         v2p -> unsafeParse(s"select * from `${posixCodec.printPath(v1p)}` limit 10"))
 
-      resolvedRefs(vs, lpf.read(v2p)) must beRightDisjunction.like {
+      resolvedRefs(vs, lpf.read(v2p)) must be_\/-.like {
         case r => r must beTreeEqual(
           Take(
             Squash(Drop(

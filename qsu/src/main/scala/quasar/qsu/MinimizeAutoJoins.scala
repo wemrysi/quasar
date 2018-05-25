@@ -136,7 +136,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       case ((QSFilter(source, predicate), i), (fm, candidates, _)) =>
         val fm2 = fm flatMap { i2 =>
           if (i2 === i)
-            func.Cond(predicate as i, i.point[FreeMapA], func.Undefined[Int])
+            func.Cond(predicate.linearize as i, i.point[FreeMapA], func.Undefined[Int])
           else
             i2.point[FreeMapA]
         }

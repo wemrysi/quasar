@@ -98,7 +98,7 @@ class assumeReadTypeSpec extends Qspec with TTypes[Fix] with TreeMatchers {
   }
 
   "assumeReadType" >> {
-    "Filter condition" >> elideProps(src => fm => fix.Filter(src, fm.linearize))
+    "Filter condition" >> elideProps(src => fm => fix.Filter(src, fm))
     "Leftshift struct" >> elideProps(src => fm => fix.LeftShift(src, fm, IncludeId, ShiftType.Array, OnUndefined.Omit, func.LeftSide))
     "Subset from" >> elideProps(src => fm => fix.Subset(src, free.Map(free.Hole, fm), Take, free.Hole))
     "Subset count" >> elideProps(src => fm => fix.Subset(src, free.Hole, Take, free.Map(free.Hole, fm)))

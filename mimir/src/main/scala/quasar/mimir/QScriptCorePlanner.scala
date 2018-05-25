@@ -324,7 +324,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
       import src.P.trans._
 
       for {
-        trans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(f)
+        trans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(f.linearize)
       } yield MimirRepr.withSort(src.P)(src.table.transform(Filter(TransSpec1.Id, trans)))(src.lastSort)
 
     case qscript.Union(src, lBranch, rBranch) =>
@@ -369,10 +369,11 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
 
     // FIXME look for Map(Unreferenced, Constant) and return constant table
     case qscript.Unreferenced() =>
-      liftFCake(MimirRepr.meld[CakeM](new DepFn1[Cake, λ[`P <: Cake` => CakeM[P#Table]]] {
-        def apply(P: Cake): CakeM[P.Table] =
-          P.Table.constLong(Set(0)).point[CakeM]
-      }))
+      liftFCake(MimirRepr.meld[CakeM, LightweightFileSystem](
+        new DepFn1[Cake, λ[`P <: Cake` => CakeM[P#Table]]] {
+          def apply(P: Cake): CakeM[P.Table] =
+            P.Table.constLong(Set(0)).point[CakeM]
+        }))
   }
 
   ////////

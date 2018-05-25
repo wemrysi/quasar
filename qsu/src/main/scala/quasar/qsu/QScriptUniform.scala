@@ -467,7 +467,7 @@ object QScriptUniform {
   // QScriptish
   final case class QSFilter[T[_[_]], A](
       source: A,
-      predicate: FreeMap[T]) extends QScriptUniform[T, A]
+      predicate: RecFreeMap[T]) extends QScriptUniform[T, A]
 
   final case class Unreferenced[T[_[_]], A]() extends QScriptUniform[T, A]
 
@@ -549,8 +549,8 @@ object QScriptUniform {
         case QSAutoJoin(l, r, ks, c) => (l, r, ks, c)
       } { case (l, r, ks, c) => QSAutoJoin(l, r, ks, c) }
 
-    def qsFilter[A]: Prism[QScriptUniform[A], (A, FreeMap)] =
-      Prism.partial[QScriptUniform[A], (A, FreeMap)] {
+    def qsFilter[A]: Prism[QScriptUniform[A], (A, RecFreeMap)] =
+      Prism.partial[QScriptUniform[A], (A, RecFreeMap)] {
         case QSFilter(a, p) => (a, p)
       } { case (a, p) => QSFilter(a, p) }
 
@@ -701,8 +701,8 @@ object QScriptUniform {
       composeLifting[G](O.qsAutoJoin[A])
     }
 
-    def qsFilter: Prism[A, F[(A, FreeMap)]] =
-      composeLifting[(?, FreeMap)](O.qsFilter[A])
+    def qsFilter: Prism[A, F[(A, RecFreeMap)]] =
+      composeLifting[(?, RecFreeMap)](O.qsFilter[A])
 
     def qsReduce: Prism[A, F[(A, List[FreeAccess[Hole]], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])]] =
       composeLifting[(?, List[FreeAccess[Hole]], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])](O.qsReduce[A])

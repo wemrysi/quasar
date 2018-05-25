@@ -2,6 +2,7 @@
     "name": "filter on date part",
 
     "backends": {
+        "lwc_local": "pending",
         "marklogic_json": "pending",
         "mimir": "pending"
     },

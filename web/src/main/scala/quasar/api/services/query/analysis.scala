@@ -20,11 +20,14 @@ import slamdata.Predef.{ -> => _, _ }
 import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
+import quasar.compile.queryPlan
 import quasar.contrib.pathy._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount.Mounting
+import quasar.fs.mount.module.resolveImports
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
+import quasar.main.CompExec
 import quasar.qscript.QScriptTotal
 
 import argonaut._, Argonaut._
@@ -44,6 +47,11 @@ object analysis {
       S0: Mounting :<: S,
       S1: FileSystemFailure :<: S
   ): QHttpService[S] = {
+    val CE = CompExec[Free[S, ?]]
+    import CE.CompileM
+
+    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+    import EitherT.eitherTMonad
 
     def analyzeQuery(
       scopedExpr: sql.ScopedExpr[Fix[sql.Sql]],
@@ -52,10 +60,10 @@ object analysis {
       offset: Natural,
       limit: Option[Positive]
     ): Free[S, ApiError \/ Json] =
-      quasar.resolveImports(scopedExpr, basePath).run.flatMap(block =>
+      resolveImports(scopedExpr, basePath).run.flatMap(block =>
         block.fold(
           semErr => semErr.toApiError.left[Json].point[Free[S, ?]],
-          block => queryPlan(block, vars, basePath, offset, limit)
+          block => queryPlan[CompileM, Fix, Fix[LogicalPlan]](block, vars, basePath, offset, limit)
                     .run.value
                     .traverse(lp => A.queryCost(lp).bimap(_.toApiError, _.asJson).run)
                     .map(_.valueOr(_.toApiError.left[Json]))))

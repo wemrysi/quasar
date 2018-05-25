@@ -1,6 +1,7 @@
 {
     "name": "job postings by city",
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },

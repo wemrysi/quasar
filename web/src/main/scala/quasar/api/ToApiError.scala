@@ -17,8 +17,9 @@
 package quasar.api
 
 import slamdata.Predef._
-import quasar.{Data, DataCodec, SemanticError}
+import quasar.{ArgumentError, Data, DataCodec, UnificationError}
 import quasar.RenderTree.ops._
+import quasar.compile.SemanticError
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
@@ -57,6 +58,31 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
   import ReadFile.ReadHandle
   import WriteFile.WriteHandle
   import QueryFile.ResultHandle
+
+  implicit def argumentErrorToApiError: ToApiError[ArgumentError] = {
+    import ArgumentError._
+    error {
+      case InvalidArgumentError(msg) =>
+        fromMsg_(
+          BadRequest withReason "Invalid argument.",
+          msg)
+
+      case e @ InvalidStringCoercionError(_, _) =>
+        fromMsg_(
+          BadRequest withReason "Invalid string coercion.",
+          e.message)
+
+      case e @ TemporalFormatError(fn, str, _) =>
+        fromMsg(
+          BadRequest withReason "Malformed date/time string.",
+          e.message,
+          "functionName" := fn.shows,
+          "input"        := str)
+
+      case TypeError(ue) =>
+        ue.toApiError
+    }
+  }
 
   implicit def environmentErrorQResponse: ToApiError[EnvironmentError] = {
     import EnvironmentError._
@@ -244,12 +270,6 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           BadRequest withReason "Invalid ObjectId.",
           err.message,
           "objectId" := oid)
-      case CompilationFailed(semErrs) =>
-        fromMsg(
-          BadRequest withReason "Compilation failed",
-          err.message,
-          "compilation errors" := semErrs.map(_.toApiError)
-        )
       case NonRepresentableInJS(value) =>
         fromMsg(
           InternalServerError withReason "Unable to compile to JavaScript.",
@@ -281,22 +301,13 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
     error(err => err match {
       case GenericError(msg) =>
         fromMsg_(BadRequest withReason "Error in query.", msg)
-      case DomainError(data, _) =>
-        fromMsg_(
-          BadRequest withReason "Illegal argument.",
-          err.message
-        ) :?+ ("data" :?= encodeData(data))
       case FunctionNotFound(name) =>
         fromMsg(
           BadRequest withReason "Unknown function.",
           err.message,
           "functionName" := name)
-      case TypeError(exp, act, _) =>
-        fromMsg(
-          BadRequest withReason "Type error.",
-          err.message,
-          "expectedType" := exp,
-          "actualType"   := act)
+      case TypeError(ue) =>
+        ue.toApiError
       case VariableParseError(vname, vval, cause) =>
         fromMsg(
           BadRequest withReason "Malformed query variable.",
@@ -319,21 +330,11 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           BadRequest withReason "No table defined.",
           err.message,
           "sql" := node.render)
-      case MissingField(name) =>
-        fromMsg(
-          BadRequest withReason "Missing field.",
-          err.message,
-          "fieldName" := name)
       case DuplicateAlias(name) =>
         fromMsg(
           BadRequest withReason "Duplicate alias name.",
           err.message,
           "name" := name)
-      case MissingIndex(i) =>
-        fromMsg(
-          BadRequest withReason "No element at index.",
-          err.message,
-          "index" := i)
       case WrongArgumentCount(fn, exp, act) =>
         fromMsg(
           BadRequest withReason "Wrong number of arguments to function.",
@@ -346,12 +347,6 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           BadRequest withReason "Ambiguous table reference.",
           err.message,
           "sql" := expr.render)
-      case DateFormatError(fn, str, _) =>
-        fromMsg(
-          BadRequest withReason "Malformed date/time string.",
-          err.message,
-          "functionName" := fn.shows,
-          "input"        := str)
       case e@AmbiguousFunctionInvoke(name, funcs) =>
         fromMsg(
           BadRequest withReason "Ambiguous function call",
@@ -364,6 +359,16 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           other.message)
     })
   }
+
+  implicit def unificationErrorToApiError: ToApiError[UnificationError] =
+    error {
+      case e @ UnificationError(exp, act, _) =>
+        fromMsg(
+          BadRequest withReason "Type error.",
+          e.message,
+          "expectedType" := exp,
+          "actualType"   := act)
+    }
 
   ////
 

@@ -19,6 +19,7 @@ package quasar.std
 import slamdata.Predef._
 import quasar.{Data, GenericFunc}
 import quasar.RenderTree.ops._
+import quasar.common.PhaseResultT
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._
@@ -31,8 +32,7 @@ import org.specs2.execute._
 import org.scalacheck.Arbitrary
 import Arbitrary._
 
-import scalaz.{Failure => _, _}
-import Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 import shapeless.Nat
 
 /** Test the typers defined in the std lib functions themselves.
@@ -50,6 +50,9 @@ class SimplifyConstantPlanStdLibSpec extends StdLibSpec {
     case (date.NowTime, _) => notHandled
     case (date.NowDate, _) => notHandled
     case (date.CurrentTimeZone, _) => notHandled
+
+    case (math.Divide, List(_, Data.Number(n)))
+      if (n === BigDecimal(0)) => notHandled
 
     case (structural.MapProject, List(Data.Obj(fields), Data.Str(field))) if !fields.contains(field) => notHandled
 
@@ -70,7 +73,7 @@ class SimplifyConstantPlanStdLibSpec extends StdLibSpec {
       .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
 
   def run(lp: Fix[LP], expected: Data): Result =
-    lpf.ensureCorrectTypes(optimizer.simplify(lp)).run.run._2 match {
+    lpf.ensureCorrectTypes[PhaseResultT[ArgumentErrors \/ ?, ?]](optimizer.simplify(lp)).value match {
       case  \/-(Embed(Constant(d))) => (d must beCloseTo(expected)).toResult
       case  \/-(v) => Failure("not a constant", v.render.shows)
       case -\/ (err) => Failure("simplification failed", err.toString)

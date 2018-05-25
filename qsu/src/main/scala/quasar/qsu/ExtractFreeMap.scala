@@ -19,12 +19,12 @@ package quasar.qsu
 import slamdata.Predef.{Map => SMap, _}
 
 import quasar.RenderTreeT
-import quasar.fs.Planner.{InternalError, PlannerErrorME}
 import quasar.effect.NameGenerator
 import quasar.fp.symbolOrder
+import quasar.frontend.logicalplan.JoinDir
+import quasar.fs.Planner.{InternalError, PlannerErrorME}
 import quasar.qscript.RecFreeS._
 import quasar.qscript.{construction, JoinSide, LeftSide, RightSide}
-import quasar.sql.JoinDir
 
 import matryoshka.{BirecursiveT, ShowT}
 import scalaz.Tags.Disjunction
@@ -60,7 +60,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
 
     case graph @ Extractors.LPFilter(src, predicate) =>
       unifyShapePreserving[F](graph, src.root, NonEmptyList(predicate.root))("filter_source", "filter_predicate") {
-        case (sym, fms) => QSFilter(sym, fms.head)
+        case (sym, fms) => QSFilter(sym, fms.head.asRec)
       }
 
     case graph @ Extractors.LPJoin(left, right, cond, jtype, lref, rref) => {

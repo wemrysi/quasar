@@ -18,7 +18,6 @@ package quasar.yggdrasil.table.cf
 
 import quasar.blueeyes._
 import quasar.precog._
-import quasar.precog.util.DateTimeUtil
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 

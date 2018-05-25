@@ -47,7 +47,6 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
       val report = new LoggingQueryLogger[N, Unit] with ExceptionQueryLogger[N, Unit] with TimingQueryLogger[N, Unit] {
         val M = N0
       }
-      def freshIdScanner = outer.freshIdScanner
     }
 
   private val groupId = new java.util.concurrent.atomic.AtomicInteger

@@ -24,6 +24,7 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript._
+import quasar.qscript.RecFreeS._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -148,7 +149,7 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
       case (Some((lf, on, f)), _) =>
         some(quasar.qscript.ThetaJoin(
           tj.src,
-          Free.roll(QCT(Filter(tj.lBranch, lf))),
+          Free.roll(QCT(Filter(tj.lBranch, lf.asRec))),
           tj.rBranch,
           on,
           tj.f,
@@ -158,7 +159,7 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
         some(quasar.qscript.ThetaJoin(
           tj.src,
           tj.lBranch,
-          Free.roll(QCT(Filter(tj.rBranch, rf))),
+          Free.roll(QCT(Filter(tj.rBranch, rf.asRec))),
           on,
           tj.f,
           simplifyCombine(f)))
@@ -228,9 +229,9 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
         makeNorm(bucket, order)(rebucket, _ => orderNormOpt)(Sort(src, _, _))
 
       case Map(src, f)                   => freeMFEq(f.linearize).map(RecFreeS.fromFree(_)).map(Map(src, _))
-      case LeftShift(src, s, i, t, u, r) => makeNorm(s.linearize, r)(freeMFEq(_), freeMFEq(_))((str, repair) => LeftShift(src, RecFreeS.fromFree(str), i, t, u, repair))
+      case LeftShift(src, s, i, t, u, r) => makeNorm(s.linearize, r)(freeMFEq(_), freeMFEq(_))((str, repair) => LeftShift(src, str.asRec, i, t, u, repair))
       case Union(src, l, r)              => makeNorm(l, r)(freeTCEq(_), freeTCEq(_))(Union(src, _, _))
-      case Filter(src, f)                => freeMFEq(f).map(Filter(src, _))
+      case Filter(src, f)                => freeMFEq(f.linearize).map(fm => Filter(src, fm.asRec))
       case Subset(src, from, sel, count) => makeNorm(from, count)(freeTCEq(_), freeTCEq(_))(Subset(src, _, sel, _))
       case Unreferenced()                => None
     })

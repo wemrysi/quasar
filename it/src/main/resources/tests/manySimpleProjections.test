@@ -2,6 +2,7 @@
   "name": "many simple projections (order matters)",
 
   "backends": {
+        "lwc_local":"ignoreFieldOrder",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":"ignoreFieldOrder"
   },

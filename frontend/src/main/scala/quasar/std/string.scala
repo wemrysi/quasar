@@ -17,7 +17,8 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar._, SemanticError._
+import quasar._
+import quasar.ArgumentError._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
@@ -240,8 +241,8 @@ trait StringLib extends Library {
       case Sized(Type.Str, Type.Int,                Type.Int)                =>
         success(Type.Str)
       case Sized(Type.Str, _,                       _)                       =>
-        failureNel(GenericError("expected integer arguments for SUBSTRING"))
-      case Sized(t, _, _) => failureNel(TypeError(Type.Str, t, None))
+        failureNel(invalidArgumentError("expected integer arguments for SUBSTRING"))
+      case Sized(t, _, _) => failureNel(typeError(UnificationError(Type.Str, t, None)))
     },
     basicUntyper)
 
@@ -255,14 +256,14 @@ trait StringLib extends Library {
       case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Str(delimiter))) =>
         success(Type.Const(Data.Arr(str.split(Regex.quote(delimiter), -1).toList.map(Data.Str(_)))))
       case Sized(strT, delimiterT) =>
-        (Type.typecheck(Type.Str, strT).leftMap(nel => nel.map(ι[SemanticError])) |@|
-         Type.typecheck(Type.Str, delimiterT).leftMap(nel => nel.map(ι[SemanticError])))((_, _) => Type.FlexArr(0, None, Type.Str))
+        (Type.typecheck(Type.Str, strT).leftMap(_.map(typeError(_))) |@|
+         Type.typecheck(Type.Str, delimiterT).leftMap(_.map(typeError(_))))((_, _) => Type.FlexArr(0, None, Type.Str))
     },
     basicUntyper)
 
   val Boolean = UnaryFunc(
     Mapping,
-    "Converts the strings “true” and “false” into boolean values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    "Converts the strings “true” and “false” into boolean values. This is a partial function – arguments that don’t satisfy the constraint have undefined results.",
     Type.Bool,
     Func.Input1(Type.Str),
     noSimplification,
@@ -272,7 +273,7 @@ trait StringLib extends Library {
       case Sized(Type.Const(Data.Str("false"))) =>
         success(Type.Const(Data.Bool(false)))
       case Sized(Type.Const(Data.Str(str)))     =>
-        failureNel(InvalidStringCoercion(str, List("true", "false").right))
+        failureNel(invalidStringCoercionError(str, NonEmptyList("true", "false")))
       case Sized(Type.Str)                      => success(Type.Bool)
     },
     untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
@@ -285,14 +286,14 @@ trait StringLib extends Library {
 
   val Integer = UnaryFunc(
     Mapping,
-    "Converts strings containing integers into integer values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    "Converts strings containing integers into integer values. This is a partial function – arguments that don’t satisfy the constraint have undefined results.",
     Type.Int,
     Func.Input1(Type.Str),
     noSimplification,
     partialTyperV[nat._1] {
       case Sized(Type.Const(Data.Str(str))) =>
         \/.fromTryCatchNonFatal(BigInt(str)).fold(
-          κ(failureNel(InvalidStringCoercion(str, "a string containing an integer".left))),
+          κ(failureNel(invalidStringCoercionError(str, "a string containing an integer".wrapNel))),
           i => success(Type.Const(Data.Int(i))))
 
       case Sized(Type.Str) => success(Type.Int)
@@ -301,14 +302,14 @@ trait StringLib extends Library {
 
   val Decimal = UnaryFunc(
     Mapping,
-    "Converts strings containing decimals into decimal values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    "Converts strings containing decimals into decimal values. This is a partial function – arguments that don’t satisfy the constraint have undefined results.",
     Type.Dec,
     Func.Input1(Type.Str),
     noSimplification,
     partialTyperV[nat._1] {
       case Sized(Type.Const(Data.Str(str))) =>
         \/.fromTryCatchNonFatal(BigDecimal(str)).fold(
-           κ(failureNel(InvalidStringCoercion(str, "a string containing an decimal number".left))),
+           κ(failureNel(invalidStringCoercionError(str, "a string containing an decimal number".wrapNel))),
           i => success(Type.Const(Data.Dec(i))))
       case Sized(Type.Str) => success(Type.Dec)
     },
@@ -316,14 +317,14 @@ trait StringLib extends Library {
 
   val Null = UnaryFunc(
     Mapping,
-    "Converts strings containing “null” into the null value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    "Converts strings containing “null” into the null value. This is a partial function – arguments that don’t satisfy the constraint have undefined results.",
     Type.Null,
     Func.Input1(Type.Str),
     noSimplification,
     partialTyperV[nat._1] {
       case Sized(Type.Const(Data.Str("null"))) => success(Type.Const(Data.Null))
       case Sized(Type.Const(Data.Str(str))) =>
-        failureNel(InvalidStringCoercion(str, List("null").right))
+        failureNel(invalidStringCoercionError(str, "null".wrapNel))
       case Sized(Type.Str) => success(Type.Null)
     },
     untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
@@ -360,10 +361,10 @@ trait StringLib extends Library {
         // NB: Should not be able to hit this case, because of the domain.
         case other                  =>
           failureNel(
-            TypeError(
+            typeError(UnificationError(
               Type.Syntaxed,
               other.dataType,
-              "can not convert aggregate types to String".some):SemanticError)
+              "can not convert aggregate types to String".some)))
       }).map(s => Type.Const(Data.Str(s)))
       case Sized(_) => success(Type.Str)
     },

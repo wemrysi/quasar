@@ -360,7 +360,7 @@ trait ColumnarTableModule[M[+ _]]
     def uniformDistribution(init: MmixPrng): Table = {
       val gen: StreamT[M, Slice] = StreamT.unfoldM[M, Slice, MmixPrng](init) { prng =>
         val (column, nextGen) = Column.uniformDistribution(prng)
-        Some((Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), yggConfig.maxSliceSize), nextGen)).point[M]
+        Some((Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), Config.maxSliceSize), nextGen)).point[M]
       }
 
       Table(gen, InfiniteSize)
@@ -612,7 +612,7 @@ trait ColumnarTableModule[M[+ _]]
     }
 
     def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int] = None): Table = {
-      val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
+      val sliceSize = maxSliceSize.getOrElse(Config.maxSliceSize)
 
       def makeSlice(data: Stream[RValue]): (Slice, Stream[RValue]) = {
         val (prefix, suffix) = data.splitAt(sliceSize)
@@ -628,8 +628,7 @@ trait ColumnarTableModule[M[+ _]]
             }
           }
         },
-        ExactSize(values.length)
-      )
+        ExactSize(values.length))
     }
 
     def join(left: Table, right: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
@@ -809,7 +808,7 @@ trait ColumnarTableModule[M[+ _]]
         case slice :: Nil => slice
         case slices =>
           val slice = Slice.concat(slices)
-          if (slices.size > (slice.size / yggConfig.smallSliceSize)) {
+          if (slices.size > (slice.size / Config.smallSliceSize)) {
             slice.materialized // Deal w/ lots of small slices by materializing them.
           } else {
             slice
@@ -1334,7 +1333,7 @@ trait ColumnarTableModule[M[+ _]]
           // We try to fill out the slices as much as possible, so we work with
           // several rows from the left at a time.
 
-          val lrowsPerSlice = math.max(1, yggConfig.maxSliceSize / rhead.size)
+          val lrowsPerSlice = math.max(1, Config.maxSliceSize / rhead.size)
           val sliceSize     = lrowsPerSlice * rhead.size
 
           // Note that this is still memory efficient, as the columns are re-used
@@ -1421,8 +1420,8 @@ trait ColumnarTableModule[M[+ _]]
         }
 
         // We canonicalize the tables so that no slices are too small.
-        val left  = this.canonicalize(yggConfig.minIdealSliceSize, Some(yggConfig.maxSliceSize))
-        val right = that.canonicalize(yggConfig.minIdealSliceSize, Some(yggConfig.maxSliceSize))
+        val left  = this.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceSize))
+        val right = that.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceSize))
 
         left.slices.uncons flatMap {
           case Some((lhead, ltail)) =>
@@ -1521,11 +1520,11 @@ trait ColumnarTableModule[M[+ _]]
         // this value may be 0 if we're looking at CEmptyObject | CEmptyArray
         val highWaterMark = math.max(innerHeads.length, primitiveMax)
 
-        val resplit = if (slice.size * highWaterMark > yggConfig.maxSliceSize) {
+        val resplit = if (slice.size * highWaterMark > Config.maxSliceSize) {
           val numSplits =
-            math.ceil((slice.size * highWaterMark).toDouble / yggConfig.maxSliceSize).toInt
+            math.ceil((slice.size * highWaterMark).toDouble / Config.maxSliceSize).toInt
 
-          val size = math.ceil(yggConfig.maxSliceSize.toDouble / highWaterMark).toInt
+          val size = math.ceil(Config.maxSliceSize.toDouble / highWaterMark).toInt
 
           // we repeatedly apply windowing to slice.  this avoids linear delegation through Remap
           val acc = (0 until numSplits).foldLeft(Vector.empty[Slice]) {

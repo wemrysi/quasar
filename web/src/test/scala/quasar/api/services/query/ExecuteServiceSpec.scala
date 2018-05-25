@@ -24,6 +24,7 @@ import quasar.api.matchers._
 import quasar.api.services.VCacheFixture
 import quasar.api.services.Fixture._
 import quasar.common.{Map => _, _}
+import quasar.compile.{queryPlan, SemanticErrsT, SemanticError}
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.effect.ScopeExecution
 import quasar.fp._
@@ -45,6 +46,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
+import eu.timepit.refined.scalaz._
 import matryoshka.data.Fix
 import org.http4s
 import org.http4s._
@@ -450,7 +452,8 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
+          queryPlan[SemanticErrsT[PhaseResultW, ?], Fix, Fix[LogicalPlan]](
+            expr, Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](liftFT[QueryFile])(
           path = fs.parent,
@@ -469,7 +472,8 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
         val err = executionFailed_(lp, msg)
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
+          queryPlan[SemanticErrsT[PhaseResultW, ?], Fix, Fix[LogicalPlan]](
+            expr, Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](failingExecPlan(msg))(
           path = rootDir,

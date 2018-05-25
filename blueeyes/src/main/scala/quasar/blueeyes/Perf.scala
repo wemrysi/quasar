@@ -17,7 +17,6 @@
 package quasar.blueeyes
 
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
 
 import scala.annotation.tailrec
 
@@ -59,31 +58,4 @@ final class LazyMap[A, B, C](source: Map[A, B], f: B => C) extends Map[A, C] {
   }
   def +[C1 >: C](kv: (A, C1)): Map[A, C1] = iterator.toMap + kv
   def -(a: A): Map[A, C]                  = iterator.toMap - a
-}
-
-final class FreshAtomicIdSource {
-  private val source = new AtomicLong
-  def nextId() = source.getAndIncrement
-  def nextIdBlock(n: Int): Long = {
-    var nextId = source.get()
-    while (!source.compareAndSet(nextId, nextId + n)) {
-      nextId = source.get()
-    }
-    nextId
-  }
-}
-
-object yggConfig {
-  val idSource = new FreshAtomicIdSource
-
-  def hashJoins         = true
-  def sortBufferSize    = 1000
-  def maxSliceSize: Int = 20000
-
-  // This is a slice size that we'd like our slices to be at least as large as.
-  def minIdealSliceSize: Int = maxSliceSize / 4
-
-  // This is what we consider a "small" slice. This may affect points where
-  // we take proactive measures to prevent problems caused by small slices.
-  def smallSliceSize: Int = 50
 }

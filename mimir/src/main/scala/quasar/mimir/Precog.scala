@@ -16,7 +16,6 @@
 
 package quasar.mimir
 
-import quasar.blueeyes.util.Clock
 import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
 
 import quasar.yggdrasil.table.VFSColumnarTableModule
@@ -112,8 +111,6 @@ final class Precog private (dataDir0: File)
   // needed for nihdb
   val masterChef: ActorRef =
     actorSystem.actorOf(props.withRouter(routerConfig))
-
-  private val clock: Clock = Clock.System
 
   // Members declared in quasar.yggdrasil.table.ColumnarTableModule
   implicit def M: Monad[Future] = futureInstance

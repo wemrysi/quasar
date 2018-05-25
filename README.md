@@ -18,12 +18,6 @@ See the [SQL² tutorial](http://quasar-analytics.org/docs/sqltutorial/) for more
 
 SQL² supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as additional parameters in the url, using the variable name prefixed by `var.` (e.g. `var.cutoff=1000`). Failure to specify valid values for all variables used inside a query will result in an error. These values use the same syntax as the query itself; notably, strings should be surrounded by double quotes. Some acceptable values are `123`, `"CO"`, and `DATE("2015-07-06")`.
 
-## Using the Pre-Built JARs
-
-In [Github Releases](http://github.com/quasar-analytics/quasar/releases), you can find pre-built JARs for all the subprojects in this repository.
-
-See the instructions below for running and configuring these JARs.
-
 ## Building from Source
 
 **Note**: This requires Java 8 and Bash (Linux, Mac).  Bash is not required on Windows, but the non-SBT infrastructure (e.g. the docker scripts) currently only works on Unix platforms.
@@ -125,12 +119,13 @@ curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": {
 ```
 The `<mountPath>` specifies the path of your mount point and the remaining parameters are listed below:
 
-| mountKey        | protocol         | uri                          |
-|-----------------|------------------|------------------------------|
-| `couchbase`     | `couchbase://`   | [Couchbase](#couchbase)      |
-| `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)      |
-| `mimir`         | `mimir=`         | "\<path-to-directory\>"      |
-| `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)  |
+| mountKey            | protocol         | uri                                   |
+|---------------------|------------------|---------------------------------------|
+| `couchbase`         | `couchbase://`   | [Couchbase](#couchbase)               |
+| `marklogic`         | `xcc://`         | [MarkLogic](#marklogic)               |
+| `mimir`             |                  | "\<path-to-mimir-storage-directory\>" |
+| `local_file_system` |                  | "\<path-to-mimir-storage-directory\>" |
+| `mongodb`           | `mongodb://`     | [MongoDB](#database-mounts)           |
 
 
 See [here](#get-mountfspath) for more details on the mount web api service.

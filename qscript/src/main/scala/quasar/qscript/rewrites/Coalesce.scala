@@ -24,6 +24,7 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript._
+import quasar.qscript.RecFreeS._
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
 
@@ -285,11 +286,11 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
           : QScriptCore[IT[F]] => Option[QScriptCore[IT[F]]] = {
         case LeftShift(src, struct, id, stpe, undef, repair) =>
           MapFuncCore.extractFilter(struct.linearize)(_.some) ∘ { case (f, m, _) =>
-            LeftShift(FToOut(QC.inj(Filter(src, f))).embed, RecFreeS.fromFree(m), id, stpe, undef, repair)
+            LeftShift(FToOut(QC.inj(Filter(src, f.asRec))).embed, m.asRec, id, stpe, undef, repair)
           }
         case Map(src, mf) =>
           MapFuncCore.extractFilter(mf.linearize)(_.some) ∘ { case (f, m, _) =>
-            Map(FToOut(QC.inj(Filter(src, f))).embed, RecFreeS.fromFree(m))
+            Map(FToOut(QC.inj(Filter(src, f.asRec))).embed, m.asRec)
           }
         case _ => none
       }
@@ -324,7 +325,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
                 Map(
                   FToOut.reverseGet(QC.inj(Filter(
                     doubleInner,
-                    cond >> mfInner.linearize))).embed,
+                    cond >> mfInner))).embed,
                   mf >> mfInner).some
               case _ => None
             }
@@ -421,7 +422,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
           }
         case Filter(Embed(src), cond) => FToOut.get(src) >>= QC.prj >>= {
           case Filter(srcInner, condInner) =>
-            Filter(srcInner, Free.roll[MapFunc, Hole](MFC(And(condInner, cond)))).some
+            Filter(srcInner, RecFreeS.roll[MapFunc, Hole](MFC(And(condInner, cond)))).some
           case _ => None
         }
         case Subset(src, from, sel, count) =>
@@ -444,7 +445,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
                     FToOut.reverseGet(QC.inj(
                       Filter(
                         FToOut.reverseGet(SR.inj(sr)).embed,
-                        mf >> innermf.linearize))).embed,
+                        mf >> innermf))).embed,
                     innermf).some
                 case _ => None
               }
@@ -459,10 +460,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
           (((FToOut.get(src) >>= QC.prj) match {
 
             case Some(Filter(Embed(innerSrc), cond)) =>
-              ((FToOut.get(innerSrc) >>= SR.prj) ⊛ eliminateRightSideProjUnary(cond))((const, newCond) =>
+              ((FToOut.get(innerSrc) >>= SR.prj) ⊛ eliminateRightSideProjUnary(cond.linearize))((const, newCond) =>
                 Filter(
                   FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
-                  newCond))
+                  newCond.asRec))
 
             case Some(Sort(Embed(innerSrc), bucket, ord)) =>
               ((FToOut.get(innerSrc) >>= SR.prj) ⊛
@@ -530,7 +531,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
             tj => TJ.inj(ThetaJoin.combine.modify(mf.linearize >> (_: JoinFunc))(tj)))
         case Filter(Embed(src), cond) =>
           (FToOut(src) >>= TJ.prj).map(
-            tj => TJ.inj(ThetaJoin.on[IT, IT[F]].modify(on => Free.roll(MFC(And(on, cond >> tj.combine))))(tj)))
+            tj => TJ.inj(ThetaJoin.on[IT, IT[F]].modify(on => Free.roll(MFC(And(on, cond.linearize >> tj.combine))))(tj)))
         case Subset(src, from, sel, count) =>
           makeBranched(from, count)(ifNeq(freeTJ))((l, r) => QC.inj(Subset(src, l, sel, r)))
         case Union(src, from, count) =>

@@ -22,10 +22,9 @@ import quasar.fs.Planner.PlannerError
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
-import quasar.frontend.logicalplan.LogicalPlan
+import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.construction
 import quasar.qscript.{ExcludeId, HoleF, OnUndefined, ReduceFuncs, ReduceIndex, RightSideF, ShiftType}
-import quasar.sql.CompilerHelpers
 import quasar.std.{AggLib, IdentityLib}
 import slamdata.Predef._
 import matryoshka._
@@ -38,7 +37,7 @@ import Path.{Sandboxed, file}
 import scalaz.{-\/, EitherT, Equal, Free, Need, StateT, \/-}
 import scalaz.syntax.show._
 
-object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
+object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
   val qsu = LPtoQS[Fix]

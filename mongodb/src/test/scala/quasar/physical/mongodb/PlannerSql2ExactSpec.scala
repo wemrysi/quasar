@@ -23,6 +23,7 @@ import quasar.contrib.pathy._
 import quasar.contrib.specs2._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp.ski._
+import quasar.frontend.logicalplan.JoinDir
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
@@ -160,17 +161,17 @@ class PlannerSql2ExactSpec extends
         qsToWf = Ok,
         fix.LeftShift(
           fix.Filter(fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(
-              func.Hole,
+            recFunc.Guard(
+              recFunc.Hole,
               Type.Obj(Map(), Some(Type.Top)),
-              func.And(
-                func.Eq(
-                  func.ProjectKeyS(func.Hole, "year"),
-                  func.Constant(json.int(2017))),
-                func.Eq(
-                  func.ProjectKeyS(func.Hole, "memberNumber"),
-                  func.Constant(json.int(123456)))),
-              func.Undefined)),
+              recFunc.And(
+                recFunc.Eq(
+                  recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("year"))),
+                  recFunc.Constant(json.int(2017))),
+                recFunc.Eq(
+                  recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("memberNumber"))),
+                  recFunc.Constant(json.int(123456)))),
+              recFunc.Undefined)),
           recFunc.Guard(
             recFunc.Guard(
               recFunc.Hole,
@@ -1139,7 +1140,7 @@ class PlannerSql2ExactSpec extends
                   $and(
                     $lt($literal(Bson.Null), $field("bar")),
                     $lt($field("bar"), $literal(Bson.Text("")))),
-                  divide($field("bar"), $literal(Bson.Int32(10))),
+                  $divide($field("bar"), $literal(Bson.Int32(10))),
                   $literal(Bson.Undefined)),
               "src"    -> $$ROOT),
             ExcludeId),

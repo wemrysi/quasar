@@ -3,7 +3,7 @@
 
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir": "pendingIgnoreFieldOrder",
+        "lwc_local": "pendingIgnoreFieldOrder",
         "marklogic_json": "pendingIgnoreFieldOrder",
         "marklogic_xml": "pending",
         "mimir":"pendingIgnoreFieldOrder"

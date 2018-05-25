@@ -1,5 +1,3 @@
-import github.GithubPlugin._
-
 import scala.Predef._
 import quasar.project._
 
@@ -83,13 +81,19 @@ lazy val backendRewrittenRunSettings = Seq(
     delegate.info("Computing classpaths of dependent backends...")
 
     val parentCp = (fullClasspath in connector in Compile).value.files
-    val backends = isolatedBackends.value map {
+    val productionBackends = isolatedBackends.value map {
       case (name, childCp) =>
         val classpathStr =
           createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(",")
 
         "--backend:" + name + "=" + classpathStr
     }
+
+    val lwcCp = (fullClasspath in mimir in Test).value.files
+    val lwcClasspath = createBackendEntry(lwcCp, parentCp).map(_.getAbsolutePath).mkString(",")
+    val testBackends = List("--backend:quasar.mimir.LightweightTester$=" + lwcClasspath)
+
+    val backends = productionBackends ++ testBackends
 
     val main = (mainClass in Compile).value.getOrElse(sys.error("unspecified main class; huzzah huzzah huzzah"))
     val r = runner.value
@@ -202,22 +206,6 @@ lazy val publishTestsSettings = Seq(
   publishArtifact in (Test, packageBin) := true
 )
 
-lazy val githubReleaseSettings =
-  githubSettings ++ Seq(
-    GithubKeys.assets := Seq(assembly.value),
-    GithubKeys.repoSlug := "quasar-analytics/quasar",
-    GithubKeys.releaseName := "quasar " + GithubKeys.tag.value,
-    releaseVersionFile := file("version.sbt"),
-    releaseUseGlobalVersion := true,
-    releaseProcess := Seq[ReleaseStep](
-      checkSnapshotDependencies,
-      inquireVersions,
-      runTest,
-      setReleaseVersion,
-      commitReleaseVersion,
-      pushChanges)
-  )
-
 def isolatedBackendSettings(classnames: String*) = Seq(
   isolatedBackends in Global ++=
     classnames.map(_ -> (fullClasspath in Compile).value.files),
@@ -247,27 +235,37 @@ lazy val root = project.in(file("."))
   .settings(excludeTypelevelScalaLibrary)
   .aggregate(
 
-       foundation,
-//     /     \    \
-    effect, ejson, js, // <- _______
-//    |        \   /                \
-              common,
-//    |       /      \                \
-        frontend,    precog,
-//    |/    /    \       |             |
-     fs, sql, datagen, blueeyes,
-//    |   |              |             |
-// ___|___|              |             |
-// |  |                  |             |
-     qscript,         niflheim,
-// |  |                  |             |
-     qsu,
-// |     \               |             |
-         connector,   yggdrasil,
-// |     /   |   \______|______________|_________
-//  \   /    |         /     \         \         \
-    core, skeleton, mimir, marklogic, mongodb, couchbase,
-//      \     |    /          |          |         |
+       foundation, //________
+//    /    |      \     \    \
+    api, effect, ejson, js, qdata,
+//  /      |        \  /  \   |
+// /       |        |  |   \  |
+// |       |    ______________/
+// |       |   /    |  |     \_______
+                  common,
+// |       | /   /  |   \             \
+        frontend,  sql, precog,
+// |   /   |    \   |     |            |
+// |  /    |     \_____   |            |
+// |  |    |        |  \  |            |
+     fs,  sst,         blueeyes,
+// |  |    |        |     |            |
+// |  |    |        /     |            |
+        datagen,
+// |__|___________/       |            |
+// |  |          /        |            |
+     qscript,          niflheim,
+// |  |      \ /          |            |
+     qsu,   core, //______|____________|
+// |   \    /             |            |
+//  \___\_____            |            |
+//        /   \           |            |
+           connector,  yggdrasil,
+//      /     |  \       |             |
+//      |     |   \______|_____________|__________
+//      |     |      \  /     \         \         \
+          skeleton, mimir, marklogic, mongodb, couchbase,
+//      \    |     /          |          |         |
           interface,
 //          /  \              |          |         |
          repl, web,
@@ -302,6 +300,24 @@ lazy val foundation = project
     libraryDependencies ++= Dependencies.foundation)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+
+lazy val qdata = project
+  .settings(name := "quasar-qdata-internal")
+  .dependsOn(foundation)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
+/** Types and interfaces describing Quasar's functionality. */
+lazy val api = project
+  .settings(name := "quasar-api-internal")
+  .dependsOn(foundation % BothScopes)
+  .settings(libraryDependencies ++= Dependencies.api)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
 
 /** A fixed-point implementation of the EJson spec. This should probably become
   * a standalone library.
@@ -354,7 +370,10 @@ lazy val common = project
   */
 lazy val frontend = project
   .settings(name := "quasar-frontend-internal")
-  .dependsOn(common % BothScopes)
+  .dependsOn(
+    qdata,
+    common % BothScopes,
+    effect)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -363,9 +382,17 @@ lazy val frontend = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val sst = project
+  .settings(name := "quasar-sst-internal")
+  .dependsOn(frontend % BothScopes)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val datagen = project
   .settings(name := "quasar-datagen")
-  .dependsOn(frontend % BothScopes)
+  .dependsOn(sst % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -378,27 +405,28 @@ lazy val datagen = project
   */
 lazy val sql = project
   .settings(name := "quasar-sql-internal")
-  .dependsOn(frontend % BothScopes)
+  .dependsOn(common % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
+  .settings(
+    libraryDependencies ++= Dependencies.sql)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val fs = project
   .settings(name := "quasar-fs-internal")
-  .dependsOn(
-    effect,
-    frontend % BothScopes)
+  .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
+  .settings(publishTestsSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
   .dependsOn(
-    sql % "test->test",
-    fs)
+    fs,
+    frontend % "test->test")
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -415,21 +443,24 @@ lazy val qsu = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
-    sql % "test->test",
+    api,
     qsu)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
+  .settings(
+    libraryDependencies ++= Dependencies.connector)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(
-    connector % BothScopes,
-    sql,
-    effect    % "test->test",
-    fs        % "test->test")
+    api     % BothScopes,
+    qscript % BothScopes,
+    sql     % BothScopes,
+    fs      % "test->test",
+    effect  % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -444,11 +475,11 @@ lazy val couchbase = project
   .settings(name := "quasar-couchbase-internal")
   .dependsOn(
     connector % BothScopes,
+    core      % "test->test",
     qscript   % "test->test")
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.couchbase)
-  .settings(githubReleaseSettings)
   .settings(isolatedBackendSettings("quasar.physical.couchbase.Couchbase$"))
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
@@ -457,12 +488,14 @@ lazy val couchbase = project
   */
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
-  .dependsOn(connector % BothScopes)
+  .dependsOn(
+    connector % BothScopes,
+    core      % "test->test",
+    qscript   % "test->test")
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
   .settings(libraryDependencies ++= Dependencies.marklogic)
-  .settings(githubReleaseSettings)
   .settings(isolatedBackendSettings("quasar.physical.marklogic.MarkLogic$"))
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
@@ -475,7 +508,7 @@ lazy val mongodb = project
     fs        % "test->test",
     connector % BothScopes,
     js        % BothScopes,
-    core      % "test->compile")
+    core      % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(
@@ -484,7 +517,6 @@ lazy val mongodb = project
       Wart.AsInstanceOf,
       Wart.Equals,
       Wart.Overloading))
-  .settings(githubReleaseSettings)
   .settings(isolatedBackendSettings("quasar.physical.mongodb.MongoDb$"))
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
@@ -506,8 +538,9 @@ lazy val interface = project
   .settings(name := "quasar-interface-internal")
   .dependsOn(
     core % BothScopes,
+    mimir,
     skeleton,
-    mimir)
+    sst)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -521,7 +554,6 @@ lazy val repl = project
   .settings(name := "quasar-repl")
   .dependsOn(interface)
   .settings(commonSettings)
-  .settings(githubReleaseSettings)
   .settings(targetSettings)
   .settings(backendRewrittenRunSettings)
   .settings(
@@ -538,7 +570,6 @@ lazy val web = project
   .dependsOn(interface % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
-  .settings(githubReleaseSettings)
   .settings(targetSettings)
   .settings(backendRewrittenRunSettings)
   .settings(
@@ -568,13 +599,19 @@ lazy val it = project
       val LoadCfgProp = "slamdata.internal.fs-load-cfg"
 
       val parentCp = (fullClasspath in connector in Compile).value.files
-      val backends = isolatedBackends.value map {
+      val productionBackends = isolatedBackends.value map {
         case (name, childCp) =>
           val classpathStr =
             createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
 
           name + "=" + classpathStr
       }
+
+      val lwcCp = (fullClasspath in mimir in Test).value.files
+      val lwcClasspath = createBackendEntry(lwcCp, parentCp).map(_.getAbsolutePath).mkString(":")
+      val testBackends = List("quasar.mimir.LightweightTester$=" + lwcClasspath)
+
+      val backends = productionBackends ++ testBackends
 
       if (java.lang.System.getProperty(LoadCfgProp, "").isEmpty) {
         // we aren't forking tests, so we just set the property in the current JVM

@@ -19,12 +19,13 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
+import quasar.compile.{queryPlan, CompilerHelpers, SemanticErrsT}
 import quasar.contrib.pathy._, Helpers._
 import quasar.contrib.specs2._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.frontend.{logicalplan => lp}, lp.{JoinDir, LogicalPlan => LP}
 import quasar.javascript._
 import quasar.{jscore => js}
 import quasar.physical.mongodb.accumulator._
@@ -192,10 +193,11 @@ object PlannerHelpers {
 
   def compileSqlToLP[M[_]: Monad: MonadFsErr: PhaseResultTell]
       (sql: Fix[Sql], basePath: ADir): M[Fix[LP]] = {
-    val (log, s) = queryPlan(sql, Variables.empty, basePath, 0L, None).run.run
+    val (log, s) = queryPlan[SemanticErrsT[PhaseResultW, ?], Fix, Fix[LP]](
+      sql, Variables.empty, basePath, 0L, None).run.run
     val lp = s.valueOr(e => scala.sys.error(e.shows))
     for {
-      _ <- scala.Predef.implicitly[PhaseResultTell[M]].tell(log)
+      _ <- PhaseResultTell[M].tell(log)
     } yield lp
   }
 

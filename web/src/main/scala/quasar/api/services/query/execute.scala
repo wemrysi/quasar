@@ -21,18 +21,22 @@ import quasar._
 import quasar.effect.{ExecutionId, ScopeExecution}
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
+import quasar.compile.queryPlan
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
+import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs._
 import quasar.fs.mount.Mounting
-import quasar.main.FilesystemQueries
+import quasar.fs.mount.module.resolveImports
+import quasar.main.{CompExec, FilesystemQueries}
 
 import argonaut._, Argonaut._
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.Accept
+import matryoshka.data.Fix
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -52,7 +56,11 @@ object execute {
     SE: ScopeExecution[Free[S, ?], T]
   ): QHttpService[S] = {
     val fsQ = new FilesystemQueries[S]
-    val xform = QueryFile.Transforms[Free[S, ?]]
+    val CE = CompExec[Free[S, ?]]
+    import CE._
+
+    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+    import EitherT.eitherTMonad
 
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
@@ -66,13 +74,13 @@ object execute {
                 lpOrSemanticErr <-
                   ST.newScope("plan query",
                     block.leftMap(_.wrapNel).flatMap(block =>
-                      queryPlan(block, requestVars(req), basePath, off, lim)
+                      queryPlan[CompileM, Fix, Fix[LogicalPlan]](block, requestVars(req), basePath, off, lim)
                     .run.value).point[Free[S, ?]])
                 evaluated <-
                   ST.newScope("evaluate query",
                     lpOrSemanticErr traverse (lp => formattedDataResponse(
                       MessageFormat.fromAccept(req.headers.get(Accept)),
-                      Q.evaluate(lp).translate(xform.dropPhases))))
+                      Q.evaluate(lp).translate(dropPhases))))
             } yield evaluated)
           } yield result
       })
