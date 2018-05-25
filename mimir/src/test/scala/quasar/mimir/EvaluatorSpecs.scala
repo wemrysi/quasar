@@ -33,8 +33,7 @@ import java.io.File
 
 import scala.collection.mutable
 
-trait EvaluatorSpecification extends Specification with EvaluatorTestSupport {
-}
+trait EvaluatorSpecification extends Specification with EvaluatorTestSupport
 
 trait EvaluatorTestSupport extends StdLibEvaluatorStack
     with BaseBlockStoreTestModule
