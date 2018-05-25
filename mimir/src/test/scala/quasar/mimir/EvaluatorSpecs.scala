@@ -33,20 +33,17 @@ import java.io.File
 
 import scala.collection.mutable
 
-trait EvaluatorSpecification[M[_]] extends Specification with EvaluatorTestSupport[M] {
-  def M = Need.need.asInstanceOf[scalaz.Monad[M] with scalaz.Comonad[M]]
+trait EvaluatorSpecification extends Specification with EvaluatorTestSupport {
 }
 
-trait EvaluatorTestSupport[M[_]] extends StdLibEvaluatorStack[M]
-    with BaseBlockStoreTestModule[M]
+trait EvaluatorTestSupport extends StdLibEvaluatorStack
+    with BaseBlockStoreTestModule
     with IdSourceScannerModule
     with SpecificationHelp { outer =>
 
-  def Evaluator[N[+_]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M) =
-    new Evaluator[N](N0)(mn,nm) {
-      val report = new LoggingQueryLogger[N, Unit] with ExceptionQueryLogger[N, Unit] with TimingQueryLogger[N, Unit] {
-        val M = N0
-      }
+  def Evaluator =
+    new Evaluator {
+      val report = new LoggingQueryLogger[Unit] with ExceptionQueryLogger[Unit] with TimingQueryLogger[Unit]
     }
 
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
@@ -98,9 +95,7 @@ trait EvaluatorTestSupport[M[_]] extends StdLibEvaluatorStack[M]
     }
   }
 
-  object Table extends TableCompanion {
-    override def M: Monad[M] = outer.M
-  }
+  object Table extends TableCompanion
 
   private var initialIndices = mutable.Map[Path, Int]()    // if we were doing this for real: j.u.c.HashMap
   private var currentIndex   = 0                      // if we were doing this for real: j.u.c.a.AtomicInteger

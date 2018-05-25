@@ -39,7 +39,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-trait TablePagerModule extends ColumnarTableModule[IO] {
+trait TablePagerModule extends ColumnarTableModule {
 
   final class TablePager private (
       slices: StreamT[Task, Slice],
@@ -86,7 +86,7 @@ trait TablePagerModule extends ColumnarTableModule[IO] {
       for {
         q <- async.boundedQueue[Task, Throwable \/ Vector[Data]](lookahead).to[IO]
         // ambiguity between M and effect-derived monad
-        slices = table.slices.trans(λ[IO ~> Task](_.to[Task]))(M, Functor[Task])
+        slices = table.slices.trans(λ[IO ~> Task](_.to[Task]))
         back <- IO(new TablePager(slices, q))
       } yield back
     }

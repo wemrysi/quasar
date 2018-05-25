@@ -28,7 +28,11 @@ import org.slf4s.Logging
 import java.io.File
 import java.util.SortedMap
 
+import cats.effect.IO
+
 import scalaz._
+
+import shims._
 
 import scala.collection.JavaConverters._
 
@@ -36,15 +40,13 @@ import scala.collection.JavaConverters._
   * A Projection wrapping a raw JDBM TreeMap index used for sorting. It's assumed that
   * the index has been created and filled prior to creating this wrapper.
   */
-class JDBMRawSortProjection[M[_]] private[yggdrasil] (dbFile: File,
-                                                        indexName: String,
-                                                        sortKeyRefs: Seq[ColumnRef],
-                                                        valRefs: Seq[ColumnRef],
-                                                        sortOrder: DesiredSortOrder,
-                                                        sliceSize: Int,
-                                                        val length: Long)(
-    implicit M: Monad[M]
-  ) extends ProjectionLike[M, Slice]
+class JDBMRawSortProjection private[yggdrasil] (dbFile: File,
+                                                indexName: String,
+                                                sortKeyRefs: Seq[ColumnRef],
+                                                valRefs: Seq[ColumnRef],
+                                                sortOrder: DesiredSortOrder,
+                                                sliceSize: Int,
+                                                val length: Long) extends ProjectionLike[Slice]
     with Logging {
   import JDBMProjection._
   type Key = Array[Byte]
@@ -64,7 +66,7 @@ class JDBMRawSortProjection[M[_]] private[yggdrasil] (dbFile: File,
   val keyFormat = RowFormat.forSortingKey(sortKeyRefs)
 
   override def getBlockAfter(id: Option[Array[Byte]], columns: Option[Set[ColumnRef]])
-  : M[Option[BlockProjectionData[Array[Byte], Slice]]] = M.bind(M.point(())) { _ =>
+  : IO[Option[BlockProjectionData[Array[Byte], Slice]]] = IO.suspend {
     // TODO: Make this far, far less ugly
     if (columns.nonEmpty) {
       throw new IllegalArgumentException("JDBM Sort Projections may not be constrained by column descriptor")
@@ -110,7 +112,7 @@ class JDBMRawSortProjection[M[_]] private[yggdrasil] (dbFile: File,
         }
       }
 
-      M.point(if (iterator.isEmpty) {
+     IO(if (iterator.isEmpty) {
         None
       } else {
         val keyColumns = sortKeyRefs.map(JDBMSlice.columnFor(CPath("[0]"), sliceSize))

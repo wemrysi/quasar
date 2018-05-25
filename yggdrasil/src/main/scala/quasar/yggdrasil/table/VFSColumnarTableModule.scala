@@ -54,9 +54,7 @@ import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 
-trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[IO] with Logging {
-  protected def M: Monad[IO] = Monad[IO]
-
+trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging {
   private type ET[F[_], A] = EitherT[F, ResourceError, A]
 
   private val dbs = new ConcurrentHashMap[(Blob, Version), NIHDB]
@@ -288,8 +286,6 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[IO] with Logg
   }
 
   trait VFSColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
-
-    override def M: Monad[IO] = Monad[IO]
 
     def load(table: Table, tpe: JType): EitherT[IO, ResourceError, Table] = {
       for {

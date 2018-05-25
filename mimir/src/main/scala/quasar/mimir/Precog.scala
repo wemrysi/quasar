@@ -52,7 +52,7 @@ import scala.collection.immutable.IndexedSeq
 final class Precog private (dataDir0: File)
     extends VFSColumnarTableModule
     with TablePagerModule
-    with StdLibModule[IO] {
+    with StdLibModule {
 
   object Library extends StdLib
 

@@ -29,7 +29,7 @@ import org.slf4s.Logging
 import cats.effect.IO
 
 
-final class NIHDBProjection(snapshot: NIHDBSnapshot, projectionId: Int) extends ProjectionLike[IO, Slice] with Logging {
+final class NIHDBProjection(snapshot: NIHDBSnapshot, projectionId: Int) extends ProjectionLike[Slice] with Logging {
   type Key = Long
 
   private[this] val readers = snapshot.readers
