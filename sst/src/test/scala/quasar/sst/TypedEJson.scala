@@ -95,7 +95,7 @@ sealed abstract class TypedEJsonInstances0 {
       type Base[B] = EJson[B]
 
       def embed(bt: EJson[TypedEJson[T]])(implicit BF: Functor[EJson]) =
-        TypedEJson(Functor[EJson].map(bt)(_.ejson).embed)
+        TypedEJson(bt.map(_.ejson).embed)
     }
 
   implicit def recursive[T[_[_]]: RecursiveT]: Recursive.Aux[TypedEJson[T], EJson] =

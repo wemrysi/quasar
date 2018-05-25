@@ -23,7 +23,7 @@ import quasar.contrib.specs2.Spec
 import quasar.{ejson => ejs}
 import quasar.ejson.{Decoded, DecodeEJson, EJson, EJsonArbitrary, EncodeEJson}
 import quasar.ejson.implicits._
-import quasar.fp.{copkEqual => _, _}, Helpers._
+import quasar.fp._, Helpers._
 import quasar.tpe._
 
 import scala.Predef.$conforms

@@ -23,7 +23,7 @@ import argonaut.{Argonaut, CodecJson, DecodeResult}
 
 import fs2.util.Catchable
 
-import scalaz.{~>, Free, :<:}
+import scalaz.{~>, Free}
 import scalaz.concurrent.Task
 import iotaz.{CopK, TNilK}
 import iotaz.TListK.:::
