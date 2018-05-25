@@ -17,8 +17,9 @@
 package quasar.api
 
 import quasar.api.ResourceError.ReadError
+import quasar.higher.HFunctor
 
-import scalaz.{\/, Applicative, Contravariant, Functor, Profunctor, Strong, ProChoice}
+import scalaz.{~>, \/, Applicative, Contravariant, Functor, Profunctor, Strong, ProChoice}
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 
@@ -40,6 +41,17 @@ sealed abstract class QueryEvaluatorInstances extends QueryEvaluatorInstances0 {
     new Functor[QueryEvaluator[F, G, Q, ?]] {
       def map[A, B](fa: QueryEvaluator[F, G, Q, A])(f: A => B) =
         DelegatingQueryEvaluator[F, G, Q, A, Q, B](fa)(_ andThen (_.map(_.map(f))))
+    }
+
+  implicit def hfunctor[G[_], Q, R]: HFunctor[QueryEvaluator[?[_], G, Q, R]] =
+    new HFunctor[QueryEvaluator[?[_], G, Q, R]] {
+      def hmap[A[_], B[_]](fa: QueryEvaluator[A, G, Q, R])(f: A ~> B) =
+        new QueryEvaluator[B, G, Q, R] {
+          def evaluate(query: Q) = f(fa.evaluate(query))
+          def children(path: ResourcePath) = f(fa.children(path))
+          def descendants(path: ResourcePath) = f(fa.descendants(path))
+          def isResource(path: ResourcePath) = f(fa.isResource(path))
+        }
     }
 
   implicit def proChoice[F[_]: Applicative, G[_]]: ProChoice[QueryEvaluator[F, G, ?, ?]] =
@@ -101,5 +113,5 @@ private[api] object DelegatingQueryEvaluator {
       u: QueryEvaluator[F, G, Q, R])(
       f: (Q => F[ReadError \/ R]) => (S => F[ReadError \/ T]))
       : QueryEvaluator[F, G, S, T] =
-    new  DelegatingQueryEvaluator(u, f)
+    new DelegatingQueryEvaluator(u, f)
 }
