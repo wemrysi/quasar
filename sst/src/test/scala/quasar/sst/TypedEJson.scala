@@ -26,13 +26,14 @@ import quasar.ejson.{
   Extension,
   CommonEJson,
   ExtEJson,
+  EJsonArbitrary,
   Meta,
   Type => EType,
   SizedType => ESizedType,
   Null => ENull
 }
 import quasar.ejson.implicits._
-import quasar.fp.{copkTraverse => _,_}, Helpers._
+import quasar.fp._, Helpers._
 import quasar.pkg.tests._
 
 import matryoshka._
@@ -67,7 +68,7 @@ object TypedEJson extends TypedEJsonInstances {
 }
 
 sealed abstract class TypedEJsonInstances extends TypedEJsonInstances0 {
-  //  import EJsonArbitrary._ will be needed when actual instance for copk is implemented
+  import EJsonArbitrary._
   import quasar.contrib.iota.copkTraverse
 
   implicit def arbitrary[T[_[_]]: BirecursiveT]: Arbitrary[TypedEJson[T]] =
@@ -94,7 +95,7 @@ sealed abstract class TypedEJsonInstances0 {
       type Base[B] = EJson[B]
 
       def embed(bt: EJson[TypedEJson[T]])(implicit BF: Functor[EJson]) =
-        TypedEJson(bt.map(_.ejson).embed)
+        TypedEJson(Functor[EJson].map(bt)(_.ejson).embed)
     }
 
   implicit def recursive[T[_[_]]: RecursiveT]: Recursive.Aux[TypedEJson[T], EJson] =

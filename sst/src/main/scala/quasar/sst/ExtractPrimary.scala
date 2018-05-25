@@ -19,11 +19,14 @@ package quasar.sst
 import slamdata.Predef._
 import quasar.ejson.EJson
 import quasar.tpe._
+import quasar.fp.mkInject
 
 import matryoshka._
 import matryoshka.patterns.EnvT
 import scalaz._, Scalaz._
 import simulacrum._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 /** Defines how to extract the `PrimaryTag` from `F`. */
 @typeclass
@@ -34,16 +37,36 @@ trait ExtractPrimary[F[_]] {
 object ExtractPrimary {
   import ops._
 
-  // TODO provide actual instance
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  implicit def copkExtractPrimary[X <: iotaz.TListK]: ExtractPrimary[iotaz.CopK[X, ?]] = null
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): ExtractPrimary[CopK[LL, ?]] =
+    M.materialize(offset = 0)
 
-  implicit def coproductExtractPrimary[F[_]: ExtractPrimary, G[_]: ExtractPrimary]
-    : ExtractPrimary[Coproduct[F, G, ?]] =
-    new ExtractPrimary[Coproduct[F, G, ?]] {
-      def primaryTag[A](fa: Coproduct[F, G, A]) =
-        fa.run.fold(_.primaryTag, _.primaryTag)
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int): ExtractPrimary[CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
+      override def materialize(offset: Int): ExtractPrimary[CopK[TNilK, ?]] = ???
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: ExtractPrimary[F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int): ExtractPrimary[CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new ExtractPrimary[CopK[F ::: LL, ?]] {
+          override def primaryTag[A](cfa: CopK[F ::: LL, A]): Option[PrimaryTag] = cfa match {
+            case I(fa) => fa.primaryTag
+            case other => LL.materialize(offset + 1).primaryTag(other.asInstanceOf[CopK[LL, A]])
+          }
+        }
+      }
+    }
+  }
 
   implicit val taggedExtractPrimary: ExtractPrimary[Tagged] =
     new ExtractPrimary[Tagged] {

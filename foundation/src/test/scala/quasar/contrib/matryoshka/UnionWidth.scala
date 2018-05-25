@@ -19,6 +19,8 @@ package quasar.contrib.matryoshka
 import slamdata.Predef._
 
 import scalaz._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 /** Calculates the width of a typelevel union (coproduct). */
 sealed abstract class UnionWidth[F[_]] {
@@ -28,6 +30,12 @@ sealed abstract class UnionWidth[F[_]] {
 object UnionWidth extends UWidthInstances
 
 sealed abstract class UWidthInstances extends UWidthInstances0 {
+
+  implicit def copkUWidthInduct[F[_], LL <: TListK](implicit U: UnionWidth[CopK[LL, ?]]): UnionWidth[CopK[F ::: LL, ?]] =
+    new UnionWidth[CopK[F ::: LL, ?]] { val width = U.width + 1 }
+
+  implicit def copkUWidthBase: UnionWidth[CopK[TNilK, ?]] = new UnionWidth[CopK[TNilK, ?]] { val width = 0 }
+
   implicit def coproductUWidth[F[_], G[_]](
     implicit
     F: UnionWidth[F],
