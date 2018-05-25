@@ -167,7 +167,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] exte
       def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T])
           : M[WorkflowBuilder[WF]] =
         getFilterBuilder.filterBuilder(
-          { fm: FreeMap[T] => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, fm) },
+          handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _: FreeMap[T]),
           src,
           partialSel,
           cond.linearize)
