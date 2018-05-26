@@ -18,21 +18,22 @@ package quasar.repl
 
 import slamdata.Predef._
 
-import quasar.{Data, DataCodec, Variables, resolveImports, queryPlan}
+import quasar.{Data, DataCodec, Variables}
 import quasar.common.{PhaseResult, PhaseResults}
+import quasar.compile.{queryPlan, SemanticErrors}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
 import quasar.effect._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
-import quasar.frontend.SemanticErrors
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fp._, ski._, numeric.widenPositive
 import quasar.fs._
 import quasar.fs.mount._
+import quasar.fs.mount.module.resolveImports
 import quasar.fs.Planner.PlannerError
-import quasar.main.{analysis, FilesystemQueries, Prettify}
+import quasar.main.{analysis, CompExec, FilesystemQueries, Prettify}
 import quasar.qsu.LPtoQS
 import quasar.sql.Sql
 import quasar.sql
@@ -127,10 +128,13 @@ object Repl {
   ): Free[S, Unit] = {
     import Command._
 
+    val CE = CompExec[Free[S, ?]]
     val RS = AtomicRef.Ops[RunState, S]
     val DF = Failure.Ops[String, S]
 
     val fsQ = new FilesystemQueries[S]
+
+    import CE._
 
     def write(f: (AFile, Vector[Data]) => W.M[Vector[FileSystemError]], dst: XFile, dStr: String): Free[S, Unit] =
       for {
@@ -144,7 +148,7 @@ object Repl {
                  else DF.fail(errs.mkString("; "))
       } yield ()
 
-    def runQuery[A](state: RunState, query: Q.transforms.CompExecM[A])(f: A => Free[S, Unit]): Free[S, Unit] =
+    def runQuery[A](state: RunState, query: CompExecM[A])(f: A => Free[S, Unit]): Free[S, Unit] =
       for {
         t <- T.time(query.run.run.run)
         ((log, v), elapsed) = t
@@ -171,7 +175,7 @@ object Repl {
           .mapT(_.eval(0))
           .flatMap(qs => PhaseResults.logPhase[M](PhaseResult.tree("QScript (Educated)", qs)))
 
-      queryPlan(expr, vars, basePath, 0L, None)
+      queryPlan[CompileM, Fix, Fix[LogicalPlan]](expr, vars, basePath, 0L, None)
         .liftM[FileSystemErrT]
         .flatMap(logQS)
         .run.run.run

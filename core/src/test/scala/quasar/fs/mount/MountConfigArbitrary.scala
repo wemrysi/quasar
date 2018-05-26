@@ -19,6 +19,7 @@ package quasar.fs.mount
 import slamdata.Predef._
 import quasar.Variables
 import quasar.VariablesGenerators._
+import quasar.common.CIName
 import quasar.fs._, FileSystemTypeArbitrary._
 import quasar.sql._, ScopedExprArbitrary._, ExprArbitrary._
 

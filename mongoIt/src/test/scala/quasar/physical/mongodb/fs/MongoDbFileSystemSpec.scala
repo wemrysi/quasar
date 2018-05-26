@@ -19,6 +19,7 @@ package quasar.physical.mongodb.fs
 import slamdata.Predef._
 import quasar._, DataGenerators._
 import quasar.common._
+import quasar.compile.{SemanticErrors, SemanticErrsT}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.foldable._
 import quasar.contrib.scalaz.writerT._
@@ -26,9 +27,8 @@ import quasar.effect.NameGenerator
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.ski._
-import quasar.frontend._
 import quasar.fs._, FileSystemError._, FileSystemTest._
-import quasar.main.FilesystemQueries
+import quasar.main.{CompExec, FilesystemQueries}
 import quasar.physical.filesystems
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.fs.MongoDbFileSystemSpec.mongoFsUT
@@ -218,9 +218,9 @@ class MongoDbFileSystemSpec
         def shouldFailWithPathNotFound(f: String => String) = {
           val dne = testPrefix map (_ </> file("__DNE__"))
           val q = dne map (p => f(posixCodec.printPath(p)))
-          val xform = QueryFile.Transforms[query.FreeS]
+          val CE = CompExec[query.FreeS]
 
-          import xform._
+          import CE._
 
           val runExec: CompExecM ~> FileSystemErrT[PhaseResultT[Task, ?], ?] = {
             type X0[A] = PhaseResultT[Task, A]

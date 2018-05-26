@@ -25,7 +25,6 @@ import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka._
 import matryoshka.data.Fix
-import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 import shapeless.Nat
@@ -96,10 +95,6 @@ object Planner {
       }
   }
 
-  final case class CompilationFailed(semErrs: NonEmptyList[SemanticError]) extends PlannerError {
-    def message = "Compilation failed: " + semErrs.list.toList.mkString(", ")
-  }
-
   final case class InternalError(msg: String, cause: Option[Exception]) extends PlannerError {
     def message = msg + ~cause.map(ex => s" (caused by: $ex)")
   }
@@ -117,46 +112,4 @@ object Planner {
 
   implicit val plannerErrorShow: Show[PlannerError] =
     Show.show(_.message)
-
-  sealed abstract class CompilationError {
-    def message: String
-  }
-
-  object CompilationError {
-    final case class CompilePathError(error: PathError)
-        extends CompilationError {
-      def message = error.shows
-    }
-
-    final case class CSemanticError(error: SemanticError)
-        extends CompilationError {
-      def message = error.message
-    }
-
-    final case class CPlannerError(error: PlannerError)
-        extends CompilationError {
-      def message = error.message
-    }
-
-    final case class ManyErrors(errors: NonEmptyList[SemanticError])
-        extends CompilationError {
-      def message = errors.map(_.message).list.toList.mkString("[", "\n", "]")
-    }
-  }
-
-  val CompilePathError = Prism.partial[CompilationError, PathError] {
-    case CompilationError.CompilePathError(error) => error
-  } (CompilationError.CompilePathError(_))
-
-  val CSemanticError = Prism.partial[CompilationError, SemanticError] {
-    case CompilationError.CSemanticError(error) => error
-  } (CompilationError.CSemanticError(_))
-
-  val CPlannerError = Prism.partial[CompilationError, PlannerError] {
-    case CompilationError.CPlannerError(error) => error
-  } (CompilationError.CPlannerError(_))
-
-  val ManyErrors = Prism.partial[CompilationError, NonEmptyList[SemanticError]] {
-    case CompilationError.ManyErrors(error) => error
-  } (CompilationError.ManyErrors(_))
 }

@@ -127,7 +127,7 @@ sealed abstract class GenericFunc[N <: Nat](implicit toInt: ToInt[N]) { self =>
       Some(Success(codomain)).filter(_ => args.zip(domain).forall { case (a, d) => d.contains(a) })
     }.getOrElse {
       val msg: String = s"Unknown arguments: $args"
-      Failure(NonEmptyList(SemanticError.GenericError(msg)))
+      Failure(NonEmptyList(ArgumentError.invalidArgumentError(msg)))
     }
 
   final def untpe(tpe: Func.Codomain): Func.VDomain[N] = {
@@ -292,8 +292,8 @@ object Func {
   type Domain[N <: Nat] = Input[Type, N]
   type Codomain = Type
 
-  type VDomain[N <: Nat] = ValidationNel[SemanticError, Domain[N]]
-  type VCodomain = ValidationNel[SemanticError, Codomain]
+  type VDomain[N <: Nat] = ValidationNel[ArgumentError, Domain[N]]
+  type VCodomain = ValidationNel[ArgumentError, Codomain]
 
   type Typer[N <: Nat] = Domain[N] => Option[VCodomain]
   type Untyper[N <: Nat] = ((Domain[N], Codomain), Codomain) => Option[VDomain[N]]

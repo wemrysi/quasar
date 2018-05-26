@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.{Variables, VariablesGenerators}
 import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
+import quasar.common.CIName
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.contrib.scalaz.catchable._
 import quasar.fp._

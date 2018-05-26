@@ -18,9 +18,9 @@ package quasar.physical
 
 import slamdata.Predef._
 import quasar.common.SortDir
+import quasar.effect.NameGenerator
 import quasar.javascript.Js
 import quasar.fs.PhysicalError
-import quasar.namegen._
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
 
@@ -39,8 +39,10 @@ package object mongodb {
   type JavaScriptLog[A] = Writer[JavaScriptPrg, A]
 
   // TODO: parameterize over label (SD-512)
-  def freshName: State[NameGen, BsonField.Name] =
-    quasar.namegen.freshName("tmp").map(BsonField.Name(_))
+  def freshName: State[Long, BsonField.Name] =
+    NameGenerator[State[Long, ?]]
+      .prefixedName("__tmp")
+      .map(BsonField.Name(_))
 
   // TODO use implicit class
   def sortDirToBson(sort: SortDir): Bson = sort match {

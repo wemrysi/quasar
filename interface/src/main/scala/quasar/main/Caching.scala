@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.concurrent.NamedDaemonThreadFactory
 import quasar.fp._, free._, ski._
 import quasar.fs.cache.ViewCacheRefresh
-import quasar.fs.QueryFile
 import quasar.metastore.MetaStoreAccess
 
 import java.lang.Thread
@@ -35,7 +34,7 @@ import scalaz.stream.{Process, time}
 object Caching {
   type Eff[A] = Coproduct[Task, Coproduct[ConnectionIO, CoreEff, ?], A]
 
-  val QT = QueryFile.Transforms[Free[Eff, ?]]
+  val QT = CompExec[Free[Eff, ?]]
 
   final case class ViewCacheRefreshCtx(start: Task[Unit], shutdown: Task[Unit])
 

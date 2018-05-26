@@ -18,13 +18,12 @@ package quasar.fs
 
 import slamdata.Predef._
 import quasar._, RenderTree.ops._, RenderTreeT.ops._
-import quasar.common.{PhaseResults, PhaseResultT, PhaseResultW}
+import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.effect.LiftedOps
 import quasar.fp._
-import quasar.frontend.SemanticErrsT
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka.{Transform => _, _}
@@ -261,28 +260,13 @@ object QueryFile {
 
   class Transforms[F[_]: Monad] {
     type G[A] = PhaseResultT[F, A]
-    type H[A] = SemanticErrsT[G, A]
-
-    type ExecM[A]     = FileSystemErrT[G, A]
-    type CompExecM[A] = FileSystemErrT[H, A]
-
-    val execToCompExec: ExecM ~> CompExecM =
-      Hoist[FileSystemErrT].hoist[G, H](liftMT[G, SemanticErrsT])
-
-    val compToCompExec: CompileM ~> CompExecM = {
-      val hoistW: PhaseResultW ~> G = Hoist[PhaseResultT].hoist(pointNT[F])
-      val hoistC: CompileM ~> H     = Hoist[SemanticErrsT].hoist(hoistW)
-      liftMT[H, FileSystemErrT] compose hoistC
-    }
+    type ExecM[A] = FileSystemErrT[G, A]
 
     val toExec: F ~> ExecM =
       liftMT[G, FileSystemErrT] compose liftMT[F, PhaseResultT]
 
     def fsErrToExec: FileSystemErrT[F, ?] ~> ExecM =
       Hoist[FileSystemErrT].hoist[F, PhaseResultT[F, ?]](liftMT[F, PhaseResultT])
-
-    val toCompExec: F ~> CompExecM =
-      execToCompExec compose toExec
 
     val dropPhases: ExecM ~> FileSystemErrT[F, ?] =
       Hoist[FileSystemErrT].hoist(λ[PhaseResultT[F, ?] ~> F](_.value))

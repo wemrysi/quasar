@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
+import quasar.compile.projectionNames
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.physical.mongodb.accumulator._

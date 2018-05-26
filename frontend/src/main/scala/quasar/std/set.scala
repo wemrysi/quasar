@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar._
 import quasar.common.JoinType
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.sql.JoinDir
 
 import scala.collection.immutable.NumericRange
 
@@ -139,9 +138,14 @@ trait SetLib extends Library {
   }
 
   def joinUntyper: Func.Untyper[nat._3] =
-    untyper[nat._3](t =>
-      (t.mapKey(Type.Const(JoinDir.Left.data)) |@| t.mapKey(Type.Const(JoinDir.Right.data)))((l, r) =>
-        Func.Input3(l, r, Type.Bool)))
+    untyper[nat._3] { t =>
+      val inf = (
+        t.mapKey(Type.Const(JoinDir.Left.data)) |@|
+        t.mapKey(Type.Const(JoinDir.Right.data))
+      )((l, r) => Func.Input3(l, r, Type.Bool))
+
+      inf.leftMap(_.map(ArgumentError.typeError(_)))
+    }
 
   val GroupBy = BinaryFunc(
     Transformation,

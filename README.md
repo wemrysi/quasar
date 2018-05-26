@@ -119,12 +119,13 @@ curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": {
 ```
 The `<mountPath>` specifies the path of your mount point and the remaining parameters are listed below:
 
-| mountKey        | protocol         | uri                          |
-|-----------------|------------------|------------------------------|
-| `couchbase`     | `couchbase://`   | [Couchbase](#couchbase)      |
-| `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)      |
-| `mimir`         | `mimir=`         | "\<path-to-directory\>"      |
-| `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)  |
+| mountKey            | protocol         | uri                                   |
+|---------------------|------------------|---------------------------------------|
+| `couchbase`         | `couchbase://`   | [Couchbase](#couchbase)               |
+| `marklogic`         | `xcc://`         | [MarkLogic](#marklogic)               |
+| `mimir`             |                  | "\<path-to-mimir-storage-directory\>" |
+| `local_file_system` |                  | "\<path-to-mimir-storage-directory\>" |
+| `mongodb`           | `mongodb://`     | [MongoDB](#database-mounts)           |
 
 
 See [here](#get-mountfspath) for more details on the mount web api service.

@@ -17,17 +17,23 @@
 package quasar
 
 import slamdata.Predef.None
+import quasar.common.PhaseResultT
+import quasar.compile.SemanticErrors
 import quasar.frontend.logicalplan.LogicalPlan
+import quasar.fp._
 import quasar.sql.Sql
 
+import eu.timepit.refined.auto._
+import matryoshka._
 import matryoshka.data.Fix
 import pathy.Path.rootDir
-import eu.timepit.refined.auto._
-
-import scalaz.Scalaz._
+import scalaz._, Scalaz._
 
 object Fixture {
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import WriterT.writerTMonad
+
   def unsafeToLP(q: Fix[Sql], vars: Variables = Variables.empty): Fix[LogicalPlan] =
-    quasar.queryPlan(q, vars, rootDir, 0L, None).run.value.valueOr(
-      err => scala.sys.error("Unexpected error compiling sql to LogicalPlan: " + err.shows))
+    compile.queryPlan[PhaseResultT[SemanticErrors \/ ?, ?], Fix, Fix[LogicalPlan]](q, vars, rootDir, 0L, None)
+      .value.valueOr(err => scala.sys.error("Unexpected error compiling sql to LogicalPlan: " + err.shows))
 }

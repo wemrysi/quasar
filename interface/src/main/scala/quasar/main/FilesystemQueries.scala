@@ -17,9 +17,11 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.{Data, queryPlan, Variables}
+import quasar.{Data, Variables}
+import quasar.compile.queryPlan
 import quasar.contrib.pathy._
 import quasar.fp.numeric._
+import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.fs._
 import quasar.sql.Sql
 
@@ -29,7 +31,8 @@ import scalaz.{Failure => _, Lens => _, _}, Scalaz._
 import scalaz.stream.{Process0, Process}
 
 class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
-  import Q.transforms._
+  val CE = CompExec[Q.FreeS]
+  import CE._
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
 
@@ -43,7 +46,8 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     off: Natural,
     lim: Option[Positive]):
       Process[CompExecM, Data] =
-    compToCompExec(queryPlan(query, vars, basePath, off, lim)).liftM[Process]
+    queryPlan[CompExecM, Fix, Fix[LP]](query, vars, basePath, off, lim)
+      .liftM[Process]
       .flatMap(Q.evaluate(_).translate[CompExecM](execToCompExec))
 
   /** Returns the path to the result of executing the given SQL^2 query
@@ -56,7 +60,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     out: AFile)(
     implicit W: WriteFile.Ops[S], MF: ManageFile.Ops[S]):
       CompExecM[Unit] =
-    compToCompExec(queryPlan(query, vars, basePath, 0L, None))
+    queryPlan[CompExecM, Fix, Fix[LP]](query, vars, basePath, 0L, None)
       .flatMap(lp => execToCompExec(Q.execute(lp, out)))
 
   /** Returns the physical execution plan for the given SQL^2 query. */
@@ -65,7 +69,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     vars: Variables,
     basePath: ADir
   ): CompExecM[ExecutionPlan] =
-    compToCompExec(queryPlan(query, vars, basePath, 0L, None))
+    queryPlan[CompExecM, Fix, Fix[LP]](query, vars, basePath, 0L, None)
       .flatMap(lp => execToCompExec(Q.explain(lp)))
 
   /** The results of executing the given SQL^2 query. */
@@ -76,6 +80,6 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     off: Natural,
     lim: Option[Positive]
   ): CompExecM[Process0[Data]] =
-    compToCompExec(queryPlan(query, vars, basePath, off, lim))
+    queryPlan[CompExecM, Fix, Fix[LP]](query, vars, basePath, off, lim)
       .flatMap(lp => execToCompExec(Q.results(lp)))
 }
