@@ -21,7 +21,7 @@ import quasar.compile.SemanticErrsT
 import quasar.fp.{liftMT, pointNT}
 import quasar.fs.{FileSystemErrT, QueryFile}
 
-import scalaz.{~>, EitherT, Hoist, Monad}
+import scalaz.{~>, Hoist, Monad}
 import scalaz.std.vector._
 
 class CompExec[F[_]: Monad] extends QueryFile.Transforms[F] {
