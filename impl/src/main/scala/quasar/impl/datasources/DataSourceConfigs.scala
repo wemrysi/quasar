@@ -21,7 +21,12 @@ import quasar.api.{DataSourceType, ResourceName}
 
 import scalaz.IMap
 
-/** Provides for managing the configuration of datasources. */
+/** A primitive facility for managing datasource configurations.
+  *
+  * All mutating operations overwrite existing configurations as this is intended
+  * to be used as a dependency in another context, such as `DefaultDataSources`,
+  * that decides whether doing so is appropriate.
+  */
 trait DataSourceConfigs[F[_], C] {
   /** Associate the given configuration with `name`, replacing any
     * existing association.

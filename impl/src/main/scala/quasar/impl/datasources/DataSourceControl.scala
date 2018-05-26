@@ -23,7 +23,12 @@ import quasar.api.DataSourceError.CreateError
 
 import scalaz.ISet
 
-/** Provides for control over the lifecycle of external DataSources. */
+/** A primitive facility for managing the lifecycle of datasources.
+  *
+  * All mutating operations replace existing datasources as this is intended
+  * to be used as a dependency in another context, such as `DefaultDataSources`,
+  * that decides whether doing so is appropriate.
+  */
 trait DataSourceControl[F[_], C] {
   /** Initialize a datasource as `name` using the provided `config`. If a
     * datasource exists at `name`, it is shut down.
