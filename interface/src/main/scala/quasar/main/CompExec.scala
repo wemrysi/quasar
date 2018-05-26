@@ -29,9 +29,6 @@ class CompExec[F[_]: Monad] extends QueryFile.Transforms[F] {
   type CompileM[A] = SemanticErrsT[PhaseResultW, A]
   type CompExecM[A] = FileSystemErrT[H, A]
 
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-  import EitherT.eitherTMonad
-
   val execToCompExec: ExecM ~> CompExecM =
       Hoist[FileSystemErrT].hoist[G, H](liftMT[G, SemanticErrsT])
 
