@@ -19,7 +19,7 @@ package quasar.connector.datasource
 import quasar.RenderTreeT
 import quasar.connector.{DataSource, QScriptEvaluator}
 import quasar.fs.Planner.PlannerErrorME
-import quasar.qscript._
+import quasar.qscript.QScriptEducated
 
 import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
@@ -32,4 +32,4 @@ abstract class HeavyweightDataSource[
     G[_],
     R]
     extends QScriptEvaluator[T, F, R]
-    with DataSource[F, Stream[G, ?], T[QScriptRead[T, ?]], R]
+    with DataSource[F, Stream[G, ?], T[QScriptEducated[T, ?]], R]

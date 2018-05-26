@@ -61,7 +61,7 @@ abstract class QScriptEvaluator[
 
   ////
 
-  def evaluate(qsr: T[QScriptRead[T, ?]]): F[ReadError \/ R] =
+  def evaluate(qsr: T[QScriptEducated[T, ?]]): F[ReadError \/ R] =
     for {
       shifted <- Unirewrite[T, QS[T], F](new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
 
