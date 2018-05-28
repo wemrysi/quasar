@@ -45,7 +45,7 @@ trait EvaluatorModule[M[+ _]]
 
   type Evaluator[N[+ _]] <: EvaluatorLike[N]
 
-  abstract class EvaluatorLike[N[+ _]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M)
+  abstract class EvaluatorLike[N[+ _]](N0: Monad[N])(implicit mn: M ~> N)
       extends OpFinder
       with ReductionFinder {
 
@@ -106,7 +106,7 @@ trait EvaluatorModule[M[+ _]]
               for {
                 pending <- f(graph)
                 _ <- monadState.modify { state =>
-                      state.copy(assume = state.assume + (graph -> (pending.table, pending.sort)))
+                      state.copy(assume = state.assume + (graph -> (pending.table -> pending.sort)))
                     }
               } yield pending
             }
@@ -129,7 +129,7 @@ trait EvaluatorModule[M[+ _]]
         def set0(pt: PendingTable, tg: (TransSpec1, DepGraph)): StateT[N, EvaluatorState, PendingTable] = {
           for {
             _ <- monadState.modify { state =>
-                  state.copy(assume = state.assume + (tg._2 -> (pt.table, pt.sort)))
+                  state.copy(assume = state.assume + (tg._2 -> (pt.table -> pt.sort)))
                 }
           } yield pt.copy(trans = tg._1, graph = tg._2)
         }
@@ -452,7 +452,7 @@ trait EvaluatorModule[M[+ _]]
 
               _ <- monadState.modify { state =>
                     state.copy(
-                      assume = state.assume + (m         -> (wrapped, IdentityOrder.empty)),
+                      assume = state.assume + (m         -> (wrapped -> IdentityOrder.empty)),
                       reductions = state.reductions + (m -> rvalue)
                     )
                   }

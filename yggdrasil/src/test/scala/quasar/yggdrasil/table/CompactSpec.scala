@@ -151,11 +151,9 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val sampleTable = undefineTable(fromSample(sample))
-      val sampleJson = toJson(sampleTable)
 
       val compactTable = sampleTable.compact(Leaf(Source))
       val compactStats = tableStats(compactTable)
-      val results = toJson(compactTable)
 
       compactStats.map(_._2).foldLeft(0)(_+_) must_== 0
     }
@@ -165,11 +163,9 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val sampleTable = undefineTable(fromSample(sample))
-      val sampleJson = toJson(sampleTable)
 
       val compactTable = sampleTable.compact(Leaf(Source))
       val compactStats = tableStats(compactTable)
-      val results = toJson(compactTable)
 
       compactStats.map(_._1).count(_ == 0) must_== 0
     }
@@ -200,7 +196,6 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       val key = chooseColumn(baseTable)
 
       val sampleTable = undefineColumn(baseTable, extractPath(key).getOrElse(CPath.Identity))
-      val sampleKey = sampleTable.transform(key)
 
       val compactTable = sampleTable.compact(key)
       val resultKey = compactTable.transform(key)
@@ -217,7 +212,6 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       val key = chooseColumn(baseTable)
 
       val sampleTable = undefineColumn(baseTable, extractPath(key).getOrElse(CPath.Identity))
-      val sampleKey = sampleTable.transform(key)
 
       val compactTable = sampleTable.compact(key)
       val resultKey = compactTable.transform(key)

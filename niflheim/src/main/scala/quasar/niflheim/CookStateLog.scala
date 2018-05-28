@@ -47,7 +47,7 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends L
   txLog.open()
   txLog.setAutoMark(false) // We only mark when we're ready to write to a new raw log
 
-  def close = {
+  def close() = {
     if (pendingCookIds0.size > 0) {
       log.warn("Closing txLog with pending cooks: " + pendingCookIds0.keys.mkString("[", ", ", "]"))
     }

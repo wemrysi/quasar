@@ -30,7 +30,7 @@ trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
 
   implicit def M: Monad[M] with Comonad[M]
 
-  def Evaluator[N[+ _]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M): EvaluatorLike[N]
+  def Evaluator[N[+ _]](N0: Monad[N])(implicit mn: M ~> N): EvaluatorLike[N]
 
   def extractIds(jv: JValue): Seq[IdType]
 
@@ -42,9 +42,6 @@ trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
       val json = result.flatMap(_.toJson).copoint filterNot { rvalue =>
         (rvalue.toJValue \ "value") == JUndefined
       }
-
-      var extractIdTime: Long      = 0L
-      var jvalueToSValueTime: Long = 0L
 
       val events = json map { rvalue =>
         (Vector(extractIds(rvalue.toJValue \ "key"): _*), jvalueToSValue(rvalue.toJValue \ "value"))

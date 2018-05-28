@@ -42,8 +42,8 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
     with IdSourceScannerModule
     with SpecificationHelp { outer =>
 
-  def Evaluator[N[+_]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M) =
-    new Evaluator[N](N0)(mn,nm) {
+  def Evaluator[N[+_]](N0: Monad[N])(implicit mn: M ~> N) =
+    new Evaluator[N](N0)(mn) {
       val report = new LoggingQueryLogger[N, Unit] with ExceptionQueryLogger[N, Unit] with TimingQueryLogger[N, Unit] {
         val M = N0
       }
@@ -100,7 +100,7 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
 
   object Table extends TableCompanion
 
-  private var initialIndices = mutable.Map[Path, Int]()    // if we were doing this for real: j.u.c.HashMap
-  private var currentIndex   = 0                      // if we were doing this for real: j.u.c.a.AtomicInteger
-  private val indexLock      = new AnyRef             // if we were doing this for real: DIE IN A FIRE!!!
+  private val initialIndices = mutable.Map[Path, Int]() // if we were doing this for real: j.u.c.HashMap
+  private var currentIndex   = 0                        // if we were doing this for real: j.u.c.a.AtomicInteger
+  private val indexLock      = new AnyRef               // if we were doing this for real: DIE IN A FIRE!!!
 }

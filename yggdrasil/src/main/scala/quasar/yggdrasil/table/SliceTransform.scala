@@ -304,7 +304,6 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
           l0.zip(r0)(equalsImpl)
 
         case EqualLiteral(source, value, invert) => {
-          val id = System.currentTimeMillis
           import cf.std.Eq
 
           val sourceSlice = composeSliceTransform2(source)
