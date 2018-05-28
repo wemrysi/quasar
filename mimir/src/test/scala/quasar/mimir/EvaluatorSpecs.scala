@@ -71,9 +71,9 @@ trait EvaluatorTestSupport extends StdLibEvaluatorStack
               val target = path.path.replaceAll("/$", ".json").replaceAll("^/" + prefix, prefix)
 
               val src = if (target startsWith prefix)
-                io.Source.fromFile(new File(target.substring(prefix.length)))
+                scala.io.Source.fromFile(new File(target.substring(prefix.length)))
               else
-                io.Source.fromInputStream(getClass.getResourceAsStream(target))
+                scala.io.Source.fromInputStream(getClass.getResourceAsStream(target))
 
               val parsed: Stream[JValue] = src.getLines map JParser.parseUnsafe toStream
 

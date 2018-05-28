@@ -18,7 +18,7 @@ package quasar.mimir
 
 import quasar.Data
 import quasar.blueeyes.json.JValue
-import quasar.contrib.scalaz.concurrent._
+import quasar.contrib.cats.effect._
 import io.chrisdavenport.scalaz.task._
 import quasar.yggdrasil.table.{ColumnarTableModule, Slice}
 

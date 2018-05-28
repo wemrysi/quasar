@@ -16,7 +16,7 @@
 
 package quasar.mimir
 
-import quasar.contrib.scalaz.concurrent._
+import quasar.contrib.cats.effect._
 import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
 
 import quasar.yggdrasil.table.VFSColumnarTableModule

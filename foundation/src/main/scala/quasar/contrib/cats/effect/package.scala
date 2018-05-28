@@ -14,21 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.contrib.scalaz
+package quasar.contrib.cats
 
-import slamdata.Predef._
+import cats.effect._
 
-import scalaz.\/-
-import scalaz.concurrent.{Strategy, Task}
+package object effect {
 
-package object concurrent {
-
-  // cribbed from cats-effect
-  def shift(implicit S: Strategy): Task[Unit] = {
-    Task async { cb =>
-      val _ = S(cb(\/-(())))
-
-      ()
-    }
+  implicit class toOps[F[_], A](fa: F[A]) {
+    def to[G[_]](implicit F: Effect[F], G: Async[G], ec: scala.concurrent.ExecutionContext): G[A] =
+      Async[G].async { l =>
+        Effect[F].runAsync(fa)(c =>
+          IO(l(c))
+        ).unsafeRunSync
+      }
   }
+
 }

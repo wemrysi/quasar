@@ -22,9 +22,9 @@ import quasar._
 import quasar.blueeyes.json.JValue
 import quasar.common._
 import quasar.connector._
+import quasar.contrib.cats.effect._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
-import quasar.contrib.scalaz.concurrent._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._
