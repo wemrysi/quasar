@@ -548,6 +548,15 @@ lazy val interface = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
+/** Implementations of the Quasar API. */
+lazy val impl = project
+  .settings(name := "quasar-impl-internal")
+  .dependsOn(api % BothScopes)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
 /** An interactive REPL application for Quasar.
   */
 lazy val repl = project
