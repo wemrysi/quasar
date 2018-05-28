@@ -108,6 +108,13 @@ object Dependencies {
     "org.tpolecat"               %% "doobie-specs2"             % doobieVersion % Test
   )
 
+  def impl = Seq(
+    "co.fs2"         %% "fs2-io"        % fs2Version,
+    "co.fs2"         %% "fs2-scalaz"    % fs2ScalazVersion,
+    "org.spire-math" %% "jawn-argonaut" % jawnVersion,
+    "org.spire-math" %% "jawn-parser"   % jawnVersion
+  )
+
   def interface = Seq(
     "com.github.scopt" %% "scopt" % scoptVersion,
     "org.jboss.aesh"    % "aesh"  % "0.66.17"

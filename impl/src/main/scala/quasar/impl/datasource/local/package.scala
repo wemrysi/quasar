@@ -14,23 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.impl.datasource
 
-import quasar.{Data, Disposable}
-import quasar.api.{DataSourceType, ResourcePath}
-import quasar.api.DataSourceError.InitializationError
+import quasar.api.DataSourceType
 
-import argonaut.Json
-import fs2.Stream
-import fs2.util.Async
-import scalaz.\/
+import eu.timepit.refined.auto._
 
-trait LightweightDataSourceModule {
-  def kind: DataSourceType
-
-  def lightweightDataSource[
-      F[_]: Async,
-      G[_]: Async](
-      config: Json)
-      : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], ResourcePath, Disposable[G, Stream[G, Data]]]]
+package object local {
+  val LocalType = DataSourceType("local", 1L)
 }
