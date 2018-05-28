@@ -52,7 +52,7 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends L
       log.warn("Closing txLog with pending cooks: " + pendingCookIds0.keys.mkString("[", ", ", "]"))
     }
     txLog.close()
-    workLock.release
+    workLock.release()
   }
 
   // Maps from blockId to txKey

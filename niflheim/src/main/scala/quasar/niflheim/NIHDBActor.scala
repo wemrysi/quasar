@@ -337,7 +337,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
   } except { case t: Throwable =>
     IO { log.error("Error during close", t) }
   } ensuring {
-    IO { workLock.release }
+    IO { workLock.release() }
   }
 
   override def postStop() = {
