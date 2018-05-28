@@ -16,7 +16,6 @@
 
 package quasar.mimir
 
-import quasar.contrib.fs2._
 import quasar.contrib.scalaz.concurrent._
 import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
 
@@ -36,6 +35,7 @@ import akka.routing.{
 import cats.effect.IO
 import fs2.async
 import fs2.interop.scalaz._
+import io.chrisdavenport.scalaz.task._
 
 import org.slf4s.Logging
 
@@ -116,7 +116,7 @@ final class Precog private (dataDir0: File)
 
   def shutdown: IO[Unit] = {
     for {
-      _ <- runToIO(vfsShutdownSignal.set(None))
+      _ <- vfsShutdownSignal.set(None).to[IO]
       _ <- IO.fromFuture(IO(actorSystem.terminate.map(_ => ())))
     } yield ()
   }

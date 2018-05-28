@@ -34,6 +34,7 @@ object Dependencies {
   private val deloreanVersion     = "1.2.42-scalaz-7.2"
   private val fs2Version          = "0.9.6"
   private val fs2ScalazVersion    = "0.2.0"
+  private val fs2CatsVersion      = "0.5.0"
 
   def foundation = Seq(
     "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
@@ -42,9 +43,11 @@ object Dependencies {
     "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
     "com.codecommit"             %% "shims"                     % "1.2.1",
     "org.typelevel"              %% "cats-effect"               % "1.0.0-RC",
+    "io.chrisdavenport"          %% "scalaz-task-effect"        % "0.1.0",
     "co.fs2"                     %% "fs2-core"                  % fs2Version,
     "co.fs2"                     %% "fs2-io"                    % fs2Version,
     "co.fs2"                     %% "fs2-scalaz"                % fs2ScalazVersion,
+    "co.fs2"                     %% "fs2-cats"                  % fs2CatsVersion,
     "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
     "org.typelevel"              %% "algebra"                   % algebraVersion,
     "org.typelevel"              %% "spire"                     % spireVersion,

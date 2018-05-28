@@ -18,7 +18,6 @@ package quasar.yggdrasil.table
 
 import quasar.blueeyes.json.JValue
 import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, APath, PathSegment}
-import quasar.contrib.fs2._
 import quasar.contrib.scalaz.concurrent._
 import quasar.fs.MoveSemantics
 import quasar.niflheim.NIHDB
@@ -37,11 +36,17 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.{ActorRef, ActorSystem}
 
 import cats.effect._
+import io.chrisdavenport.scalaz.task._
 
 import delorean._
 
 import fs2.Stream
-import fs2.interop.scalaz._
+import fs2.interop.cats.asyncInstance
+// otherwise ambiguities between shims and fs2 interop cause ambiguities.
+// also, asyncInstance from fs2-scalaz shadows asyncInstance from fs2-cats.
+import fs2.interop.scalaz.{effectToMonadError => _, catchableToMonadError => _, monadToScalaz => _, asyncInstance => _, _}
+
+import shims.{monadToCats => _, _}
 
 import org.slf4s.Logging
 
@@ -86,8 +91,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
     val failure = ResourceError.fromExtractorError(s"failed to open NIHDB in path $path")
 
     for {
-      blob <- OptionT(runToIO(vfs.readPath(path)))
-      version <- OptionT(runToIO(vfs.headOfBlob(blob)))
+      blob <- OptionT(vfs.readPath(path).to[IO])
+      version <- OptionT(vfs.headOfBlob(blob).to[IO])
 
       cached <- IO(Option(dbs.get((blob, version)))).liftM[OptionT]
 
@@ -97,7 +102,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
 
         case None =>
           for {
-            dir <- runToIO(vfs.underlyingDir(blob, version)).liftM[OptionT]
+            dir <- vfs.underlyingDir(blob, version).to[IO].liftM[OptionT]
 
             tndb = IO {
               NIHDB.open(
@@ -133,7 +138,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
       _ <- vfs.link(blob, path)   // should be `true` because we already looked for path
     } yield blob
 
-    runToIO(for {
+    (for {
       maybeBlob <- vfs.readPath(path)
       blob <- maybeBlob.map(Task.now(_)).getOrElse(createBlob)
 
@@ -150,13 +155,13 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
       }
 
       disj = validation.disjunction.leftMap(failure)
-    } yield disj.map(n => (blob, version, n)))
+    } yield disj.map(n => (blob, version, n))).to[IO]
   }
 
   def commitDB(blob: Blob, version: Version, db: NIHDB): IO[Unit] = {
     // last-wins semantics
     lazy val replaceM: OptionT[IO, Unit] = for {
-      oldHead <- OptionT(runToIO(vfs.headOfBlob(blob)))
+      oldHead <- OptionT(vfs.headOfBlob(blob).to[IO])
       oldDB <- OptionT(IO(Option(dbs.get((blob, oldHead)))))
 
       check <- IO(dbs.replace((blob, oldHead), oldDB, db)).liftM[OptionT]
@@ -171,7 +176,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
       check <- IO(dbs.putIfAbsent((blob, version), db))
 
       _ <- if (check == null)
-        runToIO(vfs.commit(blob, version))
+        vfs.commit(blob, version).to[IO]
       else
         commitDB(blob, version, db)
     } yield ()
@@ -203,8 +208,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
   // note: this function should almost always be unnecessary, since nihdb includes the append log in snapshots
   def flush(path: AFile): IO[Unit] = {
     val ot = for {
-      blob <- OptionT(runToIO(vfs.readPath(path)))
-      head <- OptionT(runToIO(vfs.headOfBlob(blob)))
+      blob <- OptionT(vfs.readPath(path).to[IO])
+      head <- OptionT(vfs.headOfBlob(blob).to[IO])
       db <- OptionT(IO(Option(dbs.get((blob, head)))))
       _ <- IO.fromFuture(IO(db.cook)).liftM[OptionT]
     } yield ()

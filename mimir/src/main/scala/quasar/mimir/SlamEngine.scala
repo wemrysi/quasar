@@ -22,7 +22,6 @@ import quasar._
 import quasar.blueeyes.json.JValue
 import quasar.common._
 import quasar.connector._
-import quasar.contrib.fs2._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.contrib.scalaz.concurrent._
@@ -40,11 +39,12 @@ import quasar.yggdrasil.bytecode.JType
 import argonaut._, Argonaut._
 
 import cats.effect.IO
-
-import delorean._
+import io.chrisdavenport.scalaz.task._
 
 import fs2.{async, Stream}
 import fs2.async.mutable.{Queue, Signal}
+import fs2.interop.cats.asyncInstance
+import fs2.interop.scalaz.{asyncInstance => scalazAsyncInstance}
 
 import matryoshka._
 import matryoshka.implicits._
@@ -388,7 +388,6 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
           {
             case (bool, data) if !bool.getAndSet(true) =>
               // FIXME this pages the entire lwc dataset into memory, crashing the server
-              import fs2.interop.scalaz._
               data.fold(Vector[Data]().point[Task])(_.runLog)
             case (_, _) => // enqueue the empty vector so ReadFile.scan knows when to stop scanning
               Vector[Data]().point[Task]
@@ -421,16 +420,14 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
     def open(file: AFile): Backend[WriteHandle] = {
       val run: Task[M[WriteHandle]] = Task.delay {
-        import fs2.interop.scalaz._
-
         log.debug(s"open file $file")
 
         val id = cur.getAndIncrement()
         val handle = WriteHandle(file, id)
 
         for {
-          queue <- Queue.bounded[IO, Vector[Data]](QueueLimit).to[Task].liftM[MT]
-          signal <- fs2.async.signalOf[IO, Boolean](false).to[Task].liftM[MT]
+          queue <- Queue.bounded[IO, Vector[Data]](QueueLimit)(asyncInstance).to[Task].liftM[MT]
+          signal <- fs2.async.signalOf[IO, Boolean](false)(asyncInstance).to[Task].liftM[MT]
 
           path = fileToPath(file)
           jvs = queue.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits).map(JValue.fromData)

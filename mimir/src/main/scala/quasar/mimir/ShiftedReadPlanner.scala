@@ -21,7 +21,6 @@ import slamdata.Predef._
 import quasar.blueeyes.json.JValue
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
-import quasar.contrib.scalaz.concurrent._
 import quasar.fs._
 import quasar.mimir.MimirCake._
 import quasar.precog.common.RValue
@@ -29,14 +28,12 @@ import quasar.qscript._
 import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
 import quasar.yggdrasil.bytecode.JType
 
-import delorean._
 import fs2.interop.scalaz._
+import io.chrisdavenport.scalaz.task._
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-
-import scala.concurrent.ExecutionContext.Implicits.global
 
 final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
     lift: FileSystemErrT[CakeM, ?] ~> F) {

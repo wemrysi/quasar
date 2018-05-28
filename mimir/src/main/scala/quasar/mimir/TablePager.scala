@@ -18,23 +18,24 @@ package quasar.mimir
 
 import quasar.Data
 import quasar.blueeyes.json.JValue
-import quasar.contrib.fs2._
 import quasar.contrib.scalaz.concurrent._
+import io.chrisdavenport.scalaz.task._
 import quasar.yggdrasil.table.{ColumnarTableModule, Slice}
-
-import delorean._
 
 import cats.effect.IO
 
 import fs2.async
 import fs2.async.mutable.Queue
-import fs2.interop.scalaz._
+// really ugly, but required to avoid ambiguity with `shims.functorToScalaz`
+// and yet if we don't import `shims.functorToScalaz`, `Functor[IO]` doesn't resolve.
+import fs2.interop.scalaz.{effectToMonadError => _, catchableToMonadError => _, monadToScalaz => _, _}
 
-import scalaz.{\/, -\/, \/-, ~>, Functor, StreamT}
+import scalaz.{\/, -\/, \/-, ~>, StreamT}
 import scalaz.concurrent.Task
 import scalaz.syntax.monad._
 
-import scala.concurrent.Future
+import shims.functorToScalaz
+
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import java.util.concurrent.atomic.AtomicBoolean
