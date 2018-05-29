@@ -18,27 +18,27 @@ package quasar.connector.datasource
 
 import slamdata.Predef.Set
 import quasar.RenderTreeT
-import quasar.api.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.api.ResourceError.ReadError
 import quasar.contrib.pathy._
 import quasar.connector.DataSource
 import quasar.fp._
+import quasar.fp.ski.κ
 import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript._
 import quasar.qscript.rewrites._
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.implicits._
-import pathy.Path._
-import scalaz.{:<:, \/, Functor, IMap, Monad}
+import scalaz.{:<:, \/, Functor, Monad}
 import scalaz.syntax.monad._
 
 /** A DataSource capable of executing QScript. */
 abstract class HeavyweightDataSource[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: Monad: PlannerErrorME,
+    G[_],
     R]
-    extends DataSource[F, T[QScriptRead[T, ?]], R] {
+    extends DataSource[F, G, T[QScriptRead[T, ?]], R] {
 
   /** QScript used by this DataSource. */
   type QS[U[_[_]]] <: CoM
@@ -66,7 +66,7 @@ abstract class HeavyweightDataSource[
 
   def evaluate(qsr: T[QScriptRead[T, ?]]): F[ReadError \/ R] =
     for {
-      shifted <- Unirewrite[T, QS[T], F](new Rewrite[T], listContents).apply(qsr)
+      shifted <- Unirewrite[T, QS[T], F](new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
 
       optimized = shifted.transHylo(optimize, Unicoalesce.Capture[T, QS[T]].run)
 
@@ -74,17 +74,6 @@ abstract class HeavyweightDataSource[
 
       result <- execute(repr)
     } yield result
-
-  private def listContents: DiscoverPath.ListContents[F] =
-    adir => children(ResourcePath.fromPath(adir)) map {
-      _.getOrElse(IMap.empty).foldlWithKey(Set.empty[PathSegment]) {
-        case (s, ResourceName(n), ResourcePathType.ResourcePrefix) =>
-          s + DirName(n)
-
-        case (s, ResourceName(n), ResourcePathType.Resource) =>
-          s + FileName(n)
-      }
-    }
 
   private final implicit def _QSMFunctor: Functor[QSM] = QSMFunctor
   private final implicit def _QSMFromQScriptCore: QScriptCore[T, ?] :<: QSM = QSMFromQScriptCore

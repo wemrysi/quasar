@@ -33,5 +33,5 @@ trait LightweightDataSourceModule {
       F[_]: Async,
       G[_]: Async](
       config: Json)
-      : F[InitializationError[Json] \/ LightweightDataSource[F, Disposable[G, Stream[G, Data]]]]
+      : F[InitializationError[Json] \/ LightweightDataSource[F, Stream[G, ?], Disposable[G, Stream[G, Data]]]]
 }

@@ -36,5 +36,5 @@ trait HeavyweightDataSourceModule {
       F[_]: Async: PlannerErrorME,
       G[_]: Async](
       config: Json)
-      : F[InitializationError[Json] \/ HeavyweightDataSource[T, F, Disposable[G, Stream[G, Data]]]]
+      : F[InitializationError[Json] \/ HeavyweightDataSource[T, F, Stream[G, ?], Disposable[G, Stream[G, Data]]]]
 }

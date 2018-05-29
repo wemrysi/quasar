@@ -20,34 +20,46 @@ import slamdata.Predef.{tailrec, Boolean, None, Option, Some, Stream, Unit}
 import quasar.api.ResourceError._
 import quasar.fp.ski.κ
 
-import scalaz.{\/, Applicative, IMap, Order, Tree}
+import scalaz.{\/, Applicative, ApplicativePlus, IMap, Order, Tree}
 import scalaz.std.stream._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
+import scalaz.syntax.foldable._
+import scalaz.syntax.plusEmpty._
+import scalaz.syntax.std.boolean._
 import scalaz.syntax.std.option._
 
-final class MockQueryEvaluator[F[_]: Applicative, Q, R] private (
+final class MockQueryEvaluator[F[_]: Applicative, G[_]: ApplicativePlus, Q, R] private (
     resources: Stream[Tree[ResourceName]],
     eval: Q => F[ReadError \/ R])
-  extends QueryEvaluator[F, Q, R] {
+  extends QueryEvaluator[F, G, Q, R] {
 
-  def children(path: ResourcePath): F[CommonError \/ IMap[ResourceName, ResourcePathType]] = {
-    val progeny = forestAt(path) map { f =>
-      IMap.fromFoldable(f map { k =>
-        val typ =
-          if (k.subForest.isEmpty) ResourcePathType.resource
-          else ResourcePathType.resourcePrefix
-
-        (k.rootLabel, typ)
-      })
-    }
+  def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]] = {
+    val progeny =
+      forestAt(path).map(_.foldMap(t =>
+        (
+          t.rootLabel,
+          t.subForest.isEmpty.fold(
+            ResourcePathType.resource,
+            ResourcePathType.resourcePrefix)
+        ).point[G])(ApplicativePlus[G].monoid))
 
     (progeny \/> pathNotFound[CommonError](path)).point[F]
   }
 
-  def descendants(path: ResourcePath): F[CommonError \/ Stream[Tree[ResourceName]]] =
-    (forestAt(path) \/> pathNotFound[CommonError](path)).point[F]
+  def descendants(path: ResourcePath): F[CommonError \/ G[ResourcePath]] = {
+    def pathify(f: Stream[Tree[ResourceName]], prefixes: G[ResourcePath]): G[ResourcePath] =
+      if (f.isEmpty)
+        prefixes
+      else
+        f.foldMap(t => pathify(t.subForest, prefixes.map(_ / t.rootLabel)))(ApplicativePlus[G].monoid)
+
+    forestAt(path)
+      .map(f => f.isEmpty.fold(mempty[G, ResourcePath], pathify(f, path.point[G])))
+      .toRightDisjunction(pathNotFound[CommonError](path))
+      .point[F]
+  }
 
   def isResource(path: ResourcePath): F[Boolean] =
     forestAt(path).exists(_.isEmpty).point[F]
@@ -63,7 +75,7 @@ final class MockQueryEvaluator[F[_]: Applicative, Q, R] private (
       p.uncons match {
         case Some((n, p1)) =>
           f.find(_.rootLabel === n) match {
-            case Some(t0) => go(p1, t0.subForest)
+            case Some(f0) => go(p1, f0.subForest)
             case None => None
           }
 
@@ -75,21 +87,21 @@ final class MockQueryEvaluator[F[_]: Applicative, Q, R] private (
 }
 
 object MockQueryEvaluator {
-  def apply[F[_]: Applicative, Q, R](
+  def apply[F[_]: Applicative, G[_]: ApplicativePlus, Q, R](
       resources: Stream[Tree[ResourceName]],
       eval: Q => F[ReadError \/ R])
-      : QueryEvaluator[F, Q, R] =
+      : QueryEvaluator[F, G, Q, R] =
     new MockQueryEvaluator(resources, eval)
 
-  def fromResponseIMap[F[_]: Applicative, Q: Order, R](
+  def fromResponseIMap[F[_]: Applicative, G[_]: ApplicativePlus, Q: Order, R](
       resources: Stream[Tree[ResourceName]],
       responses: IMap[Q, R])
-      : QueryEvaluator[F, Q, R] =
+      : QueryEvaluator[F, G, Q, R] =
     apply(resources, q => (responses.lookup(q) \/> rootNotFound).point[F])
 
-  def resourceDiscovery[F[_]: Applicative](
+  def resourceDiscovery[F[_]: Applicative, G[_]: ApplicativePlus](
       resources: Stream[Tree[ResourceName]])
-      : ResourceDiscovery[F] =
+      : ResourceDiscovery[F, G] =
     apply(resources, κ(rootNotFound.left[Unit].point[F]))
 
   ////

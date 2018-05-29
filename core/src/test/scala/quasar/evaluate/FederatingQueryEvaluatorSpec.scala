@@ -26,10 +26,10 @@ import quasar.qscript._
 import matryoshka._
 import matryoshka.data.Fix
 import pathy.Path._
-import scalaz.{Id, IMap, Show, Tree}, Id.Id
+import scalaz.{Id, IList, IMap, Show, Tree}, Id.Id
 import scalaz.std.anyVal._
 import scalaz.std.option._
-import scalaz.std.stream._
+import scalaz.std.tuple._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 
@@ -51,9 +51,9 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
       Tree.Node(ResourceName("y"), Stream(
         Tree.Leaf(ResourceName("y")))))
 
-  val abs = MockQueryEvaluator.resourceDiscovery[Id](abForest)
+  val abs = MockQueryEvaluator.resourceDiscovery[Id, IList](abForest)
 
-  val xys = MockQueryEvaluator.resourceDiscovery[Id](xyForest)
+  val xys = MockQueryEvaluator.resourceDiscovery[Id, IList](xyForest)
 
   val qfed = new QueryFederation[Fix, Id, Int, FederatedQuery[Fix, Int]] {
     def evaluateFederated(q: FederatedQuery[Fix, Int]) = q.right[ReadError]
@@ -67,7 +67,7 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
   "children" >> {
     "returns possible keys for root" >> {
       val progeny =
-        IMap(
+        IList(
           ResourceName("abs") -> ResourcePathType.resourcePrefix,
           ResourceName("xys") -> ResourcePathType.resourcePrefix)
 
@@ -89,7 +89,7 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
     "returns results" >> {
       val xx = ResourcePath.root() / ResourceName("xys") / ResourceName("x")
 
-      val expect = IMap(ResourceName("y") -> ResourcePathType.resource)
+      val expect = IList(ResourceName("y") -> ResourcePathType.resource)
 
       fqe.children(xx) must_= expect.right
     }
@@ -97,9 +97,11 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
 
   "descendants" >> {
     "returns from all sources for root" >> {
-      val expect = Stream(
-        Tree.Node(ResourceName("abs"), abForest),
-        Tree.Node(ResourceName("xys"), xyForest))
+      val expect = IList(
+        ResourcePath.root() / ResourceName("abs") / ResourceName("b") / ResourceName("a"),
+        ResourcePath.root() / ResourceName("abs") / ResourceName("a"),
+        ResourcePath.root() / ResourceName("xys") / ResourceName("x") / ResourceName("y"),
+        ResourcePath.root() / ResourceName("xys") / ResourceName("y") / ResourceName("y"))
 
       fqe.descendants(ResourcePath.root()) must_= expect.right
     }
@@ -117,7 +119,11 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
     }
 
     "returns results" >> {
-      fqe.descendants(ResourcePath.root() / ResourceName("abs")) must_= abForest.right
+      val expect = IList(
+        ResourcePath.root() / ResourceName("abs") / ResourceName("b") / ResourceName("a"),
+        ResourcePath.root() / ResourceName("abs") / ResourceName("a"))
+
+      fqe.descendants(ResourcePath.root() / ResourceName("abs")) must_= expect.right
     }
   }
 
