@@ -14,17 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
+package quasar.contrib.cats
 
-import quasar.precog.common._
+import cats.effect._
 
-import cats.effect.IO
-import scalaz._
+package object effect {
 
-trait StubProjectionModule[Block] extends ProjectionModule[Block] { self =>
-  protected def projections: Map[Path, Projection]
-
-  class ProjectionCompanion extends ProjectionCompanionLike {
-    def apply(path: Path) = IO.pure(projections.get(path))
+  implicit class toOps[F[_], A](fa: F[A]) {
+    def to[G[_]](implicit F: Effect[F], G: Async[G], ec: scala.concurrent.ExecutionContext): G[A] =
+      Async[G].async { l =>
+        Effect[F].runAsync(fa)(c =>
+          IO(l(c))
+        ).unsafeRunSync
+      }
   }
+
 }
