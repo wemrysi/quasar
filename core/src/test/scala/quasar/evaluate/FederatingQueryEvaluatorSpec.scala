@@ -17,10 +17,10 @@
 package quasar.evaluate
 
 import slamdata.Predef._
-import quasar.{Qspec, TreeMatchers}
+import quasar.TreeMatchers
 import quasar.api._, ResourceError._
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.fp.{constEqual, coproductEqual}
+import quasar.fp.{constEqual, coproductEqual, reflNT}
 import quasar.qscript._
 
 import matryoshka._
@@ -33,7 +33,9 @@ import scalaz.std.tuple._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 
-final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
+final class FederatingQueryEvaluatorSpec
+    extends ResourceDiscoverySpec[Id, IList]
+    with TreeMatchers {
 
   implicit val showTree: Show[Tree[ResourceName]] =
     Show.shows(_.drawTree)
@@ -63,6 +65,11 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
     FederatingQueryEvaluator(qfed, IMap(
       ResourceName("abs") -> ((abs, 1)),
       ResourceName("xys") -> ((xys, 2))).point[Id])
+
+  // ResourceDiscoverySpec
+  val discovery = fqe
+  val nonExistentPath = ResourcePath.root() / ResourceName("non") / ResourceName("existent")
+  val run = reflNT[Id]
 
   "children" >> {
     "returns possible keys for root" >> {
