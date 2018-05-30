@@ -23,7 +23,7 @@ import org.specs2._
 
 import _root_.scalaz._, Scalaz._
 
-trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike {
+trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
 
   def testTrivialArrayLeftShift(emit: Boolean) = {
     val rec = toRecord(Array(0), JArray(JNum(12) :: JNum(13) :: Nil))
@@ -102,7 +102,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         toRecord(Array(1), JArray(JNum(0), JNum(42))),
         toRecord(Array(1), JArray(JNum(1), JNum(43))))
 
-    toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).copoint.toVector.map(_.toJValueRaw) mustEqual expected
+    toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
   }
 
   def testHeterogenousLeftShift(emit: Boolean) = {
@@ -126,7 +126,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         toRecord(Array(3), JArray(JNum(1), JNum(43)))) ++
       (if (emit) Vector(toRecord(Array(5), JArray(JNum(0)))) else Vector())
 
-    toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).copoint.toVector.map(_.toJValueRaw) mustEqual expected
+    toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
   }
 
   def testSetArrayLeftShift(emit: Boolean) = {
