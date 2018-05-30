@@ -10,7 +10,7 @@ object Dependencies {
   private val argonautVersion     = "6.2"
   private val disciplineVersion   = "0.7.2"
   private val doobieVersion       = "0.4.4"
-  private val jawnVersion         = "0.10.4"
+  private val jawnVersion         = "0.12.1"
   private val jacksonVersion      = "2.4.4"
   private val matryoshkaVersion   = "0.18.3"
   private val monocleVersion      = "1.4.0"
@@ -52,6 +52,7 @@ object Dependencies {
     "com.chuusai"                %% "shapeless"                 % shapelessVersion,
     "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
     "com.propensive"             %% "contextual"                % "1.0.1",
+    "co.fs2"                     %% "fs2-core"                  % fs2Version,
     "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
     "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
     "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
@@ -82,15 +83,10 @@ object Dependencies {
   )
 
   def datagen = Seq(
-    "co.fs2"           %% "fs2-core"       % fs2Version,
     "co.fs2"           %% "fs2-io"         % fs2Version,
     "co.fs2"           %% "fs2-scalaz"     % fs2ScalazVersion,
     "com.github.scopt" %% "scopt"          % scoptVersion,
     "eu.timepit"       %% "refined-scalaz" % refinedVersion
-  )
-
-  def connector = Seq(
-    "co.fs2" %% "fs2-core" % fs2Version
   )
 
   def sql = Seq(
@@ -176,12 +172,10 @@ object Dependencies {
   )
   def mimir = Seq(
     "io.verizon.delorean" %% "core" % deloreanVersion,
-    "co.fs2" %% "fs2-core"   % fs2Version,
     "co.fs2" %% "fs2-scalaz" % fs2ScalazVersion
   )
   def yggdrasil = Seq(
     "io.verizon.delorean" %% "core" % deloreanVersion,
-    "co.fs2" %% "fs2-core"   % fs2Version,
     "co.fs2" %% "fs2-io"     % fs2Version,
     "co.fs2" %% "fs2-scalaz" % fs2ScalazVersion,
     "com.codecommit" %% "smock" % "0.3.1-specs2-4.0.2" % "test"

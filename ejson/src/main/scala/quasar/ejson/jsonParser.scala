@@ -16,7 +16,9 @@
 
 package quasar.ejson
 
-import slamdata.Predef.{Map => SMap, _}
+import slamdata.Predef.{Map => SMap, Int => SInt, _}
+
+import java.lang.CharSequence
 
 import jawn.{Facade, SimpleFacade, SupportParser}
 import matryoshka._
@@ -30,14 +32,28 @@ object jsonParser {
     new SupportParser[T] {
       implicit val facade: Facade[T] =
         new SimpleFacade[T] {
-          def jarray(arr: List[T])          = C(Arr(arr)).embed
-          def jobject(obj: SMap[String, T]) = O(Obj(ListMap(obj.toList: _*))).embed
-          def jnull()                       = C(Null[T]()).embed
-          def jfalse()                      = C(Bool[T](false)).embed
-          def jtrue()                       = C(Bool[T](true)).embed
-          def jnum(n: String)               = C(Dec[T](BigDecimal(n))).embed
-          def jint(n: String)               = C(Dec[T](BigDecimal(n))).embed
-          def jstring(s: String)            = C(Str[T](s)).embed
+          def jarray(arr: List[T]) =
+            C(Arr(arr)).embed
+
+          def jobject(obj: SMap[String, T]) =
+            O(Obj(ListMap(obj.toList: _*))).embed
+
+          def jnull() =
+            C(Null[T]()).embed
+
+          def jfalse() =
+            C(Bool[T](false)).embed
+
+          def jtrue() =
+            C(Bool[T](true)).embed
+
+          @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+          def jnum(n: CharSequence, decIndex: SInt, expIndex: SInt) =
+            C(Dec[T](BigDecimal(n.toString))).embed
+
+          @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+          def jstring(s: CharSequence) =
+            C(Str[T](s.toString)).embed
         }
     }
 }
