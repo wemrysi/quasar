@@ -17,12 +17,12 @@
 package quasar.yggdrasil
 package table
 
+import quasar.blueeyes._, json._
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JType
 
-import quasar.blueeyes._, json._
 import cats.effect.IO
-import scalaz._, Scalaz._
+import scalaz.StreamT
 import shims._
 
 // TODO: mix in a trait rather than defining Table directly
