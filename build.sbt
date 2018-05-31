@@ -595,6 +595,7 @@ lazy val it = project
   .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
   .dependsOn(
+    impl,
     web     % BothScopes,
     qscript % "test->test")
   .settings(commonSettings)
