@@ -29,7 +29,7 @@ import scalaz.concurrent.Task
 
 final class MimirQueryFederation[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: PlannerErrorME](
+    F[_]: Monad: PlannerErrorME] private (
     P: Cake,
     liftTask: Task ~> F)
     extends QueryFederation[T, F, QueryAssociate[T, F, Task], Stream[Task, Data]] {
@@ -39,4 +39,14 @@ final class MimirQueryFederation[
 
   def evaluateFederated(q: FederatedQuery[T, QueryAssociate[T, F, Task]]): F[ReadError \/ Stream[Task, Data]] =
     qscriptEvaluator.evaluate(q.query).run(q.sources)
+}
+
+object MimirQueryFederation {
+  def apply[
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+      F[_]: Monad: PlannerErrorME](
+      P: Cake,
+      liftTask: Task ~> F)
+      : QueryFederation[T, F, QueryAssociate[T, F, Task], Stream[Task, Data]] =
+    new MimirQueryFederation[T, F](P, liftTask)
 }

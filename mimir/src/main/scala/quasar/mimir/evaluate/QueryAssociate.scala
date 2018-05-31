@@ -35,6 +35,16 @@ object QueryAssociate extends QueryAssociateInstances {
   final case class Heavyweight[T[_[_]], F[_], G[_]](
       f: T[QScriptEducated[T, ?]] => F[ReadError \/ Disposable[G, Stream[G, Data]]])
       extends QueryAssociate[T, F, G]
+
+  def lightweight[T[_[_]], F[_], G[_]](
+      f: ResourcePath => F[ReadError \/ Disposable[G, Stream[G, Data]]])
+      : QueryAssociate[T, F, G] =
+    Lightweight(f)
+
+  def heavyweight[T[_[_]], F[_], G[_]](
+      f: T[QScriptEducated[T, ?]] => F[ReadError \/ Disposable[G, Stream[G, Data]]])
+      : QueryAssociate[T, F, G] =
+    Heavyweight(f)
 }
 
 sealed abstract class QueryAssociateInstances {

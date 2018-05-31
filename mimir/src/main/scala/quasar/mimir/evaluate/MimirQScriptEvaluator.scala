@@ -65,20 +65,23 @@ final class MimirQScriptEvaluator[
   val taskToM: Task ~> M =
     liftMT[F, MT] compose liftTask
 
-  def QSMFunctor: Functor[QSM] =
-    Functor[QSM]
+  implicit def QSMFromQScriptCoreI: Injectable.Aux[QScriptCore[T, ?], QSM] =
+    Injectable.inject[QScriptCore[T, ?], QSM]
 
-  implicit def QSMFromQScriptCore: QScriptCore[T, ?] :<: QSM =
-    Inject[QScriptCore[T, ?], QSM]
+  implicit def QSMFromEquiJoinI: Injectable.Aux[EquiJoin[T, ?], QSM] =
+    Injectable.inject[EquiJoin[T, ?], QSM]
 
-  implicit def QSMFromEquiJoin: EquiJoin[T, ?] :<: QSM =
-    Inject[EquiJoin[T, ?], QSM]
-
-  implicit def QSMFromShiftedRead: Const[ShiftedRead[AFile], ?] :<: QSM =
-    Inject[Const[ShiftedRead[AFile], ?], QSM]
+  implicit def QSMFromShiftedReadI: Injectable.Aux[Const[ShiftedRead[AFile], ?], QSM] =
+    Injectable.inject[Const[ShiftedRead[AFile], ?], QSM]
 
   implicit def QSMToQScriptTotal: Injectable.Aux[QSM, QScriptTotal[T, ?]] =
     mimir.qScriptToQScriptTotal[T]
+
+  def QSMFunctor: Functor[QSM] =
+    Functor[QSM]
+
+  def QSMFromQScriptCore: QScriptCore[T, ?] :<: QSM =
+    Inject[QScriptCore[T, ?], QSM]
 
   def UnirewriteT: Unirewrite[T, QS[T]] =
     implicitly[Unirewrite[T, QS[T]]]
