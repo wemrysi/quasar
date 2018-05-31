@@ -96,9 +96,16 @@ final class LocalDataSource[F[_]: Effect, G[_]: Async] private (
       convert.fromJavaStream(G.delay(Files.list(jp))).evalMap(withType))
   }
 
-  def descendants(path: ResourcePath): F[CommonError \/ Stream[G, ResourcePath]] =
+  def descendants(path: ResourcePath): F[CommonError \/ Stream[G, ResourcePath]] = {
+    def emitFile(p: JPath): Stream[G, JPath] =
+      Stream.eval(G.delay(Files.isRegularFile(p)))
+        .ifM(Stream.emit(p), Stream.empty)
+
     ifExists[CommonError](path)(jp =>
-      convert.fromJavaStream(G.delay(Files.walk(jp))).map(fromNio))
+      convert.fromJavaStream(G.delay(Files.walk(jp)))
+        .flatMap(emitFile)
+        .map(f => fromNio(root.relativize(f))))
+  }
 
   def isResource(path: ResourcePath): F[Boolean] =
     toNio(path) >>= (jp => F.delay(Files.isRegularFile(jp)))
