@@ -1,5 +1,5 @@
 {
-    "name": "field and flattened map field with value and key on heterogeneous",
+    "name": "field and flattened map value and key on heterogeneous",
     "backends": {
         "couchbase":         "pending",
         "marklogic_json":    "pending",

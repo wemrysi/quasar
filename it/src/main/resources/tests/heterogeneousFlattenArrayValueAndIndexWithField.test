@@ -1,5 +1,5 @@
 {
-    "name": "field and flattened field with value and index on heterogenous",
+    "name": "field and flattened array value and index on heterogenous",
     "backends": {
         "couchbase":         "pending",
         "marklogic_json":    "pending",
@@ -11,15 +11,9 @@
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [
-      { "a": 1, "i": 0 },
       { "a": 2, "b": "u", "i": 0 },
       { "a": 2, "b": "v", "i": 1 },
-      { "a": 3, "i": 0 },
-      { "a": 5, "i": 0 },
       { "a": 6, "b": "w", "i": 0 },
-      { "a": 7, "i": 0 },
-      { "a": 8, "i": 0 },
-      { "a": 9, "i": 0 },
       { "a": 10, "b": [ 4, 5, 6 ], "i": 0 },
       { "a": 10, "b": { "m": 1 }, "i": 1 },
       { "a": 10, "b": null, "i": 2 },
