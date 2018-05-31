@@ -16,16 +16,23 @@
 
 package quasar.mimir.evaluate
 
+import slamdata.Predef.Option
 import quasar.{Data, RenderTreeT}
 import quasar.api.ResourceError.ReadError
-import quasar.evaluate.{FederatedQuery, QueryFederation}
+import quasar.contrib.pathy.AFile
+import quasar.evaluate.{FederatedQuery, QueryFederation, Source}
+import quasar.fp.liftMT
 import quasar.fs.Planner.PlannerErrorME
+import quasar.higher.HFunctor
 import quasar.mimir._, MimirCake._
 
 import fs2.Stream
+import fs2.interop.scalaz._
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.{~>, \/, Monad}
+import scalaz.{~>, \/, DList, Monad, WriterT}
 import scalaz.concurrent.Task
+import scalaz.std.tuple._
+import scalaz.syntax.traverse._
 
 final class MimirQueryFederation[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
@@ -34,11 +41,25 @@ final class MimirQueryFederation[
     liftTask: Task ~> F)
     extends QueryFederation[T, F, QueryAssociate[T, F, Task], Stream[Task, Data]] {
 
-  private val qscriptEvaluator =
-    MimirQScriptEvaluator[T, F](P, liftTask)
+  type FinalizersT[X[_], A] = WriterT[X, Finalizers[Task], A]
 
-  def evaluateFederated(q: FederatedQuery[T, QueryAssociate[T, F, Task]]): F[ReadError \/ Stream[Task, Data]] =
-    qscriptEvaluator.evaluate(q.query).run(q.sources)
+  private val qscriptEvaluator =
+    MimirQScriptEvaluator[T, WriterT[F, Finalizers[Task], ?]](P, liftMT[F, FinalizersT] compose liftTask)
+
+  def evaluateFederated(q: FederatedQuery[T, QueryAssociate[T, F, Task]]): F[ReadError \/ Stream[Task, Data]] = {
+    val finalize: ((DList[Task[Unit]], Stream[Task, Data])) => Stream[Task, Data] = {
+      case (fs, s) => fs.foldLeft(s)(_ onFinalize _)
+    }
+
+    val srcs: AFile => Option[Source[QueryAssociate[T, FinalizersT[F, ?], Task]]] =
+      q.sources.andThen(_.map(_.map(HFunctor[QueryAssociate[T, ?[_], Task]].hmap(_)(liftMT[F, FinalizersT]))))
+
+    qscriptEvaluator
+      .evaluate(q.query)
+      .run(srcs)
+      .run
+      .map(_.sequence map finalize)
+  }
 }
 
 object MimirQueryFederation {

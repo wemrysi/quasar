@@ -51,7 +51,7 @@ import scalaz.concurrent.Task
 
 final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: PlannerErrorME] private (
+    F[_]: Monad: PlannerErrorME: MonadFinalizers[?[_], Task]] private (
     cake: Cake,
     liftTask: Task ~> F)
     extends QScriptEvaluator[T, AssociatesT[T, F, Task, ?], Stream[Task, Data]] {
@@ -147,7 +147,7 @@ final class MimirQScriptEvaluator[
 object MimirQScriptEvaluator {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Monad: PlannerErrorME](
+      F[_]: Monad: PlannerErrorME: MonadFinalizers[?[_], Task]](
       cake: Cake,
       liftTask: Task ~> F)
       : QScriptEvaluator[T, AssociatesT[T, F, Task, ?], Stream[Task, Data]] =

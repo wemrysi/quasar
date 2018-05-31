@@ -46,7 +46,7 @@ import scalaz.concurrent.Task
 
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
-    F[_]: Monad: PlannerErrorME](
+    F[_]: Monad: PlannerErrorME: MonadFinalizers[?[_], Task]](
     val P: Cake,
     liftTask: Task ~> F) {
 
@@ -113,17 +113,22 @@ final class FederatedShiftedReadPlanner[
     queryResult.flatMap(_.fold(handleReadError[P.Table], tableFromStream))
   }
 
-  private def tableFromStream(d: Disposable[Task, Stream[Task, Data]]): F[P.Table] =
-    liftTask(Task.delay {
-      val sliceStream =
-        d.value
-          .onFinalize(d.dispose)
-          .map(data => RValue.fromJValueRaw(JValue.fromData(data)))
-          .chunks
-          .map(c => Slice.fromRValues(unfold(c: Chunk[RValue])(_.uncons)))
+  private def tableFromStream(d: Disposable[Task, Stream[Task, Data]]): F[P.Table] = {
+    val sliceStream =
+      d.value
+        .onFinalize(d.dispose)
+        .map(data => RValue.fromJValueRaw(JValue.fromData(data)))
+        .chunks
+        .map(c => Slice.fromRValues(unfold(c: Chunk[RValue])(_.uncons)))
 
-      val slices =
-        convert.toStreamT(sliceStream).trans(λ[Task ~> Future](_.unsafeToFuture))
+
+    for {
+      d <- liftTask(convert.toStreamT(sliceStream))
+
+      _ <- MonadFinalizers[F, Task].tell(DList(d.dispose))
+
+      slices = d.value.trans(λ[Task ~> Future](_.unsafeToFuture))
+    } yield {
 
       import P.trans._
 
@@ -136,7 +141,8 @@ final class FederatedShiftedReadPlanner[
           WrapObject(
             Leaf(Source),
             Value.name)))
-    })
+    }
+  }
 
   private def handleReadError[A](rerr: ReadError): F[A] =
     PlannerErrorME[F].raiseError[A](PlanPathError(rerr match {

@@ -17,6 +17,7 @@
 package quasar.contrib.fs2
 
 import slamdata.Predef.{Boolean, None, Option, Some, Unit}
+import quasar.Disposable
 
 import java.util.Iterator
 import java.util.stream.{Stream => JStream}
@@ -57,42 +58,49 @@ object convert {
   def fromStreamT[F[_]: Functor, A](st: StreamT[F, A]): Stream[F, A] =
     fromChunkedStreamT(st.map(a => Chunk.singleton(a): Chunk[A]))
 
-  // NB: This will potentially leak resources if the resulting `StreamT` is
-  //     not fully consumed!
-  def toStreamT[F[_]: Async, A](s: Stream[F, A]): StreamT[F, A] =
-    StreamT.wrapEffect(chunkQ(s) map {
-      case (q, _) =>
-        for {
-          c <- StreamT.unfoldM(q)(_.dequeue1.map(_.flatMap(_.toOption).strengthR(q)))
-          a <- StreamT.unfoldM(c)(_.uncons.point[F])
-        } yield a
-    })
+  def toStreamT[F[_]: Async, A](s: Stream[F, A]): F[Disposable[F, StreamT[F, A]]] =
+    chunkQ(s) map { case (startQ, close) =>
+      Disposable(
+        StreamT.wrapEffect(startQ.map(q =>
+          for {
+            c <- StreamT.unfoldM(q)(_.dequeue1.map(_.flatMap(_.toOption).strengthR(q)))
+            a <- StreamT.unfoldM(c)(_.uncons.point[F])
+          } yield a)),
+        close)
+    }
 
 
   // scalaz.Process
 
-  def toProcess[F[_]: Async, A](s: Stream[F, A]): Process[F, A] =
-    Process.bracket(chunkQ(s))(t => Process.eval_(t._2)) {
+  def toProcess[F[_]: Async, A](s: Stream[F, A]): Process[F, A] = {
+    val runQ =
+      chunkQ(s).flatMap { case (q, c) => q.strengthR(c) }
+
+    Process.bracket(runQ)(t => Process.eval_(t._2)) {
       case (q, _) =>
         Process.await(q.dequeue1)(_.cata(
           a => a.fold(Process.fail, c => Process.emitAll(c.toVector)),
           Process.halt))
     }
+  }
 
   ////
 
   private def chunkQ[F[_], A](s: Stream[F, A])(implicit F: Async[F])
-      : F[(async.mutable.Queue[F, Option[Attempt[Chunk[A]]]], F[Unit])] =
-    for {
-      q <- async.boundedQueue[F, Option[Attempt[Chunk[A]]]](1)
-      i <- async.signalOf[F, Boolean](false)
+      : F[(F[async.mutable.Queue[F, Option[Attempt[Chunk[A]]]]], F[Unit])] =
+    async.signalOf[F, Boolean](false) map { i =>
+      val startQ = for {
+        q <- async.boundedQueue[F, Option[Attempt[Chunk[A]]]](1)
 
-      enqueue =
-        s.chunks.attempt.noneTerminate
-          .to(q.enqueue)
-          .interruptWhen(i)
-          .onError(_ => Stream.eval(q.enqueue1(None)))
+        enqueue =
+          s.chunks.attempt.noneTerminate
+            .interruptWhen(i)
+            .to(q.enqueue)
+            .onError(_ => Stream.eval(q.enqueue1(None)))
 
-      _ <- F.start(enqueue.run)
-    } yield (q, i.set(true))
+        _ <- F.start(enqueue.run)
+      } yield q
+
+      (startQ, i.set(true))
+    }
 }
