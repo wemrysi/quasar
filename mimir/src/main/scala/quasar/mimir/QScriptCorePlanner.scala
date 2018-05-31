@@ -215,20 +215,23 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
     case qscript.LeftShift(src, struct, idStatus, shiftType, onUndef, repair) =>
       import src.P.trans._
 
+      val s = "src"
+      val f = "f"
+
       for {
 
         structTrans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(struct.linearize)
         wrappedStructTrans =
-          OuterObjectConcat(WrapObject(TransSpec1.Id, "src"), WrapObject(structTrans, "f"))
+          OuterObjectConcat(WrapObject(TransSpec1.Id, s), WrapObject(structTrans, f))
 
         repairTrans <- repair.cataM[F, TransSpec1](
           interpretM[F, MapFunc[T, ?], JoinSide, TransSpec1](
             {
               case qscript.LeftSide =>
-                (DerefObjectStatic(TransSpec1.Id, CPathField("src")): TransSpec1).point[F]
+                (DerefObjectStatic(TransSpec1.Id, CPathField(s)): TransSpec1).point[F]
 
               case qscript.RightSide =>
-                val target = DerefObjectStatic(TransSpec1.Id, CPathField("f"))
+                val target = DerefObjectStatic(TransSpec1.Id, CPathField(f))
 
                 val back: TransSpec1 = idStatus match {
                   case IdOnly => DerefArrayStatic(target, CPathIndex(0))
@@ -241,7 +244,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
             mapFuncPlanner[F].plan(src.P)[Source1](TransSpec1.Id)))
 
         emit = onUndef === OnUndefined.Emit
-        shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ "f", emit)
+        shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ f, emit)
         repaired = shifted.transform(repairTrans)
       } yield MimirRepr(src.P)(repaired)
 
