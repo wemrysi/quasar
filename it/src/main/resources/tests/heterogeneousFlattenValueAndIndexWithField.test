@@ -6,8 +6,8 @@
         "marklogic_xml":     "pending",
         "mimir":             "ignoreFieldOrder"
     },
-    "data": "heterogenousNested.data",
-    "query": "select a, b[*], b[*:] as i from heterogenousNested",
+    "data": "heterogeneous.data",
+    "query": "select a, b[*], b[*:] as i from heterogeneous",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [
