@@ -25,6 +25,7 @@ import quasar.common.PhaseResults
 import quasar.compile.{queryPlan, SemanticErrors}
 import quasar.contrib.argonaut._
 import quasar.contrib.fs2.convert
+import quasar.contrib.fs2.stream._
 import quasar.contrib.pathy._
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
@@ -73,20 +74,6 @@ final class Sql2QueryRegressionSpec extends Qspec {
         .liftM[StateT[?[_], Long, ?]]
         .liftM[EitherT[?[_], SemanticErrors,?]]
         .liftM[EitherT[?[_], PlannerError,?]])
-
-  implicit val streamMonadPlus: MonadPlus[Stream[Task, ?]] =
-    new MonadPlus[Stream[Task, ?]] {
-      def plus[A](x: Stream[Task, A], y: => Stream[Task, A]) =
-        x ++ y
-
-      def empty[A] = Stream.empty
-
-      def bind[A, B](fa: Stream[Task, A])(f: A => Stream[Task, B]) =
-        fa flatMap f
-
-      def point[A](a: => A) =
-        Stream.emit(a)
-    }
 
   val queryEvaluator =
     for {
