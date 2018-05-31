@@ -1608,17 +1608,8 @@ trait ColumnarTableModule
 
           // figure out the definedness of the exploded, filtered result
           // this is necessary so we can implement inner-concat semantics
-          val definedness: BitSet = {
-            // the regular definedness bitset
-            val d = merged.values.map(_.definedAt(0, slice.size * highWaterMark)).reduceOption(_ | _).getOrElse(new BitSet)
-            // additional definedness bitset:
-            // we need to keep every first expanded
-            // row that's marked to be kept according to the emit bitset
-            val keep: BitSet =
-              BitSetUtil.filteredRange(0, slice.size * highWaterMark)(i =>
-                (i % highWaterMark == 0) && emit(i / highWaterMark))
-            d | keep
-          }
+          val definedness =
+            merged.values.map(_.definedAt(0, slice.size * highWaterMark)).reduceOption(_ | _).getOrElse(new BitSet)
 
           // move all of our results into second index of an array
           val indexed = merged map {
@@ -1689,11 +1680,18 @@ trait ColumnarTableModule
               ColumnRef(focus \ path, tpe) -> col
           }
 
+          // additional definedness bitset:
+          // we need to keep every first expanded row
+          // in unfocused that's marked to be kept according to the emit bitset
+          val keep: BitSet = definedness |
+            BitSetUtil.filteredRange(0, slice.size * highWaterMark)(i =>
+              (i % highWaterMark == 0) && emit(i / highWaterMark))
+
           // we need to go back to our original columns and filter them by results
           // if we don't do this, the data will be highly sparse (like an outer join)
           val unfocusedTransformed = unfocusedExpanded map {
             case (ref, col) =>
-              ref -> cf.util.filter(0, slice.size * highWaterMark, definedness)(col).get
+              ref -> cf.util.filter(0, slice.size * highWaterMark, keep)(col).get
           }
 
           // glue everything back together with the unfocused and compute the new size
