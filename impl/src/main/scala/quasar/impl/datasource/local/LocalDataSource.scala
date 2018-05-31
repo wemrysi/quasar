@@ -24,7 +24,7 @@ import quasar.api.ResourceError._
 import quasar.connector.DataSource
 import quasar.connector.datasource.LightweightDataSource
 import quasar.contrib.fs2.chunk._
-import quasar.contrib.fs2.jstream
+import quasar.contrib.fs2.convert
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
 
@@ -93,12 +93,12 @@ final class LocalDataSource[F[_]: Effect, G[_]: Async] private (
         .strengthL(toResourceName(jp))
 
     ifExists[CommonError](path)(jp =>
-      jstream.asStream(G.delay(Files.list(jp))).evalMap(withType))
+      convert.fromJavaStream(G.delay(Files.list(jp))).evalMap(withType))
   }
 
   def descendants(path: ResourcePath): F[CommonError \/ Stream[G, ResourcePath]] =
     ifExists[CommonError](path)(jp =>
-      jstream.asStream(G.delay(Files.walk(jp))).map(fromNio))
+      convert.fromJavaStream(G.delay(Files.walk(jp))).map(fromNio))
 
   def isResource(path: ResourcePath): F[Boolean] =
     toNio(path) >>= (jp => F.delay(Files.isRegularFile(jp)))

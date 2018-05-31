@@ -21,6 +21,7 @@ import slamdata.Predef.{Stream => _, _}
 import quasar.{Data, Disposable}
 import quasar.api._, ResourceError._
 import quasar.blueeyes.json.JValue
+import quasar.contrib.fs2.convert
 import quasar.contrib.pathy._
 import quasar.evaluate.{Source => EvalSource}
 import quasar.fs.PathError
@@ -113,21 +114,21 @@ final class FederatedShiftedReadPlanner[
   }
 
   private def tableFromStream(d: Disposable[Task, Stream[Task, Data]]): F[P.Table] =
-    liftTask(d(stream => Task.delay {
-      val jvStream =
-        stream.map(data => RValue.fromJValueRaw(JValue.fromData(data)))
+    liftTask(Task.delay {
+      val sliceStream =
+        d.value
+          .onFinalize(d.dispose)
+          .map(data => RValue.fromJValueRaw(JValue.fromData(data)))
+          .chunks
+          .map(c => Slice.fromRValues(unfold(c: Chunk[RValue])(_.uncons)))
 
-      // TODO: Is this resource safe?
       val slices =
-        StreamT.unfoldM[Task, Slice, Stream[Task, RValue]](jvStream.scope)(
-          _.uncons.runLast.map(_.flatten map {
-            case (c, s) => (Slice.fromRValues(unfold(c: Chunk[RValue])(_.uncons)), s)
-          }))
+        convert.toStreamT(sliceStream).trans(λ[Task ~> Future](_.unsafeToFuture))
 
       import P.trans._
 
       // TODO depending on the id status we may not need to wrap the table
-      P.Table(slices.trans(λ[Task ~> Future](_.unsafeToFuture)), UnknownSize)
+      P.Table(slices, UnknownSize)
         .transform(OuterObjectConcat(
           WrapObject(
             Scan(Leaf(Source), P.freshIdScanner),
@@ -135,7 +136,7 @@ final class FederatedShiftedReadPlanner[
           WrapObject(
             Leaf(Source),
             Value.name)))
-    }))
+    })
 
   private def handleReadError[A](rerr: ReadError): F[A] =
     PlannerErrorME[F].raiseError[A](PlanPathError(rerr match {

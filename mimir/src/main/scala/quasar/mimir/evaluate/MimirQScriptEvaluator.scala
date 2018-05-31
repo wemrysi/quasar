@@ -22,6 +22,7 @@ import quasar._
 import quasar.api.ResourceError.ReadError
 import quasar.blueeyes.json.{JValue, JUndefined}
 import quasar.connector.QScriptEvaluator
+import quasar.contrib.fs2.convert
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, readerT._
 import quasar.fp._
@@ -153,8 +154,5 @@ object MimirQScriptEvaluator {
     new MimirQScriptEvaluator[T, F](cake, liftTask)
 
   def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, JValue] =
-    Stream.unfoldChunkEval(slices)(_.step.map(_(
-      yieldd = (slice, st) => Some((Chunk.indexedSeq(SliceIndexedSeq(slice)), st))
-    , skip = st => Some((Chunk.empty, st))
-    , done = None)))
+    convert.fromChunkedStreamT(slices.map(s => Chunk.indexedSeq(SliceIndexedSeq(s))))
 }

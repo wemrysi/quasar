@@ -31,10 +31,7 @@ import scalaz.syntax.monoid._
   * resource will automatically be disposed of, or explicitly dispose of
   * the resource.
   */
-final class Disposable[F[_], A](
-    protected val value: A,
-    val dispose: F[Unit]) {
-
+final class Disposable[F[_], A](val value: A, val dispose: F[Unit]) {
   def apply[B](f: A => F[B])(implicit F0: Monad[F], F1: MonadError_[F, Throwable]): F[B] =
     F1.ensuring(f(value))(κ(dispose))
 

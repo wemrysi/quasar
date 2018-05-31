@@ -24,7 +24,7 @@ import quasar.build.BuildInfo
 import quasar.common.PhaseResults
 import quasar.compile.{queryPlan, SemanticErrors}
 import quasar.contrib.argonaut._
-import quasar.contrib.fs2.jstream
+import quasar.contrib.fs2.convert
 import quasar.contrib.pathy._
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
@@ -61,7 +61,6 @@ import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.stream.Process
 
 final class Sql2QueryRegressionSpec extends Qspec {
   import Sql2QueryRegressionSpec._
@@ -248,7 +247,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
     val result =
       exp.predicate(
         exp.rows.toVector,
-        streamToProcess(act.map(normalizeJson <<< deleteFields <<< (_.asJson))),
+        convert.toProcess(act.map(normalizeJson <<< deleteFields <<< (_.asJson))),
         fieldOrderSignificance,
         resultOrderSignificance)
 
@@ -310,7 +309,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   /** Returns all descendant files in the given dir matching `pattern`. */
   def descendantsMatching(d: RDir, pattern: Regex): Stream[Task, RFile] =
-    jstream.asStream(Task.delay(Files.walk(jPath(d))))
+    convert.fromJavaStream(Task.delay(Files.walk(jPath(d))))
       .filter(p => pattern.findFirstIn(p.getFileName.toString).isDefined)
       .map(p => posixCodec.parseRelFile(p.toString).flatMap(_.relativeTo(d)))
       .unNone
@@ -333,16 +332,6 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   def jPath(p: Path[_, _, Sandboxed]): JPath =
     Paths.get(posixCodec.printPath(p))
-
-  def streamToProcess[A](s: Stream[Task, A]): Process[Task, A] = {
-    def procStream(s0: Stream[Task, A]): Process[Task, A] =
-      Process.await(s0.scope.uncons.unNone.runLast) {
-        case Some((c, s)) => Process.emitAll(c.toVector) ++ procStream(s)
-        case None         => Process.halt
-      }
-
-    procStream(s)
-  }
 }
 
 object Sql2QueryRegressionSpec {
