@@ -33,7 +33,7 @@ import scalaz._, Scalaz._
 final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, G[_]: ApplicativePlus, S, R] private (
     queryFederation: QueryFederation[T, F, S, R],
     sources: F[IMap[ResourceName, (ResourceDiscovery[F, G], S)]])
-    extends QueryEvaluator[F, G, T[QScriptRead[T, ?]], R] {
+    extends QueryEvaluator[F, G, T[QScriptEducated[T, ?]], R] {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import WriterT.writerTMonadListen
@@ -89,7 +89,7 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, G[_]: A
         } getOrElse false
     }
 
-  def evaluate(q: T[QScriptRead[T, ?]]): F[ReadError \/ R] =
+  def evaluate(q: T[QScriptEducated[T, ?]]): F[ReadError \/ R] =
     (for {
       wa <- Trans.applyTrans(federate, ReadPath)(q).run
 
@@ -107,17 +107,17 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, G[_]: A
   private type SrcsT[X[_], A] = WriterT[X, DList[(AFile, Source[S])], A]
   private type M[A] = SrcsT[EitherT[F, ReadError, ?], A]
 
-  private val IRD = Inject[Const[QRead[ADir], ?], QScriptRead[T, ?]]
-  private val IRF = Inject[Const[QRead[AFile], ?], QScriptRead[T, ?]]
+  private val IRD = Inject[Const[QRead[ADir], ?], QScriptEducated[T, ?]]
+  private val IRF = Inject[Const[QRead[AFile], ?], QScriptEducated[T, ?]]
 
-  private val ReadPath: PrismNT[QScriptRead[T, ?], Const[QRead[APath], ?]] =
-    PrismNT[QScriptRead[T, ?], Const[QRead[APath], ?]](
-      λ[QScriptRead[T, ?] ~> (Option ∘ Const[QRead[APath], ?])#λ](qr =>
+  private val ReadPath: PrismNT[QScriptEducated[T, ?], Const[QRead[APath], ?]] =
+    PrismNT[QScriptEducated[T, ?], Const[QRead[APath], ?]](
+      λ[QScriptEducated[T, ?] ~> (Option ∘ Const[QRead[APath], ?])#λ](qr =>
         IRD.prj(qr).map(_.getConst.path)
           .orElse(IRF.prj(qr).map(_.getConst.path))
           .map(p => Const(QRead(p)))),
 
-      λ[Const[QRead[APath], ?] ~> QScriptRead[T, ?]](rp =>
+      λ[Const[QRead[APath], ?] ~> QScriptEducated[T, ?]](rp =>
         refineType(rp.getConst.path).fold(
           d => IRD.inj(Const(QRead(d))),
           f => IRF.inj(Const(QRead(f))))))
@@ -179,6 +179,6 @@ object FederatingQueryEvaluator {
   def apply[T[_[_]]: BirecursiveT, F[_]: Monad, G[_]: ApplicativePlus, S, R](
     queryFederation: QueryFederation[T, F, S, R],
     sources: F[IMap[ResourceName, (ResourceDiscovery[F, G], S)]])
-    : QueryEvaluator[F, G, T[QScriptRead[T, ?]], R] =
+    : QueryEvaluator[F, G, T[QScriptEducated[T, ?]], R] =
   new FederatingQueryEvaluator(queryFederation, sources)
 }
