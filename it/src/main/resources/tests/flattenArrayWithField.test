@@ -1,5 +1,5 @@
 {
-    "name": "field and flattened field",
+    "name": "field and flattened array",
     "backends": {
         "couchbase":         "pending",
         "marklogic_json":    "pending",

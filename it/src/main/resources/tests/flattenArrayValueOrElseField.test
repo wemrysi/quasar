@@ -1,5 +1,5 @@
 {
-    "name": "flatten or else field",
+    "name": "flatten array value or else field",
     "backends": {
         "couchbase":         "pending",
         "marklogic_json":    "pending",
