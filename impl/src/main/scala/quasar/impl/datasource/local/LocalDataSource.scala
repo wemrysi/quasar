@@ -21,16 +21,16 @@ import quasar.Data
 import quasar.DataCodec.Precise
 import quasar.api.{DataSourceType, ResourceName, ResourcePath, ResourcePathType}
 import quasar.api.ResourceError._
+import quasar.connector.DataSource
 import quasar.connector.datasource.LightweightDataSource
 import quasar.contrib.fs2.chunk._
+import quasar.contrib.fs2.jstream
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
 
 import java.nio.file.{Files, Path => JPath}
 import java.nio.ByteBuffer
 import java.text.ParseException
-import java.util.Iterator
-import java.util.stream.{Stream => JStream}
 
 import scala.collection.JavaConverters._
 import scala.collection.Seq
@@ -93,12 +93,12 @@ final class LocalDataSource[F[_]: Effect, G[_]: Async] private (
         .strengthL(toResourceName(jp))
 
     ifExists[CommonError](path)(jp =>
-      jStreamToFs2(G.delay(Files.list(jp))).evalMap(withType))
+      jstream.asStream(G.delay(Files.list(jp))).evalMap(withType))
   }
 
   def descendants(path: ResourcePath): F[CommonError \/ Stream[G, ResourcePath]] =
     ifExists[CommonError](path)(jp =>
-      jStreamToFs2(G.delay(Files.walk(jp))).map(fromNio))
+      jstream.asStream(G.delay(Files.walk(jp))).map(fromNio))
 
   def isResource(path: ResourcePath): F[Boolean] =
     toNio(path) >>= (jp => F.delay(Files.isRegularFile(jp)))
@@ -145,17 +145,6 @@ final class LocalDataSource[F[_]: Effect, G[_]: Async] private (
     }
   }
 
-  private def jStreamToFs2[A](js: G[JStream[A]]): Stream[G, A] = {
-    def getNext(i: Iterator[A]): G[Option[(A, Iterator[A])]] =
-      G.delay(i.hasNext).ifM(
-        G.delay(Some((i.next(), i))),
-        G.pure(None))
-
-    Stream.bracket(js)(
-      s => Stream.unfoldEval(s.iterator)(getNext),
-      s => G.delay(s.close()))
-  }
-
   private def fromNio(jp: JPath): ResourcePath =
     jp.iterator.asScala
       .map(toResourceName)
@@ -170,4 +159,12 @@ final class LocalDataSource[F[_]: Effect, G[_]: Async] private (
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private def toResourceName(jp: JPath): ResourceName =
     ResourceName(jp.getFileName.toString)
+}
+
+object LocalDataSource {
+  def apply[F[_]: Effect, G[_]: Async](
+      root: JPath,
+      readChunkSizeBytes: Int)
+      : DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]] =
+    new LocalDataSource[F, G](root, readChunkSizeBytes)
 }

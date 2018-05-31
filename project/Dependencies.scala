@@ -53,6 +53,7 @@ object Dependencies {
     "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
     "com.propensive"             %% "contextual"                % "1.0.1",
     "co.fs2"                     %% "fs2-core"                  % fs2Version,
+    "co.fs2"                     %% "fs2-scalaz"                % fs2ScalazVersion,
     "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
     "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
     "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
@@ -84,7 +85,6 @@ object Dependencies {
 
   def datagen = Seq(
     "co.fs2"           %% "fs2-io"         % fs2Version,
-    "co.fs2"           %% "fs2-scalaz"     % fs2ScalazVersion,
     "com.github.scopt" %% "scopt"          % scoptVersion,
     "eu.timepit"       %% "refined-scalaz" % refinedVersion
   )
@@ -110,7 +110,6 @@ object Dependencies {
 
   def impl = Seq(
     "co.fs2"         %% "fs2-io"        % fs2Version,
-    "co.fs2"         %% "fs2-scalaz"    % fs2ScalazVersion,
     "org.spire-math" %% "jawn-argonaut" % jawnVersion,
     "org.spire-math" %% "jawn-parser"   % jawnVersion
   )
@@ -178,13 +177,11 @@ object Dependencies {
     "com.google.guava" %  "guava" % "13.0"
   )
   def mimir = Seq(
-    "io.verizon.delorean" %% "core" % deloreanVersion,
-    "co.fs2" %% "fs2-scalaz" % fs2ScalazVersion
+    "io.verizon.delorean" %% "core" % deloreanVersion
   )
   def yggdrasil = Seq(
     "io.verizon.delorean" %% "core" % deloreanVersion,
     "co.fs2" %% "fs2-io"     % fs2Version,
-    "co.fs2" %% "fs2-scalaz" % fs2ScalazVersion,
     "com.codecommit" %% "smock" % "0.3.1-specs2-4.0.2" % "test"
   )
   def niflheim = Seq(
@@ -193,6 +190,7 @@ object Dependencies {
     "org.objectweb.howl" %  "howl"       % "1.0.1-1"
   )
   def it = Seq(
+    "co.fs2"           %% "fs2-io"              % fs2Version          % Test,
     "io.argonaut"      %% "argonaut-monocle"    % argonautVersion     % Test,
     "org.http4s"       %% "http4s-blaze-client" % http4sVersion       % Test,
     "eu.timepit"       %% "refined-scalacheck"  % refinedVersion      % Test,
