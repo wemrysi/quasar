@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.fp
+package quasar.contrib.iota
 
 import slamdata.Predef._
 import iotaz.TListK.:::
 import iotaz.{CopK, TListK, TNilK}
 import scalaz.Functor
+import quasar.fp.mkInject
 
 sealed trait FunctorMaterializer[LL <: TListK] {
   def materialize(offset: Int): Functor[CopK[LL, ?]]
