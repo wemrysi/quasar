@@ -22,6 +22,7 @@ import quasar.{ejson, qscript}
 import quasar.ejson.EJson
 import quasar.time.TemporalPart
 import quasar.contrib.iota.copkTraverse
+import quasar.fp.Injectable
 
 import matryoshka._
 import matryoshka.data.Fix

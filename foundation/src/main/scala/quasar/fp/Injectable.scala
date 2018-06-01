@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.fp
 
 import slamdata.Predef._
 import scalaz._
-import quasar.fp.{:<<:, ACopK}
 
 /** This is like [[scalaz.Inject]], but for injecting an arbitrary coproduct
   * where all of the components are in the `OUT` coproduct in any order.
