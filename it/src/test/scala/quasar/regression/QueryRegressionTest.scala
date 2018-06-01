@@ -29,6 +29,7 @@ import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
 import quasar.contrib.pathy._
 import quasar.fp._, free._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.main.{physicalFileSystems, CompExec, FilesystemQueries}

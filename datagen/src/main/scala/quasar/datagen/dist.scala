@@ -21,7 +21,7 @@ import quasar.contrib.spire.random.dist._
 import quasar.ejson.{DecodeEJson, EJson, Type => EType}
 import quasar.fp.numeric.SampleStats
 import quasar.fp.ski.ι
-import quasar.fp.copkTraverse
+import quasar.contrib.iota.copkTraverse
 import quasar.sst.{strings, Population, PopulationSST, SST, StructuralType, Tagged, TypeStat}
 import quasar.tpe.TypeF
 

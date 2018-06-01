@@ -21,6 +21,7 @@ import quasar._
 import quasar.Data.DateTimeConstants
 import quasar.ejson.{EJson, TypeTag, ExtEJson, CommonEJson}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs.Planner, Planner._
 

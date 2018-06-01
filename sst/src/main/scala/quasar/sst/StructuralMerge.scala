@@ -19,7 +19,8 @@ package quasar.sst
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.tpe._
-import quasar.fp.{mkInject, :<<:, ACopK}
+import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.mkInject
 
 import matryoshka._
 import matryoshka.implicits._
@@ -55,11 +56,23 @@ object StructuralMerge {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
-      override def materialize(offset: Int)(implicit F: Functor[CopK[TNilK, ?]]): StructuralMerge[CopK[TNilK, ?]] = {
-        new StructuralMerge[CopK[TNilK, ?]] {
-          def merge[V, T](pp: (P[V, T], P[V, T]))(implicit V: Semigroup[V], T: Corecursive.Aux[T, P[V, ?]]) = none
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: StructuralMerge[F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int)(implicit G: Functor[CopK[F ::: TNilK, ?]]): StructuralMerge[CopK[F ::: TNilK, ?]] = {
+        implicit val I = mkInject[F, F ::: TNilK](offset)
+        new StructuralMerge[CopK[F ::: TNilK, ?]] {
+          def merge[V, T](pp: (P[V, T], P[V, T]))(implicit V: Semigroup[V], T: Corecursive.Aux[T, P[V, ?]]) = {
+            implicit val FC: Corecursive.Aux[T, EnvT[V, F, ?]] = derivedEnvTCorec[T, V, CopK[F ::: TNilK, ?], F]
+
+            pp match {
+              case (EnvT((x, I(l))), EnvT((y, I(r)))) =>
+                F.merge[V, T]((envT(x, l), envT(y, r)))
+                  .map(EnvT.hmap(I.inj)(_))
+            }
+          }
         }
       }
     }

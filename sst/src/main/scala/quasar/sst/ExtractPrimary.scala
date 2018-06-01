@@ -19,7 +19,7 @@ package quasar.sst
 import slamdata.Predef._
 import quasar.ejson.EJson
 import quasar.tpe._
-import quasar.fp.mkInject
+import quasar.contrib.iota.mkInject
 
 import matryoshka._
 import matryoshka.patterns.EnvT
@@ -45,9 +45,19 @@ object ExtractPrimary {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
-      override def materialize(offset: Int): ExtractPrimary[CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: ExtractPrimary[F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int): ExtractPrimary[CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new ExtractPrimary[CopK[F ::: TNilK, ?]] {
+          override def primaryTag[A](cfa: CopK[F ::: TNilK, A]): Option[PrimaryTag] = cfa match {
+            case I(fa) => fa.primaryTag
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

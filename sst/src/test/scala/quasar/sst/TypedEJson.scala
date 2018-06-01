@@ -34,6 +34,7 @@ import quasar.ejson.{
 }
 import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
+import quasar.contrib.iota.copkShow
 import quasar.pkg.tests._
 
 import matryoshka._

@@ -24,18 +24,28 @@ import matryoshka.Delay
 import org.scalacheck._
 import iotaz.{TListK, CopK, TNilK}
 import iotaz.TListK.:::
+import quasar.contrib.iota.mkInject
 
 sealed trait ArbitraryKMaterializer[LL <: TListK] {
   def materialize(offset: Int): Delay[Arbitrary, CopK[LL, ?]]
 }
 
 object ArbitraryKMaterializer {
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  implicit val base: ArbitraryKMaterializer[TNilK] = new ArbitraryKMaterializer[TNilK] {
-    override def materialize(offset: Int): Delay[Arbitrary, CopK[TNilK, ?]] =
-      new Delay[Arbitrary, CopK[TNilK, ?]] {
-        override def apply[A](fa: Arbitrary[A]): Arbitrary[CopK[TNilK, A]] = Arbitrary(Gen.delay(???))
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  implicit def base[F[_]](
+    implicit
+    FA: Delay[Arbitrary, F]
+  ): ArbitraryKMaterializer[F ::: TNilK] = new ArbitraryKMaterializer[F ::: TNilK] {
+    override def materialize(offset: Int): Delay[Arbitrary, CopK[F ::: TNilK, ?]] = {
+      val I = mkInject[F, F ::: TNilK](offset)
+      new Delay[Arbitrary, CopK[F ::: TNilK, ?]] {
+        override def apply[A](arb: Arbitrary[A]): Arbitrary[CopK[F ::: TNilK, A]] = {
+          Arbitrary(Gen.frequency(
+            (1, FA(arb).arbitrary.map(I(_)))
+          ))
+        }
       }
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

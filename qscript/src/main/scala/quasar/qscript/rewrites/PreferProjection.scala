@@ -154,7 +154,6 @@ sealed abstract class PreferProjectionInstances {
         val I = mkInject[F, F ::: TNilK](offset)
         new PreferProjection[CopK[F ::: TNilK, ?], T, B] {
           type C[A] = CopK[F ::: TNilK, A]
-          type D[A] = CopK[TNilK, A]
 
           def preferProjectionƒ(BtoC: PrismNT[B, C]): C[(Outline.Shape, T)] => B[T] = {
             case I(fa) => F.preferProjectionƒ(BtoC andThen PrismNT.injectCopK[F, C](I))(fa)

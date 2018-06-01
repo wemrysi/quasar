@@ -18,7 +18,7 @@ package quasar.ejson
 
 import slamdata.Predef._
 import quasar.Qspec
-import quasar.fp._
+import quasar.contrib.iota._
 
 import matryoshka._
 import matryoshka.data.Fix

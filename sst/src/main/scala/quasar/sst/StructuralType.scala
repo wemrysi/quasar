@@ -32,7 +32,7 @@ import quasar.ejson.{
   TypeTag
 }
 import quasar.ejson.implicits._
-import quasar.fp.{copkEqual, copkShow, copkTraverse}
+import quasar.contrib.iota.{copkEqual, copkShow, copkTraverse}
 import quasar.fp.{:<<:, ACopK}
 import quasar.fp.ski.κ
 import quasar.tpe._
