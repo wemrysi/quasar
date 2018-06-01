@@ -18,7 +18,6 @@ package quasar.effect
 
 import slamdata.Predef._
 import quasar.fp.{:<<:, ACopK}
-import quasar.fp.free.injectNT
 
 import scalaz._, concurrent.Task
 import scalaz.syntax.monad._
@@ -64,7 +63,7 @@ sealed abstract class CaptureInstances extends CaptureInstances0 {
 sealed abstract class CaptureInstances0 extends CaptureInstances1 {
 
   implicit def freeCapture[F[_]: Capture, S[_]](implicit I: F :<: S): Capture[Free[S, ?]] =
-    new FreeCapture[F, S](injectNT[F, S])
+    new FreeCapture[F, S](I)
 
 }
 

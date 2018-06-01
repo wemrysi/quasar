@@ -67,7 +67,6 @@ object SimplifyJoin {
     (implicit EJ: EquiJoin[T, ?] :<<: F, QC: QScriptCore[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, ThetaJoin[T, ?], F] =
     new SimplifyJoin[ThetaJoin[T, ?]] {
-//      import MapFuncCore._
       import MapFuncsCore._
 
       type IT[F[_]] = T[F]
