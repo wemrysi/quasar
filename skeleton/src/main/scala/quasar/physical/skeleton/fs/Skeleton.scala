@@ -27,6 +27,7 @@ import quasar.fs.mount._
 import quasar.qscript._
 import quasar.qscript.analysis._
 import quasar.qscript.rewrites.{Unicoalesce, Unirewrite}
+import quasar.contrib.iota.SubInject
 
 import matryoshka._
 import matryoshka.data._

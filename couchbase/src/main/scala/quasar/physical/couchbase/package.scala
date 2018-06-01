@@ -16,7 +16,7 @@
 
 package quasar.physical
 
-import quasar.fp._
+import quasar.contrib.iota.SubInject
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
 import scalaz.Const

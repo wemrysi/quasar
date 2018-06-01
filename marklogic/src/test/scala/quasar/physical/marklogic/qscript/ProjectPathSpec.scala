@@ -18,6 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.contrib.pathy.ADir
+import quasar.contrib.iota.SubInject
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.qscript.MapFuncsCore._

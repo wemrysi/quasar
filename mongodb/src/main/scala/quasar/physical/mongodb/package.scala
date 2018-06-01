@@ -28,7 +28,7 @@ import com.mongodb.async.AsyncBatchCursor
 import org.bson.BsonValue
 import scalaz._
 import iotaz.CopK
-import quasar.fp.SubInject
+import quasar.contrib.iota.SubInject
 
 package object mongodb {
   type BsonCursor         = AsyncBatchCursor[BsonValue]

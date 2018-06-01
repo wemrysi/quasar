@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
+package quasar.contrib.iota
+
 import scala.language.experimental.macros
 
-package quasar.fp {
-  import iotaz.CopK
-  import quasar.qscript.Injectable
-  import slamdata.Predef._
+import iotaz.CopK
+import quasar.qscript.Injectable
+import slamdata.Predef._
 
-  object SubInject {
-    @SuppressWarnings(Array("org.wartremover.warts.Null"))
-    def apply[Inner[a] <: CopK[_, a], Outer[a] <: CopK[_, a]]: Injectable[Inner, Outer] = macro iotaz.internal.SubInjectMacros.create[Inner, Outer]
-  }
-
+object SubInject {
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
+  def apply[Inner[a] <: CopK[_, a], Outer[a] <: CopK[_, a]]: Injectable[Inner, Outer] = macro iotaz.internal.SubInjectMacros.create[Inner, Outer]
 }

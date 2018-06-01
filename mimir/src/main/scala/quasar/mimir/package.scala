@@ -16,6 +16,7 @@
 
 package quasar
 
+import quasar.contrib.iota.SubInject
 import quasar.fp._
 import quasar.qscript._
 import quasar.contrib.pathy.AFile

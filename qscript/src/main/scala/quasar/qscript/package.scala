@@ -19,6 +19,7 @@ package quasar
 import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
+import quasar.contrib.iota.SubInject
 
 import matryoshka._
 import matryoshka.data._

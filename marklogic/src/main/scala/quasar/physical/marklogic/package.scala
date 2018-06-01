@@ -17,10 +17,10 @@
 package quasar.physical
 
 import slamdata.Predef.String
+import quasar.contrib.iota.SubInject
 import quasar.qscript._
 import quasar.contrib.scalaz.MonadError_
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.fp.SubInject
 
 import scalaz.{Const, NonEmptyList, MonadError}
 
