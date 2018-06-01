@@ -21,6 +21,7 @@ import quasar.Disposable
 
 import java.util.Iterator
 import java.util.stream.{Stream => JStream}
+import scala.util.{Left, Right}
 
 import fs2.{async, Chunk, Stream}
 import fs2.interop.scalaz._
@@ -29,7 +30,6 @@ import scalaz.{Functor, StreamT}
 import scalaz.stream.Process
 import scalaz.std.option._
 import scalaz.syntax.monad._
-import scalaz.syntax.std.option._
 
 object convert {
 
@@ -78,9 +78,11 @@ object convert {
 
     Process.bracket(runQ)(t => Process.eval_(t._2)) {
       case (q, _) =>
-        Process.await(q.dequeue1)(_.cata(
-          a => a.fold(Process.fail, c => Process.emitAll(c.toVector)),
-          Process.halt))
+        Process.await(q.dequeue1) {
+          case Some(Right(c)) => Process.emitAll(c.toVector)
+          case Some(Left(e))  => Process.fail(e)
+          case None           => Process.halt.kill
+        }.repeat
     }
   }
 
