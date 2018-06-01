@@ -70,5 +70,5 @@ trait DefaultAnalyzeModule { self: BackendModule =>
     def queryCost(qs: Fix[QSM[Fix, ?]]): Backend[Int] =
       qs.zygoM(CardinalityQSM.calculate[Backend](pathCard), CostQSM.evaluate[Backend](pathCard))
   }
-  
+
 }
