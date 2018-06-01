@@ -181,7 +181,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
         results)
 
       verifyResults(test.expected, data, backendName)
-        .timed(30.seconds)
+        .timed(2.minutes)
         .unsafePerformSync
     }
 
