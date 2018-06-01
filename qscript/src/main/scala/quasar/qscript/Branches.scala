@@ -23,8 +23,8 @@ import monocle._
 import scalaz._, Scalaz._
 import slamdata.Predef._
 import iotaz.TListK.:::
-import quasar.fp.mkInject
-import iotaz.{ CopK, TListK, TNilK }
+import quasar.contrib.iota.mkInject
+import iotaz.{CopK, TListK, TNilK}
 
 trait Branches[T[_[_]], IN[_]] {
   def branches[A]: Traversal[IN[A], FreeQS[T]]

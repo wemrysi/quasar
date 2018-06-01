@@ -23,7 +23,6 @@ import matryoshka.patterns._
 import quasar.qscript.RecFreeS.RecOps
 import iotaz.{TListK, CopK, TNilK}
 import iotaz.TListK.:::
-import quasar.fp.mkInject
 import monocle._
 import scalaz._, Scalaz._
 

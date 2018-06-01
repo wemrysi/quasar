@@ -24,7 +24,7 @@ import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xcc._
 import quasar.ejson.EJson
 import quasar.qscript._
-import quasar.fp.mkInject
+import quasar.contrib.iota.mkInject
 
 import matryoshka._
 import scalaz._, Scalaz._

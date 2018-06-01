@@ -23,7 +23,7 @@ import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.couchbase._, common._
 import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript._
-import quasar.fp.mkInject
+import quasar.contrib.iota.mkInject
 
 import matryoshka._
 import scalaz._

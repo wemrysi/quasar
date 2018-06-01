@@ -19,6 +19,7 @@ package quasar.physical.mongodb.planner
 import slamdata.Predef._
 import quasar.Type
 import quasar.fp._
+import quasar.contrib.iota.mkInject
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.physical.mongodb.{Bson, BsonCodec, BsonField, BsonVersion}

@@ -18,7 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 
-import quasar.fp.mkInject
+import quasar.contrib.iota.mkInject
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 

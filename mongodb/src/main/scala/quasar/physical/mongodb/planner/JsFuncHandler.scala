@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.{Data, Type}, Type.{Coproduct => _, _}
 import quasar.ejson.EJson
 import quasar.fp._
+import quasar.contrib.iota.mkInject
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.fs.{Planner => QPlanner}, QPlanner._

@@ -21,7 +21,6 @@ import iotaz.TListK.:::
 import iotaz.{CopK, TListK, TNilK}
 import matryoshka.Delay
 import scalaz._
-import quasar.fp.mkInject
 
 sealed trait EqualKMaterializer[LL <: TListK] {
   def materialize(offset: Int): Delay[Equal, CopK[LL, ?]]

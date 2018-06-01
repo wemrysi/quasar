@@ -20,8 +20,8 @@ import slamdata.Predef._
 
 
 import quasar.contrib.pathy.AFile
-import quasar.contrib.iota.copkTraverse
-import quasar.fp.{coenvPrism, mkInject, :<<:, ACopK}
+import quasar.contrib.iota.{copkTraverse, mkInject}
+import quasar.fp.{coenvPrism, :<<:, ACopK}
 import quasar.qscript._
 import quasar.qscript.rewrites.ShiftRead.FixFreeH
 

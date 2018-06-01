@@ -19,7 +19,7 @@ package quasar.mimir
 import slamdata.Predef._
 
 import quasar.qscript.{MapFuncCore, MapFuncDerived}
-import quasar.fp.mkInject
+import quasar.contrib.iota.mkInject
 
 import matryoshka.{AlgebraM, BirecursiveT, RecursiveT}
 import matryoshka.{AlgebraM, RecursiveT}

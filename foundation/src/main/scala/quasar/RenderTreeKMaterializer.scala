@@ -21,7 +21,7 @@ import iotaz.TListK.:::
 import iotaz.{CopK, TListK, TNilK}
 import matryoshka.Delay
 import scalaz._
-import quasar.fp.mkInject
+import quasar.contrib.iota.mkInject
 
 sealed trait RenderTreeKMaterializer[LL <: TListK] {
   def materialize(offset: Int): Delay[RenderTree, CopK[LL, ?]]

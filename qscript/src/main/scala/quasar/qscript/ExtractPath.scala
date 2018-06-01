@@ -18,8 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 import quasar.fp.ski.κ
-import quasar.contrib.iota.copkTraverse
-import quasar.fp.mkInject
+import quasar.contrib.iota.{copkTraverse, mkInject}
 
 import matryoshka._
 import matryoshka.data._

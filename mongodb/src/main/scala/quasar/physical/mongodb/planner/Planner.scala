@@ -19,7 +19,7 @@ package quasar.physical.mongodb.planner
 import slamdata.Predef._
 import quasar._
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.fp.mkInject
+import quasar.contrib.iota.mkInject
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.physical.mongodb.WorkflowBuilder, WorkflowBuilder._

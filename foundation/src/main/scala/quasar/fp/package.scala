@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 
-import iotaz.{CopK, TListK}
+import iotaz.CopK
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -293,14 +293,6 @@ package object fp
     modify: T[CoEnv[A, F, ?]] => T[CoEnv[A, F, ?]]):
       Free[F, A] => Free[F, A] =
     applyFrom[Free[F, A], T[CoEnv[A, F, ?]]](coenvBijection[T, F, A])(modify)
-
-  def mkInject[F[_], LL <: TListK](i: Int): CopK.Inject[F, CopK[LL, ?]] = {
-    CopK.Inject.injectFromInjectL[F, LL](
-      CopK.InjectL.makeInjectL[F, LL](
-        new TListK.Pos[LL, F] { val index: Int = i }
-      )
-    )
-  }
 
 }
 
