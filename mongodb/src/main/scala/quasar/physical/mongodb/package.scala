@@ -23,6 +23,7 @@ import quasar.javascript.Js
 import quasar.fs.PhysicalError
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
+import quasar.fp.Injectable
 
 import com.mongodb.async.AsyncBatchCursor
 import org.bson.BsonValue

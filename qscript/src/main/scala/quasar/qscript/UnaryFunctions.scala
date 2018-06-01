@@ -18,6 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 
+import quasar.contrib.iota.mkInject
 import matryoshka._
 import matryoshka.patterns._
 import quasar.qscript.RecFreeS.RecOps

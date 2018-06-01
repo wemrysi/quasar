@@ -37,7 +37,8 @@ import quasar.qscript.{
   ReduceIndexF,
   ShiftType,
   SrcHole,
-  Take
+  Take,
+  qScriptReadToQscriptTotal
 }
 import quasar.qscript.MapFuncsCore.{IntLit, RecIntLit}
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU

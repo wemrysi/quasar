@@ -22,6 +22,7 @@ import quasar.contrib.pathy.AFile
 import scalaz.Const
 import iotaz.TListK.:::
 import iotaz.{TNilK, CopK}
+import quasar.fp.Injectable
 
 package object mimir {
   // pessimistically equal to couchbase's

@@ -21,6 +21,7 @@ import quasar.contrib.iota.SubInject
 import quasar.qscript._
 import quasar.contrib.scalaz.MonadError_
 import quasar.contrib.pathy.{ADir, AFile}
+import quasar.fp.Injectable
 
 import scalaz.{Const, NonEmptyList, MonadError}
 

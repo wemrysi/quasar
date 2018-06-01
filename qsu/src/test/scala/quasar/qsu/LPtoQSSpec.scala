@@ -25,7 +25,7 @@ import quasar.fp._
 import quasar.contrib.iota._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.construction
-import quasar.qscript.{ExcludeId, HoleF, OnUndefined, ReduceFuncs, ReduceIndex, RightSideF, ShiftType}
+import quasar.qscript.{ExcludeId, HoleF, OnUndefined, ReduceFuncs, ReduceIndex, RightSideF, ShiftType, qScriptReadToQscriptTotal}
 import quasar.std.{AggLib, IdentityLib}
 import slamdata.Predef._
 import matryoshka._
