@@ -19,7 +19,7 @@
 // was copied from iotaz (because it was private).
 package iotaz.internal
 
-import quasar.qscript.Injectable
+import quasar.fp.Injectable
 import iotaz.CopK
 import scala.reflect.macros.whitebox
 import scalaz._, Scalaz._
@@ -90,7 +90,7 @@ class SubInjectMacros(val c: whitebox.Context) {
     }
 
     q"""
-     _root_.quasar.qscript.Injectable.make[$Inner, $Outer](
+     _root_.quasar.fp.Injectable.make[$Inner, $Outer](
        new $NaturalTransformation[$Inner, $Outer] {
          @java.lang.SuppressWarnings(scala.Array("org.wartremover.warts.Throw"))
          override def apply[$A]($fa: $Inner[$A]): $Outer[$A] = {

@@ -19,7 +19,7 @@ package quasar.contrib.iota
 import scala.language.experimental.macros
 
 import iotaz.CopK
-import quasar.qscript.Injectable
+import quasar.fp.Injectable
 import slamdata.Predef._
 
 object SubInject {
