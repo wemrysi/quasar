@@ -26,7 +26,6 @@ import matryoshka.patterns._
 import monocle.{Lens, PLens}
 import scalaz.{Lens => _, PLens => _, _}, BijectionT._, Kleisli._, Liskov._, Scalaz._
 import shapeless.{Fin, Nat, Sized, Succ}
-import quasar.contrib.iota._
 
 sealed abstract class ListMapInstances {
   implicit def seqW[A](xs: Seq[A]): SeqW[A] = new SeqW(xs)
@@ -228,11 +227,6 @@ package object fp
 
   type ACopK[a] = CopK[_, a]
   type :<<:[F[_], G[a] <: ACopK[a]] = CopK.Inject[F, G]
-
-  implicit def copkFunctor[LL <: TListK](implicit M: FunctorMaterializer[LL]): Functor[CopK[LL, ?]] = M.materialize(offset = 0)
-  implicit def copkTraverse[LL <: TListK](implicit M: TraverseMaterializer[LL]): Traverse[CopK[LL, ?]] = M.materialize(offset = 0)
-  implicit def copkEqual[LL <: TListK](implicit M: EqualKMaterializer[LL]): Delay[Equal, CopK[LL, ?]] = M.materialize(offset = 0)
-  implicit def copkShow[LL <: TListK](implicit M: ShowKMaterializer[LL]): Delay[Show, CopK[LL, ?]] = M.materialize(offset = 0)
 
   implicit def coproductShow[F[_], G[_]](implicit F: Delay[Show, F], G: Delay[Show, G]): Delay[Show, Coproduct[F, G, ?]] =
     Delay.fromNT(λ[Show ~> DelayedFG[F, G]#Show](sh =>
