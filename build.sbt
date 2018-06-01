@@ -711,7 +711,6 @@ lazy val blueeyes = project.setup
 lazy val niflheim = project.setup
   .settings(name := "quasar-niflheim-internal")
   .dependsOn(blueeyes % BothScopes)
-  .scalacArgs("-Ypartial-unification")
   .withWarnings
   .settings(libraryDependencies ++= Dependencies.niflheim)
   .settings(headerLicenseSettings)
@@ -741,7 +740,6 @@ lazy val mimir = project.setup
     yggdrasil % BothScopes,
     core,
     connector)
-  .scalacArgs("-Ypartial-unification")
   .withWarnings
   .settings(libraryDependencies ++= Dependencies.mimir)
   .settings(headerLicenseSettings)

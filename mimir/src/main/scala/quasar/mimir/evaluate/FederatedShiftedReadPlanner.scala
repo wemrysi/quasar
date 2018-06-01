@@ -34,24 +34,22 @@ import quasar.yggdrasil.UnknownSize
 import quasar.yggdrasil.table.Slice
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 
-import delorean._
+import cats.effect.{IO, LiftIO}
 import fs2.{Chunk, Stream}
 import fs2.interop.scalaz._
+import fs2.interop.cats.asyncInstance
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
-    F[_]: Monad: PlannerErrorME: MonadFinalizers[?[_], Task]](
-    val P: Cake,
-    liftTask: Task ~> F) {
+    F[_]: LiftIO: Monad: PlannerErrorME: MonadFinalizers[?[_], IO]](
+    val P: Cake) {
 
-  type Assocs = Associates[T, F, Task]
-  type M[A] = AssociatesT[T, F, Task, A]
+  type Assocs = Associates[T, F, IO]
+  type M[A] = AssociatesT[T, F, IO, A]
 
   val plan: AlgebraM[M, Const[ShiftedRead[AFile], ?], MimirRepr] = {
     case Const(ShiftedRead(file, status)) =>
@@ -90,7 +88,7 @@ final class FederatedShiftedReadPlanner[
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
 
-  private def sourceTable(source: EvalSource[QueryAssociate[T, F, Task]]): F[P.Table] = {
+  private def sourceTable(source: EvalSource[QueryAssociate[T, F, IO]]): F[P.Table] = {
     val queryResult =
       source.src match {
         case QueryAssociate.Lightweight(f) =>
@@ -113,7 +111,7 @@ final class FederatedShiftedReadPlanner[
     queryResult.flatMap(_.fold(handleReadError[P.Table], tableFromStream))
   }
 
-  private def tableFromStream(d: Disposable[Task, Stream[Task, Data]]): F[P.Table] = {
+  private def tableFromStream(d: Disposable[IO, Stream[IO, Data]]): F[P.Table] = {
     val sliceStream =
       d.value
         .onFinalize(d.dispose)
@@ -123,11 +121,11 @@ final class FederatedShiftedReadPlanner[
 
 
     for {
-      d <- liftTask(convert.toStreamT(sliceStream))
+      d <- convert.toStreamT(sliceStream).to[F]
 
-      _ <- MonadFinalizers[F, Task].tell(DList(d.dispose))
+      _ <- MonadFinalizers[F, IO].tell(DList(d.dispose))
 
-      slices = d.value.trans(λ[Task ~> Future](_.unsafeToFuture))
+      slices = d.value
     } yield {
 
       import P.trans._

@@ -22,9 +22,9 @@ import quasar._
 import quasar.api.ResourceError.ReadError
 import quasar.blueeyes.json.{JValue, JUndefined}
 import quasar.connector.QScriptEvaluator
+import quasar.contrib.cats.effect._
 import quasar.contrib.fs2.convert
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz._, readerT._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs.Planner.PlannerErrorME
@@ -36,35 +36,31 @@ import quasar.yggdrasil.table.Slice
 
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 
-import delorean._
+import cats.effect.{IO, LiftIO}
 import fs2.{Chunk, Stream}
 import fs2.interop.scalaz._
+import io.chrisdavenport.scalaz.task._
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._
-import scalaz.std.scalaFuture._
-import scalaz.syntax.applicative._
 import scalaz.syntax.either._
+import scalaz.syntax.monad._
 import scalaz.concurrent.Task
+import shims._
 
 final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: PlannerErrorME: MonadFinalizers[?[_], Task]] private (
-    cake: Cake,
-    liftTask: Task ~> F)
-    extends QScriptEvaluator[T, AssociatesT[T, F, Task, ?], Stream[Task, Data]] {
+    F[_]: LiftIO: Monad: PlannerErrorME: MonadFinalizers[?[_], IO]] private (
+    cake: Cake)
+    extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] {
 
-  type MT[X[_], A] = Kleisli[X, Associates[T, F, Task], A]
+  type MT[X[_], A] = Kleisli[X, Associates[T, F, IO], A]
   type M[A] = MT[F, A]
 
   type QS[U[_[_]]] = mimir.MimirQScriptCP[U]
 
   type Repr = mimir.MimirRepr
-
-  val taskToM: Task ~> M =
-    liftMT[F, MT] compose liftTask
 
   implicit def QSMFromQScriptCoreI: Injectable.Aux[QScriptCore[T, ?], QSM] =
     Injectable.inject[QScriptCore[T, ?], QSM]
@@ -90,29 +86,26 @@ final class MimirQScriptEvaluator[
   def UnicoalesceCap: Unicoalesce.Capture[T, QS[T]] =
     Unicoalesce.Capture[T, QS[T]]
 
-  def execute(repr: Repr): M[ReadError \/ Stream[Task, Data]] = {
-    val slices =
-      repr.table.slices.trans(λ[Future ~> Task](_.toTask))
-
-    MimirQScriptEvaluator.slicesToStream(slices)
+  def execute(repr: Repr): M[ReadError \/ Stream[IO, Data]] =
+    MimirQScriptEvaluator.slicesToStream(repr.table.slices)
       .filter(_ != JUndefined)
       .map(JValue.toData)
       .right[ReadError]
       .point[M]
-  }
 
   def optimize: QSM[T[QSM]] => QSM[T[QSM]] =
     (new Optimize[T]).optimize(reflNT[QSM])
 
   def plan(cp: T[QSM]): M[Repr] = {
     def qScriptCorePlanner =
-      new mimir.QScriptCorePlanner[T, M](taskToM compose runReaderNT[Task, Cake](cake))
+      new mimir.QScriptCorePlanner[T, M](
+        λ[ReaderT[Task, Cake, ?] ~> M](_.run(cake).to[IO].to[F].liftM[MT]))
 
     def equiJoinPlanner =
-      new mimir.EquiJoinPlanner[T, M](taskToM)
+      new mimir.EquiJoinPlanner[T, M](λ[IO ~> M](_.to[F].liftM[MT]))
 
     def shiftedReadPlanner =
-      new FederatedShiftedReadPlanner[T, F](cake, liftTask)
+      new FederatedShiftedReadPlanner[T, F](cake)
 
     lazy val planQST: AlgebraM[M, QScriptTotal[T, ?], Repr] =
       _.run.fold(
@@ -147,11 +140,10 @@ final class MimirQScriptEvaluator[
 object MimirQScriptEvaluator {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Monad: PlannerErrorME: MonadFinalizers[?[_], Task]](
-      cake: Cake,
-      liftTask: Task ~> F)
-      : QScriptEvaluator[T, AssociatesT[T, F, Task, ?], Stream[Task, Data]] =
-    new MimirQScriptEvaluator[T, F](cake, liftTask)
+      F[_]: LiftIO: Monad: PlannerErrorME: MonadFinalizers[?[_], IO]](
+      cake: Cake)
+      : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] =
+    new MimirQScriptEvaluator[T, F](cake)
 
   def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, JValue] =
     convert.fromChunkedStreamT(slices.map(s => Chunk.indexedSeq(SliceIndexedSeq(s))))

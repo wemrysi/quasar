@@ -19,6 +19,7 @@ package quasar.mimir.evaluate
 import slamdata.Predef.Option
 import quasar.{Data, RenderTreeT}
 import quasar.api.ResourceError.ReadError
+import quasar.contrib.cats.effect.liftio._
 import quasar.contrib.pathy.AFile
 import quasar.evaluate.{FederatedQuery, QueryFederation, Source}
 import quasar.fp.liftMT
@@ -26,33 +27,34 @@ import quasar.fs.Planner.PlannerErrorME
 import quasar.higher.HFunctor
 import quasar.mimir._, MimirCake._
 
+import cats.effect.{IO, LiftIO}
 import fs2.Stream
 import fs2.interop.scalaz._
+import fs2.interop.cats.reverse._
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.{~>, \/, DList, Monad, WriterT}
-import scalaz.concurrent.Task
+import scalaz.{\/, DList, Monad, WriterT}
 import scalaz.std.tuple._
 import scalaz.syntax.traverse._
+import shims._
 
 final class MimirQueryFederation[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: PlannerErrorME] private (
-    P: Cake,
-    liftTask: Task ~> F)
-    extends QueryFederation[T, F, QueryAssociate[T, F, Task], Stream[Task, Data]] {
+    F[_]: LiftIO: Monad: PlannerErrorME] private (
+    P: Cake)
+    extends QueryFederation[T, F, QueryAssociate[T, F, IO], Stream[IO, Data]] {
 
-  type FinalizersT[X[_], A] = WriterT[X, Finalizers[Task], A]
+  type FinalizersT[X[_], A] = WriterT[X, Finalizers[IO], A]
 
   private val qscriptEvaluator =
-    MimirQScriptEvaluator[T, WriterT[F, Finalizers[Task], ?]](P, liftMT[F, FinalizersT] compose liftTask)
+    MimirQScriptEvaluator[T, WriterT[F, Finalizers[IO], ?]](P)
 
-  def evaluateFederated(q: FederatedQuery[T, QueryAssociate[T, F, Task]]): F[ReadError \/ Stream[Task, Data]] = {
-    val finalize: ((DList[Task[Unit]], Stream[Task, Data])) => Stream[Task, Data] = {
+  def evaluateFederated(q: FederatedQuery[T, QueryAssociate[T, F, IO]]): F[ReadError \/ Stream[IO, Data]] = {
+    val finalize: ((DList[IO[Unit]], Stream[IO, Data])) => Stream[IO, Data] = {
       case (fs, s) => fs.foldLeft(s)(_ onFinalize _)
     }
 
-    val srcs: AFile => Option[Source[QueryAssociate[T, FinalizersT[F, ?], Task]]] =
-      q.sources.andThen(_.map(_.map(HFunctor[QueryAssociate[T, ?[_], Task]].hmap(_)(liftMT[F, FinalizersT]))))
+    val srcs: AFile => Option[Source[QueryAssociate[T, FinalizersT[F, ?], IO]]] =
+      q.sources.andThen(_.map(_.map(HFunctor[QueryAssociate[T, ?[_], IO]].hmap(_)(liftMT[F, FinalizersT]))))
 
     qscriptEvaluator
       .evaluate(q.query)
@@ -65,9 +67,8 @@ final class MimirQueryFederation[
 object MimirQueryFederation {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Monad: PlannerErrorME](
-      P: Cake,
-      liftTask: Task ~> F)
-      : QueryFederation[T, F, QueryAssociate[T, F, Task], Stream[Task, Data]] =
-    new MimirQueryFederation[T, F](P, liftTask)
+      F[_]: LiftIO: Monad: PlannerErrorME](
+      P: Cake)
+      : QueryFederation[T, F, QueryAssociate[T, F, IO], Stream[IO, Data]] =
+    new MimirQueryFederation[T, F](P)
 }

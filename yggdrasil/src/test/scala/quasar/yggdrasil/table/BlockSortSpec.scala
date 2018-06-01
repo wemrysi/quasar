@@ -19,9 +19,7 @@ package table
 
 import quasar.blueeyes._, json._
 import quasar.precog.common._
-import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
-// import org.scalacheck._, Gen._, Arbitrary._
 import SampleData._
 import TableModule._
 
@@ -32,7 +30,7 @@ import PrecogJValueOrder._
 
 trait BlockSortSpec extends SpecificationLike with ScalaCheck {
   def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
-    val module = BlockStoreTestModule.empty[Need]
+    val module = BlockStoreTestModule.empty
 
     val jvalueOrdering = scalaz.Order[JValue].toScalaOrdering
     val desiredJValueOrder = if (sortOrder.isAscending) jvalueOrdering else jvalueOrdering.reverse
@@ -62,7 +60,7 @@ trait BlockSortSpec extends SpecificationLike with ScalaCheck {
       json <- sorted.toJson
     } yield (json, sorted)
 
-    val (result, resultTable) = resultM.copoint
+    val (result, resultTable) = resultM.unsafeRunSync
 
     result.toList.map(_.toJValue) must_== sorted
 

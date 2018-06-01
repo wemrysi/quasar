@@ -24,9 +24,11 @@ import quasar.build.BuildInfo
 import quasar.common.PhaseResults
 import quasar.compile.{queryPlan, SemanticErrors}
 import quasar.contrib.argonaut._
+import quasar.contrib.cats.effect.liftio._
 import quasar.contrib.fs2.convert
 import quasar.contrib.fs2.stream._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.MonadError_
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
 import quasar.evaluate.FederatingQueryEvaluator
@@ -50,10 +52,13 @@ import java.nio.file.{Files, Path => JPath, Paths}
 import java.text.ParseException
 
 import argonaut._, Argonaut._
-import delorean._
+import cats.effect.IO
 import eu.timepit.refined.auto._
 import fs2.{concurrent, io, text, Stream}
-import fs2.interop.scalaz._
+import fs2.interop.scalaz.{asyncInstance => taskAsyncInstance, _}
+import fs2.interop.scalaz.reverse.naturalTransformationToUf1
+import fs2.interop.cats._
+import _root_.io.chrisdavenport.scalaz.task._
 import matryoshka._
 import matryoshka.implicits._
 import matryoshka.data.Fix
@@ -67,6 +72,9 @@ final class Sql2QueryRegressionSpec extends Qspec {
   import Sql2QueryRegressionSpec._
 
   type M[A] = EitherT[EitherT[StateT[WriterT[Task, PhaseResults, ?], Long, ?], SemanticErrors, ?], PlannerError, A]
+
+  implicit val ioMonadError: MonadError_[IO, Throwable] =
+    MonadError_.monadErrorNoMonad(shims.monadErrorToScalaz[IO, Throwable])
 
   val taskToM: Task ~> M =
     λ[Task ~> M](
@@ -82,20 +90,20 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
       cake <- Precog(tmpDir)
 
-      local = LocalDataSource[Task, Task](jPath(TestDataRoot), 8192)
+      local = LocalDataSource[Task, IO](jPath(TestDataRoot), 8192)
 
-      localM = HFunctor[QueryEvaluator[?[_], Stream[Task, ?], ResourcePath, Stream[Task, Data]]].hmap(local)(taskToM)
+      localM = HFunctor[QueryEvaluator[?[_], Stream[IO, ?], ResourcePath, Stream[IO, Data]]].hmap(local)(taskToM)
 
       sdown =
-        cake.shutdown.toTask
+        cake.shutdown.to[Task]
           .onFinish(_ => Task.delay(tmpDir.deleteOnExit()))
           .onFinish(_ => local.shutdown)
 
-      mimirFederation = MimirQueryFederation[Fix, M](cake, taskToM)
+      mimirFederation = MimirQueryFederation[Fix, M](cake)
 
-      disposed = (rp: ResourcePath) => localM.evaluate(rp).map(_.map(_.point[Disposable[Task, ?]]))
-      qassoc = QueryAssociate.lightweight[Fix, M, Task](disposed)
-      discovery = (localM : ResourceDiscovery[M, Stream[Task, ?]])
+      disposed = (rp: ResourcePath) => localM.evaluate(rp).map(_.map(_.point[Disposable[IO, ?]]))
+      qassoc = QueryAssociate.lightweight[Fix, M, IO](disposed)
+      discovery = (localM : ResourceDiscovery[M, Stream[IO, ?]])
 
       federated = FederatingQueryEvaluator(
         mimirFederation,
@@ -109,11 +117,14 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   /** Return the results of evaluating the given query as a stream. */
   def queryResults(
-      f: Fix[QScriptEducated[Fix, ?]] => M[ReadError \/ Stream[Task, Data]])(
+      f: Fix[QScriptEducated[Fix, ?]] => M[ReadError \/ Stream[IO, Data]])(
       expr: Fix[Sql],
       vars: Variables,
       basePath: ADir)
       : Stream[Task, Data] = {
+
+    val ioToTask =
+      naturalTransformationToUf1(λ[IO ~> Task](_.to[Task]))
 
     def failS(msg: String): Stream[Task, Data] =
       Stream.fail(new RuntimeException(msg))
@@ -130,7 +141,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
         qs <- LPtoQS[Fix].apply[M](dataPaths)
 
         r  <- f(qs)
-      } yield r.valueOr(e => failS(e.shows))
+      } yield r.fold(e => failS(e.shows), _.translate(ioToTask))
 
     Stream.force(
       results
