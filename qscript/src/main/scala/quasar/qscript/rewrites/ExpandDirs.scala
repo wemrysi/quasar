@@ -20,6 +20,7 @@ import slamdata.Predef.{Map => _, _}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs.Planner.{NoFilesFound, PlannerErrorME}
 import quasar.qscript._

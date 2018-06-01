@@ -23,6 +23,7 @@ import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript.{
   construction,
   Hole,

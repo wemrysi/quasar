@@ -19,7 +19,7 @@ package quasar.qscript.rewrites
 import quasar.{Qspec, TreeMatchers, Type}
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
-import quasar.fp.{copkEqual, copkTraverse}
+import quasar.contrib.iota.{copkEqual, copkTraverse}
 import quasar.qscript.{construction, Hole, TTypes}
 
 import matryoshka._

@@ -19,6 +19,7 @@ package quasar.qscript
 import quasar.contrib.pathy._
 import quasar.ejson, ejson.{EJson, Fixed}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.contrib.iota.SubInject
 
 import iotaz.{TNilK,CopK}

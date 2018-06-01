@@ -19,6 +19,7 @@ package quasar.qscript
 import slamdata.Predef._
 import quasar.contrib.matryoshka.transHyloM
 import quasar.fp._
+import quasar.contrib.iota._
 
 import matryoshka._
 import matryoshka.data._

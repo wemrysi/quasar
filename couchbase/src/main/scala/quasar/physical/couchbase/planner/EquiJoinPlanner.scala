@@ -18,11 +18,12 @@ package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
 import quasar.effect.NameGenerator
-import quasar.fs.Planner.{PlannerErrorME}
+import quasar.fs.Planner.PlannerErrorME
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.fp.ski.κ
-import quasar.fp.{copkTraverse, :<<:, ACopK}
+import quasar.contrib.iota.copkTraverse
+import quasar.fp.{:<<:, ACopK}
 import quasar.physical.couchbase._,
   common.{ContextReader, DocTypeValue},
   N1QL.{Eq, Unreferenced, _},

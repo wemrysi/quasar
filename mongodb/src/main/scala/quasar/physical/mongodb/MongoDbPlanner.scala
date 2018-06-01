@@ -20,6 +20,7 @@ import quasar._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultTell}
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fs.{FileSystemError, MonadFsErr, Planner => _}
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.expression._

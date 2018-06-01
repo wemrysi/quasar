@@ -26,6 +26,7 @@ import quasar.contrib.cats.effect._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._

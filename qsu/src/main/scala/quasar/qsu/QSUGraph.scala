@@ -21,6 +21,7 @@ import quasar.effect.NameGenerator
 import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.qscript.{FreeMapA, IdStatus, OnUndefined, RecFreeMap}
 

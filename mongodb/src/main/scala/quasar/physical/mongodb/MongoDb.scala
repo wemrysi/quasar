@@ -24,6 +24,7 @@ import quasar.contrib.scalaz.MonadReader_
 import quasar.contrib.pathy._
 import quasar.effect.{Kvs, MonoSeq}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.numeric._
 import quasar.fp.ski.κ
 import quasar.fs._

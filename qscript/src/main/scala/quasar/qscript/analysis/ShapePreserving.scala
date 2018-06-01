@@ -19,6 +19,7 @@ package quasar.qscript.analysis
 import slamdata.Predef.{Map => _, _}
 
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.qscript._
 

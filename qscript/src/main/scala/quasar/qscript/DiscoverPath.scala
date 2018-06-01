@@ -21,6 +21,7 @@ import quasar.fs.Planner.NoFilesFound
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.qscript.MapFuncsCore._

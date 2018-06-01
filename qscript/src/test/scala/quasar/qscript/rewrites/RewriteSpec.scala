@@ -23,6 +23,7 @@ import quasar.contrib.pathy.{ADir, AFile}
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.contrib.iota.SubInject
 import quasar.qscript._
 

@@ -20,7 +20,8 @@ import slamdata.Predef.{Boolean, List, Option, Stream}
 import quasar.api._, ResourceError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
-import quasar.fp.{PrismNT, copkTraverse}
+import quasar.fp.PrismNT
+import quasar.contrib.iota.copkTraverse
 import quasar.qscript.{Read => QRead, _}
 
 import matryoshka._

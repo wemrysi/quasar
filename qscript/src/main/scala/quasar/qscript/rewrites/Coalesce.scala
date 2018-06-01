@@ -22,6 +22,7 @@ import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.qscript._
 import quasar.qscript.RecFreeS._

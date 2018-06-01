@@ -28,6 +28,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.contrib.scalaz.concurrent.shift
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.frontend.logicalplan.LogicalPlan

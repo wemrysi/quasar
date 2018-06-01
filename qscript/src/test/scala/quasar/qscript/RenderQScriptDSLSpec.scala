@@ -19,6 +19,7 @@ package quasar.qscript
 import slamdata.Predef.{Eq => _, _}
 import quasar.Type
 import quasar.fp._
+import quasar.contrib.iota._
 import matryoshka.Delay
 import matryoshka.data.{Fix, freeEqual, freeShow}
 import matryoshka.{delayEqual, delayShow}
@@ -51,7 +52,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       |import quasar.time.TemporalPart
       |import quasar.qscript._
       |import quasar.ejson.{EJson, Fixed}
-      |import quasar.fp.{copkEqual, copkTraverse}
+      |import quasar.contrib.iota.{copkEqual, copkTraverse}
       |import pathy.Path._
       |import quasar.contrib.pathy._
       |import matryoshka.data.Fix

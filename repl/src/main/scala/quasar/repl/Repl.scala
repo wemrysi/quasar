@@ -29,6 +29,7 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fp._, ski._, numeric.widenPositive
+import quasar.contrib.iota._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.module.resolveImports

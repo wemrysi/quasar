@@ -18,7 +18,7 @@ package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
 import quasar.fp.ski._
-import quasar.fp.copkTraverse
+import quasar.contrib.iota.copkTraverse
 import quasar.physical.mongodb.Bson
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._

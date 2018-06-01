@@ -24,6 +24,7 @@ import quasar.{Data, DSLTree, RenderDSL, Type, ejson}
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.ejson.EJson
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 
 import scalaz.{Const, Free, Functor}

@@ -21,10 +21,11 @@ import quasar.{Qspec, TreeMatchers}
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript.{construction, Hole, ExcludeId, OnUndefined, SrcHole}
 import quasar.qsu.{QScriptUniform => QSU}
 import slamdata.Predef.{Map => _, _}
-import quasar.fp.{copkEqual, copkTraverse}
+import quasar.contrib.iota.{copkEqual, copkTraverse}
 
 import matryoshka._
 import matryoshka.data._

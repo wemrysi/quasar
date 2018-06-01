@@ -22,6 +22,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.physical.mongodb.planner.common._

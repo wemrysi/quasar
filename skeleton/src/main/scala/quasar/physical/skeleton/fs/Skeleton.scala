@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.connector._
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._

@@ -21,6 +21,7 @@ import quasar.contrib.pathy.ADir
 import quasar.contrib.iota.SubInject
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript.MapFuncsCore._
 import quasar.qscript._
 

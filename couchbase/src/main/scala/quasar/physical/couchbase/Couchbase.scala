@@ -25,6 +25,7 @@ import quasar.contrib.scalaz._, eitherT._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
 import quasar.fp._, numeric._
+import quasar.contrib.iota._
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount._, BackendDef.DefErrT
 import quasar.physical.couchbase.common._

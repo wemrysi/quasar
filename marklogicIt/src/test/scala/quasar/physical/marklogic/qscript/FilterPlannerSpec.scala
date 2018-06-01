@@ -22,7 +22,8 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.catchable._
 import quasar.effect._
 import quasar.ejson.EJson
-import quasar.fp.{reflNT, copkTraverse}
+import quasar.fp.reflNT
+import quasar.contrib.iota.copkTraverse
 import quasar.fp.free._
 import quasar.physical.marklogic._
 import quasar.physical.marklogic.cts._

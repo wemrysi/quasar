@@ -20,7 +20,8 @@ import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers}
 import quasar.api._, ResourceError._
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.fp.{copkTraverse, copkEqual, constEqual}
+import quasar.contrib.iota.{copkTraverse, copkEqual}
+import quasar.fp.constEqual
 import quasar.qscript._
 
 import matryoshka._

@@ -19,7 +19,7 @@ package quasar.physical.couchbase
 import slamdata.Predef._
 import quasar.{Data => QData, TestConfig, Type => QType}
 import quasar.contrib.scalaz.eitherT._
-import quasar.fp.copkTraverse
+import quasar.contrib.iota.copkTraverse
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
 import quasar.fs.FileSystemError

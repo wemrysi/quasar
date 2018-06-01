@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
-import quasar.fp.{copkTraverse, copkFunctor}
+import quasar.contrib.iota.{copkTraverse, copkFunctor}
 import quasar.contrib.iota.SubInject
 import quasar.fp.ski.κ
 import quasar.qscript._

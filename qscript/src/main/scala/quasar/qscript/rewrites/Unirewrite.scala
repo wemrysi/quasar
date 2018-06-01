@@ -18,6 +18,7 @@ package quasar.qscript.rewrites
 
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript._
 

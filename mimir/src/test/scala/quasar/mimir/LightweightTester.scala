@@ -22,6 +22,7 @@ import quasar.common.PhaseResult
 import quasar.connector.{BackendModule, DefaultAnalyzeModule}
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.numeric._
 import quasar.fp.ski.ι
 import quasar.fs._

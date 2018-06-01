@@ -19,6 +19,7 @@ package quasar.qscript.rewrites
 import slamdata.Predef.{Map => _, _}
 import quasar.contrib.matryoshka._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript._
 
 import matryoshka._

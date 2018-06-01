@@ -30,6 +30,7 @@ import quasar.effect._
 import quasar.effect.uuid.UuidReader
 import quasar.ejson.EJson
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.fs.impl.{dataStreamRead, dataStreamClose}

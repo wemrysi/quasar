@@ -20,6 +20,7 @@ import quasar.common.SortDir
 import quasar.contrib.pathy._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.physical.mongodb._
 import quasar.qscript._
 import quasar.{Qspec, TreeMatchers, Type}

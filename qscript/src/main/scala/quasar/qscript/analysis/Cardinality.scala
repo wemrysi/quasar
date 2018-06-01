@@ -20,6 +20,7 @@ import slamdata.Predef.{Map => _, _}
 
 import quasar.contrib.pathy.APath
 import quasar.fp._, ski._
+import quasar.contrib.iota._
 import quasar.qscript._
 
 import matryoshka.{Hole => _, _}

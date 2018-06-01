@@ -24,6 +24,7 @@ import quasar.contrib.scalaz.zipper._
 import quasar.ejson
 import quasar.ejson.{EJson, ExtEJson, CommonEJson, Extension}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.tpe.CompositeType

@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.scalacheck.gen
 import quasar.fp.ski.κ
-import quasar.fp.copkTraverse
+import quasar.contrib.iota.copkTraverse
 import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
 import quasar.precog.common.RValue
 import quasar.qscript._

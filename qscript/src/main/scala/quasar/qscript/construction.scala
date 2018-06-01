@@ -21,7 +21,7 @@ import quasar.common.{JoinType, SortDir}
 import quasar.{ejson, qscript}
 import quasar.ejson.EJson
 import quasar.time.TemporalPart
-import quasar.fp.copkTraverse
+import quasar.contrib.iota.copkTraverse
 
 import matryoshka._
 import matryoshka.data.Fix

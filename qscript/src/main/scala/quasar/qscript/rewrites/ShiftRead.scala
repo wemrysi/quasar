@@ -18,6 +18,7 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript._
 import quasar.qscript.MapFuncsCore._
 
