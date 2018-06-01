@@ -28,13 +28,24 @@ sealed trait EqualKMaterializer[LL <: TListK] {
 
 object EqualKMaterializer {
 
-  implicit def base: EqualKMaterializer[TNilK] = new EqualKMaterializer[TNilK] {
-    override def materialize(offset: Int): Delay[Equal, CopK[TNilK, ?]] = {
-      Delay.fromNT(λ[Equal ~> λ[a => Equal[CopK[TNilK, a]]]] { _ =>
-        Equal equal ((_, _) => false)
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  implicit def base[F[_]](
+    implicit
+    F: Delay[Equal, F]
+  ): EqualKMaterializer[F ::: TNilK] = new EqualKMaterializer[F ::: TNilK] {
+    override def materialize(offset: Int): Delay[Equal, CopK[F ::: TNilK, ?]] = {
+      val I = mkInject[F, F ::: TNilK](offset)
+      Delay.fromNT(new (Equal ~> λ[a => Equal[CopK[F ::: TNilK, a]]]) {
+        override def apply[A](eq: Equal[A]): Equal[CopK[F ::: TNilK, A]] = {
+          Equal equal {
+            case (I(left), I(right)) => F(eq).equal(left, right)
+            case _ => false
+          }
+        }
       })
     }
   }
+
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   implicit def induct[F[_], LL <: TListK](

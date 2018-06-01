@@ -43,9 +43,19 @@ object MapFuncPlanner {
   }
   
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[M[_], FMT]: Materializer[M, FMT, TNilK] = new Materializer[M, FMT, TNilK] {
-      override def materialize(offset: Int): MapFuncPlanner[M, FMT, CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[M[_], FMT, F[_]](
+      implicit
+      F: MapFuncPlanner[M, FMT, F]
+    ): Materializer[M, FMT, F ::: TNilK] = new Materializer[M, FMT, F ::: TNilK] {
+      override def materialize(offset: Int): MapFuncPlanner[M, FMT, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new MapFuncPlanner[M, FMT, CopK[F ::: TNilK, ?]] {
+          def plan: AlgebraM[M, CopK[F ::: TNilK, ?], XQuery] = {
+            case I(fa) => F.plan(fa)
+          }
+        }
+      }
     }
   
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

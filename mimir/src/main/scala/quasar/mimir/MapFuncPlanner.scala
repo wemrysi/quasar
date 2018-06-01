@@ -51,9 +51,27 @@ object MapFuncPlanner {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]], G[_]]: Materializer[T, G, TNilK] = new Materializer[T, G, TNilK] {
-      override def materialize(offset: Int): MapFuncPlanner[T, G, CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], G[_]: Applicative, F[_]](
+      implicit
+      F: MapFuncPlanner[T, G, F]
+    ): Materializer[T, G, F ::: TNilK] = new Materializer[T, G, F ::: TNilK] {
+      override def materialize(offset: Int): MapFuncPlanner[T, G, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new MapFuncPlanner[T, G, CopK[F ::: TNilK, ?]] {
+          def plan(cake: Precog): PlanApplicator[cake.type] =
+            new PlanApplicatorCopK(cake)
+
+          final class PlanApplicatorCopK[P <: Precog](override val cake: P)
+            extends PlanApplicator[P](cake) {
+            import cake.trans._
+
+            def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[G, CopK[F ::: TNilK, ?], TransSpec[A]] = {
+              case I(fa) => F.plan(cake).apply(id)(fa)
+            }
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

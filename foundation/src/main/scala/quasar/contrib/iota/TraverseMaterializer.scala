@@ -27,9 +27,21 @@ sealed trait TraverseMaterializer[LL <: TListK] {
 
 object TraverseMaterializer {
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  implicit val base: TraverseMaterializer[TNilK] = new TraverseMaterializer[TNilK] {
-    override def materialize(offset: Int): Traverse[CopK[TNilK, ?]] = ???
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  implicit def base[F[_]](
+    implicit F: Traverse[F]
+  ): TraverseMaterializer[F ::: TNilK] = new TraverseMaterializer[F ::: TNilK] {
+    override def materialize(offset: Int): Traverse[CopK[F ::: TNilK, ?]] = {
+      val I = mkInject[F, F ::: TNilK](offset)
+
+      new Traverse[CopK[F ::: TNilK, ?]] {
+        override def traverseImpl[G[_], A, B](cfa: CopK[F ::: TNilK, A])(f: A => G[B])(implicit A: Applicative[G]): G[CopK[F ::: TNilK, B]] = {
+          cfa match {
+            case I(fa) => A.map(F.traverse(fa)(f))(I(_))
+          }
+        }
+      }
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

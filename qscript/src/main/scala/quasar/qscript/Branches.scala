@@ -48,9 +48,25 @@ object Branches {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]]]: Materializer[T, TNilK] = new Materializer[T, TNilK] {
-      override def materialize(offset: Int): Branches[T, CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_]](
+      implicit
+      F: Branches[T, F]
+    ): Materializer[T, F ::: TNilK] = new Materializer[T, F ::: TNilK] {
+      override def materialize(offset: Int): Branches[T, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Branches[T, CopK[F ::: TNilK, ?]] {
+          override def branches[A]: Traversal[CopK[F ::: TNilK, A], FreeQS[T]] = {
+            new Traversal[CopK[F ::: TNilK, A], FreeQS[T]] {
+              override def modifyF[G[_]: Applicative](f: FreeQS[T] => G[FreeQS[T]])(s: CopK[F ::: TNilK, A]): G[CopK[F ::: TNilK, A]] = {
+                s match {
+                  case I(fa) => F.branches.modifyF(f)(fa).map(I(_))
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

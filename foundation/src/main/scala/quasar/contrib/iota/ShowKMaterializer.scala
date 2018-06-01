@@ -28,9 +28,21 @@ sealed trait ShowKMaterializer[LL <: TListK] {
 
 object ShowKMaterializer {
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  implicit val base: ShowKMaterializer[TNilK] = new ShowKMaterializer[TNilK] {
-    override def materialize(offset: Int): Delay[Show, CopK[TNilK, ?]] = ???
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  implicit def base[F[_]](
+    implicit
+    F: Delay[Show, F]
+  ): ShowKMaterializer[F ::: TNilK] = new ShowKMaterializer[F ::: TNilK] {
+    override def materialize(offset: Int): Delay[Show, CopK[F ::: TNilK, ?]] = {
+      val I = mkInject[F, F ::: TNilK](offset)
+      Delay.fromNT(new (Show ~> λ[a => Show[CopK[F ::: TNilK, a]]]) {
+        override def apply[A](sh: Show[A]): Show[CopK[F ::: TNilK, A]] = {
+          Show show {
+            case I(fa) => F(sh).show(fa)
+          }
+        }
+      })
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

@@ -125,9 +125,19 @@ object Cardinality {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
-      override def materialize(offset: Int): Cardinality[CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: Cardinality[F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int): Cardinality[CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Cardinality[CopK[F ::: TNilK, ?]] {
+          override def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, CopK[F ::: TNilK, ?], Int] = {
+            case I(fa) => F.calculate(pathCard).apply(fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

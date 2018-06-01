@@ -576,9 +576,19 @@ object JsFuncHandler {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
-      override def materialize(offset: Int): JsFuncHandler[CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: JsFuncHandler[F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int): JsFuncHandler[CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new JsFuncHandler[CopK[F ::: TNilK, ?]] {
+          def handle[M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, CopK[F ::: TNilK, ?], JsCore] = {
+            case I(fa) => F.handle[M].apply(fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

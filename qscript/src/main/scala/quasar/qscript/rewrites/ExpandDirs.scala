@@ -106,9 +106,22 @@ abstract class ExpandDirsInstances {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]], H[_]]: Materializer[T, TNilK, H] = new Materializer[T, TNilK, H] {
-      override def materialize(offset: Int): ExpandDirs.Aux[T, CopK[TNilK, ?], H] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], G[_], H[_]](
+      implicit
+      G: ExpandDirs.Aux[T, G, H]
+    ): Materializer[T, G ::: TNilK, H] = new Materializer[T, G ::: TNilK, H] {
+      override def materialize(offset: Int): ExpandDirs.Aux[T, CopK[G ::: TNilK, ?], H] = {
+        val I = mkInject[G, G ::: TNilK](offset)
+        new ExpandDirs[CopK[G ::: TNilK, ?]] {
+          type IT[F[_]] = T[F]
+          type OUT[A] = H[A]
+
+          def expandDirs[M[_]: Monad: PlannerErrorME, F[_]: Functor](OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) = {
+            case I(fa) => G.expandDirs(OutToF, g).apply(fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -127,7 +140,6 @@ abstract class ExpandDirsInstances {
             case I(fa) => G.expandDirs(OutToF, g).apply(fa)
             case other => LL.materialize(offset + 1).expandDirs(OutToF, g).apply(other.asInstanceOf[CopK[LL, T[F]]])
           }
-
         }
       }
     }

@@ -510,9 +510,43 @@ object FuncHandler {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
-      override def materialize(offset: Int): FuncHandler[CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: FuncHandler[F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int): FuncHandler[CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new FuncHandler[CopK[F ::: TNilK, ?]] {
+          def handleOpsCore[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+          (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX)
+          : AlgebraM[M, CopK[F ::: TNilK, ?], Fix[EX]] = {
+            case I(fa) => F.handleOpsCore[EX, M](v).apply(fa)
+          }
+
+          def handleOps3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+          (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, CopK[F ::: TNilK, ?], Fix[EX]] = {
+            case I(fa) => F.handleOps3_4[EX, M](v).apply(fa)
+          }
+
+          def handleOps3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+          (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, CopK[F ::: TNilK, ?], Fix[EX]] = {
+            case I(fa) => F.handleOps3_4_4[EX, M](v).apply(fa)
+          }
+
+          def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+          (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, CopK[F ::: TNilK, ?], Fix[EX]] = {
+            case I(fa) => F.handleOps3_6[EX, M](v).apply(fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

@@ -80,9 +80,19 @@ object RenderQScriptDSL {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
-      override def materialize(offset: Int): Delay[RenderQScriptDSL, CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: Delay[RenderQScriptDSL, F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int): Delay[RenderQScriptDSL, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Delay[RenderQScriptDSL, CopK[F ::: TNilK, ?]] {
+          override def apply[A](rec: RenderQScriptDSL[A]): RenderQScriptDSL[CopK[F ::: TNilK, A]] = {
+            case (base, I(fa)) => F(rec)(base, fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -325,8 +335,7 @@ object RenderQScriptDSL {
       Materializer.induct(shiftedReadFileRenderDelay,
       Materializer.induct(readDirRenderDelay,
       Materializer.induct(readFileRenderDelay,
-      Materializer.induct(deadEndRenderDelay,
-      Materializer.base))))))))))
+      Materializer.base  (deadEndRenderDelay))))))))))
   }
 
   def freeQSRender[T[_[_]]: RecursiveT]: RenderQScriptDSL[FreeQS[T]] =

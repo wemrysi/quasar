@@ -120,9 +120,19 @@ sealed abstract class DeepShapeInstances {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]]]: Materializer[T, TNilK] = new Materializer[T, TNilK] {
-      override def materialize(offset: Int): DeepShape[T, CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_]](
+      implicit
+      F: DeepShape[T, F]
+    ): Materializer[T, F ::: TNilK] = new Materializer[T, F ::: TNilK] {
+      override def materialize(offset: Int): DeepShape[T, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new DeepShape[T, CopK[F ::: TNilK, ?]] {
+          override def deepShapeƒ: Algebra[CopK[F ::: TNilK, ?], FreeShape[T]] = {
+            case I(fa) => F.deepShapeƒ(fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

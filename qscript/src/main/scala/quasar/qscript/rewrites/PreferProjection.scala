@@ -145,9 +145,23 @@ sealed abstract class PreferProjectionInstances {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T, B[_]]: Materializer[T, B, TNilK] = new Materializer[T, B, TNilK] {
-      override def materialize(offset: Int): PreferProjection[CopK[TNilK, ?], T, B] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T, B[_], F[_]](
+      implicit
+      F: PreferProjection[F, T, B]
+    ): Materializer[T, B, F ::: TNilK] = new Materializer[T, B, F ::: TNilK] {
+      override def materialize(offset: Int): PreferProjection[CopK[F ::: TNilK, ?], T, B] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new PreferProjection[CopK[F ::: TNilK, ?], T, B] {
+          type C[A] = CopK[F ::: TNilK, A]
+          type D[A] = CopK[TNilK, A]
+
+          def preferProjectionƒ(BtoC: PrismNT[B, C]): C[(Outline.Shape, T)] => B[T] = {
+            case I(fa) => F.preferProjectionƒ(BtoC andThen PrismNT.injectCopK[F, C](I))(fa)
+          }
+
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

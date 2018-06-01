@@ -111,11 +111,24 @@ sealed abstract class ShiftReadDirInstances extends ShiftReadDirInstances0 {
   }
   
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]], M[_]]: Materializer[T, TNilK, M] = new Materializer[T, TNilK, M] {
-      override def materialize(offset: Int): ShiftReadDir.Aux[T, CopK[TNilK, ?], M] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_], M[_]](
+      implicit
+      F: ShiftReadDir.Aux[T, F, M]
+    ): Materializer[T, F ::: TNilK, M] = new Materializer[T, F ::: TNilK, M] {
+      override def materialize(offset: Int): ShiftReadDir.Aux[T, CopK[F ::: TNilK, ?], M] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new ShiftReadDir[CopK[F ::: TNilK, ?]] {
+          type G[A] = M[A]
+          def shiftReadDir[H[_]](GtoH: G ~> H) = new (CopK[F ::: TNilK, ?] ~> FixFreeH[H, ?]) {
+            override def apply[A](cfa: CopK[F ::: TNilK, A]): FixFreeH[H, A] = cfa match {
+              case I(fa) => F.shiftReadDir(GtoH)(fa)
+            }
+          }
+        }
+      }
     }
-  
+
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     implicit def induct[T[_[_]], F[_], LL <: TListK, M[_]](
       implicit

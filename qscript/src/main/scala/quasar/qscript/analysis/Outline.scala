@@ -160,10 +160,21 @@ sealed abstract class OutlineInstances {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
-      override def materialize(offset: Int): Outline[CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: Outline[F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int): Outline[CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Outline[CopK[F ::: TNilK, ?]] {
+          override def outlineƒ: Algebra[CopK[F ::: TNilK, ?], Shape] = {
+            case I(fa) => F.outlineƒ(fa)
+          }
+        }
+      }
     }
+
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     implicit def induct[F[_], LL <: TListK](

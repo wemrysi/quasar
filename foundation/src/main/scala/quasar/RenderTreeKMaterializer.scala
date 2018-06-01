@@ -29,9 +29,21 @@ sealed trait RenderTreeKMaterializer[LL <: TListK] {
 
 object RenderTreeKMaterializer {
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  implicit val base: RenderTreeKMaterializer[TNilK] = new RenderTreeKMaterializer[TNilK] {
-    override def materialize(offset: Int): Delay[RenderTree, CopK[TNilK, ?]] = ???
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  implicit def base[F[_]](
+    implicit
+    F: Delay[RenderTree, F]
+  ): RenderTreeKMaterializer[F ::: TNilK] = new RenderTreeKMaterializer[F ::: TNilK] {
+    override def materialize(offset: Int): Delay[RenderTree, CopK[F ::: TNilK, ?]] = {
+      val I = mkInject[F, F ::: TNilK](offset)
+      Delay.fromNT(new (RenderTree ~> λ[a => RenderTree[CopK[F ::: TNilK, a]]]) {
+        override def apply[A](rt: RenderTree[A]): RenderTree[CopK[F ::: TNilK, A]] = {
+          RenderTree make {
+            case I(fa) => F(rt).render(fa)
+          }
+        }
+      })
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

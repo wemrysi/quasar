@@ -27,10 +27,23 @@ sealed trait FunctorMaterializer[LL <: TListK] {
 
 object FunctorMaterializer {
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  implicit val base: FunctorMaterializer[TNilK] = new FunctorMaterializer[TNilK] {
-    override def materialize(offset: Int): Functor[CopK[TNilK, ?]] = ???
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  implicit def base[F[_]](
+    implicit
+    F: Functor[F]
+  ): FunctorMaterializer[F ::: TNilK] = new FunctorMaterializer[F ::: TNilK] {
+    override def materialize(offset: Int): Functor[CopK[F ::: TNilK, ?]] = {
+      val I = mkInject[F, F ::: TNilK](offset)
+      new Functor[CopK[F ::: TNilK, ?]] {
+        override def map[A, B](cfa: CopK[F ::: TNilK, A])(f: A => B): CopK[F ::: TNilK, B] = {
+          cfa match {
+            case I(fa) => I(F.map(fa)(f))
+          }
+        }
+      }
+    }
   }
+
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   implicit def induct[F[_], LL <: TListK](

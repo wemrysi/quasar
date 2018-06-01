@@ -45,9 +45,19 @@ object Planner {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]], N[_]]: Materializer[T, N, TNilK] = new Materializer[T, N, TNilK] {
-      override def materialize(offset: Int): Planner[T, N, CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], N[_], F[_]](
+      implicit
+      F: Planner[T, N, F]
+    ): Materializer[T, N, F ::: TNilK] = new Materializer[T, N, F ::: TNilK] {
+      override def materialize(offset: Int): Planner[T, N, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Planner[T, N, CopK[F ::: TNilK, ?]] {
+          val plan: AlgebraM[N, CopK[F ::: TNilK, ?], T[N1QL]] = {
+            case I(fa) => F.plan(fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -96,7 +106,7 @@ object Planner {
     : Planner[T, F, MapFunc[T, ?]] = {
     val core = new MapFuncCorePlanner[T, F]
     val derived = new MapFuncDerivedPlanner(core)
-    copk(Materializer.induct(core, Materializer.induct(derived, Materializer.base)))
+    copk(Materializer.induct(core, Materializer.base(derived)))
   }
 
   implicit def projectBucketPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorME]

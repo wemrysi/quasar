@@ -77,9 +77,21 @@ sealed abstract class PlannerInstances extends PlannerInstances0 {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[M[_], FMT, G]: Materializer[M, FMT, TNilK, G] = new Materializer[M, FMT, TNilK, G] {
-      override def materialize(offset: Int): Planner[M, FMT, CopK[TNilK, ?], G] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[M[_], FMT, F[_], G](
+      implicit
+      F: Lazy[Planner[M, FMT, F, G]]
+    ): Materializer[M, FMT, F ::: TNilK, G] = new Materializer[M, FMT, F ::: TNilK, G] {
+      override def materialize(offset: Int): Planner[M, FMT, CopK[F ::: TNilK, ?], G] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Planner[M, FMT, CopK[F ::: TNilK, ?], G] {
+          def plan[Q](
+            implicit Q: Birecursive.Aux[Q, Query[G, ?]]
+          ): AlgebraM[M, CopK[F ::: TNilK, ?], Search[Q] \/ XQuery] = {
+            case I(fa) => F.value.plan.apply(fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

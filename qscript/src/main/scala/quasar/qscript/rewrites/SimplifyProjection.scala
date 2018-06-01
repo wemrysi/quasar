@@ -71,9 +71,21 @@ object SimplifyProjection {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[G[_]]: Materializer[G, TNilK] = new Materializer[G, TNilK] {
-      override def materialize(offset: Int): Aux[CopK[TNilK, ?], G] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[G[_], F[_]](
+      implicit
+      F: Aux[F, G]
+    ): Materializer[G, F ::: TNilK] = new Materializer[G, F ::: TNilK] {
+      override def materialize(offset: Int): Aux[CopK[F ::: TNilK, ?], G] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        make(new (CopK[F ::: TNilK, ?] ~> G) {
+          override def apply[A](cfa: CopK[F ::: TNilK, A]): G[A] = {
+            cfa match {
+              case I(fa) => F.simplifyProjection(fa)
+            }
+          }
+        })
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

@@ -149,9 +149,21 @@ abstract class DiscoverPathInstances {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]], H[_]]: Materializer[T, TNilK, H] = new Materializer[T, TNilK, H] {
-      override def materialize(offset: Int): DiscoverPath.Aux[T, CopK[TNilK, ?], H] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_], H[_]](
+      implicit
+      F: DiscoverPath.Aux[T, F, H]
+    ): Materializer[T, F ::: TNilK, H] = new Materializer[T, F ::: TNilK, H] {
+      override def materialize(offset: Int): DiscoverPath.Aux[T, CopK[F ::: TNilK, ?], H] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new DiscoverPath[CopK[F ::: TNilK, ?]] {
+          type IT[X[_]] = T[X]
+          type OUT[A] = H[A]
+          override def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
+            case I(fa) => F.discoverPath(g).apply(fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

@@ -167,9 +167,22 @@ object SimplifyJoin {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]], S[_]]: Materializer[T, TNilK, S] = new Materializer[T, TNilK, S] {
-      override def materialize(offset: Int): SimplifyJoin.Aux[T, CopK[TNilK, ?], S] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_], S[_]](
+      implicit
+      S: SimplifyJoin.Aux[T, F, S]
+    ): Materializer[T, F ::: TNilK, S] = new Materializer[T, F ::: TNilK, S] {
+      override def materialize(offset: Int): SimplifyJoin.Aux[T, CopK[F ::: TNilK, ?], S] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new SimplifyJoin[CopK[F ::: TNilK, ?]] {
+          type IT[F[_]] = T[F]
+          type G[A] = S[A]
+
+          def simplifyJoin[H[_]: Functor](GtoH: G ~> H): CopK[F ::: TNilK, T[H]] => H[T[H]] = {
+            case I(fa) => S.simplifyJoin(GtoH).apply(fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

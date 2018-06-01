@@ -73,9 +73,21 @@ trait NormalizableInstances {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit val base: Materializer[TNilK] = new Materializer[TNilK] {
-      override def materialize(offset: Int): Normalizable[CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: Normalizable[F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int): Normalizable[CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Normalizable[CopK[F ::: TNilK, ?]] {
+          override def normalizeF: NTComp[CopK[F ::: TNilK, ?], Option] = new (CopK[F ::: TNilK, ?] ~> (Option ∘ CopK[F ::: TNilK, ?])#λ) {
+            override def apply[A](cfa: CopK[F ::: TNilK, A]): Option[CopK[F ::: TNilK, A]] = cfa match {
+              case I(fa) => F.normalizeF(fa).map(I(_))
+            }
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

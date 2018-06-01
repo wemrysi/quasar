@@ -73,9 +73,28 @@ object Planner {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]]]: Materializer[T, TNilK] = new Materializer[T, TNilK] {
-      override def materialize(offset: Int): Planner.Aux[T, CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_]](
+      implicit
+      F: Planner.Aux[T, F]
+    ): Materializer[T, F ::: TNilK] = new Materializer[T, F ::: TNilK] {
+      override def materialize(offset: Int): Planner.Aux[T, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Planner[CopK[F ::: TNilK, ?]] {
+          type IT[G[_]] = T[G]
+          def plan
+          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
+          (cfg: PlannerConfig[T, EX, WF, M])
+            (implicit
+              ev0: WorkflowOpCoreF :<: WF,
+              ev1: RenderTree[WorkflowBuilder[WF]],
+              ev2: WorkflowBuilder.Ops[WF],
+              ev3: ExprOpCoreF :<: EX,
+              ev4: EX :<: ExprOp) = {
+            case I(fa) => F.plan[M, WF, EX](cfg).apply(fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

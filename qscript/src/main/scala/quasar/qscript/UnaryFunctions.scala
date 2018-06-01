@@ -52,9 +52,24 @@ object UnaryFunctions {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]]]: Materializer[T, TNilK] = new Materializer[T, TNilK] {
-      override def materialize(offset: Int): UnaryFunctions[T, CopK[TNilK, ?]] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_]](
+      implicit
+      F: UnaryFunctions[T, F]
+    ): Materializer[T, F ::: TNilK] = new Materializer[T, F ::: TNilK] {
+      override def materialize(offset: Int): UnaryFunctions[T, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new UnaryFunctions[T, CopK[F ::: TNilK, ?]] {
+          override def unaryFunctions[A]: Traversal[CopK[F ::: TNilK, A], FreeMap[T]] =
+            new Traversal[CopK[F ::: TNilK, A], FreeMap[T]] {
+              override def modifyF[G[_] : Applicative](f: FreeMap[T] => G[FreeMap[T]])(s: CopK[F ::: TNilK, A]): G[CopK[F ::: TNilK, A]] = {
+                s match {
+                  case I(fa) => F.unaryFunctions.modifyF(f)(fa).map(I(_))
+                }
+              }
+            }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

@@ -48,9 +48,19 @@ sealed abstract class ExtractPathInstances extends ExtractPathInstances0 {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[P]: Materializer[TNilK, P] = new Materializer[TNilK, P] {
-      override def materialize(offset: Int): ExtractPath[CopK[TNilK, ?], P] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_], P](
+      implicit
+      F: Lazy[ExtractPath[F, P]]
+    ): Materializer[F ::: TNilK, P] = new Materializer[F ::: TNilK, P] {
+      override def materialize(offset: Int): ExtractPath[CopK[F ::: TNilK, ?], P] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new ExtractPath[CopK[F ::: TNilK, ?], P] {
+          override def extractPath[G[_] : ApplicativePlus]: Algebra[CopK[F ::: TNilK, ?], G[P]] = {
+            case I(fa) => F.value.extractPath[G].apply(fa)
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

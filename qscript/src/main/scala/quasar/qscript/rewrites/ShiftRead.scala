@@ -134,9 +134,23 @@ object ShiftRead {
   }
 
   object Materializer {
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    implicit def base[T[_[_]], I[_]]: Materializer[T, TNilK, I] = new Materializer[T, TNilK, I] {
-      override def materialize(offset: Int): ShiftRead.Aux[T, CopK[TNilK, ?], I] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_], I[_]](
+      implicit
+      F: ShiftRead.Aux[T, F, I]
+    ): Materializer[T, F ::: TNilK, I] = new Materializer[T, F ::: TNilK, I] {
+      override def materialize(offset: Int): ShiftRead.Aux[T, CopK[F ::: TNilK, ?], I] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new ShiftRead[CopK[F ::: TNilK, ?]] {
+          type G[A] = I[A]
+
+          def shiftRead[H[_]](GtoH: G ~> H) = new (CopK[F ::: TNilK, ?] ~> FixFreeH[H, ?]) {
+            override def apply[A](cfa: CopK[F ::: TNilK, A]): FixFreeH[H, A] = cfa match {
+              case I(fa) => F.shiftRead(GtoH)(fa)
+            }
+          }
+        }
+      }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
