@@ -71,6 +71,7 @@ object StructuralMerge {
               case (EnvT((x, I(l))), EnvT((y, I(r)))) =>
                 F.merge[V, T]((envT(x, l), envT(y, r)))
                   .map(EnvT.hmap(I.inj)(_))
+              case _ => none
             }
           }
         }
