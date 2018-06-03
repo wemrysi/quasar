@@ -26,9 +26,10 @@ import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript._
 import quasar.qscript.rewrites._
 
+import iotaz.{CopK, TListK}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.implicits._
-import scalaz.{:<:, \/, Functor, Monad}
+import scalaz.{\/, Functor, Monad}
 import scalaz.syntax.monad._
 
 /** Provides for evaluating QScript to a result. */
@@ -38,15 +39,15 @@ abstract class QScriptEvaluator[
     R] {
 
   /** QScript used by this evaluator. */
-  type QS[U[_[_]]] <: CoM
-  type QSM[A] = QS[T]#M[A]
+  type QS[U[_[_]]] <: TListK
+  type QSM[A] = CopK[QS[T], A]
 
   /** Executable representation. */
   type Repr
 
   def QSMFunctor: Functor[QSM]
-  def QSMFromQScriptCore: QScriptCore[T, ?] :<: QSM
-  def QSMToQScriptTotal: Injectable.Aux[QSM, QScriptTotal[T, ?]]
+  def QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM
+  def QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]]
   def UnirewriteT: Unirewrite[T, QS[T]]
   def UnicoalesceCap: Unicoalesce.Capture[T, QS[T]]
 
@@ -73,8 +74,8 @@ abstract class QScriptEvaluator[
     } yield result
 
   private final implicit def _QSMFunctor: Functor[QSM] = QSMFunctor
-  private final implicit def _QSMFromQScriptCore: QScriptCore[T, ?] :<: QSM = QSMFromQScriptCore
-  private final implicit def _QSMToQScriptTotal: Injectable.Aux[QSM, QScriptTotal[T, ?]] = QSMToQScriptTotal
+  private final implicit def _QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM = QSMFromQScriptCore
+  private final implicit def _QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]] = QSMToQScriptTotal
   private final implicit def _UnirewriteT: Unirewrite[T, QS[T]] = UnirewriteT
   private final implicit def _UnicoalesceCap: Unicoalesce.Capture[T, QS[T]] = UnicoalesceCap
 }

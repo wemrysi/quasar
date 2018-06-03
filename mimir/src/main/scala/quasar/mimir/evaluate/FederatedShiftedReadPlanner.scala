@@ -22,6 +22,7 @@ import quasar.{Data, Disposable}
 import quasar.api._, ResourceError._
 import quasar.blueeyes.json.JValue
 import quasar.contrib.fs2.convert
+import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.evaluate.{Source => EvalSource}
 import quasar.fs.PathError

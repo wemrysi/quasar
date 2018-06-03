@@ -24,6 +24,7 @@ import quasar.blueeyes.json.{JValue, JUndefined}
 import quasar.connector.QScriptEvaluator
 import quasar.contrib.cats.effect._
 import quasar.contrib.fs2.convert
+import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.numeric._
@@ -41,6 +42,7 @@ import cats.effect.{IO, LiftIO}
 import fs2.{Chunk, Stream}
 import fs2.interop.scalaz._
 import io.chrisdavenport.scalaz.task._
+import iotaz.CopK
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._
@@ -62,23 +64,23 @@ final class MimirQScriptEvaluator[
 
   type Repr = mimir.MimirRepr
 
-  implicit def QSMFromQScriptCoreI: Injectable.Aux[QScriptCore[T, ?], QSM] =
+  implicit def QSMFromQScriptCoreI: Injectable[QScriptCore[T, ?], QSM] =
     Injectable.inject[QScriptCore[T, ?], QSM]
 
-  implicit def QSMFromEquiJoinI: Injectable.Aux[EquiJoin[T, ?], QSM] =
+  implicit def QSMFromEquiJoinI: Injectable[EquiJoin[T, ?], QSM] =
     Injectable.inject[EquiJoin[T, ?], QSM]
 
-  implicit def QSMFromShiftedReadI: Injectable.Aux[Const[ShiftedRead[AFile], ?], QSM] =
+  implicit def QSMFromShiftedReadI: Injectable[Const[ShiftedRead[AFile], ?], QSM] =
     Injectable.inject[Const[ShiftedRead[AFile], ?], QSM]
 
-  implicit def QSMToQScriptTotal: Injectable.Aux[QSM, QScriptTotal[T, ?]] =
+  implicit def QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]] =
     mimir.qScriptToQScriptTotal[T]
 
   def QSMFunctor: Functor[QSM] =
     Functor[QSM]
 
-  def QSMFromQScriptCore: QScriptCore[T, ?] :<: QSM =
-    Inject[QScriptCore[T, ?], QSM]
+  def QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM =
+    CopK.Inject[QScriptCore[T, ?], QSM]
 
   def UnirewriteT: Unirewrite[T, QS[T]] =
     implicitly[Unirewrite[T, QS[T]]]
@@ -107,31 +109,29 @@ final class MimirQScriptEvaluator[
     def shiftedReadPlanner =
       new FederatedShiftedReadPlanner[T, F](cake)
 
-    lazy val planQST: AlgebraM[M, QScriptTotal[T, ?], Repr] =
-      _.run.fold(
-        qScriptCorePlanner.plan(planQST),
-        _.run.fold(
-          _ => ???,   // ProjectBucket
-          _.run.fold(
-            _ => ???,   // ThetaJoin
-            _.run.fold(
-              equiJoinPlanner.plan(planQST),
-              _.run.fold(
-                _ => ???,    // ShiftedRead[ADir]
-                _.run.fold(
-                  shiftedReadPlanner.plan,
-                  _.run.fold(
-                    _ => ???,   // Read[ADir]
-                    _.run.fold(
-                      _ => ???,   // Read[AFile]
-                      _ => ???))))))))    // DeadEnd
+    lazy val planQST: AlgebraM[M, QScriptTotal[T, ?], Repr] = {
+      val QScriptCore = CopK.Inject[QScriptCore[T, ?],            QScriptTotal[T, ?]]
+      val EquiJoin    = CopK.Inject[EquiJoin[T, ?],               QScriptTotal[T, ?]]
+      val ShiftedRead = CopK.Inject[Const[ShiftedRead[AFile], ?], QScriptTotal[T, ?]]
+      _ match {
+        case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
+        case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+        case _ => ???
+      }
+    }
 
-    def planQSM(in: QSM[Repr]): M[Repr] =
-      in.run.fold(
-        qScriptCorePlanner.plan(planQST),
-        _.run.fold(
-          equiJoinPlanner.plan(planQST),
-	        shiftedReadPlanner.plan))
+    def planQSM(in: QSM[Repr]): M[Repr] = {
+      val QScriptCore = CopK.Inject[QScriptCore[T, ?],            QSM]
+      val EquiJoin    = CopK.Inject[EquiJoin[T, ?],               QSM]
+      val ShiftedRead = CopK.Inject[Const[ShiftedRead[AFile], ?], QSM]
+
+      in match {
+        case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
+        case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+      }
+    }
 
     cp.cataM[M, Repr](planQSM _)
   }
