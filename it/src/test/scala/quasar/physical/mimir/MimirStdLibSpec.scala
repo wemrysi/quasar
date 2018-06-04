@@ -225,7 +225,7 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
 }
 
 trait PrecogCake extends Scope with AfterAll {
-  val cake = Precog(Files.createTempDirectory("mimir").toFile()).unsafePerformSync
+  val cake = Precog(Files.createTempDirectory("mimir").toFile()).unsafeRunSync
 
   def afterAll(): Unit = cake.shutdown.unsafeRunSync
 }

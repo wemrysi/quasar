@@ -28,7 +28,6 @@ import quasar.qscript._
 import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
 import quasar.yggdrasil.bytecode.JType
 
-import fs2.interop.scalaz._
 import io.chrisdavenport.scalaz.task._
 import matryoshka._
 import pathy.Path._
