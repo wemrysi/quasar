@@ -131,7 +131,7 @@ object FreeVFS {
       for {
         verStream <- POSIX.openR[S](path)
         verBV <- verStream.runFoldMap(ι).mapSuspension(
-          CopK.NaturalTransformation.of[POSIXWithTaskCopK, S](injectNTCopK[POSIXOp, S], injectNTCopK[Task, S]))
+          CopK.NaturalTransformation.of[POSIXWithTaskCopK, S](S0.inj, S1.inj))
         ver <- lift(
           C.decode(verBV.toBitVector).fold(
             e => Task.fail(new RuntimeException(e.message)),
