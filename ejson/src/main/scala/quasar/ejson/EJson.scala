@@ -25,12 +25,11 @@ import matryoshka.implicits._
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.syntax.traverse._
-import iotaz.syntax.injectK._
 
 object EJson {
   def fromJson[A](f: String => A): Json[A] => EJson[A] = {
-    case ObjJson(obj) => Extension.fromObj(f)(obj).injectK[EJson]
-    case CommonJson(c) => c.injectK[EJson]
+    case ObjJson(obj) => ExtEJson(Extension.fromObj(f)(obj))
+    case CommonJson(c) => CommonEJson(c)
   }
 
   def fromCommon[T](c: Common[T])(implicit T: Corecursive.Aux[T, EJson]): T =
@@ -44,17 +43,17 @@ object EJson {
       case Map(xs) =>
         xs.traverse {
           case (k, v) => f(k) strengthR v
-        } map (kvs => Obj(ListMap(kvs : _*)).injectK[Json])
+        } map (kvs => ObjJson(Obj(ListMap(kvs : _*))))
 
       case Int(i) =>
-        some[Common[A]](Dec(BigDecimal(i))).map(_.injectK[Json])
+        some(CommonJson(Dec(BigDecimal(i))))
 
       case _ => none
     }
 
     {
       case ExtEJson(ext) => handleExt(ext)
-      case CommonEJson(c) => some(c.injectK[Json])
+      case CommonEJson(c) => some(CommonJson(c))
     }
   }
 
