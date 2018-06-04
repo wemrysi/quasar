@@ -99,11 +99,6 @@ jobs:
       script:
         - set -e
 
-        - echo "testing travis_wait...."
-        - date
-        - travis_wait 30 ./scripts/wait20min.sh
-        - date
-
         - travis_wait 30 scripts/s3Cache cleanup
 
         - ./sbt preBuild
