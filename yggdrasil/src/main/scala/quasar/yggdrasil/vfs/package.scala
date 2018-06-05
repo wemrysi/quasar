@@ -61,7 +61,7 @@ package object vfs {
     def generalize[S[a] <: ACopK[a]]: GeneralizeSyntax[S] = new GeneralizeSyntax[S] {}
 
     private val JP = CopK.Inject[POSIXOp, POSIXWithTaskCopK]
-    private val JT = CopK.Inject[Task,    POSIXWithTaskCopK]
+    private val JT = CopK.Inject[Task, POSIXWithTaskCopK]
 
     trait GeneralizeSyntax[S[a] <: ACopK[a]] {
       def apply[A](pwt: POSIXWithTask[A])(implicit IP: POSIXOp :<<: S, IT: Task :<<: S): Free[S, A] =
