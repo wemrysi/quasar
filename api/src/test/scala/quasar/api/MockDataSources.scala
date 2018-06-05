@@ -17,14 +17,18 @@
 package quasar.api
 
 import slamdata.Predef.{None, Some}
-import quasar.Condition
-import scalaz.{IMap, ISet, Monad, \/}
-import scalaz.syntax.either._
-import quasar.contrib.scalaz.MonadState_
-import MockDataSources.DSMockState
+
 import quasar.api.DataSourceError.{CommonError, CreateError, DataSourceNotFound, ExistentialError}
+import quasar.Condition
+import quasar.contrib.scalaz.MonadState_
+
+import scalaz.{IMap, ISet, Monad, \/}
 import scalaz.syntax.monad._
 import scalaz.syntax.equal._
+import scalaz.syntax.std.option._
+
+
+import MockDataSources.DSMockState
 
 
 final class MockDataSources[F[_]: Monad: DSMockState[?[_], C], C] private (
@@ -33,49 +37,45 @@ final class MockDataSources[F[_]: Monad: DSMockState[?[_], C], C] private (
 
   val store = MonadState_[F, IMap[ResourceName, (DataSourceMetadata, C)]]
 
-   def add(
-       name: ResourceName,
-       kind: DataSourceType,
-       config: C,
-       onConflict: ConflictResolution)
-       : F[Condition[CreateError[C]]]=
-       if (supportedDataSources.contains(kind))
-         store.get.flatMap(m => m.lookup(name) match {
-           case Some(_) if onConflict === ConflictResolution.Preserve =>
-             Condition.abnormal[CreateError[C]](DataSourceError.DataSourceExists(name)).point[F]
-           case _ =>
-             store.put(m.insert(name, (DataSourceMetadata(kind, Condition.normal()), config)))
-                  .as(Condition.normal())
-         })
-       else
-         Condition.abnormal[CreateError[C]](DataSourceError.DataSourceUnsupported(kind, supportedDataSources)).point[F]
-
-   def lookup(name: ResourceName): F[CommonError \/ (DataSourceMetadata, C)] =
-     store.gets(m => m.lookup(name) match {
-       case Some(a) => a.right
-       case None    => DataSourceNotFound(name).left
+  def add(
+      name: ResourceName,
+      kind: DataSourceType,
+      config: C,
+      onConflict: ConflictResolution)
+      : F[Condition[CreateError[C]]]=
+    if (supportedDataSources.contains(kind))
+      store.get.flatMap(m => m.lookup(name) match {
+        case Some(_) if onConflict === ConflictResolution.Preserve =>
+          Condition.abnormal[CreateError[C]](DataSourceError.DataSourceExists(name)).point[F]
+        case _ =>
+          store.put(m.insert(name, (DataSourceMetadata(kind, Condition.normal()), config)))
+               .as(Condition.normal())
      })
+    else
+      Condition.abnormal[CreateError[C]](DataSourceError.DataSourceUnsupported(kind, supportedDataSources)).point[F]
 
-   def metadata: F[IMap[ResourceName, DataSourceMetadata]] = store.gets(x => x.map(_._1))
+  def lookup(name: ResourceName): F[CommonError \/ (DataSourceMetadata, C)] =
+   store.gets(m => m.lookup(name).toRightDisjunction(DataSourceNotFound(name)))
 
+  def metadata: F[IMap[ResourceName, DataSourceMetadata]] = store.gets(x => x.map(_._1))
 
-   def remove(name: ResourceName): F[Condition[CommonError]] =
-     store.gets(x => x.updateLookupWithKey(name, (_, _) => None)).flatMap {
-       case (Some(_), m) =>
-         store.put(m).as(Condition.normal())
-       case (None, _) =>
-         Condition.abnormal[CommonError](DataSourceNotFound(name)).point[F]
-     }
+  def remove(name: ResourceName): F[Condition[CommonError]] =
+   store.gets(x => x.updateLookupWithKey(name, (_, _) => None)).flatMap {
+     case (Some(_), m) =>
+       store.put(m).as(Condition.normal())
+     case (None, _) =>
+       Condition.abnormal[CommonError](DataSourceNotFound(name)).point[F]
+   }
 
-   def rename(src: ResourceName, dst: ResourceName, onConflict: ConflictResolution): F[Condition[ExistentialError]] =
-     store.get.flatMap(m => (m.lookup(src), m.lookup(dst)) match {
-       case (None, _) => Condition.abnormal[ExistentialError](DataSourceNotFound(src)).point[F]
-       case (Some(_), Some(_)) if onConflict === ConflictResolution.Preserve =>
-         Condition.abnormal[ExistentialError](DataSourceError.DataSourceExists(dst)).point[F]
-       case (Some(s), _) => store.put(m.delete(src).insert(dst, s)).as(Condition.normal())
-     })
+  def rename(src: ResourceName, dst: ResourceName, onConflict: ConflictResolution): F[Condition[ExistentialError]] =
+   store.get.flatMap(m => (m.lookup(src), m.lookup(dst)) match {
+     case (None, _) => Condition.abnormal[ExistentialError](DataSourceNotFound(src)).point[F]
+     case (Some(_), Some(_)) if onConflict === ConflictResolution.Preserve =>
+       Condition.abnormal[ExistentialError](DataSourceError.DataSourceExists(dst)).point[F]
+     case (Some(s), _) => store.put(m.delete(src).insert(dst, s)).as(Condition.normal())
+   })
 
-   def supported: F[ISet[DataSourceType]] = supportedDataSources.point[F]
+  def supported: F[ISet[DataSourceType]] = supportedDataSources.point[F]
 }
 
 object MockDataSources {
@@ -85,5 +85,3 @@ object MockDataSources {
   def apply[F[_]: Monad: DSMockState[?[_], C], C](supportedDataSources:  ISet[DataSourceType]): DataSources[F, C] =
     new MockDataSources[F, C](supportedDataSources)
 }
-
-
