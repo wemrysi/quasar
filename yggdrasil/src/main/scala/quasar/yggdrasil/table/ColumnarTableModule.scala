@@ -1486,15 +1486,15 @@ trait ColumnarTableModule
         val (focused: Map[ColumnRef, Column], unfocused: Map[ColumnRef, Column]) =
           slice.columns.partition(_._1.selector.hasPrefix(focus))
 
-        // discard scalar values at focus
-        val typed = focused filter {
+        // partition by elems being flattenable or not
+        val (flattenable, unflattenable) = focused partition {
           case (ColumnRef(`focus`, CArrayType(_)), _) => true
           case (ColumnRef(`focus`, _), _) => false
           case _ => true
         }
 
-        // remap focused, non-scalars to be at "root"
-        val remapped = typed map {
+        // remap focused, flattenables to be at "root"
+        val remapped = flattenable map {
           case (ColumnRef(path, tpe), col) =>
             (ColumnRef(path.dropPrefix(focus).get, tpe), col)
         }
@@ -1503,7 +1503,10 @@ trait ColumnarTableModule
           if (emitOnUndef) {
             val undefineds = focused.values.map(_.definedAt(0, slice.size)).reduceOption(_ | _).getOrElse(new BitSet)
             undefineds.flip(0, slice.size) //mutation!
-            undefineds
+
+            val unflattenables = unflattenable.values.map(_.definedAt(0, slice.size)).reduceOption(_ | _).getOrElse(new BitSet)
+
+            unflattenables | undefineds
           }
           else
             new BitSet

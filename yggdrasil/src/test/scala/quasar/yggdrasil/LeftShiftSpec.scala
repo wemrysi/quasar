@@ -41,7 +41,9 @@ trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
     val rec = toRecord(Array(0), JArray(Nil))
     val table = fromSample(SampleData(Stream(rec)))
 
-    val expected = Vector()
+    val expected =
+      if (emit) Vector(toRecord0(Array(0)))
+      else Vector()
 
     toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
   }
@@ -50,7 +52,9 @@ trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
     val rec = toRecord(Array(0), JString("s"))
     val table = fromSample(SampleData(Stream(rec)))
 
-    val expected = Vector()
+    val expected =
+      if (emit) Vector(toRecord0(Array(0)))
+      else Vector()
 
     toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
   }
@@ -82,7 +86,9 @@ trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
     val rec = toRecord(Array(0), JObject())
     val table = fromSample(SampleData(Stream(rec)))
 
-    val expected = Vector()
+    val expected =
+      if (emit) Vector(toRecord0(Array(0)))
+      else Vector()
 
     toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
   }
@@ -118,12 +124,15 @@ trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
             toRecord(Array(5), JUndefined))))
 
     val expected =
+      (if (emit) Vector(toRecord0(Array(0))) else Vector()) ++
       Vector(
         toRecord(Array(1), JArray(JString("bar"), JNum(13))),
-        toRecord(Array(1), JArray(JString("foo"), JNum(12))),
+        toRecord(Array(1), JArray(JString("foo"), JNum(12)))) ++
+      (if (emit) Vector(toRecord0(Array(2))) else Vector()) ++
+      Vector(
         toRecord(Array(3), JArray(JNum(0), JNum(42))),
         toRecord(Array(3), JArray(JNum(1), JNum(43)))) ++
-      (if (emit) Vector(toRecord0(Array(5))) else Vector())
+      (if (emit) Vector(toRecord0(Array(4)), toRecord0(Array(5))) else Vector())
 
     toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
   }
@@ -163,7 +172,7 @@ trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
         toRecord(Array(1), JArray(JNum(1), JNum(23))),
         toRecord(Array(1), JArray(JNum(2), JNum(24))),
         toRecord(Array(1), JArray(JNum(3), JNum(25)))) ++ (
-      if (emit) Vector(toRecord0(Array(4)))
+      if (emit) Vector(toRecord0(Array(2)), toRecord0(Array(3)), toRecord0(Array(4)))
       else Vector())
 
     toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
