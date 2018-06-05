@@ -1185,8 +1185,6 @@ Then, you can try the following command:
 
 This will ensure that your local version is also passing the tests.
 
-Check to see if the problem you are having is mentioned in the [JIRA issues](https://slamdata.atlassian.net/) and, if it isn't, feel free to create a new issue.
-
 You can also discuss issues [on Discord](https://discord.gg/QNjwCg6).
 
 ## Thanks to Sponsors
