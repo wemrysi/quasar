@@ -19,7 +19,7 @@ package quasar.sst
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.tpe._
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.contrib.iota.mkInject
 
 import matryoshka._

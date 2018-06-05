@@ -18,7 +18,7 @@ package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{ADir, RDir, RFile}
 import quasar.contrib.scalaz.stateT, stateT._
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import argonaut.{Argonaut, Parse}
 

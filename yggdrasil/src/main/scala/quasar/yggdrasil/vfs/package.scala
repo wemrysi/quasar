@@ -17,7 +17,7 @@
 package quasar.yggdrasil
 
 import quasar.contrib.scalaz.catchable
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import argonaut.{Argonaut, CodecJson, DecodeResult}
 

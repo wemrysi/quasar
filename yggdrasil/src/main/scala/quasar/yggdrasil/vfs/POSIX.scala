@@ -17,7 +17,7 @@
 package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{ADir, AFile, APath, RPath}
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import fs2.{Sink, Stream}
 

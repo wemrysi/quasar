@@ -16,7 +16,7 @@
 
 package quasar.fp.free
 
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 import scalaz._
 
 object lift {

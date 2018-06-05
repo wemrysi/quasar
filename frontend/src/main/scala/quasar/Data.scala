@@ -28,6 +28,7 @@ import quasar.ejson.{
   CommonEJson
 }
 import quasar.fp._
+import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.javascript.Js
 import quasar.time.{DateTimeInterval, OffsetDate => QOffsetDate}
 

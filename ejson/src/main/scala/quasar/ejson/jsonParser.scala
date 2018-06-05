@@ -17,7 +17,7 @@
 package quasar.ejson
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import jawn.{Facade, SimpleFacade, SupportParser}
 import matryoshka._

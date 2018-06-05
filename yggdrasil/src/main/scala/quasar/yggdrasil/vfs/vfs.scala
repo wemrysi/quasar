@@ -22,7 +22,7 @@ import quasar.contrib.pathy.{unsafeSandboxAbs, ADir, AFile, APath, RPath}
 import quasar.contrib.scalaz.stateT, stateT._
 import quasar.fp.ski.ι
 import quasar.fp.free._
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.fs.MoveSemantics
 
 import argonaut.{Argonaut, Parse}

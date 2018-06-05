@@ -21,7 +21,8 @@ import slamdata.Predef.{Map => _, _}
 import quasar.ejson
 import quasar.ejson.{EJson, ExtEJson}
 import quasar.contrib.iota.{copkTraverse, mkInject}
-import quasar.fp.{:<<:, ACopK, PrismNT}
+import quasar.fp.PrismNT
+import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.analysis.Outline
