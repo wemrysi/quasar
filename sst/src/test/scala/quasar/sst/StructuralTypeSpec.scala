@@ -19,10 +19,12 @@ package quasar.sst
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
+import quasar.contrib.specs2.Spec
 import quasar.{ejson => ejs}
 import quasar.ejson.{Decoded, DecodeEJson, EJson, EJsonArbitrary, EncodeEJson}
 import quasar.ejson.implicits._
-import quasar.fp._
+import quasar.fp._, Helpers._
+import quasar.contrib.iota._
 import quasar.tpe._
 
 import scala.Predef.$conforms
@@ -32,13 +34,11 @@ import matryoshka.data._
 import matryoshka.implicits._
 import monocle.syntax.fields._
 import org.specs2.scalacheck._
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.{ScalazProperties => propz}
 import scalaz.scalacheck.ScalazArbitrary._
 
 final class StructuralTypeSpec extends Spec
-  with ScalazMatchers
   with StructuralTypeArbitrary
   with EJsonArbitrary
   with SimpleTypeArbitrary {

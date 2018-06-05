@@ -22,13 +22,14 @@ import quasar.fs.MoveSemantics
 import fs2.{Stream, Sink}
 
 import org.specs2.mutable._
-import org.specs2.scalaz.ScalazMatchers._
+import org.specs2.matcher.DisjunctionMatchers
 
 import pathy.Path
 
-import scalaz.{Coproduct, Need}
+import scalaz.Need
 import scalaz.concurrent.Task
 import scalaz.syntax.monad._
+import iotaz.CopK
 
 import scodec.Codec
 import scodec.bits.ByteVector
@@ -37,11 +38,11 @@ import smock._
 
 import java.util.UUID
 
-object FreeVFSSpecs extends Specification {
+object FreeVFSSpecs extends Specification with DisjunctionMatchers {
   import POSIXOp._
   import StreamTestUtils._
 
-  type S[A] = Coproduct[POSIXOp, Task, A]
+  type S[A] = POSIXWithTaskCopK[A]
 
   val H = Harness[S, Task]
 
@@ -263,7 +264,7 @@ object FreeVFSSpecs extends Specification {
 
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSyncAttempt
 
-      vfs.leftMap(_.getMessage) must beLeftDisjunction("Unexpected VERSION, 0100000000000000")
+      vfs.leftMap(_.getMessage) must be_-\/("Unexpected VERSION, 0100000000000000")
     }
 
     "initialize from an empty state with pre-existing directory" in {
@@ -1320,13 +1321,6 @@ object FreeVFSSpecs extends Specification {
     } yield ()
   }
 
-  object CPR {
-    def unapply[A](cp: Coproduct[POSIXOp, Task, A]): Option[Task[A]] =
-      cp.run.toOption
-  }
-
-  object CPL {
-    def unapply[A](cp: Coproduct[POSIXOp, Task, A]): Option[POSIXOp[A]] =
-      cp.run.swap.toOption
-  }
+  val CPR = CopK.Inject[Task, S]
+  val CPL = CopK.Inject[POSIXOp, S]
 }

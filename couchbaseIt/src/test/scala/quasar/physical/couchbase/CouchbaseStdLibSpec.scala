@@ -19,6 +19,7 @@ package quasar.physical.couchbase
 import slamdata.Predef._
 import quasar.{Data => QData, TestConfig, Type => QType}
 import quasar.contrib.scalaz.eitherT._
+import quasar.contrib.iota.copkTraverse
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
 import quasar.fs.FileSystemError
@@ -34,7 +35,7 @@ import quasar.time.{DateGenerators, DateTimeInterval}
 import java.time._
 
 import matryoshka._
-import matryoshka.data.Fix
+import matryoshka.data.{Fix, freeRecursive}
 import matryoshka.implicits._
 import matryoshka.patterns._
 import org.scalacheck.Arbitrary.arbitrary
@@ -127,7 +128,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
       } yield (rq, r)
     ).run.run.run(cfg).foldMap(fs.interp.unsafePerformSync).unsafePerformSync._2
 
-    (r must beRightDisjunction.like { case (q, Vector(d)) =>
+    (r must be_\/-.like { case (q, Vector(d)) =>
       d must beCloseTo(expected).updateMessage(_ ⊹ s"\nquery: $q")
     }).toResult
   }

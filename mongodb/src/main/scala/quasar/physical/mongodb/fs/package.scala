@@ -33,6 +33,8 @@ import pathy.Path.{depth, dirName}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.{Writer => _, _}
+import iotaz.TListK.:::
+import iotaz.{TNilK, CopK}
 
 package object fs {
   import BackendDef.DefErrT
@@ -51,8 +53,8 @@ package object fs {
 
   type MongoM[A] = Free[Eff, A]
 
-  type MongoQScriptCP[T[_[_]]] = qs.QScriptCore[T, ?] :\: qs.EquiJoin[T, ?] :/: Const[qs.ShiftedRead[AFile], ?]
-  type MongoQScript[T[_[_]], A] = MongoQScriptCP[T]#M[A]
+  type MongoQScriptCP[T[_[_]]] = qs.QScriptCore[T, ?] ::: qs.EquiJoin[T, ?] ::: Const[qs.ShiftedRead[AFile], ?] ::: TNilK
+  type MongoQScript[T[_[_]], A] = CopK[MongoQScriptCP[T], A]
 
   final case class MongoConfig(
     client: MongoClient,
@@ -129,7 +131,9 @@ package object fs {
 
   private def fsEffToTask: PhysFsEff ~> Task = λ[PhysFsEff ~> Task](_.run.fold(
     NaturalTransformation.refl[Task],
-    Failure.toRuntimeError[Task, PhysicalError]
+    Failure.toRuntimeError[Task, PhysicalError] {
+      case UnhandledFSError(e) => e
+    }
   ))
 
   private[fs] def asyncClientDef[S[_]](

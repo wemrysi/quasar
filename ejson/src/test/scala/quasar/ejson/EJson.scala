@@ -19,8 +19,10 @@ package quasar.ejson
 import slamdata.Predef.{Int => SInt, _}
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
+import quasar.contrib.specs2.Spec
 import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
+import quasar.contrib.iota._
 
 import scala.Predef.implicitly
 import scala.Predef.$conforms
@@ -29,9 +31,8 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.scalacheck._
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
-import scalaz.scalacheck.ScalazProperties._
+import scalaz.scalacheck.ScalazProperties.{equal => eql, _}
 
 class EJsonSpecs extends Spec with EJsonArbitrary {
   import Extension.Optics.meta
@@ -50,7 +51,7 @@ class EJsonSpecs extends Spec with EJsonArbitrary {
 
   checkAll("Extension", traverse.laws[Extension](implicitly, implicitly, Extension.structuralOrder(Order[SInt])))
   checkAll("Extension", order.laws[Extension[SInt]](Extension.structuralOrder(Order[SInt]), implicitly))
-  checkAll("Extension", equal.laws[Extension[SInt]](Extension.structuralEqual(Equal[SInt]), implicitly))
+  checkAll("Extension", eql.laws[Extension[SInt]](Extension.structuralEqual(Equal[SInt]), implicitly))
 
   checkAll("EJson", order.laws[J])
 
