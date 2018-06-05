@@ -408,6 +408,7 @@ lazy val sql = project
   .settings(name := "quasar-sql-internal")
   .dependsOn(common % BothScopes)
   .settings(commonSettings)
+  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .settings(
