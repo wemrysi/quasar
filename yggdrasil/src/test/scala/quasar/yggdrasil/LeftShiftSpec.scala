@@ -25,6 +25,14 @@ import _root_.scalaz._, Scalaz._
 
 trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
 
+  def testEmptyLeftShift(emit: Boolean) = {
+    val table = fromSample(SampleData(Stream.empty))
+
+    val expected = Vector.empty
+
+    toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
+  }
+
   def testTrivialArrayLeftShift(emit: Boolean) = {
     val rec = toRecord(Array(0), JArray(JNum(12) :: JNum(13) :: Nil))
     val table = fromSample(SampleData(Stream(rec)))
