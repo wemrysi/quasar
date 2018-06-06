@@ -147,11 +147,11 @@ lazy val publishSettings = commonPublishSettings ++ Seq(
   performMavenCentralSync := false,   // publishes quasar to bintray only, skipping sonatype and maven central
   organizationName := "SlamData Inc.",
   organizationHomepage := Some(url("http://quasar-analytics.org")),
-  homepage := Some(url("https://github.com/quasar-analytics/quasar")),
+  homepage := Some(url("https://github.com/slamdata/quasar")),
   scmInfo := Some(
     ScmInfo(
-      url("https://github.com/quasar-analytics/quasar"),
-      "scm:git@github.com:quasar-analytics/quasar.git"
+      url("https://github.com/slamdata/quasar"),
+      "scm:git@github.com:slamdata/quasar.git"
     )
   ),
   bintrayCredentialsFile := {
