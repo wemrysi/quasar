@@ -1,5 +1,5 @@
 {
-    "name": "flatten or else field unavailable",
+    "name": "flatten array value or else field unavailable",
     "backends": {
         "couchbase": "pending"
     },
