@@ -1508,7 +1508,7 @@ trait ColumnarTableModule
       val slices2: StreamT[IO, Slice] = slices.map(_.materialized) flatMap { slice =>
         val (focused, emit, unfocused) = lens(slice)
 
-        val innerHeads = {
+        val innerHeads: Vector[CPathNode] = {
           val unsorted = focused.keys.toVector flatMap {
             case ColumnRef(path, _) => path.head.toVector
           }
@@ -1530,23 +1530,23 @@ trait ColumnarTableModule
           }
         }
 
-        val innerIndex = Map(innerHeads.zipWithIndex: _*)
+        val innerIndex: Map[CPathNode, Int] = Map(innerHeads.zipWithIndex: _*)
 
-        val primitiveWaterMarks = focused.toList collect {
+        val primitiveWaterMarks: List[Int] = focused.toList collect {
           case (ColumnRef(CPath.Identity, CArrayType(_)), col: HomogeneousArrayColumn[a]) =>
             (0 until slice.size).map(col(_).length).max
         }
 
         // .max doesn't work, because Scala doesn't understand monoids
-        val primitiveMax = primitiveWaterMarks.fold(0)(math.max)
+        val primitiveMax: Int = primitiveWaterMarks.fold(0)(math.max)
 
         // TODO doesn't handle the case where we have a sparse array with a missing column!
         // this value may be 0 if we're looking at CEmptyObject | CEmptyArray
         // and emitOnUndef = false
-        val highWaterMark =
+        val highWaterMark: Int =
           math.max(innerHeads.length, primitiveMax)
 
-        val resplit = if (slice.size * highWaterMark > Config.maxSliceSize) {
+        val resplit: Vector[Slice] = if (slice.size * highWaterMark > Config.maxSliceSize) {
           val numSplits =
             math.ceil((slice.size * highWaterMark).toDouble / Config.maxSliceSize).toInt
 
@@ -1572,7 +1572,7 @@ trait ColumnarTableModule
           val expansion = cf.util.Remap(_ / highWaterMark)
 
           // expand all of the unfocused columns, then mostly leave them alone
-          val unfocusedExpanded = unfocused map {
+          val unfocusedExpanded: Map[ColumnRef, Column] = unfocused map {
             case (ref, col) => ref -> expansion(col).get
           }
 
@@ -1601,25 +1601,25 @@ trait ColumnarTableModule
 
           // figure out the definedness of the exploded, filtered result
           // this is necessary so we can implement inner-concat semantics
-          val definedness =
+          val definedness: BitSet =
             merged.values.map(_.definedAt(0, slice.size * highWaterMark)).reduceOption(_ | _).getOrElse(new BitSet)
 
           // move all of our results into second index of an array
-          val indexed = merged map {
+          val indexed: Map[ColumnRef, Column] = merged map {
             case (ColumnRef(path, tpe), col) =>
               ColumnRef(1 \: path, tpe) -> col
           }
 
-          val refinedHeads = innerHeads collect {
+          val refinedHeads: Vector[String \/ Int] = innerHeads collect {
             case CPathField(field) => -\/(field)
             case CPathIndex(idx) => \/-(idx)
           }
 
-          val hasFields = refinedHeads.exists(_.isLeft)
-          val hasIndices = refinedHeads.exists(_.isRight)
+          val hasFields: Boolean = refinedHeads.exists(_.isLeft)
+          val hasIndices: Boolean = refinedHeads.exists(_.isRight)
 
           // generate the field names column
-          val fieldsCol = if (hasFields) {
+          val fieldsCol: Option[Column] = if (hasFields) {
             val loci = refinedHeads.zipWithIndex collect {
               case (-\/(_), i) => i
             } toSet
@@ -1640,7 +1640,7 @@ trait ColumnarTableModule
           }
 
           // generate the array indices column
-          val indicesCol = if (hasIndices) {
+          val indicesCol: Option[Column] = if (hasIndices) {
             val loci = refinedHeads.zipWithIndex collect {
               case (\/-(_), i) => i
             } toSet
@@ -1661,14 +1661,16 @@ trait ColumnarTableModule
           }
 
           // put the fields and index columns into the same path, in the first index of the array
-          val fassigned = fieldsCol.map(col => ColumnRef(CPathIndex(0), CString) -> col).toList
-          val iassigned = indicesCol.map(col => ColumnRef(CPathIndex(0), CLong) -> col).toList
+          val fassigned: List[(ColumnRef, Column)] =
+            fieldsCol.map(col => ColumnRef(CPathIndex(0), CString) -> col).toList
+          val iassigned: List[(ColumnRef, Column)] =
+            indicesCol.map(col => ColumnRef(CPathIndex(0), CLong) -> col).toList
 
           // merge them together to produce the heterogeneous output
-          val idCols = Map(fassigned ++ iassigned: _*)
+          val idCols: Map[ColumnRef, Column] = Map(fassigned ++ iassigned: _*)
 
           // put the focus prefix BACK on the results and ids (which are now in an array together)
-          val focusedTransformed = (indexed ++ idCols) map {
+          val focusedTransformed: Map[ColumnRef, Column] = (indexed ++ idCols) map {
             case (ColumnRef(path, tpe), col) =>
               ColumnRef(focus \ path, tpe) -> col
           }
@@ -1682,7 +1684,7 @@ trait ColumnarTableModule
 
           // we need to go back to our original columns and filter them by results
           // if we don't do this, the data will be highly sparse (like an outer join)
-          val unfocusedTransformed = unfocusedExpanded map {
+          val unfocusedTransformed: Map[ColumnRef, Column] = unfocusedExpanded map {
             case (ref, col) =>
               ref -> cf.util.filter(0, slice.size * highWaterMark, keep)(col).get
           }
