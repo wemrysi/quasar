@@ -1531,8 +1531,65 @@ trait ColumnarTableModule
         })(collection.breakOut)
       }
 
-      def leftShiftFocused(indexed: Map[ColumnRef, Column], fieldsCol: Option[Column], indicesCol: Option[Column])
+      def leftShiftFocused(merged: Map[ColumnRef, Column], innerHeads: Vector[CPathNode], definedness: BitSet)
           : Map[ColumnRef, Column] = {
+
+        // move all of our results into second index of an array
+        val indexed: Map[ColumnRef, Column] = merged map {
+          case (ColumnRef(path, tpe), col) =>
+            ColumnRef(1 \: path, tpe) -> col
+        }
+
+        val refinedHeads: Vector[String \/ Int] = innerHeads collect {
+          case CPathField(field) => -\/(field)
+          case CPathIndex(idx) => \/-(idx)
+        }
+
+        val hasFields: Boolean = refinedHeads.exists(_.isLeft)
+        val hasIndices: Boolean = refinedHeads.exists(_.isRight)
+
+        // generate the field names column
+        val fieldsCol: Option[Column] = if (hasFields) {
+          val loci = refinedHeads.zipWithIndex collect {
+            case (-\/(_), i) => i
+          } toSet
+
+          val col = new StrColumn {
+            def apply(row: Int) = {
+              val -\/(back) = refinedHeads(row % refinedHeads.length)
+              back
+            }
+
+            def isDefinedAt(row: Int) =
+              loci(row % refinedHeads.length) && definedness(row)
+          }
+
+          Some(col)
+        } else {
+          None
+        }
+
+        // generate the array indices column
+        val indicesCol: Option[Column] = if (hasIndices) {
+          val loci = refinedHeads.zipWithIndex collect {
+            case (\/-(_), i) => i
+          } toSet
+
+          val col = new LongColumn {
+            def apply(row: Int) = {
+              val \/-(back) = refinedHeads(row % refinedHeads.length)
+              back
+            }
+
+            def isDefinedAt(row: Int) =
+              loci(row % refinedHeads.length) && definedness(row)
+          }
+
+          Some(col)
+        } else {
+          None
+        }
+
         // put the fields and index columns into the same path, in the first index of the array
         val fassigned: List[(ColumnRef, Column)] =
           fieldsCol.map(col => ColumnRef(CPathIndex(0), CString) -> col).toList
@@ -1653,64 +1710,8 @@ trait ColumnarTableModule
           val definedness: BitSet =
             merged.values.map(_.definedAt(0, slice.size * highWaterMark)).reduceOption(_ | _).getOrElse(new BitSet)
 
-          // move all of our results into second index of an array
-          val indexed: Map[ColumnRef, Column] = merged map {
-            case (ColumnRef(path, tpe), col) =>
-              ColumnRef(1 \: path, tpe) -> col
-          }
-
-          val refinedHeads: Vector[String \/ Int] = innerHeads collect {
-            case CPathField(field) => -\/(field)
-            case CPathIndex(idx) => \/-(idx)
-          }
-
-          val hasFields: Boolean = refinedHeads.exists(_.isLeft)
-          val hasIndices: Boolean = refinedHeads.exists(_.isRight)
-
-          // generate the field names column
-          val fieldsCol: Option[Column] = if (hasFields) {
-            val loci = refinedHeads.zipWithIndex collect {
-              case (-\/(_), i) => i
-            } toSet
-
-            val col = new StrColumn {
-              def apply(row: Int) = {
-                val -\/(back) = refinedHeads(row % refinedHeads.length)
-                back
-              }
-
-              def isDefinedAt(row: Int) =
-                loci(row % refinedHeads.length) && definedness(row)
-            }
-
-            Some(col)
-          } else {
-            None
-          }
-
-          // generate the array indices column
-          val indicesCol: Option[Column] = if (hasIndices) {
-            val loci = refinedHeads.zipWithIndex collect {
-              case (\/-(_), i) => i
-            } toSet
-
-            val col = new LongColumn {
-              def apply(row: Int) = {
-                val \/-(back) = refinedHeads(row % refinedHeads.length)
-                back
-              }
-
-              def isDefinedAt(row: Int) =
-                loci(row % refinedHeads.length) && definedness(row)
-            }
-
-            Some(col)
-          } else {
-            None
-          }
-
           val focusedTransformed: Map[ColumnRef, Column] =
-            leftShiftFocused(indexed, fieldsCol, indicesCol)
+            leftShiftFocused(merged, innerHeads, definedness)
 
           val unfocusedTransformed: Map[ColumnRef, Column] =
             leftshiftUnfocused(unfocused, slice.size, definedness, emit, expansion, highWaterMark)
