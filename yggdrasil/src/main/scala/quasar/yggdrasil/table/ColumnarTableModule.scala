@@ -1504,6 +1504,24 @@ trait ColumnarTableModule
         (remapped, emit, unfocused)
       }
 
+      def leftShiftFocused(indexed: Map[ColumnRef, Column], fieldsCol: Option[Column], indicesCol: Option[Column])
+          : Map[ColumnRef, Column] = {
+        // put the fields and index columns into the same path, in the first index of the array
+        val fassigned: List[(ColumnRef, Column)] =
+          fieldsCol.map(col => ColumnRef(CPathIndex(0), CString) -> col).toList
+        val iassigned: List[(ColumnRef, Column)] =
+          indicesCol.map(col => ColumnRef(CPathIndex(0), CLong) -> col).toList
+
+        // merge them together to produce the heterogeneous output
+        val idCols: Map[ColumnRef, Column] = Map(fassigned ++ iassigned: _*)
+
+        // put the focus prefix BACK on the results and ids (which are now in an array together)
+        (indexed ++ idCols) map {
+          case (ColumnRef(path, tpe), col) =>
+            ColumnRef(focus \ path, tpe) -> col
+        }
+      }
+
       def leftshiftUnfocused(
         unfocused: Map[ColumnRef, Column],
         size: Int,
@@ -1685,20 +1703,8 @@ trait ColumnarTableModule
             None
           }
 
-          // put the fields and index columns into the same path, in the first index of the array
-          val fassigned: List[(ColumnRef, Column)] =
-            fieldsCol.map(col => ColumnRef(CPathIndex(0), CString) -> col).toList
-          val iassigned: List[(ColumnRef, Column)] =
-            indicesCol.map(col => ColumnRef(CPathIndex(0), CLong) -> col).toList
-
-          // merge them together to produce the heterogeneous output
-          val idCols: Map[ColumnRef, Column] = Map(fassigned ++ iassigned: _*)
-
-          // put the focus prefix BACK on the results and ids (which are now in an array together)
-          val focusedTransformed: Map[ColumnRef, Column] = (indexed ++ idCols) map {
-            case (ColumnRef(path, tpe), col) =>
-              ColumnRef(focus \ path, tpe) -> col
-          }
+          val focusedTransformed: Map[ColumnRef, Column] =
+            leftShiftFocused(indexed, fieldsCol, indicesCol)
 
           val unfocusedTransformed: Map[ColumnRef, Column] =
             leftshiftUnfocused(unfocused, slice.size, definedness, emit, expansion, highWaterMark)
