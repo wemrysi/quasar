@@ -1504,6 +1504,35 @@ trait ColumnarTableModule
         (remapped, emit, unfocused)
       }
 
+      def leftshiftUnfocused(
+        unfocused: Map[ColumnRef, Column],
+        size: Int,
+        definedness: BitSet,
+        emit: BitSet,
+        expansion: CF1,
+        highWaterMark: Int)
+          : Map[ColumnRef, Column] = {
+
+        // expand all of the unfocused columns
+        val unfocusedExpanded: Map[ColumnRef, Column] = unfocused map {
+          case (ref, col) => ref -> expansion(col).get
+        }
+
+        // additional definedness bitset:
+        // we need to keep every first expanded row
+        // in unfocused that's marked to be kept according to the emit bitset
+        val keep: BitSet = definedness |
+          BitSetUtil.filteredRange(0, size * highWaterMark)(i =>
+            (i % highWaterMark == 0) && emit(i / highWaterMark))
+
+        // we need to go back to our original columns and filter them by results
+        // if we don't do this, the data will be highly sparse (like an outer join)
+        unfocusedExpanded map {
+          case (ref, col) =>
+            ref -> cf.util.filter(0, size * highWaterMark, keep)(col).get
+        }
+      }
+
       // eagerly force the slices, since we'll be backtracking within each
       val slices2: StreamT[IO, Slice] = slices.map(_.materialized) flatMap { slice =>
         val (focused, emit, unfocused) = lens(slice)
@@ -1571,10 +1600,6 @@ trait ColumnarTableModule
           // a CF1 for inflating column sizes to account for shifting
           val expansion = cf.util.Remap(_ / highWaterMark)
 
-          // expand all of the unfocused columns, then mostly leave them alone
-          val unfocusedExpanded: Map[ColumnRef, Column] = unfocused map {
-            case (ref, col) => ref -> expansion(col).get
-          }
 
           val remapped: List[(ColumnRef, Column)] = focused.toList map {
             case (ColumnRef(CPath.Identity, CArrayType(tpe)), col: HomogeneousArrayColumn[a]) =>
@@ -1675,19 +1700,8 @@ trait ColumnarTableModule
               ColumnRef(focus \ path, tpe) -> col
           }
 
-          // additional definedness bitset:
-          // we need to keep every first expanded row
-          // in unfocused that's marked to be kept according to the emit bitset
-          val keep: BitSet = definedness |
-            BitSetUtil.filteredRange(0, slice.size * highWaterMark)(i =>
-              (i % highWaterMark == 0) && emit(i / highWaterMark))
-
-          // we need to go back to our original columns and filter them by results
-          // if we don't do this, the data will be highly sparse (like an outer join)
-          val unfocusedTransformed: Map[ColumnRef, Column] = unfocusedExpanded map {
-            case (ref, col) =>
-              ref -> cf.util.filter(0, slice.size * highWaterMark, keep)(col).get
-          }
+          val unfocusedTransformed: Map[ColumnRef, Column] =
+            leftshiftUnfocused(unfocused, slice.size, definedness, emit, expansion, highWaterMark)
 
           // glue everything back together with the unfocused and compute the new size
           Slice(focusedTransformed ++ unfocusedTransformed, slice.size * highWaterMark)
