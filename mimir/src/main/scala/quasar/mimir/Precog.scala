@@ -34,8 +34,6 @@ import akka.routing.{
 
 import cats.effect.IO
 import fs2.async
-import fs2.interop.scalaz._
-import io.chrisdavenport.scalaz.task._
 
 import org.slf4s.Logging
 
@@ -47,6 +45,7 @@ import java.util.concurrent.CountDownLatch
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.collection.immutable.IndexedSeq
+import scala.util.{Left, Right}
 
 // calling this constructor is a side-effect; you must always shutdown allocated instances
 final class Precog private (dataDir0: File)
@@ -66,18 +65,18 @@ final class Precog private (dataDir0: File)
   val CookThreshold: Int = 20000
   val StorageTimeout: FiniteDuration = 300.seconds
 
-  private var _vfs: SerialVFS = _
+  private var _vfs: SerialVFS[IO] = _
   def vfs = _vfs
 
   private val vfsLatch = new CountDownLatch(1)
 
   private val vfsShutdownSignal =
-    async.signalOf[Task, Option[Unit]](Some(())).unsafePerformSync
+    async.signalOf[IO, Option[Unit]](Some(())).unsafeRunSync
 
   {
     // setup VFS stuff as a side-effect (and a race condition!)
-    val vfsStr = SerialVFS(dataDir0).evalMap { v =>
-      Task delay {
+    val vfsStr = SerialVFS[IO](dataDir0).evalMap { v =>
+      IO {
         _vfs = v
         vfsLatch.countDown()
       }
@@ -85,7 +84,14 @@ final class Precog private (dataDir0: File)
 
     val gated = vfsStr.mergeHaltBoth(vfsShutdownSignal.discrete.noneTerminate.drain)
 
-    Precog.startTask(gated.run, vfsLatch.countDown()).unsafePerformSync
+    gated.compile.drain.unsafeRunAsync {
+      case Left(t) =>
+        log.error(s"exception in background task", t)
+        vfsLatch.countDown()
+
+      case Right(_) => ()
+    }
+
     vfsLatch.await()      // sigh....
   }
 
@@ -116,7 +122,7 @@ final class Precog private (dataDir0: File)
 
   def shutdown: IO[Unit] = {
     for {
-      _ <- vfsShutdownSignal.set(None).to[IO]
+      _ <- vfsShutdownSignal.set(None)
       _ <- IO.fromFuture(IO(actorSystem.terminate.map(_ => ())))
     } yield ()
   }
@@ -124,8 +130,8 @@ final class Precog private (dataDir0: File)
 
 object Precog extends Logging {
 
-  def apply(dataDir: File): Task[Precog] =
-    Task.delay(new Precog(dataDir))
+  def apply(dataDir: File): IO[Precog] =
+    IO(new Precog(dataDir))
 
   // utility function for running a Task in the background
   def startTask(ta: Task[_], cb: => Unit): Task[Unit] =
