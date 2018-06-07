@@ -1504,6 +1504,33 @@ trait ColumnarTableModule
         (remapped, emit, unfocused)
       }
 
+      def merge(focused: Map[ColumnRef, Column], innerIndex: Map[CPathNode, Int], expansion: CF1, highWaterMark: Int)
+          : Map[ColumnRef, Column] = {
+
+        val remapped: List[(ColumnRef, Column)] = focused.toList map {
+          case (ColumnRef(CPath.Identity, CArrayType(tpe)), col: HomogeneousArrayColumn[a]) =>
+            ???
+
+          // because of how we have defined things, path is guaranteed NOT to be Identity now
+          case (ColumnRef(path, tpe), col) =>
+            val head = path.head.get
+            val locus = innerIndex(head)
+
+            // explode column and then sparsen by mod ring
+            val expanded =
+              expansion.andThen(cf.util.filterBy(_ % highWaterMark == locus))(col).get
+
+            ColumnRef(path.dropPrefix(head).get, tpe) -> expanded
+        }
+
+        // put together all the same-ref columns which now are mapped to the same path
+        remapped.groupBy(_._1).map({
+          // the key here is the column ref; the value is the list of same-type pairs
+          case (ref, toMerge) =>
+            ref -> toMerge.map(_._2).reduce(cf.util.UnionRight(_, _).get)
+        })(collection.breakOut)
+      }
+
       def leftShiftFocused(indexed: Map[ColumnRef, Column], fieldsCol: Option[Column], indicesCol: Option[Column])
           : Map[ColumnRef, Column] = {
         // put the fields and index columns into the same path, in the first index of the array
@@ -1618,29 +1645,8 @@ trait ColumnarTableModule
           // a CF1 for inflating column sizes to account for shifting
           val expansion = cf.util.Remap(_ / highWaterMark)
 
-
-          val remapped: List[(ColumnRef, Column)] = focused.toList map {
-            case (ColumnRef(CPath.Identity, CArrayType(tpe)), col: HomogeneousArrayColumn[a]) =>
-              ???
-
-            // because of how we have defined things, path is guaranteed NOT to be Identity now
-            case (ColumnRef(path, tpe), col) =>
-              val head = path.head.get
-              val locus = innerIndex(head)
-
-              // explode column and then sparsen by mod ring
-              val expanded =
-                expansion.andThen(cf.util.filterBy(_ % highWaterMark == locus))(col).get
-
-              ColumnRef(path.dropPrefix(head).get, tpe) -> expanded
-          }
-
-          // put together all the same-ref columns which now are mapped to the same path
-          val merged: Map[ColumnRef, Column] = remapped.groupBy(_._1).map({
-            // the key here is the column ref; the value is the list of same-type pairs
-            case (ref, toMerge) =>
-              ref -> toMerge.map(_._2).reduce(cf.util.UnionRight(_, _).get)
-          })(collection.breakOut)
+          val merged: Map[ColumnRef, Column] =
+            merge(focused, innerIndex, expansion, highWaterMark)
 
           // figure out the definedness of the exploded, filtered result
           // this is necessary so we can implement inner-concat semantics
