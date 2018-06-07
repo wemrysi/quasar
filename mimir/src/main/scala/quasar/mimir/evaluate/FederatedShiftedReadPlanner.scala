@@ -37,9 +37,7 @@ import quasar.yggdrasil.table.Slice
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.{IO, LiftIO}
-import fs2.{Chunk, Stream}
-import fs2.interop.scalaz._
-import fs2.interop.cats.asyncInstance
+import fs2.Stream
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -117,8 +115,8 @@ final class FederatedShiftedReadPlanner[
       d.value
         .onFinalize(d.dispose)
         .map(data => RValue.fromJValueRaw(JValue.fromData(data)))
-        .chunks
-        .map(c => Slice.fromRValues(unfold(c: Chunk[RValue])(_.uncons)))
+        .segments
+        .map(s => Slice.fromRValues(unfold(s)(_.force.uncons1.toOption)))
 
 
     for {

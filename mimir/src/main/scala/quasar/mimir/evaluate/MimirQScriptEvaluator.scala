@@ -40,7 +40,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.{IO, LiftIO}
 import fs2.{Chunk, Stream}
-import fs2.interop.scalaz._
 import io.chrisdavenport.scalaz.task._
 import iotaz.CopK
 import matryoshka._

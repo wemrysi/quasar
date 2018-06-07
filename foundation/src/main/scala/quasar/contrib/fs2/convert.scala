@@ -16,34 +16,34 @@
 
 package quasar.contrib.fs2
 
-import slamdata.Predef.{Boolean, None, Option, Some, Unit}
+import slamdata.Predef.{Boolean, None, Option, Some, Throwable, Unit}
 import quasar.Disposable
 
 import java.util.Iterator
 import java.util.stream.{Stream => JStream}
-import scala.util.{Left, Right}
+import scala.util.{Either, Left, Right}
 
+import cats.effect.{Concurrent, Sync}
 import fs2.{async, Chunk, Stream}
-import fs2.interop.scalaz._
-import fs2.util.{Async, Attempt, Suspendable}
 import scalaz.{Functor, StreamT}
 import scalaz.stream.Process
 import scalaz.std.option._
 import scalaz.syntax.monad._
+import scalaz.syntax.std.boolean._
+import shims._
 
 object convert {
 
   // java.util.stream.Stream
 
-  def fromJavaStream[F[_], A](js: F[JStream[A]])(implicit F: Suspendable[F]): Stream[F, A] = {
+  def fromJavaStream[F[_], A](js: F[JStream[A]])(implicit F: Sync[F]): Stream[F, A] = {
     def getNext(i: Iterator[A]): F[Option[(A, Iterator[A])]] =
       F.delay(i.hasNext).ifM(
         F.delay(Some((i.next(), i))),
         F.pure(None))
 
-    Stream.bracket(js)(
-      s => Stream.unfoldEval(s.iterator)(getNext),
-      s => F.delay(s.close()))
+    Stream.bracket(js)(s => F.delay(s.close()))
+      .flatMap(s => Stream.unfoldEval(s.iterator)(getNext))
   }
 
 
@@ -58,13 +58,13 @@ object convert {
   def fromStreamT[F[_]: Functor, A](st: StreamT[F, A]): Stream[F, A] =
     fromChunkedStreamT(st.map(a => Chunk.singleton(a): Chunk[A]))
 
-  def toStreamT[F[_]: Async, A](s: Stream[F, A]): F[Disposable[F, StreamT[F, A]]] =
+  def toStreamT[F[_]: Concurrent, A](s: Stream[F, A]): F[Disposable[F, StreamT[F, A]]] =
     chunkQ(s) map { case (startQ, close) =>
       Disposable(
         StreamT.wrapEffect(startQ.map(q =>
           for {
             c <- StreamT.unfoldM(q)(_.dequeue1.map(_.flatMap(_.toOption).strengthR(q)))
-            a <- StreamT.unfoldM(c)(_.uncons.point[F])
+            a <- StreamT.unfoldM(0)(i => (i < c.size).option((c(i), i + 1)).point[F])
           } yield a)),
         close)
     }
@@ -72,7 +72,7 @@ object convert {
 
   // scalaz.Process
 
-  def toProcess[F[_]: Async, A](s: Stream[F, A]): Process[F, A] = {
+  def toProcess[F[_]: Concurrent, A](s: Stream[F, A]): Process[F, A] = {
     val runQ =
       chunkQ(s).flatMap { case (q, c) => q.strengthR(c) }
 
@@ -88,19 +88,19 @@ object convert {
 
   ////
 
-  private def chunkQ[F[_], A](s: Stream[F, A])(implicit F: Async[F])
-      : F[(F[async.mutable.Queue[F, Option[Attempt[Chunk[A]]]]], F[Unit])] =
+  private def chunkQ[F[_], A](s: Stream[F, A])(implicit F: Concurrent[F])
+      : F[(F[async.mutable.Queue[F, Option[Either[Throwable, Chunk[A]]]]], F[Unit])] =
     async.signalOf[F, Boolean](false) map { i =>
       val startQ = for {
-        q <- async.boundedQueue[F, Option[Attempt[Chunk[A]]]](1)
+        q <- async.boundedQueue[F, Option[Either[Throwable, Chunk[A]]]](1)
 
         enqueue =
           s.chunks.attempt.noneTerminate
             .interruptWhen(i)
             .to(q.enqueue)
-            .onError(_ => Stream.eval(q.enqueue1(None)))
+            .handleErrorWith(t => Stream.eval(q.enqueue1(Some(Left(t)))))
 
-        _ <- F.start(enqueue.run)
+        _ <- F.start(enqueue.compile.drain)
       } yield q
 
       (startQ, i.set(true))

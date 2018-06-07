@@ -21,8 +21,8 @@ import quasar.api.{DataSourceType, ResourcePath}
 import quasar.api.DataSourceError.InitializationError
 
 import argonaut.Json
+import cats.effect.Async
 import fs2.Stream
-import fs2.util.Async
 import scalaz.\/
 
 trait LightweightDataSourceModule {

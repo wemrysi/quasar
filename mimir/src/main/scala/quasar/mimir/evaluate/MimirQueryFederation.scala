@@ -29,8 +29,6 @@ import quasar.mimir._, MimirCake._
 
 import cats.effect.{IO, LiftIO}
 import fs2.Stream
-import fs2.interop.scalaz._
-import fs2.interop.cats.reverse._
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import scalaz.{\/, DList, Monad, WriterT}
 import scalaz.std.tuple._

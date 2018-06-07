@@ -18,28 +18,36 @@ package quasar.yggdrasil.vfs
 
 import quasar.precog.util.IOUtils
 
+import cats.arrow.FunctionK
+import cats.effect.IO
+
 import fs2.Stream
-import fs2.interop.scalaz._
 
 import org.specs2.mutable._
 
 import pathy.Path
 
-import scalaz.{~>, Coproduct, NaturalTransformation}
-import scalaz.concurrent.Task
+import scalaz.{~>, NaturalTransformation}
+
+import shims._
 
 import scodec.bits.ByteVector
 
 import java.nio.file.Files
 import java.io.{File, FileInputStream, FileOutputStream}
 
+import iotaz.CopK
+
 object RealPOSIXSpecs extends Specification {
   import POSIXOp._
+
+  def ioPOSIX(root: File): IO[POSIXOp ~> IO] =
+    RealPOSIX[IO](root)
 
   "real posix interpreter" should {
     "mkdir on root if non-existent" in {
       val target = new File(newBase(), "non-existent")
-      RealPOSIX(target).unsafePerformSync
+      ioPOSIX(target).unsafeRunSync
 
       target.exists() mustEqual true
       target.isDirectory() mustEqual true
@@ -47,12 +55,12 @@ object RealPOSIXSpecs extends Specification {
 
     "produce distinct UUIDs" in setupDir { base =>
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         first <- interp(GenUUID)
         second <- interp(GenUUID)
       } yield (first, second)
 
-      val (first, second) = test.unsafePerformSync
+      val (first, second) = test.unsafeRunSync
 
       first must not(be(second))
     }
@@ -65,25 +73,25 @@ object RealPOSIXSpecs extends Specification {
       fos.close()
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         results <- interp(OpenR(Path.rootDir </> Path.file("test")))
         contents <- translate(results, interp).fold(ByteVector.empty)(_ ++ _).runLast
       } yield contents
 
-      test.unsafePerformSync must beSome(ByteVector(1, 2, 3, 4, 5))
+      test.unsafeRunSync must beSome(ByteVector(1, 2, 3, 4, 5))
     }
 
     "write to a file" in setupDir { base =>
       val file = new File(base, "test")
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         sink <- interp(OpenW(Path.rootDir </> Path.file("test")))
-        driver = Stream(ByteVector(1, 2, 3, 4, 5)).to(sink)
+        driver = Stream(ByteVector(1, 2, 3, 4, 5)).covary[POSIXWithIO].to(sink)
         _ <- translate(driver, interp).run
       } yield ()
 
-      test.unsafePerformSync
+      test.unsafeRunSync
 
       val fis = new FileInputStream(file)
       val buffer = new Array[Byte](10)
@@ -98,22 +106,22 @@ object RealPOSIXSpecs extends Specification {
       targets.foreach(target => Files.createFile(new File(base, target).toPath()))
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         files <- interp(Ls(Path.rootDir))
       } yield files
 
-      test.unsafePerformSync must containTheSameElementsAs(targets.map(Path.file))
+      test.unsafeRunSync must containTheSameElementsAs(targets.map(Path.file))
     }
 
     "make a subdirectory" in setupDir { base =>
       val target = "foo"
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         _ <- interp(MkDir(Path.rootDir </> Path.dir(target)))
       } yield ()
 
-      test.unsafePerformSync
+      test.unsafeRunSync
 
       val ftarget = new File(base, target)
 
@@ -126,12 +134,12 @@ object RealPOSIXSpecs extends Specification {
       val to = "bar"
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         _ <- interp(MkDir(Path.rootDir </> Path.dir(from)))
         _ <- interp(LinkDir(Path.rootDir </> Path.dir(from), Path.rootDir </> Path.dir(to)))
       } yield ()
 
-      test.unsafePerformSync
+      test.unsafeRunSync
 
       val ffrom = new File(base, from)
       val fto = new File(base, to)
@@ -149,20 +157,20 @@ object RealPOSIXSpecs extends Specification {
       val to = "bar"
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
 
         sink1 <- interp(OpenW(Path.rootDir </> Path.file(from)))
-        driver1 = Stream(ByteVector(1, 2, 3)).to(sink1)
+        driver1 = Stream(ByteVector(1, 2, 3)).covary[POSIXWithIO].to(sink1)
         _ <- translate(driver1, interp).run
 
         _ <- interp(LinkFile(Path.rootDir </> Path.file(from), Path.rootDir </> Path.file(to)))
 
         sink2 <- interp(OpenW(Path.rootDir </> Path.file(from)))
-        driver2 = Stream(ByteVector(4, 5, 6)).to(sink2)
+        driver2 = Stream(ByteVector(4, 5, 6)).covary[POSIXWithIO].to(sink2)
         _ <- translate(driver2, interp).run
       } yield ()
 
-      test.unsafePerformSync
+      test.unsafeRunSync
 
       val fis = new FileInputStream(new File(base, to))
       val buffer = new Array[Byte](3)
@@ -179,11 +187,11 @@ object RealPOSIXSpecs extends Specification {
       Files.createFile(new File(base, from).toPath())
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         _ <- interp(Move(Path.rootDir </> Path.file(from), Path.rootDir </> Path.file(to)))
       } yield ()
 
-      test.unsafePerformSync
+      test.unsafeRunSync
 
       new File(base, from).exists() mustEqual false
       new File(base, to).exists() mustEqual true
@@ -196,12 +204,12 @@ object RealPOSIXSpecs extends Specification {
       Files.createFile(new File(base, foo).toPath())
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         fooEx <- interp(Exists(Path.rootDir </> Path.file(foo)))
         barEx <- interp(Exists(Path.rootDir </> Path.file(bar)))
       } yield (fooEx, barEx)
 
-      val (fooEx, barEx) = test.unsafePerformSync
+      val (fooEx, barEx) = test.unsafeRunSync
 
       fooEx mustEqual true
       barEx mustEqual false
@@ -214,12 +222,12 @@ object RealPOSIXSpecs extends Specification {
       new File(base, foo).mkdir()
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         fooEx <- interp(Exists(Path.rootDir </> Path.dir(foo)))
         barEx <- interp(Exists(Path.rootDir </> Path.dir(bar)))
       } yield (fooEx, barEx)
 
-      val (fooEx, barEx) = test.unsafePerformSync
+      val (fooEx, barEx) = test.unsafeRunSync
 
       fooEx mustEqual true
       barEx mustEqual false
@@ -231,11 +239,11 @@ object RealPOSIXSpecs extends Specification {
       Files.createFile(new File(base, target).toPath())
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         _ <- interp(Delete(Path.rootDir </> Path.file(target)))
       } yield ()
 
-      test.unsafePerformSync
+      test.unsafeRunSync
 
       new File(base, target).exists() mustEqual false
     }
@@ -247,11 +255,11 @@ object RealPOSIXSpecs extends Specification {
       ftarget.mkdir()
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         _ <- interp(Delete(Path.rootDir </> Path.dir(target)))
       } yield ()
 
-      test.unsafePerformSync
+      test.unsafeRunSync
 
       ftarget.exists() mustEqual false
     }
@@ -265,11 +273,11 @@ object RealPOSIXSpecs extends Specification {
       Files.createFile(new File(ftarget, "bar").toPath())
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         _ <- interp(Delete(Path.rootDir </> Path.dir(target)))
       } yield ()
 
-      test.unsafePerformSync
+      test.unsafeRunSync
 
       ftarget.exists() mustEqual false
     }
@@ -283,12 +291,12 @@ object RealPOSIXSpecs extends Specification {
       Files.createFile(new File(ftarget, "test").toPath())
 
       val test = for {
-        interp <- RealPOSIX(base)
+        interp <- ioPOSIX(base)
         _ <- interp(LinkDir(Path.rootDir </> Path.dir("foo"), Path.rootDir </> Path.dir("bar")))
         _ <- interp(Delete(Path.rootDir </> Path.dir("bar")))
       } yield ()
 
-      test.unsafePerformSync
+      test.unsafeRunSync
 
       ftarget.exists() mustEqual true
       new File(ftarget, "test").exists() mustEqual true
@@ -297,12 +305,10 @@ object RealPOSIXSpecs extends Specification {
     }
   }
 
-  def translate[A](str: Stream[POSIXWithTask, A], interp: POSIXOp ~> Task): Stream[Task, A] = {
-    import fs2.util.UF1
-
-    val nt = λ[UF1[POSIXWithTask, Task]] { pwt =>
+  def translate[A](str: Stream[POSIXWithIO, A], interp: POSIXOp ~> IO): Stream[IO, A] = {
+    val nt = λ[FunctionK[POSIXWithIO, IO]] { pwt =>
       val fullInt =
-        λ[Coproduct[POSIXOp, Task, ?] ~> Task](_.fold(interp, NaturalTransformation.refl[Task]))
+        CopK.NaturalTransformation.of[POSIXWithIOCopK, IO](interp, NaturalTransformation.refl[IO])
 
       pwt.foldMap(fullInt)
     }

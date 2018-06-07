@@ -19,10 +19,10 @@ package quasar.datagen
 import slamdata.Predef.{Stream => _, _}
 import quasar.{Data, DataCodec}
 import quasar.ejson.{optics => eoptics, EJson}
+import quasar.contrib.iota.copkTraverse
 
 import argonaut.{Json, Parse}
 import fs2.{Pipe, Stream}
-import fs2.interop.scalaz._
 import matryoshka.{Corecursive, Recursive}
 import matryoshka.implicits._
 import scalaz.syntax.show._
@@ -39,6 +39,6 @@ object codec {
     _.map(_.cata(Data.fromEJson))
       .flatMap(d =>
         DataCodec.Precise.encode(d)
-          .fold(failedStream[F, Json](s"Unable to encode as JSON: ${d.shows}"))(Stream.emit))
+          .fold(failedStream[F, Json](s"Unable to encode as JSON: ${d.shows}"))(Stream.emit(_).covary[F]))
       .map(_.nospaces)
 }

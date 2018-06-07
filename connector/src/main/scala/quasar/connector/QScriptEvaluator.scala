@@ -19,6 +19,7 @@ package quasar.connector
 import slamdata.Predef.Set
 import quasar.RenderTreeT
 import quasar.api.ResourceError.ReadError
+import quasar.contrib.iota.:<<:
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.ski.κ

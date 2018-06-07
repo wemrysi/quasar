@@ -23,7 +23,6 @@ import quasar.api.{DataSourceType, ResourceName, ResourcePath, ResourcePathType}
 import quasar.api.ResourceError._
 import quasar.connector.DataSource
 import quasar.connector.datasource.LightweightDataSource
-import quasar.contrib.fs2.chunk._
 import quasar.contrib.fs2.convert
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
@@ -36,13 +35,13 @@ import scala.collection.JavaConverters._
 import scala.collection.Seq
 
 import argonaut.Json
+import cats.effect.{Effect, Sync, Timer}
 import fs2.{io, Chunk, Stream}
-import fs2.interop.scalaz._
-import fs2.util.{Async, Effect}
 import jawn.AsyncParser
 import jawn.support.argonaut.Parser.facade
 import pathy.Path
 import scalaz.{\/, EitherT, Scalaz}, Scalaz._
+import shims._
 
 /** A DataSource backed by the underlying filesystem local to Quasar.
   *
@@ -53,7 +52,7 @@ import scalaz.{\/, EitherT, Scalaz}, Scalaz._
   * @param root the scope of this datasource, all paths will be considered relative to this one.
   * @param readChunkSizeBytes the number of bytes per chunk to use when reading files.
   */
-final class LocalDataSource[F[_]: Effect, G[_]: Async] private (
+final class LocalDataSource[F[_]: Sync, G[_]: Effect: Timer] private (
     root: JPath,
     readChunkSizeBytes: Int)
     extends LightweightDataSource[F, Stream[G, ?], Stream[G, Data]] {
@@ -112,14 +111,14 @@ final class LocalDataSource[F[_]: Effect, G[_]: Async] private (
 
   ////
 
-  private val F = Effect[F]
-  private val G = Async[G]
+  private val F = Sync[F]
+  private val G = Effect[G]
   private val ME = MonadError_[F, Throwable]
 
 
   private def parseJsonAsync(parser: AsyncParser[Json], path: JPath): Stream[G, Json] = {
     def unattemptChunk(at: Either[Exception, Seq[Json]]): Stream[G, Json] =
-      at.fold(Stream.fail, Stream.emits)
+      at.fold(Stream.raiseError, Stream.emits).covary[G]
 
     val initial =
       io.file.readAllAsync[G](path, readChunkSizeBytes)
@@ -133,7 +132,8 @@ final class LocalDataSource[F[_]: Effect, G[_]: Async] private (
   private def decodeChunk(c: Chunk[Json]): Stream[G, Data] =
     c.traverse(Precise.decode)
       .leftMap(e => new ParseException(e.message, -1))
-      .fold(Stream.fail, Stream.chunk)
+      .fold(Stream.raiseError, Stream.chunk)
+      .covary[G]
 
   private object ifExists {
     def apply[E >: CommonError] = new PartiallyApplied[E]
@@ -169,7 +169,7 @@ final class LocalDataSource[F[_]: Effect, G[_]: Async] private (
 }
 
 object LocalDataSource {
-  def apply[F[_]: Effect, G[_]: Async](
+  def apply[F[_]: Sync, G[_]: Effect: Timer](
       root: JPath,
       readChunkSizeBytes: Int)
       : DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]] =

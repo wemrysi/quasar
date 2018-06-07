@@ -18,21 +18,22 @@ package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{ADir, RDir, RFile}
 import quasar.contrib.scalaz.stateT, stateT._
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import argonaut.{Argonaut, Parse}
 
+import cats.effect.IO
 import fs2.Stream
-import fs2.interop.scalaz.StreamScalazOps
 
 import pathy.Path
 
-import scalaz.{:<:, Free, Monad, StateT}
-import scalaz.concurrent.Task
+import scalaz.{Free, Monad, StateT}
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.string._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
+import shims.{monadToCats => _, _}
 
 import scodec.bits.ByteVector
 
@@ -56,7 +57,7 @@ object VersionLog {
   private val KeepLimit = 5
 
   // TODO failure recovery
-  def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VersionLog] = {
+  def init[S[a] <: ACopK[a]](baseDir: ADir)(implicit IP: POSIXOp :<<: S, IT: IO :<<: S): Free[S, VersionLog] = {
     for {
       exists <- POSIX.exists[S](baseDir </> VersionsJson)
 
@@ -66,16 +67,17 @@ object VersionLog {
 
           // TODO character encoding!
           fileString = fileStream.map(_.toArray).map(new String(_)).foldMonoid
-          json <- POSIXWithTask.generalize[S](fileString.runLast)
+          json <- POSIXWithIO.generalize[S](fileString.compile.last)
         } yield json.flatMap(Parse.decodeOption[List[Version]](_)).getOrElse(Nil)
       } else {
         for {
+
           vnew <- POSIX.openW[S](baseDir </> VersionsJsonNew)
 
           json = List[Version]().asJson.nospaces
           // TODO character encoding!
-          writer = Stream.emit(ByteVector(json.getBytes)).to(vnew).run
-          _ <- POSIXWithTask.generalize(writer)
+          writer = Stream.emit(ByteVector(json.getBytes)).covary[POSIXWithIO].to(vnew).run
+          _ <- POSIXWithIO.generalize(writer)
 
           _ <- POSIX.move[S](baseDir </> VersionsJsonNew, baseDir </> VersionsJson)
         } yield Nil
@@ -97,7 +99,7 @@ object VersionLog {
     } yield VersionLog(baseDir, committed, versions.toSet)
   }
 
-  def fresh[S[_]](implicit I: POSIXOp :<: S): StateT[Free[S, ?], VersionLog, Version] = {
+  def fresh[S[a] <: ACopK[a]](implicit I: POSIXOp :<<: S): StateT[Free[S, ?], VersionLog, Version] = {
     for {
       log <- StateTContrib.get[Free[S, ?], VersionLog]
       uuid <- POSIX.genUUID[S].liftM[ST]
@@ -120,7 +122,7 @@ object VersionLog {
     StateTContrib.get[F, VersionLog].map(_.baseDir </> Path.dir(v.value.toString))
 
   // TODO add symlink
-  def commit[S[_]](v: Version)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
+  def commit[S[a] <: ACopK[a]](v: Version)(implicit IP: POSIXOp :<<: S, IT: IO :<<: S): StateT[Free[S, ?], VersionLog, Unit] = {
     for {
       log <- StateTContrib.get[Free[S, ?], VersionLog]
       log2 = log.copy(committed = v :: log.committed)
@@ -133,8 +135,8 @@ object VersionLog {
 
           json = log2.committed.asJson.nospaces
           // TODO character encoding!
-          writer = Stream.emit(ByteVector(json.getBytes)).to(vnew).run
-          _ <- POSIXWithTask.generalize(writer).liftM[ST]
+          writer = Stream.emit(ByteVector(json.getBytes)).covary[POSIXWithIO].to(vnew).run
+          _ <- POSIXWithIO.generalize(writer).liftM[ST]
 
           _ <- POSIX.move[S](log.baseDir </> VersionsJsonNew, log.baseDir </> VersionsJson).liftM[ST]
 
@@ -157,7 +159,7 @@ object VersionLog {
     } yield back
   }
 
-  def purgeOld[S[_]](implicit I: POSIXOp :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
+  def purgeOld[S[a] <: ACopK[a]](implicit I: POSIXOp :<<: S): StateT[Free[S, ?], VersionLog, Unit] = {
     for {
       log <- StateTContrib.get[Free[S, ?], VersionLog]
       toPurge = log.committed.drop(KeepLimit)

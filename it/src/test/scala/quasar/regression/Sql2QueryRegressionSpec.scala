@@ -27,8 +27,8 @@ import quasar.contrib.argonaut._
 import quasar.contrib.cats.effect.liftio._
 import quasar.contrib.fs2.convert
 import quasar.contrib.fs2.stream._
+import quasar.contrib.iota._
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.MonadError_
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
 import quasar.evaluate.FederatingQueryEvaluator
@@ -52,12 +52,9 @@ import java.nio.file.{Files, Path => JPath, Paths}
 import java.text.ParseException
 
 import argonaut._, Argonaut._
-import cats.effect.IO
+import cats.effect.{ConcurrentEffect, Effect, IO, Sync, Timer}
 import eu.timepit.refined.auto._
-import fs2.{concurrent, io, text, Stream}
-import fs2.interop.scalaz.{asyncInstance => taskAsyncInstance, _}
-import fs2.interop.scalaz.reverse.naturalTransformationToUf1
-import fs2.interop.cats._
+import fs2.{io, text, Stream}
 import _root_.io.chrisdavenport.scalaz.task._
 import matryoshka._
 import matryoshka.implicits._
@@ -67,17 +64,16 @@ import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+// import shims._ causes compilation to not terminate in any reasonable amount of time.
+import shims.{monadErrorToScalaz, monadToScalaz}
 
 final class Sql2QueryRegressionSpec extends Qspec {
   import Sql2QueryRegressionSpec._
 
-  type M[A] = EitherT[EitherT[StateT[WriterT[Task, PhaseResults, ?], Long, ?], SemanticErrors, ?], PlannerError, A]
+  type M[A] = EitherT[EitherT[StateT[WriterT[IO, PhaseResults, ?], Long, ?], SemanticErrors, ?], PlannerError, A]
 
-  implicit val ioMonadError: MonadError_[IO, Throwable] =
-    MonadError_.monadErrorNoMonad(shims.monadErrorToScalaz[IO, Throwable])
-
-  val taskToM: Task ~> M =
-    λ[Task ~> M](
+  val ioToM: IO ~> M =
+    λ[IO ~> M](
       _.liftM[WriterT[?[_], PhaseResults, ?]]
         .liftM[StateT[?[_], Long, ?]]
         .liftM[EitherT[?[_], SemanticErrors,?]]
@@ -85,19 +81,19 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   val queryEvaluator =
     for {
-      tmpPath <- Task.delay(Files.createTempDirectory("quasar-test-"))
+      tmpPath <- IO(Files.createTempDirectory("quasar-test-"))
       tmpDir = tmpPath.toFile
 
       cake <- Precog(tmpDir)
 
-      local = LocalDataSource[Task, IO](jPath(TestDataRoot), 8192)
+      local = LocalDataSource[IO, IO](jPath(TestDataRoot), 8192)
 
-      localM = HFunctor[QueryEvaluator[?[_], Stream[IO, ?], ResourcePath, Stream[IO, Data]]].hmap(local)(taskToM)
+      localM = HFunctor[QueryEvaluator[?[_], Stream[IO, ?], ResourcePath, Stream[IO, Data]]].hmap(local)(ioToM)
 
       sdown =
-        cake.shutdown.to[Task]
-          .onFinish(_ => Task.delay(tmpDir.deleteOnExit()))
-          .onFinish(_ => local.shutdown)
+        cake.shutdown
+          .guarantee(IO(tmpDir.deleteOnExit()))
+          .guarantee(local.shutdown)
 
       mimirFederation = MimirQueryFederation[Fix, M](cake)
 
@@ -121,13 +117,10 @@ final class Sql2QueryRegressionSpec extends Qspec {
       expr: Fix[Sql],
       vars: Variables,
       basePath: ADir)
-      : Stream[Task, Data] = {
+      : Stream[IO, Data] = {
 
-    val ioToTask =
-      naturalTransformationToUf1(λ[IO ~> Task](_.to[Task]))
-
-    def failS(msg: String): Stream[Task, Data] =
-      Stream.fail(new RuntimeException(msg))
+    def failS(msg: String): Stream[IO, Data] =
+      Stream.raiseError(new RuntimeException(msg)).covary[IO]
 
     val results =
       for {
@@ -141,7 +134,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
         qs <- LPtoQS[Fix].apply[M](dataPaths)
 
         r  <- f(qs)
-      } yield r.fold(e => failS(e.shows), _.translate(ioToTask))
+      } yield r.valueOr(e => failS(e.shows))
 
     Stream.force(
       results
@@ -153,16 +146,16 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   ////
 
-  (regressionTests(TestsRoot, TestDataRoot) |@| queryEvaluator)({
+  (regressionTests[IO](TestsRoot, TestDataRoot) |@| queryEvaluator)({
     case (tests, (eval, sdown)) =>
       suiteName >> {
         tests.toList foreach { case (f, t) =>
           regressionExample(f, t, BackendName("mimir"), queryResults(eval.evaluate))
         }
 
-        step(sdown.unsafePerformSync)
+        step(sdown.unsafeRunSync)
       }
-  }).unsafePerformSync
+  }).unsafeRunSync
 
   ////
 
@@ -171,7 +164,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
       loc: RFile,
       test: RegressionTest,
       backendName: BackendName,
-      results: (Fix[Sql], Variables, ADir) => Stream[Task, Data])
+      results: (Fix[Sql], Variables, ADir) => Stream[IO, Data])
       : Fragment = {
     def runTest: execute.Result = {
       val data = testQuery(
@@ -181,7 +174,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
         results)
 
       verifyResults(test.expected, data, backendName)
-        .timed(2.minutes)
+        .timed(5.minutes)
         .unsafePerformSync
     }
 
@@ -204,7 +197,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
   /** Verify the given results according to the provided expectation. */
   def verifyResults(
       exp: ExpectedResult,
-      act: Stream[Task, Data],
+      act: Stream[IO, Data],
       backendName: BackendName)
       : Task[execute.Result] = {
 
@@ -215,7 +208,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
       λ[EndoK[ejson.Common]](CO.dec.modify(_.round(TestContext))(_))
 
     val normalizeJson: Json => Json =
-      j => Recursive[Json, ejson.Json].transCata(j)(liftFF(reducePrecision[Json]))
+      j => Recursive[Json, ejson.Json].transCata(j)(liftFFCopK(reducePrecision[Json]))
 
     val deleteFields: Json => Json =
       _.withObject(exp.ignoredFields.foldLeft(_)(_ - _))
@@ -242,10 +235,14 @@ final class Sql2QueryRegressionSpec extends Qspec {
             OrderIgnored
         } | OrderPreserved
 
+    val actProcess =
+      convert.toProcess(act.map(normalizeJson <<< deleteFields <<< (_.asJson)))
+        .translate(λ[IO ~> Task](_.to[Task]))
+
     val result =
       exp.predicate(
         exp.rows.toVector,
-        convert.toProcess(act.map(normalizeJson <<< deleteFields <<< (_.asJson))),
+        actProcess,
         fieldOrderSignificance,
         resultOrderSignificance)
 
@@ -273,41 +270,42 @@ final class Sql2QueryRegressionSpec extends Qspec {
   }
 
   /** Parse and execute the given query, returning a stream of results. */
-  def testQuery(
+  def testQuery[F[_]](
       loc: ADir,
       qry: String,
       vars: Map[String, String],
-      results: (Fix[Sql], Variables, ADir) => Stream[Task, Data])
-      : Stream[Task, Data] =
+      results: (Fix[Sql], Variables, ADir) => Stream[F, Data])
+      : Stream[F, Data] =
     sql.fixParser.parseExpr(qry).fold(
-      e => Stream.fail(new ParseException(e.message, -1)),
+      e => Stream.raiseError(new ParseException(e.message, -1)).covary[F],
       s => results(s.mkPathsAbsolute(loc), Variables.fromMap(vars), loc))
 
   /** Returns all the `RegressionTest`s found in the given directory, keyed by
     * file path.
     */
-  def regressionTests(
+  def regressionTests[F[_]: ConcurrentEffect: Timer](
       testDir: RDir,
       dataDir: RDir)
-      : Task[Map[RFile, RegressionTest]] =
-    concurrent.join(12)(
-      descendantsMatching(testDir, TestPattern)
-        .map(f => loadRegressionTest(f).map((f.relativeTo(dataDir).get, _))))
-      .runFold(Map[RFile, RegressionTest]())(_ + _)
+      : F[Map[RFile, RegressionTest]] =
+    descendantsMatching[F](testDir, TestPattern)
+      .map(f => loadRegressionTest[F](f).map((f.relativeTo(dataDir).get, _)))
+      .join(12)
+      .compile
+      .fold(Map[RFile, RegressionTest]())(_ + _)
 
   /** Loads a `RegressionTest` from the given file. */
-  def loadRegressionTest(file: RFile): Stream[Task, RegressionTest] =
-    io.file.readAllAsync[Task](jPath(file), 1024)
+  def loadRegressionTest[F[_]: Effect: Timer](file: RFile): Stream[F, RegressionTest] =
+    io.file.readAllAsync[F](jPath(file), 1024)
       .through(text.utf8Decode)
       .reduce(_ + _)
       .flatMap(txt =>
         decodeJson[RegressionTest](txt).fold(
-          err => Stream.fail(new RuntimeException(posixCodec.printPath(file) + ": " + err)),
-          Stream.emit))
+          err => Stream.raiseError(new RuntimeException(posixCodec.printPath(file) + ": " + err)),
+          Stream.emit).covary[F])
 
   /** Returns all descendant files in the given dir matching `pattern`. */
-  def descendantsMatching(d: RDir, pattern: Regex): Stream[Task, RFile] =
-    convert.fromJavaStream(Task.delay(Files.walk(jPath(d))))
+  def descendantsMatching[F[_]: Sync](d: RDir, pattern: Regex): Stream[F, RFile] =
+    convert.fromJavaStream(Sync[F].delay(Files.walk(jPath(d))))
       .filter(p => pattern.findFirstIn(p.getFileName.toString).isDefined)
       .map(p => posixCodec.parseRelFile(p.toString).flatMap(_.relativeTo(d)))
       .unNone
@@ -326,7 +324,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
       pf: PartialFunction[TestDirective, A])
       : Option[A] =
     Foldable[Option].compose[NonEmptyList]
-      .findMapM[Id, TestDirective, A](dirs get name)(pf.lift)
+      .findMapM[Id, TestDirective, A](dirs get name)(pf.lift)(idInstance)
 
   def jPath(p: Path[_, _, Sandboxed]): JPath =
     Paths.get(posixCodec.printPath(p))

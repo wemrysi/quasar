@@ -23,8 +23,8 @@ import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript.QScriptEducated
 
 import argonaut.Json
+import cats.effect.Async
 import fs2.Stream
-import fs2.util.Async
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import scalaz.\/
 
