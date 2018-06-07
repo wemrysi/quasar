@@ -28,6 +28,7 @@ import quasar.contrib.cats.effect.liftio._
 import quasar.contrib.fs2.convert
 import quasar.contrib.fs2.stream._
 import quasar.contrib.iota._
+import quasar.contrib.nio.{file => contribFile}
 import quasar.contrib.pathy._
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
@@ -92,7 +93,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
       sdown =
         cake.shutdown
-          .guarantee(IO(tmpDir.deleteOnExit()))
+          .guarantee(contribFile.deleteRecursively[IO](tmpDir.toPath))
           .guarantee(local.shutdown)
 
       mimirFederation = MimirQueryFederation[Fix, M](cake)
