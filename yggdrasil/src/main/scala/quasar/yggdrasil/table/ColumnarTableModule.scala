@@ -1531,14 +1531,8 @@ trait ColumnarTableModule
         })(collection.breakOut)
       }
 
-      def leftShiftFocused(merged: Map[ColumnRef, Column], innerHeads: Vector[CPathNode], definedness: BitSet)
+      def idColumns(innerHeads: Vector[CPathNode], pathNode: CPathNode, definedness: BitSet)
           : Map[ColumnRef, Column] = {
-
-        // move all of our results into second index of an array
-        val indexed: Map[ColumnRef, Column] = merged map {
-          case (ColumnRef(path, tpe), col) =>
-            ColumnRef(1 \: path, tpe) -> col
-        }
 
         val refinedHeads: Vector[String \/ Int] = innerHeads collect {
           case CPathField(field) => -\/(field)
@@ -1592,12 +1586,25 @@ trait ColumnarTableModule
 
         // put the fields and index columns into the same path, in the first index of the array
         val fassigned: List[(ColumnRef, Column)] =
-          fieldsCol.map(col => ColumnRef(CPathIndex(0), CString) -> col).toList
+          fieldsCol.map(col => ColumnRef(pathNode, CString) -> col).toList
         val iassigned: List[(ColumnRef, Column)] =
-          indicesCol.map(col => ColumnRef(CPathIndex(0), CLong) -> col).toList
+          indicesCol.map(col => ColumnRef(pathNode, CLong) -> col).toList
 
         // merge them together to produce the heterogeneous output
-        val idCols: Map[ColumnRef, Column] = Map(fassigned ++ iassigned: _*)
+        Map(fassigned ++ iassigned: _*)
+      }
+
+      def leftShiftFocused(merged: Map[ColumnRef, Column], innerHeads: Vector[CPathNode], definedness: BitSet)
+          : Map[ColumnRef, Column] = {
+
+        // move all of our results into index 1 of an array
+        val indexed: Map[ColumnRef, Column] = merged map {
+          case (ColumnRef(path, tpe), col) =>
+            ColumnRef(1 \: path, tpe) -> col
+        }
+
+        // .. and our ids into index 0 of an array
+        val idCols: Map[ColumnRef, Column] = idColumns(innerHeads, CPathIndex(0), definedness)
 
         // put the focus prefix BACK on the results and ids (which are now in an array together)
         (indexed ++ idCols) map {
