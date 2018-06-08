@@ -896,12 +896,6 @@ trait IdentitiesRowFormat extends RowFormat {
 
   lazy val identities: Int = columnRefs.size
 
-  // FYI: This is here purely to ensure backwards compatiblity. Not used.
-  // When we upgrade the serialization format, we can remove this.
-  private final val codec = Codec.PackedLongCodec
-
-  val _ = codec
-
   private final def packedSize(n: Long): Int = {
 
     @inline

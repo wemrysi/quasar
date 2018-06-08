@@ -399,7 +399,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (tpe, _) if tpe eq tpe => sys.error("Unsupported CFArray type: " + tpe)
+      case (tpe, _) if => sys.error("Unsupported CFArray type: " + tpe)
     }
 
     columns
