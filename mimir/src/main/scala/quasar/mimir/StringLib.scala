@@ -36,7 +36,7 @@ import java.util.regex.{ Pattern, PatternSyntaxException }
  * revert this and only accept JTextT (StrColumn).
  */
 
-trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
+trait StringLibModule extends ColumnarTableLibModule {
   trait StringLib extends ColumnarTableLib {
     import StdLib._
 
@@ -296,7 +296,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
       lazy val prepare = CF1("id")(Some(_))
 
-      val mapper = CF2Array[String, M]("std::string::regexMatch") {
+      val mapper = CF2Array[String]("std::string::regexMatch") {
         case (target: StrColumn, regex: StrColumn, range) => {
           val table   = new Array[Array[String]](range.length)
           val defined = new BitSet(range.length)
@@ -477,7 +477,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       lazy val mapper = splitMapper(false)
     }
 
-    def splitMapper(quote: Boolean) = CF2Array[String, M]("std::string::split(%s)".format(quote)) {
+    def splitMapper(quote: Boolean) = CF2Array[String]("std::string::split(%s)".format(quote)) {
       case (left: StrColumn, right: StrColumn, range) => {
         val result  = new Array[Array[String]](range.length)
         val defined = new BitSet(range.length)

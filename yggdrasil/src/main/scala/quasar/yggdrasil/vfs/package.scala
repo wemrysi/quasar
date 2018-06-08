@@ -17,21 +17,25 @@
 package quasar.yggdrasil
 
 import quasar.contrib.scalaz.catchable
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import fs2.util.Catchable
 
-import scalaz.{:<:, Coproduct, Free}
+import scalaz.Free
 import scalaz.concurrent.Task
+import iotaz.{CopK, TNilK}
+import iotaz.TListK.:::
 
 import scala.util.Either
 
 package object vfs {
   type POSIX[A] = Free[POSIXOp, A]
-  type POSIXWithTask[A] = Free[Coproduct[POSIXOp, Task, ?], A]
+  type POSIXWithTaskCopK[A] = CopK[POSIXOp ::: Task ::: TNilK, A]
+  type POSIXWithTask[A] = Free[POSIXWithTaskCopK, A]
 
   // this is needed kind of a lot
-  private[vfs] implicit def catchableForS[S[_]](implicit I: Task :<: S): Catchable[Free[S, ?]] = {
-    val delegate = catchable.freeCatchable[Task, S]
+  private[vfs] implicit def catchableForS[S[a] <: ACopK[a]](implicit I: Task :<<: S): Catchable[Free[S, ?]] = {
+    val delegate = catchable.copKinjectableTaskCatchable[S]
 
     new Catchable[Free[S, ?]] {
 
@@ -48,5 +52,6 @@ package object vfs {
         fa.flatMap(f)
     }
   }
+
 
 }

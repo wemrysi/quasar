@@ -22,9 +22,11 @@ import quasar._
 import quasar.blueeyes.json.JValue
 import quasar.common._
 import quasar.connector._
+import quasar.contrib.cats.effect._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._
@@ -37,11 +39,13 @@ import quasar.yggdrasil.bytecode.JType
 
 import argonaut._, Argonaut._
 
-import delorean._
+import cats.effect.IO
+import io.chrisdavenport.scalaz.task._
 
 import fs2.{async, Stream}
 import fs2.async.mutable.{Queue, Signal}
-import fs2.interop.scalaz._
+import fs2.interop.cats.asyncInstance
+import fs2.interop.scalaz.{asyncInstance => scalazAsyncInstance}
 
 import matryoshka._
 import matryoshka.implicits._
@@ -53,10 +57,10 @@ import pathy.Path._
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import iotaz.CopK
 
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -71,16 +75,16 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
   type QS[T[_[_]]] = MimirQScriptCP[T]
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[QSM[T, ?], QScriptTotal[T, ?]] =
     mimir.qScriptToQScriptTotal[T]
 
-  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], QSM[T, ?]] =
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], QSM[T, ?]] =
     Injectable.inject[QScriptCore[T, ?], QSM[T, ?]]
 
-  implicit def equiJoinToQScript[T[_[_]]]: Injectable.Aux[EquiJoin[T, ?], QSM[T, ?]] =
+  implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], QSM[T, ?]] =
     Injectable.inject[EquiJoin[T, ?], QSM[T, ?]]
 
-  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[AFile], ?], QSM[T, ?]] =
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], QSM[T, ?]] =
     Injectable.inject[Const[ShiftedRead[AFile], ?], QSM[T, ?]]
 
   type Repr = MimirRepr
@@ -96,7 +100,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
   def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
-  def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
+  def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<<: QSM[T, ?]]
   def MonadM = Monad[M]
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
@@ -151,7 +155,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
     } yield {
       connector.map {
         case (fs, shutdown) =>
-          (λ[M ~> Task](_.run((cake: Cake, fs))), cake.shutdown.toTask >> shutdown)
+          (λ[M ~> Task](_.run((cake: Cake, fs))), cake.shutdown.to[Task] >> shutdown)
       }
     }
 
@@ -169,11 +173,11 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
       cp: T[QSM[T, ?]]): Backend[Repr] = {
 
     def qScriptCorePlanner = new QScriptCorePlanner[T, Backend](
-      λ[Task ~> Backend](_.liftM[MT].liftB),
+      λ[IO ~> Backend](_.to[Task].liftM[MT].liftB),
       λ[M ~> Backend](_.liftB))
 
     def equiJoinPlanner = new EquiJoinPlanner[T, Backend](
-      λ[Task ~> Backend](_.liftM[MT].liftB))
+      λ[IO ~> Backend](_.to[Task].liftM[MT].liftB))
 
     val liftErr: FileSystemErrT[M, ?] ~> Backend =
       Hoist[FileSystemErrT].hoist[M, PhaseResultT[Configured, ?]](
@@ -182,29 +186,28 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
     def shiftedReadPlanner = new ShiftedReadPlanner[T, Backend](liftErr)
 
-    lazy val planQST: AlgebraM[Backend, QScriptTotal[T, ?], Repr] =
-      _.run.fold(
-        qScriptCorePlanner.plan(planQST),
-        _.run.fold(
-          _ => ???,   // ProjectBucket
-          _.run.fold(
-            _ => ???,   // ThetaJoin
-            _.run.fold(
-              equiJoinPlanner.plan(planQST),
-              _.run.fold(
-                _ => ???,    // ShiftedRead[ADir]
-                _.run.fold(
-                  shiftedReadPlanner.plan,
-                  _.run.fold(
-                    _ => ???,   // Read[ADir]
-                    _.run.fold(
-                      _ => ???,   // Read[AFile]
-                      _ => ???))))))))    // DeadEnd
+    lazy val planQST: AlgebraM[Backend, QScriptTotal[T, ?], Repr] = {
+      val QScriptCore = CopK.Inject[QScriptCore[T, ?],            QScriptTotal[T, ?]]
+      val EquiJoin    = CopK.Inject[EquiJoin[T, ?],               QScriptTotal[T, ?]]
+      val ShiftedRead = CopK.Inject[Const[ShiftedRead[AFile], ?], QScriptTotal[T, ?]]
+      _ match {
+        case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
+        case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+        case _ => ???
+      }
+    }
 
-    def planQSM(in: QSM[T, Repr]): Backend[Repr] =
-      in.run.fold(qScriptCorePlanner.plan(planQST), _.run.fold(
-        equiJoinPlanner.plan(planQST),
-	shiftedReadPlanner.plan))
+    def planQSM(in: QSM[T, Repr]): Backend[Repr] = {
+      val QScriptCore = CopK.Inject[QScriptCore[T, ?],            QSM[T, ?]]
+      val EquiJoin    = CopK.Inject[EquiJoin[T, ?],               QSM[T, ?]]
+      val ShiftedRead = CopK.Inject[Const[ShiftedRead[AFile], ?], QSM[T, ?]]
+      in match {
+        case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
+        case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+      }
+    }
 
     cp.cataM[Backend, Repr](planQSM _)
   }
@@ -222,39 +225,42 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
       // TODO it's kind of ugly that we have to page through JValue to get back into NIHDB
       val driver = for {
-        q <- async.boundedQueue[Task, Vector[JValue]](1)
+        q <- async.boundedQueue[IO, Vector[JValue]](1)
 
-        populator = repr.table.slices.trans(λ[Future ~> Task](_.toTask)) foreachRec { slice =>
-          if (!slice.isEmpty) {
-            val json = slice.toJsonElements
-            if (!json.isEmpty)
-              q.enqueue1(json)
-            else
-              Task.now(())
-          } else {
-            Task.now(())
+        populator = scala.Predef.locally {
+          import shims._
+          repr.table.slices.foreachRec { slice =>
+            if (!slice.isEmpty) {
+              val json = slice.toJsonElements
+              if (!json.isEmpty)
+                q.enqueue1(json)
+              else
+                IO.unit
+            } else {
+              IO.unit
+            }
           }
         }
 
-        populatorWithTermination = populator >> q.enqueue1(Vector.empty)
+        populatorWithTermination = populator.flatMap(_ => q.enqueue1(Vector.empty))
 
         ingestor = repr.P.ingest(path, q.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits)).run
 
         // generally this function is bad news (TODO provide a way to ingest as a Stream)
-        _ <- Task.gatherUnordered(Seq(populatorWithTermination, ingestor))
+        _ <- Task.gatherUnordered(Seq(populatorWithTermination.to[Task], ingestor.to[Task])).to[IO]
       } yield ()
 
-      driver.liftM[MT].liftB
+      driver.to[Task].liftM[MT].liftB
     }
 
     def evaluatePlan(repr: Repr): Backend[ResultHandle] = {
       val t = for {
-        handle <- Task.delay(ResultHandle(cur.getAndIncrement()))
+        handle <- IO(ResultHandle(cur.getAndIncrement()))
         pager <- repr.P.TablePager(repr.table)
-        _ <- Task.delay(map.put(handle, pager))
+        _ <- IO(map.put(handle, pager))
       } yield handle
 
-      t.liftM[MT].liftB
+      t.to[Task].liftM[MT].liftB
     }
 
     def more(h: ResultHandle): Backend[Vector[Data]] = {
@@ -341,7 +347,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
         // If the file doesn't exist in mimir we read from the lightweight connector.
         // FIXME apparently read on a non-existent file is equivalent to reading the empty file??!!
-        eitherTable <- precog.Table.load(target, JType.JUniverseT).mapT(_.toTask).run.liftM[MT].liftB
+        eitherTable <- precog.Table.load(target, JType.JUniverseT).mapT(_.to[Task]).run.liftM[MT].liftB
 
         reader <- eitherTable.bitraverse(
           _ => {
@@ -356,7 +362,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
             val projected = limited.transform(precog.trans.constants.SourceValue.Single)
 
-            precog.TablePager(projected)
+            precog.TablePager(projected).to[Task]
           }).liftM[MT].liftB
 
         _ <- Task.delay {
@@ -406,21 +412,21 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
     // quasar's paging logic.  See also: TablePager.apply
     private val QueueLimit = 1
 
-    private val map: ConcurrentHashMap[WriteHandle, (Queue[Task, Vector[Data]], Signal[Task, Boolean])] =
+    private val map: ConcurrentHashMap[WriteHandle, (Queue[IO, Vector[Data]], Signal[IO, Boolean])] =
       new ConcurrentHashMap
 
     private val cur = new AtomicLong(0L)
 
     def open(file: AFile): Backend[WriteHandle] = {
-      val run: Task[M[WriteHandle]] = Task delay {
+      val run: Task[M[WriteHandle]] = Task.delay {
         log.debug(s"open file $file")
 
         val id = cur.getAndIncrement()
         val handle = WriteHandle(file, id)
 
         for {
-          queue <- Queue.bounded[Task, Vector[Data]](QueueLimit).liftM[MT]
-          signal <- fs2.async.signalOf[Task, Boolean](false).liftM[MT]
+          queue <- Queue.bounded[IO, Vector[Data]](QueueLimit)(asyncInstance).to[Task].liftM[MT]
+          signal <- fs2.async.signalOf[IO, Boolean](false)(asyncInstance).to[Task].liftM[MT]
 
           path = fileToPath(file)
           jvs = queue.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits).map(JValue.fromData)
@@ -428,10 +434,11 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
           connectors <- cake[M]
           (precog, _) = connectors
 
-          ingestion = for {
-            _ <- precog.ingest(path, jvs).run   // TODO log resource errors?
+          ingestion = (for {
+            // TODO log resource errors?
+            _ <- precog.ingest(path, jvs).run
             _ <- signal.set(true)
-          } yield ()
+          } yield ()).to[Task]
 
           // run asynchronously forever
           _ <- startTask(ingestion, ()).liftM[MT]
@@ -448,40 +455,40 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
       log.debug(s"write to $h and $chunk")
 
       val t = for {
-        maybePair <- Task.delay(Option(map.get(h)))
+        maybePair <- IO(Option(map.get(h)))
 
         back <- maybePair match {
           case Some(pair) =>
             if (chunk.isEmpty) {
-              Task.now(Vector.empty[FileSystemError])
+              IO.pure(Vector.empty[FileSystemError])
             } else {
               val (queue, _) = pair
               queue.enqueue1(chunk).map(_ => Vector.empty[FileSystemError])
             }
 
           case _ =>
-            Task.now(Vector(unknownWriteHandle(h)))
+            IO.pure(Vector(unknownWriteHandle(h)))
         }
       } yield back
 
-      t.liftM[MT].liftM[ConfiguredT]
+      t.to[Task].liftM[MT].liftM[ConfiguredT]
     }
 
     def close(h: WriteHandle): Configured[Unit] = {
       val t = for {
         // yolo we crash because quasar
-        pair <- Task.delay(Option(map.get(h)).get).liftM[MT]
+        pair <- IO(Option(map.get(h)).get)
         (queue, signal) = pair
 
-        _ <- Task.delay(map.remove(h)).liftM[MT]
-        _ <- Task.delay(log.debug(s"close $h")).liftM[MT]
+        _ <- IO(map.remove(h))
+        _ <- IO(log.debug(s"close $h"))
         // ask queue to stop
-        _ <- queue.enqueue1(Vector.empty).liftM[MT]
+        _ <- queue.enqueue1(Vector.empty)
         // wait until queue actually stops; task async completes when signal completes
-        _ <- signal.discrete.takeWhile(!_).run.liftM[MT]
+        _ <- signal.discrete.takeWhile(!_).run
       } yield ()
 
-      t.liftM[ConfiguredT]
+      t.to[Task].liftM[MT].liftM[ConfiguredT]
     }
   }
 

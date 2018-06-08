@@ -24,14 +24,16 @@ import quasar.yggdrasil.bytecode.JType
 
 import org.slf4j.LoggerFactory
 
+import cats.effect.IO
 import scalaz._, Scalaz._
+import shims._
 
 import TableModule._
 import SampleData._
 
 import java.nio.CharBuffer
 
-trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
+trait TestColumnarTableModule extends ColumnarTableModuleTestSupport { self =>
   type GroupId = Int
   import trans._
 
@@ -48,39 +50,39 @@ trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
       }
   }
 
-  class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
+  class Table(slices: StreamT[IO, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
     def load(jtpe: JType) = sys.error("todo")
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = M.point(this)
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = sys.error("todo")
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = IO(this)
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): IO[Seq[Table]] = sys.error("todo")
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: StreamT[M, Slice], size: TableSize) = new Table(slices, size)
+    def apply(slices: StreamT[IO, Slice], size: TableSize) = new Table(slices, size)
 
-    def singleton(slice: Slice) = new Table(slice :: StreamT.empty[M, Slice], ExactSize(1))
+    def singleton(slice: Slice) = new Table(slice :: StreamT.empty[IO, Slice], ExactSize(1))
 
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[(Table, Table)] =
+    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): IO[(Table, Table)] =
       sys.error("not implemented here")
   }
 
   object Table extends TableCompanion
 }
 
-trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
-    with TableModuleSpec[M]
-    with CogroupSpec[M]
-    with CrossSpec[M]
-    with LeftShiftSpec[M]
-    with TransformSpec[M]
-    with CompactSpec[M]
-    with TakeRangeSpec[M]
-    with CanonicalizeSpec[M]
-    with PartitionMergeSpec[M]
-    with ToArraySpec[M]
-    with SampleSpec[M]
-    with DistinctSpec[M]
-    with SchemasSpec[M]
+trait ColumnarTableModuleSpec extends TestColumnarTableModule
+    with TableModuleSpec
+    with CogroupSpec
+    with CrossSpec
+    with LeftShiftSpec
+    with TransformSpec
+    with CompactSpec
+    with TakeRangeSpec
+    with CanonicalizeSpec
+    with PartitionMergeSpec
+    with ToArraySpec
+    with SampleSpec
+    with DistinctSpec
+    with SchemasSpec
     { spec =>
 
   import trans._
@@ -103,18 +105,19 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
   lazy val xlogger = LoggerFactory.getLogger("quasar.yggdrasil.table.ColumnarTableModuleSpec")
 
-  def streamToString(stream: StreamT[M, CharBuffer]): String = {
-    def loop(stream: StreamT[M, CharBuffer], sb: StringBuilder): M[String] =
+  def streamToString(stream: StreamT[IO, CharBuffer]): String = {
+    def loop(stream: StreamT[IO, CharBuffer], sb: StringBuilder): IO[String] =
       stream.uncons.flatMap {
         case None =>
-          M.point(sb.toString)
+          IO.pure(sb.toString)
         case Some((cb, tail)) =>
-          sb.append(cb)
-          loop(tail, sb)
+          IO.suspend {
+            sb.append(cb)
+            loop(tail, sb)
+          }
       }
-    loop(stream, new StringBuilder).copoint
+    loop(stream, new StringBuilder).unsafeRunSync
   }
-
 
   def testRenderCsv(json: String, maxSliceSize: Option[Int] = None): String = {
     val es    = JParser.parseManyFromString(json).valueOr(throw _)
@@ -148,7 +151,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     val arrayM = table.renderJson("[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
 
     val minimized = minimize(expected) getOrElse JArray(Nil)
-    arrayM.copoint mustEqual minimized
+    arrayM.unsafeRunSync mustEqual minimized
   }
 
   def renderLotsToCsv(lots: Int, maxSliceSize: Option[Int] = None) = {
@@ -184,7 +187,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
       val dataset = fromJson(sample.toStream)
       val results = dataset.toJson
-      results.copoint.toList.map(_.toJValue) must_== sample
+      results.unsafeRunSync.toList.map(_.toJValue) must_== sample
     }
 
     "verify bijection from JSON" in checkMappings(this)
@@ -312,7 +315,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
         val dataset1 = fromJson(sample.toStream, Some(3))
 
-        dataset1.cross(dataset1)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight))).slices.uncons.copoint must beLike {
+        dataset1.cross(dataset1)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight))).slices.uncons.unsafeRunSync must beLike {
           case Some((head, _)) => head.size must beLessThanOrEqualTo(Config.maxSliceSize)
         }
       }
@@ -323,13 +326,23 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       }
     }
 
-    "in leftShift" >> {
-      "shift a simple array" in testTrivialArrayLeftShift
-      "shift a simple object" in testTrivialObjectLeftShift
-      "shift a mixture of objects and arrays" in testTrivialObjectArrayLeftShift
-      "shift a set of arrays" in testSetArrayLeftShift
-      "shift a heterogeneous array" in testHeteroArrayLeftShift
-      "shift a simple array with an inner object" in testTrivialArrayLeftShiftWithInnerObject
+    def emitToString(emit: Boolean) = if (emit) "emit" else "omit"
+
+    List(true, false).foreach { emit =>
+      s"in leftShift (${emitToString(emit)} on undefined)" >> {
+        "shift empty" in testEmptyLeftShift(emit)
+        "shift a string" in testTrivialStringLeftShift(emit)
+        "shift undefined" in testTrivialUndefinedLeftShift(emit)
+        "shift a simple array" in testTrivialArrayLeftShift(emit)
+        "shift a simple empty array" in testTrivialEmptyArrayLeftShift(emit)
+        "shift a simple object" in testTrivialObjectLeftShift(emit)
+        "shift a simple empty object" in testTrivialEmptyObjectLeftShift(emit)
+        "shift a mixture of objects and arrays" in testTrivialObjectArrayLeftShift(emit)
+        "shift a heterogeneous structure" in testHeterogenousLeftShift(emit)
+        "shift a set of arrays" in testSetArrayLeftShift(emit)
+        "shift a heterogeneous array" in testHeteroArrayLeftShift(emit)
+        "shift a simple array with an inner object" in testTrivialArrayLeftShiftWithInnerObject(emit)
+      }
     }
 
     "in transform" >> {
@@ -546,7 +559,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
         val table = fromSample(sample)
         val t0 = table.transform(TransSpec1.Id)
-        t0.toJson.copoint must_== sample.data
+        t0.toJson.unsafeRunSync must_== sample.data
 
         table.metrics.startCount must_== 1
         table.metrics.sliceTraversedCount must_== expectedSlices
@@ -562,7 +575,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
         val table = fromSample(sample)
         val t0 = table.transform(TransSpec1.Id).transform(TransSpec1.Id).transform(TransSpec1.Id)
-        t0.toJson.copoint must_== sample.data
+        t0.toJson.unsafeRunSync must_== sample.data
 
         table.metrics.startCount must_== 1
         table.metrics.sliceTraversedCount must_== expectedSlices
@@ -578,8 +591,8 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
         val table = fromSample(sample)
         val t0 = table.compact(TransSpec1.Id).compact(TransSpec1.Id).compact(TransSpec1.Id)
-        table.toJson.copoint must_== sample.data
-        t0.toJson.copoint must_== sample.data
+        table.toJson.unsafeRunSync must_== sample.data
+        t0.toJson.unsafeRunSync must_== sample.data
 
         table.metrics.startCount must_== 2
         table.metrics.sliceTraversedCount must_== (expectedSlices * 2)
@@ -662,6 +675,4 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
   }
 }
 
-object ColumnarTableModuleSpec extends ColumnarTableModuleSpec[Need] {
-  implicit def M = Need.need
-}
+object ColumnarTableModuleSpec extends ColumnarTableModuleSpec

@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.scalacheck.gen
 import quasar.fp.ski.κ
+import quasar.contrib.iota.copkTraverse
 import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
 import quasar.precog.common.RValue
 import quasar.qscript._
@@ -35,7 +36,7 @@ import org.specs2.specification.{AfterAll, Scope}
 import java.time.{Duration => _, _}
 
 import matryoshka.AlgebraM
-import matryoshka.data.Fix
+import matryoshka.data.{Fix, freeRecursive}
 import matryoshka.implicits._
 import matryoshka.patterns._
 
@@ -45,11 +46,7 @@ import scalaz.syntax.either._
 
 import java.nio.file.Files
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
-
 class MimirStdLibSpec extends StdLibSpec with PrecogCake {
-  import scala.concurrent.ExecutionContext.Implicits.global
 
   private val notImplemented: Result = Skipped("TODO")
 
@@ -101,7 +98,11 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
   private def check[A](fm: FreeMapA[Fix, A]): Option[Result] =
     fm.cataM(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](
       κ(().right),
-      _.run.fold(shortCircuitCore, shortCircuitDerived))).swap.toOption
+      {
+        case MFC(mfc) => shortCircuitCore(mfc)
+        case MFD(mfd) => shortCircuitDerived(mfd)
+      }
+    )).swap.toOption
 
   private def run[A](
     freeMap: FreeMapA[Fix, A],
@@ -119,8 +120,9 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     rvalue.map(cake.trans.transRValue(_, cake.trans.TransSpec1.Id)).getOrElse(cake.trans.TransSpec1.Undef)
   }
 
-  private def actual(table: cake.Table): List[Data] =
-    Await.result(table.toJson.map(_.toList.map(MapFuncCorePlanner.rValueToData)), Duration.Inf)
+  private def actual(table: cake.Table): List[Data] = {
+    table.toJson.map(_.toList.map(MapFuncCorePlanner.rValueToData)).unsafeRunSync
+  }
 
   def runner = new MapFuncStdLibTestRunner {
     def nullaryMapFunc(prg: FreeMapA[Fix, Nothing], expected: Data): Result =
@@ -225,5 +227,5 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
 trait PrecogCake extends Scope with AfterAll {
   val cake = Precog(Files.createTempDirectory("mimir").toFile()).unsafePerformSync
 
-  def afterAll(): Unit = Await.result(cake.shutdown, Duration.Inf)
+  def afterAll(): Unit = cake.shutdown.unsafeRunSync
 }

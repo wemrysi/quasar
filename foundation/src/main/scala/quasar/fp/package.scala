@@ -18,6 +18,7 @@ package quasar
 
 import slamdata.Predef._
 
+import quasar.contrib.iota.{:<<:, ACopK}
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -167,7 +168,7 @@ package object fp
 
   def evalNT[F[_]: Monad, S](initial: S) = λ[StateT[F, S, ?] ~> F](_ eval initial)
 
-  def liftFG[F[_], G[_], A](orig: F[A] => G[A])(implicit F: F :<: G):
+  def liftFG[F[_], G[a] <: ACopK[a], A](orig: F[A] => G[A])(implicit F: F :<<: G):
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig)
 
@@ -181,6 +182,10 @@ package object fp
 
 
   def liftFF[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<: G):
+      G[A] => G[A] =
+    ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
+
+  def liftFFCopK[F[_], G[a] <: ACopK[a], A](orig: F[A] => F[A])(implicit F: F :<<: G):
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
 
@@ -285,6 +290,7 @@ package object fp
     modify: T[CoEnv[A, F, ?]] => T[CoEnv[A, F, ?]]):
       Free[F, A] => Free[F, A] =
     applyFrom[Free[F, A], T[CoEnv[A, F, ?]]](coenvBijection[T, F, A])(modify)
+
 }
 
 package fp {
