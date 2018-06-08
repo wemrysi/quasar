@@ -191,7 +191,7 @@ trait ArrayMapperS extends CMapperS {
     val results = this(columns0, range)
 
     val columns = results flatMap {
-      case (CString, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CString => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[String]]]
 
@@ -206,7 +206,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (CBoolean, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CBoolean => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Boolean]]]
 
@@ -220,7 +220,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (CLong, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CLong => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Long]]]
 
@@ -234,7 +234,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (CDouble, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CDouble => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Double]]]
 
@@ -248,7 +248,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (CNum, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CNum => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[BigDecimal]]]
 
@@ -262,7 +262,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (CNull, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CNull => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Unit]]]
 
@@ -275,7 +275,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (CEmptyObject, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CEmptyObject => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Unit]]]
 
@@ -288,7 +288,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (CEmptyArray, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CEmptyArray => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[Unit]]]
 
@@ -301,7 +301,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (COffsetDateTime, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq COffsetDateTime => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[OffsetDateTime]]]
 
@@ -315,7 +315,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (COffsetTime, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq COffsetTime => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[OffsetTime]]]
 
@@ -329,7 +329,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (COffsetDate, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq COffsetDate => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[OffsetDate]]]
 
@@ -343,7 +343,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (CLocalDateTime, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CLocalDateTime => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[LocalDateTime]]]
 
@@ -357,7 +357,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (CLocalTime, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CLocalTime => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[LocalTime]]]
 
@@ -371,7 +371,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (CLocalDate, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CLocalDate => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[LocalDate]]]
 
@@ -385,7 +385,7 @@ trait ArrayMapperS extends CMapperS {
         columns
       }
 
-      case (CInterval, (cols0, defined)) => {
+      case (tpe, (cols0, defined)) if tpe eq CInterval => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[DateTimeInterval]]]
 
