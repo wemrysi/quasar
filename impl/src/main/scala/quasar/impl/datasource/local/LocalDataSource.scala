@@ -115,7 +115,6 @@ final class LocalDataSource[F[_]: Sync, G[_]: Effect: Timer] private (
   private val G = Effect[G]
   private val ME = MonadError_[F, Throwable]
 
-
   private def parseJsonAsync(parser: AsyncParser[Json], path: JPath): Stream[G, Json] = {
     def unattemptChunk(at: Either[Exception, Seq[Json]]): Stream[G, Json] =
       at.fold(Stream.raiseError, Stream.emits).covary[G]

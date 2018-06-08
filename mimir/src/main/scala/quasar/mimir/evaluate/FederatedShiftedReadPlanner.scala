@@ -18,7 +18,7 @@ package quasar.mimir.evaluate
 
 import slamdata.Predef.{Stream => _, _}
 
-import quasar.{Data, Disposable}
+import quasar.Data
 import quasar.api._, ResourceError._
 import quasar.blueeyes.json.JValue
 import quasar.contrib.fs2.convert
@@ -110,14 +110,11 @@ final class FederatedShiftedReadPlanner[
     queryResult.flatMap(_.fold(handleReadError[P.Table], tableFromStream))
   }
 
-  private def tableFromStream(d: Disposable[IO, Stream[IO, Data]]): F[P.Table] = {
+  private def tableFromStream(s: Stream[IO, Data]): F[P.Table] = {
     val sliceStream =
-      d.value
-        .onFinalize(d.dispose)
-        .map(data => RValue.fromJValueRaw(JValue.fromData(data)))
+      s.map(data => RValue.fromJValueRaw(JValue.fromData(data)))
         .segments
-        .map(s => Slice.fromRValues(unfold(s)(_.force.uncons1.toOption)))
-
+        .map(c => Slice.fromRValues(unfold(c)(_.force.uncons1.toOption)))
 
     for {
       d <- convert.toStreamT(sliceStream).to[F]

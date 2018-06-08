@@ -16,7 +16,7 @@
 
 package quasar.connector
 
-import quasar.{Data, Disposable}
+import quasar.Data
 import quasar.api.{DataSourceType, ResourcePath}
 import quasar.api.DataSourceError.InitializationError
 
@@ -28,9 +28,6 @@ import scalaz.\/
 trait LightweightDataSourceModule {
   def kind: DataSourceType
 
-  def lightweightDataSource[
-      F[_]: Async,
-      G[_]: Async](
-      config: Json)
-      : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], ResourcePath, Disposable[G, Stream[G, Data]]]]
+  def lightweightDataSource[F[_]: Async, G[_]: Async](config: Json)
+      : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]]
 }

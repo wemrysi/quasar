@@ -52,6 +52,8 @@ import java.math.{MathContext, RoundingMode}
 import java.nio.file.{Files, Path => JPath, Paths}
 import java.text.ParseException
 
+import scala.Predef.=:=
+
 import argonaut._, Argonaut._
 import cats.effect.{ConcurrentEffect, Effect, IO, Sync, Timer}
 import eu.timepit.refined.auto._
@@ -71,10 +73,20 @@ import shims.{monadErrorToScalaz, monadToScalaz}
 final class Sql2QueryRegressionSpec extends Qspec {
   import Sql2QueryRegressionSpec._
 
-  type M[A] = EitherT[EitherT[StateT[WriterT[IO, PhaseResults, ?], Long, ?], SemanticErrors, ?], PlannerError, A]
+  type M[A] = EitherT[EitherT[StateT[WriterT[Stream[IO, ?], PhaseResults, ?], Long, ?], SemanticErrors, ?], PlannerError, A]
 
-  val ioToM: IO ~> M =
-    λ[IO ~> M](
+  // Make the `join` syntax from Monad ambiguous.
+  implicit class NoJoin[F[_], A](ffa: F[A]) {
+    def join(implicit ev: A =:= F[A]): F[A] = ???
+  }
+
+  val DataDir = rootDir[Sandboxed] </> dir("local")
+
+  /** A name to identify the suite in test output. */
+  val suiteName: String = "SQL^2 Regression Queries"
+
+  val streamToM: Stream[IO, ?] ~> M =
+    λ[Stream[IO, ?] ~> M](
       _.liftM[WriterT[?[_], PhaseResults, ?]]
         .liftM[StateT[?[_], Long, ?]]
         .liftM[EitherT[?[_], SemanticErrors,?]]
@@ -87,30 +99,24 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
       cake <- Precog(tmpDir)
 
-      local = LocalDataSource[IO, IO](jPath(TestDataRoot), 8192)
+      local = LocalDataSource[Stream[IO, ?], IO](jPath(TestDataRoot), 8192)
 
-      localM = HFunctor[QueryEvaluator[?[_], Stream[IO, ?], ResourcePath, Stream[IO, Data]]].hmap(local)(ioToM)
+      localM = HFunctor[QueryEvaluator[?[_], Stream[IO, ?], ResourcePath, Stream[IO, Data]]].hmap(local)(streamToM)
 
       sdown =
         cake.shutdown
           .guarantee(contribFile.deleteRecursively[IO](tmpDir.toPath))
-          .guarantee(local.shutdown)
+          .guarantee(local.shutdown.compile.drain)
 
       mimirFederation = MimirQueryFederation[Fix, M](cake)
 
-      disposed = (rp: ResourcePath) => localM.evaluate(rp).map(_.map(_.point[Disposable[IO, ?]]))
-      qassoc = QueryAssociate.lightweight[Fix, M, IO](disposed)
+      qassoc = QueryAssociate.lightweight[Fix, M, IO](localM.evaluate)
       discovery = (localM : ResourceDiscovery[M, Stream[IO, ?]])
 
       federated = FederatingQueryEvaluator(
         mimirFederation,
         IMap((ResourceName("local"), (discovery, qassoc))).point[M])
     } yield (federated, sdown)
-
-  val DataDir = rootDir[Sandboxed] </> dir("local")
-
-  /** A name to identify the suite in test output. */
-  def suiteName: String = "SQL^2 Regression Queries"
 
   /** Return the results of evaluating the given query as a stream. */
   def queryResults(
@@ -137,12 +143,12 @@ final class Sql2QueryRegressionSpec extends Qspec {
         r  <- f(qs)
       } yield r.valueOr(e => failS(e.shows))
 
-    Stream.force(
-      results
-        .valueOr(e => failS(e.shows))
-        .valueOr(e => failS(e.shows))
-        .eval(0)
-        .value)
+    results
+      .valueOr(e => failS(e.shows))
+      .valueOr(e => failS(e.shows))
+      .eval(0)
+      .value(streamApplicativePlus)
+      .flatMap(x => x)
   }
 
   ////
@@ -175,7 +181,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
         results)
 
       verifyResults(test.expected, data, backendName)
-        .timed(5.minutes)
+        .timed(2.minutes)
         .unsafePerformSync
     }
 

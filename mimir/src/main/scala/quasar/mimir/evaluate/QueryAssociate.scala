@@ -16,7 +16,7 @@
 
 package quasar.mimir.evaluate
 
-import quasar.{Data, Disposable}
+import quasar.Data
 import quasar.api.ResourcePath
 import quasar.api.ResourceError.ReadError
 import quasar.higher.HFunctor
@@ -29,20 +29,20 @@ sealed trait QueryAssociate[T[_[_]], F[_], G[_]]
 
 object QueryAssociate extends QueryAssociateInstances {
   final case class Lightweight[T[_[_]], F[_], G[_]](
-      f: ResourcePath => F[ReadError \/ Disposable[G, Stream[G, Data]]])
+      f: ResourcePath => F[ReadError \/ Stream[G, Data]])
       extends QueryAssociate[T, F, G]
 
   final case class Heavyweight[T[_[_]], F[_], G[_]](
-      f: T[QScriptEducated[T, ?]] => F[ReadError \/ Disposable[G, Stream[G, Data]]])
+      f: T[QScriptEducated[T, ?]] => F[ReadError \/ Stream[G, Data]])
       extends QueryAssociate[T, F, G]
 
   def lightweight[T[_[_]], F[_], G[_]](
-      f: ResourcePath => F[ReadError \/ Disposable[G, Stream[G, Data]]])
+      f: ResourcePath => F[ReadError \/ Stream[G, Data]])
       : QueryAssociate[T, F, G] =
     Lightweight(f)
 
   def heavyweight[T[_[_]], F[_], G[_]](
-      f: T[QScriptEducated[T, ?]] => F[ReadError \/ Disposable[G, Stream[G, Data]]])
+      f: T[QScriptEducated[T, ?]] => F[ReadError \/ Stream[G, Data]])
       : QueryAssociate[T, F, G] =
     Heavyweight(f)
 }

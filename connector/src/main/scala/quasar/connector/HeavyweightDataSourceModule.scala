@@ -16,7 +16,7 @@
 
 package quasar.connector
 
-import quasar.{Data, Disposable, RenderTreeT}
+import quasar.{Data, RenderTreeT}
 import quasar.api.DataSourceType
 import quasar.api.DataSourceError.InitializationError
 import quasar.fs.Planner.PlannerErrorME
@@ -36,5 +36,5 @@ trait HeavyweightDataSourceModule {
       F[_]: Async: PlannerErrorME,
       G[_]: Async](
       config: Json)
-      : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], T[QScriptEducated[T, ?]], Disposable[G, Stream[G, Data]]]]
+      : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], T[QScriptEducated[T, ?]], Stream[G, Data]]]
 }
