@@ -157,7 +157,12 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
     } yield {
       connector.map {
         case (fs, shutdown) =>
-          (λ[M ~> Task](_.run((cake: Cake, fs))), cake.shutdown.to[Task] >> shutdown)
+          val dispose =
+            cake.mapK(λ[IO ~> Task](_.to[Task]))
+              .onDispose(shutdown)
+              .dispose
+
+          (λ[M ~> Task](_.run((cake.unsafeValue: Cake, fs))), dispose)
       }
     }
 
