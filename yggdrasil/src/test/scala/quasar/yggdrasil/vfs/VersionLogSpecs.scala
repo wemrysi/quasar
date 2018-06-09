@@ -67,7 +67,7 @@ object VersionLogSpecs extends Specification {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- HWT.pattern[List[RPath]] {
           case CPL(Ls(BaseDir)) => IO.pure(Nil)
@@ -100,7 +100,7 @@ object VersionLogSpecs extends Specification {
             }
         }
 
-        _ <- ioPattern.replicateM(10)
+        _ <- drainIO
 
         _ <- HWT.pattern[Unit] {
           case CPL(Move(from, to)) =>
@@ -146,7 +146,7 @@ object VersionLogSpecs extends Specification {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- HWT.pattern[List[RPath]] {
           case CPL(Ls(BaseDir)) => IO.pure(members)
@@ -186,7 +186,7 @@ object VersionLogSpecs extends Specification {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- HWT.pattern[List[RPath]] {
           case CPL(Ls(BaseDir)) => IO.pure(members)
@@ -266,7 +266,7 @@ object VersionLogSpecs extends Specification {
             }
         }
 
-        _ <- ioPattern.replicateM(10)
+        _ <- drainIO
 
         _ <- HWT.pattern[Unit] {
           case CPL(Move(from, to)) =>
@@ -347,7 +347,7 @@ object VersionLogSpecs extends Specification {
 
   val CPL = CopK.Inject[POSIXOp, POSIXWithIOCopK]
 
-  val ioPattern = HWT.pattern[Unit] {
+  val drainIO = HWT.whileDefined[Unit] {
     case CPR(ioa) => ioa
   }
 }

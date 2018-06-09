@@ -88,7 +88,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(11)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -158,7 +158,9 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(4)
+        _ <- H.pattern[Unit] {
+          case CPR(io) => io
+        }.replicateM(4)
 
         _ <- H.pattern[FreeVFS.VFSVersion] {
           case CPR(ta) =>
@@ -230,7 +232,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(5)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -283,7 +285,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(11)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -348,7 +350,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(4)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -372,7 +374,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
@@ -383,7 +385,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
@@ -433,7 +435,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(4)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -457,7 +459,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
@@ -468,7 +470,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
@@ -532,7 +534,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(4)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -556,7 +558,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
@@ -567,7 +569,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
@@ -1174,7 +1176,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
                 }
             }
 
-            _ <- ioPattern.replicateM(15)
+            _ <- drainIO
 
             _ <- H.pattern[List[RPath]] {
               case CPL(Ls(target)) =>
@@ -1197,7 +1199,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
                 }
             }
 
-            _ <- ioPattern.replicateM(3)
+            _ <- drainIO
 
             _ <- H.pattern[Unit] {
               case CPL(Move(from, to)) =>
@@ -1250,7 +1252,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           }
       }
 
-      _ <- ioPattern.replicateM(11)
+      _ <- drainIO
 
       _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
         case CPL(OpenW(target)) =>
@@ -1260,7 +1262,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           }
       }
 
-      _ <- ioPattern.replicateM(10)
+      _ <- drainIO
 
       _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
         case CPL(OpenW(target)) =>
@@ -1270,7 +1272,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           }
       }
 
-      _ <- ioPattern.replicateM(10)
+      _ <- drainIO
 
       _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
         case CPL(OpenW(target)) =>
@@ -1280,7 +1282,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           }
       }
 
-      _ <- ioPattern.replicateM(10)
+      _ <- drainIO
 
       _ <- H.pattern[Unit] {
         case CPL(Move(from, to)) =>
@@ -1313,7 +1315,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
   val CPL = CopK.Inject[POSIXOp, S]
 
-  val ioPattern = H.pattern[Unit] {
+  val drainIO = H.whileDefined[Unit] {
     case CPR(ioa) => ioa
   }
 }

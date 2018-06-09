@@ -188,7 +188,7 @@ object Dependencies {
     "io.verizon.delorean" %% "core" % deloreanVersion,
     "co.fs2" %% "fs2-core"   % fs2Version,
     "co.fs2" %% "fs2-io"     % fs2Version,
-    "com.codecommit" %% "smock" % "0.3.1-specs2-4.0.2" % "test"
+    "com.codecommit" %% "smock" % "0.4.0-specs2-4.0.2" % "test"
   )
   def niflheim = Seq(
     "com.typesafe.akka"  %% "akka-actor" % akkaVersion,
