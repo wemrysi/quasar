@@ -17,22 +17,19 @@
 package quasar.api
 
 import slamdata.Predef.{None, Some}
-
-import quasar.api.DataSourceError.{CommonError, CreateError, DataSourceNotFound, ExistentialError}
+import quasar.api.DataSourceError.{CommonError, CreateError, DataSourceNotFound, ExistentialError, InitializationError}
 import quasar.Condition
 import quasar.contrib.scalaz.MonadState_
-
 import scalaz.{IMap, ISet, Monad, \/}
 import scalaz.syntax.monad._
 import scalaz.syntax.equal._
 import scalaz.syntax.std.option._
-
-
 import MockDataSources.DSMockState
 
 
 final class MockDataSources[F[_]: Monad: DSMockState[?[_], C], C] private (
-  supportedDataSources: ISet[DataSourceType])
+  supportedDataSources: ISet[DataSourceType],
+  errorCondition: (ResourceName, DataSourceType, C) => Condition[InitializationError[C]])
   extends DataSources[F, C] {
 
   val store = MonadState_[F, IMap[ResourceName, (DataSourceMetadata, C)]]
@@ -47,9 +44,10 @@ final class MockDataSources[F[_]: Monad: DSMockState[?[_], C], C] private (
       store.get.flatMap(m => m.lookup(name) match {
         case Some(_) if onConflict === ConflictResolution.Preserve =>
           Condition.abnormal[CreateError[C]](DataSourceError.DataSourceExists(name)).point[F]
-        case _ =>
-          store.put(m.insert(name, (DataSourceMetadata(kind, Condition.normal()), config)))
-               .as(Condition.normal())
+        case _ => errorCondition(name, kind, config) match {
+            case Condition.Abnormal(e) => Condition.abnormal[CreateError[C]](e).point[F]
+            case Condition.Normal() => store.put(m.insert(name, (DataSourceMetadata(kind, Condition.normal()), config))).as(Condition.normal())
+          }
      })
     else
       Condition.abnormal[CreateError[C]](DataSourceError.DataSourceUnsupported(kind, supportedDataSources)).point[F]
@@ -82,6 +80,9 @@ object MockDataSources {
 
   type DSMockState[F[_], C] = MonadState_[F, IMap[ResourceName, (DataSourceMetadata, C)]]
 
-  def apply[F[_]: Monad: DSMockState[?[_], C], C](supportedDataSources:  ISet[DataSourceType]): DataSources[F, C] =
-    new MockDataSources[F, C](supportedDataSources)
+  def apply[F[_]: Monad: DSMockState[?[_], C], C](
+      supportedDataSources:  ISet[DataSourceType],
+      errorCondition: (ResourceName, DataSourceType, C) => Condition[InitializationError[C]]
+      ): DataSources[F, C] =
+    new MockDataSources[F, C](supportedDataSources, errorCondition)
 }
