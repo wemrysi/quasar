@@ -553,7 +553,7 @@ trait EvaluatorModule
       val resultState: StateT[IO, EvaluatorState, Table] = fullEval(rewrittenDAG, Map(), Nil)
 
       val resultTable: IO[Table] = resultState.eval(EvaluatorState())
-      resultTable map { _ paged Config.maxSliceSize compact DerefObjectStatic(Leaf(Source), paths.Value) }
+      resultTable map { _ paged Config.maxSliceRows compact DerefObjectStatic(Leaf(Source), paths.Value) }
     }
 
     private[this] def stagedOptimizations(graph: DepGraph, ctx: EvaluationContext, optimize: Boolean) =

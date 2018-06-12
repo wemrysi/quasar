@@ -20,21 +20,13 @@ import slamdata.Predef.{Stream => _, _}
 
 import quasar.Data
 import quasar.api._, ResourceError._
-import quasar.blueeyes.json.JValue
-import quasar.contrib.fs2.convert
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.evaluate.{Source => EvalSource}
 import quasar.fs.PathError
 import quasar.fs.Planner.{InternalError, PlannerErrorME, PlanPathError}
 import quasar.mimir._, MimirCake._
-import quasar.precog.common.RValue
 import quasar.qscript._
-import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
-import quasar.yggdrasil.UnknownSize
-import quasar.yggdrasil.table.Slice
-
-import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.{IO, LiftIO}
 import fs2.Stream
@@ -111,31 +103,9 @@ final class FederatedShiftedReadPlanner[
   }
 
   private def tableFromStream(s: Stream[IO, Data]): F[P.Table] = {
-    val sliceStream =
-      s.map(data => RValue.fromJValueRaw(JValue.fromData(data)))
-        .segments
-        .map(c => Slice.fromRValues(unfold(c)(_.force.uncons1.toOption)))
-
-    for {
-      d <- convert.toStreamT(sliceStream).to[F]
-
-      _ <- MonadFinalizers[F, IO].tell(DList(d.dispose))
-
-      slices = d.value
-    } yield {
-
-      import P.trans._
-
-      // TODO depending on the id status we may not need to wrap the table
-      P.Table(slices, UnknownSize)
-        .transform(OuterObjectConcat(
-          WrapObject(
-            Scan(Leaf(Source), P.freshIdScanner),
-            Key.name),
-          WrapObject(
-            Leaf(Source),
-            Value.name)))
-    }
+    P.Table.fromRValueStream[F](s.map(
+      MapFuncCorePlanner.dataToRValue(_)
+        .getOrElse(sys.error("There is no representation of CUndefined in SlamDB as a value"))))
   }
 
   private def handleReadError[A](rerr: ReadError): F[A] =

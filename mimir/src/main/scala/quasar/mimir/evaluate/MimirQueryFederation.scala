@@ -54,6 +54,7 @@ final class MimirQueryFederation[
     val srcs: AFile => Option[Source[QueryAssociate[T, FinalizersT[F, ?], IO]]] =
       q.sources.andThen(_.map(_.map(HFunctor[QueryAssociate[T, ?[_], IO]].hmap(_)(liftMT[F, FinalizersT]))))
 
+    // TODO: if we fail to materialize a stream, we should run finalizers immediately.
     qscriptEvaluator
       .evaluate(q.query)
       .run(srcs)

@@ -1789,8 +1789,8 @@ object Slice {
     }
   }
 
-  def updateRefs(rv: RValue, into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int, sliceSize: Int): Map[ColumnRef, ArrayColumn[_]] = {
-    rv.flattenWithPath.foldLeft(into) {
+  def updateRefs(rv: List[(CPath, CValue)], into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int, sliceSize: Int): Map[ColumnRef, ArrayColumn[_]] = {
+    rv.foldLeft(into) {
       case (acc, (cpath, CUndefined)) => acc
       case (acc, (cpath, cvalue)) =>
         val ref = ColumnRef(cpath, (cvalue.cType))
@@ -1883,16 +1883,82 @@ object Slice {
     }
   }
 
-  def fromJValues(values: Stream[JValue]): Slice =
-    fromRValues(values.flatMap(RValue.fromJValue))
+  final case class ArraySliced[A](arr: Array[A], start: Int, size: Int) {
+    def head: A = arr(start)
+    def tail: ArraySliced[A] = ArraySliced(arr, start + 1, size - 1)
+  }
 
+  def fromRValuesStep(values: ArraySliced[RValue], maxSliceRows: Option[Int] = None, maxSliceColumns: Option[Int] = None): (Slice, ArraySliced[RValue]) = {
+    val maxSliceRowsC = maxSliceRows.getOrElse(Config.maxSliceRows)
+    val maxSliceColumnsC = maxSliceColumns.getOrElse(Config.maxSliceColumns)
+    def inner(next: ArraySliced[RValue], rows: Int, cols: Int, acc: Map[ColumnRef, ArrayColumn[_]], maxRows: Int): (Slice, ArraySliced[RValue]) =
+      if (next.size == 0) {
+        if (acc.isEmpty)
+          (Slice.empty, next)
+        else
+          (new Slice {
+            val size = rows
+            val columns = acc
+          }, new ArraySliced[RValue](new Array[RValue](0), 0, 0))
+      } else {
+        if (cols >= maxSliceColumnsC) {
+          (new Slice {
+            val size = rows
+            val columns = acc
+          }, next)
+        } else if (rows >= maxRows) {
+          if (rows >= maxSliceRowsC) {
+            (new Slice {
+              val size = rows
+              val columns = acc
+            }, next)
+          } else {
+            val newMaxRows = maxRows * 2
+            inner(next, rows, cols, acc.mapValues { _.resize(newMaxRows) }, newMaxRows)
+          }
+        } else {
+          val flattened = next.head.flattenWithPath
+          val newAcc = updateRefs(flattened, acc, rows, maxRows)
+          val newCols = newAcc.size
+          val newRows = rows + 1
+          inner(next.tail, newRows, newCols, newAcc, maxRows)
+        }
+      }
+    inner(values, 0, 0, Map.empty, Math.max(64, Config.smallSliceSize))
+  }
+
+  def allFromRValues(values: fs2.Stream[IO, RValue], maxSliceRowS: Option[Int] = None, maxSliceColumns: Option[Int] = None): fs2.Stream[IO, Slice] = {
+    def rec(next: Slice.ArraySliced[RValue], values: fs2.Stream[IO, RValue]): fs2.Pull[IO, Slice, Unit] =
+      if (next.size == 0) {
+        for {
+          uncons <- values.pull.unconsChunk
+          _ <- uncons match {
+            case Some((chunk, next)) =>
+              val chunkArr = chunk.toArray
+              rec(Slice.ArraySliced(chunkArr, 0, chunkArr.length), next)
+            case None                => fs2.Pull.done
+          }
+        } yield ()
+      } else {
+        val (nextSlice, remainingData) = Slice.fromRValuesStep(next)
+        fs2.Pull.output1(nextSlice) >> rec(remainingData, values)
+      }
+
+    rec(Slice.ArraySliced(new Array[RValue](0), 0, 0), values).stream
+  }
+
+  def fromJValues(values: Stream[JValue]): Slice =
+    fromRValues(values.map(RValue.fromJValueRaw))
+
+  // don't use this anymore. It doesn't limit the slice size properly,
+  // unlike allFromRValues and fromRValuesStep.
   def fromRValues(values: Stream[RValue]): Slice = {
     val sliceSize = values.size
 
     @tailrec def buildColArrays(from: Stream[RValue], into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int): (Map[ColumnRef, ArrayColumn[_]], Int) = {
       from match {
         case jv #:: xs =>
-          val refs = updateRefs(jv, into, sliceIndex, sliceSize)
+          val refs = updateRefs(jv.flattenWithPath, into, sliceIndex, sliceSize)
           buildColArrays(xs, refs, sliceIndex + 1)
         case _ =>
           (into, sliceIndex)

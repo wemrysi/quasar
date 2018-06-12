@@ -104,7 +104,7 @@ trait SamplableColumnarTableModule extends SamplableTableModule { self: Columnar
                 case SampleState(inserter, length, _) =>
                   val len = length min sampleSize
                   inserter map { _.toSlice(len) } map { slice =>
-                    Table(slice :: StreamT.empty[IO, Slice], ExactSize(len)).paged(Config.maxSliceSize)
+                    Table(slice :: StreamT.empty[IO, Slice], ExactSize(len)).paged(Config.maxSliceRows)
                   } getOrElse {
                     Table(StreamT.empty[IO, Slice], ExactSize(0))
                   }

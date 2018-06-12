@@ -125,7 +125,7 @@ final class LocalDataSource[F[_]: Sync, G[_]: Effect: Timer] private (
         .map(_.toBytes)
         .flatMap(bs => unattemptChunk(parser.absorb(ByteBuffer.wrap(bs.values, bs.offset, bs.size))))
 
-    initial ++ unattemptChunk(parser.finish())
+    initial // ++ unattemptChunk(parser.finish())
   }
 
   private def decodeChunk(c: Chunk[Json]): Stream[G, Data] =

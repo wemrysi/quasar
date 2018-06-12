@@ -37,31 +37,33 @@ sealed trait RValue { self =>
     RValue.unsafeInsert(self, path, value)
   }
 
-  def flattenWithPath: Vector[(CPath, CValue)] = {
-    def flatten0(path: CPath)(value: RValue): Vector[(CPath, CValue)] = value match {
+  def flattenWithPath: List[(CPath, CValue)] = {
+    val lb = List.newBuilder[(CPath, CValue)]
+    def flatten0(path: CPath, value: RValue): Unit = value match {
       case RObject(fields) if fields.isEmpty =>
-        Vector((path, CEmptyObject))
+        lb += ((path, CEmptyObject))
 
       case RArray(elems) if elems.isEmpty =>
-        Vector((path, CEmptyArray))
+        lb += ((path, CEmptyArray))
 
       case RObject(fields) =>
-        fields.foldLeft(Vector.empty[(CPath, CValue)]) {
-          case (acc, field) =>
-            acc ++ flatten0(path \ field._1)(field._2)
+        fields.toList.foreach {
+          case (k, v) =>
+            flatten0(path \ k, v)
         }
 
       case RArray(elems) =>
-        Vector(elems: _*).zipWithIndex.flatMap { tuple =>
-          val (elem, idx) = tuple
-
-          flatten0(path \ idx)(elem)
+        elems.zipWithIndex.foreach {
+          case (elem, idx) =>
+            flatten0(path \ idx, elem)
         }
 
-      case (v: CValue) => Vector((path, v))
+      case (v: CValue) =>
+        lb += ((path, v))
     }
 
-    flatten0(CPath.Identity)(self)
+    flatten0(CPath.Identity, self)
+    lb.result()
   }
 }
 

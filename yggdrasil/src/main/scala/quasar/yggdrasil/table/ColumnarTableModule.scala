@@ -18,16 +18,19 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
+import quasar.contrib.fs2.convert
+import quasar.contrib.scalaz.MonadTell_
 import quasar.precog.{BitSet, MimeType, MimeTypes}
 import quasar.precog.common._
 import quasar.precog.common.ingest.FileContent
 import quasar.precog.util.{BitSetUtil, RawBitSet}
+import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
 import quasar.time.{DateTimeInterval, OffsetDate}
 
-import cats.effect.IO
+import cats.effect.{IO, LiftIO}
 
 import TransSpecModule._
 import org.slf4j.Logger
@@ -55,10 +58,10 @@ trait ColumnarTableTypes {
 }
 
 trait ColumnarTableModuleConfig {
-  def maxSliceSize: Int
+  def maxSliceRows: Int
 
   // This is a slice size that we'd like our slices to be at least as large as.
-  def minIdealSliceSize: Int = maxSliceSize / 4
+  def minIdealSliceSize: Int = maxSliceRows / 4
 
   // This is what we consider a "small" slice. This may affect points where
   // we take proactive measures to prevent problems caused by small slices.
@@ -365,7 +368,7 @@ trait ColumnarTableModule
     def uniformDistribution(init: MmixPrng): Table = {
       val gen: StreamT[IO, Slice] = StreamT.unfoldM[IO, Slice, MmixPrng](init) { prng =>
         val (column, nextGen) = Column.uniformDistribution(prng)
-        (Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), Config.maxSliceSize), nextGen).some.point[IO]
+        (Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), Config.maxSliceRows), nextGen).some.point[IO]
       }
 
       Table(gen, InfiniteSize)
@@ -616,8 +619,34 @@ trait ColumnarTableModule
       }
     }
 
-    def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int] = None): Table = {
-      val sliceSize = maxSliceSize.getOrElse(Config.maxSliceSize)
+    def fromRValueStream[M[_]: Monad: MonadTell_[?[_], DList[IO[Unit]]]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table] = {
+
+      val sliceStream = Slice.allFromRValues(values)
+
+      for {
+        d <- LiftIO[M].liftIO(convert.toStreamT(sliceStream))
+
+        _ <- MonadTell_[M, DList[IO[Unit]]].tell(DList(d.dispose))
+
+        slices = d.value
+      } yield {
+
+        import trans._
+
+        // TODO depending on the id status we may not need to wrap the table
+        Table(slices, UnknownSize)
+          .transform(OuterObjectConcat(
+            WrapObject(
+              Scan(Leaf(Source), freshIdScanner),
+              Key.name),
+            WrapObject(
+              Leaf(Source),
+              Value.name)))
+      }
+    }
+
+    def fromRValues(values: Stream[RValue], maxSliceRows: Option[Int] = None): Table = {
+      val sliceSize = maxSliceRows.getOrElse(Config.maxSliceRows)
 
       def makeSlice(data: Stream[RValue]): (Slice, Stream[RValue]) = {
         val (prefix, suffix) = data.splitAt(sliceSize)
@@ -1342,7 +1371,7 @@ trait ColumnarTableModule
           // We try to fill out the slices as much as possible, so we work with
           // several rows from the left at a time.
 
-          val lrowsPerSlice = math.max(1, Config.maxSliceSize / rhead.size)
+          val lrowsPerSlice = math.max(1, Config.maxSliceRows / rhead.size)
           val sliceSize     = lrowsPerSlice * rhead.size
 
           // Note that this is still memory efficient, as the columns are re-used
@@ -1429,8 +1458,8 @@ trait ColumnarTableModule
         }
 
         // We canonicalize the tables so that no slices are too small.
-        val left  = this.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceSize))
-        val right = that.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceSize))
+        val left  = this.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceRows))
+        val right = that.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceRows))
 
         (left.slices.uncons |@| right.slices.uncons).tupled flatMap {
           case (Some((lhead, ltail)), Some((rhead, rtail))) =>
@@ -1546,11 +1575,11 @@ trait ColumnarTableModule
         val highWaterMark: Int =
           math.max(innerHeads.length, primitiveMax)
 
-        val resplit: Vector[Slice] = if (slice.size * highWaterMark > Config.maxSliceSize) {
+        val resplit: Vector[Slice] = if (slice.size * highWaterMark > Config.maxSliceRows) {
           val numSplits =
-            math.ceil((slice.size * highWaterMark).toDouble / Config.maxSliceSize).toInt
+            math.ceil((slice.size * highWaterMark).toDouble / Config.maxSliceRows).toInt
 
-          val size = math.ceil(Config.maxSliceSize.toDouble / highWaterMark).toInt
+          val size = math.ceil(Config.maxSliceRows.toDouble / highWaterMark).toInt
 
           // we repeatedly apply windowing to slice.  this avoids linear delegation through Remap
           val acc = (0 until numSplits).foldLeft(Vector.empty[Slice]) {

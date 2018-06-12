@@ -97,7 +97,7 @@ public class BitSet {
      *
      * Used internally by copy.
      */
-    private BitSet(long[] _bits, int _len) {
+    public BitSet(long[] _bits, int _len) {
         bits = _bits;
         _length = _len;
     }
@@ -504,7 +504,7 @@ public class BitSet {
      *
      * @param newLength the new length of the table.
      */
-    private final void setLength(final int newLength) {
+    public final void setLength(final int newLength) {
         int arrayLength = 1 << (32 - Integer.numberOfLeadingZeros(newLength));
         if (arrayLength < 0 || arrayLength > (1 << 27)) {
             throw new RuntimeException(newLength + " is too large for a BitSet length");
