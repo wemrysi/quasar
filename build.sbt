@@ -630,6 +630,7 @@ lazy val mimir = project
     scalacOptions += "-language:postfixOps")
   .dependsOn(
     yggdrasil % BothScopes,
+    impl % BothScopes,
     core,
     connector)
   .settings(headerLicenseSettings)
