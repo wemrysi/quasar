@@ -41,7 +41,6 @@ object Dependencies {
     "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
     "com.codecommit"             %% "shims"                     % "1.2.1",
     "org.typelevel"              %% "cats-effect"               % "1.0.0-RC2",
-    "io.chrisdavenport"          %% "scalaz-task-effect"        % "0.1.0",
     "co.fs2"                     %% "fs2-core"                  % fs2Version,
     "co.fs2"                     %% "fs2-io"                    % fs2Version,
     "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
