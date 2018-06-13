@@ -1888,46 +1888,56 @@ object Slice {
     def tail: ArraySliced[A] = ArraySliced(arr, start + 1, size - 1)
   }
 
-  def fromRValuesStep(values: ArraySliced[RValue], maxSliceRows: Option[Int] = None, maxSliceColumns: Option[Int] = None): (Slice, ArraySliced[RValue]) = {
-    val maxSliceRowsC = maxSliceRows.getOrElse(Config.maxSliceRows)
-    val maxSliceColumnsC = maxSliceColumns.getOrElse(Config.maxSliceColumns)
-    def inner(next: ArraySliced[RValue], rows: Int, cols: Int, acc: Map[ColumnRef, ArrayColumn[_]], maxRows: Int): (Slice, ArraySliced[RValue]) =
+  def fromRValuesStep(values: ArraySliced[RValue], maxRows: Int, maxColumns: Int): (Slice, ArraySliced[RValue]) = {
+    def inner(next: ArraySliced[RValue], rows: Int, cols: Int, acc: Map[ColumnRef, ArrayColumn[_]], _size: Int): (Slice, ArraySliced[RValue]) = {
       if (next.size == 0) {
-        if (acc.isEmpty)
+        if (acc.isEmpty) {
+          // println("no more data to use, emitting slice with no data")
           (Slice.empty, next)
-        else
+        } else {
+          // println("no more data to use, emitting slice with data")
           (new Slice {
             val size = rows
             val columns = acc
           }, new ArraySliced[RValue](new Array[RValue](0), 0, 0))
+        }
       } else {
-        if (cols >= maxSliceColumnsC) {
-          (new Slice {
-            val size = rows
-            val columns = acc
-          }, next)
-        } else if (rows >= maxRows) {
-          if (rows >= maxSliceRowsC) {
+         if (rows >= _size) {
+          if (rows >= maxRows) {
+            // println("we have too many rows, cutting slice early")
             (new Slice {
               val size = rows
               val columns = acc
             }, next)
           } else {
-            val newMaxRows = maxRows * 2
-            inner(next, rows, cols, acc.mapValues { _.resize(newMaxRows) }, newMaxRows)
+            // println("we're resizing the columns because we have too many rows")
+            val newSize = _size * 2
+            inner(next, rows, cols, acc.mapValues { _.resize(newSize) }, newSize)
           }
         } else {
           val flattened = next.head.flattenWithPath
           val newAcc = updateRefs(flattened, acc, rows, maxRows)
           val newCols = newAcc.size
-          val newRows = rows + 1
-          inner(next.tail, newRows, newCols, newAcc, maxRows)
+          if (newCols > maxColumns && cols > 1) {
+            // println("we have too many columns, cutting slice early")
+            (new Slice {
+              val size = rows
+              val columns = acc
+            }, next)
+          } else {
+            // println("we're adding a CValue to a column")
+            inner(next.tail, rows + 1, newCols, newAcc, maxRows)
+          }
         }
       }
+    }
     inner(values, 0, 0, Map.empty, Math.max(64, Config.smallSliceSize))
   }
 
-  def allFromRValues(values: fs2.Stream[IO, RValue], maxSliceRowS: Option[Int] = None, maxSliceColumns: Option[Int] = None): fs2.Stream[IO, Slice] = {
+  def allFromRValues(values: fs2.Stream[IO, RValue], maxRows: Option[Int] = None, maxColumns: Option[Int] = None): fs2.Stream[IO, Slice] = {
+    val maxRowsC = maxRows.getOrElse(Config.maxSliceRows)
+    val maxColumnsC = maxColumns.getOrElse(Config.maxSliceColumns)
+    // println(s"maxRows: $maxRowsC, maxCols: $maxColumnsC")
     def rec(next: Slice.ArraySliced[RValue], values: fs2.Stream[IO, RValue]): fs2.Pull[IO, Slice, Unit] =
       if (next.size == 0) {
         for {
@@ -1935,12 +1945,16 @@ object Slice {
           _ <- uncons match {
             case Some((chunk, next)) =>
               val chunkArr = chunk.toArray
+              // println(s"got new chunk with length ${chunkArr.length}")
               rec(Slice.ArraySliced(chunkArr, 0, chunkArr.length), next)
-            case None                => fs2.Pull.done
+            case None                =>
+              // println("Finished top-level loop")
+              fs2.Pull.done
           }
         } yield ()
       } else {
-        val (nextSlice, remainingData) = Slice.fromRValuesStep(next)
+        // println(s"extracting slice from data with size ${next.size}")
+        val (nextSlice, remainingData) = Slice.fromRValuesStep(next, maxRowsC, maxColumnsC)
         fs2.Pull.output1(nextSlice) >> rec(remainingData, values)
       }
 
