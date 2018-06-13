@@ -18,6 +18,7 @@ package quasar.yggdrasil.vfs
 
 import slamdata.Predef.{SuppressWarnings, Array}
 
+import quasar.Disposable
 import quasar.contrib.pathy.{unsafeSandboxAbs, ADir, AFile, APath, RPath}
 import quasar.contrib.scalaz.stateT, stateT._
 import quasar.fp.free._
@@ -610,19 +611,27 @@ object SerialVFS {
    * Returns a stream which will immediately emit SerialVFS and then
    * continue running until the end of the world.  When the stream ends,
    * SerialVFS will no longer function.
+   *
+   * TODO: Return a `Stream[F, SerialVFS[F]]` to allow for better resource
+   *       handling once we're rid of `BackendModule`.
    */
-  def apply[F[_]: Concurrent](root: File): Stream[F, SerialVFS[F]] = {
+  def apply[F[_]: Concurrent](root: File): F[Disposable[F, SerialVFS[F]]] = {
     import shims.monadToScalaz
 
     val ioToF = λ[IO ~> F](LiftIO[F].liftIO(_))
 
     for {
-      pint <- Stream.eval(RealPOSIX[F](root))
+      pint <- RealPOSIX[F](root)
       interp = CopK.NaturalTransformation.of[S, F](pint, ioToF)
-      vfs <- Stream.eval(FreeVFS.init[S](Path.rootDir).foldMap(interp))
-      worker <- Stream.eval(async.boundedQueue[F, F[Unit]](10))
+      vfs <- FreeVFS.init[S](Path.rootDir).foldMap(interp)
+
+      worker <- async.boundedQueue[F, F[Unit]](10)
+      sdown <- async.signalOf[F, Boolean](false)
+
       svfs = new SerialVFS(root, vfs, worker, λ[POSIXWithIO ~> F](_.foldMap(interp)))
-      back <- Stream.emit(svfs).merge(worker.dequeue.evalMap(t => t).drain)
-    } yield back
+      exec = worker.dequeue.evalMap(t => t).interruptWhen(sdown)
+
+      _ <- Concurrent[F].start(exec.compile.drain)
+    } yield Disposable(svfs, sdown.set(true))
   }
 }

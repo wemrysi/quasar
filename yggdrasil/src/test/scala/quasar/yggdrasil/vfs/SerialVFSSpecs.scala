@@ -28,13 +28,14 @@ import java.nio.file.Files
 
 // For cats.effect.Timer[IO]
 import scala.concurrent.ExecutionContext.Implicits.global
+import shims._
 
 object SerialVFSSpecs extends Specification {
   "serial vfs facade" should {
     "create a scratch directory, assign a path, work with real files, and list" in {
       val base = Files.createTempDirectory("SerialVFSSpecs").toFile
 
-      val test = SerialVFS[IO](base).mapAsync(1)(vfs => for {
+      val test = SerialVFS[IO](base).flatMap(_(vfs => for {
         blob <- vfs.scratch
         version <- vfs.fresh(blob)
         dir <- vfs.underlyingDir(blob, version)
@@ -47,9 +48,9 @@ object SerialVFSSpecs extends Specification {
 
         _ <- vfs.commit(blob, version)
         _ <- vfs.link(blob, Path.rootDir </> Path.file("foo"))
-      } yield ())
+      } yield ()))
 
-      val test2 = SerialVFS[IO](base).mapAsync(1)(vfs => for {
+      val test2 = SerialVFS[IO](base).flatMap(_(vfs => for {
         ob <- vfs.readPath(Path.rootDir </> Path.file("foo"))
 
         blob <- IO {
@@ -70,15 +71,15 @@ object SerialVFSSpecs extends Specification {
           dir.exists() mustEqual true
           new File(dir, "test").exists() mustEqual true
         }
-      } yield ())
+      } yield ()))
 
       val test3 =
-        SerialVFS[IO](base).mapAsync(1)(_.ls(Path.rootDir))
+        SerialVFS[IO](base).flatMap(_(_.ls(Path.rootDir)))
 
       val result =
-        test.take(1) >> test2.take(1) >> test3.take(1)
+        test >> test2 >> test3
 
-      result.compile.last.unsafeRunSync must beSome(List(Path.file("foo")))
+      result.unsafeRunSync must_=== List(Path.file("foo"))
     }
   }
 }
