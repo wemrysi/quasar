@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.blueeyes.json.JValue
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
+import quasar.contrib.scalaz.concurrent.task._
 import quasar.fs._
 import quasar.mimir.MimirCake._
 import quasar.precog.common.RValue
@@ -28,8 +29,6 @@ import quasar.qscript._
 import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
 import quasar.yggdrasil.bytecode.JType
 
-import fs2.interop.scalaz._
-import io.chrisdavenport.scalaz.task._
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
