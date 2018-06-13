@@ -20,9 +20,10 @@ import slamdata.Predef._
 
 import quasar._
 import quasar.common._
-import quasar.contrib.scalaz._
-import quasar.fp._
 import quasar.contrib.iota._
+import quasar.contrib.scalaz._
+import quasar.contrib.scalaz.concurrent.task._
+import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.ski.κ
 import quasar.precog.common.{CNumericValue, ColumnRef, CPath, CPathField, CPathIndex}
@@ -34,7 +35,6 @@ import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 import scala.collection.immutable.{Map => ScalaMap}
 
 import cats.effect.IO
-import io.chrisdavenport.scalaz.task._
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import matryoshka.data._

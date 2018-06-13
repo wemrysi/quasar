@@ -121,7 +121,7 @@ final class FederatedShiftedReadPlanner[
 
       _ <- MonadFinalizers[F, IO].tell(DList(d.dispose))
 
-      slices = d.value
+      slices = d.unsafeValue
     } yield {
 
       import P.trans._

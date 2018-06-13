@@ -46,6 +46,9 @@ trait StreamInstances {
 
       def point[A](a: => A) =
         Stream.emit(a)
+
+      override def map[A, B](fa: Stream[F, A])(f: A => B) =
+        fa map f
     }
 
   implicit def streamSync[F[_]](implicit F: Sync[F]): Sync[Stream[F, ?]] =

@@ -24,6 +24,7 @@ import quasar.common._
 import quasar.connector._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
+import quasar.contrib.scalaz.concurrent.task._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.numeric._
@@ -41,7 +42,6 @@ import argonaut._, Argonaut._
 import cats.Parallel
 import cats.effect.IO
 import cats.instances.list._
-import io.chrisdavenport.scalaz.task._
 
 import fs2.{async, Stream}
 import fs2.async.mutable.{Queue, Signal}
@@ -157,7 +157,12 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
     } yield {
       connector.map {
         case (fs, shutdown) =>
-          (λ[M ~> Task](_.run((cake: Cake, fs))), cake.shutdown.to[Task] >> shutdown)
+          val dispose =
+            cake.mapK(λ[IO ~> Task](_.to[Task]))
+              .onDispose(shutdown)
+              .dispose
+
+          (λ[M ~> Task](_.run((cake.unsafeValue: Cake, fs))), dispose)
       }
     }
 

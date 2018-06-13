@@ -30,6 +30,7 @@ import quasar.contrib.fs2.stream._
 import quasar.contrib.iota._
 import quasar.contrib.nio.{file => contribFile}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.concurrent.task._
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
 import quasar.evaluate.FederatingQueryEvaluator
@@ -58,7 +59,6 @@ import argonaut._, Argonaut._
 import cats.effect.{ConcurrentEffect, Effect, IO, Sync, Timer}
 import eu.timepit.refined.auto._
 import fs2.{io, text, Stream}
-import _root_.io.chrisdavenport.scalaz.task._
 import matryoshka._
 import matryoshka.implicits._
 import matryoshka.data.Fix
@@ -104,11 +104,11 @@ final class Sql2QueryRegressionSpec extends Qspec {
       localM = HFunctor[QueryEvaluator[?[_], Stream[IO, ?], ResourcePath, Stream[IO, Data]]].hmap(local)(streamToM)
 
       sdown =
-        cake.shutdown
+        cake.dispose
           .guarantee(contribFile.deleteRecursively[IO](tmpDir.toPath))
           .guarantee(local.shutdown.compile.drain)
 
-      mimirFederation = MimirQueryFederation[Fix, M](cake)
+      mimirFederation = MimirQueryFederation[Fix, M](cake.unsafeValue)
 
       qassoc = QueryAssociate.lightweight[Fix, M, IO](localM.evaluate)
       discovery = (localM : ResourceDiscovery[M, Stream[IO, ?]])
