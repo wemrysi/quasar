@@ -31,7 +31,7 @@ object Dependencies {
   private val specsVersion        = "4.0.2"
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
-  private val fs2Version          = "1.0.0-M1"
+  private val fs2Version          = "0.10.5"
 
   def foundation = Seq(
     "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
@@ -39,7 +39,7 @@ object Dependencies {
     "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
     "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
     "com.codecommit"             %% "shims"                     % "1.2.1",
-    "org.typelevel"              %% "cats-effect"               % "1.0.0-RC2",
+    "org.typelevel"              %% "cats-effect"               % "0.10",
     "io.chrisdavenport"          %% "scalaz-task-effect"        % "0.1.0",
     "co.fs2"                     %% "fs2-core"                  % fs2Version,
     "co.fs2"                     %% "fs2-io"                    % fs2Version,

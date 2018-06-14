@@ -1931,7 +1931,7 @@ object Slice {
         }
       }
     }
-    inner(values, 0, 0, Map.empty, Math.max(64, Config.smallSliceSize))
+    inner(values, 0, 0, Map.empty, 64)
   }
 
   def allFromRValues(values: fs2.Stream[IO, RValue], maxRows: Option[Int] = None, maxColumns: Option[Int] = None): fs2.Stream[IO, Slice] = {
@@ -1945,7 +1945,6 @@ object Slice {
           _ <- uncons match {
             case Some((chunk, next)) =>
               val chunkArr = chunk.toArray
-              // println(s"got new chunk with length ${chunkArr.length}")
               rec(Slice.ArraySliced(chunkArr, 0, chunkArr.length), next)
             case None                =>
               // println("Finished top-level loop")

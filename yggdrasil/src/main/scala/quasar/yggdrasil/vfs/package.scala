@@ -24,7 +24,7 @@ import quasar.fp.free
 import argonaut.{Argonaut, CodecJson, DecodeResult}
 
 import cats.StackSafeMonad
-import cats.effect.{ExitCase, IO, Sync}
+import cats.effect.{IO, Sync}
 
 import iotaz.{CopK, TNilK}
 import iotaz.TListK.:::
@@ -52,15 +52,6 @@ package object vfs {
             Free.liftF(sa) map (_.right[Throwable]))(
             ioa => Free.liftF(I(ioa.attempt.map(_.disjunction)))))
         }
-
-      def bracketCase[A, B](acquire: Free[S, A])(use: A => Free[S, B])(release: (A, ExitCase[Throwable]) => Free[S, Unit]): Free[S, B] =
-        for {
-          a <- acquire
-          r <- use(a).foldMap(attemptT).run
-          b <- r.fold(
-            t => release(a, ExitCase.error(t)) *> raiseError[B](t),
-            b => release(a, ExitCase.complete).as(b))
-        } yield b
 
       def suspend[A](thunk: => Free[S, A]): Free[S, A] =
         delay(thunk).join

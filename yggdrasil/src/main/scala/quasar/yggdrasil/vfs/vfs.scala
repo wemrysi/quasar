@@ -26,8 +26,7 @@ import quasar.fs.MoveSemantics
 
 import argonaut.{Argonaut, Parse}
 
-import cats.effect.{Concurrent, IO, LiftIO}
-import cats.effect.concurrent.Deferred
+import cats.effect.{Effect, IO, LiftIO}
 
 import fs2.Stream
 import fs2.async, async.mutable
@@ -48,7 +47,9 @@ import shims.monoidToCats
 import java.io.File
 import java.util.UUID
 
-import scala.util.Either
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Promise
+import scala.util.{Failure, Success}
 
 final case class VFS(
     baseDir: ADir,
@@ -538,7 +539,7 @@ final class SerialVFS[F[_]] private (
     @volatile private var current: VFS,
     worker: mutable.Queue[F, F[Unit]],    // this exists solely for #serialize
     interp: POSIXWithIO ~> F)(
-    implicit F: Concurrent[F]) {
+    implicit F: Effect[F]) {
 
   import SerialVFS.S
   import shims.monadToScalaz
@@ -595,11 +596,16 @@ final class SerialVFS[F[_]] private (
 
   private def serialize[A](fa: F[A]): F[A] = {
     for {
-      ref <- Deferred[F, Either[Throwable, A]]
-      _ <- worker.enqueue1(F.attempt(fa).flatMap(ref.complete))
-      r <- ref.get
-      a <- F.fromEither(r)
-    } yield a
+      ref <- F.delay(Promise[A])
+      _ <- worker.enqueue1(F.attempt(fa).flatMap {
+        case Left(e) => F.delay(ref.complete(Failure(e)))
+        case Right(a) => F.delay(ref.complete(Success(a)))
+      })
+      r <- F.async[A](cb => ref.future.onComplete {
+        case Success(a) => cb(Right(a))
+        case Failure(e) => cb(Left(e))
+      })
+    } yield r
   }
 }
 
@@ -611,7 +617,7 @@ object SerialVFS {
    * continue running until the end of the world.  When the stream ends,
    * SerialVFS will no longer function.
    */
-  def apply[F[_]: Concurrent](root: File): Stream[F, SerialVFS[F]] = {
+  def apply[F[_]: Effect](root: File): Stream[F, SerialVFS[F]] = {
     import shims.monadToScalaz
 
     val ioToF = λ[IO ~> F](LiftIO[F].liftIO(_))

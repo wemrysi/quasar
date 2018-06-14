@@ -89,8 +89,10 @@ final class MimirQScriptEvaluator[
 
   def execute(repr: Repr): M[ReadError \/ Stream[IO, Data]] =
     MimirQScriptEvaluator.slicesToStream(repr.table.slices)
-      .filter(_ != JUndefined)
-      .map(JValue.toData)
+      .mapSegments(
+        _.filter(_ != JUndefined)
+          .map(JValue.toData).force.toChunk.toSegment
+      )
       .right[ReadError]
       .point[M]
 

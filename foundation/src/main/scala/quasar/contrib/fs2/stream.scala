@@ -16,11 +16,11 @@
 
 package quasar.contrib.fs2
 
-import slamdata.Predef.{Throwable, Unit}
+import slamdata.Predef.Throwable
 
 import scala.util.Either
 
-import cats.effect.{ExitCase, IO, LiftIO, Sync}
+import cats.effect.{IO, LiftIO, Sync}
 import fs2.Stream
 import scalaz.ApplicativePlus
 
@@ -50,24 +50,13 @@ trait StreamInstances {
 
   implicit def streamSync[F[_]](implicit F: Sync[F]): Sync[Stream[F, ?]] =
     new Sync[Stream[F, ?]] {
-      val ME = Stream.monadErrorInstance[F]
+      val ME = Stream.syncInstance[F]
 
       def suspend[A](fa: => Stream[F, A]): Stream[F, A] =
         ME.flatten(delay(fa))
 
       override def delay[A](a: => A): Stream[F, A] =
         Stream.eval(F.delay(a))
-
-      def bracketCase[A, B]
-          (acq: Stream[F, A])
-          (use: A => Stream[F, B])
-          (rel: (A, ExitCase[Throwable]) => Stream[F, Unit])
-          : Stream[F, B] =
-        acq flatMap { a =>
-          use(a)
-            .handleErrorWith(t => rel(a, ExitCase.error(t)).drain)
-            .append(rel(a, ExitCase.complete).drain)
-        }
 
       def pure[A](x: A): Stream[F, A] =
         ME.pure(x)

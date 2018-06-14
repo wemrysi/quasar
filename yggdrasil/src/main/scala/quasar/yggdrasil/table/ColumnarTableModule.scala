@@ -620,7 +620,6 @@ trait ColumnarTableModule
     }
 
     def fromRValueStream[M[_]: Monad: MonadTell_[?[_], DList[IO[Unit]]]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table] = {
-
       val sliceStream = Slice.allFromRValues(values)
 
       for {

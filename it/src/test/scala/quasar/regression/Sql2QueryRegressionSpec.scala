@@ -55,7 +55,7 @@ import java.text.ParseException
 import scala.Predef.=:=
 
 import argonaut._, Argonaut._
-import cats.effect.{ConcurrentEffect, Effect, IO, Sync, Timer}
+import cats.effect.{Effect, IO, Sync, Timer}
 import eu.timepit.refined.auto._
 import fs2.{io, text, Stream}
 import _root_.io.chrisdavenport.scalaz.task._
@@ -72,6 +72,8 @@ import shims.{monadErrorToScalaz, monadToScalaz}
 
 final class Sql2QueryRegressionSpec extends Qspec {
   import Sql2QueryRegressionSpec._
+
+  // sequential
 
   type M[A] = EitherT[EitherT[StateT[WriterT[Stream[IO, ?], PhaseResults, ?], Long, ?], SemanticErrors, ?], PlannerError, A]
 
@@ -92,6 +94,10 @@ final class Sql2QueryRegressionSpec extends Qspec {
         .liftM[EitherT[?[_], SemanticErrors,?]]
         .liftM[EitherT[?[_], PlannerError,?]])
 
+  def guarantee[A, B](io: IO[A], cleanup: IO[B]): IO[A] = io.attempt.flatMap {
+    e => cleanup.flatMap(_ => e.fold(IO.raiseError, IO.pure))
+  }
+
   val queryEvaluator =
     for {
       tmpPath <- IO(Files.createTempDirectory("quasar-test-"))
@@ -99,14 +105,13 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
       cake <- Precog(tmpDir)
 
-      local = LocalDataSource[Stream[IO, ?], IO](jPath(TestDataRoot), 8192)
+      local = LocalDataSource[Stream[IO, ?], IO](jPath(TestDataRoot), 65536)
 
       localM = HFunctor[QueryEvaluator[?[_], Stream[IO, ?], ResourcePath, Stream[IO, Data]]].hmap(local)(streamToM)
 
       sdown =
-        cake.shutdown
-          .guarantee(contribFile.deleteRecursively[IO](tmpDir.toPath))
-          .guarantee(local.shutdown.compile.drain)
+        guarantee(cake.shutdown,
+          guarantee(contribFile.deleteRecursively[IO](tmpDir.toPath), local.shutdown.compile.drain))
 
       mimirFederation = MimirQueryFederation[Fix, M](cake)
 
@@ -243,12 +248,12 @@ final class Sql2QueryRegressionSpec extends Qspec {
         } | OrderPreserved
 
     val actProcess =
-      convert.toProcess(act.map(normalizeJson <<< deleteFields <<< (_.asJson)))
+      convert.toProcess(act).map(normalizeJson <<< deleteFields <<< (_.asJson))
         .translate(λ[IO ~> Task](_.to[Task]))
 
     val result =
       exp.predicate(
-        exp.rows.toVector,
+        exp.rows,
         actProcess,
         fieldOrderSignificance,
         resultOrderSignificance)
@@ -290,7 +295,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
   /** Returns all the `RegressionTest`s found in the given directory, keyed by
     * file path.
     */
-  def regressionTests[F[_]: ConcurrentEffect: Timer](
+  def regressionTests[F[_]: Effect: Timer](
       testDir: RDir,
       dataDir: RDir)
       : F[Map[RFile, RegressionTest]] =
@@ -302,7 +307,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   /** Loads a `RegressionTest` from the given file. */
   def loadRegressionTest[F[_]: Effect: Timer](file: RFile): Stream[F, RegressionTest] =
-    io.file.readAllAsync[F](jPath(file), 1024)
+    io.file.readAllAsync[F](jPath(file), 2048)
       .through(text.utf8Decode)
       .reduce(_ + _)
       .flatMap(txt =>

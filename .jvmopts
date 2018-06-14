@@ -1,6 +1,8 @@
--Xms512m
+-Xms1g
 -Xmx6g
 -Xss2m
+-XX:MetaspaceSize=128m
 -XX:+UseG1GC
 -XX:ParallelGCThreads=2
 -XX:ConcGCThreads=1
+-XX:MaxInlineLevel=15
