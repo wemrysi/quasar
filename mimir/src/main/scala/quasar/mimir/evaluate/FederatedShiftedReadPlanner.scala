@@ -111,10 +111,14 @@ final class FederatedShiftedReadPlanner[
   }
 
   private def tableFromStream(s: Stream[IO, Data]): F[P.Table] = {
+    val dataToRValue: Data => RValue =
+      d => RValue.fromJValueRaw(JValue.fromData(d))
+
+    // TODO{fs2}: Chunkiness
     val sliceStream =
-      s.map(data => RValue.fromJValueRaw(JValue.fromData(data)))
+      s.mapChunks(_.map(dataToRValue).toSegment)
         .segments
-        .map(c => Slice.fromRValues(unfold(c)(_.force.uncons1.toOption)))
+        .map(seg => Slice.fromRValues(seg.force.toList.toStream))
 
     for {
       d <- convert.toStreamT(sliceStream).to[F]

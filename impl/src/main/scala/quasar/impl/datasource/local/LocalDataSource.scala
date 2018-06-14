@@ -28,7 +28,6 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
 
 import java.nio.file.{Files, Path => JPath}
-import java.nio.ByteBuffer
 import java.text.ParseException
 
 import scala.collection.JavaConverters._
@@ -122,8 +121,8 @@ final class LocalDataSource[F[_]: Sync, G[_]: Effect: Timer] private (
     val initial =
       io.file.readAllAsync[G](path, readChunkSizeBytes)
         .chunks
-        .map(_.toBytes)
-        .flatMap(bs => unattemptChunk(parser.absorb(ByteBuffer.wrap(bs.values, bs.offset, bs.size))))
+        .map(_.toByteBuffer)
+        .flatMap(buf => unattemptChunk(parser.absorb(buf)))
 
     initial ++ unattemptChunk(parser.finish())
   }

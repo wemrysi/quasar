@@ -99,7 +99,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
       cake <- Precog(tmpDir)
 
-      local = LocalDataSource[Stream[IO, ?], IO](jPath(TestDataRoot), 8192)
+      local = LocalDataSource[Stream[IO, ?], IO](jPath(TestDataRoot), 65535)
 
       localM = HFunctor[QueryEvaluator[?[_], Stream[IO, ?], ResourcePath, Stream[IO, Data]]].hmap(local)(streamToM)
 
@@ -243,7 +243,9 @@ final class Sql2QueryRegressionSpec extends Qspec {
         } | OrderPreserved
 
     val actProcess =
-      convert.toProcess(act.map(normalizeJson <<< deleteFields <<< (_.asJson)))
+      convert.toProcess(act)
+        // TODO{fs2}: Chunkiness
+        .map(normalizeJson <<< deleteFields <<< (_.asJson))
         .translate(λ[IO ~> Task](_.to[Task]))
 
     val result =
