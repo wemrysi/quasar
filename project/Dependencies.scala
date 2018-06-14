@@ -20,15 +20,13 @@ object Dependencies {
   private val scodecBitsVersion   = "1.1.2"
   private val scodecScalazVersion = "1.4.1a"
   private val http4sVersion       = "0.16.6a"
-  private val scalacheckVersion   = "1.13.4"
+  private val scalacheckVersion   = "1.14.0"
   private val scalazVersion       = "7.2.23"
   private val scalazStreamVersion = "0.8.6a"
   private val scoptVersion        = "3.5.0"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"
-  // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
-  // leads to a ParquetRDDE failure under a full test run
-  private val specsVersion        = "4.0.2"
+  private val specsVersion        = "4.2.0"
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
   private val fs2Version          = "1.0.0-M1"
@@ -54,7 +52,7 @@ object Dependencies {
     "com.chuusai"                %% "shapeless"                 % shapelessVersion,
     "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
     "com.propensive"             %% "contextual"                % "1.0.1",
-    "io.frees"                   %% "iotaz-core"                % "0.3.8-SNAPSHOT",
+    "io.frees"                   %% "iotaz-core"                % "0.3.8",
     "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
     "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
     "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
@@ -62,7 +60,7 @@ object Dependencies {
     "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
     "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
     "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
-    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") % Test,
+    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.14") % Test,
     "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                              % Test
   )
 
