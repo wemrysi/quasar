@@ -35,6 +35,7 @@ import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
 import quasar.evaluate.FederatingQueryEvaluator
 import quasar.fp._
+import quasar.fs.FileSystemType
 import quasar.fs.Planner.PlannerError
 import quasar.frontend.logicalplan.{LogicalPlan => LP, Read => LPRead}
 import quasar.higher.HFunctor
@@ -153,15 +154,20 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   ////
 
-  (regressionTests[IO](TestsRoot, TestDataRoot) |@| queryEvaluator)({
-    case (tests, (eval, sdown)) =>
-      suiteName >> {
-        tests.toList foreach { case (f, t) =>
-          regressionExample(f, t, BackendName("mimir"), queryResults(eval.evaluate))
-        }
+  Effect[Task].toIO(TestConfig.fileSystemConfigs(FileSystemType("lwc_local"))).flatMap({cfgs =>
+    if (cfgs.isEmpty)
+      IO(suiteName >> skipped("to run, enable the 'lwc_local' test configuration."))
+    else
+      (regressionTests[IO](TestsRoot, TestDataRoot) |@| queryEvaluator)({
+        case (tests, (eval, sdown)) =>
+          suiteName >> {
+            tests.toList foreach { case (f, t) =>
+              regressionExample(f, t, BackendName("mimir"), queryResults(eval.evaluate))
+            }
 
-        step(sdown.unsafeRunSync)
-      }
+            step(sdown.unsafeRunSync)
+          }
+      })
   }).unsafeRunSync
 
   ////
