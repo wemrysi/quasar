@@ -202,7 +202,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
       _ match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan.apply(value)
         case _ => ???
       }
     }
@@ -214,7 +214,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
       in match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan.apply(value)
       }
     }
 
