@@ -16,23 +16,25 @@
 
 package quasar.yggdrasil.vfs
 
-import quasar.contrib.iota.{:<<:, ACopK}
+import quasar.contrib.iota.{ACopK, :<<:}
+
+import cats.effect.IO
 
 import iotaz.CopK
-import scalaz.{~>, Free}
-import scalaz.concurrent.Task
 
-object POSIXWithTask {
+import scalaz.{~>, Free}
+
+object POSIXWithIO {
   def generalize[S[a] <: ACopK[a]]: GeneralizeSyntax[S] = new GeneralizeSyntax[S] {}
 
-  private val JP = CopK.Inject[POSIXOp, POSIXWithTaskCopK]
-  private val JT = CopK.Inject[Task, POSIXWithTaskCopK]
+  private val JP = CopK.Inject[POSIXOp, POSIXWithIOCopK]
+  private val JI = CopK.Inject[IO, POSIXWithIOCopK]
 
   trait GeneralizeSyntax[S[a] <: ACopK[a]] {
-    def apply[A](pwt: POSIXWithTask[A])(implicit IP: POSIXOp :<<: S, IT: Task :<<: S): Free[S, A] =
-      pwt.mapSuspension(λ[POSIXWithTaskCopK ~> S] {
+    def apply[A](pwt: POSIXWithIO[A])(implicit IP: POSIXOp :<<: S, II: IO :<<: S): Free[S, A] =
+      pwt.mapSuspension(λ[POSIXWithIOCopK ~> S] {
         case JP(p) => IP(p)
-        case JT(t) => IT(t)
+        case JI(t) => II(t)
       })
   }
 }
