@@ -74,10 +74,6 @@ object Dependencies {
     "org.typelevel"              %% "algebra-laws"  % algebraVersion  % Test
   )
 
-  def ejson = Seq(
-    "org.spire-math" %% "jawn-parser" % jawnVersion
-  )
-
   def effect = Seq(
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
   )
