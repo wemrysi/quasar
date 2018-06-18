@@ -123,7 +123,7 @@ final class FederatedShiftedReadPlanner[
     for {
       d <- convert.toStreamT(sliceStream).to[F]
 
-      _ <- MonadFinalizers[F, IO].tell(DList(d.dispose))
+      _ <- MonadFinalizers[F, IO].tell(List(d.dispose))
 
       slices = d.unsafeValue
     } yield {

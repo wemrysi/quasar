@@ -16,7 +16,7 @@
 
 package quasar.mimir.evaluate
 
-import slamdata.Predef.Option
+import slamdata.Predef.{List, Option}
 import quasar.{Data, RenderTreeT}
 import quasar.api.ResourceError.ReadError
 import quasar.contrib.cats.effect.liftio._
@@ -30,7 +30,8 @@ import quasar.mimir._, MimirCake._
 import cats.effect.{IO, LiftIO}
 import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.{\/, DList, Monad, WriterT}
+import scalaz.{\/, Monad, WriterT}
+import scalaz.std.list._
 import scalaz.std.tuple._
 import scalaz.syntax.traverse._
 import shims._
@@ -47,7 +48,7 @@ final class MimirQueryFederation[
     MimirQScriptEvaluator[T, WriterT[F, Finalizers[IO], ?]](P)
 
   def evaluateFederated(q: FederatedQuery[T, QueryAssociate[T, F, IO]]): F[ReadError \/ Stream[IO, Data]] = {
-    val finalize: ((DList[IO[Unit]], Stream[IO, Data])) => Stream[IO, Data] = {
+    val finalize: ((List[IO[Unit]], Stream[IO, Data])) => Stream[IO, Data] = {
       case (fs, s) => fs.foldLeft(s)(_ onFinalize _)
     }
 
