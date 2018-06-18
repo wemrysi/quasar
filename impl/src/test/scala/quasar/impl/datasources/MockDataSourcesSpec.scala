@@ -19,7 +19,7 @@ package quasar.impl.datasources
 import slamdata.Predef.{String, List}
 
 import quasar.api._
-import quasar.api.DataSourceError.{InitializationError, MalformedConfiguration}
+import quasar.api.DataSourceError.InitializationError
 import quasar.Condition
 import quasar.fp.numeric.Positive
 import quasar.impl.datasources.MockDataSourcesSpec.DefaultM
@@ -45,13 +45,8 @@ final class MockDataSourcesSpec extends DataSourcesSpec[DefaultM, String] {
       rn: ResourceName,
       dst: DataSourceType,
       config: C
-      ): Condition[InitializationError[C]] =
-    (rn.value, config) match {
-      case ("bar", "bad-s3-config") =>
-        Condition.abnormal[InitializationError[C]](MalformedConfiguration(dst, config, "Malformed DataSource configuration"))
-      case (_, _) =>
-        Condition.normal()
-    }
+      ): Condition[InitializationError[C]] = Condition.normal()
+
 }
 
 object MockDataSourcesSpec {
