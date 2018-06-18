@@ -791,7 +791,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val from = Path.rootDir </> Path.file("foo")
       val to = Path.rootDir </> Path.file("bar")
 
-      val vfs = BlankVFS.copy(paths = Map(from -> Blob(UUID.randomUUID())))
+      val vfs = BlankVFS.copy(paths = Map(from -> blob))
 
       val interp = ().point[Harness[S, IO, ?]]
 
@@ -862,13 +862,9 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
     }
 
     "moveDir fails with a non-existent source" in {
-      val blob = Blob(UUID.randomUUID())
-
       val source = Path.rootDir </> Path.dir("source")
-      val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to = target </> Path.file("foo")
 
       val interp = ().point[Harness[S, IO, ?]]
 
@@ -886,7 +882,6 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to = target </> Path.file("foo")
 
       val vfs =
         BlankVFS.copy(
@@ -911,7 +906,6 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to = target </> Path.file("foo")
 
       val vfs =
         BlankVFS.copy(

@@ -179,8 +179,6 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): Backend[Repr] = {
 
-    def mapFuncPlanner[F[_]: Monad] = MapFuncPlanner[T, F, MapFunc[T, ?]]
-
     def qScriptCorePlanner = new QScriptCorePlanner[T, Backend](
       λ[IO ~> Backend](_.to[Task].liftM[MT].liftB),
       λ[M ~> Backend](_.liftB))
