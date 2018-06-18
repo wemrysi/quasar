@@ -326,8 +326,11 @@ trait ColumnarTableModule
     with SamplableColumnarTableModule
     with IndicesModule {
 
-  // shadow instance of scalaz type classes for `Id`
-  private val idInstance: Int = 1
+  // shadow instance of scalaz type classes for `Id`,
+  // because with shims we have ambiguous instances
+  // the right-hand side is necessary to prevent `idInstance`
+  // from being marked unused.
+  private val idInstance: Int = idInstance + 1
 
   import TableModule._
   import trans.{Range => _, _}
