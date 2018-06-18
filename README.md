@@ -120,7 +120,7 @@ The `<mountPath>` specifies the path of your mount point and the remaining param
 | `couchbase`         | `couchbase://`   | [Couchbase](#couchbase)               |
 | `marklogic`         | `xcc://`         | [MarkLogic](#marklogic)               |
 | `mimir`             |                  | "\<path-to-mimir-storage-directory\>" |
-| `local_file_system` |                  | "\<path-to-mimir-storage-directory\>" |
+| `lwc_local`         |                  | "\<path-to-mimir-storage-directory\>" |
 | `mongodb`           | `mongodb://`     | [MongoDB](#database-mounts)           |
 
 
