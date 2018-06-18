@@ -100,6 +100,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
       cake <- Precog(tmpDir)
 
+      // 64 KB chunks, chosen mostly arbitrarily.
       local = LocalDataSource[Stream[IO, ?], IO](jPath(TestDataRoot), 65535)
 
       localM = HFunctor[QueryEvaluator[?[_], Stream[IO, ?], ResourcePath, Stream[IO, Data]]].hmap(local)(streamToM)
