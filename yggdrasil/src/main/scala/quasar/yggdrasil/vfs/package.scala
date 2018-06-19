@@ -21,8 +21,6 @@ import slamdata.Predef.Throwable
 import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.fp.free
 
-import argonaut.{Argonaut, CodecJson, DecodeResult}
-
 import cats.StackSafeMonad
 import cats.effect.{ExitCase, IO, Sync}
 
@@ -33,8 +31,6 @@ import scalaz.{~>, EitherT, Free}
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.either._
-
-import java.util.UUID
 
 package object vfs {
   type POSIX[A] = Free[POSIXOp, A]
@@ -80,5 +76,4 @@ package object vfs {
       def flatMap[A, B](fa: Free[S, A])(f: A => Free[S, B]): Free[S, B] =
         fa.flatMap(f)
     }
-
 }

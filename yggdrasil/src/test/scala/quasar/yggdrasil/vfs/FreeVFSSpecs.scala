@@ -1086,12 +1086,6 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val blob = Blob(UUID.randomUUID())
       val version = Version(UUID.randomUUID())
 
-      val blobVLog =
-        VersionLog(
-          BaseDir </> Path.dir(blob.value.toString),
-          List(version),
-          Set(version))
-
       val interp = ().point[Harness[S, IO, ?]]
 
       val result = interp(FreeVFS.underlyingDir[S](blob, version).eval(BlankVFS)).unsafeRunSync
