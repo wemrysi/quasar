@@ -264,8 +264,8 @@ lazy val root = project.in(file("."))
 //      /     |  \       |             |
 //      |     |   \______|_____________|
 //      |     |      \  /     \
-          skeleton, mimir, mongodb,
-//      \    |     /          |
+                   mimir, mongodb,
+//      \     |    /          |
           interface,
 //          /  \              |
          repl, web,
@@ -487,17 +487,6 @@ lazy val mongodb = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-/** A connector outline, meant to be copied and incrementally filled in while
-  * implementing a new connector.
-  */
-lazy val skeleton = project
-  .settings(name := "quasar-skeleton-internal")
-  .dependsOn(connector % BothScopes)
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Types and operations needed by applications that embed Quasar.
   */
 lazy val interface = project
@@ -505,7 +494,6 @@ lazy val interface = project
   .dependsOn(
     core % BothScopes,
     mimir,
-    skeleton,
     sst)
   .settings(commonSettings)
   .settings(publishTestsSettings)
