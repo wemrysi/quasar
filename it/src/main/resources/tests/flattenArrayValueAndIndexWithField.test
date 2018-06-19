@@ -2,10 +2,10 @@
     "name": "field and flattened array value and index",
     "backends": {
         "couchbase":         "pending",
-        "lwc_local":         "pendingIgnoreFieldOrder",
+        "lwc_local":         "ignoreFieldOrder",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",
-        "mimir":             "pendingIgnoreFieldOrder",
+        "mimir":             "ignoreFieldOrder",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
         "mongodb_3_4_13":    "pending",
