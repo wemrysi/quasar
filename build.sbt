@@ -559,6 +559,7 @@ lazy val it = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
+  .settings(logBuffered in Test := false)
   .settings(
     sideEffectTestFSConfig := {
       val LoadCfgProp = "slamdata.internal.fs-load-cfg"
