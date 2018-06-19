@@ -2,12 +2,10 @@
     "name": "geo_markers_step1",
     "data": "patients.data",
     "backends": {
-       "couchbase":         "skip",
        "lwc_local":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
-    "NB": "Couchbase fails because it can not load patients data",
     "query": "SELECT COUNT(*) AS cnt, loc[1] AS lat, loc[0] AS lng FROM patients WHERE state = \"TX\" GROUP BY loc[1], loc[0] ORDER BY loc[1] ASC, loc[0] ASC LIMIT 6",
     "predicate": "exactly",
     "expected": [

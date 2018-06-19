@@ -50,7 +50,6 @@ object TestConfig {
    * `it` and the connectors.  Hence, the redundant hard-coding of constants.  We
    * should get rid of this abomination as soon as possible.
    */
-  val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), FileSystemType("couchbase"))
   val LWC_LOCAL       = ExternalBackendRef(BackendRef(BackendName("lwc_local")        , BackendCapability.All), FileSystemType("lwc_local"))
   val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), FileSystemType("marklogic"))
   val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), FileSystemType("marklogic"))
@@ -62,7 +61,6 @@ object TestConfig {
   val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), FileSystemType("mongodb"))
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
-    COUCHBASE,
     LWC_LOCAL,
     MARKLOGIC_JSON, MARKLOGIC_XML,
     MIMIR,
@@ -70,11 +68,6 @@ object TestConfig {
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")
-
-  /** True if this backend configuration is for a couchbase connection.
-    */
-  def isCouchbase(backendRef: BackendRef): Boolean =
-    backendRef === COUCHBASE.ref
 
   /** Returns the name of the environment variable used to configure the
     * given backend.

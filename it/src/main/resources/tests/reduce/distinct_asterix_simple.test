@@ -2,7 +2,6 @@
     "name": "[qa_s08] distinct * simple",
 
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },

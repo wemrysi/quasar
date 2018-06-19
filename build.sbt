@@ -262,22 +262,22 @@ lazy val root = project.in(file("."))
 //        /   \           |            |
            connector,  yggdrasil,
 //      /     |  \       |             |
-//      |     |   \______|_____________|__________
-//      |     |      \  /     \         \         \
-          skeleton, mimir, marklogic, mongodb, couchbase,
-//      \    |     /          |          |         |
+//      |     |   \______|_____________|
+//      |     |      \  /     \         \
+          skeleton, mimir, marklogic, mongodb,
+//      \    |     /          |          |
           interface,
-//          /  \              |          |         |
+//          /  \              |          |
          repl, web,
-//              |             |          |         |
+//              |             |          |
                 it,
-//   ___________|_____________/          |         |
-//  /           |      __________________/         |
-//  |          /|\    /          __________________/
-//  |         / | \  /          /
-//  |        /  |  \/__________/
-//  |       /   |  /    \     /
-  marklogicIt, mongoIt, couchbaseIt
+//   ___________|_____________/          |
+//  /           |      __________________/
+//  |          /|\    /
+//  |         / | \  /
+//  |        /  |  \/
+//  |       /   |  /
+  marklogicIt, mongoIt
 //
 // NB: the *It projects are temporary until we polyrepo
   ).enablePlugins(AutomateHeaderPlugin)
@@ -470,21 +470,6 @@ lazy val core = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-/** Implementation of the Couchbase connector.
-  */
-lazy val couchbase = project
-  .settings(name := "quasar-couchbase-internal")
-  .dependsOn(
-    connector % BothScopes,
-    core      % "test->test",
-    qscript   % "test->test")
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(libraryDependencies ++= Dependencies.couchbase)
-  .settings(isolatedBackendSettings("quasar.physical.couchbase.Couchbase$"))
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Implementation of the MarkLogic connector.
   */
 lazy val marklogic = project
@@ -655,19 +640,6 @@ lazy val marklogicIt = project
 lazy val mongoIt = project
   .configs(ExclusiveTests)
   .dependsOn(it % BothScopes, mongodb)
-  .settings(commonSettings)
-  .settings(noPublishSettings)
-  .settings(targetSettings)
-  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
-  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
-  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
-  .settings(parallelExecution in Test := false)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val couchbaseIt = project
-  .configs(ExclusiveTests)
-  .dependsOn(it % BothScopes, couchbase)
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(targetSettings)

@@ -2,7 +2,6 @@
   "name": "[reg] bug2226",
   "data": "revenue.data",
   "backends": {
-    "couchbase":         "ignoreFieldOrder",
     "marklogic_json":    "ignoreFieldOrder",
     "mimir":             "ignoreFieldOrder"
   },

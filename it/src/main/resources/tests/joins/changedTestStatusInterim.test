@@ -4,7 +4,6 @@
            and should be removed when some connectors start passing that test.",
     "NB": "Skipped on mimir due to timeout.",
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":         "skip",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",

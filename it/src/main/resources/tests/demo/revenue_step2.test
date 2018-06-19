@@ -2,12 +2,11 @@
     "name": "revenue_step2",
     "data": "revenue.data",
     "backends": {
-       "couchbase":         "pending",
        "lwc_local":         "pending",
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "pending"
     },
-    "NB": "part of the query results with 'not implemented' for couchbase; mimir gets results in wrong order",
+    "NB": "mimir gets results in wrong order",
     "query": "SELECT DISTINCT value AS value, quarter AS dimension, region AS series, null AS parallel FROM revenue ORDER BY value DESC, region ASC, quarter ASC LIMIT 6",
     "predicate": "exactly",
     "expected": [

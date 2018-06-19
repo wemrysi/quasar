@@ -2,7 +2,6 @@
   "name": "[reg] customerOrders",
   "data": ["customers.data", "orders.data", "ordered_items.data", "inventory_items.data"],
   "backends": {
-      "couchbase":         "skip",
       "lwc_local":         "ignoreFieldOrder",
       "marklogic_json":    "ignoreFieldOrder",
       "mimir":             "ignoreFieldOrder"

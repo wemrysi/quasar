@@ -2,7 +2,6 @@
     "name": "[qa_s08] groupBy with avg, max, min, count, sum, and arbitrary",
 
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
        "lwc_local":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"

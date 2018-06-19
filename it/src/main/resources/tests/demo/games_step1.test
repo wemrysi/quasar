@@ -2,7 +2,6 @@
     "name": "games_step1",
     "data": "steamgames.data",
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
        "lwc_local":         "ignoreFieldOrder",
        "marklogic_xml":     "pending",
        "marklogic_json":    "pending",

@@ -53,14 +53,13 @@ quasar_mongodb_3_4
 quasar_metastore
 quasar_marklogic_xml
 quasar_marklogic_json
-quasar_couchbase
 ```
 
 Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example
-if you wanted to run integration tests with mongo, marklogic, and couchbase you would use:
+if you wanted to run integration tests with mongo and marklogic you would use:
 
 ```
-./setupContainers -u quasar_metastore,quasar_mongodb_3_4,quasar_marklogic_xml,quasar_couchbase
+./setupContainers -u quasar_metastore,quasar_mongodb_3_4,quasar_marklogic_xml
 ```
 
 Note: `quasar_metastore` is always needed to run integration tests.
@@ -80,7 +79,6 @@ After running this command your `testing.conf` file should look similar to this:
 ```
 > cat it/testing.conf
 postgresql_metastore="{\"host\":\"192.168.99.101\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"
-couchbase="couchbase://192.168.99.101/beer-sample?password=&docTypeKey=type&socketConnectTimeoutSeconds=15"
 marklogic_xml="xcc://marklogic:marklogic@192.168.99.101:8000/Documents?format=xml"
 mongodb_3_4="mongodb://192.168.99.101:27022"
 ```
@@ -117,7 +115,6 @@ The `<mountPath>` specifies the path of your mount point and the remaining param
 
 | mountKey            | protocol         | uri                                   |
 |---------------------|------------------|---------------------------------------|
-| `couchbase`         | `couchbase://`   | [Couchbase](#couchbase)               |
 | `marklogic`         | `xcc://`         | [MarkLogic](#marklogic)               |
 | `mimir`             |                  | "\<path-to-mimir-storage-directory\>" |
 | `local_file_system` |                  | "\<path-to-mimir-storage-directory\>" |
@@ -126,10 +123,10 @@ The `<mountPath>` specifies the path of your mount point and the remaining param
 
 See [here](#get-mountfspath) for more details on the mount web api service.
 
-For example, to create a couchbase mount point, issue a `curl` command like:
+For example, to create a mongo mount point, issue a `curl` command like:
 
 ```bash
-curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100/beer-sample?password=&docTypeKey=type" } }'
+curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "mongodb": { "connectionUri":"mongodb://<host>:<port>" } }'
 ```
 
 #### Web JAR
@@ -196,7 +193,6 @@ What follows is a list of class names for each supported backend:
 
 | mountKey          | class name                                               |
 |-------------------|----------------------------------------------------------|
-| `couchbase`       | `quasar.physical.couchbase.Couchbase$`                   |
 | `marklogic`       | `quasar.physical.marklogic.MarkLogic$`                   |
 | `mongodb`         | `quasar.physical.mongodb.MongoDb$`                       |
 
@@ -283,24 +279,6 @@ To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection strin
 - `javax.net.ssl.keyStorePassword`: password for the key store.
 - `javax.net.debug`: (optional) use `all` for very verbose but sometimes helpful output.
 - `invalidHostNameAllowed`: (optional) use `true` to disable host name checking, which is less secure but may be needed in test environments using self-signed certificates.
-
-#### Couchbase
-
-To connect to Couchbase use the following `connectionUri` format:
-
-`couchbase://<host>[:<port>]/<bucket-name>?password=<password>&docTypeKey=<type>[&queryTimeoutSeconds=<seconds>]`
-
-Prerequisites
-- Couchbase Server 4.5.1 or greater
-- A "default" bucket with anonymous access
-- Documents must have a `docTypeKey` field to be listed
-- Primary index on queried buckets
-- Secondary index on `docTypeKey` field for queried buckets
-- Additional indices and tuning as recommended by Couchbase for proper N1QL performance
-
-Known Limitations
-- Slow queries — query optimization hasn't been applied
-- Join unimplemented — future support planned
 
 #### MarkLogic
 

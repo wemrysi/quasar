@@ -1,7 +1,6 @@
 {
     "name": "propagate undefined and null in JS",
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":         "pending",
         "mimir":             "pending"
     },

@@ -25,7 +25,6 @@ import iotaz.{TNilK, CopK}
 import quasar.fp.Injectable
 
 package object mimir {
-  // pessimistically equal to couchbase's
   type MimirQScriptCP[T[_[_]]] =
     QScriptCore[T, ?]            :::
     EquiJoin[T, ?]               :::

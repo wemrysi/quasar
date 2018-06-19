@@ -1,7 +1,6 @@
 {
     "name": "field and flattened map value on heterogeneous",
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":         "ignoreFieldOrder",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",

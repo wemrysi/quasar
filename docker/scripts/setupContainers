@@ -26,12 +26,6 @@ init_metastore() {
   docker exec quasar_metastore /tmp/initPostgresql metastore
 }
 
-init_couchbase() {
-  echo "configuring couchbase..."
-  docker cp $SCRIPTS_DIR/initCouchbase quasar_couchbase:/tmp/initCouchbase
-  docker exec quasar_couchbase /tmp/initCouchbase
-}
-
 init_marklogic() {
   # marklogic init script is ran from outside
   # the container due to this curl issue
@@ -49,7 +43,6 @@ apply_configuration() {
   CONTAINER=$1
   echo "apply configuration for " $CONTAINER
   if [[ $CONTAINER == "quasar_mongodb_read_only"   ]]; then init_mongo;                                  fi
-  if [[ $CONTAINER == "quasar_couchbase"           ]]; then init_couchbase;                              fi
   if [[ $CONTAINER == "quasar_marklogic_xml"       ]]; then init_marklogic $DOCKERIP 8001 8002 enabled;  fi
   if [[ $CONTAINER == "quasar_marklogic_json"      ]]; then init_marklogic $DOCKERIP 9001 9002 disabled; fi
   if [[ $CONTAINER == "quasar_metastore"           ]]; then init_metastore;                              fi
@@ -128,7 +121,7 @@ create_database() {
 usage() {
 cat << EOF
 Usage: $0 [-h] [-a] [-c CONTAINER-NAME]
-Create and configure metastore, mongo, couchbase, and marklogic containers
+Create and configure metastore, mongo, and marklogic containers
 for integration tests with Quasar.
 
   -h                   help (also trigged with no parameters): display this help and exit

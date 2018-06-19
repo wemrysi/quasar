@@ -2,13 +2,11 @@
     "name": "[qa_s07] join with multiple fields selected",
 
     "backends": {
-        "couchbase": "pending",
         "lwc_local": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
 
-    "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
     "data": ["../smallZips.data", "../extraSmallZips.data"],
 

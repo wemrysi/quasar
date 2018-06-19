@@ -1,7 +1,6 @@
 {
     "name": "project index with object flatten",
     "backends": {
-        "couchbase": "pending",
         "lwc_local": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"

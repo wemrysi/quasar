@@ -1,7 +1,6 @@
 {
     "name": "field and flattened array value and index",
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":         "pendingIgnoreFieldOrder",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",

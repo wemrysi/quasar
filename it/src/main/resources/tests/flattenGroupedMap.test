@@ -1,7 +1,6 @@
 {
     "name": "flatten a grouped map with filter",
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":         "ignoreFieldOrder",
         "marklogic_json":    "pendingIgnoreFieldOrder",
         "mimir":             "ignoreFieldOrder",

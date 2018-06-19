@@ -2,7 +2,6 @@
     "name": "four different kinds of CASE expressions (switch/match, with and without ELSE)",
 
     "backends": {
-        "couchbase":  "pending",
         "lwc_local":         "ignoreFieldOrder",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder"

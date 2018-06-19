@@ -2,7 +2,6 @@
   "name": "[qa_s02] coercions",
 
   "backends": {
-    "couchbase":         "skip",
     "lwc_local":         "skip",
     "marklogic_json":    "skip",
     "marklogic_xml":     "skip",

@@ -36,15 +36,6 @@ configure_marklogic_json() {
 }
 
 ##########################################
-# injects couchbase url into
-# it/testing.conf
-#
-configure_couchbase() {
-  CONTAINERNAME=$1
-  echo "$CONTAINERNAME=\"couchbase://${DOCKERIP}/beer-sample?password=&docTypeKey=type&socketConnectTimeoutSeconds=15\"" >> $CONFIGFILE
-}
-
-##########################################
 # injects metastore conf into
 # it/testing.conf
 #
@@ -71,7 +62,6 @@ container_lookup() {
   if [[ $CONTAINER =~ "mongodb"        ]]; then configure_mongo          $CONTAINER;      fi
   if [[ $CONTAINER == "marklogic_xml"  ]]; then configure_marklogic_xml  $CONTAINER 8001; fi
   if [[ $CONTAINER == "marklogic_json" ]]; then configure_marklogic_json $CONTAINER 9001; fi
-  if [[ $CONTAINER == "couchbase"      ]]; then configure_couchbase      $CONTAINER;      fi
   if [[ $CONTAINER == "metastore"      ]]; then configure_metastore;                      fi
   if [[ $CONTAINER == "mimir"          ]]; then configure_mimir;                          fi
   if [[ $CONTAINER == "lwc_local"      ]]; then configure_lwc_local;                      fi

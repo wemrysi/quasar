@@ -1,7 +1,6 @@
 {
   "name": "subselect in where",
   "backends": {
-    "couchbase":         "skip",
     "lwc_local":         "ignoreFieldOrder",
     "marklogic_json":    "skip",
     "marklogic_xml":     "skip",
@@ -12,7 +11,6 @@
     "mongodb_3_6":       "pending",
     "mongodb_read_only": "pending"
   },
-  "NB": "skipped on couchbase due to lack of general join",
   "NB": "skipped on marklogic due to timeout",
   "NB": "pending for mongodb due to MongoDB Error: Command failed with error 13070: 'value too large to reduce'",
   "data": ["demo/patients.data", "extraSmallZips.data"],

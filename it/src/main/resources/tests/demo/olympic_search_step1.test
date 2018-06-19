@@ -2,7 +2,6 @@
     "name": "olympic_search_step1",
     "data": "olympics.data",
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
        "lwc_local":         "pending",
        "marklogic_json":    "pending",
        "mimir":             "pending"

@@ -2,7 +2,6 @@
     "name": "top 5 cities by total population",
 
     "backends": {
-        "couchbase":         "ignoreFieldOrder",
         "lwc_local":         "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder"
     },

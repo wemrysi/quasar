@@ -2,7 +2,6 @@
     "name": "conditional_input_step3",
     "data": "patients.data",
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
        "lwc_local":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"

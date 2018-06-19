@@ -1,7 +1,6 @@
 {
     "name": "filter on disjunction of expressions involving guards",
     "backends": {
-        "couchbase":  "ignoreFieldOrder",
         "marklogic_json": "pendingIgnoreFieldOrder",
         "mimir":"ignoreFieldOrder"
     },

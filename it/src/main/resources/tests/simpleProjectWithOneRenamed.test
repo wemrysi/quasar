@@ -2,7 +2,6 @@
     "name": "simple $project with one renamed field and one unchanged (see #598)",
 
     "backends": {
-        "couchbase":    "ignoreFieldOrder",
         "mongodb_3_2":       "ignoreFieldOrder",
         "mongodb_3_4":       "ignoreFieldOrder",
         "mongodb_3_4_13":    "ignoreFieldOrder",

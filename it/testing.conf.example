@@ -3,5 +3,4 @@
 #mongodb_3_4       ="mongodb://<host>:<port>"
 #mongodb_read_only ="mongodb://<host>:<port>"
 #marklogic         ="xcc://<username>:<password>@<host>:<port>/<database>"
-#couchbase         ="couchbase://<host>[:<port>]/<bucket-name>?password=<password>&docTypeKey=<type>[&queryTimeoutSeconds=<seconds>]"
 #mimir              ="<path_to_folder>"

@@ -1,7 +1,6 @@
 {
     "name": "select all backend failure statuses",
     "backends": {
-        "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "mongodb_3_2":       "pending",

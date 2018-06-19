@@ -1,7 +1,6 @@
 {
     "name": "derived function abs",
     "backends": {
-      "couchbase": "ignoreFieldOrder",
       "marklogic_json": "ignoreFieldOrder",
       "mimir": "ignoreFieldOrder"
     },

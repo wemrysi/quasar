@@ -1,7 +1,6 @@
 {
     "name": "unshift aggregation",
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":         "ignoreFieldOrder",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder",
@@ -9,7 +8,6 @@
         "mongodb_3_4":       "ignoreFieldOrder",
         "mongodb_read_only": "ignoreFieldOrder"
     },
-    "NB": "Couchbase pending due to different ordering of pop array. Enable once group contents ordering is possible.",
     "data": "zips.data",
     "query": "select state, city, [pop ...] as pop from zips group by state, city",
     "predicate": "atLeast",

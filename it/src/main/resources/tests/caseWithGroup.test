@@ -2,7 +2,6 @@
     "name": "combine case (3-arg expr) with group by",
 
     "backends": {
-        "couchbase":      "pending",
         "lwc_local":      "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
         "mimir":          "ignoreFieldOrder"

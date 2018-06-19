@@ -2,7 +2,6 @@
     "name": "filter on time_of_day",
 
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":"pendingIgnoreFieldOrder",
         "marklogic_json": "pendingIgnoreFieldOrder",
         "marklogic_xml": "pending",

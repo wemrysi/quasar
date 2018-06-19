@@ -1,7 +1,6 @@
 {
     "name": "flatten keys and values from multiple levels of the same root",
     "backends": {
-        "couchbase":         "pending",
         "marklogic_json":    "pendingIgnoreFieldOrder",
         "marklogic_xml":     "pending",
         "mongodb_3_2":       "pending",

@@ -1,7 +1,6 @@
 {
     "name": "expressions with `= null` and `is null`, with missing fields (pending #465)",
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":         "pendingIgnoreFieldOrder",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",

@@ -1,7 +1,6 @@
 {
     "name": "use subquery when there's a group by statement",
     "backends": {
-        "couchbase":         "skip",
         "marklogic_json":    "pendingIgnoreFieldOrder",
         "marklogic_xml":     "timeout",
         "mimir":             "ignoreFieldOrder",
@@ -12,7 +11,6 @@
         "mongodb_read_only": "pending"
     },
     "NB": "pending on mongo due to sorting issues",
-    "NB": "skipped on couchbase due to a lack of general join",
     "data": "zips.data",
     "query": "SELECT round_scale(100 * SUM(pop) / (SELECT SUM(pop) FROM zips), 2), state FROM zips GROUP BY state ORDER BY state LIMIT 5",
     "predicate": "exactly",

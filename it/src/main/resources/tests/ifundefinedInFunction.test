@@ -2,7 +2,6 @@
     "name": "if undefined in function",
 
     "backends": {
-        "couchbase": "ignoreFieldOrder",
         "lwc_local": "ignoreFieldOrder",
         "marklogic_json": "pendingIgnoreFieldOrder",
         "mimir": "ignoreFieldOrder"

@@ -1,7 +1,6 @@
 {
     "name": "group by flattened field",
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":         "pendingIgnoreFieldOrder",
         "marklogic_xml":     "pending",
         "marklogic_json":    "pendingIgnoreFieldOrder",

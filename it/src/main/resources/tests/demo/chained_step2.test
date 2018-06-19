@@ -2,7 +2,6 @@
     "name": "chained_step2",
     "data": "patients.data",
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
