@@ -2,9 +2,7 @@
     "name": "select a reduction from an inner select with reduction",
 
     "backends": {
-        "couchbase": "ignoreFieldOrder",
         "lwc_local": "ignoreFieldOrder",
-        "marklogic_json": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
 

@@ -1,7 +1,6 @@
 {
     "name": "convert null to/from strings",
     "backends": {
-        "marklogic_json": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
     "data": "nulls.data",

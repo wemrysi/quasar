@@ -47,20 +47,15 @@ Of particular interest are the following two scripts:
 Quasar supports the following datastores:
 
 ```
-quasar_mongodb_read_only
-quasar_mongodb_3_2
 quasar_mongodb_3_4
 quasar_metastore
-quasar_marklogic_xml
-quasar_marklogic_json
-quasar_couchbase
 ```
 
 Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example
-if you wanted to run integration tests with mongo, marklogic, and couchbase you would use:
+if you wanted to run integration tests with mongo you would use:
 
 ```
-./setupContainers -u quasar_metastore,quasar_mongodb_3_4,quasar_marklogic_xml,quasar_couchbase
+./setupContainers -u quasar_metastore,quasar_mongodb_3_4
 ```
 
 Note: `quasar_metastore` is always needed to run integration tests.
@@ -80,8 +75,6 @@ After running this command your `testing.conf` file should look similar to this:
 ```
 > cat it/testing.conf
 postgresql_metastore="{\"host\":\"192.168.99.101\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"
-couchbase="couchbase://192.168.99.101/beer-sample?password=&docTypeKey=type&socketConnectTimeoutSeconds=15"
-marklogic_xml="xcc://marklogic:marklogic@192.168.99.101:8000/Documents?format=xml"
 mongodb_3_4="mongodb://192.168.99.101:27022"
 ```
 
@@ -117,8 +110,6 @@ The `<mountPath>` specifies the path of your mount point and the remaining param
 
 | mountKey            | protocol         | uri                                   |
 |---------------------|------------------|---------------------------------------|
-| `couchbase`         | `couchbase://`   | [Couchbase](#couchbase)               |
-| `marklogic`         | `xcc://`         | [MarkLogic](#marklogic)               |
 | `mimir`             |                  | "\<path-to-mimir-storage-directory\>" |
 | `lwc_local`         |                  | "\<path-to-mimir-storage-directory\>" |
 | `mongodb`           | `mongodb://`     | [MongoDB](#database-mounts)           |
@@ -126,10 +117,10 @@ The `<mountPath>` specifies the path of your mount point and the remaining param
 
 See [here](#get-mountfspath) for more details on the mount web api service.
 
-For example, to create a couchbase mount point, issue a `curl` command like:
+For example, to create a mongo mount point, issue a `curl` command like:
 
 ```bash
-curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100/beer-sample?password=&docTypeKey=type" } }'
+curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "mongodb": { "connectionUri":"mongodb://<host>:<port>" } }'
 ```
 
 #### Web JAR
@@ -168,7 +159,7 @@ Now run the `assembly` task for the relevant backend:
 $ ./sbt mongodb/assembly
 ```
 
-The path to the JAR will be something like `./.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar`, though the exact name of the JAR (and the directory path in question) will of course depend on the backend built (for example, `marklogic/assembly` will produce a very different JAR from `mongodb/assembly`).
+The path to the JAR will be something like `./.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar`, though the exact name of the JAR (and the directory path in question) will of course depend on the backend built (for example, `mongodb/assembly` will produce a very different JAR from `mongodb/assembly`).
 
 For each backend that you wish to support, run that backend's `assembly` and copy the JAR file into your new `plugins/` directory.  Once this is done, you can launch the web assembly using the following sort of command:
 
@@ -196,8 +187,6 @@ What follows is a list of class names for each supported backend:
 
 | mountKey          | class name                                               |
 |-------------------|----------------------------------------------------------|
-| `couchbase`       | `quasar.physical.couchbase.Couchbase$`                   |
-| `marklogic`       | `quasar.physical.marklogic.MarkLogic$`                   |
 | `mongodb`         | `quasar.physical.mongodb.MongoDb$`                       |
 
 Mimir is not included in the above, since it is already built into the core of quasar.
@@ -283,59 +272,6 @@ To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection strin
 - `javax.net.ssl.keyStorePassword`: password for the key store.
 - `javax.net.debug`: (optional) use `all` for very verbose but sometimes helpful output.
 - `invalidHostNameAllowed`: (optional) use `true` to disable host name checking, which is less secure but may be needed in test environments using self-signed certificates.
-
-#### Couchbase
-
-To connect to Couchbase use the following `connectionUri` format:
-
-`couchbase://<host>[:<port>]/<bucket-name>?password=<password>&docTypeKey=<type>[&queryTimeoutSeconds=<seconds>]`
-
-Prerequisites
-- Couchbase Server 4.5.1 or greater
-- A "default" bucket with anonymous access
-- Documents must have a `docTypeKey` field to be listed
-- Primary index on queried buckets
-- Secondary index on `docTypeKey` field for queried buckets
-- Additional indices and tuning as recommended by Couchbase for proper N1QL performance
-
-Known Limitations
-- Slow queries — query optimization hasn't been applied
-- Join unimplemented — future support planned
-
-#### MarkLogic
-
-To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) with a `format` query parameter and an optional root directory as the `connectionUri`:
-
-`xcc://<username>:<password>@<host>:<port>/<database>[/root/dir/path]?format=[json|xml]`
-
-the mount will query either JSON or XML documents based on the value of the `format` parameter. For backwards-compatibility, if the `format` parameter is omitted then XML is assumed.
-
-If a root directory path is specified, all operations and queries within the mount will be local to the MarkLogic directory at the specified path.
-
-Prerequisites
-- MarkLogic 8.0+
-- The URI lexicon must be enabled.
-- Namespaces used in queries must be defined on the server.
-- Loading schema definitions into the server, while not required, will improve sorting and other operations on types other than `xs:string`. Otherwise, non-string fields may require casting in queries using [SQL² conversion functions](http://docs.slamdata.com/en/v4.0/sql-squared-reference.html#section-11-data-type-conversion).
-
-- It is not possible to query both JSON and XML documents from a single mount, a separate mount with the appropriate `format` value must be created for each type of document.
-- Index usage is currently poor, so performance may degrade on large directories and/or complex queries and joins. This should improve as optimizations are applied both to the MarkLogic connector and the `QScript` compiler.
-
-Quasar's data model is JSON-ish and thus there is a bit of translation required when applying it to XML. The current mapping aims to be intuitive while still taking advantage of the XDM as much as possible. Take note of the following:
-- Projecting a field will result in the child element(s) having the given name. If more than one element matches, the result will be an array.
-- As the children of an element form a sequence, they may be treated both as a mapping from element names to values and as an array of values. That is to say, given a document like `<foo><bar>1</bar><baz>2</baz></foo>`, `foo.bar` and `foo[0]` both refer to `<bar>1</bar>`.
-- XML document results are currently serialized to JSON with an emphasis on producting idiomatic JSON:
-  - An element is serialized to a singleton object with the element name as the only key and an object representing the children as its value. The child object will contain an entry for each child element with repeated elements collected into an array.
-  - An element without attributes containing only text content will be serialized as a singleton object with the element name as the only key and the text content as its value.
-  - Element attributes are serialized to an object at the `_xml.attributes` key.
-  - Text content of elements containing mixed text and element children or attributes will be available at the `_xml.text` key.
-- Fields that are not valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) are encoded as `<ejson:key>` elements with a `ejson:key-id` attribute including the field's original name. For instance, the query `SELECT TO_STRING(city), TO_STRING(state) FROM zips` yields elements with numeric field names. Numeric names are not valid QNames and will be encoded as follows:
-
-  ```xml
-  <ejson:key ejson:key-id="0" ejson:type="string">GILMAN CITY</ejson:key>
-  <ejson:key ejson:key-id="1" ejson:type="string">MO</ejson:key>
-  ```
-
 
 ### View mounts
 

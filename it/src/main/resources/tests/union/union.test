@@ -1,7 +1,6 @@
 {
     "name": "[qa_s06] union",
     "backends": {
-        "couchbase": "pendingIgnoreFieldOrder",
         "lwc_local":"ignoreFieldOrder",
         "mimir":"ignoreFieldOrder"
     },

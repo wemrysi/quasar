@@ -1,8 +1,6 @@
 {
     "name": "concat array with unknown structure",
     "backends": {
-        "couchbase":         "ignoreFieldOrder",
-        "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder"
     },
     "data": "largeZips.data",

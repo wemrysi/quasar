@@ -2,7 +2,6 @@
   "name": "numeric field names",
 
   "backends": {
-    "couchbase": "ignoreFieldOrder"
   },
 
   "data": "smallZips.data",

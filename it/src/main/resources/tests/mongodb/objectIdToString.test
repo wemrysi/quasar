@@ -3,12 +3,8 @@
   "data": "../objectids.data",
   "query": "select to_string(`_id`), `_id`, bar from `../objectids` order by `_id`",
   "backends": {
-    "couchbase":         "skip",
     "lwc_local":         "skip",
-    "marklogic_json":    "skip",
-    "marklogic_xml":     "skip",
-    "mimir":             "skip",
-    "mongodb_3_2":       "ignoreFieldOrder"
+    "mimir":             "skip"
   },
   "predicate": "exactly",
   "expected": [

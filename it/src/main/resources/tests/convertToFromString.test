@@ -1,9 +1,7 @@
 {
     "name": "convert values to/from strings",
     "backends": {
-        "couchbase": "ignoreFieldOrder",
         "lwc_local":"ignoreFieldOrder",
-        "marklogic_json": "ignoreFieldOrder",
         "mimir":"ignoreFieldOrder"
     },
     "data": "zips.data",
