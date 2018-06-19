@@ -182,7 +182,6 @@ object Dependencies {
   def it = Seq(
     "co.fs2"           %% "fs2-io"              % fs2Version          % Test,
     "io.argonaut"      %% "argonaut-monocle"    % argonautVersion     % Test,
-    "org.http4s"       %% "http4s-blaze-client" % http4sVersion       % Test,
     "eu.timepit"       %% "refined-scalacheck"  % refinedVersion      % Test,
     "io.verizon.knobs" %% "core"                % "4.0.30-scalaz-7.2" % Test
   )
