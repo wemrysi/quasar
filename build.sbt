@@ -116,17 +116,6 @@ lazy val backendRewrittenRunSettings = Seq(
     r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered)
   })
 
-// In Travis, the processor count is reported as 32, but only ~2 cores are
-// actually available to run.
-concurrentRestrictions in Global := {
-  val maxTasks = 2
-  if (isTravisBuild.value)
-    // Recreate the default rules with the task limit hard-coded:
-    Seq(Tags.limitAll(maxTasks), Tags.limit(Tags.ForkedTestGroup, 1))
-  else
-    (concurrentRestrictions in Global).value
-}
-
 // Tasks tagged with `ExclusiveTest` should be run exclusively.
 concurrentRestrictions in Global += Tags.exclusive(ExclusiveTest)
 
