@@ -5,8 +5,6 @@
     "NB": "Skipped on mimir due to timeout.",
     "backends": {
         "lwc_local":         "skip",
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending",
         "mimir":             "skip",
         "mongodb_3_2":       "pendingIgnoreFieldOrder",
         "mongodb_3_4":       "pending"

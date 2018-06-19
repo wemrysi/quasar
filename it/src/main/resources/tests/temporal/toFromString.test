@@ -2,8 +2,6 @@
     "name": "convert dates to/from strings",
     "backends": {
         "lwc_local":"pendingIgnoreFieldOrder",
-        "marklogic_json": "pendingIgnoreFieldOrder",
-        "marklogic_xml": "pending",
         "mimir":"pendingIgnoreFieldOrder",
         "mongodb_3_2":       "pendingIgnoreFieldOrder",
         "mongodb_3_4":       "pendingIgnoreFieldOrder",

@@ -1,7 +1,6 @@
 {
     "name": "concat BETWEEN with other fields",
     "backends": {
-        "marklogic_json": "ignoreFieldOrder",
         "mimir":          "ignoreFieldOrder"
     },
     "data": "smallZips.data",

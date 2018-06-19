@@ -2,8 +2,6 @@
     "name": "expressions with `= null` and `is null`, with missing fields (pending #465)",
     "backends": {
         "lwc_local":         "pendingIgnoreFieldOrder",
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending",
         "mimir":             "pendingIgnoreFieldOrder",
         "mongodb_3_2":       "pendingIgnoreFieldOrder",
         "mongodb_3_4":       "pendingIgnoreFieldOrder",

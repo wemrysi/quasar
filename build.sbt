@@ -263,21 +263,17 @@ lazy val root = project.in(file("."))
            connector,  yggdrasil,
 //      /     |  \       |             |
 //      |     |   \______|_____________|
-//      |     |      \  /     \         \
-          skeleton, mimir, marklogic, mongodb,
-//      \    |     /          |          |
+//      |     |      \  /     \
+          skeleton, mimir, mongodb,
+//      \    |     /          |
           interface,
-//          /  \              |          |
+//          /  \              |
          repl, web,
-//              |             |          |
+//              |             |
                 it,
-//   ___________|_____________/          |
-//  /           |      __________________/
-//  |          /|\    /
-//  |         / | \  /
-//  |        /  |  \/
-//  |       /   |  /
-  marklogicIt, mongoIt
+//              |   __________|
+//              |  /
+              mongoIt
 //
 // NB: the *It projects are temporary until we polyrepo
   ).enablePlugins(AutomateHeaderPlugin)
@@ -470,22 +466,6 @@ lazy val core = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-/** Implementation of the MarkLogic connector.
-  */
-lazy val marklogic = project
-  .settings(name := "quasar-marklogic-internal")
-  .dependsOn(
-    connector % BothScopes,
-    core      % "test->test",
-    qscript   % "test->test")
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
-  .settings(libraryDependencies ++= Dependencies.marklogic)
-  .settings(isolatedBackendSettings("quasar.physical.marklogic.MarkLogic$"))
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Implementation of the MongoDB connector.
   */
 lazy val mongodb = project
@@ -621,19 +601,6 @@ lazy val it = project
 
       test in Test
     }.value)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val marklogicIt = project
-  .configs(ExclusiveTests)
-  .dependsOn(it % BothScopes, marklogic % BothScopes)
-  .settings(commonSettings)
-  .settings(noPublishSettings)
-  .settings(targetSettings)
-  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
-  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
-  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
-  .settings(parallelExecution in Test := false)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 

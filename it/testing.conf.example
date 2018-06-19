@@ -2,5 +2,4 @@
 #mongodb_3_2       ="mongodb://<host>:<port>"
 #mongodb_3_4       ="mongodb://<host>:<port>"
 #mongodb_read_only ="mongodb://<host>:<port>"
-#marklogic         ="xcc://<username>:<password>@<host>:<port>/<database>"
 #mimir              ="<path_to_folder>"

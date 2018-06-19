@@ -3,8 +3,6 @@
   "data": "patients.data",
   "backends": {
     "lwc_local":         "pendingIgnoreFieldOrder",
-    "marklogic_json":    "skip",
-    "marklogic_xml":     "skip",
     "mimir":             "pendingIgnoreFieldOrder",
     "mongodb_3_2":       "pending",
     "mongodb_3_4":       "pending",

@@ -2,8 +2,6 @@
     "name": "group by flattened field",
     "backends": {
         "lwc_local":         "pendingIgnoreFieldOrder",
-        "marklogic_xml":     "pending",
-        "marklogic_json":    "pendingIgnoreFieldOrder",
         "mimir":             "pendingIgnoreFieldOrder",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",

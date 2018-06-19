@@ -41,21 +41,3 @@ services:
     privileged: true
     ports:
       - "5432:5432"
-
-  quasar_marklogic_xml:
-    container_name: quasar_marklogic_xml
-    build:
-      context: ./Dockerfiles/Marklogic
-      dockerfile: MarkLogic-Dockerfile
-    ports:
-      - "8000-8002:8000-8002"
-    mem_limit: 2048m
-
-  quasar_marklogic_json:
-    container_name: quasar_marklogic_json
-    build:
-      context: ./Dockerfiles/Marklogic
-      dockerfile: MarkLogic-Dockerfile
-    ports:
-      - "9000-9002:8000-8002"
-    mem_limit: 2048m

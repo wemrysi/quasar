@@ -2,8 +2,6 @@
   "name": "subselect in where",
   "backends": {
     "lwc_local":         "ignoreFieldOrder",
-    "marklogic_json":    "skip",
-    "marklogic_xml":     "skip",
     "mimir":             "ignoreFieldOrder",
     "mongodb_3_2":       "pending",
     "mongodb_3_4":       "pending",
@@ -11,7 +9,6 @@
     "mongodb_3_6":       "pending",
     "mongodb_read_only": "pending"
   },
-  "NB": "skipped on marklogic due to timeout",
   "NB": "pending for mongodb due to MongoDB Error: Command failed with error 13070: 'value too large to reduce'",
   "data": ["demo/patients.data", "extraSmallZips.data"],
   "query": "SELECT first_name, last_name FROM `demo/patients` AS p where state in (SELECT state FROM extraSmallZips) ORDER BY last_name, first_name",

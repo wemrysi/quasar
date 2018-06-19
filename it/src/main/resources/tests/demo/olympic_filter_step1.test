@@ -3,7 +3,6 @@
     "data": "olympics.data",
     "backends": {
        "lwc_local":         "pending",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "pending"
     },
     "NB": "mimir is pending because the results are not properly ordered - it can only be fully ASC or DESC, you can not mix sorting orders",

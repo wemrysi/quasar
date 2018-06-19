@@ -1,7 +1,6 @@
 {
     "name": "derived function abs",
     "backends": {
-      "marklogic_json": "ignoreFieldOrder",
       "mimir": "ignoreFieldOrder"
     },
     "data": "divide.data",

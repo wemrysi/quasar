@@ -3,10 +3,9 @@
     "data": "olympics.data",
     "backends": {
        "lwc_local":         "pending",
-       "marklogic_json":    "pending",
        "mimir":             "pending"
     },
-    "NB": "mimir handles order incorrectly, marklogic_json blows up with 'arg1 is not of type xs:string? on line 117'",
+    "NB": "mimir handles order incorrectly",
     "query": "temp0 := SELECT * FROM olympics;
            SELECT DISTINCT * FROM (temp0) AS temp1 WHERE (((SEARCH(city, \"^.*NOR.*$\", true)) OR ((SEARCH(country, \"^.*NOR.*$\", true))) OR ((SEARCH(discipline, \"^.*NOR.*$\", true))) OR ((SEARCH(event, \"^.*NOR.*$\", true))) OR ((SEARCH(gender, \"^.*NOR.*$\", true))) OR ((SEARCH(sport, \"^.*NOR.*$\", true))) OR ((SEARCH(type, \"^.*NOR.*$\", true))) OR ((SEARCH(year, \"^.*NOR.*$\", true))))) ORDER BY year desc,discipline asc, city asc, country asc, type desc, event asc LIMIT 6",
     "predicate": "exactly",

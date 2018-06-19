@@ -22,8 +22,6 @@ stages:
 env:
   matrix:
     - CONNECTOR=lwc_local
-    - CONNECTOR=marklogic_json
-    - CONNECTOR=marklogic_xml
     - CONNECTOR=mimir
     - CONNECTOR=mongodb_3_2
     - CONNECTOR=mongodb_3_4
@@ -71,7 +69,6 @@ script:
     SPECIFIC_DELEGATE=
 
     case $CONNECTOR in
-      marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly failtrace" ;;
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
     esac
 

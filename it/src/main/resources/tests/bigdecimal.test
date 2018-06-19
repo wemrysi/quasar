@@ -1,7 +1,6 @@
 {
     "name": "bigdecimal",
     "backends": {
-      "marklogic_json": "pending",
       "mongodb_3_2": "pending"
     },
     "data": "bigdecimal.data",

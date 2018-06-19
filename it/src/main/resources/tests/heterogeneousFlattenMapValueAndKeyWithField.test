@@ -2,8 +2,6 @@
     "name": "field and flattened map value and key on heterogeneous",
     "backends": {
         "lwc_local":         "pendingIgnoreFieldOrder",
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending",
         "mimir":             "pendingIgnoreFieldOrder",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",

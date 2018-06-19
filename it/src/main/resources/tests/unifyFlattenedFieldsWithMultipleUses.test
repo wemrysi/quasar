@@ -2,8 +2,6 @@
     "name": "unify flattened fields with multiple shape-preserving ops.",
     "backends": {
         "lwc_local":         "pendingIgnoreFieldOrder",
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending",
         "mimir":             "pendingIgnoreFieldOrder",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",

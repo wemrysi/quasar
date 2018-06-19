@@ -1,7 +1,6 @@
 {
     "name": "select unreduced grouped values from nested select with reduction",
     "backends": {
-        "marklogic_json":    "pending"
     },
     "data": "patients.data",
     "query": "select city, cnt as c from (select city, count(*) as cnt from patients where state = \"NY\"

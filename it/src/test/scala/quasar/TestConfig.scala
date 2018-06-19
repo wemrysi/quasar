@@ -51,8 +51,6 @@ object TestConfig {
    * should get rid of this abomination as soon as possible.
    */
   val LWC_LOCAL       = ExternalBackendRef(BackendRef(BackendName("lwc_local")        , BackendCapability.All), FileSystemType("lwc_local"))
-  val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), FileSystemType("marklogic"))
-  val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), FileSystemType("marklogic"))
   val MIMIR           = ExternalBackendRef(BackendRef(BackendName("mimir")            , BackendCapability.All), mimir.Mimir.Type)
   val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), FileSystemType("mongodb"))
   val MONGO_3_4       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4")      , BackendCapability.All), FileSystemType("mongodb"))
@@ -62,7 +60,6 @@ object TestConfig {
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
     LWC_LOCAL,
-    MARKLOGIC_JSON, MARKLOGIC_XML,
     MIMIR,
     MONGO_3_2, MONGO_3_4, MONGO_3_4_13, MONGO_3_6, MONGO_READ_ONLY)
 

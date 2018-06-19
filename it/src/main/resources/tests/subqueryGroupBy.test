@@ -1,8 +1,6 @@
 {
     "name": "use subquery when there's a group by statement",
     "backends": {
-        "marklogic_json":    "pendingIgnoreFieldOrder",
-        "marklogic_xml":     "timeout",
         "mimir":             "ignoreFieldOrder",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",

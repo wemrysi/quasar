@@ -3,7 +3,6 @@
     "data": "revenue.data",
     "backends": {
        "lwc_local":         "ignoreFieldOrder",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
     "query": "SELECT SUM(value) AS value, region, quarter FROM revenue GROUP BY region, quarter ORDER BY quarter ASC, value ASC, region ASC",

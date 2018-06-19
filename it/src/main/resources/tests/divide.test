@@ -1,8 +1,6 @@
 {
     "name": "divide",
     "backends": {
-        "marklogic_json": "pending",
-        "marklogic_xml": "pending"
     },
     "data": "divide.data",
     "query": "select nr, val1 / val2 as d from divide",

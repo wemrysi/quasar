@@ -1,7 +1,6 @@
 {
     "name": "select reduction from nested select",
     "backends": {
-        "marklogic_json":    "ignoreFieldOrder"
     },
     "data": "otherpatients.data",
     "query": "SELECT AVG(cnt) as measure, state as category FROM

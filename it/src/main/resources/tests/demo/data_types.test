@@ -3,7 +3,6 @@
     "data": "types.data",
     "backends": {
        "lwc_local":         "pending",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "pending"
     },
     "NB": "mimir failing with missing implementation for typeof",

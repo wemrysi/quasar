@@ -1,9 +1,7 @@
 {
     "name": "flatten array on the left with unflattened field",
     "backends": {
-        "mimir": "ignoreFieldOrder",
-        "marklogic_json": "ignoreFieldOrder",
-        "marklogic_xml":     "skip"
+        "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",
     "query": "SELECT loc[*] as coord, `_id` as zip FROM zips",

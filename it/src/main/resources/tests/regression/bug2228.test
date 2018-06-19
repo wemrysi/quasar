@@ -3,7 +3,6 @@
   "data": ["customers.data", "orders.data", "ordered_items.data", "inventory_items.data"],
   "backends": {
     "lwc_local":         "ignoreFieldOrder",
-    "marklogic_json":    "ignoreFieldOrder",
     "mimir":             "ignoreFieldOrder"
   },
   "query": "SELECT o.order_key AS OrderKey, o.purchase_date AS PurchaseDate, c.last_name, c.city AS City, c.state AS State, oi.qty AS Quantity, i.price AS UnitPrice

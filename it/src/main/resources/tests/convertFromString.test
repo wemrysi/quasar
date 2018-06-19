@@ -1,7 +1,6 @@
 {
     "name": "convert values from strings",
     "backends": {
-        "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder"
     },
     "data": "smallZips.data",

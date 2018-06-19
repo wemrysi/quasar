@@ -1,8 +1,6 @@
 {
     "name": "grouped sum of distinct values",
     "backends": {
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending",
         "mongodb_3_2":       "ignoreFieldOrder",
         "mongodb_3_4":       "ignoreFieldOrder",
         "mongodb_3_4_13":    "ignoreFieldOrder",

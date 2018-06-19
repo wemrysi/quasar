@@ -3,7 +3,6 @@
     "data": "timeseries.data",
     "backends": {
        "lwc_local":         "ignoreFieldOrder",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
 
     },

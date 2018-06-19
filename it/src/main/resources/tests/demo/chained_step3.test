@@ -3,7 +3,6 @@
     "data": "patients.data",
     "backends": {
        "lwc_local":         "ignoreFieldOrder",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
     "query": "SELECT first_name, last_name, middle_name, age FROM patients WHERE state = \"CO\" AND city = \"DENVER\" ORDER BY last_name ASC LIMIT 10",

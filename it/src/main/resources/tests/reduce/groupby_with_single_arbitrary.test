@@ -2,7 +2,6 @@
     "name": "[qa_s08] group by with single arbitrary",
 
     "backends": {
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
 

@@ -1,7 +1,6 @@
 {
     "name": "project index from group",
     "backends": {
-        "marklogic_json": "ignoreFieldOrder",
         "mimir":"ignoreFieldOrder"
     },
     "data": "slamengine_commits.data",

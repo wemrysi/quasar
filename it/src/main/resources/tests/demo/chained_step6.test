@@ -3,7 +3,6 @@
     "data": "patients.data",
     "backends": {
        "lwc_local":         "pending",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "pending"
     },
     "query": "temp0 := SELECT * FROM patients WHERE state = \"CO\" AND city = \"DENVER\" ORDER BY last_name ASC;

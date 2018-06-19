@@ -3,7 +3,6 @@
     "data": ["../customers.data", "../orders.data", "../ordered_items.data", "../inventory_items.data"],
     "backends": {
         "lwc_local":         "ignoreFieldOrder",
-        "marklogic_json":    "pendingIgnoreFieldOrder",
         "mimir":             "ignoreFieldOrder",
         "mongodb_3_2":       "skip",
         "mongodb_3_4":       "skip",

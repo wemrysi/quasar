@@ -1,7 +1,6 @@
 {
     "name": "case-insensitive regex in projections",
     "backends": {
-        "marklogic_json": "ignoreFieldOrder",
         "mimir":"ignoreFieldOrder"
     },
     "data": "largeZips.data",

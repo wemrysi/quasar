@@ -3,7 +3,6 @@
     "data": "revenue.data",
     "backends": {
        "lwc_local":         "pending",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "pending"
     },
     "NB": "mimir gets results in wrong order",

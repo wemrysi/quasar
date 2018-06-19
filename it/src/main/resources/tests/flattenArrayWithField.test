@@ -1,8 +1,6 @@
 {
     "name": "field and flattened array",
     "backends": {
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending"
     },
     "data": "flattenable.data",
     "query": "select a, b[*] from flattenable",

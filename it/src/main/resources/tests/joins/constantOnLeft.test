@@ -2,7 +2,6 @@
     "name": "[qa_s07] join where the left hand side is constant",
 
     "backends": {
-        "marklogic_json":    "ignoreFieldOrder"
     },
 
 

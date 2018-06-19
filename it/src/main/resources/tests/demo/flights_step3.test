@@ -3,7 +3,6 @@
     "data": "flights.data",
     "backends": {
        "lwc_local":         "ignoreFieldOrder",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
     "query": "SELECT DISTINCT row.source AS Source, [row.destination...] AS Destination, [row.fuel...] AS Cost FROM flights AS row GROUP BY row.source ORDER BY row.source ASC",

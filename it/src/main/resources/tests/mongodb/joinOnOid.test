@@ -2,8 +2,6 @@
     "name": "join with oid func",
     "backends": {
         "lwc_local":       "skip",
-        "marklogic_json":  "skip",
-        "marklogic_xml":   "skip",
         "mimir":           "skip"
     },
     "data": ["../oidtestchild.data", "../oidtestparent.data"],

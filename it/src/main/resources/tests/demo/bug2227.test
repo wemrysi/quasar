@@ -3,7 +3,6 @@
   "NB": "This test is basically charting on queries with reductions",
   "backends": {
     "lwc_local": "ignoreFieldOrder",
-    "marklogic_json": "ignoreFieldOrder",
     "mimir": "ignoreFieldOrder"
   },
   "data": "otherpatients.data",

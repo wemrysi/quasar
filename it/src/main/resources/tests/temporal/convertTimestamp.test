@@ -3,8 +3,6 @@
 
     "backends": {
         "lwc_local": "pendingIgnoreFieldOrder",
-        "marklogic_json": "pendingIgnoreFieldOrder",
-        "marklogic_xml": "pending",
         "mimir":"pendingIgnoreFieldOrder"
     },
     "data": "../days.data",

@@ -2,7 +2,6 @@
     "name": "order by desc and asc",
     "backends": {
         "lwc_local": "ignoreFieldOrder",
-        "marklogic_json": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",

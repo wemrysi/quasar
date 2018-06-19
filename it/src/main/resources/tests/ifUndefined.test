@@ -1,7 +1,6 @@
 {
     "name": "handle undefined values",
     "backends": {
-        "marklogic_json": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",

@@ -1,8 +1,6 @@
 {
     "name": "flatten keys and values from multiple levels of the same root",
     "backends": {
-        "marklogic_json":    "pendingIgnoreFieldOrder",
-        "marklogic_xml":     "pending",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending"
     },

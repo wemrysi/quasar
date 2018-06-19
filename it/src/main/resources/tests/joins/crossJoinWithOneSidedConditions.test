@@ -3,7 +3,6 @@
 
     "backends": {
         "lwc_local":         "skip",
-        "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "skip"
     },
 

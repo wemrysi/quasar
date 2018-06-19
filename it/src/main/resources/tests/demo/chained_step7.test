@@ -3,7 +3,6 @@
     "data": "patients.data",
     "backends": {
        "lwc_local":         "ignoreFieldOrder",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
     "query": "temp0 := SELECT COUNT(*) AS cnt, gender FROM patients WHERE state = \"CO\" AND city = \"DENVER\" GROUP BY gender;
