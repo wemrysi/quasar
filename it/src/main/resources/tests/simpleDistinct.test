@@ -2,7 +2,6 @@
   "name": "simple distinct",
 
   "backends": {
-        "marklogic_json": "ignoreFieldOrder",
         "mimir":"ignoreFieldOrder"
   },
 

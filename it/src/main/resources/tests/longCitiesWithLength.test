@@ -1,7 +1,6 @@
 {
     "name": "long city names in Colorado",
     "backends": {
-        "couchbase": "ignoreFieldOrder",
         "mimir":"ignoreFieldOrder"
     },
     "data": "largeZips.data",

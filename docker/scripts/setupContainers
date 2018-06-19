@@ -6,16 +6,6 @@ IFS=$IFS_S
 
 SCRIPTS_DIR=$(dirname "$0")
 
-##########################################
-# methods to intialize various databases
-#
-init_mongo() {
-  # only mongodb_read_only needs to be configured
-  echo "configuring mongodb_read_only..."
-  docker cp $SCRIPTS_DIR/initMongodb quasar_mongodb_read_only:/tmp/initMongodb
-  docker exec quasar_mongodb_read_only /tmp/initMongodb
-}
-
 init_metastore() {
   # a restart of the container is needed here due to
   # http://askubuntu.com/questions/308054/how-to-create-s-pgsql-5432
@@ -26,21 +16,6 @@ init_metastore() {
   docker exec quasar_metastore /tmp/initPostgresql metastore
 }
 
-init_couchbase() {
-  echo "configuring couchbase..."
-  docker cp $SCRIPTS_DIR/initCouchbase quasar_couchbase:/tmp/initCouchbase
-  docker exec quasar_couchbase /tmp/initCouchbase
-}
-
-init_marklogic() {
-  # marklogic init script is ran from outside
-  # the container due to this curl issue
-  # curl: symbol lookup error: /lib64/libldap-2.4.so.2
-  echo "configuring marklogic..."
-  sleep 20
-  $SCRIPTS_DIR/initMarklogic $1 $2 $3 $4
-}
-
 ##########################################
 # parse arguments and run various
 # database configuration scripts
@@ -48,10 +23,6 @@ init_marklogic() {
 apply_configuration() {
   CONTAINER=$1
   echo "apply configuration for " $CONTAINER
-  if [[ $CONTAINER == "quasar_mongodb_read_only"   ]]; then init_mongo;                                  fi
-  if [[ $CONTAINER == "quasar_couchbase"           ]]; then init_couchbase;                              fi
-  if [[ $CONTAINER == "quasar_marklogic_xml"       ]]; then init_marklogic $DOCKERIP 8001 8002 enabled;  fi
-  if [[ $CONTAINER == "quasar_marklogic_json"      ]]; then init_marklogic $DOCKERIP 9001 9002 disabled; fi
   if [[ $CONTAINER == "quasar_metastore"           ]]; then init_metastore;                              fi
 }
 
@@ -115,10 +86,6 @@ create_database() {
   elif [[ $LOCAL_CONTAINER == "quasar_lwc_local" ]]
   then
     echo "$LOCAL_CONTAINER: not starting a container for local lwc..."
-  elif [[ $LOCAL_CONTAINER =~ "marklogic" ]]
-  then
-    $SCRIPTS_DIR/../Dockerfiles/Marklogic/getMLRpm
-    upContainer $LOCAL_CONTAINER
   else
     echo "creating $LOCAL_CONTAINER"
     upContainer $LOCAL_CONTAINER
@@ -128,7 +95,7 @@ create_database() {
 usage() {
 cat << EOF
 Usage: $0 [-h] [-a] [-c CONTAINER-NAME]
-Create and configure metastore, mongo, couchbase, and marklogic containers
+Create and configure metastore and mongo containers
 for integration tests with Quasar.
 
   -h                   help (also trigged with no parameters): display this help and exit

@@ -2,16 +2,11 @@
     "name": "[qa_s07] select tests that have changed status",
     "NB": "This is currently disabled on all connectors due to #2110.",
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":         "skip",
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending",
         "mimir":             "skip",
-        "mongodb_3_2":       "pendingIgnoreFieldOrder",
         "mongodb_3_4":       "pendingIgnoreFieldOrder",
         "mongodb_3_4_13":    "pendingIgnoreFieldOrder",
-        "mongodb_3_6":       "pendingIgnoreFieldOrder",
-        "mongodb_read_only": "pendingIgnoreFieldOrder"
+        "mongodb_3_6":       "pendingIgnoreFieldOrder"
     },
     "NB": "Mimir runs of out memory and the JVM dies when this test runs",
     "data": ["../oldTests.data", "../newTests.data"],

@@ -2,16 +2,11 @@
     "name": "[qa_s04] select with limit and then offset",
 
     "backends": {
-       "couchbase":         "pending",
        "lwc_local":         "pending",
-       "marklogic_json":    "pending",
-       "marklogic_xml":     "pending",
        "mimir":             "pending",
-       "mongodb_3_2":       "pending",
        "mongodb_3_4":       "pending",
        "mongodb_3_4_13":    "pending",
-       "mongodb_3_6":       "pending",
-       "mongodb_read_only": "pending"
+       "mongodb_3_6":       "pending"
     },
 
     "NB": "Pending for majority of connectors, because QScript understands order (first Limit and then Offset) and connectors follow that order. This query should either ignore order (change limit->offset to offset->limit during compilation) or not compile at all (requires change in qscript)",
