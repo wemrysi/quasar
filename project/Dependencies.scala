@@ -65,8 +65,9 @@ object Dependencies {
   )
 
   def api = Seq(
-    "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion,
-    "eu.timepit"                 %% "refined-scalaz" % refinedVersion
+    "com.github.julien-truffaut" %% "monocle-macro"      % monocleVersion,
+    "eu.timepit"                 %% "refined-scalaz"     % refinedVersion,
+    "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test
   )
 
   def frontend = Seq(
