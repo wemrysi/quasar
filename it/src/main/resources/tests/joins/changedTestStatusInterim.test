@@ -4,9 +4,8 @@
            and should be removed when some connectors start passing that test.",
     "NB": "Skipped on mimir due to timeout.",
     "backends": {
-        "lwc_local":         "skip",
-        "mimir":             "skip",
-        "mongodb_3_4":       "pending"
+        "lwc_local": "skip",
+        "mimir": "skip"
     },
     "data": ["../oldTests.data", "../newTests.data"],
     "query": "select old.name ?? new.name as name,
