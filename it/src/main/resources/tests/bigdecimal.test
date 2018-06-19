@@ -1,7 +1,6 @@
 {
     "name": "bigdecimal",
     "backends": {
-      "mongodb_3_2": "pending"
     },
     "data": "bigdecimal.data",
     "query": "select nr, val1 from bigdecimal",

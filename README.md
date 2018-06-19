@@ -47,8 +47,6 @@ Of particular interest are the following two scripts:
 Quasar supports the following datastores:
 
 ```
-quasar_mongodb_read_only
-quasar_mongodb_3_2
 quasar_mongodb_3_4
 quasar_metastore
 ```

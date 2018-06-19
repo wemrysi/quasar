@@ -2,11 +2,9 @@
     "name": "select count and another field",
     "backends": {
         "mimir":"ignoreFieldOrder",
-        "mongodb_3_2":       "ignoreFieldOrder",
         "mongodb_3_4":       "ignoreFieldOrder",
         "mongodb_3_4_13":    "ignoreFieldOrder",
-        "mongodb_3_6":       "ignoreFieldOrder",
-        "mongodb_read_only": "ignoreFieldOrder"
+        "mongodb_3_6":       "ignoreFieldOrder"
     },
     "data": "slamengine_commits.data",
     "query": "select committer.login, count(*) from slamengine_commits",

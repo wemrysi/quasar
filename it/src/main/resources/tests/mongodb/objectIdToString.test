@@ -4,8 +4,7 @@
   "query": "select to_string(`_id`), `_id`, bar from `../objectids` order by `_id`",
   "backends": {
     "lwc_local":         "skip",
-    "mimir":             "skip",
-    "mongodb_3_2":       "ignoreFieldOrder"
+    "mimir":             "skip"
   },
   "predicate": "exactly",
   "expected": [

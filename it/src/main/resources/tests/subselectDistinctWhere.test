@@ -3,11 +3,9 @@
   "backends": {
     "lwc_local":         "ignoreFieldOrder",
     "mimir":             "ignoreFieldOrder",
-    "mongodb_3_2":       "pending",
     "mongodb_3_4":       "pending",
     "mongodb_3_4_13":    "pending",
-    "mongodb_3_6":       "pending",
-    "mongodb_read_only": "pending"
+    "mongodb_3_6":       "pending"
   },
   "NB": "pending for mongodb due to MongoDB Error: Command failed with error 13070: 'value too large to reduce'",
   "data": ["demo/patients.data", "zips.data"],

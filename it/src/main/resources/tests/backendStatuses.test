@@ -1,10 +1,8 @@
 {
     "name": "select all backend failure statuses",
     "backends": {
-        "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending"
     },
-    "NB": "Skipped for now because this is now intermitently working on some backends, but not consistently",
     "data": "newTests.data",
     "query": "select backends{_:} as backend, backends{:_} as status, name from newTests",
     "predicate": "atLeast",

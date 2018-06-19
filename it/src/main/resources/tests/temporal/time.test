@@ -4,11 +4,9 @@
     "backends": {
         "lwc_local":"pendingIgnoreFieldOrder",
         "mimir":"pendingIgnoreFieldOrder",
-        "mongodb_3_2":       "pendingIgnoreFieldOrder",
         "mongodb_3_4":       "pendingIgnoreFieldOrder",
         "mongodb_3_4_13":    "pendingIgnoreFieldOrder",
-        "mongodb_3_6":       "pendingIgnoreFieldOrder",
-        "mongodb_read_only": "pendingIgnoreFieldOrder"
+        "mongodb_3_6":       "pendingIgnoreFieldOrder"
     },
     "data": "../days.data",
 

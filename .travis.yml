@@ -23,11 +23,9 @@ env:
   matrix:
     - CONNECTOR=lwc_local
     - CONNECTOR=mimir
-    - CONNECTOR=mongodb_3_2
     - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_3_4_13
     - CONNECTOR=mongodb_3_6
-    - CONNECTOR=mongodb_read_only
   global:
     - COURSIER_PROGRESS=0
     - SBT=./sbt

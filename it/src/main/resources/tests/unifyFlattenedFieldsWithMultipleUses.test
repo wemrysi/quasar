@@ -3,11 +3,9 @@
     "backends": {
         "lwc_local":         "pendingIgnoreFieldOrder",
         "mimir":             "pendingIgnoreFieldOrder",
-        "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
         "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending",
-        "mongodb_read_only": "pending"
+        "mongodb_3_6":       "pending"
     },
     "data": "zips.data",
     "query": "select `_id` as zip, loc[*] from zips where loc[*] > 68 order by loc[*]",

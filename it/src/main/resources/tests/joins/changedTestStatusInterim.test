@@ -6,7 +6,6 @@
     "backends": {
         "lwc_local":         "skip",
         "mimir":             "skip",
-        "mongodb_3_2":       "pendingIgnoreFieldOrder",
         "mongodb_3_4":       "pending"
     },
     "data": ["../oldTests.data", "../newTests.data"],

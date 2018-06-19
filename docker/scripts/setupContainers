@@ -6,16 +6,6 @@ IFS=$IFS_S
 
 SCRIPTS_DIR=$(dirname "$0")
 
-##########################################
-# methods to intialize various databases
-#
-init_mongo() {
-  # only mongodb_read_only needs to be configured
-  echo "configuring mongodb_read_only..."
-  docker cp $SCRIPTS_DIR/initMongodb quasar_mongodb_read_only:/tmp/initMongodb
-  docker exec quasar_mongodb_read_only /tmp/initMongodb
-}
-
 init_metastore() {
   # a restart of the container is needed here due to
   # http://askubuntu.com/questions/308054/how-to-create-s-pgsql-5432
@@ -33,7 +23,6 @@ init_metastore() {
 apply_configuration() {
   CONTAINER=$1
   echo "apply configuration for " $CONTAINER
-  if [[ $CONTAINER == "quasar_mongodb_read_only"   ]]; then init_mongo;                                  fi
   if [[ $CONTAINER == "quasar_metastore"           ]]; then init_metastore;                              fi
 }
 

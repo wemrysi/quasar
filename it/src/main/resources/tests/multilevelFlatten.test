@@ -1,7 +1,6 @@
 {
     "name": "flatten keys and values from multiple levels of the same root",
     "backends": {
-        "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending"
     },
     "data": "nested.data",
