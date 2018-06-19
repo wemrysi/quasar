@@ -250,17 +250,6 @@ object PlannerHelpers {
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
     queryPlanner(query, basePath, model, stats, indexes, listContents, anyDoc, Instant.now).run.value.toEither
 
-  def plan3_2(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, basePathDb, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, emptyDoc)
-
-  def plan3_4(
-    query: Fix[Sql],
-    stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]],
-    anyDoc: Collection => OptionT[EitherWriter, BsonDocument]
-  ): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, basePathDb, MongoQueryModel.`3.4`, stats, indexes, anyDoc)
-
   def plan3_4_4(
     query: Fix[Sql],
     stats: Collection => Option[CollectionStatistics],
@@ -284,10 +273,10 @@ object PlannerHelpers {
     plan(query).disjunction.toOption >>= toMetalPlan
 
   def planAt(time: Instant, query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    queryPlanner(query, basePathDb, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, listContents, emptyDoc, time).run.value.toEither
+    queryPlanner(query, basePathDb, MongoQueryModel.`3.6`, defaultStats, defaultIndexes, listContents, emptyDoc, time).run.value.toEither
 
   def planLog(query: Fix[Sql]): Vector[PhaseResult] =
-    queryPlanner(query, basePathDb, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, emptyDoc, Instant.now).run.written
+    queryPlanner(query, basePathDb, MongoQueryModel.`3.6`, defaultStats, defaultIndexes, listContents, emptyDoc, Instant.now).run.written
 
   def qscriptPlan(
     qs: Fix[fs.MongoQScript[Fix, ?]],
@@ -408,7 +397,7 @@ trait PlannerHelpers extends
      _  <- emit("Input", logical)
      simplified <- emit("Simplified", optimizer.simplify(logical))
      qs <- MongoDb.lpToQScript(simplified, listContents)
-     phys <- MongoDb.doPlan[Fix, EitherWriter](qs, fs.QueryContext(defaultStats, defaultIndexes), MongoQueryModel.`3.2`, emptyDoc, Instant.now)
+     phys <- MongoDb.doPlan[Fix, EitherWriter](qs, fs.QueryContext(defaultStats, defaultIndexes), MongoQueryModel.`3.6`, emptyDoc, Instant.now)
     } yield phys).run.value.toEither
   }
 

@@ -38,7 +38,6 @@ class PlannerSpec extends
   // to write the new actuals:
   // override val mode = WriteMode
 
-  import CollectionUtil._
   import PlannerHelpers._
 
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
@@ -78,23 +77,6 @@ class PlannerSpec extends
        beRight.which(cwf => notBrokenWithOpsTree(cwf.op, expectedOps)),
         beRight.which(cwf => trackActual(cwf, testFile(s"plan $name"))))
 
-  def trackPendingErr(
-    name: String,
-    plan: => Either[FileSystemError, Crystallized[WorkflowF]],
-    expectedOps: IList[MongoOp],
-    errPattern: PartialFunction[FileSystemError, MatchResult[_]]) =
-      trackPendingTemplate(name, plan,
-        beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps)),
-        beLeft(beLike(errPattern)))
-
-  def trackPendingThrow(
-    name: String,
-    plan: => Either[FileSystemError, Crystallized[WorkflowF]],
-    expectedOps: IList[MongoOp]) =
-      trackPendingTemplate(name, plan,
-        beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps)),
-        throwA[scala.NotImplementedError])
-
   "plan from query string" should {
 
     "filter with both index and key projections" in {
@@ -108,11 +90,6 @@ class PlannerSpec extends
       plan(sqlE"select city, sum(pop) from extraSmallZips group by city having sum(pop) > 40000"),
       IList(ReadOp, GroupOp, MatchOp, ProjectOp)
     )*/
-
-    "select partially-applied substring" in {
-      plan3_2(sqlE"""select substring("abcdefghijklmnop", 5, trunc(pop / 10000)) from extraSmallZips""") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp)))
-    }
 
     "sort wildcard on expression" in {
       plan(sqlE"select * from zips order by pop/10 desc") must
@@ -203,28 +180,10 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
     }
 
-    "length of min (JS on top of reduce)" in {
-      plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp)))
-    }
-
-    "plan js expr grouped by js expr" in {
-      plan3_2(sqlE"select length(city) as len, count(*) as cnt from zips group by length(city)") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, SimpleMapOp, GroupOp, ProjectOp)))
-    }
-
     "plan expressions with ~" in {
       plan(sqlE"""select foo ~ "bar.*", "abc" ~ "a|b", "baz" ~ regex, target ~ regex from a""") must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, SimpleMapOp, ProjectOp)))
     }
-
-
-    trackPending(
-      "object flatten v34",
-      plan3_4(sqlE"select geo{*} from usa_factbook", defaultStats, defaultIndexes, emptyDoc),
-      // Actual: [ReadOp,ProjectOp,SimpleMapOp,ProjectOp]
-      // FIXME: Inline the ProjectOp inside the SimpleMapOp as a SubMap
-      IList(ReadOp, SimpleMapOp, ProjectOp))
 
     "object flatten" in {
       plan(sqlE"select geo{*} from usa_factbook") must
@@ -360,24 +319,6 @@ class PlannerSpec extends
           projectOp.node(unwindOp.node(unwindOp.node(projectOp.node(matchOp.node(stdFoldLeftJoinSubTree)))))))
     }
 
-    "plan simple left equi-join ($lookup)" in {
-      plan3_4(
-        sqlE"select foo.name, bar.address from foo left join bar on foo.id = bar.foo_id",
-        defaultStats,
-        indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
-        emptyDoc) must beRight.which(wf =>
-          notBrokenWithOps(wf.op, IList(ReadOp, MatchOp, ProjectOp, LookupOp, ProjectOp, UnwindOp, ProjectOp), false))
-    }
-
-    "plan simple right equi-join ($lookup)" in {
-      plan3_4(
-        sqlE"select foo.name, bar.address from foo right join bar on foo.id = bar.foo_id",
-        defaultStats,
-        indexes(collection("db", "foo") -> BsonField.Name("id")),
-        emptyDoc) must beRight.which(wf =>
-          notBrokenWithOps(wf.op, IList(ReadOp, MatchOp, ProjectOp, LookupOp, ProjectOp, UnwindOp, ProjectOp), false))
-    }
-
     trackPendingTree(
       "3-way right equi-join (map-reduce)",
       plan(sqlE"select customers.last_name, orders.purchase_date, ordered_items.qty from customers join orders on customers.customer_key = orders.customer_key right join ordered_items on orders.order_key = ordered_items.order_key"),
@@ -387,28 +328,6 @@ class PlannerSpec extends
         foldLeftJoinSubTree(
           readOp.leaf,
           reduceOp.node(mapOp.node(unwindOp.node(unwindOp.node(stdFoldLeftJoinSubTree))))))))))
-
-    trackPending(
-      "3-way equi-join ($lookup)",
-      plan3_4(
-        sqlE"select extraSmallZips.city, smallZips.state, zips.pop from extraSmallZips join smallZips on extraSmallZips.`_id` = smallZips.`_id` join zips on smallZips.`_id` = zips.`_id`",
-        defaultStats,
-        defaultIndexes,
-        emptyDoc),
-      // Failing because of typechecks on statically known structures (qz-3577)
-      // actual [ReadOp,MatchOp,ProjectOp,LookupOp,UnwindOp,MatchOp,ProjectOp,MatchOp,ProjectOp,LookupOp,UnwindOp,SimpleMapOp,ProjectOp]
-      IList(ReadOp, MatchOp, ProjectOp, LookupOp, UnwindOp, MatchOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
-
-    trackPending(
-      "count of $lookup",
-      plan3_4(
-        sqlE"select tp.`_id`, count(*) from `zips` as tp join `largeZips` as ti on tp.`_id` = ti.TestProgramId group by tp.`_id`",
-        defaultStats,
-        defaultIndexes,
-        emptyDoc),
-      // should not use map-reduce
-      // actual [ReadOp,MatchOp,ProjectOp,LookupOp,UnwindOp,ProjectOp,SimpleMapOp,GroupOp]
-      IList(ReadOp, MatchOp, ProjectOp, LookupOp, UnwindOp, GroupOp, ProjectOp))
 
     trackPendingTree(
       "join with multiple conditions",

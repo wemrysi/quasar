@@ -22,7 +22,6 @@ import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._
 import quasar.contrib.specs2._
 import quasar.ejson.{EJson, Fixed}
-import quasar.fp.ski._
 import quasar.frontend.logicalplan.JoinDir
 import quasar.fs._
 import quasar.javascript._
@@ -40,7 +39,6 @@ import scala.Either
 
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
-import org.specs2.execute._
 import pathy.Path._
 import scalaz._, Scalaz._
 
@@ -324,29 +322,6 @@ class PlannerSql2ExactSpec extends
            ExcludeId)))
     }
 
-    "plan concat (3.2+)" in {
-      plan3_2(sqlE"select concat(city, state) from extraSmallZips") must
-       beWorkflow(chain[Workflow](
-         $read(collection("db", "extraSmallZips")),
-         $project(
-           reshape(sigil.Quasar ->
-             $cond(
-               $and(
-                 $lte($literal(Bson.Text("")), $field("state")),
-                 $lt($field("state"), $literal(Bson.Doc()))),
-               $cond(
-                 $and(
-                   $lte($literal(Bson.Text("")), $field("city")),
-                   $lt($field("city"), $literal(Bson.Doc()))),
-                 $let(ListMap(DocVar.Name("a1") -> $field("city"), DocVar.Name("a2") -> $field("state")),
-                   $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),
-                     $concatArrays(List($field("$a1"), $field("$a2"))),
-                     $concat($field("$a1"), $field("$a2")))),
-                 $literal(Bson.Undefined)),
-               $literal(Bson.Undefined))),
-           ExcludeId)))
-    }
-
     "plan concat strings with ||" in {
       plan(sqlE"""select city || ", " || state from extraSmallZips""") must
        beWorkflow(chain[Workflow](
@@ -615,22 +590,6 @@ class PlannerSql2ExactSpec extends
           ExcludeId)))
     }
 
-    "plan select array element (3.2+)" in {
-      plan3_2(sqlE"select loc[0] from extraSmallZips") must
-      beWorkflow(chain[Workflow](
-        $read(collection("db", "extraSmallZips")),
-        $project(
-          reshape(
-            sigil.Quasar ->
-              $cond(
-                $and(
-                  $lte($literal(Bson.Arr(List())), $field("loc")),
-                  $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
-                $arrayElemAt($field("loc"), $literal(Bson.Int32(0))),
-                $literal(Bson.Undefined))),
-          ExcludeId)))
-    }
-
     "plan array length" in {
       plan(sqlE"select array_length(loc, 1) from extraSmallZips") must
       beWorkflow(chain[Workflow](
@@ -643,19 +602,6 @@ class PlannerSql2ExactSpec extends
               $size($field("loc")),
               $literal(Bson.Undefined))),
           ExcludeId)))
-    }
-
-    "plan array length 3.2" in {
-      plan3_2(sqlE"select array_length(loc, 1) from extraSmallZips") must
-       beWorkflow(chain[Workflow](
-         $read(collection("db", "extraSmallZips")),
-         $simpleMap(
-           NonEmptyList(MapExpr(JsFn(Name("x"),
-             underSigil(If(
-               Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
-               Call(ident("NumberLong"), List(Select(Select(ident("x"), "loc"), "length"))),
-               ident(Js.Undefined.ident)))))),
-             ListMap())))
     }
 
     "plan array flatten" in {
@@ -816,50 +762,6 @@ class PlannerSql2ExactSpec extends
                $literal(Bson.Undefined))),
            ExcludeId)))
     }
-
-    "plan simple js filter 3.2" in {
-      plan3_2(sqlE"select * from zips where length(city) < 4") must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "zips")),
-        $match(Selector.Doc(BsonField.Name("city") -> Selector.Type(BsonType.Text))),
-
-        $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-            "0" -> Call(ident("NumberLong"), List(Select(Select(ident("x"), "city"), "length"))),
-            "src" -> ident("x")) ))),
-          ListMap()),
-        $match(Selector.Doc(BsonField.Name("0") -> Selector.Lt(Bson.Int32(4)))),
-        $project(
-          reshape(sigil.Quasar -> $field("src")),
-          ExcludeId)))
-    }
-
-    "plan filter with js and non-js 3.2" in {
-      plan3_2(sqlE"select * from zips where length(city) < 4 and pop < 20000") must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "zips")),
-        $match(Selector.And(
-          Selector.Or(
-            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int32)),
-            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int64)),
-            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Dec)),
-            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Text)),
-            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Date)),
-            Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Bool))),
-          Selector.Doc(BsonField.Name("city") -> Selector.Type(BsonType.Text)))),
-        $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-            "0" -> Call(ident("NumberLong"), List(Select(Select(ident("x"), "city"), "length"))),
-            "1" -> Select(ident("x"), "pop"),
-            "src" -> ident("x"))))),
-          ListMap()),
-        $match(
-          Selector.And(
-            Selector.Doc(BsonField.Name("0") -> Selector.Lt(Bson.Int32(4))),
-            Selector.Doc(BsonField.Name("1") -> Selector.Lt(Bson.Int32(20000))))),
-        $project(
-          reshape(sigil.Quasar -> $field("src")),
-          ExcludeId)))
-    }
-
     "plan filter with between" in {
       plan(sqlE"select * from extraSmallZips where pop between 10000 and 12000") must
        beWorkflow(chain[Workflow](
@@ -1459,40 +1361,6 @@ class PlannerSql2ExactSpec extends
           ExcludeId)))
     }
 
-    "plan simple JS inside expression" in {
-      plan3_2(sqlE"select length(city) + 1 from zips") must
-        beWorkflow(chain[Workflow](
-          $read(collection("db", "zips")),
-          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-            underSigil(If(Call(ident("isString"), List(Select(ident("x"), "city"))),
-                BinOp(jscore.Add,
-                  Call(ident("NumberLong"),
-                    List(Select(Select(ident("x"), "city"), "length"))),
-                  jscore.Literal(Js.Num(1, false))),
-                ident("undefined")))))),
-            ListMap())))
-    }
-
-
-    "plan array project with concat (3.2+)" in {
-      plan3_2(sqlE"select city, loc[0] from zips") must
-        beWorkflow {
-          chain[Workflow](
-            $read(collection("db", "zips")),
-            $project(
-              reshape(
-                "city" -> $field("city"),
-                "1"    ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Arr(List())), $field("loc")),
-                      $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
-                    $arrayElemAt($field("loc"), $literal(Bson.Int32(0))),
-                    $literal(Bson.Undefined))),
-              ExcludeId))
-        }
-    }
-
     "plan limit with offset" in {
       plan(sqlE"SELECT * FROM zips OFFSET 100 LIMIT 5") must
         beWorkflow(chain[Workflow](
@@ -1620,67 +1488,6 @@ class PlannerSql2ExactSpec extends
             \/-($literal(Bson.Null)))))
     }.pendingUntilFixed
 
-    "plan simple sort on map-reduce with mapBeforeSort" in {
-      plan3_2(sqlE"select length(city) from zips order by city") must
-        beWorkflow(chain[Workflow](
-          $read(collection("db", "zips")),
-          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), Arr(List(
-              obj("0" -> If(
-                Call(ident("isString"), List(Select(ident("x"), "city"))),
-                Call(ident("NumberLong"),
-                  List(Select(Select(ident("x"), "city"), "length"))),
-                ident("undefined"))),
-              ident("x")))))),
-            ListMap()),
-          $project(
-            reshape(
-              "0" -> $let(ListMap(
-                DocVar.Name("el") -> $arrayElemAt($$ROOT, $literal(Bson.Int32(1)))),
-                $field("$el", "city")),
-              "src" -> $$ROOT),
-            ExcludeId),
-          $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),
-          $project(
-            reshape(sigil.Quasar -> $arrayElemAt($field("src"), $literal(Bson.Int32(0)))),
-            ExcludeId)))
-    }
-
-    "plan order by JS expr with filter" in {
-      plan3_2(sqlE"select city, pop from zips where pop > 1000 order by length(city)") must
-        beWorkflow(chain[Workflow](
-          $read(collection("db", "zips")),
-          $match(Selector.And(
-            isNumeric(BsonField.Name("pop")),
-            Selector.Doc(
-              BsonField.Name("pop") -> Selector.Gt(Bson.Int32(1000))))),
-          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-            "0" ->
-              If(Call(ident("isString"), List(Select(ident("x"), "city"))),
-                Call(ident("NumberLong"),
-                  List(Select(Select(ident("x"), "city"), "length"))),
-                ident("undefined")),
-            "src"   -> ident("x"))))),
-            ListMap()),
-          $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),
-          $project(
-            reshape(
-              "city" -> $field("src", "city"),
-              "pop"  -> $field("src", "pop")),
-            ExcludeId)))
-    }
-
-    "plan select length()" in {
-      plan3_2(sqlE"select length(city) from zips") must
-        beWorkflow(chain[Workflow](
-          $read(collection("db", "zips")),
-          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-            underSigil(If(Call(ident("isString"),
-              List(Select(ident("x"), "city"))),
-              Call(ident("NumberLong"), List(Select(Select(ident("x"), "city"), "length"))),
-              ident("undefined")))))),
-          ListMap())))
-    }
-
     "plan select length() and simple field" in {
       plan(sqlE"select city, length(city) from zips") must
       beWorkflow(chain[Workflow](
@@ -1694,25 +1501,6 @@ class PlannerSql2ExactSpec extends
                 $lt($field("city"), $literal(Bson.Doc()))),
                 $strLenCP($field("city")),
                 $literal(Bson.Undefined))),
-          ExcludeId)))
-    }
-
-    "plan select length() and simple field 3.2" in {
-      plan3_2(sqlE"select city, length(city) from zips") must
-      beWorkflow(chain[Workflow](
-        $read(collection("db", "zips")),
-        $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-          "city" -> Select(ident("x"), "city"),
-          "1" ->
-            If(Call(ident("isString"), List(Select(ident("x"), "city"))),
-              Call(ident("NumberLong"),
-                List(Select(Select(ident("x"), "city"), "length"))),
-              ident("undefined")))))),
-          ListMap()),
-        $project(
-          reshape(
-            "city" -> $include(),
-            "1"    -> $include()),
           ExcludeId)))
     }
 
@@ -1790,23 +1578,6 @@ class PlannerSql2ExactSpec extends
             ExcludeId)))
     }
 
-    "plan time_of_day (pipeline)" in {
-      import FormatSpecifier._
-
-      plan3_2(sqlE"select time_of_day(ts) from days") must
-        beWorkflow(chain[Workflow](
-          $read(collection("db", "days")),
-          $project(
-            reshape(sigil.Quasar ->
-              $cond(
-                $and(
-                  $lte($literal(Check.minDate), $field("ts")),
-                  $lt($field("ts"), $literal(Check.minTimestamp))),
-                $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, $field("ts")),
-                $literal(Bson.Undefined))),
-            ExcludeId)))
-    }
-
     "plan filter on date" in {
       val date23 = Bson.Date.fromInstant(Instant.parse("2015-01-23T00:00:00Z")).get
       val date25 = Bson.Date.fromInstant(Instant.parse("2015-01-25T00:00:00Z")).get
@@ -1843,34 +1614,6 @@ class PlannerSql2ExactSpec extends
                 BsonField.Name("ts") -> Selector.Lt(date30)))))))
     }.pendingWithActual("qz-3232", testFile("plan filter on date"))
 
-    "plan js and filter with id" in {
-      Bson.ObjectId.fromString("0123456789abcdef01234567").fold[Result](
-        failure("Couldn’t create ObjectId."))(
-        oid => plan3_2(sqlE"""select length(city), foo = oid("0123456789abcdef01234567") from days where `_id` = oid("0123456789abcdef01234567")""") must
-          beWorkflow(chain[Workflow](
-            $read(collection("db", "days")),
-            $match(Selector.Doc(
-              BsonField.Name("_id") -> Selector.Eq(oid))),
-            $simpleMap(
-              NonEmptyList(MapExpr(JsFn(Name("x"),
-                obj(
-                  "0" ->
-                    If(Call(ident("isString"), List(Select(ident("x"), "city"))),
-                      Call(ident("NumberLong"),
-                        List(Select(Select(ident("x"), "city"), "length"))),
-                      ident("undefined")),
-                  "1" ->
-                    BinOp(jscore.Eq,
-                      Select(ident("x"), "foo"),
-                      Call(ident("ObjectId"), List(jscore.Literal(Js.Str("0123456789abcdef01234567"))))))))),
-              ListMap()),
-            $project(
-              reshape(
-                "0" -> $include(),
-                "1" -> $include()),
-              ExcludeId))))
-    }
-
     "plan convert to timestamp" in {
       plan(sqlE"select to_timestamp(epoch) from foo") must beWorkflow {
         chain[Workflow](
@@ -1888,35 +1631,6 @@ class PlannerSql2ExactSpec extends
       }
     }
 
-    "plan convert to timestamp in map-reduce" in {
-      plan3_2(sqlE"select length(name), to_timestamp(epoch) from foo") must beWorkflow {
-        chain[Workflow](
-          $read(collection("db", "foo")),
-          $simpleMap(
-            NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-              "0" ->
-                If(Call(ident("isString"), List(Select(ident("x"), "name"))),
-                  Call(ident("NumberLong"),
-                    List(Select(Select(ident("x"), "name"), "length"))),
-                  ident("undefined")),
-              "1" ->
-                If(
-                  BinOp(jscore.Or,
-                    Call(ident("isNumber"), List(Select(ident("x"), "epoch"))),
-                    BinOp(jscore.Or,
-                      BinOp(Instance, Select(ident("x"), "epoch"), ident("NumberInt")),
-                      BinOp(Instance, Select(ident("x"), "epoch"), ident("NumberLong")))),
-                  New(Name("Date"), List(Select(ident("x"), "epoch"))),
-                  ident("undefined")))))),
-            ListMap()),
-          $project(
-            reshape(
-              "0" -> $include(),
-              "1" -> $include()),
-            ExcludeId))
-      }
-    }
-
     val selectTrunc = chain[Workflow](
       $read(collection("db", "divide")),
       $project(
@@ -1929,61 +1643,8 @@ class PlannerSql2ExactSpec extends
              $literal(Bson.Undefined))),
         ExcludeId))
 
-    "plan simple derived mapfunc" in {
-      plan3_2(sqlE"select trunc(val3) from divide") must beWorkflow(selectTrunc)
-    }
-
     "plan simple derived mapfunc - fallback" in {
       plan(sqlE"select trunc(val3) from divide") must beWorkflow(selectTrunc)
-    }
-
-    "plan derived mapfunc" in {
-      plan3_2(sqlE"select ceil_scale(val3,1) from divide") must_===(
-        plan(sqlE"select ceil_scale(val3,1) from divide"))
-    }
-
-    def simpleJoinMapReduce(coll1: Collection, coll2: Collection) =
-      joinStructure(
-        $read(coll1), "0", $$ROOT,
-        $read(coll2),
-        reshape("0" -> $field("_id")),
-        Obj(ListMap(Name("0") -> Select(ident("value"), "_id"))).right,
-        chain[Workflow](_,
-          $match(Selector.Doc(ListMap[BsonField, Selector.ConditionExpr](
-            JoinHandler.LeftName -> Selector.NotCondExpr(Selector.Size(0)),
-            JoinHandler.RightName -> Selector.NotCondExpr(Selector.Size(0))))),
-          $unwind(DocField(JoinHandler.RightName), None, None),
-          $unwind(DocField(JoinHandler.LeftName), None, None),
-          $project(
-            reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
-            ExcludeId)),
-        false).op
-
-    val simpleJoinMapReduceDb =
-      simpleJoinMapReduce(collection("db", "zips"), collection("db", "smallZips"))
-
-    "plan simple join with sharded inputs" in {
-      // NB: cannot use $lookup, so fall back to map-reduce
-      val query = sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`"
-      plan3_4(query,
-        c => Map(
-          collection("db", "zips") -> CollectionStatistics(10, 100, true),
-          collection("db", "smallZips") -> CollectionStatistics(15, 150, true)).get(c),
-        defaultIndexes,
-        emptyDoc) must beWorkflow(simpleJoinMapReduceDb)
-    }
-
-    "plan simple join with sources in different DBs" in {
-      // NB: cannot use $lookup, so fall back to map-reduce
-      val query = sqlE"select smallZips.city from `db1/zips` join `db2/smallZips` on zips.`_id` = smallZips.`_id`"
-      plan0(query, rootDir[Sandboxed], MongoQueryModel.`3.4`, defaultStats, defaultIndexes, emptyDoc) must
-        beWorkflow(simpleJoinMapReduce(collection("db1", "zips"), collection("db2", "smallZips")))
-    }
-
-    "plan simple join with no index" in {
-      // NB: cannot use $lookup, so fall back to map-reduce
-      val query = sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`"
-      plan3_4(query, defaultStats, κ(None), emptyDoc) must beWorkflow(simpleJoinMapReduceDb)
     }
   }
 }

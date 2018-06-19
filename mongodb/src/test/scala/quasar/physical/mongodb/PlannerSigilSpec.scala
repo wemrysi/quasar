@@ -41,7 +41,7 @@ class PlannerSigilSpec extends
           sigil.Quasar,
           new BsonDocument("bar", new BsonDouble(4.2))))
 
-      plan3_4(sqlE"select bar, baz from foo", defaultStats, defaultIndexes, getDoc) must
+      plan3_6(sqlE"select bar, baz from foo", defaultStats, defaultIndexes, getDoc) must
         beWorkflow(
           chain[Workflow](
             $read(collection("db", "foo")),
@@ -61,7 +61,7 @@ class PlannerSigilSpec extends
               sigil.Quasar,
               new BsonDocument("bar", new BsonDouble(4.2)))))
 
-      plan3_4(sqlE"select bar, baz from foo", defaultStats, defaultIndexes, getDoc) must
+      plan3_6(sqlE"select bar, baz from foo", defaultStats, defaultIndexes, getDoc) must
         beWorkflow(
           chain[Workflow](
             $read(collection("db", "foo")),
