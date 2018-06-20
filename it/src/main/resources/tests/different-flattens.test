@@ -1,9 +1,11 @@
 {
     "name": "merge differently-nested flattens",
     "backends": {
-        "lwc_local":         "skip",
-        "mimir":             "skip",
-        "mongodb_3_4":       "skip"
+        "lwc_local":         "ignoreFieldOrder",
+        "mimir":             "ignoreFieldOrder",
+        "mongodb_3_4":       "pending",
+        "mongodb_3_4_13":    "pending",
+        "mongodb_3_6":       "pending"
     },
     "data": "user_comments.data",
     "query": "select profile from user_comments where (
