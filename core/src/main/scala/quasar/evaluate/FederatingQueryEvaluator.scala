@@ -16,7 +16,7 @@
 
 package quasar.evaluate
 
-import slamdata.Predef.{Boolean, List, Option, Stream}
+import slamdata.Predef.{Boolean, List, Option}
 import quasar.api._, ResourceError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
@@ -24,32 +24,34 @@ import quasar.fp.PrismNT
 import quasar.contrib.iota.copkTraverse
 import quasar.qscript.{Read => QRead, _}
 
+import scala.Predef.implicitly
+
 import matryoshka._
 import pathy.Path.refineType
 import scalaz._, Scalaz._
 import iotaz.CopK
 
 /** A `QueryEvaluator` capable of executing queries against multiple sources. */
-final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] private (
+final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, G[_]: ApplicativePlus, S, R] private (
     queryFederation: QueryFederation[T, F, S, R],
-    sources: F[IMap[ResourceName, (ResourceDiscovery[F], S)]])
-    extends QueryEvaluator[F, T[QScriptRead[T, ?]], R] {
+    sources: F[IMap[ResourceName, (ResourceDiscovery[F, G], S)]])
+    extends QueryEvaluator[F, G, T[QScriptEducated[T, ?]], R] {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import WriterT.writerTMonadListen
 
-  def children(path: ResourcePath): F[CommonError \/ IMap[ResourceName, ResourcePathType]] =
+  def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]] =
     path match {
       case ResourcePath.Root =>
         for {
           rds <- discoveries
 
-          pairs <- rds.traverse { case (n, rd) =>
+          pairs <- rds.foldMapM({ case (n, rd) =>
             rd.isResource(ResourcePath.root()) map { b =>
-              (n, b.fold(ResourcePathType.resource, ResourcePathType.resourcePrefix))
+              (n, b.fold(ResourcePathType.resource, ResourcePathType.resourcePrefix)).point[G]
             }
-          }
-        } yield IMap.fromFoldable(pairs).right[CommonError]
+          })(implicitly, ApplicativePlus[G].monoid)
+        } yield pairs.right[CommonError]
 
       case ResourcePath.Leaf(f) =>
         (for {
@@ -61,26 +63,21 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
         } yield r).run
     }
 
-  def descendants(path: ResourcePath): F[CommonError \/ Stream[Tree[ResourceName]]] =
+  def descendants(path: ResourcePath): F[CommonError \/ G[ResourcePath]] =
     (path match {
       case ResourcePath.Root =>
         for {
           rds <- discoveries.liftM[EitherT[?[_], CommonError, ?]]
 
-          subTrees <- rds.traverse {
-            case (n, rd) =>
-              EitherT(rd.descendants(ResourcePath.root())) map (Tree.Node(n, _))
-          }
-        } yield subTrees.toStream
+          descs <- rds.foldMapM({
+            case (n, rd) => descendantsOf(n, rd, ResourcePath.root())
+          })(implicitly, ApplicativePlus[G].monoid)
+        } yield descs
 
       case ResourcePath.Leaf(f) =>
-        for {
-          x <- lookupLeaf[CommonError](f)
-
-          (n, d, s) = x
-
-          r <- EitherT(d.descendants(s.path)) leftMap prefixCommonError(n)
-        } yield r
+        lookupLeaf[CommonError](f).flatMap {
+          case (n, d, s) => descendantsOf(n, d, s.path)
+        }
     }).run
 
   def isResource(path: ResourcePath): F[Boolean] =
@@ -94,7 +91,7 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
         } getOrElse false
     }
 
-  def evaluate(q: T[QScriptRead[T, ?]]): F[ReadError \/ R] =
+  def evaluate(q: T[QScriptEducated[T, ?]]): F[ReadError \/ R] =
     (for {
       wa <- Trans.applyTrans(federate, ReadPath)(q).run
 
@@ -112,17 +109,17 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
   private type SrcsT[X[_], A] = WriterT[X, DList[(AFile, Source[S])], A]
   private type M[A] = SrcsT[EitherT[F, ReadError, ?], A]
 
-  private val IRD = CopK.Inject[Const[QRead[ADir], ?], QScriptRead[T, ?]]
-  private val IRF = CopK.Inject[Const[QRead[AFile], ?], QScriptRead[T, ?]]
+  private val IRD = CopK.Inject[Const[QRead[ADir], ?], QScriptEducated[T, ?]]
+  private val IRF = CopK.Inject[Const[QRead[AFile], ?], QScriptEducated[T, ?]]
 
-  private val ReadPath: PrismNT[QScriptRead[T, ?], Const[QRead[APath], ?]] =
-    PrismNT[QScriptRead[T, ?], Const[QRead[APath], ?]](
-      λ[QScriptRead[T, ?] ~> (Option ∘ Const[QRead[APath], ?])#λ](qr =>
+  private val ReadPath: PrismNT[QScriptEducated[T, ?], Const[QRead[APath], ?]] =
+    PrismNT[QScriptEducated[T, ?], Const[QRead[APath], ?]](
+      λ[QScriptEducated[T, ?] ~> (Option ∘ Const[QRead[APath], ?])#λ](qr =>
         IRD.prj(qr).map(_.getConst.path)
           .orElse(IRF.prj(qr).map(_.getConst.path))
           .map(p => Const(QRead(p)))),
 
-      λ[Const[QRead[APath], ?] ~> QScriptRead[T, ?]](rp =>
+      λ[Const[QRead[APath], ?] ~> QScriptEducated[T, ?]](rp =>
         refineType(rp.getConst.path).fold(
           d => IRD.inj(Const(QRead(d))),
           f => IRF.inj(Const(QRead(f))))))
@@ -153,11 +150,20 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
       }
     }
 
-  private def discoveries: F[List[(ResourceName, ResourceDiscovery[F])]] =
+  private def descendantsOf(
+      name: ResourceName,
+      rd: ResourceDiscovery[F, G],
+      path: ResourcePath)
+      : EitherT[F, CommonError, G[ResourcePath]] =
+    EitherT(rd.descendants(path))
+      .leftMap(prefixCommonError(name))
+      .map(_.map(name /: _))
+
+  private def discoveries: F[List[(ResourceName, ResourceDiscovery[F, G])]] =
     sources.map(_.map(_._1).toAscList)
 
   private def lookupLeaf[E >: CommonError](file: AFile)
-      : EitherT[F, E, (ResourceName, ResourceDiscovery[F], Source[S])] = {
+      : EitherT[F, E, (ResourceName, ResourceDiscovery[F, G], Source[S])] = {
 
     val (n, p) = ResourcePath.unconsLeaf(file)
 
@@ -172,9 +178,9 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
 }
 
 object FederatingQueryEvaluator {
-  def apply[T[_[_]]: BirecursiveT, F[_]: Monad, S, R](
+  def apply[T[_[_]]: BirecursiveT, F[_]: Monad, G[_]: ApplicativePlus, S, R](
     queryFederation: QueryFederation[T, F, S, R],
-    sources: F[IMap[ResourceName, (ResourceDiscovery[F], S)]])
-    : QueryEvaluator[F, T[QScriptRead[T, ?]], R] =
+    sources: F[IMap[ResourceName, (ResourceDiscovery[F, G], S)]])
+    : QueryEvaluator[F, G, T[QScriptEducated[T, ?]], R] =
   new FederatingQueryEvaluator(queryFederation, sources)
 }

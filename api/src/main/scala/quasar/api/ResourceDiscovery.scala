@@ -16,23 +16,23 @@
 
 package quasar.api
 
-import slamdata.Predef.{Boolean, Stream}
+import slamdata.Predef.Boolean
 import quasar.api.ResourceError.CommonError
 
-import scalaz.{\/, IMap, Tree}
+import scalaz.\/
 
 /** Provides for discovering the resources in a datasource. */
-trait ResourceDiscovery[F[_]] {
+trait ResourceDiscovery[F[_], G[_]] {
 
   /** Returns the children of the specified resource path or an error if it
     * does not exist.
     */
-  def children(path: ResourcePath): F[CommonError \/ IMap[ResourceName, ResourcePathType]]
+  def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]]
 
   /** Returns the descendants of the specified resource path or an error if it
     * does not exist.
     */
-  def descendants(path: ResourcePath): F[CommonError \/ Stream[Tree[ResourceName]]]
+  def descendants(path: ResourcePath): F[CommonError \/ G[ResourcePath]]
 
   /** Returns whether the specified resource path refers to a resource. */
   def isResource(path: ResourcePath): F[Boolean]

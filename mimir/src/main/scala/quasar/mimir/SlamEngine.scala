@@ -179,9 +179,15 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): Backend[Repr] = {
 
+    val liftCake: ReaderT[Task, Cake, ?] ~> Backend =
+      λ[ReaderT[Task, Cake, ?] ~> Backend] { rc =>
+        cake[CakeM]
+          .andThenK(r => rc.run(r._1))
+          .liftB
+      }
+
     def qScriptCorePlanner = new QScriptCorePlanner[T, Backend](
-      λ[IO ~> Backend](_.to[Task].liftM[MT].liftB),
-      λ[M ~> Backend](_.liftB))
+      liftCake)
 
     def equiJoinPlanner = new EquiJoinPlanner[T, Backend](
       λ[IO ~> Backend](_.to[Task].liftM[MT].liftB))

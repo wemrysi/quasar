@@ -20,9 +20,10 @@ import slamdata.Predef._
 
 import quasar._
 import quasar.common._
-import quasar.contrib.scalaz._
-import quasar.fp._
 import quasar.contrib.iota._
+import quasar.contrib.scalaz._
+import quasar.contrib.scalaz.concurrent.task._
+import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.ski.κ
 import quasar.precog.common.{CNumericValue, ColumnRef, CPath, CPathField, CPathIndex}
@@ -31,19 +32,22 @@ import quasar.qscript._, MapFuncCore._
 import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
+import scala.collection.immutable.{Map => ScalaMap}
+
 import cats.effect.IO
-// import fs2.interop.scalaz._
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import matryoshka.data._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import shims._
-
-import scala.collection.immutable.{Map => ScalaMap}
+import scalaz.concurrent.Task
+import shims.monadToScalaz
 
 final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
-    liftF: IO ~> F, liftFCake: CakeM ~> F) {
+    liftFCake: ReaderT[Task, Cake, ?] ~> F) {
+
+  val liftF: IO ~> F =
+    λ[IO ~> F](io => liftFCake(io.to[Task].liftM[ReaderT[?[_], Cake, ?]]))
 
   def mapFuncPlanner[G[_]: Monad] = MapFuncPlanner[T, G, MapFunc[T, ?]]
 
@@ -373,10 +377,10 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
 
     // FIXME look for Map(Unreferenced, Constant) and return constant table
     case qscript.Unreferenced() =>
-      liftFCake(MimirRepr.meld[CakeM, LightweightFileSystem](
-        new DepFn1[Cake, λ[`P <: Cake` => CakeM[P#Table]]] {
-          def apply(P: Cake): CakeM[P.Table] =
-            P.Table.constLong(Set(0)).point[CakeM]
+      liftFCake(MimirRepr.meldCake[ReaderT[Task, Cake, ?]](
+        new DepFn1[Cake, λ[`P <: Cake` => ReaderT[Task, Cake, P#Table]]] {
+          def apply(P: Cake): ReaderT[Task, Cake, P.Table] =
+            P.Table.constLong(Set(0)).point[ReaderT[Task, Cake, ?]]
         }))
   }
 

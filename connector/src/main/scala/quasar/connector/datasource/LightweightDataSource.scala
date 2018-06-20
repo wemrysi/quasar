@@ -20,4 +20,4 @@ import quasar.api.ResourcePath
 import quasar.connector.DataSource
 
 /** A DataSource capable of returning the contents of resources. */
-trait LightweightDataSource[F[_], R] extends DataSource[F, ResourcePath, R]
+trait LightweightDataSource[F[_], G[_], R] extends DataSource[F, G, ResourcePath, R]

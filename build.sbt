@@ -322,7 +322,6 @@ lazy val api = project
 lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
   .dependsOn(foundation % BothScopes)
-  .settings(libraryDependencies ++= Dependencies.ejson)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -447,8 +446,6 @@ lazy val connector = project
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
-  .settings(
-    libraryDependencies ++= Dependencies.connector)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
@@ -506,9 +503,13 @@ lazy val interface = project
 /** Implementations of the Quasar API. */
 lazy val impl = project
   .settings(name := "quasar-impl-internal")
-  .dependsOn(api % BothScopes)
+  .dependsOn(
+    api % BothScopes,
+    connector,
+    frontend)
   .settings(commonSettings)
   .settings(targetSettings)
+  .settings(libraryDependencies ++= Dependencies.impl)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -548,6 +549,7 @@ lazy val it = project
   .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
   .dependsOn(
+    impl,
     web     % BothScopes,
     qscript % "test->test")
   .settings(commonSettings)
@@ -558,6 +560,7 @@ lazy val it = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
+  .settings(logBuffered in Test := false)
   .settings(
     sideEffectTestFSConfig := {
       val LoadCfgProp = "slamdata.internal.fs-load-cfg"
@@ -664,9 +667,9 @@ lazy val mimir = project.setup
   .settings(name := "quasar-mimir-internal")
   .dependsOn(
     yggdrasil % BothScopes,
+    core,
     connector)
   .withWarnings
-  .settings(libraryDependencies ++= Dependencies.mimir)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
