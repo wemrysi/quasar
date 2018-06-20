@@ -14,20 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.higher
 
-import quasar.Data
-import quasar.api.{DataSourceType, ResourcePath}
-import quasar.api.DataSourceError.InitializationError
+import scalaz.~>
+import simulacrum._
 
-import argonaut.Json
-import cats.effect.Async
-import fs2.Stream
-import scalaz.\/
-
-trait LightweightDataSourceModule {
-  def kind: DataSourceType
-
-  def lightweightDataSource[F[_]: Async, G[_]: Async](config: Json)
-      : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]]
+@typeclass
+trait HFunctor[F[_[_]]] {
+  def hmap[A[_], B[_]](fa: F[A])(f: A ~> B): F[B]
 }
