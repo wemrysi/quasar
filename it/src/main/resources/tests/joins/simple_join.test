@@ -2,15 +2,10 @@
     "name": "[qa_s07] simple join",
 
     "backends": {
-        "couchbase":         "timeout",
         "lwc_local":         "ignoreFieldOrder",
-        "marklogic_json":    "timeout",
-        "marklogic_xml":     "timeout",
-        "mongodb_3_2":       "ignoreFieldOrder",
         "mongodb_3_4":       "ignoreFieldOrder",
         "mongodb_3_4_13":    "ignoreFieldOrder",
         "mongodb_3_6":       "ignoreFieldOrder",
-        "mongodb_read_only": "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder"
     },
 

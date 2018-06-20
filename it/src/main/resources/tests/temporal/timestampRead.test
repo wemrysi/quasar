@@ -1,7 +1,6 @@
 {
     "name": "reads timestamps with flatten",
     "backends": {
-        "couchbase": "pending",
         "lwc_local": "pending",
         "mimir":     "pending"
     },

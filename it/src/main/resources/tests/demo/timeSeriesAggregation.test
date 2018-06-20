@@ -1,10 +1,7 @@
 {
     "name": "time series aggregation",
     "backends": {
-        "couchbase": "ignoreFieldOrder",
         "lwc_local":"pendingIgnoreFieldOrder",
-        "marklogic_json": "pendingIgnoreFieldOrder",
-        "marklogic_xml": "pending",
         "mimir":"pendingIgnoreFieldOrder"
     },
     "data": "smalltimeseries.data",

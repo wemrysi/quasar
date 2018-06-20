@@ -1,9 +1,7 @@
 {
     "name": "order by desc and asc",
     "backends": {
-        "couchbase": "ignoreFieldOrder",
         "lwc_local": "ignoreFieldOrder",
-        "marklogic_json": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",

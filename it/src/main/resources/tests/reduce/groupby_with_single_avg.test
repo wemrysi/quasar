@@ -2,8 +2,6 @@
     "name": "[qa_s08] groupby with single avg",
 
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
 

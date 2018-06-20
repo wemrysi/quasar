@@ -1,7 +1,6 @@
 {
     "name": "select string concatenation",
     "backends": {
-        "couchbase": "ignoreFieldOrder",
         "lwc_local": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },

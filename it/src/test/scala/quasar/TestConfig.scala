@@ -50,31 +50,19 @@ object TestConfig {
    * `it` and the connectors.  Hence, the redundant hard-coding of constants.  We
    * should get rid of this abomination as soon as possible.
    */
-  val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), FileSystemType("couchbase"))
   val LWC_LOCAL       = ExternalBackendRef(BackendRef(BackendName("lwc_local")        , BackendCapability.All), FileSystemType("lwc_local"))
-  val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), FileSystemType("marklogic"))
-  val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), FileSystemType("marklogic"))
   val MIMIR           = ExternalBackendRef(BackendRef(BackendName("mimir")            , BackendCapability.All), mimir.Mimir.Type)
-  val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), FileSystemType("mongodb"))
   val MONGO_3_4       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4")      , BackendCapability.All), FileSystemType("mongodb"))
   val MONGO_3_4_13    = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4_13")   , BackendCapability.All), FileSystemType("mongodb"))
   val MONGO_3_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_6")      , BackendCapability.All), FileSystemType("mongodb"))
-  val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), FileSystemType("mongodb"))
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
-    COUCHBASE,
     LWC_LOCAL,
-    MARKLOGIC_JSON, MARKLOGIC_XML,
     MIMIR,
-    MONGO_3_2, MONGO_3_4, MONGO_3_4_13, MONGO_3_6, MONGO_READ_ONLY)
+    MONGO_3_4, MONGO_3_4_13, MONGO_3_6)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")
-
-  /** True if this backend configuration is for a couchbase connection.
-    */
-  def isCouchbase(backendRef: BackendRef): Boolean =
-    backendRef === COUCHBASE.ref
 
   /** Returns the name of the environment variable used to configure the
     * given backend.

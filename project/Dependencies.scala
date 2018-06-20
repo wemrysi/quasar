@@ -130,22 +130,6 @@ object Dependencies {
     )
   }
 
-  def marklogic = Seq(
-    "com.fasterxml.jackson.core" %  "jackson-core"         % jacksonVersion,
-    "com.fasterxml.jackson.core" %  "jackson-databind"     % jacksonVersion,
-    "com.marklogic"              %  "marklogic-xcc"        % "8.0.5",
-    "com.slamdata"               %% "xml-names-core"       % "0.0.1",
-    "org.scala-lang.modules"     %% "scala-xml"            % "1.0.6",
-    "eu.timepit"                 %% "refined-scalaz"       % refinedVersion,
-    "eu.timepit"                 %% "refined-scalacheck"   % refinedVersion % Test,
-    "com.slamdata"               %% "xml-names-scalacheck" % "0.0.1"        % Test
-  )
-  val couchbase = Seq(
-    "com.couchbase.client" %  "java-client" % "2.3.5",
-    "io.reactivex"         %% "rxscala"     % "0.26.4",
-    "org.http4s"           %% "http4s-core" % http4sVersion,
-    "log4j"                %  "log4j"       % "1.2.17" % Test
-  )
   def web = Seq(
     "eu.timepit"     %% "refined-scalaz"      % refinedVersion,
     "org.http4s"     %% "http4s-dsl"          % http4sVersion,
@@ -160,6 +144,7 @@ object Dependencies {
     "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
     "eu.timepit"     %% "refined-scalacheck"  % refinedVersion     % Test
   )
+
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % "1.7.25",
     "org.slf4j"            %  "slf4j-log4j12"   % "1.7.16",

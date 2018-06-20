@@ -1,16 +1,11 @@
 {
     "name": "having with multiple projections",
     "backends": {
-        "couchbase":         "pendingIgnoreFieldOrder",
         "lwc_local":         "pendingIgnoreFieldOrder",
-        "marklogic_json":    "pendingIgnoreFieldOrder",
-        "marklogic_xml":     "pending",
         "mimir":             "pendingIgnoreFieldOrder",
-        "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
         "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending",
-        "mongodb_read_only": "pending"
+        "mongodb_3_6":       "pending"
     },
     "NB": "Pending for all connectors because of qz-3686",
     "data": "extraSmallZips.data",

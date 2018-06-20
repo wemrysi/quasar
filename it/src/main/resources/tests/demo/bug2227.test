@@ -2,9 +2,7 @@
   "name": "bug2227",
   "NB": "This test is basically charting on queries with reductions",
   "backends": {
-    "couchbase": "ignoreFieldOrder",
     "lwc_local": "ignoreFieldOrder",
-    "marklogic_json": "ignoreFieldOrder",
     "mimir": "ignoreFieldOrder"
   },
   "data": "otherpatients.data",

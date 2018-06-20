@@ -2,9 +2,7 @@
     "name": "conditional_input_step3",
     "data": "patients.data",
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
        "lwc_local":         "ignoreFieldOrder",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
     "query": "temp0 := SELECT * FROM patients WHERE state = \"CO\" AND (CASE \"both\" WHEN \"male\" THEN gender = \"male\" WHEN \"female\" THEN gender = \"female\" WHEN \"both\" THEN gender IN (\"male\", \"female\") END) AND (CASE WHEN 40 > 0 THEN age >= 40 ELSE age > 0 END) AND (CASE WHEN 55 > 0 THEN age <= 55 ELSE age > 0 END);

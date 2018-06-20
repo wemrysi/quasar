@@ -2,9 +2,7 @@
   "name": "date_part with (virtually) all selectors, after conversion to JS (see #1238)",
 
   "backends": {
-        "couchbase": "ignoreFieldOrder",
         "lwc_local": "ignoreFieldOrder",
-        "marklogic_json": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
   },
 

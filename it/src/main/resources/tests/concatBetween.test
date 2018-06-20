@@ -1,8 +1,6 @@
 {
     "name": "concat BETWEEN with other fields",
     "backends": {
-        "couchbase":      "ignoreFieldOrder",
-        "marklogic_json": "ignoreFieldOrder",
         "mimir":          "ignoreFieldOrder"
     },
     "data": "smallZips.data",

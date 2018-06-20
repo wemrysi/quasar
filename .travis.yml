@@ -21,16 +21,11 @@ stages:
 # this all goes in the test stage
 env:
   matrix:
-    # - CONNECTOR=couchbase
     - CONNECTOR=lwc_local
-    - CONNECTOR=marklogic_json
-    - CONNECTOR=marklogic_xml
     - CONNECTOR=mimir
-    - CONNECTOR=mongodb_3_2
     - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_3_4_13
     - CONNECTOR=mongodb_3_6
-    - CONNECTOR=mongodb_read_only
   global:
     - COURSIER_PROGRESS=0
     - SBT=./sbt
@@ -72,8 +67,6 @@ script:
     SPECIFIC_DELEGATE=
 
     case $CONNECTOR in
-      couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly failtrace" ;;
-      marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly failtrace" ;;
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
     esac
 
