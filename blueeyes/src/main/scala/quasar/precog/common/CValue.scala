@@ -20,6 +20,8 @@ package common
 import quasar.blueeyes._, json._
 import quasar.time.{DateTimeInterval, OffsetDate}
 
+import monocle.{Optional, Prism, Traversal}
+import monocle.function.{At, Each, Index}
 import scalaz._, Scalaz._, Ordering._
 
 import java.math.MathContext.UNLIMITED
@@ -66,13 +68,117 @@ sealed trait RValue { self =>
 }
 
 object RValue {
+  val rObject: Prism[RValue, Map[String, RValue]] =
+    Prism.partial[RValue, Map[String, RValue]] {
+      case RObject(fields) => fields
+    } (RObject(_))
+
+  def rField(field: String): Optional[RValue, Option[RValue]] =
+    rObject composeLens At.at(field)
+
+  def rField1(field: String): Optional[RValue, RValue] =
+    rField(field) composePrism monocle.std.option.some
+
+  val rFields: Traversal[RValue, RValue] =
+    rObject composeTraversal Each.each
+
+  val rArray: Prism[RValue, List[RValue]] =
+    Prism.partial[RValue, List[RValue]] {
+      case RArray(values) => values
+    } (RArray(_))
+
+  def rElement(index: Int): Optional[RValue, RValue] =
+    rArray composeOptional Index.index(index)
+
+  val rElements: Traversal[RValue, RValue] =
+    rArray composeTraversal Each.each
+
+  val rUndefined: Prism[RValue, Unit] =
+    Prism.partial[RValue, Unit] {
+      case CUndefined => ()
+    } (_ => CUndefined)
+
+  val rNull: Prism[RValue, Unit] =
+    Prism.partial[RValue, Unit] {
+      case CNull => ()
+    } (_ => CNull)
+
+  val rEmptyObject: Prism[RValue, Unit] =
+    Prism.partial[RValue, Unit] {
+      case CEmptyObject => ()
+    } (_ => CEmptyObject)
+
+  val rEmptyArray: Prism[RValue, Unit] =
+    Prism.partial[RValue, Unit] {
+      case CEmptyArray => ()
+    } (_ => CEmptyArray)
+
+  val rBoolean: Prism[RValue, Boolean] =
+    Prism.partial[RValue, Boolean] {
+      case CBoolean(b) => b
+    } (CBoolean(_))
+
+  val rString: Prism[RValue, String] =
+    Prism.partial[RValue, String] {
+      case CString(s) => s
+    } (CString(_))
+
+  val rLong: Prism[RValue, Long] =
+    Prism.partial[RValue, Long] {
+      case CLong(l) => l
+    } (CLong(_))
+
+  val rDouble: Prism[RValue, Double] =
+    Prism.partial[RValue, Double] {
+      case CDouble(d) => d
+    } (CDouble(_))
+
+  val rNum: Prism[RValue, BigDecimal] =
+    Prism.partial[RValue, BigDecimal] {
+      case CNum(n) => n
+    } (CNum(_))
+
+  val rOffsetDateTime: Prism[RValue, OffsetDateTime] =
+    Prism.partial[RValue, OffsetDateTime] {
+      case COffsetDateTime(t) => t
+    } (COffsetDateTime(_))
+
+  val rOffsetDate: Prism[RValue, OffsetDate] =
+    Prism.partial[RValue, OffsetDate] {
+      case COffsetDate(t) => t
+    } (COffsetDate(_))
+
+  val rOffsetTime: Prism[RValue, OffsetTime] =
+    Prism.partial[RValue, OffsetTime] {
+      case COffsetTime(t) => t
+    } (COffsetTime(_))
+
+  val rLocalDateTime: Prism[RValue, LocalDateTime] =
+    Prism.partial[RValue, LocalDateTime] {
+      case CLocalDateTime(t) => t
+    } (CLocalDateTime(_))
+
+  val rLocalDate: Prism[RValue, LocalDate] =
+    Prism.partial[RValue, LocalDate] {
+      case CLocalDate(t) => t
+    } (CLocalDate(_))
+
+  val rLocalTime: Prism[RValue, LocalTime] =
+    Prism.partial[RValue, LocalTime] {
+      case CLocalTime(t) => t
+    } (CLocalTime(_))
+
+  val rInterval: Prism[RValue, DateTimeInterval] =
+    Prism.partial[RValue, DateTimeInterval] {
+      case CInterval(i) => i
+    } (CInterval(_))
+
   def toCValue(rvalue: RValue): Option[CValue] = rvalue match {
     case cvalue: CValue => Some(cvalue)
     case RArray.empty   => Some(CEmptyArray)
     case RObject.empty  => Some(CEmptyObject)
     case _              => None
   }
-
 
   def fromJValueRaw(jv: JValue): RValue = {
     def loop(jv: JValue): Option[RValue] = jv match {
