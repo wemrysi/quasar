@@ -24,7 +24,7 @@ package object niflheim {
    * Dear god don't use this!  It's a shim to make old things work.  This is NOT
    * a lawful monad!
    */
-  @deprecated
+  // @deprecated("don't use this", "ever")
   private[niflheim] implicit def validationMonad[E]: Monad[Validation[E, ?]] =
     new Monad[Validation[E, ?]] {
       def point[A](a: => A) = Success(a)

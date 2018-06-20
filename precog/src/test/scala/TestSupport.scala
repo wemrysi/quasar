@@ -98,7 +98,7 @@ trait ScalacheckSupport {
   def genPosLong: Gen[Long]         = choose(1L, Long.MaxValue)
   def genPosInt: Gen[Int]           = choose(1, Int.MaxValue)
 
-  def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary map (d => BigDecimal(d.bigDecimal, d.mc))
+  def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary.map(d => BigDecimal.decimal(d.bigDecimal, d.mc))
 
   implicit class ArbitraryOps[A](arb: Arbitrary[A]) {
     def ^^[B](f: A => B): Arbitrary[B]      = Arbitrary(arb.arbitrary map f)

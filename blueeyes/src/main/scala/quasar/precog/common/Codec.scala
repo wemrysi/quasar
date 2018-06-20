@@ -571,7 +571,7 @@ object Codec {
     x => (x.unscaledValue.toByteArray, x.scale.toLong),
     (u, s) => new BigDec(new java.math.BigInteger(u), s.toInt))
 
-  implicit val BigDecimalCodec = JBigDecimalCodec.as[BigDecimal](_.underlying, BigDecimal(_, java.math.MathContext.UNLIMITED))
+  implicit val BigDecimalCodec = JBigDecimalCodec.as[BigDecimal](_.underlying, BigDecimal.decimal(_, java.math.MathContext.UNLIMITED))
 
   final class IndexedSeqCodec[A](val elemCodec: Codec[A]) extends Codec[IndexedSeq[A]] {
 
