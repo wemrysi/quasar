@@ -33,11 +33,12 @@ trait DataSourceTypeGenerator {
     } yield DataSourceType(name, ver))
 
   private def genName: Gen[DataSourceType.Name] =
-    Gen.listOf(
-      Gen.frequency(
+    for {
+      cs <- Gen.listOf(Gen.frequency(
         100 -> Gen.alphaNumChar,
         3   -> Gen.const('-')))
-      .map(cs => Refined.unsafeApply[String, DataSourceType.NameP](cs.mkString))
+      c <- Gen.alphaNumChar
+    } yield Refined.unsafeApply[String, DataSourceType.NameP]((c :: cs).mkString)
 }
 
 object DataSourceTypeGenerator extends DataSourceTypeGenerator
