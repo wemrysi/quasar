@@ -20,29 +20,30 @@ import quasar.api.{ResourceDiscoverySpec, ResourceName, ResourcePath}
 import LocalDataSourceSpec._
 
 import java.nio.file.Paths
+import scala.concurrent.ExecutionContext.Implicits.global
 
+import cats.effect.IO
 import fs2.Stream
-import fs2.interop.scalaz._
 import scalaz.{~>, Foldable, Id, Monoid}, Id.Id
-import scalaz.concurrent.Task
+import shims._
 
 final class LocalDataSourceSpec
-    extends ResourceDiscoverySpec[Task, Stream[Task, ?]] {
+    extends ResourceDiscoverySpec[IO, Stream[IO, ?]] {
 
   val discovery =
-    LocalDataSource(Paths.get("./it/src/main/resources/tests"), 1024)
+    LocalDataSource[IO, IO](Paths.get("./it/src/main/resources/tests"), 1024)
 
   val nonExistentPath =
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")
 
   val run =
-    λ[Task ~> Id](_.unsafePerformSync)
+    λ[IO ~> Id](_.unsafeRunSync)
 }
 
 object LocalDataSourceSpec {
-  implicit val unsafeStreamFoldable: Foldable[Stream[Task, ?]] =
-    new Foldable[Stream[Task, ?]] with Foldable.FromFoldMap[Stream[Task, ?]] {
-      def foldMap[A, M](fa: Stream[Task, A])(f: A => M)(implicit M: Monoid[M]) =
-        fa.runFold(M.zero)((m, a) => M.append(m, f(a))).unsafePerformSync
+  implicit val unsafeStreamFoldable: Foldable[Stream[IO, ?]] =
+    new Foldable[Stream[IO, ?]] with Foldable.FromFoldMap[Stream[IO, ?]] {
+      def foldMap[A, M](fa: Stream[IO, A])(f: A => M)(implicit M: Monoid[M]) =
+        fa.compile.fold(M.zero)((m, a) => M.append(m, f(a))).unsafeRunSync
     }
 }
