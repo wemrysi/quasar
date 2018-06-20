@@ -48,7 +48,7 @@ trait DefaultDecomposers {
   }
 
   implicit val FloatDecomposer: Decomposer[Float] = new Decomposer[Float] {
-    def decompose(tvalue: Float): JValue = JNum(BigDecimal(tvalue, MathContext.UNLIMITED))
+    def decompose(tvalue: Float): JValue = JNum(BigDecimal.decimal(tvalue, MathContext.UNLIMITED))
   }
 
   implicit val DoubleDecomposer: Decomposer[Double] = new Decomposer[Double] {

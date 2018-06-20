@@ -76,7 +76,7 @@ object VersionLog {
 
           json = List[Version]().asJson.nospaces
           // TODO character encoding!
-          writer = Stream.emit(ByteVector(json.getBytes)).covary[POSIXWithIO].to(vnew).run
+          writer = Stream.emit(ByteVector(json.getBytes)).covary[POSIXWithIO].to(vnew).compile.drain
           _ <- POSIXWithIO.generalize(writer)
 
           _ <- POSIX.move[S](baseDir </> VersionsJsonNew, baseDir </> VersionsJson)
@@ -135,7 +135,7 @@ object VersionLog {
 
           json = log2.committed.asJson.nospaces
           // TODO character encoding!
-          writer = Stream.emit(ByteVector(json.getBytes)).covary[POSIXWithIO].to(vnew).run
+          writer = Stream.emit(ByteVector(json.getBytes)).covary[POSIXWithIO].to(vnew).compile.drain
           _ <- POSIXWithIO.generalize(writer).liftM[ST]
 
           _ <- POSIX.move[S](log.baseDir </> VersionsJsonNew, log.baseDir </> VersionsJson).liftM[ST]

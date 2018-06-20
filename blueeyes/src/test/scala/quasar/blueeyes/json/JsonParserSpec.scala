@@ -274,8 +274,8 @@ xyz
 
     JParser.parseFromString("[1, 2,\t3,\n4,\r5]\r").toOption must_== Some(ja(1, 2, 3, 4, 5))
     JParser.parseManyFromString("[1,\r\n2]\r\n[3,\r\n4]\r\n").toOption must_== Some(Seq(ja(1, 2), ja(3, 4)))
-    JParser.parseFromString("[1, 2,\t3,\n4,\0 5]").toOption must_== None
-    JParser.parseManyFromString("[1,\r\n2]\0[3,\r\n4]\r\n").toOption must_== None
+    JParser.parseFromString("[1, 2,\t3,\n4,\u0000 5]").toOption must_== None
+    JParser.parseManyFromString("[1,\r\n2]\u0000[3,\r\n4]\r\n").toOption must_== None
   }
 
   "Handles whitespace correctly" in {
@@ -283,8 +283,8 @@ xyz
 
     JParser.parseFromString("[1, 2,\t3,\n4,\r5]\r").toOption must_== Some(ja(1, 2, 3, 4, 5))
     JParser.parseManyFromString("[1,\r\n2]\r\n[3,\r\n4]\r\n").toOption must_== Some(Seq(ja(1, 2), ja(3, 4)))
-    JParser.parseFromString("[1, 2,\t3,\n4,\0 5]").toOption must_== None
-    JParser.parseManyFromString("[1,\r\n2]\0[3,\r\n4]\r\n").toOption must_== None
+    JParser.parseFromString("[1, 2,\t3,\n4,\u0000 5]").toOption must_== None
+    JParser.parseManyFromString("[1,\r\n2]\u0000[3,\r\n4]\r\n").toOption must_== None
   }
 }
 
