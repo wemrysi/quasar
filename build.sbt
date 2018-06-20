@@ -580,7 +580,8 @@ lazy val precog = project
 lazy val blueeyes = project
   .settings(
     name := "quasar-blueeyes-internal",
-    scalacStrictMode := false)
+    scalacStrictMode := false,
+    scalacOptions += "-language:postfixOps")
   .dependsOn(precog % BothScopes, frontend)
   .settings(libraryDependencies ++= Dependencies.blueeyes)
   .settings(headerLicenseSettings)
