@@ -21,8 +21,6 @@ import slamdata.Predef.Throwable
 import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.fp.free
 
-import argonaut.{Argonaut, CodecJson, DecodeResult}
-
 import cats.StackSafeMonad
 import cats.effect.{IO, Sync}
 
@@ -33,8 +31,6 @@ import scalaz.{~>, EitherT, Free}
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.either._
-
-import java.util.UUID
 
 package object vfs {
   type POSIX[A] = Free[POSIXOp, A]
@@ -71,55 +67,4 @@ package object vfs {
       def flatMap[A, B](fa: Free[S, A])(f: A => Free[S, B]): Free[S, B] =
         fa.flatMap(f)
     }
-
-  object POSIXWithIO {
-    def generalize[S[a] <: ACopK[a]]: GeneralizeSyntax[S] = new GeneralizeSyntax[S] {}
-
-    private val JP = CopK.Inject[POSIXOp, POSIXWithIOCopK]
-    private val JI = CopK.Inject[IO, POSIXWithIOCopK]
-
-    trait GeneralizeSyntax[S[a] <: ACopK[a]] {
-      def apply[A](pwt: POSIXWithIO[A])(implicit IP: POSIXOp :<<: S, II: IO :<<: S): Free[S, A] =
-        pwt.mapSuspension(λ[POSIXWithIOCopK ~> S] {
-          case JP(p) => IP(p)
-          case JI(t) => II(t)
-        })
-    }
-  }
-
-  final case class Version(value: UUID) extends AnyVal
-
-  object Version extends (UUID => Version) {
-    import Argonaut._
-
-    implicit val codec: CodecJson[Version] =
-      CodecJson[Version](v => jString(v.value.toString), { c =>
-        c.as[String] flatMap { str =>
-          try {
-            DecodeResult.ok(Version(UUID.fromString(str)))
-          } catch {
-            case _: IllegalArgumentException =>
-              DecodeResult.fail(s"string '${str}' is not a valid UUID", c.history)
-          }
-        }
-      })
-  }
-
-  final case class Blob(value: UUID) extends AnyVal
-
-  object Blob extends (UUID => Blob) {
-    import Argonaut._
-
-    implicit val codec: CodecJson[Blob] =
-      CodecJson[Blob](v => jString(v.value.toString), { c =>
-        c.as[String] flatMap { str =>
-          try {
-            DecodeResult.ok(Blob(UUID.fromString(str)))
-          } catch {
-            case _: IllegalArgumentException =>
-              DecodeResult.fail(s"string '${str}' is not a valid UUID", c.history)
-          }
-        }
-      })
-  }
 }

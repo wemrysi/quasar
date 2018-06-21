@@ -1,7 +1,6 @@
 {
     "name": "subselect a reduction",
     "backends": {
-        "marklogic_xml": "timeout"
     },
     "data": "zips.data",
     "query": "select count(*) from (select sum(pop) from zips) as b",

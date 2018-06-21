@@ -234,7 +234,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
   private[this] var actorState: Option[State] = None
   private def state = {
     import scalaz.syntax.effect.id._
-    actorState getOrElse open.flatMap(_.tap(s => IO(actorState = Some(s)))).unsafePerformIO
+    actorState getOrElse open.flatMap(_.tap(s => IO { actorState = Some(s) })).unsafePerformIO
   }
 
   private def initDirs(f: File) = IO {
@@ -306,7 +306,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
   }
 
   private def cook(responseRequested: Boolean) = IO {
-    state.blockState.rawLog.close
+    state.blockState.rawLog.close()
     val toCook = state.blockState.rawLog
     val newRaw = RawHandler.empty(toCook.id + 1, rawFileFor(toCook.id + 1))
 
@@ -325,8 +325,8 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
   private def quiesce = IO {
     actorState foreach { s =>
       log.debug("Releasing resources for projection in " + baseDir)
-      s.blockState.rawLog.close
-      s.txLog.close
+      s.blockState.rawLog.close()
+      s.txLog.close()
       ProjectionState.toFile(currentState, descriptorFile)
       actorState = None
     }
@@ -337,7 +337,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
   } except { case t: Throwable =>
     IO { log.error("Error during close", t) }
   } ensuring {
-    IO { workLock.release }
+    IO { workLock.release() }
   }
 
   override def postStop() = {

@@ -25,10 +25,10 @@ import fs2.Stream
 import scalaz.ApplicativePlus
 
 trait StreamInstances {
-  implicit val streamIOLiftIO: LiftIO[Stream[IO, ?]] =
-    new LiftIO[Stream[IO, ?]] {
-      def liftIO[A](ioa: IO[A]): Stream[IO, A] =
-        Stream.eval(ioa)
+  implicit def streamLiftIO[F[_]: LiftIO]: LiftIO[Stream[F, ?]] =
+    new LiftIO[Stream[F, ?]] {
+      def liftIO[A](ioa: IO[A]): Stream[F, A] =
+        Stream.eval(LiftIO[F].liftIO(ioa))
     }
 
   implicit def streamApplicativePlus[F[_]]: ApplicativePlus[Stream[F, ?]] =
@@ -46,6 +46,9 @@ trait StreamInstances {
 
       def point[A](a: => A) =
         Stream.emit(a)
+
+      override def map[A, B](fa: Stream[F, A])(f: A => B) =
+        fa map f
     }
 
   implicit def streamSync[F[_]](implicit F: Sync[F]): Sync[Stream[F, ?]] =

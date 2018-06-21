@@ -3,8 +3,6 @@
 
   "backends": {
     "lwc_local":      "pending",
-    "marklogic_json": "skip",
-    "marklogic_xml":  "skip",
     "mimir":          "pending"
   },
   "data": "../arrayProcessingInts.data",

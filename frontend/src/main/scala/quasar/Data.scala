@@ -16,7 +16,7 @@
 
 package quasar
 
-import slamdata.Predef.{Int => SInt, _}
+import slamdata.Predef._
 import quasar.ejson.{
   Common,
   EJson,
@@ -40,11 +40,9 @@ import java.time.{
   OffsetTime => JOffsetTime,
   ZoneOffset
 }
-import java.lang.CharSequence
 import java.time.format.DateTimeFormatter
 import scala.Any
 
-import jawn._
 import matryoshka._
 import matryoshka.patterns._
 import monocle.{Iso, Optional, Prism}
@@ -336,25 +334,6 @@ object Data {
     new Corecursive[Data] {
       type Base[T] = EJson[T]
       def embed(t: EJson[Data])(implicit BF: Functor[Base]) = fromEJson(t)
-    }
-
-  /** NB: For parsing arbitrary JSON into `Data`, _not_ for deserializing `Data`
-    *     previously serialized as JSON. For that, see `DataCodec`.
-    */
-  val jsonParser: SupportParser[Data] =
-    new SupportParser[Data] {
-      implicit val facade: Facade[Data] =
-        new SimpleFacade[Data] {
-          def jarray(arr: List[Data])                 = Arr(arr)
-          def jobject(obj: Map[String, Data])         = Obj(ListMap(obj.toList: _*))
-          def jnull()                                 = Null
-          def jfalse()                                = False
-          def jtrue()                                 = True
-          @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-          def jnum(n: CharSequence, d: SInt, e: SInt) = Dec(BigDecimal(n.toString))
-          @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-          def jstring(s: CharSequence)                = Str(s.toString)
-        }
     }
 
   object DateTimeConstants {

@@ -1,16 +1,11 @@
 {
     "name": "field and flattened map value on heterogeneous",
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":         "ignoreFieldOrder",
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending",
         "mimir":             "ignoreFieldOrder",
-        "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
         "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending",
-        "mongodb_read_only": "pending"
+        "mongodb_3_6":       "pending"
     },
     "data": "heterogeneous.data",
     "query": "select a, b{*} from heterogeneous",

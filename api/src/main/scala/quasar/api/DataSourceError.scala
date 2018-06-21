@@ -42,6 +42,9 @@ object DataSourceError extends DataSourceErrorInstances {
   final case class InvalidConfiguration[C](kind: DataSourceType, config: C, reasons: NonEmptyList[String])
       extends InitializationError[C]
 
+  final case class UnprocessableEntity[C](kind: DataSourceType, config: C, reason: String)
+    extends InitializationError[C]
+
   sealed trait ExistentialError extends CreateError[Nothing]
 
   final case class DataSourceExists(name: ResourceName)
@@ -70,6 +73,9 @@ sealed abstract class DataSourceErrorInstances {
       case MalformedConfiguration(k, c, r) =>
         (none, none, none, some((k, c, r)), none)
 
+      case UnprocessableEntity(k, c, r) =>
+        (none, none, none, some((k, c, r)), none)
+
       case InvalidConfiguration(k, c, rs) =>
         (none, none, none, none, some((k, c, rs)))
     }
@@ -87,6 +93,9 @@ sealed abstract class DataSourceErrorInstances {
 
       case MalformedConfiguration(k, c, r) =>
         Cord("MalformedConfiguration(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ r.show ++ Cord(")")
+
+      case UnprocessableEntity(k, c, r) =>
+        Cord("UnprocessableEntity(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ r.show ++ Cord(")")
 
       case InvalidConfiguration(k, c, rs) =>
         Cord("InvalidConfiguration(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ rs.show ++ Cord(")")

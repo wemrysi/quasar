@@ -32,7 +32,6 @@ import quasar.fs.mount._
 import quasar.fs.mount.cache.VCache, VCache.{VCacheExpR, VCacheExpW, VCacheKVS}
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
-import quasar.physical._
 import quasar.main.config.loadConfigFile
 import quasar.metastore._
 
@@ -65,7 +64,6 @@ package object main extends Logging {
   private val CoreFS = IList(
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
     mimir.LocalLWC.definition translate injectFT[Task, PhysFsEff],
-    skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff]
   ).fold
 
   val QuasarAPI = QuasarAPIImpl[Free[CoreEff, ?]](liftFT)

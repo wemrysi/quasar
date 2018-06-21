@@ -91,8 +91,8 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     val json1 = """{ "a": 1, "b": "x", "c": null }"""
     val json2 = """[4, "foo", null, true]"""
 
-    val data1: Stream[JValue] = Stream.fill(25)(JParser.parse(json1))
-    val data2: Stream[JValue] = Stream.fill(35)(JParser.parse(json2))
+    val data1: Stream[JValue] = Stream.fill(25)(JParser.parseUnsafe(json1))
+    val data2: Stream[JValue] = Stream.fill(35)(JParser.parseUnsafe(json2))
 
     val table1 = fromSample(SampleData(data1), Some(10))
     val table2 = fromSample(SampleData(data2), Some(10))
@@ -314,7 +314,6 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
         )
 
         val dataset1 = fromJson(sample.toStream, Some(3))
-        val dataset2 = fromJson(sample.toStream, Some(3))
 
         dataset1.cross(dataset1)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight))).slices.uncons.unsafeRunSync must beLike {
           case Some((head, _)) => head.size must beLessThanOrEqualTo(Config.maxSliceRows)

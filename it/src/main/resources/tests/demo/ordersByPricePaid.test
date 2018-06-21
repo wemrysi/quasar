@@ -2,15 +2,11 @@
     "name": "clothing orders by price paid",
     "data": ["../customers.data", "../orders.data", "../ordered_items.data", "../inventory_items.data"],
     "backends": {
-        "couchbase":         "skip",
         "lwc_local":         "ignoreFieldOrder",
-        "marklogic_json":    "pendingIgnoreFieldOrder",
         "mimir":             "ignoreFieldOrder",
-        "mongodb_3_2":       "skip",
         "mongodb_3_4":       "skip",
         "mongodb_3_4_13":    "skip",
-        "mongodb_3_6":       "skip",
-        "mongodb_read_only": "skip"
+        "mongodb_3_6":       "skip"
     },
     "NB2": "mongo skipped due to timeout",
     "query": "

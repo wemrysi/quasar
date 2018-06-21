@@ -1,7 +1,6 @@
 {
     "name": "sum flattened int arrays",
     "backends": {
-        "couchbase":        "pending"
     },
     "data": "intArrays.data",
     "query": "select b[*] + c[*] from intArrays",

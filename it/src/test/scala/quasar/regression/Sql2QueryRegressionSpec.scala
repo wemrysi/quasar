@@ -30,10 +30,12 @@ import quasar.contrib.fs2.stream._
 import quasar.contrib.iota._
 import quasar.contrib.nio.{file => contribFile}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.concurrent.task._
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
 import quasar.evaluate.FederatingQueryEvaluator
 import quasar.fp._
+import quasar.fs.FileSystemType
 import quasar.fs.Planner.PlannerError
 import quasar.frontend.logicalplan.{LogicalPlan => LP, Read => LPRead}
 import quasar.higher.HFunctor
@@ -58,7 +60,6 @@ import argonaut._, Argonaut._
 import cats.effect.{Effect, IO, Sync, Timer}
 import eu.timepit.refined.auto._
 import fs2.{io, text, Stream}
-import _root_.io.chrisdavenport.scalaz.task._
 import matryoshka._
 import matryoshka.implicits._
 import matryoshka.data.Fix
@@ -105,15 +106,17 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
       cake <- Precog(tmpDir)
 
-      local = LocalDataSource[Stream[IO, ?], IO](jPath(TestDataRoot), 65536)
+      // 64 KB chunks, chosen mostly arbitrarily.
+      local = LocalDataSource[Stream[IO, ?], IO](jPath(TestDataRoot), 65535)
 
       localM = HFunctor[QueryEvaluator[?[_], Stream[IO, ?], ResourcePath, Stream[IO, Data]]].hmap(local)(streamToM)
 
       sdown =
-        guarantee(cake.shutdown,
-          guarantee(contribFile.deleteRecursively[IO](tmpDir.toPath), local.shutdown.compile.drain))
+        cake.dispose
+          .guarantee(contribFile.deleteRecursively[IO](tmpDir.toPath))
+          .guarantee(local.shutdown.compile.drain)
 
-      mimirFederation = MimirQueryFederation[Fix, M](cake)
+      mimirFederation = MimirQueryFederation[Fix, M](cake.unsafeValue)
 
       qassoc = QueryAssociate.lightweight[Fix, M, IO](localM.evaluate)
       discovery = (localM : ResourceDiscovery[M, Stream[IO, ?]])
@@ -158,15 +161,20 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   ////
 
-  (regressionTests[IO](TestsRoot, TestDataRoot) |@| queryEvaluator)({
-    case (tests, (eval, sdown)) =>
-      suiteName >> {
-        tests.toList foreach { case (f, t) =>
-          regressionExample(f, t, BackendName("mimir"), queryResults(eval.evaluate))
-        }
+  Effect[Task].toIO(TestConfig.fileSystemConfigs(FileSystemType("lwc_local"))).flatMap({cfgs =>
+    if (cfgs.isEmpty)
+      IO(suiteName >> skipped("to run, enable the 'lwc_local' test configuration."))
+    else
+      (regressionTests[IO](TestsRoot, TestDataRoot) |@| queryEvaluator)({
+        case (tests, (eval, sdown)) =>
+          suiteName >> {
+            tests.toList foreach { case (f, t) =>
+              regressionExample(f, t, BackendName("mimir"), queryResults(eval.evaluate))
+            }
 
-        step(sdown.unsafeRunSync)
-      }
+            step(sdown.unsafeRunSync)
+          }
+      })
   }).unsafeRunSync
 
   ////
@@ -248,7 +256,9 @@ final class Sql2QueryRegressionSpec extends Qspec {
         } | OrderPreserved
 
     val actProcess =
-      convert.toProcess(act).map(normalizeJson <<< deleteFields <<< (_.asJson))
+      convert.toProcess(act)
+        // TODO{fs2}: Chunkiness
+        .map(normalizeJson <<< deleteFields <<< (_.asJson))
         .translate(λ[IO ~> Task](_.to[Task]))
 
     val result =

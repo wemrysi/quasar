@@ -2,12 +2,9 @@
     "name": "[qa_s07] join the results of a pair of sub-queries",
 
     "backends": {
-        "couchbase":      "skip",
-        "marklogic_json": "ignoreFieldOrder",
         "mimir":          "ignoreFieldOrder"
     },
 
-    "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
     "data": ["../zips.data", "../largeZips.data"],
 

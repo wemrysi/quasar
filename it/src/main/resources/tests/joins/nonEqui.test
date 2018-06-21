@@ -2,10 +2,8 @@
     "name": "join with non-equi condition",
 
     "backends": {
-        "couchbase": "skip"
     },
 
-    "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
     "data": ["../cars.data", "../cars2.data"],
 

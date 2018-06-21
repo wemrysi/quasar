@@ -114,15 +114,11 @@ abstract class QueryRegressionTest[S[_]](
   //     this printing can be removed.
   fileSystemShould { (fs, fsNonChrooted) =>
     suiteName should {
-      step(print(s"Running $suiteName ["))
-
       tests.toList foreach { case (f, t) =>
         val fsʹ = t.data.nonEmpty.fold(fs, fsNonChrooted)
         regressionExample(f, t, fsʹ.ref.name, fsʹ.setupInterpM, fsʹ.testInterpM)
-        step(print("."))
       }
 
-      step(println("]"))
       step(doDelete(fs.setupInterpM, DataDir).runVoid)
     }
   }

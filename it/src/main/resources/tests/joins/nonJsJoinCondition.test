@@ -2,10 +2,7 @@
     "name": "flatten one side of a join condition",
 
     "backends": {
-        "couchbase":       "pending",
         "lwc_local":       "ignoreFieldOrder",
-        "marklogic_json":  "timeout",
-        "marklogic_xml":   "timeout",
         "mimir":           "ignoreFieldOrder"
     },
 

@@ -2,9 +2,7 @@
     "name": "flights_step2",
     "data": "flights.data",
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
        "lwc_local":         "ignoreFieldOrder",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
     "query": "SELECT source, destination, SUM(fuel) AS weight FROM flights GROUP BY source, destination ORDER BY source ASC, destination ASC, weight asc LIMIT 6",

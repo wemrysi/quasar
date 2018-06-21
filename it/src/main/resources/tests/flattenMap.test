@@ -2,7 +2,6 @@
     "name": "flatten map",
     "backends": {
         "lwc_local": "ignoreFieldOrder",
-        "couchbase": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
     "data": "usa_factbook.data",

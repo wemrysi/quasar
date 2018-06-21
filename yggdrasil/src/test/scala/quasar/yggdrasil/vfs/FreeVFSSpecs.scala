@@ -88,7 +88,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(11)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -158,7 +158,9 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(4)
+        _ <- H.pattern[Unit] {
+          case CPR(io) => io
+        }.replicateM(4)
 
         _ <- H.pattern[FreeVFS.VFSVersion] {
           case CPR(ta) =>
@@ -230,7 +232,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(5)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -283,7 +285,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(11)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -348,7 +350,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(4)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -372,7 +374,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
@@ -383,7 +385,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
@@ -433,7 +435,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(4)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -457,7 +459,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
@@ -468,7 +470,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
@@ -532,7 +534,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(4)
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -556,7 +558,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
@@ -567,7 +569,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             }
         }
 
-        _ <- ioPattern.replicateM(15)
+        _ <- drainIO
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
@@ -789,7 +791,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val from = Path.rootDir </> Path.file("foo")
       val to = Path.rootDir </> Path.file("bar")
 
-      val vfs = BlankVFS.copy(paths = Map(from -> Blob(UUID.randomUUID())))
+      val vfs = BlankVFS.copy(paths = Map(from -> blob))
 
       val interp = ().point[Harness[S, IO, ?]]
 
@@ -860,13 +862,9 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
     }
 
     "moveDir fails with a non-existent source" in {
-      val blob = Blob(UUID.randomUUID())
-
       val source = Path.rootDir </> Path.dir("source")
-      val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to = target </> Path.file("foo")
 
       val interp = ().point[Harness[S, IO, ?]]
 
@@ -884,7 +882,6 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to = target </> Path.file("foo")
 
       val vfs =
         BlankVFS.copy(
@@ -909,7 +906,6 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to = target </> Path.file("foo")
 
       val vfs =
         BlankVFS.copy(
@@ -1090,12 +1086,6 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val blob = Blob(UUID.randomUUID())
       val version = Version(UUID.randomUUID())
 
-      val blobVLog =
-        VersionLog(
-          BaseDir </> Path.dir(blob.value.toString),
-          List(version),
-          Set(version))
-
       val interp = ().point[Harness[S, IO, ?]]
 
       val result = interp(FreeVFS.underlyingDir[S](blob, version).eval(BlankVFS)).unsafeRunSync
@@ -1174,7 +1164,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
                 }
             }
 
-            _ <- ioPattern.replicateM(15)
+            _ <- drainIO
 
             _ <- H.pattern[List[RPath]] {
               case CPL(Ls(target)) =>
@@ -1197,7 +1187,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
                 }
             }
 
-            _ <- ioPattern.replicateM(3)
+            _ <- drainIO
 
             _ <- H.pattern[Unit] {
               case CPL(Move(from, to)) =>
@@ -1250,7 +1240,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           }
       }
 
-      _ <- ioPattern.replicateM(11)
+      _ <- drainIO
 
       _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
         case CPL(OpenW(target)) =>
@@ -1260,7 +1250,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           }
       }
 
-      _ <- ioPattern.replicateM(10)
+      _ <- drainIO
 
       _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
         case CPL(OpenW(target)) =>
@@ -1270,7 +1260,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           }
       }
 
-      _ <- ioPattern.replicateM(10)
+      _ <- drainIO
 
       _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
         case CPL(OpenW(target)) =>
@@ -1280,7 +1270,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           }
       }
 
-      _ <- ioPattern.replicateM(10)
+      _ <- drainIO
 
       _ <- H.pattern[Unit] {
         case CPL(Move(from, to)) =>
@@ -1313,7 +1303,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
   val CPL = CopK.Inject[POSIXOp, S]
 
-  val ioPattern = H.pattern[Unit] {
+  val drainIO = H.whileDefined[Unit] {
     case CPR(ioa) => ioa
   }
 }

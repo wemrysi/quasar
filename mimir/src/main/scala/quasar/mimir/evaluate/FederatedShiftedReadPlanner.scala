@@ -103,9 +103,33 @@ final class FederatedShiftedReadPlanner[
   }
 
   private def tableFromStream(s: Stream[IO, Data]): F[P.Table] = {
-    P.Table.fromRValueStream[F](s.mapChunks(c => fs2.Segment.chunk(c.map(
-      MapFuncCorePlanner.dataToRValue(_)
-        .getOrElse(sys.error("There is no representation of CUndefined in SlamDB as a value"))))))
+    val dataToRValue: Data => RValue =
+      d => MapFuncCorePlanner.dataToRValue(d).getOrElse(sys.error("There is no representation of CUndefined in SlamDB as a value"))
+
+    // TODO{fs2}: Chunkiness
+    val table =
+      P.Table.fromRValuesStream(s.mapChunks(_.map(dataToRValue).toSegment))
+
+    for {
+      d <- convert.toStreamT(sliceStream).to[F]
+
+      _ <- MonadFinalizers[F, IO].tell(List(d.dispose))
+
+      slices = d.unsafeValue
+    } yield {
+
+      import P.trans._
+
+      // TODO depending on the id status we may not need to wrap the table
+      P.Table(slices, UnknownSize)
+        .transform(OuterObjectConcat(
+          WrapObject(
+            Scan(Leaf(Source), P.freshIdScanner),
+            Key.name),
+          WrapObject(
+            Leaf(Source),
+            Value.name)))
+    }
   }
 
   private def handleReadError[A](rerr: ReadError): F[A] =

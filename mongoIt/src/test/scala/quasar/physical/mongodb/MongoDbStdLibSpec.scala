@@ -67,9 +67,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name)
 
   def advertisedVersion(backend: BackendName): Option[MongoQueryModel] =
-    if (backend ≟ TestConfig.MONGO_3_2.name) MongoQueryModel.`3.2`.some
-    else if (backend ≟ TestConfig.MONGO_3_4.name) MongoQueryModel.`3.4`.some
-    else if ((backend ≟ TestConfig.MONGO_3_4_13.name) || (backend ≟ TestConfig.MONGO_READ_ONLY.name))
+    if (backend ≟ TestConfig.MONGO_3_4.name) MongoQueryModel.`3.4`.some
+    else if ((backend ≟ TestConfig.MONGO_3_4_13.name))
       MongoQueryModel.`3.4.4`.some
     else if (backend ≟ TestConfig.MONGO_3_6.name) MongoQueryModel.`3.6`.some
     else None

@@ -2,8 +2,6 @@
     "name": "chained_step1",
     "data": "patients.data",
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
     "query": "SELECT DISTINCT (state) as State FROM patients ORDER BY state ASC LIMIT 5",

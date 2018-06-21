@@ -2,8 +2,6 @@
     "name": "[qa_s08] distinct single field",
 
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
-       "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
     "data": "../basic2.data",

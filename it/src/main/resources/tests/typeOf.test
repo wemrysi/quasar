@@ -1,14 +1,11 @@
 {
     "name": "use type_of function",
     "backends": {
-        "couchbase":         "pending",
         "lwc_local":         "pendingIgnoreFieldOrder",
         "mimir":             "pendingIgnoreFieldOrder",
-        "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
         "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending",
-        "mongodb_read_only": "pending"
+        "mongodb_3_6":       "pending"
     },
     "data": "nested_foo.data",
     "query": "select foo ?? \"nope\" as foo, type_of(foo ?? 42) as type from nested_foo",

@@ -95,7 +95,11 @@ object convert {
         q <- async.boundedQueue[F, Option[Either[Throwable, Chunk[A]]]](1)
 
         enqueue =
-          s.chunks.attempt.noneTerminate
+          // TODO{fs2}: Chunkiness
+          s.mapSegments(_.force.toChunk.toSegment)
+            .chunks
+            .attempt
+            .noneTerminate
             .interruptWhen(i)
             .to(q.enqueue)
             .handleErrorWith(t => Stream.eval(q.enqueue1(Some(Left(t)))))

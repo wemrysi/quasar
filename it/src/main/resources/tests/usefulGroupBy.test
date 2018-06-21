@@ -1,7 +1,6 @@
 {
     "name": "useful group by",
     "backends": {
-        "couchbase": "pending"
     },
     "data": "extraSmallZips.data",
     "query": "select city || \", \" || state, sum(pop) from extraSmallZips group by city, state",

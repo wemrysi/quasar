@@ -24,6 +24,7 @@ import quasar.common._
 import quasar.connector._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
+import quasar.contrib.scalaz.concurrent.task._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.numeric._
@@ -41,7 +42,6 @@ import argonaut._, Argonaut._
 import cats.Parallel
 import cats.effect.IO
 import cats.instances.list._
-import io.chrisdavenport.scalaz.task._
 
 import fs2.{async, Stream}
 import fs2.async.mutable.{Queue, Signal}
@@ -157,7 +157,12 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
     } yield {
       connector.map {
         case (fs, shutdown) =>
-          (λ[M ~> Task](_.run((cake: Cake, fs))), cake.shutdown.to[Task] >> shutdown)
+          val dispose =
+            cake.mapK(λ[IO ~> Task](_.to[Task]))
+              .onDispose(shutdown)
+              .dispose
+
+          (λ[M ~> Task](_.run((cake.unsafeValue: Cake, fs))), dispose)
       }
     }
 
@@ -201,7 +206,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
       _ match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan.apply(value)
         case _ => ???
       }
     }
@@ -213,7 +218,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
       in match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan.apply(value)
       }
     }
 
@@ -369,7 +374,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
             val limited = if (offset.value === 0L && !limit.isDefined)
               table
             else
-              table.takeRange(offset.value, limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
+              table.drop(offset.value).take(limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
 
             val projected = limited.transform(precog.trans.constants.SourceValue.Single)
 
@@ -398,7 +403,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
           {
             case (bool, data) if !bool.getAndSet(true) =>
               // FIXME this pages the entire lwc dataset into memory, crashing the server
-              data.fold(Vector[Data]().point[Task])(_.runLog)
+              data.fold(Vector[Data]().point[Task])(_.compile.toVector)
             case (_, _) => // enqueue the empty vector so ReadFile.scan knows when to stop scanning
               Vector[Data]().point[Task]
           }).liftM[MT].liftB
@@ -496,7 +501,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
         // ask queue to stop
         _ <- queue.enqueue1(Vector.empty)
         // wait until queue actually stops; task async completes when signal completes
-        _ <- signal.discrete.takeWhile(!_).run
+        _ <- signal.discrete.takeWhile(!_).compile.drain
       } yield ()
 
       t.to[Task].liftM[MT].liftM[ConfiguredT]
