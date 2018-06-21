@@ -61,13 +61,13 @@ trait ColumnarTableModuleConfig {
   def maxSliceRows: Int
 
   // This is a slice size that we'd like our slices to be at least as large as.
-  def minIdealSliceSize: Int = maxSliceRows / 4
+  def minIdealSliceRows: Int = maxSliceRows / 4
 
   // This is what we consider a "small" slice. This may affect points where
   // we take proactive measures to prevent problems caused by small slices.
-  def smallSliceSize: Int
+  def smallSliceRows: Int
 
-  def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
+  def maxSaneCrossRows: Long = 2400000000L // 2.4 billion
 }
 
 object ColumnarTableModule extends Logging {
@@ -845,7 +845,7 @@ trait ColumnarTableModule
         case slice :: Nil => slice
         case slices =>
           val slice = Slice.concat(slices)
-          if (slices.size > (slice.size / Config.smallSliceSize)) {
+          if (slices.size > (slice.size / Config.smallSliceRows)) {
             slice.materialized // Deal w/ lots of small slices by materializing them.
           } else {
             slice
@@ -1460,8 +1460,8 @@ trait ColumnarTableModule
         }
 
         // We canonicalize the tables so that no slices are too small.
-        val left  = this.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceRows))
-        val right = that.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceRows))
+        val left  = this.canonicalize(Config.minIdealSliceRows, Some(Config.maxSliceRows))
+        val right = that.canonicalize(Config.minIdealSliceRows, Some(Config.maxSliceRows))
 
         (left.slices.uncons |@| right.slices.uncons).tupled flatMap {
           case (Some((lhead, ltail)), Some((rhead, rtail))) =>

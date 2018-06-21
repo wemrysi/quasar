@@ -45,6 +45,7 @@ object ArrayColumn {
 
   def resizeBitSet(bs: BitSet, size: Int): BitSet = {
     val arr = new Array[Long](size)
+    // 64 bits per long, 2^6 == 64
     System.arraycopy(bs.getBits(), 0, arr, 0, size >> 6)
     new BitSet(arr, size)
   }
@@ -94,6 +95,7 @@ class ArrayBoolColumn(val defined: BitSet, val values: BitSet) extends ArrayColu
 
   def resize(size: Int): ArrayColumn[Boolean] = {
     val newValues = ArrayColumn.resizeBitSet(values, size)
+    // 64 bits per long, 2^6 == 64
     val newDefined = ArrayColumn.resizeBitSet(defined, size >> 6)
     new ArrayBoolColumn(newDefined, newValues)
   }

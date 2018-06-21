@@ -24,9 +24,9 @@ object Config {
   def maxSliceColumns: Int = 150
 
   // This is a slice size that we'd like our slices to be at least as large as.
-  def minIdealSliceSize: Int = maxSliceRows / 4
+  def minIdealSliceRows: Int = maxSliceRows / 4
 
   // This is what we consider a "small" slice. This may affect points where
   // we take proactive measures to prevent problems caused by small slices.
-  def smallSliceSize: Int = 50
+  def smallSliceRows: Int = 50
 }
