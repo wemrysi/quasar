@@ -47,15 +47,18 @@ sealed trait RValue { self =>
         lb += ((path, CEmptyArray))
 
       case RObject(fields) =>
-        fields.toList.foreach {
-          case (k, v) =>
-            flatten0(path \ k, v)
+        val it = fields.iterator
+        while (it.hasNext) {
+          val (k, v) = it.next()
+          flatten0(path \ k, v)
         }
 
       case RArray(elems) =>
-        elems.zipWithIndex.foreach {
-          case (elem, idx) =>
-            flatten0(path \ idx, elem)
+        val it = elems.iterator
+        var i = 0
+        while (it.hasNext) {
+          flatten0(path \ i, it.next())
+          i = i + 1
         }
 
       case (v: CValue) =>

@@ -1,9 +1,6 @@
 {
     "name": "filter on date part",
 
-    "backends": {
-        "marklogic_json": "pending"
-    },
     "data": "../days.data",
 
     "query": "select distinct `day` from `../days` where date_part(\"dow\", ts) >= 3",

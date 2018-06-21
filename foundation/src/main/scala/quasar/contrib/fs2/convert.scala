@@ -22,9 +22,8 @@ import quasar.Disposable
 import java.util.Iterator
 import java.util.stream.{Stream => JStream}
 import scala.util.{Either, Left, Right}
-import scala.concurrent.ExecutionContext.Implicits.global
 
-import cats.effect.{Effect, IO, Sync}
+import cats.effect.{ConcurrentEffect, Sync}
 import fs2.{async, Chunk, Stream}
 import scalaz.{Functor, StreamT}
 import scalaz.stream.Process
@@ -43,7 +42,8 @@ object convert {
         F.delay(Some((i.next(), i))),
         F.pure(None))
 
-    Stream.bracket(js)(s => Stream.unfoldEval(s.iterator)(getNext), s => F.delay(s.close()))
+    Stream.bracket(js)(s => F.delay(s.close()))
+      .flatMap(s => Stream.unfoldEval(s.iterator)(getNext))
   }
 
 
@@ -58,7 +58,7 @@ object convert {
   def fromStreamT[F[_]: Functor, A](st: StreamT[F, A]): Stream[F, A] =
     fromChunkedStreamT(st.map(a => Chunk.singleton(a): Chunk[A]))
 
-  def toStreamT[F[_]: Effect, A](s: Stream[F, A]): F[Disposable[F, StreamT[F, A]]] =
+  def toStreamT[F[_]: ConcurrentEffect, A](s: Stream[F, A]): F[Disposable[F, StreamT[F, A]]] =
     chunkQ(s) map { case (startQ, close) =>
       Disposable(
         StreamT.wrapEffect(startQ.map(q =>
@@ -72,7 +72,7 @@ object convert {
 
   // scalaz.Process
 
-  def toProcess[F[_]: Effect, A](s: Stream[F, A]): Process[F, A] = {
+  def toProcess[F[_]: ConcurrentEffect, A](s: Stream[F, A]): Process[F, A] = {
     val runQ =
       chunkQ(s).flatMap { case (q, c) => q.strengthR(c) }
 
@@ -88,7 +88,7 @@ object convert {
 
   ////
 
-  private def chunkQ[F[_], A](s: Stream[F, A])(implicit F: Effect[F])
+  private def chunkQ[F[_], A](s: Stream[F, A])(implicit F: ConcurrentEffect[F])
       : F[(F[async.mutable.Queue[F, Option[Either[Throwable, Chunk[A]]]]], F[Unit])] =
     async.signalOf[F, Boolean](false) map { i =>
       val startQ = for {
@@ -104,7 +104,7 @@ object convert {
             .to(q.enqueue)
             .handleErrorWith(t => Stream.eval(q.enqueue1(Some(Left(t)))))
 
-        _ <- F.async[Unit](cb => F.runAsync(enqueue.compile.drain)(_ => IO.unit).unsafeRunAsync(cb))
+        _ <- F.start(enqueue.compile.drain)
       } yield q
 
       (startQ, i.set(true))

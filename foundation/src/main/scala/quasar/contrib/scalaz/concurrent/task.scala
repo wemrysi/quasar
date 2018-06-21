@@ -21,7 +21,7 @@ import slamdata.Predef.{PartialFunction, Throwable, Unit}
 import scala.util.{Either, Left, Right}
 import java.util.concurrent.atomic.AtomicBoolean
 
-import cats.effect.{Effect, IO}
+import cats.effect.{Effect, ExitCase, IO}
 import cats.StackSafeMonad
 import scalaz.{\/, -\/, \/-}
 import scalaz.concurrent.{Future, Task}
@@ -41,6 +41,13 @@ object task {
       fa.handleWith(functionToPartial(f))
 
     def raiseError[A](e: Throwable): Task[A] = Task.fail(e)
+
+    // Members declared in cats.effect.Bracket
+    def bracketCase[A, B](acq: Task[A])(use: A => Task[B])(rel: (A, ExitCase[Throwable]) => Task[Unit]): Task[B] =
+      acq flatMap { a =>
+        use(a).onFinish(err =>
+          rel(a, err.fold(ExitCase.complete[Throwable])(ExitCase.error)))
+      }
 
     // Members declared in cats.effect.Async
     // In order to comply with `repeatedCallbackIgnored` law
@@ -76,6 +83,9 @@ object task {
           case other              => Left(new Task(other))
         }
       })
+
+    override def toIO[A](fa: Task[A]): IO[A] =
+      IO.async(cb => fa.unsafePerformAsync(d => cb(d.toEither)))
 
     // Members declared in cats.FlatMap
     def flatMap[A, B](fa: Task[A])(f: A => Task[B]): Task[B] = fa.flatMap(f)

@@ -22,11 +22,14 @@ import quasar.Data
 import quasar.api._, ResourceError._
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.MonadTell_
 import quasar.evaluate.{Source => EvalSource}
 import quasar.fs.PathError
 import quasar.fs.Planner.{InternalError, PlannerErrorME, PlanPathError}
 import quasar.mimir._, MimirCake._
+import quasar.precog.common.RValue
 import quasar.qscript._
+import quasar.yggdrasil.TransSpecModule
 
 import cats.effect.{IO, LiftIO}
 import fs2.Stream
@@ -36,7 +39,7 @@ import scalaz._, Scalaz._
 
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
-    F[_]: LiftIO: Monad: PlannerErrorME: MonadFinalizers[?[_], IO]](
+    F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], DList[IO[Unit]]]](
     val P: Cake) {
 
   type Assocs = Associates[T, F, IO]
@@ -106,29 +109,22 @@ final class FederatedShiftedReadPlanner[
     val dataToRValue: Data => RValue =
       d => MapFuncCorePlanner.dataToRValue(d).getOrElse(sys.error("There is no representation of CUndefined in SlamDB as a value"))
 
-    // TODO{fs2}: Chunkiness
-    val table =
-      P.Table.fromRValuesStream(s.mapChunks(_.map(dataToRValue).toSegment))
-
     for {
-      d <- convert.toStreamT(sliceStream).to[F]
-
-      _ <- MonadFinalizers[F, IO].tell(List(d.dispose))
-
-      slices = d.unsafeValue
+      // TODO{fs2}: Chunkiness
+      table <- P.Table.fromRValueStream[F](s.mapChunks(_.map(dataToRValue).toSegment))
     } yield {
 
       import P.trans._
 
       // TODO depending on the id status we may not need to wrap the table
-      P.Table(slices, UnknownSize)
+      table
         .transform(OuterObjectConcat(
           WrapObject(
             Scan(Leaf(Source), P.freshIdScanner),
-            Key.name),
+            TransSpecModule.paths.Key.name),
           WrapObject(
             Leaf(Source),
-            Value.name)))
+            TransSpecModule.paths.Value.name)))
     }
   }
 

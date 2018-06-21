@@ -27,7 +27,8 @@ import quasar.fs.MoveSemantics
 
 import argonaut.{Argonaut, Parse}
 
-import cats.effect.{Effect, IO, LiftIO}
+import cats.effect.{ConcurrentEffect, IO, LiftIO}
+import cats.effect.concurrent.Deferred
 
 import fs2.Stream
 import fs2.async, async.mutable
@@ -540,7 +541,7 @@ final class SerialVFS[F[_]] private (
     @volatile private var current: VFS,
     worker: mutable.Queue[F, F[Unit]],    // this exists solely for #serialize
     interp: POSIXWithIO ~> F)(
-    implicit F: Effect[F]) {
+    implicit F: ConcurrentEffect[F]) {
 
   import SerialVFS.S
   import shims.monadToScalaz
@@ -595,19 +596,12 @@ final class SerialVFS[F[_]] private (
     serialize(run)
   }
 
-  private def serialize[A](fa: F[A]): F[A] = {
-    for {
-      ref <- F.delay(Promise[A])
-      _ <- worker.enqueue1(F.attempt(fa).flatMap {
-        case Left(e) => F.delay(ref.complete(Failure(e)))
-        case Right(a) => F.delay(ref.complete(Success(a)))
-      })
-      r <- F.async[A](cb => ref.future.onComplete {
-        case Success(a) => cb(Right(a))
-        case Failure(e) => cb(Left(e))
-      })
-    } yield r
-  }
+  private def serialize[A](fa: F[A]): F[A] = for {
+    ref <- Deferred[F, Either[Throwable, A]]
+    _ <- worker.enqueue1(F.attempt(fa).flatMap(ref.complete))
+    r <- ref.get
+    a <- F.fromEither(r)
+  } yield a
 }
 
 object SerialVFS {
@@ -621,7 +615,7 @@ object SerialVFS {
    * TODO: Return a `Stream[F, SerialVFS[F]]` to allow for better resource
    *       handling once we're rid of `BackendModule`.
    */
-  def apply[F[_]: Concurrent](root: File): F[Disposable[F, SerialVFS[F]]] = {
+  def apply[F[_]: ConcurrentEffect](root: File): F[Disposable[F, SerialVFS[F]]] = {
     import shims.monadToScalaz
 
     val ioToF = λ[IO ~> F](LiftIO[F].liftIO(_))
@@ -637,7 +631,7 @@ object SerialVFS {
       svfs = new SerialVFS(root, vfs, worker, λ[POSIXWithIO ~> F](_.foldMap(interp)))
       exec = worker.dequeue.evalMap(t => t).interruptWhen(sdown)
 
-      _ <- Concurrent[F].start(exec.compile.drain)
+      _ <- ConcurrentEffect[F].start(exec.compile.drain)
     } yield Disposable(svfs, sdown.set(true))
   }
 }

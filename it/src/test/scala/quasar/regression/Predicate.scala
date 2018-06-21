@@ -164,8 +164,10 @@ object Predicate extends ScalazSpecs2Instances {
     }
 
     // Removes the element at `idx` from `as`.
-    private def deleteAt[A](idx: Int, as: List[A]): List[A] =
-      as.patch(idx, Nil, 1)
+    private def deleteAt[A](idx: Int, as: List[A]): List[A] = {
+      val (i, t) = as.splitAt(idx)
+      i ++ t.drop(1)
+    }
   }
 
   /** Must START WITH the elements, in order. */

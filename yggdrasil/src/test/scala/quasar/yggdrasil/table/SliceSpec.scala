@@ -147,8 +147,6 @@ class SliceSpec extends Specification with ScalaCheck {
     result.map(_.columns.size) mustEqual expectedNrCols
   }
 
-  sequential
-
   "fromRValues" should {
 
     val v = List(CString("x"), CNum(42))

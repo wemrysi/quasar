@@ -32,7 +32,6 @@ import java.text.ParseException
 
 import scala.collection.JavaConverters._
 import scala.collection.Seq
-import scala.concurrent.ExecutionContext.Implicits.global
 
 import argonaut.Json
 import cats.effect.{Effect, Sync, Timer}

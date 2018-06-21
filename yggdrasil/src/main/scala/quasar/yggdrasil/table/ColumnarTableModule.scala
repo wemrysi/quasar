@@ -630,7 +630,7 @@ trait ColumnarTableModule
 
         _ <- MonadTell_[M, DList[IO[Unit]]].tell(DList(d.dispose))
 
-        slices = d.value
+        slices = d.unsafeValue
       } yield {
 
         import trans._

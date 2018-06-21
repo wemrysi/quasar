@@ -25,6 +25,7 @@ import quasar.connector.QScriptEvaluator
 import quasar.contrib.fs2.convert
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.MonadTell_
 import quasar.contrib.scalaz.concurrent.task._
 import quasar.fp._
 import quasar.fp.numeric._
@@ -52,7 +53,7 @@ import shims._
 
 final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: LiftIO: Monad: PlannerErrorME: MonadFinalizers[?[_], IO]] private (
+    F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], DList[IO[Unit]]]] private (
     cake: Cake)
     extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] {
 
@@ -140,7 +141,7 @@ final class MimirQScriptEvaluator[
 object MimirQScriptEvaluator {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: LiftIO: Monad: PlannerErrorME: MonadFinalizers[?[_], IO]](
+      F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], DList[IO[Unit]]]](
       cake: Cake)
       : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] =
     new MimirQScriptEvaluator[T, F](cake)

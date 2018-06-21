@@ -74,8 +74,6 @@ import shims.{monadErrorToScalaz, monadToScalaz}
 final class Sql2QueryRegressionSpec extends Qspec {
   import Sql2QueryRegressionSpec._
 
-  // sequential
-
   type M[A] = EitherT[EitherT[StateT[WriterT[Stream[IO, ?], PhaseResults, ?], Long, ?], SemanticErrors, ?], PlannerError, A]
 
   // Make the `join` syntax from Monad ambiguous.
@@ -94,10 +92,6 @@ final class Sql2QueryRegressionSpec extends Qspec {
         .liftM[StateT[?[_], Long, ?]]
         .liftM[EitherT[?[_], SemanticErrors,?]]
         .liftM[EitherT[?[_], PlannerError,?]])
-
-  def guarantee[A, B](io: IO[A], cleanup: IO[B]): IO[A] = io.attempt.flatMap {
-    e => cleanup.flatMap(_ => e.fold(IO.raiseError, IO.pure))
-  }
 
   val queryEvaluator =
     for {
@@ -310,14 +304,14 @@ final class Sql2QueryRegressionSpec extends Qspec {
       dataDir: RDir)
       : F[Map[RFile, RegressionTest]] =
     descendantsMatching[F](testDir, TestPattern)
-      .map(f => loadRegressionTest[F](f).map((f.relativeTo(dataDir).get, _)))
-      .join(12)
+      .flatMap(f => loadRegressionTest[F](f).map((f.relativeTo(dataDir).get, _)))
       .compile
       .fold(Map[RFile, RegressionTest]())(_ + _)
 
   /** Loads a `RegressionTest` from the given file. */
   def loadRegressionTest[F[_]: Effect: Timer](file: RFile): Stream[F, RegressionTest] =
-    io.file.readAllAsync[F](jPath(file), 2048)
+    // all test files right now fit into 8K, which is a reasonable chunk size anyway
+    io.file.readAllAsync[F](jPath(file), 8192)
       .through(text.utf8Decode)
       .reduce(_ + _)
       .flatMap(txt =>
