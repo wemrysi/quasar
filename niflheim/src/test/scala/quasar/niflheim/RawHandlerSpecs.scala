@@ -46,7 +46,7 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
   implicit val ordering = scala.math.Ordering.by[(String, CType), String](_.toString)
 
   def slurp(f: File): String =
-    new java.util.Scanner(f, "UTF-8").useDelimiter("\0").next()
+    new java.util.Scanner(f, "UTF-8").useDelimiter("\u0000").next()
 
   def json(s: String): Seq[JValue] =
     JParser.parseManyFromString(s).valueOr(throw _)

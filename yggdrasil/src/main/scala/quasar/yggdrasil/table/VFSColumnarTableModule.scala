@@ -192,7 +192,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
 
       driver = actions.drain ++ Stream.eval(commitDB(blob, version, nihdb))
 
-      _ <- EitherT.rightT[IO, ResourceError, Unit](driver.run)
+      _ <- EitherT.rightT[IO, ResourceError, Unit](driver.compile.drain)
     } yield ()
   }
 

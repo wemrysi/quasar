@@ -11,36 +11,18 @@ import sbt._, Keys._
 import sbt.std.Transform.DummyTaskMap
 import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
-import slamdata.SbtSlamData.transferPublishAndTagResources
-
-val BothScopes = "test->test;compile->compile"
-
-// Exclusive execution settings
-lazy val ExclusiveTests = config("exclusive") extend Test
-
-val ExclusiveTest = Tags.Tag("exclusive-test")
 
 def exclusiveTasks(tasks: Scoped*) =
   tasks.flatMap(inTask(_)(tags := Seq((ExclusiveTest, 1))))
 
-lazy val buildSettings = commonBuildSettings ++ Seq(
-  organization := "org.quasar-analytics",
-  scalaOrganization := "org.scala-lang",
-  scalacOptions --= Seq(
-    "-Yliteral-types",
-    "-Xstrict-patmat-analysis",
-    "-Yinduction-heuristics",
-    "-Ykind-polymorphism",
-    "-Ybackend:GenBCode"
-  ),
+lazy val buildSettings = Seq(
+  scalacOptions --= Seq("-Ybackend:GenBCode"),
   initialize := {
     val version = sys.props("java.specification.version")
     assert(
       Integer.parseInt(version.split("\\.")(1)) >= 8,
       "Java 8 or above required, found " + version)
   },
-
-  scalacOptions += "-target:jvm-1.8",
 
   // NB: -Xlint triggers issues that need to be fixed
   scalacOptions --= Seq("-Xlint"),
@@ -130,37 +112,15 @@ concurrentRestrictions in Global := {
 // Tasks tagged with `ExclusiveTest` should be run exclusively.
 concurrentRestrictions in Global += Tags.exclusive(ExclusiveTest)
 
-version in ThisBuild := {
-  val currentVersion = (version in ThisBuild).value
-  if (!isTravisBuild.value)
-    currentVersion + "-" + "git rev-parse HEAD".!!.substring(0, 7)
-  else
-    currentVersion
-}
-
-useGpg in Global := {
-  val oldValue = (useGpg in Global).value
-  !isTravisBuild.value || oldValue
-}
-
-lazy val publishSettings = commonPublishSettings ++ Seq(
+lazy val publishSettings = Seq(
   performMavenCentralSync := false,   // publishes quasar to bintray only, skipping sonatype and maven central
-  organizationName := "SlamData Inc.",
-  organizationHomepage := Some(url("http://quasar-analytics.org")),
   homepage := Some(url("https://github.com/slamdata/quasar")),
   scmInfo := Some(
     ScmInfo(
       url("https://github.com/slamdata/quasar"),
       "scm:git@github.com:slamdata/quasar.git"
     )
-  ),
-  bintrayCredentialsFile := {
-    val oldValue = bintrayCredentialsFile.value
-    if (!isTravisBuild.value)
-      Path.userHome / ".bintray" / ".credentials"
-    else
-      oldValue
-  })
+  ))
 
 lazy val assemblySettings = Seq(
   test in assembly := {},
@@ -203,8 +163,7 @@ lazy val excludeTypelevelScalaLibrary =
 
 // Include to also publish a project's tests
 lazy val publishTestsSettings = Seq(
-  publishArtifact in (Test, packageBin) := true
-)
+  publishArtifact in (Test, packageBin) := true)
 
 def isolatedBackendSettings(classnames: String*) = Seq(
   isolatedBackends in Global ++=
@@ -230,7 +189,6 @@ def createBackendEntry(childPath: Seq[File], parentPath: Seq[File]): Seq[File] =
 lazy val root = project.in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
-  .settings(transferPublishAndTagResources)
   .settings(aggregate in assembly := false)
   .settings(excludeTypelevelScalaLibrary)
   .aggregate(
@@ -258,15 +216,15 @@ lazy val root = project.in(file("."))
 // |  |      \ /          |            |
      qsu,   core, //______|____________|
 // |   \    /             |            |
-//  \___\_____            |            |
-//        /   \           |            |
+// |\___\_____            |            |
+// |      /   \           |            |
            connector,  yggdrasil,
-//      /     |  \       |             |
-//      |     |   \______|_____________|
-//      |     |      \  /     \
+// |    /     |  \       |             |
+// |    |     |   \______|_____________|
+// |    |     |      \  /     \
                    mimir, mongodb,
-//      \     |    /          |
-          interface,
+// \   / \    |    /          |
+    impl, interface,
 //          /  \              |
          repl, web,
 //              |             |
@@ -311,6 +269,7 @@ lazy val api = project
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.api)
   .settings(commonSettings)
+  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
@@ -321,7 +280,6 @@ lazy val api = project
 lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
   .dependsOn(foundation % BothScopes)
-  .settings(libraryDependencies ++= Dependencies.ejson)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -446,8 +404,6 @@ lazy val connector = project
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
-  .settings(
-    libraryDependencies ++= Dependencies.connector)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
@@ -505,9 +461,13 @@ lazy val interface = project
 /** Implementations of the Quasar API. */
 lazy val impl = project
   .settings(name := "quasar-impl-internal")
-  .dependsOn(api % BothScopes)
+  .dependsOn(
+    api % BothScopes,
+    connector,
+    frontend)
   .settings(commonSettings)
   .settings(targetSettings)
+  .settings(libraryDependencies ++= Dependencies.impl)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -547,6 +507,7 @@ lazy val it = project
   .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
   .dependsOn(
+    impl,
     web     % BothScopes,
     qscript % "test->test")
   .settings(commonSettings)
@@ -557,6 +518,7 @@ lazy val it = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
+  .settings(logBuffered in Test := false)
   .settings(
     sideEffectTestFSConfig := {
       val LoadCfgProp = "slamdata.internal.fs-load-cfg"
@@ -605,14 +567,11 @@ lazy val mongoIt = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-/***** PRECOG *****/
-
-import precogbuild.Build._
-
-lazy val precog = project.setup
-  .settings(name := "quasar-precog-internal")
+lazy val precog = project
+  .settings(
+    name := "quasar-precog-internal",
+    scalacStrictMode := false)
   .dependsOn(common % BothScopes)
-  .withWarnings
   .settings(libraryDependencies ++= Dependencies.precog)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
@@ -621,10 +580,12 @@ lazy val precog = project.setup
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val blueeyes = project.setup
-  .settings(name := "quasar-blueeyes-internal")
+lazy val blueeyes = project
+  .settings(
+    name := "quasar-blueeyes-internal",
+    scalacStrictMode := false,
+    scalacOptions += "-language:postfixOps")
   .dependsOn(precog % BothScopes, frontend)
-  .withWarnings
   .settings(libraryDependencies ++= Dependencies.blueeyes)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
@@ -633,10 +594,11 @@ lazy val blueeyes = project.setup
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val niflheim = project.setup
-  .settings(name := "quasar-niflheim-internal")
+lazy val niflheim = project
+  .settings(
+    name := "quasar-niflheim-internal",
+    scalacStrictMode := false)
   .dependsOn(blueeyes % BothScopes)
-  .withWarnings
   .settings(libraryDependencies ++= Dependencies.niflheim)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
@@ -645,10 +607,12 @@ lazy val niflheim = project.setup
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val yggdrasil = project.setup
-  .settings(name := "quasar-yggdrasil-internal")
+lazy val yggdrasil = project
+  .settings(
+    name := "quasar-yggdrasil-internal",
+    scalacStrictMode := false,
+    scalacOptions += "-language:postfixOps")
   .dependsOn(niflheim % BothScopes)
-  .withWarnings
   .settings(
     resolvers += "bintray-djspiewak-maven" at "https://dl.bintray.com/djspiewak/maven",
     libraryDependencies ++= Dependencies.yggdrasil)
@@ -659,13 +623,15 @@ lazy val yggdrasil = project.setup
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val mimir = project.setup
-  .settings(name := "quasar-mimir-internal")
+lazy val mimir = project
+  .settings(
+    name := "quasar-mimir-internal",
+    scalacStrictMode := false,
+    scalacOptions += "-language:postfixOps")
   .dependsOn(
     yggdrasil % BothScopes,
+    core,
     connector)
-  .withWarnings
-  .settings(libraryDependencies ++= Dependencies.mimir)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
