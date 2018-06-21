@@ -47,7 +47,7 @@ class PlannerLogSpec extends PlannerHelpers {
           "QScript Mongo", "QScript Mongo (Subset Before Map)",
           "QScript Mongo (Prefer Projection)", "QScript Mongo (Map Before Sort)",
           "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)")
-    }.pendingUntilFixed
+    }
 
     "include correct phases with type error" in {
       planLog(sqlE"select 'a' + 0 from zips").map(_.name) must_===

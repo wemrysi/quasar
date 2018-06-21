@@ -132,6 +132,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (quasar.std.SetLib.Within, _) => notHandled.left
 
     /* STRING */
+    case (string.Length, _) if advertisedVersion(backend) lt `3.4`.some =>
+      notImplBeforeSkipped(`3.4`).left
     case (string.Integer, _) => notHandled.left
     case (string.Decimal, _) => notHandled.left
 
@@ -139,6 +141,11 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
       Pending("implemented but isn't formatted as specified").left
 
     case (string.Search, _) => notHandled.left
+    case (string.Split, _) if advertisedVersion(backend) lt `3.4`.some =>
+      notImplBeforeSkipped(`3.4`).left
+    case (string.Substring, List(Data.Str(s), _, _)) if
+      ((advertisedVersion(backend) lt `3.4`.some) && !isPrintableAscii(s)) =>
+        Skipped("only printable ascii supported on MongoDB < 3.4").left
 
     /* STRUCTURAL */
     case (structural.ConcatOp, _) => notHandled.left
@@ -178,6 +185,16 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
       case MongoQueryModel.`3.4.4` =>
         (exprOp.getExpr[Fix, PlanStdT, Expr3_4_4](
           FuncHandler.handle3_4_4(bsonVersion), StaticHandler.handle).apply(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
+          .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
+
+      case MongoQueryModel.`3.4` =>
+        (exprOp.getExpr[Fix, PlanStdT, Expr3_4](
+          FuncHandler.handle3_4(bsonVersion), StaticHandler.handle).apply(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
+          .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
+
+      case MongoQueryModel.`3.2` =>
+        (exprOp.getExpr[Fix, PlanStdT, Expr3_2](
+          FuncHandler.handle3_2(bsonVersion), StaticHandler.handle).apply(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
     }
   }

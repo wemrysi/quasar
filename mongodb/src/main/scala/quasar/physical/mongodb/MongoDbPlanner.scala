@@ -18,6 +18,7 @@ package quasar.physical.mongodb
 
 import quasar._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultTell}
+import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fs.{FileSystemError, MonadFsErr, Planner => _}
@@ -242,6 +243,25 @@ object MongoDbPlanner {
           queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_4F, Expr3_4_4](anyDoc, cfg)(qs)
+
+      case `3.4` =>
+        val cfg = PlannerConfig[T, Expr3_4, Workflow3_4F, M](
+          joinHandler[Workflow3_4F],
+          FuncHandler.handle3_4[MapFunc[T, ?], M](bsonVersion),
+          StaticHandler.handle,
+          queryModel,
+          bsonVersion)
+        plan0[T, M, Workflow3_4F, Expr3_4](anyDoc, cfg)(qs)
+
+      case `3.2` =>
+        val cfg = PlannerConfig[T, Expr3_2, Workflow3_2F, M](
+          joinHandler[Workflow3_2F],
+          FuncHandler.handle3_2[MapFunc[T, ?], M](bsonVersion),
+          StaticHandler.handle,
+          queryModel,
+          bsonVersion)
+        plan0[T, M, Workflow3_2F, Expr3_2](anyDoc, cfg)(qs).map(_.inject[WorkflowF])
+
     }
   }
 }
