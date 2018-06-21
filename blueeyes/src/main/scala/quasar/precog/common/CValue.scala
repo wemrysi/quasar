@@ -67,7 +67,7 @@ sealed trait RValue { self =>
   }
 }
 
-object RValue {
+object RValue extends RValueInstances {
   val rObject: Prism[RValue, Map[String, RValue]] =
     Prism.partial[RValue, Map[String, RValue]] {
       case RObject(fields) => fields
@@ -269,6 +269,14 @@ object RValue {
 
     rec(rootTarget, rootPath, rootValue)
   }
+}
+
+sealed abstract class RValueInstances {
+  implicit val equal: Equal[RValue] =
+    Equal.equalA
+
+  implicit val show: Show[RValue] =
+    Show.showFromToString
 }
 
 case class RObject(fields: Map[String, RValue]) extends RValue {
