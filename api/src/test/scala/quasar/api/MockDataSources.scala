@@ -68,6 +68,8 @@ final class MockDataSources[F[_]: Monad: DSMockState[?[_], C], C] private (
   def rename(src: ResourceName, dst: ResourceName, onConflict: ConflictResolution): F[Condition[ExistentialError]] =
    store.get.flatMap(m => (m.lookup(src), m.lookup(dst)) match {
      case (None, _) => Condition.abnormal[ExistentialError](DataSourceNotFound(src)).point[F]
+     case (Some(_), _) if src === dst =>
+       Condition.normal().point[F]
      case (Some(_), Some(_)) if onConflict === ConflictResolution.Preserve =>
        Condition.abnormal[ExistentialError](DataSourceError.DataSourceExists(dst)).point[F]
      case (Some(s), _) => store.put(m.delete(src).insert(dst, s)).as(Condition.normal())

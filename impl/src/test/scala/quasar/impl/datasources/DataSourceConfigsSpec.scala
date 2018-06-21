@@ -114,14 +114,6 @@ abstract class DataSourceConfigsSpec[F[_]: Monad, C: Arbitrary: Equal: Show]
       })
     }}
 
-    "rename to self is a no-op" >> prop { (n: ResourceName, c: DataSourceConfig[C]) =>
-      withDataSourceConfigs(cfgs => for {
-        _ <- cfgs.add(n, c)
-        _ <- cfgs.rename(n, n)
-        l <- cfgs.lookup(n)
-      } yield l must_= Some(c))
-    }
-
     "makes src available at dst and no longer available at src" >> prop {
       (n1: ResourceName, n2: ResourceName, c: DataSourceConfig[C]) => (n1 =/= n2) ==> {
 
