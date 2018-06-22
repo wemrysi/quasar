@@ -26,9 +26,7 @@ object Dependencies {
   private val scoptVersion        = "3.5.0"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"
-  // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
-  // leads to a ParquetRDDE failure under a full test run
-  private val specsVersion        = "4.0.2"
+  private val specsVersion        = "4.1.0"
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
   private val fs2Version          = "1.0.0-M1"
