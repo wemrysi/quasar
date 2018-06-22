@@ -23,7 +23,6 @@ env:
   matrix:
     - CONNECTOR=lwc_local
     - CONNECTOR=mimir
-    - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_3_4_13
     - CONNECTOR=mongodb_3_6
   global:
