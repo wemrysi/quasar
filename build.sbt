@@ -226,7 +226,7 @@ lazy val root = project.in(file("."))
 // \   / \    |    /          |
     impl, interface,
 //          /  \              |
-         repl, web,
+         repl,
 //              |             |
                 it,
 //              |   __________|
@@ -486,21 +486,6 @@ lazy val repl = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-/** An HTTP interface to Quasar.
-  */
-lazy val web = project
-  .settings(name := "quasar-web")
-  .dependsOn(interface % BothScopes)
-  .settings(commonSettings)
-  .settings(publishTestsSettings)
-  .settings(targetSettings)
-  .settings(backendRewrittenRunSettings)
-  .settings(
-    mainClass in Compile := Some("quasar.server.Server"),
-    libraryDependencies ++= Dependencies.web)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Integration tests that have some dependency on a running connector.
   */
 lazy val it = project
@@ -508,7 +493,7 @@ lazy val it = project
   .configs(ExclusiveTests)
   .dependsOn(
     impl,
-    web     % BothScopes,
+    interface % BothScopes,
     qscript % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)

@@ -124,21 +124,6 @@ object Dependencies {
     )
   }
 
-  def web = Seq(
-    "eu.timepit"     %% "refined-scalaz"      % refinedVersion,
-    "org.http4s"     %% "http4s-dsl"          % http4sVersion,
-    "org.http4s"     %% "http4s-argonaut"     % http4sVersion,
-    "org.http4s"     %% "http4s-client"       % http4sVersion,
-    "org.http4s"     %% "http4s-server"       % http4sVersion,
-    "org.http4s"     %% "http4s-blaze-server" % http4sVersion,
-    "org.http4s"     %% "http4s-blaze-client" % http4sVersion,
-    "org.scodec"     %% "scodec-scalaz"       % scodecScalazVersion,
-    "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
-    "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
-    "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
-    "eu.timepit"     %% "refined-scalacheck"  % refinedVersion     % Test
-  )
-
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % "1.7.25",
     "org.slf4j"            %  "slf4j-log4j12"   % "1.7.16",
