@@ -19,7 +19,7 @@ object Dependencies {
   private val refinedVersion      = "0.8.3"
   private val scodecBitsVersion   = "1.1.2"
   private val scodecScalazVersion = "1.4.1a"
-  private val http4sVersion       = "0.16.6a"
+  private val http4sVersion       = "0.18.13"
   private val scalacheckVersion   = "1.13.4"
   private val scalazVersion       = "7.2.23"
   private val scalazStreamVersion = "0.8.6a"
