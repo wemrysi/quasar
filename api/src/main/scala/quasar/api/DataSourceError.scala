@@ -16,7 +16,7 @@
 
 package quasar.api
 
-import slamdata.Predef.{Nothing, Product, Serializable, String}
+import slamdata.Predef._
 
 import scalaz.{Cord, Equal, ISet, NonEmptyList, Show}
 import scalaz.std.option._
@@ -45,6 +45,9 @@ object DataSourceError extends DataSourceErrorInstances {
   final case class UnprocessableEntity[C](kind: DataSourceType, config: C, reason: String)
     extends InitializationError[C]
 
+  final case class ConnectionFailed[C](kind: DataSourceType, config: C, cause: Exception)
+    extends InitializationError[C]
+
   sealed trait ExistentialError extends CreateError[Nothing]
 
   final case class DataSourceExists(name: ResourceName)
@@ -62,22 +65,25 @@ sealed abstract class DataSourceErrorInstances {
   implicit def equal[C: Equal]: Equal[DataSourceError[C]] =
     Equal.equalBy {
       case DataSourceExists(n) =>
-        (some(n), none, none, none, none)
+        (some(n), none, none, none, none, none, none)
 
       case DataSourceNotFound(n) =>
-        (none, some(n), none, none, none)
+        (none, some(n), none, none, none, none, none)
 
       case DataSourceUnsupported(k, s) =>
-        (none, none, some((k, s)), none, none)
+        (none, none, some((k, s)), none, none, none, none)
 
       case MalformedConfiguration(k, c, r) =>
-        (none, none, none, some((k, c, r)), none)
+        (none, none, none, some((k, c, r)), none, none, none)
 
       case UnprocessableEntity(k, c, r) =>
-        (none, none, none, some((k, c, r)), none)
+        (none, none, none, none, some((k, c, r)), none, none)
+
+      case ConnectionFailed(k, c, _) =>
+        (none, none, none, none, none, some((k, c)), none)
 
       case InvalidConfiguration(k, c, rs) =>
-        (none, none, none, none, some((k, c, rs)))
+        (none, none, none, none, none, none, some((k, c, rs)))
     }
 
   implicit def show[C: Show]: Show[DataSourceError[C]] =
@@ -96,6 +102,9 @@ sealed abstract class DataSourceErrorInstances {
 
       case UnprocessableEntity(k, c, r) =>
         Cord("UnprocessableEntity(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ r.show ++ Cord(")")
+
+      case ConnectionFailed(k, c, e) =>
+        Cord("ConnectionFailed(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(s")\n\n$e")
 
       case InvalidConfiguration(k, c, rs) =>
         Cord("InvalidConfiguration(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ rs.show ++ Cord(")")
