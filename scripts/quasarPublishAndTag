@@ -11,6 +11,8 @@ source scripts/constants
 TRAVIS_JOB_NUMBER=1 scripts/publishAndTag 'slamdata/quasar'
 
 
-bumpInSlamdataBackend() { echo $1 > quasar-version; }
-export -f bumpInSlamdataBackend
-scripts/bumpDependentProject slamdata slamdata-backend bumpInSlamdataBackend
+bumpInDownstream() { echo $1 > quasar-version; }
+export -f bumpInDownstream
+
+scripts/bumpDependentProject slamdata slamdata-backend bumpInDownstream
+scripts/bumpDependentProject slamdata quasar-s3 bumpInDownstream

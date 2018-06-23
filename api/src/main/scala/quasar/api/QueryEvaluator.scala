@@ -17,12 +17,13 @@
 package quasar.api
 
 import quasar.api.ResourceError.ReadError
+import quasar.higher.HFunctor
 
-import scalaz.{\/, Applicative, Contravariant, Functor, Profunctor, Strong, ProChoice}
+import scalaz.{~>, \/, Applicative, Contravariant, Functor, Profunctor, Strong, ProChoice}
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 
-trait QueryEvaluator[F[_], Q, R] extends ResourceDiscovery[F] {
+trait QueryEvaluator[F[_], G[_], Q, R] extends ResourceDiscovery[F, G] {
   /** Returns the results of evaluating the given query. */
   def evaluate(query: Q): F[ReadError \/ R]
 }
@@ -30,29 +31,40 @@ trait QueryEvaluator[F[_], Q, R] extends ResourceDiscovery[F] {
 object QueryEvaluator extends QueryEvaluatorInstances
 
 sealed abstract class QueryEvaluatorInstances extends QueryEvaluatorInstances0 {
-  implicit def contravariant[F[_], R]: Contravariant[QueryEvaluator[F, ?, R]] =
-    new Contravariant[QueryEvaluator[F, ?, R]] {
-      def contramap[A, B](fa: QueryEvaluator[F, A, R])(f: B => A) =
-        DelegatingQueryEvaluator[F, A, R, B, R](fa)(_ compose f)
+  implicit def contravariant[F[_], G[_], R]: Contravariant[QueryEvaluator[F, G, ?, R]] =
+    new Contravariant[QueryEvaluator[F, G, ?, R]] {
+      def contramap[A, B](fa: QueryEvaluator[F, G, A, R])(f: B => A) =
+        DelegatingQueryEvaluator[F, G, A, R, B, R](fa)(_ compose f)
     }
 
-  implicit def functor[F[_]: Functor, Q]: Functor[QueryEvaluator[F, Q, ?]] =
-    new Functor[QueryEvaluator[F, Q, ?]] {
-      def map[A, B](fa: QueryEvaluator[F, Q, A])(f: A => B) =
-        DelegatingQueryEvaluator[F, Q, A, Q, B](fa)(_ andThen (_.map(_.map(f))))
+  implicit def functor[F[_]: Functor, G[_], Q]: Functor[QueryEvaluator[F, G, Q, ?]] =
+    new Functor[QueryEvaluator[F, G, Q, ?]] {
+      def map[A, B](fa: QueryEvaluator[F, G, Q, A])(f: A => B) =
+        DelegatingQueryEvaluator[F, G, Q, A, Q, B](fa)(_ andThen (_.map(_.map(f))))
     }
 
-  implicit def proChoice[F[_]: Applicative]: ProChoice[QueryEvaluator[F, ?, ?]] =
-    new QueryEvaluatorProfunctor[F] with ProChoice[QueryEvaluator[F, ?, ?]] {
-      def left[A, B, C](fa: QueryEvaluator[F, A, B]) =
-        DelegatingQueryEvaluator[F, A, B, (A \/ C), (B \/ C)](fa) { eval => { q =>
+  implicit def hfunctor[G[_], Q, R]: HFunctor[QueryEvaluator[?[_], G, Q, R]] =
+    new HFunctor[QueryEvaluator[?[_], G, Q, R]] {
+      def hmap[A[_], B[_]](fa: QueryEvaluator[A, G, Q, R])(f: A ~> B) =
+        new QueryEvaluator[B, G, Q, R] {
+          def evaluate(query: Q) = f(fa.evaluate(query))
+          def children(path: ResourcePath) = f(fa.children(path))
+          def descendants(path: ResourcePath) = f(fa.descendants(path))
+          def isResource(path: ResourcePath) = f(fa.isResource(path))
+        }
+    }
+
+  implicit def proChoice[F[_]: Applicative, G[_]]: ProChoice[QueryEvaluator[F, G, ?, ?]] =
+    new QueryEvaluatorProfunctor[F, G] with ProChoice[QueryEvaluator[F, G, ?, ?]] {
+      def left[A, B, C](fa: QueryEvaluator[F, G, A, B]) =
+        DelegatingQueryEvaluator[F, G, A, B, (A \/ C), (B \/ C)](fa) { eval => { q =>
           q.fold(
             a => eval(a).map(_.map(_.left[C])),
             c => c.right[B].right[ReadError].point[F])
         }}
 
-      def right[A, B, C](fa: QueryEvaluator[F, A, B]) =
-        DelegatingQueryEvaluator[F, A, B, (C \/ A), (C \/ B)](fa) { eval => {q =>
+      def right[A, B, C](fa: QueryEvaluator[F, G, A, B]) =
+        DelegatingQueryEvaluator[F, G, A, B, (C \/ A), (C \/ B)](fa) { eval => {q =>
           q.fold(
             c => c.left[B].right[ReadError].point[F],
             a => eval(a).map(_.map(_.right[C])))
@@ -61,34 +73,34 @@ sealed abstract class QueryEvaluatorInstances extends QueryEvaluatorInstances0 {
 }
 
 sealed abstract class QueryEvaluatorInstances0 {
-  implicit def strong[F[_]: Functor]: Strong[QueryEvaluator[F, ?, ?]] =
-    new QueryEvaluatorProfunctor[F] with Strong[QueryEvaluator[F, ?, ?]] {
-      def first[A, B, C](fa: QueryEvaluator[F, A, B]) =
-        DelegatingQueryEvaluator[F, A, B, (A, C), (B, C)](fa) { eval => {
+  implicit def strong[F[_]: Functor, G[_]]: Strong[QueryEvaluator[F, G, ?, ?]] =
+    new QueryEvaluatorProfunctor[F, G] with Strong[QueryEvaluator[F, G, ?, ?]] {
+      def first[A, B, C](fa: QueryEvaluator[F, G, A, B]) =
+        DelegatingQueryEvaluator[F, G, A, B, (A, C), (B, C)](fa) { eval => {
           case (a, c) => eval(a).map(_.strengthR(c))
         }}
 
-      def second[A, B, C](fa: QueryEvaluator[F, A, B]) =
-        DelegatingQueryEvaluator[F, A, B, (C, A), (C, B)](fa) { eval => {
+      def second[A, B, C](fa: QueryEvaluator[F, G, A, B]) =
+        DelegatingQueryEvaluator[F, G, A, B, (C, A), (C, B)](fa) { eval => {
           case (c, a) => eval(a).map(_.strengthL(c))
         }}
     }
 }
 
-private[api] abstract class QueryEvaluatorProfunctor[F[_]: Functor]
-    extends Profunctor[QueryEvaluator[F, ?, ?]] {
+private[api] abstract class QueryEvaluatorProfunctor[F[_]: Functor, G[_]]
+    extends Profunctor[QueryEvaluator[F, G, ?, ?]] {
 
-  def mapfst[A, B, C](fa: QueryEvaluator[F, A, B])(f: C => A) =
-    Contravariant[QueryEvaluator[F, ?, B]].contramap(fa)(f)
+  def mapfst[A, B, C](fa: QueryEvaluator[F, G, A, B])(f: C => A) =
+    Contravariant[QueryEvaluator[F, G, ?, B]].contramap(fa)(f)
 
-  def mapsnd[A, B, C](fa: QueryEvaluator[F, A, B])(f: B => C) =
-    Functor[QueryEvaluator[F, A, ?]].map(fa)(f)
+  def mapsnd[A, B, C](fa: QueryEvaluator[F, G, A, B])(f: B => C) =
+    Functor[QueryEvaluator[F, G, A, ?]].map(fa)(f)
 }
 
-private[api] final class DelegatingQueryEvaluator[F[_], Q, R, S, T](
-    underlying: QueryEvaluator[F, Q, R],
+private[api] final class DelegatingQueryEvaluator[F[_], G[_], Q, R, S, T](
+    underlying: QueryEvaluator[F, G, Q, R],
     f: (Q => F[ReadError \/ R]) => (S => F[ReadError \/ T]))
-    extends QueryEvaluator[F, S, T] {
+    extends QueryEvaluator[F, G, S, T] {
 
   def evaluate(query: S) = f(underlying.evaluate)(query)
   def children(path: ResourcePath) = underlying.children(path)
@@ -97,9 +109,9 @@ private[api] final class DelegatingQueryEvaluator[F[_], Q, R, S, T](
 }
 
 private[api] object DelegatingQueryEvaluator {
-  def apply[F[_], Q, R, S, T](
-      u: QueryEvaluator[F, Q, R])(
+  def apply[F[_], G[_], Q, R, S, T](
+      u: QueryEvaluator[F, G, Q, R])(
       f: (Q => F[ReadError \/ R]) => (S => F[ReadError \/ T]))
-      : QueryEvaluator[F, S, T] =
-    new  DelegatingQueryEvaluator(u, f)
+      : QueryEvaluator[F, G, S, T] =
+    new DelegatingQueryEvaluator(u, f)
 }

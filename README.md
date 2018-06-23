@@ -47,7 +47,7 @@ Of particular interest are the following two scripts:
 Quasar supports the following datastores:
 
 ```
-quasar_mongodb_3_4
+quasar_mongodb_3_4_13
 quasar_metastore
 ```
 
@@ -55,7 +55,7 @@ Knowing which backend datastores are supported you can create and configure dock
 if you wanted to run integration tests with mongo you would use:
 
 ```
-./setupContainers -u quasar_metastore,quasar_mongodb_3_4
+./setupContainers -u quasar_metastore,quasar_mongodb_3_4_13
 ```
 
 Note: `quasar_metastore` is always needed to run integration tests.
@@ -75,7 +75,7 @@ After running this command your `testing.conf` file should look similar to this:
 ```
 > cat it/testing.conf
 postgresql_metastore="{\"host\":\"192.168.99.101\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"
-mongodb_3_4="mongodb://192.168.99.101:27022"
+mongodb_3_4_13="mongodb://192.168.99.101:27022"
 ```
 
 IP's will vary depending on your docker environment. In addition the scripts assume you have docker and docker-compose installed.
@@ -111,7 +111,7 @@ The `<mountPath>` specifies the path of your mount point and the remaining param
 | mountKey            | protocol         | uri                                   |
 |---------------------|------------------|---------------------------------------|
 | `mimir`             |                  | "\<path-to-mimir-storage-directory\>" |
-| `local_file_system` |                  | "\<path-to-mimir-storage-directory\>" |
+| `lwc_local`         |                  | "\<path-to-mimir-storage-directory\>" |
 | `mongodb`           | `mongodb://`     | [MongoDB](#database-mounts)           |
 
 
@@ -120,7 +120,7 @@ See [here](#get-mountfspath) for more details on the mount web api service.
 For example, to create a mongo mount point, issue a `curl` command like:
 
 ```bash
-curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "mongodb": { "connectionUri":"mongodb://<host>:<port>" } }'
+curl -v -X PUT http://localhost:8080/mount/fs/mongo/ -d '{ "mongodb": { "connectionUri":"mongodb://<host>:<port>" } }'
 ```
 
 #### Web JAR

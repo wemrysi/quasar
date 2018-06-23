@@ -30,7 +30,7 @@ trait CanonicalizeSpec extends ColumnarTableModuleTestSupport with Specification
   import SampleData._
 
   val table = {
-    val JArray(elements) = JParser.parse("""[
+    val JArray(elements) = JParser.parseUnsafe("""[
       {"foo":1},
       {"foo":2},
       {"foo":3},

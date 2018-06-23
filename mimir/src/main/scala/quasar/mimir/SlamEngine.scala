@@ -179,9 +179,15 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): Backend[Repr] = {
 
+    val liftCake: ReaderT[Task, Cake, ?] ~> Backend =
+      λ[ReaderT[Task, Cake, ?] ~> Backend] { rc =>
+        cake[CakeM]
+          .andThenK(r => rc.run(r._1))
+          .liftB
+      }
+
     def qScriptCorePlanner = new QScriptCorePlanner[T, Backend](
-      λ[IO ~> Backend](_.to[Task].liftM[MT].liftB),
-      λ[M ~> Backend](_.liftB))
+      liftCake)
 
     def equiJoinPlanner = new EquiJoinPlanner[T, Backend](
       λ[IO ~> Backend](_.to[Task].liftM[MT].liftB))
@@ -368,7 +374,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
             val limited = if (offset.value === 0L && !limit.isDefined)
               table
             else
-              table.takeRange(offset.value, limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
+              table.drop(offset.value).take(limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
 
             val projected = limited.transform(precog.trans.constants.SourceValue.Single)
 
@@ -397,7 +403,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
           {
             case (bool, data) if !bool.getAndSet(true) =>
               // FIXME this pages the entire lwc dataset into memory, crashing the server
-              data.fold(Vector[Data]().point[Task])(_.runLog)
+              data.fold(Vector[Data]().point[Task])(_.compile.toVector)
             case (_, _) => // enqueue the empty vector so ReadFile.scan knows when to stop scanning
               Vector[Data]().point[Task]
           }).liftM[MT].liftB
@@ -495,7 +501,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
         // ask queue to stop
         _ <- queue.enqueue1(Vector.empty)
         // wait until queue actually stops; task async completes when signal completes
-        _ <- signal.discrete.takeWhile(!_).run
+        _ <- signal.discrete.takeWhile(!_).compile.drain
       } yield ()
 
       t.to[Task].liftM[MT].liftM[ConfiguredT]

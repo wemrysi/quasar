@@ -315,7 +315,7 @@ private[yggdrasil] final class ArraySelector[@specialized(Boolean, Long, Double)
     var i             = 0
     while (i < mask.length) {
       if (mask(i)) {
-        if (am.erasure.isInstance(arr)) {
+        if (am.runtimeClass.isInstance(arr)) {
           return indices(i) < arr.length
         } else {
           if (indices(i) < arr.length) {
@@ -338,7 +338,7 @@ private[yggdrasil] final class ArraySelector[@specialized(Boolean, Long, Double)
 
     while (i < mask.length) {
       if (mask(i)) {
-        if (am.erasure.isInstance(arr)) {
+        if (am.runtimeClass.isInstance(arr)) {
           val sarr = arr.asInstanceOf[Array[A]]
           return sarr(indices(i))
         } else {

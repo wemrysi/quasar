@@ -234,7 +234,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
   private[this] var actorState: Option[State] = None
   private def state = {
     import scalaz.syntax.effect.id._
-    actorState getOrElse open.flatMap(_.tap(s => IO(actorState = Some(s)))).unsafePerformIO
+    actorState getOrElse open.flatMap(_.tap(s => IO { actorState = Some(s) })).unsafePerformIO
   }
 
   private def initDirs(f: File) = IO {

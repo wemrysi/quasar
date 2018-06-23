@@ -19,7 +19,7 @@ package quasar.connector
 import slamdata.Predef.Unit
 import quasar.api.{DataSourceType, QueryEvaluator}
 
-trait DataSource[F[_], Q, R] extends QueryEvaluator[F, Q, R] {
+trait DataSource[F[_], G[_], Q, R] extends QueryEvaluator[F, G, Q, R] {
   def kind: DataSourceType
   def shutdown: F[Unit]
 }
