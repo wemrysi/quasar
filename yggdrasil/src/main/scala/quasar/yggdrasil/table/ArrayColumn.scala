@@ -44,9 +44,11 @@ object ArrayColumn {
   }
 
   def resizeBitSet(bs: BitSet, size: Int): BitSet = {
-    val howManyLongs = size >> 6
-    val arr = new Array[Long](howManyLongs)
     // 64 bits per long, 2^6 == 64
+    val howManyLongs =
+      if (Integer.highestOneBit(size) == size) size >> 6
+      else size >> 6 + 1
+    val arr = new Array[Long](howManyLongs)
     System.arraycopy(bs.getBits(), 0, arr, 0, Math.min(howManyLongs, bs.getBits().length))
     new BitSet(arr, size)
   }
