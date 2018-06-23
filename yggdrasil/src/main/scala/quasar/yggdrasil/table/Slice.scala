@@ -1922,6 +1922,7 @@ object Slice {
   def fromRValuesStep(
     values: ArraySliced[RValue], maxRows: Int, maxColumns: Int
   ): (Slice, ArraySliced[RValue]) = {
+    @tailrec
     def inner(
       next: ArraySliced[RValue], rowsInCol: Int, rows: Int, cols: Int,
       acc: Map[ColumnRef, ArrayColumn[_]], _size: Int
