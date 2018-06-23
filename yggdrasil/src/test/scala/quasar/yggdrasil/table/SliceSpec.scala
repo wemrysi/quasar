@@ -34,8 +34,6 @@ import Gen.listOfN
 class SliceSpec extends Specification with ScalaCheck {
   import ArbitrarySlice._
 
-  import ArbitrarySlice._
-
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering
   implicit def listOrdering[A](implicit ord0: Ordering[A]) = new Ordering[List[A]] {
     def compare(a: List[A], b: List[A]): Int =
@@ -156,7 +154,7 @@ class SliceSpec extends Specification with ScalaCheck {
       "maxSliceRows < nrRows" >> testFromRValuesMaxSliceRowsOverflow(v)
       "maxSliceRows = 1" >> testFromRValuesMaxSliceRows1(v)
       "maxSliceColumns = nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsEqualsBiggestValue(v)
-      // "maxSliceColumns < nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsLowerThanBiggestValue(v)
+      "maxSliceColumns < nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsLowerThanBiggestValue(v)
     }
 
     val v1 = List.tabulate(10000)(CNum(_))
@@ -209,7 +207,7 @@ class SliceSpec extends Specification with ScalaCheck {
 
 
     "construct slices from arbitrary values" in Prop.forAll(genCValues){ values =>
-      testFromRValuesFittingIn1Slice(values) and
+      testFromRValuesFittingIn1Slice(values)
       testFromRValuesMaxSliceRowsOverflow(values) and
       testFromRValuesMaxSliceRows1(values) and
       testFromRValuesMaxSliceColumnsEqualsBiggestValue(values) and
