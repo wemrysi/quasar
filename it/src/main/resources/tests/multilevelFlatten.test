@@ -1,13 +1,16 @@
 {
     "name": "flatten keys and values from multiple levels of the same root",
     "backends": {
+        "mongodb_3_4_13":    "pending",
+        "mongodb_3_6":       "pending"
     },
     "data": "nested.data",
     "query": "select topObj{_:} as k1, topObj{_}{_:} as k2, topObj{_}{_} as v2 from nested",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [
-      { "k1": "midObj", "k2": "botArr", "v2": [13, 14, 15] }
-    , { "k1": "midObj", "k2": "botObj", "v2": {"a": "m", "b": "n", "c": "o"} }
+      { "k1": "midArr" },
+      { "k1": "midObj", "k2": "botArr", "v2": [13, 14, 15] },
+      { "k1": "midObj", "k2": "botObj", "v2": {"a": "m", "b": "n", "c": "o"} }
     ]
 }
