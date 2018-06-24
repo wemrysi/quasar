@@ -33,6 +33,7 @@ trait DefinedAtIndex {
 
 trait ArrayColumn[@specialized(Boolean, Long, Double) A] extends DefinedAtIndex with ExtensibleColumn {
   def update(row: Int, value: A): Unit
+  def clear(row: Int): Unit
   def resize(size: Int): ArrayColumn[A]
 }
 
@@ -64,6 +65,8 @@ class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val def
     defined.set(row)
     values(row) = value
   }
+
+  def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Array[A]] = {
     if (size <= values.length) {
@@ -101,6 +104,8 @@ class ArrayBoolColumn(val defined: BitSet, val values: BitSet) extends ArrayColu
     if (value) values.set(row) else values.clear(row)
   }
 
+  def clear(row: Int): Unit = defined.clear(row)
+
   def resize(size: Int): ArrayColumn[Boolean] = {
     if (size <= values.length) {
       this
@@ -135,6 +140,8 @@ class ArrayLongColumn(val defined: BitSet, val values: Array[Long]) extends Arra
     values(row) = value
   }
 
+  def clear(row: Int): Unit = defined.clear(row)
+
   def resize(size: Int): ArrayColumn[Long] = {
     if (size <= values.length) {
       this
@@ -162,6 +169,8 @@ class ArrayDoubleColumn(val defined: BitSet, values: Array[Double]) extends Arra
     defined.set(row)
     values(row) = value
   }
+
+  def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Double] = {
     if (size <= values.length) {
@@ -191,6 +200,8 @@ class ArrayNumColumn(val defined: BitSet, val values: Array[BigDecimal]) extends
     values(row) = value
   }
 
+  def clear(row: Int): Unit = defined.clear(row)
+
   def resize(size: Int): ArrayColumn[BigDecimal] = {
     if (size <= values.length) {
       this
@@ -218,6 +229,8 @@ class ArrayStrColumn(val defined: BitSet, values: Array[String]) extends ArrayCo
     defined.set(row)
     values(row) = value
   }
+
+  def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[String] = {
     if (size <= values.length) {
@@ -247,6 +260,8 @@ class ArrayOffsetDateTimeColumn(val defined: BitSet, values: Array[OffsetDateTim
     values(row) = value
   }
 
+  def clear(row: Int): Unit = defined.clear(row)
+
   def resize(size: Int): ArrayColumn[OffsetDateTime] = {
     if (size <= values.length) {
       this
@@ -274,6 +289,8 @@ class ArrayOffsetTimeColumn(val defined: BitSet, values: Array[OffsetTime]) exte
     defined.set(row)
     values(row) = value
   }
+
+  def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[OffsetTime] = {
     if (size <= values.length) {
@@ -303,6 +320,8 @@ class ArrayOffsetDateColumn(val defined: BitSet, values: Array[OffsetDate]) exte
     values(row) = value
   }
 
+  def clear(row: Int): Unit = defined.clear(row)
+
   def resize(size: Int): ArrayColumn[OffsetDate] = {
     if (size <= values.length) {
       this
@@ -330,6 +349,8 @@ class ArrayLocalDateTimeColumn(val defined: BitSet, values: Array[LocalDateTime]
     defined.set(row)
     values(row) = value
   }
+
+  def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[LocalDateTime] = {
     if (size <= values.length) {
@@ -359,6 +380,8 @@ class ArrayLocalTimeColumn(val defined: BitSet, values: Array[LocalTime]) extend
     values(row) = value
   }
 
+  def clear(row: Int): Unit = defined.clear(row)
+
   def resize(size: Int): ArrayColumn[LocalTime] = {
     if (size <= values.length) {
       this
@@ -386,6 +409,8 @@ class ArrayLocalDateColumn(val defined: BitSet, values: Array[LocalDate]) extend
     defined.set(row)
     values(row) = value
   }
+
+  def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[LocalDate] = {
     if (size <= values.length) {
@@ -415,6 +440,8 @@ class ArrayIntervalColumn(val defined: BitSet, values: Array[DateTimeInterval]) 
     values(row) = value
   }
 
+  def clear(row: Int): Unit = defined.clear(row)
+
   def resize(size: Int): ArrayColumn[DateTimeInterval] = {
     if (size <= values.length) {
       this
@@ -440,6 +467,8 @@ class MutableEmptyArrayColumn(val defined: BitSet) extends ArrayColumn[Boolean] 
     if (value) defined.set(row) else defined.clear(row)
   }
 
+  def clear(row: Int): Unit = defined.clear(row)
+
   def resize(size: Int): ArrayColumn[Boolean] = {
     if (size <= defined.length) {
       this
@@ -459,6 +488,8 @@ class MutableEmptyObjectColumn(val defined: BitSet) extends ArrayColumn[Boolean]
     if (value) defined.set(row) else defined.clear(row)
   }
 
+  def clear(row: Int): Unit = defined.clear(row)
+
   def resize(size: Int): ArrayColumn[Boolean] = {
     if (size <= defined.length) {
       this
@@ -477,6 +508,8 @@ class MutableNullColumn(val defined: BitSet) extends ArrayColumn[Boolean] with N
   def update(row: Int, value: Boolean) = {
     if (value) defined.set(row) else defined.clear(row)
   }
+
+  def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Boolean] = {
     if (size <= defined.length) {

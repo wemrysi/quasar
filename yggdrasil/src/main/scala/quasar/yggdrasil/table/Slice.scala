@@ -1962,7 +1962,7 @@ object Slice {
             // println("we have too many columns with this new value, cutting slice early")
             (new Slice {
               val size = rows
-              val columns = acc
+              val columns = acc.mapValues { c => c.clear(newRowsInCol); c }
             }, next)
           } else {
             // println("we're adding a CValue to a column")
