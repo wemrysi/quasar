@@ -23,7 +23,7 @@ import java.util.Iterator
 import java.util.stream.{Stream => JStream}
 import scala.util.{Either, Left, Right}
 
-import cats.effect.{ConcurrentEffect, Sync}
+import cats.effect.{Concurrent, Sync}
 import fs2.{async, Chunk, Stream}
 import scalaz.{Functor, StreamT}
 import scalaz.stream.Process
@@ -58,7 +58,7 @@ object convert {
   def fromStreamT[F[_]: Functor, A](st: StreamT[F, A]): Stream[F, A] =
     fromChunkedStreamT(st.map(a => Chunk.singleton(a): Chunk[A]))
 
-  def toStreamT[F[_]: ConcurrentEffect, A](s: Stream[F, A]): F[Disposable[F, StreamT[F, A]]] =
+  def toStreamT[F[_]: Concurrent, A](s: Stream[F, A]): F[Disposable[F, StreamT[F, A]]] =
     chunkQ(s) map { case (startQ, close) =>
       Disposable(
         StreamT.wrapEffect(startQ.map(q =>
@@ -72,7 +72,7 @@ object convert {
 
   // scalaz.Process
 
-  def toProcess[F[_]: ConcurrentEffect, A](s: Stream[F, A]): Process[F, A] = {
+  def toProcess[F[_]: Concurrent, A](s: Stream[F, A]): Process[F, A] = {
     val runQ =
       chunkQ(s).flatMap { case (q, c) => q.strengthR(c) }
 
@@ -88,7 +88,7 @@ object convert {
 
   ////
 
-  private def chunkQ[F[_], A](s: Stream[F, A])(implicit F: ConcurrentEffect[F])
+  private def chunkQ[F[_], A](s: Stream[F, A])(implicit F: Concurrent[F])
       : F[(F[async.mutable.Queue[F, Option[Either[Throwable, Chunk[A]]]]], F[Unit])] =
     async.signalOf[F, Boolean](false) map { i =>
       val startQ = for {

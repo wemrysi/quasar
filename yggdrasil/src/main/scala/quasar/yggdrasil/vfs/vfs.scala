@@ -27,7 +27,7 @@ import quasar.fs.MoveSemantics
 
 import argonaut.{Argonaut, Parse}
 
-import cats.effect.{ConcurrentEffect, IO, LiftIO}
+import cats.effect.{Concurrent, IO, LiftIO}
 import cats.effect.concurrent.Deferred
 
 import fs2.Stream
@@ -541,7 +541,7 @@ final class SerialVFS[F[_]] private (
     @volatile private var current: VFS,
     worker: mutable.Queue[F, F[Unit]],    // this exists solely for #serialize
     interp: POSIXWithIO ~> F)(
-    implicit F: ConcurrentEffect[F]) {
+    implicit F: Concurrent[F]) {
 
   import SerialVFS.S
   import shims.monadToScalaz
@@ -615,7 +615,7 @@ object SerialVFS {
    * TODO: Return a `Stream[F, SerialVFS[F]]` to allow for better resource
    *       handling once we're rid of `BackendModule`.
    */
-  def apply[F[_]: ConcurrentEffect](root: File): F[Disposable[F, SerialVFS[F]]] = {
+  def apply[F[_]: Concurrent](root: File): F[Disposable[F, SerialVFS[F]]] = {
     import shims.monadToScalaz
 
     val ioToF = λ[IO ~> F](LiftIO[F].liftIO(_))
@@ -631,7 +631,7 @@ object SerialVFS {
       svfs = new SerialVFS(root, vfs, worker, λ[POSIXWithIO ~> F](_.foldMap(interp)))
       exec = worker.dequeue.evalMap(t => t).interruptWhen(sdown)
 
-      _ <- ConcurrentEffect[F].start(exec.compile.drain)
+      _ <- Concurrent[F].start(exec.compile.drain)
     } yield Disposable(svfs, sdown.set(true))
   }
 }

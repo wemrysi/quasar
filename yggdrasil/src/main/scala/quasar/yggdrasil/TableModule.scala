@@ -36,7 +36,7 @@ import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTim
 
 // TODO: define better upper/lower bound methods, better comparisons,
 // better names, better everything!
-// TODO: investigate adding columns
+// TODO: investigate adding columns to TableSize
 
 sealed trait TableSize {
   def maxSize: Long
