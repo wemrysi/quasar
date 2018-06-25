@@ -16,9 +16,8 @@
 
 package quasar.contrib.fs2
 
-import slamdata.Predef.Throwable
+import slamdata.Predef.{Throwable, Unit}
 
-import scala.Unit
 import scala.util.Either
 
 import cats.effect.{ExitCase, IO, LiftIO, Sync}
