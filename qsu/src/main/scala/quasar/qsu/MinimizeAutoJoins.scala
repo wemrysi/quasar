@@ -30,6 +30,7 @@ import quasar.qscript.{
   construction,
   Center,
   Hole,
+  JoinSide3,
   LeftSide,
   LeftSide3,
   RightSide,
@@ -68,7 +69,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
     type G[A] = StateT[StateT[F, RevIdx, ?], MinimizationState[T], A]
 
-    val back = agraph.graph rewriteM {
+    val back = agraph.graph corewriteM {
       case qgraph @ AutoJoin2(left, right, combiner) =>
         val combiner2: FreeMapA[Int] = combiner map {
           case LeftSide => 0
@@ -111,20 +112,21 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
     for {
       state <- MinStateM[T, G].get
 
-      fms = branches.zipWithIndex map {
-        case (g, i) =>
-          // Halt coalescing if we previously failed to coalesce this graph or
-          // if this graph was grouped, to ensure joining on group keys works
-          MappableRegion[T](
-            s =>
-              state.failed(s) ||
-              groupKeyOf.exist(_ === s)(state.auth.lookupDims(s)),
-            g) strengthR i
-      }
+      fms = branches.map( g =>
+          /* Halt coalescing if this graph was grouped, to ensure joining on group keys works */
+          MappableRegion[T](s => groupKeyOf.exist(_ === s)(state.auth.lookupDims(s)), g))
 
-      (remap, candidates) = minimizeSources(fms.flatMap(_.toList))
+      sources = fms.flatMap(_.toList).zipWithIndex
 
-      fm = combiner.flatMap(i => fms(i) as remap(i))
+      (remap, candidates) = minimizeSources(sources)
+
+      /* `sources` needs to be reversed because scala.Map construction
+       * is right-biased. However, minimizeSources collapses duplicate
+       * graphs in `sources` from the right into the leftmost
+       * graphs */
+      index = SMap(sources.reverse.map(_.leftMap(_.root)):_ *)
+
+      fm = combiner.flatMap(fms(_)).map(g => remap(index(g.root)))
 
       back <- coalesceRoots[G](qgraph, fm, candidates)
     } yield back
@@ -178,14 +180,33 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
           coalesceToMap[G](qgraph, candidates2, fm2)
 
         case None =>
-          none[QSUGraph].point[G]
+          multiple match {
+            case left :: right :: Nil => {
+              val fm2: JoinFunc = fm map {
+                case 0 => LeftSide
+                case 1 => RightSide
+              }
+
+              qgraph.overwriteAtRoot(QSU.AutoJoin2[T, Symbol](left.root, right.root, fm2)).some.point[G]
+            }
+            case left :: center :: right :: Nil => {
+              val fm2: FreeMapA[JoinSide3] = fm map {
+                case 0 => LeftSide3
+                case 1 => Center
+                case 2 => RightSide3
+              }
+
+              qgraph.overwriteAtRoot(QSU.AutoJoin3[T, Symbol](left.root, center.root, right.root, fm2)).some.point[G]
+            }
+            case _ => none[QSUGraph].point[G]
+          }
       }
 
     case multiple =>
+
       for {
         resultM <- Minimizers.foldLeftM[G, Option[(QSUGraph, QSUGraph)]](None) {
-          case (Some(pair), _) =>
-            Option(pair).point[G]
+          case (Some(pair), _) => Option(pair).point[G]
 
           case (None, minimizer) =>
             if (minimizer.couldApplyTo(multiple)) {
@@ -199,6 +220,10 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                 }
 
                 upperFM = func.StaticMapFS((0 until exCandidates.length): _*)(_.point[FreeMapA], _.toString)
+
+                /* The contents of the AutoJoin2 are irrelevant, as they
+                will be overwritten by updateGraph. We just need any
+                graph to be there. */
 
                 fakeAutoJoinM = exCandidates match {
                   case left :: right :: _ =>
@@ -216,11 +241,15 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                     coalesceToMap[G](
                       fakeAutoJoin,
                       exCandidates,
-                      upperFM))
+                      upperFM)).filter {
+                    case AutoJoin2(_, _, _) => false
+                    case AutoJoin3(_, _, _, _) => false
+                    case _ => true
+                  }
 
                 (simplifiedSource, simplifiedFM) = singleSource match {
                   case Map(src, fm) => (src, fm)
-                  case _            => (singleSource, recFunc.Hole)
+                  case _  => (singleSource, recFunc.Hole)
                 }
 
                 candidates2 <- exRebuilds.zipWithIndex traverse {
