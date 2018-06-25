@@ -39,7 +39,7 @@ import scalaz._, Scalaz._
 
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
-    F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], DList[IO[Unit]]]](
+    F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], List[IO[Unit]]]](
     val P: Cake) {
 
   type Assocs = Associates[T, F, IO]

@@ -156,7 +156,7 @@ trait TableModule extends TransSpecModule {
     def constEmptyArray: Table
 
     def fromRValues(values: Stream[RValue], maxSliceRows: Option[Int] = None): Table
-    def fromRValueStream[M[_]: Monad: MonadTell_[?[_], DList[IO[Unit]]]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table]
+    def fromRValueStream[M[_]: Monad: MonadTell_[?[_], List[IO[Unit]]]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table]
 
     def merge(grouping: GroupingSpec)(body: (RValue, GroupId => IO[Table]) => IO[Table]): IO[Table]
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): IO[(Table, Table)]

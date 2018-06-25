@@ -53,7 +53,7 @@ import shims._
 
 final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], DList[IO[Unit]]]] private (
+    F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], List[IO[Unit]]]] private (
     cake: Cake)
     extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] {
 
@@ -141,7 +141,7 @@ final class MimirQScriptEvaluator[
 object MimirQScriptEvaluator {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], DList[IO[Unit]]]](
+      F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], List[IO[Unit]]]](
       cake: Cake)
       : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] =
     new MimirQScriptEvaluator[T, F](cake)
