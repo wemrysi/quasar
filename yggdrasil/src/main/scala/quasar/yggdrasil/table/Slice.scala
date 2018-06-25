@@ -1953,9 +1953,6 @@ object Slice {
           inner(next, rowsInCol, rows, cols, acc.mapValues { _.resize(newSize) }, newSize)
         } else {
           val flattened = next.head.flattenWithPath
-          // this shouldn't work. `updateRefs` mutates the underlying arrays of `acc`,
-          // so just "throwing away" `newAcc` later on when we decide we don't
-          // want it anymore is not possible.
           val newAcc = updateRefs(flattened, acc, rowsInCol, _size)
           val newCols = newAcc.size
           if (newCols > maxColumns && cols > 1) {
