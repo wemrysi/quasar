@@ -38,24 +38,28 @@ trait ArrayColumn[@specialized(Boolean, Long, Double) A] extends DefinedAtIndex 
 }
 
 object ArrayColumn {
-  def resizeArray[A](arr: Array[A], size: Int)(implicit A: ClassTag[A]): Array[A] = {
+  private[table] def resizeArray[A](arr: Array[A], size: Int)(implicit A: ClassTag[A]): Array[A] = {
     val newArr = new Array[A](size)
     System.arraycopy(arr, 0, newArr, 0, Math.min(size, arr.length));
     newArr
   }
 
-  def resizeBitSet(bs: BitSet, size: Int): BitSet = {
+  private[table] def resizeBitSet(bs: BitSet, size: Int): BitSet = {
     // 64 bits per long, 2^6 == 64
-    val howManyLongs =
+    val howManyLongs = Math.max(
       if (Integer.highestOneBit(size) == size) size >> 6
-      else size >> 6 + 1
+      else size >> 6 + 1,
+    1)
     val arr = new Array[Long](howManyLongs)
     System.arraycopy(bs.getBits(), 0, arr, 0, Math.min(howManyLongs, bs.getBits().length))
     new BitSet(arr, size)
   }
+
+  private[table] def filterDefined[A: ClassTag](d: BitSet, arr: Array[A]): Array[A] =
+    arr.zipWithIndex.collect { case (v, i) if d(i) => v }.toArray
 }
 
-class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val defined: BitSet, values: Array[Array[A]])(implicit val tpe: CArrayType[A])
+class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val defined: BitSet, val values: Array[Array[A]])(implicit val tpe: CArrayType[A])
     extends HomogeneousArrayColumn[A]
     with ArrayColumn[Array[A]] {
 
@@ -115,6 +119,16 @@ class ArrayBoolColumn(val defined: BitSet, val values: BitSet) extends ArrayColu
       new ArrayBoolColumn(newDefined, newValues)
     }
   }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayBoolColumn]) {
+      val otherC = other.asInstanceOf[ArrayBoolColumn]
+      // this is incorrect, we should filter by definedness first.
+      defined == otherC.defined && values == otherC.values
+    } else {
+      false
+    }
+  }
 }
 
 object ArrayBoolColumn {
@@ -151,6 +165,16 @@ class ArrayLongColumn(val defined: BitSet, val values: Array[Long]) extends Arra
       new ArrayLongColumn(newDefined, newValues)
     }
   }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayLongColumn]) {
+      val otherC = other.asInstanceOf[ArrayLongColumn]
+      ArrayColumn.filterDefined(defined, values).deep ==
+        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
+    } else {
+      false
+    }
+  }
 }
 
 object ArrayLongColumn {
@@ -162,7 +186,7 @@ object ArrayLongColumn {
     new ArrayLongColumn(new BitSet, new Array[Long](size))
 }
 
-class ArrayDoubleColumn(val defined: BitSet, values: Array[Double]) extends ArrayColumn[Double] with DoubleColumn {
+class ArrayDoubleColumn(val defined: BitSet, val values: Array[Double]) extends ArrayColumn[Double] with DoubleColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: Double) = {
@@ -179,6 +203,16 @@ class ArrayDoubleColumn(val defined: BitSet, values: Array[Double]) extends Arra
       val newValues = ArrayColumn.resizeArray(values, size)
       val newDefined = ArrayColumn.resizeBitSet(defined, size)
       new ArrayDoubleColumn(newDefined, newValues)
+    }
+  }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayDoubleColumn]) {
+      val otherC = other.asInstanceOf[ArrayDoubleColumn]
+      ArrayColumn.filterDefined(defined, values).deep ==
+        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
+    } else {
+      false
     }
   }
 }
@@ -211,6 +245,16 @@ class ArrayNumColumn(val defined: BitSet, val values: Array[BigDecimal]) extends
       new ArrayNumColumn(newDefined, newValues)
     }
   }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayNumColumn]) {
+      val otherC = other.asInstanceOf[ArrayNumColumn]
+      ArrayColumn.filterDefined(defined, values).deep ==
+        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
+    } else {
+      false
+    }
+  }
 }
 
 object ArrayNumColumn {
@@ -222,7 +266,7 @@ object ArrayNumColumn {
     new ArrayNumColumn(new BitSet, new Array[BigDecimal](size))
 }
 
-class ArrayStrColumn(val defined: BitSet, values: Array[String]) extends ArrayColumn[String] with StrColumn {
+class ArrayStrColumn(val defined: BitSet, val values: Array[String]) extends ArrayColumn[String] with StrColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: String) = {
@@ -241,6 +285,16 @@ class ArrayStrColumn(val defined: BitSet, values: Array[String]) extends ArrayCo
       new ArrayStrColumn(newDefined, newValues)
     }
   }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayStrColumn]) {
+      val otherC = other.asInstanceOf[ArrayStrColumn]
+      ArrayColumn.filterDefined(defined, values).deep ==
+        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
+    } else {
+      false
+    }
+  }
 }
 
 object ArrayStrColumn {
@@ -252,7 +306,7 @@ object ArrayStrColumn {
     new ArrayStrColumn(new BitSet, new Array[String](size))
 }
 
-class ArrayOffsetDateTimeColumn(val defined: BitSet, values: Array[OffsetDateTime]) extends ArrayColumn[OffsetDateTime] with OffsetDateTimeColumn {
+class ArrayOffsetDateTimeColumn(val defined: BitSet, val values: Array[OffsetDateTime]) extends ArrayColumn[OffsetDateTime] with OffsetDateTimeColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: OffsetDateTime) = {
@@ -271,6 +325,16 @@ class ArrayOffsetDateTimeColumn(val defined: BitSet, values: Array[OffsetDateTim
       new ArrayOffsetDateTimeColumn(newDefined, newValues)
     }
   }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayOffsetDateTimeColumn]) {
+      val otherC = other.asInstanceOf[ArrayOffsetDateTimeColumn]
+      ArrayColumn.filterDefined(defined, values).deep ==
+        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
+    } else {
+      false
+    }
+  }
 }
 
 object ArrayOffsetDateTimeColumn {
@@ -282,7 +346,7 @@ object ArrayOffsetDateTimeColumn {
     new ArrayOffsetDateTimeColumn(new BitSet, new Array[OffsetDateTime](size))
 }
 
-class ArrayOffsetTimeColumn(val defined: BitSet, values: Array[OffsetTime]) extends ArrayColumn[OffsetTime] with OffsetTimeColumn {
+class ArrayOffsetTimeColumn(val defined: BitSet, val values: Array[OffsetTime]) extends ArrayColumn[OffsetTime] with OffsetTimeColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: OffsetTime) = {
@@ -301,6 +365,16 @@ class ArrayOffsetTimeColumn(val defined: BitSet, values: Array[OffsetTime]) exte
       new ArrayOffsetTimeColumn(newDefined, newValues)
     }
   }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayOffsetTimeColumn]) {
+      val otherC = other.asInstanceOf[ArrayOffsetTimeColumn]
+      ArrayColumn.filterDefined(defined, values).deep ==
+        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
+    } else {
+      false
+    }
+  }
 }
 
 object ArrayOffsetTimeColumn {
@@ -312,7 +386,7 @@ object ArrayOffsetTimeColumn {
     new ArrayOffsetTimeColumn(new BitSet, new Array[OffsetTime](size))
 }
 
-class ArrayOffsetDateColumn(val defined: BitSet, values: Array[OffsetDate]) extends ArrayColumn[OffsetDate] with OffsetDateColumn {
+class ArrayOffsetDateColumn(val defined: BitSet, val values: Array[OffsetDate]) extends ArrayColumn[OffsetDate] with OffsetDateColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: OffsetDate) = {
@@ -331,6 +405,16 @@ class ArrayOffsetDateColumn(val defined: BitSet, values: Array[OffsetDate]) exte
       new ArrayOffsetDateColumn(newDefined, newValues)
     }
   }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayOffsetDateColumn]) {
+      val otherC = other.asInstanceOf[ArrayOffsetDateColumn]
+      ArrayColumn.filterDefined(defined, values).deep ==
+        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
+    } else {
+      false
+    }
+  }
 }
 
 object ArrayOffsetDateColumn {
@@ -342,7 +426,7 @@ object ArrayOffsetDateColumn {
     new ArrayOffsetDateColumn(new BitSet, new Array[OffsetDate](size))
 }
 
-class ArrayLocalDateTimeColumn(val defined: BitSet, values: Array[LocalDateTime]) extends ArrayColumn[LocalDateTime] with LocalDateTimeColumn {
+class ArrayLocalDateTimeColumn(val defined: BitSet, val values: Array[LocalDateTime]) extends ArrayColumn[LocalDateTime] with LocalDateTimeColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: LocalDateTime) = {
@@ -361,6 +445,16 @@ class ArrayLocalDateTimeColumn(val defined: BitSet, values: Array[LocalDateTime]
       new ArrayLocalDateTimeColumn(newDefined, newValues)
     }
   }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayLocalDateTimeColumn]) {
+      val otherC = other.asInstanceOf[ArrayLocalDateTimeColumn]
+      ArrayColumn.filterDefined(defined, values).deep ==
+        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
+    } else {
+      false
+    }
+  }
 }
 
 object ArrayLocalDateTimeColumn {
@@ -372,7 +466,7 @@ object ArrayLocalDateTimeColumn {
     new ArrayLocalDateTimeColumn(new BitSet, new Array[LocalDateTime](size))
 }
 
-class ArrayLocalTimeColumn(val defined: BitSet, values: Array[LocalTime]) extends ArrayColumn[LocalTime] with LocalTimeColumn {
+class ArrayLocalTimeColumn(val defined: BitSet, val values: Array[LocalTime]) extends ArrayColumn[LocalTime] with LocalTimeColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: LocalTime) = {
@@ -391,6 +485,16 @@ class ArrayLocalTimeColumn(val defined: BitSet, values: Array[LocalTime]) extend
       new ArrayLocalTimeColumn(newDefined, newValues)
     }
   }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayLocalTimeColumn]) {
+      val otherC = other.asInstanceOf[ArrayLocalTimeColumn]
+      ArrayColumn.filterDefined(defined, values).deep ==
+        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
+    } else {
+      false
+    }
+  }
 }
 
 object ArrayLocalTimeColumn {
@@ -402,7 +506,7 @@ object ArrayLocalTimeColumn {
     new ArrayLocalTimeColumn(new BitSet, new Array[LocalTime](size))
 }
 
-class ArrayLocalDateColumn(val defined: BitSet, values: Array[LocalDate]) extends ArrayColumn[LocalDate] with LocalDateColumn {
+class ArrayLocalDateColumn(val defined: BitSet, val values: Array[LocalDate]) extends ArrayColumn[LocalDate] with LocalDateColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: LocalDate) = {
@@ -421,6 +525,16 @@ class ArrayLocalDateColumn(val defined: BitSet, values: Array[LocalDate]) extend
       new ArrayLocalDateColumn(newDefined, newValues)
     }
   }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayLocalDateColumn]) {
+      val otherC = other.asInstanceOf[ArrayLocalDateColumn]
+      ArrayColumn.filterDefined(defined, values).deep ==
+        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
+    } else {
+      false
+    }
+  }
 }
 
 object ArrayLocalDateColumn {
@@ -432,7 +546,7 @@ object ArrayLocalDateColumn {
     new ArrayLocalDateColumn(new BitSet, new Array[LocalDate](size))
 }
 
-class ArrayIntervalColumn(val defined: BitSet, values: Array[DateTimeInterval]) extends ArrayColumn[DateTimeInterval] with IntervalColumn {
+class ArrayIntervalColumn(val defined: BitSet, val values: Array[DateTimeInterval]) extends ArrayColumn[DateTimeInterval] with IntervalColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: DateTimeInterval) = {
@@ -449,6 +563,16 @@ class ArrayIntervalColumn(val defined: BitSet, values: Array[DateTimeInterval]) 
       val newValues = ArrayColumn.resizeArray(values, size)
       val newDefined = ArrayColumn.resizeBitSet(defined, size)
       new ArrayIntervalColumn(newDefined, newValues)
+    }
+  }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[ArrayIntervalColumn]) {
+      val otherC = other.asInstanceOf[ArrayIntervalColumn]
+      ArrayColumn.filterDefined(defined, values).deep ==
+        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
+    } else {
+      false
     }
   }
 }

@@ -93,14 +93,14 @@ class SliceSpec extends Specification with ScalaCheck {
   def testFromRValuesMaxSliceColumnsEqualsBiggestValue(values: List[CValue]) = {
     val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
 
-    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue)).runLog.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue)).compile.toVector.unsafeRunSync.toList
     assertSlices(values, slices, be_>(0))
   }
 
   def testFromRValuesMaxSliceColumnsLowerThanBiggestValue(values: List[CValue]) = {
     val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
 
-    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue - 1)).runLog.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue - 1)).compile.toVector.unsafeRunSync.toList
     assertSlices(values, slices, be_>(0))
   }
 
@@ -108,7 +108,7 @@ class SliceSpec extends Specification with ScalaCheck {
     val (totalRows, _, totalColumns) = valueCalcs(values)
     val maxSliceRows = Math.max(1, Math.ceil(totalRows.toDouble / 3).toInt)
     val expectedNrSlices = Math.min(Math.ceil(totalRows.toDouble / maxSliceRows).toInt, 3)
-    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).runLog.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).compile.toVector.unsafeRunSync.toList
     assertSlices(values, slices, be_==(expectedNrSlices))
   }
 
@@ -116,7 +116,7 @@ class SliceSpec extends Specification with ScalaCheck {
     val (totalRows, _, totalColumns) = valueCalcs(values)
     val maxSliceRows = 1
 
-    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).runLog.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).compile.toVector.unsafeRunSync.toList
     assertSlices(values, slices, be_==(totalRows))
   }
 
@@ -124,7 +124,7 @@ class SliceSpec extends Specification with ScalaCheck {
     val (totalRows, _, totalColumns) = valueCalcs(values)
 
     // test with a slice that's just big enough to hold the values
-    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(totalColumns + 1)).runLog.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(totalColumns + 1)).compile.toVector.unsafeRunSync.toList
     assertSlices(values, slices, be_==(1))
   }
 
@@ -135,7 +135,7 @@ class SliceSpec extends Specification with ScalaCheck {
       case _ => ???
     }
 
-    val result: List[Slice] = Slice.allFromRValues(fs2.Stream.emits(data), Some(maxRows), Some(maxCols)).runLog.unsafeRunSync.toList
+    val result: List[Slice] = Slice.allFromRValues(fs2.Stream.emits(data), Some(maxRows), Some(maxCols)).compile.toVector.unsafeRunSync.toList
 
     result.map(s => toCValues(s))
       .foldLeft(List.empty[CValue])(_ ++ _.flatten)
@@ -145,7 +145,7 @@ class SliceSpec extends Specification with ScalaCheck {
     result.map(_.columns.size) mustEqual expectedNrCols
   }
 
-  "fromRValues" should {
+  "allFromRValues" should {
 
     val v = List(CString("x"), CNum(42))
 
@@ -283,6 +283,100 @@ class SliceSpec extends Specification with ScalaCheck {
       "column and row boundary hit" >>
         testFromRValuesTemplate(testInput2, 3, 4, List(3, 3, 2, 3, 3), List(4, 4, 4, 3, 3))
     }
+  }
+
+  "fromRValuesStep" should {
+    import Slice.ArraySliced
+    "emit an empty slice given no data" >> {
+      Slice.fromRValuesStep(ArraySliced.noRValues, 10, 10, 32) must_==
+        ((Slice.empty, ArraySliced.noRValues))
+    }
+
+    "increase slice size to the next power of two when slice size cannot be predicted" >> {
+      val data = ArraySliced(Array[RValue](
+        CLong(1), CLong(2), RArray(List(CLong(1)))
+      ), 0, 3)
+      val columnSize = Slice.fromRValuesStep(data, 6, 3, 2)
+        ._1.columns(ColumnRef(CPath.Identity, CLong)).asInstanceOf[ArrayLongColumn].values.length
+      columnSize must_== 4
+    }
+
+    "increase slice size to the next power of two when slice size can be predicted" >> {
+      val data = ArraySliced(Array[RValue](
+        CLong(1), CLong(2), CLong(3)
+      ), 0, 3)
+      val columnSize = Slice.fromRValuesStep(data, 6, 3, 2)
+        ._1.columns(ColumnRef(CPath.Identity, CLong)).asInstanceOf[ArrayLongColumn].values.length
+      columnSize must_== 4
+    }
+
+    "stop increasing slice size at maxRows" >> {
+      val data = ArraySliced(Array[RValue](
+        CLong(1), CLong(2), CLong(3), CLong(4), CLong(5)
+      ), 0, 5)
+      val (slice, rest) = Slice.fromRValuesStep(data, 4, 1, 2)
+      val columnSize =
+        slice.columns(ColumnRef(CPath.Identity, CLong)).asInstanceOf[ArrayLongColumn].values.length
+      columnSize must_== 4
+      rest.size must_== 1
+    }
+
+    "not add values that overflow the column limit" >> {
+      val data = ArraySliced(Array[RValue](
+        CLong(1),
+        RArray(List(CLong(1), CLong(2), CLong(3)))), 0, 2)
+      val expectedDefined = new BitSet(1)
+      expectedDefined.set(0)
+      val expectedSlice = new Slice {
+        def size = 1
+        def columns = Map(
+          ColumnRef(CPath.Identity, CLong) ->
+            new ArrayLongColumn(expectedDefined, Array(1L)))
+      }
+      val expectedRemaining = ArraySliced(data.arr, 1, 1)
+      val (actualSlice, actualRemaining) =
+        Slice.fromRValuesStep(data, 3, 2, 32)
+      actualSlice must_== expectedSlice
+      actualRemaining must_== expectedRemaining
+    }
+
+    "add a value that overflows the column limit, if otherwise the slice would be empty" >> {
+      val data = ArraySliced(Array[RValue](RArray(List(CLong(1), CLong(2), CLong(3)))), 0, 1)
+      val expectedDefined = new BitSet(1)
+      expectedDefined.set(0)
+      val expectedSlice = new Slice {
+        def size = 1
+        def columns = Map(
+          ColumnRef(CPath.Identity \ 0, CLong) -> new ArrayLongColumn(expectedDefined, Array(1)),
+          ColumnRef(CPath.Identity \ 1, CLong) -> new ArrayLongColumn(expectedDefined, Array(2)),
+          ColumnRef(CPath.Identity \ 2, CLong) -> new ArrayLongColumn(expectedDefined, Array(3))
+        )
+      }
+      val expectedRemaining = ArraySliced.noRValues
+      val (actualSlice, actualRemaining) =
+        Slice.fromRValuesStep(data, 1, 2, 32)
+      actualSlice must_== expectedSlice
+      actualRemaining must_== expectedRemaining
+    }
+
+    "grow slices to maxRows given only scalars" >> {
+      val data = Array[Long](1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+      val arraySliced = ArraySliced(data.map[RValue, Array[RValue]](CLong(_)), start = 0, size = 10)
+      val expectedDefined = new BitSet(8)
+      expectedDefined.set(0, 8)
+      val expectedSlice = new Slice {
+        def size = 8
+        val columns = Map(
+          ColumnRef(CPath.Identity, CLong) ->
+            new ArrayLongColumn(expectedDefined, data))
+      }
+      val expectedRemaining = ArraySliced(arraySliced.arr, 8, 2)
+      val (actualSlice, actualRemaining) =
+        Slice.fromRValuesStep(arraySliced, 8, 10, 32)
+      actualSlice must_== expectedSlice
+      actualRemaining must_== expectedRemaining
+    }
+
   }
 
   "sortBy" should {

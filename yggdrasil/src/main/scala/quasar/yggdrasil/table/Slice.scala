@@ -73,6 +73,14 @@ trait Slice { source =>
     defined
   }
 
+  override def equals(other: Any): Boolean =
+    if (other.isInstanceOf[Slice]) {
+      val otherSlice = other.asInstanceOf[Slice]
+      size == otherSlice.size && columns == otherSlice.columns
+    } else {
+      false
+    }
+
   def mapRoot(f: CF1): Slice = new Slice {
     val size = source.size
 
@@ -1903,6 +1911,14 @@ object Slice {
   final case class ArraySliced[A](arr: Array[A], start: Int, size: Int) {
     def head: A = arr(start)
     def tail: ArraySliced[A] = ArraySliced(arr, start + 1, size - 1)
+    // have to override this because of `Array.equals`
+    override def equals(other: Any): Boolean =
+      if (other.isInstanceOf[ArraySliced[A]]) {
+        val otherA = other.asInstanceOf[ArraySliced[A]]
+        arr.deep == otherA.arr.deep && start == otherA.start && size == otherA.size
+      } else {
+        false
+      }
   }
 
   object ArraySliced {
@@ -1920,14 +1936,16 @@ object Slice {
   }
 
   def fromRValuesStep(
-    values: ArraySliced[RValue], maxRows: Int, maxColumns: Int
+    values: ArraySliced[RValue], maxRows: Int, maxColumns: Int, startingSize: Int
   ): (Slice, ArraySliced[RValue]) = {
     @tailrec
     def inner(
-      next: ArraySliced[RValue], rowsInCol: Int, rows: Int, cols: Int,
+      next: ArraySliced[RValue], rows: Int, cols: Int,
       acc: Map[ColumnRef, ArrayColumn[_]], _size: Int
     ): (Slice, ArraySliced[RValue]) = {
       if (next.size == 0) {
+        // there's no more data to make slices of.
+        // we'll have to emit whatever data we have already as a slice.
         if (acc.isEmpty) {
           // println("no more data to use, emitting slice with no data")
           (Slice.empty, ArraySliced.noRValues)
@@ -1939,51 +1957,76 @@ object Slice {
           }, ArraySliced.noRValues)
         }
       } else {
-        val newRowsInCol = rowsInCol + 1
-        val newRows = Math.max(rows, newRowsInCol)
-        if (newRows > maxRows) {
-          // println(s"we have $newRows rows which is more than maximum $maxRows, cutting slice early")
+        // we have some data.
+        if (rows >= maxRows) {
+          // we'd have more rows than `maxRows` if we added
+          // this row to the slice. so we have to emit the
+          // data we have already as a slice, and pass
+          // the row back to the caller.
+          // println(s"we have the maximum ($maxRows) rows, cutting slice early")
           (new Slice {
             val size = rows
             val columns = acc
           }, next)
-        } else if (newRows >= _size) {
+        } else if (rows >= _size) {
+          // we'd have more rows than `_size` if we added this
+          // row to the slice. `_size` is the size in rows of
+          // all of the columns we've accumulated, so we'll
+          // have to resize those columns to add further data.
+          // `_size` should always be a power of two, so we multiply
+          // by two.
           // println("we're resizing the columns because we have too many rows")
           val newSize = _size * 2
-          inner(next, rowsInCol, rows, cols, acc.mapValues { _.resize(newSize) }, newSize)
+          inner(next, rows, cols, acc.mapValues { _.resize(newSize) }, newSize)
         } else {
+          // we *may* have enough space in this slice for the
+          // next `RValue`. we're going to flatten the `RValue`
+          // out to find out how many columns we would have
+          // if we added that `RValue` to the current slice.
           val flattened = next.head.flattenWithPath
-          val newAcc = updateRefs(flattened, acc, rowsInCol, _size)
+          val newAcc = updateRefs(flattened, acc, rows, _size)
           val newCols = newAcc.size
-          if (newCols > maxColumns && cols > 1) {
-            // println("we have too many columns with this new value, cutting slice early")
+          val newRows = rows + 1
+          if (newCols > maxColumns && rows > 0) {
+            // we would have too many columns in this slice if we added this
+            // `RValue`. so we're going to pass it back to the caller and
+            // return a slice with the data we have already. we have to be
+            // careful to clear the new `RValue`'s data out of the accumulated
+            // data, because checking the column count mutated the columns.
+            // println("we would have too many columns with this new value, cutting slice early")
             (new Slice {
               val size = rows
-              val columns = acc.mapValues { c => c.clear(newRowsInCol); c }
+              val columns = acc.mapValues { c => c.clear(newRows); c }
             }, next)
           } else {
-            // println("we're adding a CValue to a column")
-            inner(next.tail, newRowsInCol, newRows, newCols, newAcc, _size)
+            // we're okay with adding this RValue to the slice!
+            // we already have the slice's data including RValue in `newAcc`,
+            // so we pass that on and advance the data cursor.
+            // println("we're adding an RValue to the slice")
+            inner(next.tail, newRows, newCols, newAcc, _size)
           }
         }
       }
     }
-    if (values.size == 0) (Slice.empty, ArraySliced.noRValues)
-    else {
+
+    if (values.size == 0) {
+      (Slice.empty, ArraySliced.noRValues)
+    } else {
       // we can make a guess at a nice starting array size;
       // if we know that `n` values at the start of the array are
       // scalars, we know we're going to have at least `min(n, maxRows)`
       // scalars in this slice.
-      // otherwise, we go with 32, because we have some vector data coming up,
-      // so who knows how many rows we'll get before we have too many columns.
+      // otherwise, we go with the constant limit we've been passed, because
+      // we have some vector data coming up, so who knows how many rows we'll
+      // get before we have too many columns.
       var ctr = values.start
       var r = values.head
-      while (ctr < values.arr.length - 1 && ctr < (values.start + maxRows) && r.isInstanceOf[CValue]) {
+      while (ctr < values.arr.length - 1 && ctr < (values.start + maxRows) && RValue.toCValue(r).nonEmpty) {
         ctr = ctr + 1
         r = values.arr(ctr)
       }
-      val startingSize = Math.max(nextPowerOfTwo(ctr - values.start), 32)
-      inner(values, 0, 0, 0, Map.empty, startingSize)
+      val size = Math.min(maxRows, Math.max(nextPowerOfTwo(ctr - values.start), startingSize))
+      inner(values, 0, 0, Map.empty, size)
     }
   }
 
@@ -2008,7 +2051,7 @@ object Slice {
         } yield ()
       } else {
         // println(s"extracting slice from data with size ${next.size}")
-        val (nextSlice, remainingData) = Slice.fromRValuesStep(next, maxRowsC, maxColumnsC)
+        val (nextSlice, remainingData) = Slice.fromRValuesStep(next, maxRowsC, maxColumnsC, 32)
         fs2.Pull.output1(nextSlice) >> rec(remainingData, values)
       }
 

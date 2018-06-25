@@ -490,6 +490,21 @@ public class BitSet {
         return true;
     }
 
+    public String toString() {
+        int bitLen = _length << 6;
+        StringBuilder str = new StringBuilder(bitLen);
+        int c = 0;
+        while (c < bitLen) {
+            if (contains(c)) {
+                str.append("1");
+            } else {
+                str.append("0");
+            }
+            c += 1;
+        }
+        return str.toString();
+    }
+
     // Optimization.
     public int hashCode() {
         int h = 0;
