@@ -2,6 +2,7 @@
     "name": "use subquery when there's a group by statement",
     "backends": {
         "mimir":          "pending",
+        "lwc_local":      "pending",
         "mongodb_3_4_13": "pending",
         "mongodb_3_6":    "pending"
     },
