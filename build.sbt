@@ -218,7 +218,7 @@ lazy val root = project.in(file("."))
 // |   \    /             |            |
 // |\___\_____            |            |
 // |      /   \           |            |
-           connector,  yggdrasil,
+           connector,  yggdrasil, yggdrasilPerf,
 // |    /     |  \       |             |
 // |    |     |   \______|_____________|
 // |    |     |      \  /     \
@@ -622,6 +622,19 @@ lazy val yggdrasil = project
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
+
+lazy val yggdrasilPerf = project
+  .settings(
+    name := "quasar-yggdrasil-perf-internal",
+    scalacStrictMode := false)
+  .dependsOn(yggdrasil % BothScopes)
+  .settings(headerLicenseSettings)
+  .settings(noPublishSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+  .enablePlugins(JmhPlugin)
 
 lazy val mimir = project
   .settings(
