@@ -76,7 +76,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
           case RightSide => 1
         }
 
-        OptionT(coalesceToMap[G](qgraph, List(left, right), combiner2)).getOrElseF(failure[G](qgraph))
+        OptionT(coalesceToMap[G](qgraph, List(left, right), combiner2)).getOrElseF(qgraph.point[G])
 
       case qgraph @ AutoJoin3(left, center, right, combiner) =>
         val combiner2: FreeMapA[Int] = combiner map {
@@ -85,11 +85,11 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
           case RightSide3 => 2
         }
 
-        OptionT(coalesceToMap[G](qgraph, List(left, center, right), combiner2)).getOrElseF(failure[G](qgraph))
+        OptionT(coalesceToMap[G](qgraph, List(left, center, right), combiner2)).getOrElseF(qgraph.point[G])
     }
 
-    val lifted = back(MinimizationState[T](agraph.auth, Set())) map {
-      case (MinimizationState(auth, _), graph) => AuthenticatedQSU[T](graph, auth)
+    val lifted = back(MinimizationState[T](agraph.auth)) map {
+      case (MinimizationState(auth), graph) => AuthenticatedQSU[T](graph, auth)
     }
 
     lifted.eval(agraph.graph.generateRevIndex)
@@ -279,11 +279,6 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       } yield back
   }
 
-  private def failure[G[_]: Monad: MinStateM[T, ?[_]]](graph: QSUGraph): G[QSUGraph] =
-    MinStateM[T, G] modify { state =>
-      state.copy(failed = state.failed + graph.root)
-    } as graph
-
   private def updateForCoalesce[G[_]: Bind: MinStateM[T, ?[_]]](
       candidates: List[QSUGraph],
       newRoot: Symbol): G[Unit] = {
@@ -323,7 +318,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 }
 
 object MinimizeAutoJoins {
-  final case class MinimizationState[T[_[_]]](auth: QAuth[T], failed: Set[Symbol])
+  final case class MinimizationState[T[_[_]]](auth: QAuth[T])
 
   type MinStateM[T[_[_]], F[_]] = MonadState_[F, MinimizationState[T]]
   def MinStateM[T[_[_]], F[_]](implicit ev: MinStateM[T, F]): MinStateM[T, F] = ev
