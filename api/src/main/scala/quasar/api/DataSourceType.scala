@@ -35,7 +35,8 @@ import shapeless.{Witness => W}
 final case class DataSourceType(name: DataSourceType.Name, version: Positive)
 
 object DataSourceType extends DataSourceTypeInstances {
-  type Name = String Refined MatchesRegex[W.`"[a-zA-Z0-9-]+"`.T]
+  type NameP = MatchesRegex[W.`"[a-zA-Z0-9-]+"`.T]
+  type Name = String Refined NameP
 }
 
 sealed abstract class DataSourceTypeInstances {

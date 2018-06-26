@@ -278,7 +278,7 @@ trait TableModule extends TransSpecModule {
 
     def partitionMerge(partitionBy: TransSpec1, keepKey: Boolean = false)(f: Table => IO[Table]): IO[Table]
 
-    @deprecated("use drop/take directly")
+    // @deprecated("use drop/take directly")
     def takeRange(startIndex: Long, numberToTake: Long): Table = {
       if (startIndex < 0 || numberToTake < 0)   // it's defined this way, for... reasons
         Table.empty

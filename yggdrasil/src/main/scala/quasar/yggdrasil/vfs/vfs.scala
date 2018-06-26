@@ -111,7 +111,7 @@ object FreeVFS {
       v <- lift(C.encode(currentVersion).fold(
         e => IO.raiseError(new RuntimeException(e.message)),
         r => IO.pure(r.toByteVector))).intoCopK[S]
-      verWriter = Stream.emit(v).covary[POSIXWithIO].to(verSink).run
+      verWriter = Stream.emit(v).covary[POSIXWithIO].to(verSink).compile.drain
       _ <- POSIXWithIO.generalize(verWriter)
     } yield ()
 
@@ -214,7 +214,7 @@ object FreeVFS {
       }
 
       pathsJson = pathsFromStrings.asJson.nospaces
-      pathsWriter = Stream.emit(ByteVector(pathsJson.getBytes)).covary[POSIXWithIO].to(pathsSink).run
+      pathsWriter = Stream.emit(ByteVector(pathsJson.getBytes)).covary[POSIXWithIO].to(pathsSink).compile.drain
       _ <- POSIXWithIO.generalize(pathsWriter).liftM[StateT[?[_], VersionLog, ?]]
 
       indexSink <- POSIX.openW[S](target </> IndexFile).liftM[StateT[?[_], VersionLog, ?]]
@@ -224,7 +224,7 @@ object FreeVFS {
       }
 
       indexJson = indexFromStrings.asJson.nospaces
-      indexWriter = Stream.emit(ByteVector(indexJson.getBytes)).covary[POSIXWithIO].to(indexSink).run
+      indexWriter = Stream.emit(ByteVector(indexJson.getBytes)).covary[POSIXWithIO].to(indexSink).compile.drain
       _ <- POSIXWithIO.generalize[S](indexWriter).liftM[StateT[?[_], VersionLog, ?]]
 
       _ <- VersionLog.commit[S](v)
@@ -241,7 +241,7 @@ object FreeVFS {
           for {
             pathsStream <- POSIX.openR[S](dir </> PathsFile).liftM[StateT[?[_], VersionLog, ?]]
             pathsString = pathsStream.map(_.toArray).map(new String(_)).foldMonoid
-            pathsJson <- POSIXWithIO.generalize[S](pathsString.runLast).liftM[StateT[?[_], VersionLog, ?]]
+            pathsJson <- POSIXWithIO.generalize[S](pathsString.compile.last).liftM[StateT[?[_], VersionLog, ?]]
 
             pathsFromStrings =
               pathsJson.flatMap(Parse.decodeOption[Map[String, Blob]]).getOrElse(Map())
@@ -254,7 +254,7 @@ object FreeVFS {
 
             indexStream <- POSIX.openR[S](dir </> IndexFile).liftM[StateT[?[_], VersionLog, ?]]
             indexString = indexStream.map(_.toArray).map(new String(_)).foldMonoid
-            indexJson <- POSIXWithIO.generalize[S](indexString.runLast).liftM[StateT[?[_], VersionLog, ?]]
+            indexJson <- POSIXWithIO.generalize[S](indexString.compile.last).liftM[StateT[?[_], VersionLog, ?]]
 
             indexFromStrings =
               indexJson.flatMap(Parse.decodeOption[Map[String, Vector[RPath]]](_)).getOrElse(Map())

@@ -2,7 +2,6 @@
     "name": "select field with reduction",
 
     "backends": {
-        "mongodb_3_4":       "ignoreFieldOrder",
         "mongodb_3_4_13":    "ignoreFieldOrder",
         "mongodb_3_6":       "ignoreFieldOrder"
     },

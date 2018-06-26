@@ -75,7 +75,7 @@ object RealPOSIXSpecs extends Specification {
       val test = for {
         interp <- ioPOSIX(base)
         results <- interp(OpenR(Path.rootDir </> Path.file("test")))
-        contents <- translate(results, interp).fold(ByteVector.empty)(_ ++ _).runLast
+        contents <- translate(results, interp).fold(ByteVector.empty)(_ ++ _).compile.last
       } yield contents
 
       test.unsafeRunSync must beSome(ByteVector(1, 2, 3, 4, 5))
@@ -88,7 +88,7 @@ object RealPOSIXSpecs extends Specification {
         interp <- ioPOSIX(base)
         sink <- interp(OpenW(Path.rootDir </> Path.file("test")))
         driver = Stream(ByteVector(1, 2, 3, 4, 5)).covary[POSIXWithIO].to(sink)
-        _ <- translate(driver, interp).run
+        _ <- translate(driver, interp).compile.drain
       } yield ()
 
       test.unsafeRunSync
@@ -161,13 +161,13 @@ object RealPOSIXSpecs extends Specification {
 
         sink1 <- interp(OpenW(Path.rootDir </> Path.file(from)))
         driver1 = Stream(ByteVector(1, 2, 3)).covary[POSIXWithIO].to(sink1)
-        _ <- translate(driver1, interp).run
+        _ <- translate(driver1, interp).compile.drain
 
         _ <- interp(LinkFile(Path.rootDir </> Path.file(from), Path.rootDir </> Path.file(to)))
 
         sink2 <- interp(OpenW(Path.rootDir </> Path.file(from)))
         driver2 = Stream(ByteVector(4, 5, 6)).covary[POSIXWithIO].to(sink2)
-        _ <- translate(driver2, interp).run
+        _ <- translate(driver2, interp).compile.drain
       } yield ()
 
       test.unsafeRunSync

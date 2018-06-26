@@ -10,7 +10,7 @@ object Dependencies {
   private val argonautVersion     = "6.2"
   private val disciplineVersion   = "0.7.2"
   private val doobieVersion       = "0.4.4"
-  private val jawnVersion         = "0.10.4"
+  private val jawnVersion         = "0.12.1"
   private val jacksonVersion      = "2.4.4"
   private val matryoshkaVersion   = "0.18.3"
   private val monocleVersion      = "1.4.0"
@@ -20,16 +20,15 @@ object Dependencies {
   private val scodecBitsVersion   = "1.1.2"
   private val scodecScalazVersion = "1.4.1a"
   private val http4sVersion       = "0.16.6a"
-  private val scalacheckVersion   = "1.14.0"
+  private val scalacheckVersion   = "1.13.4"
   private val scalazVersion       = "7.2.23"
   private val scalazStreamVersion = "0.8.6a"
   private val scoptVersion        = "3.5.0"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"
-  private val specsVersion        = "4.2.0"
+  private val specsVersion        = "4.1.0"
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
-  private val deloreanVersion     = "1.2.42-scalaz-7.2"
   private val fs2Version          = "1.0.0-M1"
 
   def foundation = Seq(
@@ -61,7 +60,7 @@ object Dependencies {
     "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
     "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
     "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
-    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.14") % Test,
+    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") % Test,
     "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                              % Test
   )
 
@@ -75,23 +74,13 @@ object Dependencies {
     "org.typelevel"              %% "algebra-laws"  % algebraVersion  % Test
   )
 
-  def ejson = Seq(
-    "org.spire-math" %% "jawn-parser" % jawnVersion
-  )
-
   def effect = Seq(
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
   )
 
   def datagen = Seq(
-    "co.fs2"           %% "fs2-core"       % fs2Version,
-    "co.fs2"           %% "fs2-io"         % fs2Version,
     "com.github.scopt" %% "scopt"          % scoptVersion,
     "eu.timepit"       %% "refined-scalaz" % refinedVersion
-  )
-
-  def connector = Seq(
-    "co.fs2" %% "fs2-core" % fs2Version
   )
 
   def sql = Seq(
@@ -111,6 +100,11 @@ object Dependencies {
     // Quasar attempts to connect to an h2 database to use as a metastore
     "com.h2database"              % "h2"                        % "1.4.196",
     "org.tpolecat"               %% "doobie-specs2"             % doobieVersion % Test
+  )
+
+  def impl = Seq(
+    "org.spire-math" %% "jawn-argonaut" % jawnVersion,
+    "org.spire-math" %% "jawn-parser"   % jawnVersion
   )
 
   def interface = Seq(
@@ -162,14 +156,7 @@ object Dependencies {
     "com.google.guava" %  "guava" % "13.0"
   )
 
-  def mimir = Seq(
-    "io.verizon.delorean" %% "core" % deloreanVersion,
-    "co.fs2" %% "fs2-core"   % fs2Version
-  )
   def yggdrasil = Seq(
-    "io.verizon.delorean" %% "core" % deloreanVersion,
-    "co.fs2" %% "fs2-core"   % fs2Version,
-    "co.fs2" %% "fs2-io"     % fs2Version,
     "com.codecommit" %% "smock" % "0.4.0-specs2-4.0.2" % "test"
   )
   def niflheim = Seq(
@@ -178,8 +165,8 @@ object Dependencies {
     "org.objectweb.howl" %  "howl"       % "1.0.1-1"
   )
   def it = Seq(
+    "co.fs2"           %% "fs2-io"              % fs2Version          % Test,
     "io.argonaut"      %% "argonaut-monocle"    % argonautVersion     % Test,
-    "org.http4s"       %% "http4s-blaze-client" % http4sVersion       % Test,
     "eu.timepit"       %% "refined-scalacheck"  % refinedVersion      % Test,
     "io.verizon.knobs" %% "core"                % "4.0.30-scalaz-7.2" % Test
   )

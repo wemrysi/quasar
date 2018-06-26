@@ -23,7 +23,6 @@ env:
   matrix:
     - CONNECTOR=lwc_local
     - CONNECTOR=mimir
-    - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_3_4_13
     - CONNECTOR=mongodb_3_6
   global:
@@ -71,14 +70,14 @@ script:
     SPECIFIC_DELEGATE=
 
     case $CONNECTOR in
-      mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
+      mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- failtrace" ;;
     esac
 
   # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
   - |-
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       it/sideEffectTestFSConfig \
-      "it/testOnly -- xonly failtrace" \
+      "it/testOnly -- failtrace" \
       "$SPECIFIC_DELEGATE"
 
   - set +e
