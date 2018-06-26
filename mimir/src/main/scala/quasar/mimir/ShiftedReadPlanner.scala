@@ -83,7 +83,7 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                           val slices = stream.chunks.map { ch =>
                             Slice.fromRValues(
                               ch.toList.toStream.map(data =>
-                                RValue.fromJValueRaw(JValue.fromData(data))))
+                                MapFuncCorePlanner.dataToRValue(data).getOrElse(sys.error("no representation for Data.NA in SlamEngine as a constant"))))
                           }.translate(Lambda[FunctionK[Task, IO]](Effect[Task].toIO(_)))
 
                           // TODO leaks resources

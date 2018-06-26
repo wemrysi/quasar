@@ -635,15 +635,7 @@ trait ColumnarTableModule
 
         import trans._
 
-        // TODO depending on the id status we may not need to wrap the table
         Table(slices, UnknownSize)
-          .transform(OuterObjectConcat(
-            WrapObject(
-              Scan(Leaf(Source), freshIdScanner),
-              Key.name),
-            WrapObject(
-              Leaf(Source),
-              Value.name)))
       }
     }
 

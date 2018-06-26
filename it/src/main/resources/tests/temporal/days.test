@@ -3,7 +3,7 @@
 
     "backends": {
         "lwc_local":"ignoreFieldOrder",
-        "mimir":"ignoreFieldOrder"
+        "mimir":"pendingIgnoreFieldOrder"
     },
 
     "data": "../days.data",

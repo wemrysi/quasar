@@ -1,6 +1,10 @@
 {
     "name": "filter on date part",
 
+    "backends": {
+        "mimir": "pending"
+    },
+
     "data": "../days.data",
 
     "query": "select distinct `day` from `../days` where date_part(\"dow\", ts) >= 3",

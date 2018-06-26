@@ -25,6 +25,7 @@ import quasar.precog.common._
 import quasar.precog.util._
 import quasar.time.DateGenerators
 import quasar.yggdrasil.TableModule.SortDescending
+import quasar.yggdrasil.Config
 
 import scala.util.Random
 import org.scalacheck.{Arbitrary, Gen}
@@ -324,16 +325,17 @@ class SliceSpec extends Specification with ScalaCheck {
     "not add values that overflow the column limit" >> {
       val data = ArraySliced(Array[RValue](
         CLong(1),
-        RArray(List(CLong(1), CLong(2), CLong(3)))), 0, 2)
+        CLong(2),
+        RArray(List(CLong(1), CLong(2), CLong(3)))), 0, 3)
       val expectedDefined = new BitSet(1)
-      expectedDefined.set(0)
+      expectedDefined.set(0, 2)
       val expectedSlice = new Slice {
-        def size = 1
+        def size = 2
         def columns = Map(
           ColumnRef(CPath.Identity, CLong) ->
-            new ArrayLongColumn(expectedDefined, Array(1L)))
+            new ArrayLongColumn(expectedDefined, Array(1L, 2L)))
       }
-      val expectedRemaining = ArraySliced(data.arr, 1, 1)
+      val expectedRemaining = ArraySliced(data.arr, 2, 1)
       val (actualSlice, actualRemaining) =
         Slice.fromRValuesStep(data, 3, 2, 32)
       actualSlice must_== expectedSlice

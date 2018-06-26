@@ -76,11 +76,6 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   type M[A] = EitherT[EitherT[StateT[WriterT[Stream[IO, ?], PhaseResults, ?], Long, ?], SemanticErrors, ?], PlannerError, A]
 
-  // Make the `join` syntax from Monad ambiguous.
-  implicit class NoJoin[F[_], A](ffa: F[A]) {
-    def join(implicit ev: A =:= F[A]): F[A] = ???
-  }
-
   val DataDir = rootDir[Sandboxed] </> dir("local")
 
   /** A name to identify the suite in test output. */

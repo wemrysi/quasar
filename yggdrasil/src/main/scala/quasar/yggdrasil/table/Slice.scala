@@ -1779,7 +1779,7 @@ trait Slice { source =>
     (0 until size).map(i => prefix + " " + toJson(i)).mkString("\n")
   }
 
-  override def toString = (0 until size).map(toString(_).getOrElse("")).mkString("\n")
+  override def toString = (0 until size).map(toString(_).getOrElse("")).mkString("\n", "\n", "\n")
 }
 
 object Slice {
@@ -1990,13 +1990,13 @@ object Slice {
           if (newCols > maxColumns && rows > 0) {
             // we would have too many columns in this slice if we added this
             // `RValue`. so we're going to pass it back to the caller and
-            // return a slice with the data we have already. we have to be
-            // careful to clear the new `RValue`'s data out of the accumulated
-            // data, because checking the column count mutated the columns.
+            // return a slice with the data we have already. we don't have to
+            // clear the new `RValue`'s data out of the accumulated data,
+            // because we've already made sure to set `size` correctly.
             // println("we would have too many columns with this new value, cutting slice early")
             (new Slice {
               val size = rows
-              val columns = acc.mapValues { c => c.clear(newRows); c }
+              val columns = acc
             }, next)
           } else {
             // we're okay with adding this RValue to the slice!
