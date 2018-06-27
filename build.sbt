@@ -206,7 +206,7 @@ lazy val root = project.in(file("."))
     qscript, qsu,
     repl,
     sql, sst,
-    yggdrasil, yggdrasilPerf
+    yggdrasil
   ).enablePlugins(AutomateHeaderPlugin)
 
 /** Very general utilities, ostensibly not Quasar-specific, but they just aren’t
