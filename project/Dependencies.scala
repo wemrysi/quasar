@@ -19,7 +19,7 @@ object Dependencies {
   private val refinedVersion      = "0.8.3"
   private val scodecBitsVersion   = "1.1.2"
   private val scodecScalazVersion = "1.4.1a"
-  private val http4sVersion       = "0.16.6a"
+  private val http4sVersion       = "0.18.13"
   private val scalacheckVersion   = "1.13.4"
   private val scalazVersion       = "7.2.23"
   private val scalazStreamVersion = "0.8.6a"
@@ -123,21 +123,6 @@ object Dependencies {
       "io.netty"    % "netty-handler"        % nettyVersion
     )
   }
-
-  def web = Seq(
-    "eu.timepit"     %% "refined-scalaz"      % refinedVersion,
-    "org.http4s"     %% "http4s-dsl"          % http4sVersion,
-    "org.http4s"     %% "http4s-argonaut"     % http4sVersion,
-    "org.http4s"     %% "http4s-client"       % http4sVersion,
-    "org.http4s"     %% "http4s-server"       % http4sVersion,
-    "org.http4s"     %% "http4s-blaze-server" % http4sVersion,
-    "org.http4s"     %% "http4s-blaze-client" % http4sVersion,
-    "org.scodec"     %% "scodec-scalaz"       % scodecScalazVersion,
-    "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
-    "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
-    "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
-    "eu.timepit"     %% "refined-scalacheck"  % refinedVersion     % Test
-  )
 
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % "1.7.25",
