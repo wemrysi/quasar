@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 import quasar.contrib.scalacheck.gen
-import quasar.time.{DateGenerators, DateTimeInterval}
+import qdata.time.{DateTimeInterval, TimeGenerators}
 
 import java.time._
 
@@ -46,7 +46,7 @@ trait MongoDbDomain {
       LocalDate.of(9999, 12, 31).toEpochDay
     ) ∘ (LocalDate.ofEpochDay(_))
 
-  val timeDomain: Gen[LocalTime] = DateGenerators.genLocalTime
-  val intervalDomain: Gen[DateTimeInterval] = DateGenerators.genDateTimeInterval
-  val timezoneDomain: Gen[ZoneOffset] = DateGenerators.genZoneOffset
+  val timeDomain: Gen[LocalTime] = TimeGenerators.genLocalTime
+  val intervalDomain: Gen[DateTimeInterval] = TimeGenerators.genDateTimeInterval
+  val timezoneDomain: Gen[ZoneOffset] = TimeGenerators.genZoneOffset
 }

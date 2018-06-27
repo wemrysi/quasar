@@ -23,7 +23,7 @@ import quasar.precog.BitSet
 import quasar.precog.TestSupport._
 import quasar.precog.common._
 import quasar.precog.util._
-import quasar.time.DateGenerators
+import qdata.time.TimeGenerators
 import quasar.yggdrasil.TableModule.SortDescending
 
 import scala.util.Random
@@ -546,8 +546,11 @@ class SliceSpec extends Specification with ScalaCheck {
 }
 
 
-object ArbitrarySlice extends RCValueGenerators with DateGenerators {
-  private def genBitSet(size: Int): Gen[BitSet] = listOfN(size, genBool) ^^ (BitsetColumn bitset _)
+object ArbitrarySlice extends RCValueGenerators {
+  import TimeGenerators._
+
+  private def genBitSet(size: Int): Gen[BitSet] =
+    listOfN(size, genBool) ^^ (BitsetColumn bitset _)
 
   // TODO remove duplication with `SegmentFormatSupport#genForCType`
   def genColumn(col: ColumnRef, size: Int): Gen[Column] = {

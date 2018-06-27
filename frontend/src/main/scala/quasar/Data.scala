@@ -30,7 +30,7 @@ import quasar.ejson.{
 import quasar.fp._
 import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.javascript.Js
-import quasar.time.{DateTimeInterval, OffsetDate => QOffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate => QOffsetDate}
 
 import java.time.{
   LocalDate => JLocalDate,

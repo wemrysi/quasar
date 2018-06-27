@@ -20,7 +20,7 @@ import quasar.contrib.scalaz.MonadTell_
 import quasar.precog.common._
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import scala.collection.immutable.Set
 

@@ -23,7 +23,7 @@ import quasar.common.PhaseResultT
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._
-import quasar.time.DateGenerators
+import qdata.time.TimeGenerators
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -104,13 +104,13 @@ class SimplifyConstantPlanStdLibSpec extends StdLibSpec {
 
     def stringDomain = arbitrary[String]
 
-    def dateDomain = DateGenerators.genLocalDate
+    def dateDomain = TimeGenerators.genLocalDate
 
-    def timeDomain = DateGenerators.genLocalTime
+    def timeDomain = TimeGenerators.genLocalTime
 
-    def timezoneDomain = DateGenerators.genZoneOffset
+    def timezoneDomain = TimeGenerators.genZoneOffset
 
-    def intervalDomain = DateGenerators.genInterval
+    def intervalDomain = TimeGenerators.genInterval
   }
 
   tests(runner)

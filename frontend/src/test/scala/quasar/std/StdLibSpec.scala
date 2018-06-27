@@ -18,6 +18,7 @@ package quasar.std
 
 import slamdata.Predef._, BigDecimal.RoundingMode
 
+import qdata.time.{DateTimeInterval, OffsetDate => QOffsetDate, TimeGenerators}
 import quasar.{Data, Qspec, Type}
 import quasar.DataGenerators.{dataArbitrary => _, _}
 import quasar.frontend.logicalplan._
@@ -26,9 +27,6 @@ import quasar.time.{
   truncDateTime,
   truncDate,
   truncTime,
-  DateGenerators,
-  DateTimeInterval,
-  OffsetDate => QOffsetDate,
   TemporalPart
 }
 
@@ -129,8 +127,8 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbDataInterval: Arbitrary[Data.Interval] =
       arbInterval ^^ Data.Interval
 
-    implicit val arbDuration: Arbitrary[Duration] = DateGenerators.arbDuration
-    implicit val arbPeriod: Arbitrary[Period] = DateGenerators.arbPeriod
+    implicit val arbDuration: Arbitrary[Duration] = TimeGenerators.arbDuration
+    implicit val arbPeriod: Arbitrary[Period] = TimeGenerators.arbPeriod
 
     def commute(
         prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
@@ -1886,7 +1884,7 @@ abstract class StdLibSpec extends Qspec {
         "Interval/Int" >> prop { (x: DateTimeInterval, y: Int) =>
           val expected = x.multiply(y)
           commute(Multiply(_, _).embed, Data.Interval(x), Data.Int(y), Data.Interval(expected))
-        }.setGens(DateGenerators.genInterval, Gen.choose(-10, 10)) // avoid integer overflow
+        }.setGens(TimeGenerators.genInterval, Gen.choose(-10, 10)) // avoid integer overflow
 
         // TODO: figure out what domain can be tested here (tends to overflow)
         // "any doubles" >> prop { (x: Double, y: Double) =>

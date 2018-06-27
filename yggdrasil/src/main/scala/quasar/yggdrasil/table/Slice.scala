@@ -21,7 +21,7 @@ import quasar.precog._
 import quasar.precog.common._
 import quasar.precog.util._
 import quasar.precog.util.RingDeque
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate}
 import quasar.yggdrasil._
 import quasar.yggdrasil.TransSpecModule._
 import quasar.yggdrasil.bytecode._

@@ -18,7 +18,7 @@ package quasar.precog
 package common
 
 import quasar.blueeyes._, json._
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import scalaz._, Scalaz._, Ordering._
 

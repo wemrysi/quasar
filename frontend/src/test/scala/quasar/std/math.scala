@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.{ArgumentError, Func, Type, TypeGenerators}, Type.Const
 import quasar.frontend.logicalplan._
-import quasar.time.DateTimeInterval
+import qdata.time.DateTimeInterval
 
 import java.time.{OffsetDateTime => JOffsetDateTime}
 

@@ -21,7 +21,8 @@ import quasar._
 import quasar.DataDateTimeExtractors._
 import quasar.ArgumentError._
 import quasar.fp.ski._
-import quasar.time.{OffsetDate => QOffsetDate, _}
+import quasar.time._
+import qdata.time.{DateTimeInterval, OffsetDate => QOffsetDate}
 
 import java.time.{
   Instant,

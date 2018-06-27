@@ -19,7 +19,7 @@ package util
 
 import quasar.blueeyes._
 import quasar.precog.common._
-import quasar.time.OffsetDate
+import qdata.time.OffsetDate
 import quasar.yggdrasil.table._
 
 import scalaz._, Scalaz._
