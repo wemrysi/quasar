@@ -109,8 +109,8 @@ object Dependencies {
   )
 
   def impl = Seq(
-    "org.spire-math" %% "jawn-argonaut" % jawnVersion,
-    "org.spire-math" %% "jawn-parser"   % jawnVersion
+    "org.http4s"     %% "jawn-fs2"      % "0.13.0-M1",
+    "org.spire-math" %% "jawn-argonaut" % jawnVersion
   )
 
   def interface = Seq(
