@@ -54,8 +54,6 @@ import java.math.{MathContext, RoundingMode}
 import java.nio.file.{Files, Path => JPath, Paths}
 import java.text.ParseException
 
-import scala.Predef.=:=
-
 import argonaut._, Argonaut._
 import cats.effect.{Effect, IO, Sync, Timer}
 import eu.timepit.refined.auto._

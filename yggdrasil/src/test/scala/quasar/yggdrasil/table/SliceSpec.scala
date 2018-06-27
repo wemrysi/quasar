@@ -25,7 +25,6 @@ import quasar.precog.common._
 import quasar.precog.util._
 import quasar.time.DateGenerators
 import quasar.yggdrasil.TableModule.SortDescending
-import quasar.yggdrasil.Config
 
 import scala.util.Random
 import org.scalacheck.{Arbitrary, Gen}
