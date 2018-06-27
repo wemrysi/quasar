@@ -22,7 +22,6 @@ import quasar.yggdrasil.table._
 import quasar.precog.common._
 
 import cats.effect.IO
-import fs2.{Chunk, Stream}
 
 // Must not be in default package
 import java.util.concurrent.TimeUnit
@@ -35,78 +34,82 @@ import org.openjdk.jmh.runner.options.{Options, OptionsBuilder}
 /* Default settings for benchmarks in this class */
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @BenchmarkMode(Array(Mode.Throughput))
+@State(Scope.Benchmark)
 class FromRValuesBenchmark {
 
-  def scalars(numChunks: Int, chunkSize: Int, scalar: CValue): Stream[IO, RValue] =
-    List.fill(numChunks)(
-      Stream.emits(Array.fill(chunkSize)(scalar)))
-    .foldLeft(Stream.empty.covaryAll[IO, RValue])(_ ++ _)
+  @Param(value = Array("true", "false"))
+  var streaming: Boolean = _
 
-  def arrays(chunks: Int, chunkSize: Int, arrSize: Int, scalar: CValue): Stream[IO, RValue] =
-    List.fill(chunks)(
-      Stream.emits(List.fill(chunkSize)(
-        RArray(List.tabulate(arrSize)(i => scalar)))))
-    .foldLeft(Stream.empty.covaryAll[IO, RValue])(_ ++ _)
+  def scalars(chunks: Int, chunkSize: Int, scalar: CValue): Stream[List[RValue]] =
+    Stream.fill(chunks)(
+      List.fill(chunkSize)(scalar))
+
+  def arrays(chunks: Int, chunkSize: Int, arrSize: Int, scalar: CValue): Stream[List[RValue]] =
+    Stream.fill(chunks)(
+      List.fill(chunkSize)(
+        RArray(List.tabulate(arrSize)(i => scalar))))
 
   // Each chunk should look like:
   // { k1: v1, k2: v2, k3: v3 }, { k1: v1, k2: v2, k3: v3 }
-  def objects(chunks: Int, chunkSize: Int, keys: Int, scalar: CValue): Stream[IO, RValue] = {
-    List.fill(chunks)(
-      Stream.emits(List.fill(chunkSize)(
-        RObject(List.tabulate(keys)(i => ("k" + i) -> scalar).toMap))))
-    .foldLeft(Stream.empty.covaryAll[IO, RValue])(_ ++ _)
-  }
+  def objects(chunks: Int, chunkSize: Int, keys: Int, scalar: CValue): Stream[List[RValue]] =
+    Stream.fill(chunks)(
+      List.fill(chunkSize)(
+        RObject(List.tabulate(keys)(i => ("k" + i) -> scalar).toMap)))
 
   // Each chunk should look like:
   // { k11: v1, k12: v2, k13: v3 }, { k21: v1, k22: v2, k23: v3 }
-  def distinctFieldObjects(chunks: Int, chunkSize: Int, keys: Int, scalar: CValue): Stream[IO, RValue] =
-    List.tabulate(chunks)(c =>
-      Stream.emits(List.tabulate(chunkSize)(s =>
+  def distinctFieldObjects(chunks: Int, chunkSize: Int, keys: Int, scalar: CValue): Stream[List[RValue]] =
+    Stream.tabulate(chunks)(c =>
+      List.tabulate(chunkSize)(s =>
         RObject(List.tabulate(keys)(i => ("k" + c + s + i) -> scalar).toMap)))
-    ).foldLeft(Stream.empty.covaryAll[IO, RValue])(_ ++ _)
 
   def consumeSlice(slice: Slice, bh: Blackhole): IO[Unit] = {
     IO(bh.consume(slice.materialized))
   }
 
-  def consumeSlices(slices: Stream[IO, Slice], bh: Blackhole): IO[Unit] = {
+  def consumeSlices(slices: fs2.Stream[IO, Slice], bh: Blackhole): IO[Unit] = {
     slices.compile.fold(())((_, o) => consumeSlice(o, bh))
+  }
+
+  def createAndConsumeSlices(data: Stream[List[RValue]], bh: Blackhole): IO[Unit] = {
+    if (streaming) consumeSlices(Slice.allFromRValues(fs2.Stream.fromIterator[IO, fs2.Stream[IO, RValue]](data.iterator.map(fs2.Stream.emits(_).covary)).flatMap(x => x)), bh)
+    else consumeSlices(fs2.Stream.fromIterator[IO, Slice](data.iterator.map(l => Slice.fromRValues(l.toStream))), bh)
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestLongs(bh: Blackhole): Unit = {
-    consumeSlices(Slice.allFromRValues(scalars(20, 50000, CLong(100))), bh).unsafeRunSync
+    createAndConsumeSlices(scalars(20, 50000, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestArrsWithFittingColumns(bh: Blackhole): Unit = {
-    consumeSlices(Slice.allFromRValues(arrays(20, 20, 80, CLong(100))), bh).unsafeRunSync
+    createAndConsumeSlices(arrays(20, 200, 80, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestArrsWithOverflowingColumns(bh: Blackhole): Unit = {
-    consumeSlices(Slice.allFromRValues(arrays(20, 20, 200, CLong(100))), bh).unsafeRunSync
+    createAndConsumeSlices(arrays(20, 200, 200, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestObjectsWithOverflowingColumns(bh: Blackhole): Unit = {
-    consumeSlices(Slice.allFromRValues(objects(20, 20, 200, CLong(100))), bh).unsafeRunSync
+    createAndConsumeSlices(objects(20, 200, 200, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestObjectsWithFittingColumns(bh: Blackhole): Unit = {
-    consumeSlices(Slice.allFromRValues(objects(20, 20, 80, CLong(100))), bh).unsafeRunSync
+    createAndConsumeSlices(objects(20, 200, 80, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestObjectsWithDistinctColumns(bh: Blackhole): Unit = {
-    consumeSlices(Slice.allFromRValues(distinctFieldObjects(20, 20, 100, CLong(100))), bh).unsafeRunSync
+    createAndConsumeSlices(distinctFieldObjects(20, 200, 100, CLong(100)), bh).unsafeRunSync
   }
 
 }
