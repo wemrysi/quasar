@@ -27,6 +27,7 @@ import quasar.Data.{
   OffsetTime => DOffsetTime
 }
 import quasar.fp._
+import qdata.time.{OffsetDate => QOffsetDate}
 
 import java.time.{
   LocalDate => JLocalDate,
@@ -95,10 +96,10 @@ object DataDateTimeExtractors {
   object CanSetTimeZone {
     def unapply(data: Data): Option[ZoneOffset => Data] = data match {
       case d @ DOffsetDateTime(_) => Some(zo => DOffsetDateTime(JOffsetDateTime.of(d.value.toLocalDateTime, zo)))
-      case d @ DOffsetDate(_) => Some(zo => DOffsetDate(time.OffsetDate(d.value.date, zo)))
+      case d @ DOffsetDate(_) => Some(zo => DOffsetDate(QOffsetDate(d.value.date, zo)))
       case d @ DOffsetTime(_) => Some(zo => DOffsetTime(JOffsetTime.of(d.value.toLocalTime, zo)))
       case d @ DLocalDateTime(_) => Some(zo => DOffsetDateTime(JOffsetDateTime.of(d.value, zo)))
-      case d @ DLocalDate(_) => Some(zo => DOffsetDate(time.OffsetDate(d.value, zo)))
+      case d @ DLocalDate(_) => Some(zo => DOffsetDate(QOffsetDate(d.value, zo)))
       case d @ DLocalTime(_) => Some(zo => DOffsetTime(JOffsetTime.of(d.value, zo)))
       case _ => None
     }
@@ -107,7 +108,7 @@ object DataDateTimeExtractors {
   object CanRemoveTime {
     def unapply(data: Data): Option[Data] = data match {
       case DLocalDateTime(v) => Some(DLocalDate(v.toLocalDate))
-      case DOffsetDateTime(v) => Some(DOffsetDate(time.OffsetDate(v.toLocalDate, v.getOffset)))
+      case DOffsetDateTime(v) => Some(DOffsetDate(QOffsetDate(v.toLocalDate, v.getOffset)))
       case _ => None
     }
   }

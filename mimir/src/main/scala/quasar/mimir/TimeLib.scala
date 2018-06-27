@@ -17,7 +17,8 @@
 package quasar.mimir
 
 import quasar.time
-import quasar.time.{DateTimeInterval, OffsetDate => QOffsetDate, TemporalPart}
+import quasar.time.TemporalPart
+import qdata.time.{DateTimeInterval, OffsetDate => QOffsetDate}
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.util.ColumnDateTimeExtractors._

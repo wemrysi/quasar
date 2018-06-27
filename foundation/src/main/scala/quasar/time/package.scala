@@ -22,9 +22,8 @@ import java.time._
 import java.time.temporal.{ChronoField, ChronoUnit}
 
 import monocle.Lens
-
-import scalaz.{Lens => _, _}
-import Scalaz._
+import qdata.time.OffsetDate
+import scalaz.{Lens => _, _}, Scalaz._
 
 package object time {
 

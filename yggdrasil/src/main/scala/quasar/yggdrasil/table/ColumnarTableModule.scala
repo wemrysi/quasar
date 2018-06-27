@@ -25,7 +25,7 @@ import quasar.precog.util.{BitSetUtil, RawBitSet}
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import cats.effect.IO
 

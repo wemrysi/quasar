@@ -26,7 +26,7 @@ import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
 import quasar.precog.common.RValue
 import quasar.qscript._
 import quasar.std.StdLibSpec
-import quasar.time.{DateGenerators, DateTimeInterval}
+import qdata.time.{DateTimeInterval, TimeGenerators}
 
 import org.scalacheck.{Arbitrary, Gen}
 
@@ -216,9 +216,9 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
         LocalDate.of(9999, 12, 31).toEpochDay
       ) ∘ (LocalDate.ofEpochDay(_))
 
-    def timeDomain: Gen[LocalTime] = DateGenerators.genLocalTime
-    def intervalDomain: Gen[DateTimeInterval] = DateGenerators.genInterval
-    def timezoneDomain: Gen[ZoneOffset] = DateGenerators.genZoneOffset
+    def timeDomain: Gen[LocalTime] = TimeGenerators.genLocalTime
+    def intervalDomain: Gen[DateTimeInterval] = TimeGenerators.genInterval
+    def timezoneDomain: Gen[ZoneOffset] = TimeGenerators.genZoneOffset
   }
 
   tests(runner)
