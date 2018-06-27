@@ -24,6 +24,7 @@ import quasar.api.ResourceError.{CommonError, ReadError}
 import quasar.connector.{DataSource, HeavyweightDataSourceModule, LightweightDataSourceModule}
 import quasar.contrib.scalaz.MonadError_
 import quasar.fs.Planner.{PlannerError, PlannerErrorME}
+import quasar.impl.DataSourceModule
 import quasar.qscript.QScriptEducated
 
 import java.lang.IllegalArgumentException
@@ -89,8 +90,8 @@ final class DataSourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
   val modules: DataSourceManagement.Modules =
     IMap(
-      lightMod.kind -> lightMod.left,
-      heavyMod.kind -> heavyMod.right)
+      lightMod.kind -> DataSourceModule.Lightweight(lightMod),
+      heavyMod.kind -> DataSourceModule.Heavyweight(heavyMod))
 
   def withMgmt[A](f: (Mgmt, IO[Running]) => IO[A]): A =
     (for {

@@ -20,10 +20,11 @@ import slamdata.Predef.{Exception, None, Option, Some, Throwable, Unit}
 import quasar.{Condition, Data, RenderTreeT}
 import quasar.api.{DataSourceType, ResourceName, ResourcePath}
 import quasar.api.DataSourceError.{CreateError, DataSourceUnsupported}
-import quasar.connector.{DataSource, LightweightDataSourceModule, HeavyweightDataSourceModule}
+import quasar.connector.DataSource
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.{κ, κ2}
 import quasar.fs.Planner.PlannerErrorME
+import quasar.impl.DataSourceModule
 import quasar.qscript.QScriptEducated
 
 import argonaut.Json
@@ -61,14 +62,15 @@ final class DataSourceManagement[
       config: DataSourceConfig[Json])
       : F[Condition[CreateError[Json]]] = {
 
-    def init0(mod: LightweightDataSourceModule \/ HeavyweightDataSourceModule)
-        : EitherT[F, CreateError[Json], DS] =
-      mod.fold(
-        lw => EitherT(lw.lightweightDataSource[F, G](config.config))
-          .bimap(ie => ie: CreateError[Json], _.left),
+    val init0: DataSourceModule => EitherT[F, CreateError[Json], DS] = {
+      case DataSourceModule.Lightweight(lw) =>
+        EitherT(lw.lightweightDataSource[F, G](config.config))
+          .bimap(ie => ie: CreateError[Json], _.left)
 
-        hw => EitherT(hw.heavyweightDataSource[T, F, G](config.config))
-          .bimap(ie => ie: CreateError[Json], _.right))
+      case DataSourceModule.Heavyweight(hw) =>
+        EitherT(hw.heavyweightDataSource[T, F, G](config.config))
+          .bimap(ie => ie: CreateError[Json], _.right)
+    }
 
     val inited = for {
       sup <- EitherT.rightU[CreateError[Json]](supported)
@@ -146,7 +148,7 @@ final class DataSourceManagement[
 }
 
 object DataSourceManagement {
-  type Modules = IMap[DataSourceType, LightweightDataSourceModule \/ HeavyweightDataSourceModule]
+  type Modules = IMap[DataSourceType, DataSourceModule]
   type LDS[F[_], G[_]] = DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]
   type HDS[T[_[_]], F[_], G[_]] = DataSource[F, Stream[G, ?], T[QScriptEducated[T, ?]], Stream[G, Data]]
   type DS[T[_[_]], F[_], G[_]] = LDS[F, G] \/ HDS[T, F, G]
