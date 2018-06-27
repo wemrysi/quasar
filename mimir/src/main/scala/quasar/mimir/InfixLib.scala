@@ -19,7 +19,7 @@ package quasar.mimir
 import quasar.precog.util.NumericComparisons
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
-import quasar.time.DateTimeInterval
+import qdata.time.DateTimeInterval
 
 trait InfixLibModule extends ColumnarTableLibModule {
   trait InfixLib extends ColumnarTableLib {

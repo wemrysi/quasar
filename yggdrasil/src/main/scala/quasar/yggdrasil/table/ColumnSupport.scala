@@ -20,7 +20,7 @@ package table
 import quasar.blueeyes._
 import quasar.precog.BitSet
 import quasar.precog.common._
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 

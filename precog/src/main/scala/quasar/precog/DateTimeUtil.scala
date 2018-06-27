@@ -16,7 +16,7 @@
 
 package quasar.precog
 
-import quasar.time.OffsetDate
+import qdata.time.OffsetDate
 
 import java.time._
 import java.time.format._

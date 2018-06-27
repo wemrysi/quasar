@@ -23,7 +23,7 @@ import quasar.DataDateTimeExtractors._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.time.DateTimeInterval
+import qdata.time.DateTimeInterval
 
 import scala.math.BigDecimal.RoundingMode
 

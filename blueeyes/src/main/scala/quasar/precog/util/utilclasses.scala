@@ -16,7 +16,7 @@
 
 package quasar.precog.util
 
-import quasar.time.OffsetDate
+import qdata.time.OffsetDate
 
 import org.slf4s.Logging
 

@@ -19,7 +19,7 @@ package quasar.precog.common
 import quasar.blueeyes._
 import quasar.precog._
 import quasar.precog.util.{BitSetUtil, ByteBufferMonad, ByteBufferPool, RawBitSet}
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.{CharsetEncoder, CoderResult}

@@ -30,6 +30,7 @@ object Dependencies {
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
   private val fs2Version          = "1.0.0-M1"
+  private val qdataVersion        = "1.0.1"
 
   def foundation = Seq(
     "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
@@ -48,6 +49,7 @@ object Dependencies {
     "com.slamdata"               %% "matryoshka-core"           % matryoshkaVersion,
     "com.slamdata"               %% "pathy-core"                % pathyVersion,
     "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
+    "com.slamdata"               %% "qdata-time"                % qdataVersion,
     "eu.timepit"                 %% "refined"                   % refinedVersion,
     "com.chuusai"                %% "shapeless"                 % shapelessVersion,
     "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
@@ -71,7 +73,9 @@ object Dependencies {
 
   def frontend = Seq(
     "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
-    "org.typelevel"              %% "algebra-laws"  % algebraVersion  % Test
+    "com.slamdata"               %% "qdata-core"    % qdataVersion,
+    "com.slamdata"               %% "qdata-time"    % qdataVersion % "test->test" classifier "tests",
+    "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test
   )
 
   def effect = Seq(
@@ -138,17 +142,19 @@ object Dependencies {
   )
 
   def blueeyes = Seq(
-    "com.google.guava" %  "guava" % "13.0"
+    "com.google.guava" % "guava" % "13.0"
   )
 
   def yggdrasil = Seq(
     "com.codecommit" %% "smock" % "0.4.0-specs2-4.0.2" % "test"
   )
+
   def niflheim = Seq(
     "com.typesafe.akka"  %% "akka-actor" % akkaVersion,
     "org.typelevel"      %% "spire"      % spireVersion,
     "org.objectweb.howl" %  "howl"       % "1.0.1-1"
   )
+
   def it = Seq(
     "co.fs2"           %% "fs2-io"              % fs2Version          % Test,
     "io.argonaut"      %% "argonaut-monocle"    % argonautVersion     % Test,
