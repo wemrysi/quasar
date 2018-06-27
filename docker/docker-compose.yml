@@ -1,12 +1,5 @@
 version: '2'
 services:
-  quasar_mongodb_3_4:
-    container_name: quasar_mongodb_3_4
-    image: mongo:3.4.3
-    command: ["mongod", "--smallfiles", "--storageEngine", "ephemeralForTest"]
-    ports:
-      - "27022:27017"
-
   quasar_mongodb_3_4_13:
     container_name: quasar_mongodb_3_4_13
     image: mongo:3.4.13

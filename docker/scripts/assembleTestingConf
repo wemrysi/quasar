@@ -35,18 +35,17 @@ configure_metastore() {
 #
 configure_mongo() {
   CONTAINERNAME=$1
-  if [[ $CONTAINERNAME == "mongodb_3_4"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27022\"" >> $CONFIGFILE; fi
-  if [[ $CONTAINERNAME == "mongodb_3_4_13"    ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27023\"" >> $CONFIGFILE; fi
-  if [[ $CONTAINERNAME == "mongodb_3_6"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27024\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_3_4_13" ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27023\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_3_6"    ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27024\"" >> $CONFIGFILE; fi
 }
 
 
 container_lookup() {
   CONTAINER=$(echo "$1" | cut -d_ -f2-)
-  if [[ $CONTAINER =~ "mongodb"        ]]; then configure_mongo          $CONTAINER;      fi
-  if [[ $CONTAINER == "metastore"      ]]; then configure_metastore;                      fi
-  if [[ $CONTAINER == "mimir"          ]]; then configure_mimir;                          fi
-  if [[ $CONTAINER == "lwc_local"      ]]; then configure_lwc_local;                      fi
+  if [[ $CONTAINER =~ "mongodb"   ]]; then configure_mongo $CONTAINER; fi
+  if [[ $CONTAINER == "metastore" ]]; then configure_metastore;        fi
+  if [[ $CONTAINER == "mimir"     ]]; then configure_mimir;            fi
+  if [[ $CONTAINER == "lwc_local" ]]; then configure_lwc_local;        fi
 }
 
 

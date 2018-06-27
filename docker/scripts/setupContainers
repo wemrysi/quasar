@@ -23,7 +23,7 @@ init_metastore() {
 apply_configuration() {
   CONTAINER=$1
   echo "apply configuration for " $CONTAINER
-  if [[ $CONTAINER == "quasar_metastore"           ]]; then init_metastore;                              fi
+  if [[ $CONTAINER == "quasar_metastore" ]]; then init_metastore; fi
 }
 
 
