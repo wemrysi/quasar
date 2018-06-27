@@ -31,8 +31,6 @@ sealed trait RValue { self =>
   def toJValue: JValue
   def toJValueRaw: JValue
 
-  def \(fieldName: String): RValue
-
   def unsafeInsert(path: CPath, value: RValue): RValue = {
     RValue.unsafeInsert(self, path, value)
   }
@@ -72,7 +70,6 @@ object RValue {
     case RObject.empty  => Some(CEmptyObject)
     case _              => None
   }
-
 
   def fromJValueRaw(jv: JValue): RValue = {
     def loop(jv: JValue): Option[RValue] = jv match {
@@ -166,9 +163,8 @@ object RValue {
 }
 
 case class RObject(fields: Map[String, RValue]) extends RValue {
-  def toJValue                     = JObject(fields mapValues (_.toJValue) toMap)
-  def toJValueRaw                  = JObject(fields mapValues (_.toJValueRaw) toMap)
-  def \(fieldName: String): RValue = fields(fieldName)
+  def toJValue = JObject(fields mapValues (_.toJValue) toMap)
+  def toJValueRaw = JObject(fields mapValues (_.toJValueRaw) toMap)
 }
 
 object RObject {
@@ -177,9 +173,8 @@ object RObject {
 }
 
 case class RArray(elements: List[RValue]) extends RValue {
-  def toJValue                     = JArray(elements map { _.toJValue })
-  def toJValueRaw                  = JArray(elements map { _.toJValueRaw })
-  def \(fieldName: String): RValue = CUndefined
+  def toJValue = JArray(elements map { _.toJValue })
+  def toJValueRaw = JArray(elements map { _.toJValueRaw })
 }
 
 object RArray {
@@ -189,7 +184,6 @@ object RArray {
 
 sealed trait CValue extends RValue {
   def cType: CType
-  def \(fieldName: String): RValue = CUndefined
 }
 
 sealed trait CNullValue extends CValue { self: CNullType =>
