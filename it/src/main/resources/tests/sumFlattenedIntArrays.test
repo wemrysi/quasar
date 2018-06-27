@@ -1,6 +1,8 @@
 {
     "name": "sum flattened int arrays",
     "backends": {
+        "mongodb_3_4_13":    "pending",
+        "mongodb_3_6":       "pending"
     },
     "data": "intArrays.data",
     "query": "select b[*] + c[*] from intArrays",

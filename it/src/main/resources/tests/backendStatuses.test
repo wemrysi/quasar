@@ -1,7 +1,6 @@
 {
     "name": "select all backend failure statuses",
     "backends": {
-        "mongodb_3_4":       "pending"
     },
     "data": "newTests.data",
     "query": "select backends{_:} as backend, backends{:_} as status, name from newTests",

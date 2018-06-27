@@ -3,7 +3,6 @@
     "backends": {
         "lwc_local":"pendingIgnoreFieldOrder",
         "mimir":"pendingIgnoreFieldOrder",
-        "mongodb_3_4":       "pendingIgnoreFieldOrder",
         "mongodb_3_4_13":    "pendingIgnoreFieldOrder",
         "mongodb_3_6":       "pendingIgnoreFieldOrder"
     },
