@@ -134,7 +134,7 @@ lazy val assemblySettings = Seq(
     // in the scala-lang scala-compiler 2.11.11 jar. It comes bundled with jansi OS libraries
     // which conflict with similar jansi libraries brought in by fusesource.jansi.jansi-1.11
     // So the merge needed the following lines to avoid the "deduplicate: different file contents found"
-    // produced by web/assembly. Look into removing this once we move to scala v2.11.11.
+    // produced by repl/assembly. This is still a problem on quasar v47.0.0
     case s if s.endsWith("libjansi.jnilib")                   => MergeStrategy.last
     case s if s.endsWith("jansi.dll")                         => MergeStrategy.last
     case s if s.endsWith("libjansi.so")                       => MergeStrategy.last
