@@ -35,16 +35,16 @@ object DataSourceConfig extends DataSourceConfigInstances {
 }
 
 sealed abstract class DataSourceConfigInstances extends DataSourceConfigInstances0 {
-  def order[C: Order]: Order[DataSourceConfig[C]] =
+  implicit def order[C: Order]: Order[DataSourceConfig[C]] =
     Order.orderBy(c => (c.kind, c.config))
 
-  def show[C: Show]: Show[DataSourceConfig[C]] =
+  implicit def show[C: Show]: Show[DataSourceConfig[C]] =
     Show.show {
       case DataSourceConfig(t, c) =>
         Cord("DataSourceConfig(") ++ t.show ++ Cord(", ") ++ c.show ++ Cord(")")
     }
 
-  val traverse1: Traverse1[DataSourceConfig] =
+  implicit val traverse1: Traverse1[DataSourceConfig] =
     new Traverse1[DataSourceConfig] {
       def foldMapRight1[A, B](fa: DataSourceConfig[A])(z: A => B)(f: (A, => B) => B) =
         z(fa.config)
@@ -55,6 +55,6 @@ sealed abstract class DataSourceConfigInstances extends DataSourceConfigInstance
 }
 
 sealed abstract class DataSourceConfigInstances0 {
-  def equal[C: Equal]: Equal[DataSourceConfig[C]] =
+  implicit def equal[C: Equal]: Equal[DataSourceConfig[C]] =
     Equal.equalBy(c => (c.kind, c.config))
 }

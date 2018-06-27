@@ -14,16 +14,27 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.mimir
+
+import quasar.precog.common.RValue
+import quasar.yggdrasil.SValueGenerators
+
+import scala.math
 
 import org.scalacheck.{Arbitrary, Gen}
 
-trait ResourceNameGenerator {
-  implicit val resourceNameArbitrary: Arbitrary[ResourceName] =
+// TODO: This should probably live over in blueeyes, but defining here for
+//       now as it depends on Gen[SValue] from yggdrasil.
+trait RValueGenerator {
+  implicit val rValueArbitrary: Arbitrary[RValue] = {
+    val svgen = new SValueGenerators {}
+
     Arbitrary(for {
-      cs <- Gen.listOf(Gen.alphaNumChar)
-      a  <- Gen.alphaChar
-    } yield ResourceName((a :: cs).mkString))
+      size <- Gen.size
+      depth = math.round(math.log(size.toDouble)).toInt
+      svalue <- svgen.svalue(depth)
+    } yield svalue.toRValue)
+  }
 }
 
-object ResourceNameGenerator extends ResourceNameGenerator
+object RValueGenerator extends RValueGenerator

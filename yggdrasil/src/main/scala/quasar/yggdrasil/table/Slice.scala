@@ -1729,6 +1729,20 @@ trait Slice { source =>
     }
   }
 
+  def toRValues: List[RValue] = {
+    @tailrec
+    def loop(idx: Int, rvalues: List[RValue]): List[RValue] =
+      if (idx >= 0)
+        toRValue(idx) match {
+          case CUndefined => loop(idx - 1, rvalues)
+          case rv         => loop(idx - 1, rv :: rvalues)
+        }
+      else
+        rvalues
+
+    loop(source.size - 1, Nil)
+  }
+
   def toJValue(row: Int) = {
     columns.foldLeft[JValue](JUndefined) {
       case (jv, (ColumnRef(selector, _), col)) if col.isDefinedAt(row) =>

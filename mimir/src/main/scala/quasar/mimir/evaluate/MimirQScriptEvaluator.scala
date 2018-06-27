@@ -22,7 +22,6 @@ import quasar._
 import quasar.api.ResourceError.ReadError
 import quasar.blueeyes.json.{JValue, JUndefined}
 import quasar.connector.QScriptEvaluator
-import quasar.contrib.fs2.convert
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.concurrent.task._
@@ -33,14 +32,13 @@ import quasar.mimir
 import quasar.mimir.MimirCake._
 import quasar.qscript._
 import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
-import quasar.yggdrasil.table.Slice
 
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.{IO, LiftIO}
 import cats.effect.implicits._
-import fs2.{Chunk, Stream}
+import fs2.Stream
 import iotaz.CopK
 import matryoshka._
 import matryoshka.implicits._
@@ -88,7 +86,7 @@ final class MimirQScriptEvaluator[
     Unicoalesce.Capture[T, QS[T]]
 
   def execute(repr: Repr): M[ReadError \/ Stream[IO, Data]] =
-    MimirQScriptEvaluator.slicesToStream(repr.table.slices)
+    mimir.slicesToStream(repr.table.slices)
       // TODO{fs2}: Chunkiness
       .mapSegments(s =>
         s.filter(_ != JUndefined).map(JValue.toData).force.toChunk.toSegment)
@@ -144,7 +142,4 @@ object MimirQScriptEvaluator {
       cake: Cake)
       : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] =
     new MimirQScriptEvaluator[T, F](cake)
-
-  def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, JValue] =
-    convert.fromChunkedStreamT(slices.map(s => Chunk.indexedSeq(SliceIndexedSeq(s))))
 }
