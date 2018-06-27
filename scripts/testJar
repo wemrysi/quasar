@@ -15,7 +15,6 @@ then
     cp $(dirname $0)/../example-quasar-config.json $CONFIG_FILE
 fi
 
-QUASAR_VERSION=$(cat $WS_DIR/version.sbt | sed -n -e 's/^ *version.*:= "\(.*\)"[^\n]*/\1/p')
 QUASAR_SUCCESS_OUTPUT="(v$QUASAR_VERSION) 💪 $"
 QUASAR_LOG_FILE="$TEMP_DIR/quasarout.log"
 
