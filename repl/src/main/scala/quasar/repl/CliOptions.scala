@@ -46,7 +46,7 @@ object CliOptions {
       c.copy(config = Some(x))
     } text("path to the config file to use")
 
-    opt[(String, Seq[File])]("backend").required.unbounded validate { x =>
+    opt[(String, Seq[File])]("backend").unbounded validate { x =>
       import scala.language.postfixOps   // thanks, SIP-18, this is valuable...
 
       x._2.toList traverse { file =>

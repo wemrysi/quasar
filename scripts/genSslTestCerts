@@ -57,7 +57,7 @@
 #   -Djavax.net.ssl.keyStore=ssl/keystore.jks \
 #   -Djavax.net.ssl.keyStorePassword=password \
 #   -DinvalidHostNameAllow=true \
-#   -jar <path to repl or web jar>
+#   -jar <path to repl jar>
 
 
 
