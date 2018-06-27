@@ -74,7 +74,7 @@ class MountConfigSpec extends quasar.Qspec {
       "decode with bad scheme" in {
         viewJson("foo:///?q=%28select+*+from+zips%29")
           .as[MountConfig].toEither.leftMap(_._1) must
-            beLeft("unrecognized scheme: foo")
+            beLeft("unrecognized scheme: Scheme(foo)")
       }
 
       "decode with unparseable URI" in {
