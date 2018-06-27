@@ -2,7 +2,6 @@
     "name": "field and flattened array index on heterogenous",
     "backends": {
         "mimir":             "ignoreFieldOrder",
-        "mongodb_3_4":       "pending",
         "mongodb_3_4_13":    "pending",
         "mongodb_3_6":       "pending"
     },

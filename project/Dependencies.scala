@@ -19,14 +19,14 @@ object Dependencies {
   private val refinedVersion      = "0.8.3"
   private val scodecBitsVersion   = "1.1.2"
   private val scodecScalazVersion = "1.4.1a"
-  private val http4sVersion       = "0.16.6a"
-  private val scalacheckVersion   = "1.14.0"
+  private val http4sVersion       = "0.18.13"
+  private val scalacheckVersion   = "1.13.4"
   private val scalazVersion       = "7.2.23"
   private val scalazStreamVersion = "0.8.6a"
   private val scoptVersion        = "3.5.0"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"
-  private val specsVersion        = "4.2.0"
+  private val specsVersion        = "4.1.0"
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
   private val fs2Version          = "1.0.0-M1"
@@ -60,7 +60,7 @@ object Dependencies {
     "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
     "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
     "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
-    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.14") % Test,
+    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") % Test,
     "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                              % Test
   )
 
@@ -124,21 +124,6 @@ object Dependencies {
       "io.netty"    % "netty-handler"        % nettyVersion
     )
   }
-
-  def web = Seq(
-    "eu.timepit"     %% "refined-scalaz"      % refinedVersion,
-    "org.http4s"     %% "http4s-dsl"          % http4sVersion,
-    "org.http4s"     %% "http4s-argonaut"     % http4sVersion,
-    "org.http4s"     %% "http4s-client"       % http4sVersion,
-    "org.http4s"     %% "http4s-server"       % http4sVersion,
-    "org.http4s"     %% "http4s-blaze-server" % http4sVersion,
-    "org.http4s"     %% "http4s-blaze-client" % http4sVersion,
-    "org.scodec"     %% "scodec-scalaz"       % scodecScalazVersion,
-    "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
-    "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
-    "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
-    "eu.timepit"     %% "refined-scalacheck"  % refinedVersion     % Test
-  )
 
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % "1.7.25",

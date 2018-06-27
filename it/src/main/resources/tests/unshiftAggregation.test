@@ -2,8 +2,7 @@
     "name": "unshift aggregation",
     "backends": {
         "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder",
-        "mongodb_3_4":       "ignoreFieldOrder"
+        "mimir":             "ignoreFieldOrder"
     },
     "data": "zips.data",
     "query": "select state, city, [pop ...] as pop from zips group by state, city",

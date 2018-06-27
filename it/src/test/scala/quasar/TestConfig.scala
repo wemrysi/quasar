@@ -52,14 +52,14 @@ object TestConfig {
    */
   val LWC_LOCAL       = ExternalBackendRef(BackendRef(BackendName("lwc_local")        , BackendCapability.All), FileSystemType("lwc_local"))
   val MIMIR           = ExternalBackendRef(BackendRef(BackendName("mimir")            , BackendCapability.All), mimir.Mimir.Type)
-  val MONGO_3_4       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4")      , BackendCapability.All), FileSystemType("mongodb"))
   val MONGO_3_4_13    = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4_13")   , BackendCapability.All), FileSystemType("mongodb"))
   val MONGO_3_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_6")      , BackendCapability.All), FileSystemType("mongodb"))
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
     LWC_LOCAL,
     MIMIR,
-    MONGO_3_4, MONGO_3_4_13, MONGO_3_6)
+    MONGO_3_4_13,
+    MONGO_3_6)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")

@@ -47,7 +47,7 @@ Of particular interest are the following two scripts:
 Quasar supports the following datastores:
 
 ```
-quasar_mongodb_3_4
+quasar_mongodb_3_4_13
 quasar_metastore
 ```
 
@@ -55,7 +55,7 @@ Knowing which backend datastores are supported you can create and configure dock
 if you wanted to run integration tests with mongo you would use:
 
 ```
-./setupContainers -u quasar_metastore,quasar_mongodb_3_4
+./setupContainers -u quasar_metastore,quasar_mongodb_3_4_13
 ```
 
 Note: `quasar_metastore` is always needed to run integration tests.
@@ -75,7 +75,7 @@ After running this command your `testing.conf` file should look similar to this:
 ```
 > cat it/testing.conf
 postgresql_metastore="{\"host\":\"192.168.99.101\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"
-mongodb_3_4="mongodb://192.168.99.101:27022"
+mongodb_3_4_13="mongodb://192.168.99.101:27022"
 ```
 
 IP's will vary depending on your docker environment. In addition the scripts assume you have docker and docker-compose installed.
@@ -100,12 +100,6 @@ java -jar [<path to jar>] [-c <config file>]
 
 As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker.
 
-Once you have a running metastore you can start the web api service with [these](#web-jar) instructions and issue curl commands
-of the following format to create new mount points.
-
-```bash
-curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": { "connectionUri":"<protocol><uri>" } }'
-```
 The `<mountPath>` specifies the path of your mount point and the remaining parameters are listed below:
 
 | mountKey            | protocol         | uri                                   |
@@ -120,30 +114,14 @@ See [here](#get-mountfspath) for more details on the mount web api service.
 For example, to create a mongo mount point, issue a `curl` command like:
 
 ```bash
-curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "mongodb": { "connectionUri":"mongodb://<host>:<port>" } }'
+curl -v -X PUT http://localhost:8080/mount/fs/mongo/ -d '{ "mongodb": { "connectionUri":"mongodb://<host>:<port>" } }'
 ```
 
-#### Web JAR
-
-To build a JAR containing a lightweight HTTP server that allows you to programmatically interact with Quasar, execute the following command:
-
-```bash
-./sbt 'web/assembly'
-```
-
-The path of the JAR will be `./.targets/web/scala-2.11/quasar-web-assembly-[version].jar`, where `[version]` is the Quasar version number.
-
-To run the JAR, execute the following command:
-
-```bash
-java -jar [<path to jar>] [-c <config file>]
-```
-
-Web jar users, will also need the metadata store. See [here](#full-testing-prerequisite-docker-and-docker-compose) for getting up and running with one using docker.
+You will also need the metadata store. See [here](#full-testing-prerequisite-docker-and-docker-compose) for getting up and running with one using docker.
 
 ### Backends
 
-By default, neither the REPL nor the web assemblies contain any backends *other* than mimir.  Thus, if you invoke them as shown above, the only mount type that will be understood will be `mimir`.  In order to use other mounts – such as mongodb – you will need to build the relevant backend and place the JAR in a directory where quasar can find it.  This can be done in one of two ways
+By default, the REPL assembly contains only `mimir` and `lwc_local`. In order to use other mounts – such as mongodb – you will need to build the relevant backend and place the JAR in a directory where quasar can find it.  This can be done in one of two ways
 
 #### Plugins Directory
 
@@ -161,27 +139,19 @@ $ ./sbt mongodb/assembly
 
 The path to the JAR will be something like `./.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar`, though the exact name of the JAR (and the directory path in question) will of course depend on the backend built (for example, `mongodb/assembly` will produce a very different JAR from `mongodb/assembly`).
 
-For each backend that you wish to support, run that backend's `assembly` and copy the JAR file into your new `plugins/` directory.  Once this is done, you can launch the web assembly using the following sort of command:
-
-```bash
-java -jar [<path to quasar jar>] [-c <config file>] -P plugins/
-```
-
-All of the JARs within the `plugins/` directory will be loaded as a backend provider, and their relevant mount type will be made available by quasar. Be sure that no two different versions of the same connector are found within this directory.
-
-This technique (a directory containing multiple plugin JARs) only works with the web assembly.  If you wish to use the REPL, you will need to use the second method (which works with both).
+For each backend that you wish to support, run that backend's `assembly`. See the [launcher](https://github.com/slamdata/launcher) for further instructions.
 
 #### Individual Backend Configuration
 
 This technique is designed for local development use, where the backend implementation is changing frequently.  Under certain circumstances though, it may be useful for the pre-built JAR case.
 
-As with the plugins directory approach, you will need to run the `assembly` task for each backend that you want to use.  But instead of copying the JAR files into a directory, you will be referencing each JAR file individually using the `--backend` switch on the web or REPL JAR invocation:
+As with the plugins directory approach, you will need to run the `assembly` task for each backend that you want to use.  But instead of copying the JAR files into a directory, you will be referencing each JAR file individually using the `--backend` switch on the REPL JAR invocation:
 
 ```bash
 java -jar [<path to jar>] [-c <config file>] --backend:quasar.physical.mongodb.MongoDb\$=.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar
 ```
 
-Replace the JAR file in the above with the path to the backend whose `assembly` you ran.  The `--backend` switch may be repeated as many times as necessary: once for each backend you wish to add.  The value to the left of the `=` is the `BackendModule` object *class name* which defines the backend in question.  Note that we need to escape the `$` character which will be present in each class name, solely because of bash syntax. If you are invoking the `--backend` option within `sbt` (for example running `web/run` or `repl/run`) you do not need to escape the `$`.
+Replace the JAR file in the above with the path to the backend whose `assembly` you ran.  The `--backend` switch may be repeated as many times as necessary: once for each backend you wish to add.  The value to the left of the `=` is the `BackendModule` object *class name* which defines the backend in question.  Note that we need to escape the `$` character which will be present in each class name, solely because of bash syntax. If you are invoking the `--backend` option within `sbt` (for example running `repl/run`) you do not need to escape the `$`.
 
 What follows is a list of class names for each supported backend:
 
@@ -251,7 +221,7 @@ The contents of the optional `parameters` object correspond to the various drive
 
 #### Initializing and updating Schema
 
-Before the server can be started, the metadata store schema must be initialized. To do so utilize the "initUpdateMetaStore" command with a web or repl quasar jar.
+Before the server can be started, the metadata store schema must be initialized. To do so utilize the "initUpdateMetaStore" command with a repl quasar jar.
 
 If mounts are already defined in the config file, initialization will migrate those to the metadata store.
 

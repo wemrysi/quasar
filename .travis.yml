@@ -23,7 +23,6 @@ env:
   matrix:
     - CONNECTOR=lwc_local
     - CONNECTOR=mimir
-    - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_3_4_13
     - CONNECTOR=mongodb_3_6
   global:
@@ -39,6 +38,10 @@ env:
     # GITHUB_TOKEN
     - secure: "lH3uaFqFM+4fXAQiF+cQ6eo89HI4Vc7QuIaVUuA7xcVTkPy52cWg6ivrX1ZIG1HQXo5UOFEJDxPmGyeobF/8BrcgacigvEbiHkVhiXzRnWtpZYEPFac3cUmnKd8VRgYA68gXX3pBuF29v+v91MmznDiuBkfKn8r7z/sTykUdHV4="
 
+before_script:
+  # confirm we are using travis' premium VMs
+  - nproc 2>/dev/null && python -c 'import multiprocessing;print multiprocessing.cpu_count()'
+  - free && cat /proc/meminfo
 
 # this is also the test stage :eyeroll:
 script:

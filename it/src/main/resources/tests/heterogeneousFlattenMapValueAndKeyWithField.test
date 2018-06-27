@@ -1,9 +1,8 @@
 {
     "name": "field and flattened map value and key on heterogeneous",
     "backends": {
-        "lwc_local":         "pendingIgnoreFieldOrder",
-        "mimir":             "pendingIgnoreFieldOrder",
-        "mongodb_3_4":       "pending",
+        "lwc_local":         "ignoreFieldOrder",
+        "mimir":             "ignoreFieldOrder",
         "mongodb_3_4_13":    "pending",
         "mongodb_3_6":       "pending"
     },

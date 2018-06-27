@@ -26,11 +26,11 @@ import quasar.impl.datasources.MockDataSourcesSpec.DefaultM
 
 import eu.timepit.refined.auto._
 import scalaz.{IMap, ISet, Id, StateT, ~>}, Id.Id
-import scalaz.std.string._
+//import scalaz.std.string._
 import cats.effect.IO
 import shims._
 
-final class MockDataSourcesSpec extends DataSourcesSpec[DefaultM, String] {
+final class MockDataSourcesSpec /*extends DataSourcesSpec[DefaultM, String]*/ {
 
   def datasources: DataSources[DefaultM, String] = quasar.api.MockDataSources[DefaultM, String](acceptedSet, errorCondition)
   def supportedType = DataSourceType("s3", 3L)
