@@ -192,45 +192,21 @@ lazy val root = project.in(file("."))
   .settings(aggregate in assembly := false)
   .settings(excludeTypelevelScalaLibrary)
   .aggregate(
-
-       foundation, //___
-//    /    |      \     \
-    api, effect, ejson, js,
-//  /      |        \  /  \________
-                  common,
-// |       |     /  |   \           \
-        frontend,  sql, precog,
-// |   /   |    \   |     |         |
-// |  /    |     \_____   |         |
-// |  |    |        |  \  |         |
-     fs,  sst,         blueeyes,
-// |  |    |        |     |         |
-// |  |    |        /     |         |
-        datagen,
-// |__|___________/       |         |
-// |  |          /        |         |
-     qscript,          niflheim,
-// |  |      \ /          |         |
-     qsu,   core,
-// |   \    /             |         |
-// |\___\_____            |         |
-// |      /   \           |         |
-            connector,  yggdrasil,
-// |    /  /      \       |         |
-// |   /  /        \______|________/
-// |   \ /            \  /    |
-                    mimir, mongodb,
-// \   / \          /         |
-    impl, interface,
-//          /  \              |
-         repl,
-//              |             |
-                it,
-//              |   _________/
-//              |  /
-              mongoIt
-//
-// NB: the *It projects are temporary until we polyrepo
+    api,
+    blueeyes,
+    common, connector, core,
+    datagen,
+    effect, ejson,
+    foundation, frontend, fs,
+    impl, interface, it,
+    js,
+    mimir, mongodb, mongoIt,
+    niflheim,
+    precog,
+    qscript, qsu,
+    repl,
+    sql, sst,
+    yggdrasil
   ).enablePlugins(AutomateHeaderPlugin)
 
 /** Very general utilities, ostensibly not Quasar-specific, but they just aren’t
