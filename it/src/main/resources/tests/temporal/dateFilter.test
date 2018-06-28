@@ -2,7 +2,8 @@
     "name": "filter on date part",
 
     "backends": {
-        "mimir": "pending"
+        "mimir": "pendingIgnoreFieldOrder",
+        "lwc_local": "ignoreFieldOrder"
     },
 
     "data": "../days.data",

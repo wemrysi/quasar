@@ -156,7 +156,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
         case (tests, (eval, sdown)) =>
           suiteName >> {
             tests.toList foreach { case (f, t) =>
-              regressionExample(f, t, BackendName("mimir"), queryResults(eval.evaluate))
+              regressionExample(f, t, BackendName("lwc_local"), queryResults(eval.evaluate))
             }
 
             step(sdown.unsafeRunSync)
