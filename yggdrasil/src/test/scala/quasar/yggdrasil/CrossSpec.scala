@@ -17,7 +17,7 @@
 package quasar.yggdrasil
 
 import quasar.blueeyes.json._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 import quasar.precog.common._
 
 import cats.effect.IO

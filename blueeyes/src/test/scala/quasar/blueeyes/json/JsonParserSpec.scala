@@ -17,7 +17,8 @@
 package quasar.blueeyes.json
 
 import quasar.blueeyes._
-import quasar.precog._, JsonTestSupport._
+import quasar.pkg.tests._
+import quasar.precog.JsonTestSupport._
 
 import scalaz._
 

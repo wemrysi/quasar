@@ -19,7 +19,7 @@ package table
 
 import quasar.blueeyes._, json._
 import quasar.precog.common._
-import quasar.precog.TestSupport._, Gen._
+import quasar.pkg.tests._, Gen._
 import quasar.yggdrasil.bytecode.JType
 
 import org.slf4j.LoggerFactory

@@ -17,8 +17,7 @@
 package quasar.blueeyes
 package json
 
-import org.scalacheck.Prop
-import org.scalacheck.Arbitrary, Arbitrary.arbitrary
+import quasar.pkg.tests._
 import quasar.precog.JsonTestSupport._
 
 object JPathSpec extends Specification with ScalaCheck {

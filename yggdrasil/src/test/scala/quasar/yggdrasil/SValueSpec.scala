@@ -18,7 +18,7 @@ package quasar.yggdrasil
 
 import quasar.blueeyes._, json._
 import quasar.precog.common._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 
 class SValueSpec extends Specification {
   "set" should {

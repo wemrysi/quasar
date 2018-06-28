@@ -18,7 +18,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes.json._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 
 trait ToArraySpec extends ColumnarTableModuleTestSupport with SpecificationLike {
   def testToArrayHomogeneous = {

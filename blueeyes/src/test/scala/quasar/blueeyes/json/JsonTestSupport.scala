@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-import org.scalacheck._
-import Gen._
-import quasar.blueeyes._, json._
-
 package quasar.precog {
-  object JsonTestSupport extends TestSupport with JsonGenerators {
+  import quasar.blueeyes.json._
+  import quasar.pkg.tests._
+
+  object JsonTestSupport extends JsonGenerators {
     implicit def arbJValue: Arbitrary[JValue]   = Arbitrary(genJValue)
     implicit def arbJObject: Arbitrary[JObject] = Arbitrary(genJObject)
     implicit def arbJPath: Arbitrary[JPath]     = Arbitrary(genJPath)
@@ -41,7 +40,7 @@ package quasar.precog {
 }
 
 package quasar.blueeyes.json {
-  import quasar.precog.TestSupport._
+  import quasar.pkg.tests._
 
   final case class JValueAndPath(jv: JValue, p: JPath)
 
@@ -55,19 +54,19 @@ package quasar.blueeyes.json {
       case (_, JPathIndex(i) :: xs)          => (i != 0) || badPath(JArray(Nil), JPath(xs))
     }
 
-    def genJPathNode: Gen[JPathNode] = frequency(
+    def genJPathNode: Gen[JPathNode] = Gen.frequency(
       1 -> (choose(0, 10) ^^ JPathIndex),
       9 -> (genIdent ^^ JPathField)
     )
-    def genJPath: Gen[JPath] = choose(0, 10) >> (len => listOfN(len, genJPathNode) ^^ (JPath(_)))
-    def genJValue: Gen[JValue] = frequency(
+    def genJPath: Gen[JPath] = choose(0, 10) >> (len => Gen.listOfN(len, genJPathNode) ^^ (JPath(_)))
+    def genJValue: Gen[JValue] = Gen.frequency(
       5 -> genSimple,
-      1 -> delay(genJArray),
-      1 -> delay(genJObject)
+      1 -> Gen.delay(genJArray),
+      1 -> Gen.delay(genJObject)
     )
 
-    def genIdent: Gen[String]    = choose(3, 8) >> (len => arrayOfN(len, alphaLowerChar) ^^ (new String(_)))
-    def genSimple: Gen[JValue]   = oneOf[JValue](JNull, genJNum, genJBool, genJString)
+    def genIdent: Gen[String]    = choose(3, 8) >> (len => arrayOfN(len, Gen.alphaLowerChar) ^^ (new String(_)))
+    def genSimple: Gen[JValue]   = Gen.oneOf[JValue](JNull, genJNum, genJBool, genJString)
     def genSmallInt: Gen[Int]    = choose(0, 5)
     def genJNum: Gen[JNum]       = genBigDecimal ^^ (x => JNum(x))
     def genJBool: Gen[JBool]     = genBool ^^ (x => JBool(x))
@@ -76,7 +75,7 @@ package quasar.blueeyes.json {
     def genJObject: Gen[JObject] = genSmallInt >> genJFieldList ^^ (xs => JObject(xs: _*))
     def genJArray: Gen[JArray]   = genSmallInt >> genJList ^^ JArray
 
-    def genJList(size: Int): Gen[List[JValue]]      = listOfN(size, genJValue)
-    def genJFieldList(size: Int): Gen[List[JField]] = listOfN(size, genJField)
+    def genJList(size: Int): Gen[List[JValue]]      = Gen.listOfN(size, genJValue)
+    def genJFieldList(size: Int): Gen[List[JField]] = Gen.listOfN(size, genJField)
   }
 }
