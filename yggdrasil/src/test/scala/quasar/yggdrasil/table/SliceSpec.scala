@@ -174,7 +174,7 @@ class SliceSpec extends Specification with ScalaCheck {
     }
 
     import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
-    import quasar.time.{DateTimeInterval, OffsetDate}
+    import qdata.time.{DateTimeInterval, OffsetDate}
 
     val pathological =
       List(CTrue, CEmptyObject, COffsetTime(OffsetTime.parse("16:30:38.540182417-17:24:37")), CLong(-2090824460258735860L),
