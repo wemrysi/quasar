@@ -204,7 +204,7 @@ lazy val root = project.in(file("."))
     niflheim,
     precog,
     qscript, qsu,
-    repl,
+    repl, runp,
     sql, sst,
     yggdrasil
   ).enablePlugins(AutomateHeaderPlugin)
@@ -432,6 +432,18 @@ lazy val impl = project
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.impl)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val runp = (project in file("run"))
+  .settings(name := "quasar-run")
+  .dependsOn(
+    core,
+    impl,
+    mimir)
+  .settings(commonSettings)
+  .settings(publishTestsSettings)
+  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
