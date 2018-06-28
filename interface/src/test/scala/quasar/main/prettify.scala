@@ -310,7 +310,7 @@ class PrettifySpecs extends quasar.Qspec {
         parse(r).map(render(_).value) must beSome(r)
       }
       // Test will sometimes fail due to to many generator failures without this
-    }.setArbitrary(Arbitrary(DataGenerators.simpleData))
+    }.setArbitrary(Arbitrary(DataGenerators.simpleNonNested))
   }
 
   "renderTable" should {
