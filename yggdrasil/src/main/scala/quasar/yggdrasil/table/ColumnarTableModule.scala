@@ -24,7 +24,6 @@ import quasar.precog.{BitSet, MimeType, MimeTypes}
 import quasar.precog.common._
 import quasar.precog.common.ingest.FileContent
 import quasar.precog.util.{BitSetUtil, RawBitSet}
-import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
@@ -631,12 +630,7 @@ trait ColumnarTableModule
         _ <- MonadTell_[M, List[IO[Unit]]].tell(List(d.dispose))
 
         slices = d.unsafeValue
-      } yield {
-
-        import trans._
-
-        Table(slices, UnknownSize)
-      }
+      } yield Table(slices, UnknownSize)
     }
 
     def fromRValues(values: Stream[RValue], maxSliceRows: Option[Int] = None): Table = {
