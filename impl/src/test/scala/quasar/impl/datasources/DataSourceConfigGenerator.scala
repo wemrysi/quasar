@@ -14,16 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.impl.datasources
 
-import org.scalacheck.{Arbitrary, Gen}
+import quasar.api.{DataSourceType, DataSourceTypeGenerator}
 
-trait ResourceNameGenerator {
-  implicit val resourceNameArbitrary: Arbitrary[ResourceName] =
+import org.scalacheck._, Arbitrary.arbitrary
+
+trait DataSourceConfigGenerator {
+  import DataSourceTypeGenerator._
+
+  implicit def dataSourceConfigArbitrary[C: Arbitrary]: Arbitrary[DataSourceConfig[C]] =
     Arbitrary(for {
-      cs <- Gen.listOf(Gen.alphaNumChar)
-      a  <- Gen.alphaChar
-    } yield ResourceName((a :: cs).mkString))
+      tpe <- arbitrary[DataSourceType]
+      c   <- arbitrary[C]
+    } yield DataSourceConfig(tpe, c))
 }
 
-object ResourceNameGenerator extends ResourceNameGenerator
+object DataSourceConfigGenerator extends DataSourceConfigGenerator

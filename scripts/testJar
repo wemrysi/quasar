@@ -15,16 +15,16 @@ then
     cp $(dirname $0)/../example-quasar-config.json $CONFIG_FILE
 fi
 
-QUASAR_SUCCESS_OUTPUT="Server started listening on port"
+QUASAR_SUCCESS_OUTPUT="(v$QUASAR_VERSION) 💪 $"
 QUASAR_LOG_FILE="$TEMP_DIR/quasarout.log"
 
 echo "Initializing Quasar MetaStore..."
 
-java -jar "$QUASAR_WEB_JAR_PATH" initUpdateMetaStore
+java -jar "$QUASAR_REPL_JAR_PATH" initUpdateMetaStore
 
-echo "Launching Quasar JAR..."
+echo "Launching Quasar REPL JAR..."
 
-java -jar "$QUASAR_WEB_JAR_PATH" &> "$QUASAR_LOG_FILE" &
+java -jar "$QUASAR_REPL_JAR_PATH" &> "$QUASAR_LOG_FILE" &
 QUASAR_PID=$!
 
 echo "Quasar PID: $QUASAR_PID"

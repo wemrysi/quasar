@@ -1033,16 +1033,6 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       })
     }
 
-    def toRValue: IO[RValue] = {
-      def loop(stream: StreamT[IO, Slice]): IO[RValue] = stream.uncons flatMap {
-        case Some((head, tail)) if head.size > 0 => IO(head.toRValue(0))
-        case Some((_, tail))                     => loop(tail)
-        case None                                => IO.pure(CUndefined)
-      }
-
-      loop(slices)
-    }
-
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): IO[Seq[Table]] = {
       val xform = transform(valueSpec)
       IO(List.fill(groupKeys.size)(xform))

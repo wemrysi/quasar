@@ -100,7 +100,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
       sdown =
         cake.dispose
-          .guarantee(contribFile.deleteRecursively[IO](tmpDir.toPath))
+          .guarantee(contribFile.deleteRecursively[IO](tmpPath))
           .guarantee(local.shutdown.compile.drain)
 
       mimirFederation = MimirQueryFederation[Fix, M](cake.unsafeValue)

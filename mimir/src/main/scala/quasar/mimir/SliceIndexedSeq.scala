@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.mimir.evaluate
+package quasar.mimir
 
 import slamdata.Predef.{IndexedSeq, Int}
 import quasar.blueeyes.json.JValue
