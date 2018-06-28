@@ -46,13 +46,10 @@ object ArrayColumn {
 
   private[table] def resizeBitSet(bs: BitSet, size: Int): BitSet = {
     // 64 bits per long, 2^6 == 64
-    val howManyLongs = Math.max(
-      if (Integer.highestOneBit(size) == size) size >> 6
-      else size >> 6 + 1,
-    1)
+    val howManyLongs = ((size - 1) >> 6) + 1
     val arr = new Array[Long](howManyLongs)
     System.arraycopy(bs.getBits(), 0, arr, 0, Math.min(howManyLongs, bs.getBits().length))
-    new BitSet(arr, size)
+    new BitSet(arr, howManyLongs)
   }
 
   private[table] def filterDefined[A: ClassTag](d: BitSet, arr: Array[A]): Array[A] =
@@ -73,14 +70,10 @@ class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val def
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Array[A]] = {
-    if (size <= values.length) {
-      this
-    } else {
-      implicit val ct: ClassTag[Array[A]] = tpe.classTag
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayHomogeneousArrayColumn(newDefined, newValues)
-    }
+    implicit val ct: ClassTag[Array[A]] = tpe.classTag
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayHomogeneousArrayColumn(newDefined, newValues)
   }
 }
 
@@ -111,20 +104,19 @@ class ArrayBoolColumn(val defined: BitSet, val values: BitSet) extends ArrayColu
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Boolean] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeBitSet(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayBoolColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeBitSet(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayBoolColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
     if (other.isInstanceOf[ArrayBoolColumn]) {
       val otherC = other.asInstanceOf[ArrayBoolColumn]
-      // this is incorrect, we should filter by definedness first.
-      defined == otherC.defined && values == otherC.values
+      val newValues = values.copy()
+      val newOtherValues = otherC.values.copy()
+      newValues.and(defined)
+      newOtherValues.and(otherC.defined)
+      newValues == newOtherValues
     } else {
       false
     }
@@ -157,13 +149,9 @@ class ArrayLongColumn(val defined: BitSet, val values: Array[Long]) extends Arra
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Long] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayLongColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayLongColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
@@ -197,13 +185,9 @@ class ArrayDoubleColumn(val defined: BitSet, val values: Array[Double]) extends 
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Double] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayDoubleColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayDoubleColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
@@ -237,13 +221,9 @@ class ArrayNumColumn(val defined: BitSet, val values: Array[BigDecimal]) extends
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[BigDecimal] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayNumColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayNumColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
@@ -277,13 +257,9 @@ class ArrayStrColumn(val defined: BitSet, val values: Array[String]) extends Arr
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[String] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayStrColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayStrColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
@@ -317,13 +293,9 @@ class ArrayOffsetDateTimeColumn(val defined: BitSet, val values: Array[OffsetDat
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[OffsetDateTime] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayOffsetDateTimeColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayOffsetDateTimeColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
@@ -357,13 +329,9 @@ class ArrayOffsetTimeColumn(val defined: BitSet, val values: Array[OffsetTime]) 
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[OffsetTime] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayOffsetTimeColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayOffsetTimeColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
@@ -397,13 +365,9 @@ class ArrayOffsetDateColumn(val defined: BitSet, val values: Array[OffsetDate]) 
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[OffsetDate] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayOffsetDateColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayOffsetDateColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
@@ -437,13 +401,9 @@ class ArrayLocalDateTimeColumn(val defined: BitSet, val values: Array[LocalDateT
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[LocalDateTime] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayLocalDateTimeColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayLocalDateTimeColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
@@ -477,13 +437,9 @@ class ArrayLocalTimeColumn(val defined: BitSet, val values: Array[LocalTime]) ex
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[LocalTime] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayLocalTimeColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayLocalTimeColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
@@ -517,13 +473,9 @@ class ArrayLocalDateColumn(val defined: BitSet, val values: Array[LocalDate]) ex
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[LocalDate] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayLocalDateColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayLocalDateColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
@@ -557,13 +509,9 @@ class ArrayIntervalColumn(val defined: BitSet, val values: Array[DateTimeInterva
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[DateTimeInterval] = {
-    if (size <= values.length) {
-      this
-    } else {
-      val newValues = ArrayColumn.resizeArray(values, size)
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new ArrayIntervalColumn(newDefined, newValues)
-    }
+    val newValues = ArrayColumn.resizeArray(values, size)
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new ArrayIntervalColumn(newDefined, newValues)
   }
 
   override def equals(other: Any): Boolean = {
@@ -594,12 +542,8 @@ class MutableEmptyArrayColumn(val defined: BitSet) extends ArrayColumn[Boolean] 
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Boolean] = {
-    if (size <= defined.length) {
-      this
-    } else {
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new MutableEmptyArrayColumn(newDefined)
-    }
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new MutableEmptyArrayColumn(newDefined)
   }
 }
 
@@ -615,12 +559,8 @@ class MutableEmptyObjectColumn(val defined: BitSet) extends ArrayColumn[Boolean]
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Boolean] = {
-    if (size <= defined.length) {
-      this
-    } else {
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new MutableEmptyObjectColumn(newDefined)
-    }
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new MutableEmptyObjectColumn(newDefined)
   }
 }
 
@@ -636,11 +576,16 @@ class MutableNullColumn(val defined: BitSet) extends ArrayColumn[Boolean] with N
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Boolean] = {
-    if (size <= defined.length) {
-      this
+    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    new MutableNullColumn(newDefined)
+  }
+
+  override def equals(other: Any): Boolean = {
+    if (other.isInstanceOf[MutableNullColumn]) {
+      val otherC = other.asInstanceOf[MutableNullColumn]
+      defined == otherC.defined
     } else {
-      val newDefined = ArrayColumn.resizeBitSet(defined, size)
-      new MutableNullColumn(newDefined)
+      false
     }
   }
 }

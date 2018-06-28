@@ -1,6 +1,11 @@
 {
     "name": "filter on date part",
 
+    "backends": {
+        "mimir": "pendingIgnoreFieldOrder",
+        "lwc_local": "ignoreFieldOrder"
+    },
+
     "data": "../days.data",
 
     "query": "select distinct `day` from `../days` where date_part(\"dow\", ts) >= 3",

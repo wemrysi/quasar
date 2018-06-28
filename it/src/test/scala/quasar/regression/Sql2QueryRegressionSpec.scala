@@ -54,8 +54,6 @@ import java.math.{MathContext, RoundingMode}
 import java.nio.file.{Files, Path => JPath, Paths}
 import java.text.ParseException
 
-import scala.Predef.=:=
-
 import argonaut._, Argonaut._
 import cats.effect.{Effect, IO, Sync, Timer}
 import eu.timepit.refined.auto._
@@ -75,11 +73,6 @@ final class Sql2QueryRegressionSpec extends Qspec {
   import Sql2QueryRegressionSpec._
 
   type M[A] = EitherT[EitherT[StateT[WriterT[Stream[IO, ?], PhaseResults, ?], Long, ?], SemanticErrors, ?], PlannerError, A]
-
-  // Make the `join` syntax from Monad ambiguous.
-  implicit class NoJoin[F[_], A](ffa: F[A]) {
-    def join(implicit ev: A =:= F[A]): F[A] = ???
-  }
 
   val DataDir = rootDir[Sandboxed] </> dir("local")
 
@@ -163,7 +156,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
         case (tests, (eval, sdown)) =>
           suiteName >> {
             tests.toList foreach { case (f, t) =>
-              regressionExample(f, t, BackendName("mimir"), queryResults(eval.evaluate))
+              regressionExample(f, t, BackendName("lwc_local"), queryResults(eval.evaluate))
             }
 
             step(sdown.unsafeRunSync)

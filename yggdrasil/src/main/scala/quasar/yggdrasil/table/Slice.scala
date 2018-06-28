@@ -1779,7 +1779,7 @@ trait Slice { source =>
     (0 until size).map(i => prefix + " " + toJson(i)).mkString("\n")
   }
 
-  override def toString = (0 until size).map(toString(_).getOrElse("")).mkString("\n")
+  override def toString = (0 until size).map(toString(_).getOrElse("")).mkString("\n", "\n", "\n")
 }
 
 object Slice {
@@ -1940,8 +1940,8 @@ object Slice {
   ): (Slice, ArraySliced[RValue]) = {
     @tailrec
     def inner(
-      next: ArraySliced[RValue], rows: Int, cols: Int,
-      acc: Map[ColumnRef, ArrayColumn[_]], _size: Int
+      next: ArraySliced[RValue], rows: Int,
+      acc: Map[ColumnRef, ArrayColumn[_]], allocatedColSize: Int
     ): (Slice, ArraySliced[RValue]) = {
       if (next.size == 0) {
         // there's no more data to make slices of.
@@ -1968,42 +1968,41 @@ object Slice {
             val size = rows
             val columns = acc
           }, next)
-        } else if (rows >= _size) {
-          // we'd have more rows than `_size` if we added this
-          // row to the slice. `_size` is the size in rows of
+        } else if (rows >= allocatedColSize) {
+          // we'd have more rows than `allocatedColSize` if we added this
+          // row to the slice. `allocatedColSize` is the size in rows of
           // all of the columns we've accumulated, so we'll
           // have to resize those columns to add further data.
-          // `_size` should always be a power of two, so we multiply
+          // `allocatedColSize` should always be a power of two, so we multiply
           // by two.
           // println("we're resizing the columns because we have too many rows")
-          val newSize = _size * 2
-          inner(next, rows, cols, acc.mapValues { _.resize(newSize) }, newSize)
+          val newSize = allocatedColSize * 2
+          inner(next, rows, acc.mapValues { _.resize(newSize) }, newSize)
         } else {
           // we *may* have enough space in this slice for the
           // next `RValue`. we're going to flatten the `RValue`
           // out to find out how many columns we would have
           // if we added that `RValue` to the current slice.
           val flattened = next.head.flattenWithPath
-          val newAcc = updateRefs(flattened, acc, rows, _size)
+          val newAcc = updateRefs(flattened, acc, rows, allocatedColSize)
           val newCols = newAcc.size
-          val newRows = rows + 1
           if (newCols > maxColumns && rows > 0) {
             // we would have too many columns in this slice if we added this
             // `RValue`. so we're going to pass it back to the caller and
-            // return a slice with the data we have already. we have to be
-            // careful to clear the new `RValue`'s data out of the accumulated
-            // data, because checking the column count mutated the columns.
+            // return a slice with the data we have already. we don't have to
+            // clear the new `RValue`'s data out of the accumulated data,
+            // because we've already made sure to set `size` correctly.
             // println("we would have too many columns with this new value, cutting slice early")
             (new Slice {
               val size = rows
-              val columns = acc.mapValues { c => c.clear(newRows); c }
+              val columns = acc
             }, next)
           } else {
             // we're okay with adding this RValue to the slice!
             // we already have the slice's data including RValue in `newAcc`,
             // so we pass that on and advance the data cursor.
             // println("we're adding an RValue to the slice")
-            inner(next.tail, newRows, newCols, newAcc, _size)
+            inner(next.tail, rows + 1, newAcc, allocatedColSize)
           }
         }
       }
@@ -2026,7 +2025,7 @@ object Slice {
         r = values.arr(ctr)
       }
       val size = Math.min(maxRows, Math.max(nextPowerOfTwo(ctr - values.start), startingSize))
-      inner(values, 0, 0, Map.empty, size)
+      inner(values, 0, Map.empty, size)
     }
   }
 
