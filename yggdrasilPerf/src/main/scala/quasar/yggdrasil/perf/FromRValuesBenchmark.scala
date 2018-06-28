@@ -26,10 +26,8 @@ import cats.effect.IO
 // Must not be in default package
 import java.util.concurrent.TimeUnit
 
-import org.openjdk.jmh.annotations.{Benchmark, BenchmarkMode, Mode, OutputTimeUnit, Param, Scope, Setup, State}
+import org.openjdk.jmh.annotations.{Benchmark, BenchmarkMode, Mode, OutputTimeUnit, Param, Scope, State}
 import org.openjdk.jmh.infra.Blackhole
-import org.openjdk.jmh.runner.{Runner, RunnerException}
-import org.openjdk.jmh.runner.options.{Options, OptionsBuilder}
 
 /* Default settings for benchmarks in this class */
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -63,17 +61,14 @@ class FromRValuesBenchmark {
       List.tabulate(chunkSize)(s =>
         RObject(List.tabulate(keys)(i => ("k" + c + s + i) -> scalar).toMap)))
 
-  def consumeSlice(slice: Slice, bh: Blackhole): IO[Unit] = {
-    IO(bh.consume(slice.materialized))
-  }
-
-  def consumeSlices(slices: fs2.Stream[IO, Slice], bh: Blackhole): IO[Unit] = {
-    slices.compile.fold(())((_, o) => consumeSlice(o, bh))
-  }
-
   def createAndConsumeSlices(data: Stream[List[RValue]], bh: Blackhole): IO[Unit] = {
-    if (streaming) consumeSlices(Slice.allFromRValues(fs2.Stream.fromIterator[IO, fs2.Stream[IO, RValue]](data.iterator.map(fs2.Stream.emits(_).covary)).flatMap(x => x)), bh)
-    else consumeSlices(fs2.Stream.fromIterator[IO, Slice](data.iterator.map(l => Slice.fromRValues(l.toStream))), bh)
+    val slices: fs2.Stream[IO, Slice] =
+      if (streaming) {
+        Slice.allFromRValues(fs2.Stream.fromIterator[IO, fs2.Stream[IO, RValue]](data.iterator.map(fs2.Stream.emits(_).covary)).flatMap(x => x))
+      } else {
+        fs2.Stream.fromIterator[IO, Slice](data.iterator.map(l => Slice.fromRValues(l.toStream)))
+      }
+    SliceTools.consumeSlices(slices, bh)
   }
 
   @Benchmark
