@@ -17,6 +17,7 @@ def exclusiveTasks(tasks: Scoped*) =
 
 lazy val buildSettings = Seq(
   scalacOptions --= Seq("-Ybackend:GenBCode"),
+  scalacOptions ++= Seq("-Ypatmat-exhaust-depth 200"),
   initialize := {
     val version = sys.props("java.specification.version")
     assert(
