@@ -17,8 +17,8 @@
 package quasar
 
 import slamdata.Predef._
+import qdata.time.{TimeGenerators, OffsetDate}
 import quasar.pkg.tests._
-import quasar.time.{DateGenerators, OffsetDate}
 
 import java.time.{
   LocalDate => JLocalDate,
@@ -89,13 +89,13 @@ object DataGenerators extends DataGenerators {
       strSrc ^^ Data.Str,
       intSrc ^^ Data.Int,
       decSrc ^^ Data.Dec,
-      DateGenerators.genInterval ^^ Data.Interval,
-      DateGenerators.genOffsetDateTime ^^ Data.OffsetDateTime,
-      DateGenerators.genOffsetDate ^^ Data.OffsetDate,
-      DateGenerators.genOffsetTime ^^ Data.OffsetTime,
-      DateGenerators.genLocalDateTime ^^ Data.LocalDateTime,
-      DateGenerators.genLocalDate ^^ Data.LocalDate,
-      DateGenerators.genLocalTime ^^ Data.LocalTime,
+      TimeGenerators.genInterval ^^ Data.Interval,
+      TimeGenerators.genOffsetDateTime ^^ Data.OffsetDateTime,
+      TimeGenerators.genOffsetDate ^^ Data.OffsetDate,
+      TimeGenerators.genOffsetTime ^^ Data.OffsetTime,
+      TimeGenerators.genLocalDateTime ^^ Data.LocalDateTime,
+      TimeGenerators.genLocalDate ^^ Data.LocalDate,
+      TimeGenerators.genLocalTime ^^ Data.LocalTime,
       arrayOf(genByte) ^^ Data.Binary.fromArray,
       idSrc ^^ Data.Id)
   }

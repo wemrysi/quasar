@@ -19,7 +19,7 @@ object Dependencies {
   private val refinedVersion      = "0.8.3"
   private val scodecBitsVersion   = "1.1.2"
   private val scodecScalazVersion = "1.4.1a"
-  private val http4sVersion       = "0.16.6a"
+  private val http4sVersion       = "0.18.13"
   private val scalacheckVersion   = "1.13.4"
   private val scalazVersion       = "7.2.23"
   private val scalazStreamVersion = "0.8.6a"
@@ -30,6 +30,7 @@ object Dependencies {
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
   private val fs2Version          = "1.0.0-M1"
+  private val qdataVersion        = "1.0.1"
 
   def foundation = Seq(
     "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
@@ -48,6 +49,7 @@ object Dependencies {
     "com.slamdata"               %% "matryoshka-core"           % matryoshkaVersion,
     "com.slamdata"               %% "pathy-core"                % pathyVersion,
     "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
+    "com.slamdata"               %% "qdata-time"                % qdataVersion,
     "eu.timepit"                 %% "refined"                   % refinedVersion,
     "com.chuusai"                %% "shapeless"                 % shapelessVersion,
     "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
@@ -71,7 +73,9 @@ object Dependencies {
 
   def frontend = Seq(
     "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
-    "org.typelevel"              %% "algebra-laws"  % algebraVersion  % Test
+    "com.slamdata"               %% "qdata-core"    % qdataVersion,
+    "com.slamdata"               %% "qdata-time"    % qdataVersion % "test->test" classifier "tests",
+    "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test
   )
 
   def effect = Seq(
@@ -124,21 +128,6 @@ object Dependencies {
     )
   }
 
-  def web = Seq(
-    "eu.timepit"     %% "refined-scalaz"      % refinedVersion,
-    "org.http4s"     %% "http4s-dsl"          % http4sVersion,
-    "org.http4s"     %% "http4s-argonaut"     % http4sVersion,
-    "org.http4s"     %% "http4s-client"       % http4sVersion,
-    "org.http4s"     %% "http4s-server"       % http4sVersion,
-    "org.http4s"     %% "http4s-blaze-server" % http4sVersion,
-    "org.http4s"     %% "http4s-blaze-client" % http4sVersion,
-    "org.scodec"     %% "scodec-scalaz"       % scodecScalazVersion,
-    "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
-    "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
-    "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
-    "eu.timepit"     %% "refined-scalacheck"  % refinedVersion     % Test
-  )
-
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % "1.7.25",
     "org.slf4j"            %  "slf4j-log4j12"   % "1.7.16",
@@ -153,17 +142,19 @@ object Dependencies {
   )
 
   def blueeyes = Seq(
-    "com.google.guava" %  "guava" % "13.0"
+    "com.google.guava" % "guava" % "13.0"
   )
 
   def yggdrasil = Seq(
     "com.codecommit" %% "smock" % "0.4.0-specs2-4.0.2" % "test"
   )
+
   def niflheim = Seq(
     "com.typesafe.akka"  %% "akka-actor" % akkaVersion,
     "org.typelevel"      %% "spire"      % spireVersion,
     "org.objectweb.howl" %  "howl"       % "1.0.1-1"
   )
+
   def it = Seq(
     "co.fs2"           %% "fs2-io"              % fs2Version          % Test,
     "io.argonaut"      %% "argonaut-monocle"    % argonautVersion     % Test,

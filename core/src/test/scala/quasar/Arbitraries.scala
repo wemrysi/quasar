@@ -18,7 +18,6 @@ package quasar
 
 trait Arbitraries extends
   DataGenerators with
-  time.DateGenerators with
   TypeGenerators with
   VariablesGenerators
 

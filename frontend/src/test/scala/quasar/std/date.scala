@@ -18,7 +18,7 @@ package quasar.std
 
 import slamdata.Predef._
 import quasar._
-import quasar.time.DateTimeInterval
+import qdata.time.DateTimeInterval
 
 import scalaz._
 

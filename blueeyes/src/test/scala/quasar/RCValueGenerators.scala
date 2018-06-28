@@ -18,7 +18,7 @@ package quasar
 
 import quasar.precog.common._
 import quasar.pkg.tests._, Gen._
-import quasar.time.DateGenerators._
+import qdata.time.TimeGenerators._
 
 trait RCValueGenerators {
   def maxArrayDepth = 3

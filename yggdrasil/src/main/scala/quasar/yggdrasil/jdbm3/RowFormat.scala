@@ -22,7 +22,7 @@ import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.precog.util.{ByteBufferMonad, ByteBufferPool, NumericComparisons, RawBitSet}
 import ByteBufferPool._
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import scalaz._
 import Scalaz._

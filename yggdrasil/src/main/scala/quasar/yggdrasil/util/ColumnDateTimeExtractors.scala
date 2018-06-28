@@ -16,7 +16,7 @@
 
 package quasar.yggdrasil.util
 
-import quasar.time.OffsetDate
+import qdata.time.OffsetDate
 import quasar.yggdrasil.table._
 
 import java.time._

@@ -18,7 +18,7 @@ package quasar.niflheim
 
 import quasar.precog.common._
 import quasar.precog.util._
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import org.specs2._
 import org.specs2.mutable.Specification

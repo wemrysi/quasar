@@ -144,9 +144,9 @@ object MountConfig {
     import org.http4s.{parser => _, _}
 
     for {
-      parsed   <- Uri.fromString(uri).leftMap(_.sanitized)
+      parsed   <- \/.fromEither(Uri.fromString(uri).leftMap(_.sanitized))
       scheme   <- parsed.scheme \/> s"missing URI scheme: $parsed"
-      _        <- (scheme == "sql2".ci) either (()) or s"unrecognized scheme: $scheme"
+      _        <- (scheme.value.ci == "sql2".ci) either (()) or s"unrecognized scheme: $scheme"
       queryStr <- parsed.params.get("q") \/> s"missing query: $uri"
       sExpr    <- sql.fixParser.parseScopedExpr(queryStr).leftMap(_.message)
       vars     =  Variables(parsed.multiParams collect {
@@ -171,7 +171,7 @@ object MountConfig {
       * the host and path for now.
       */
     Uri(
-      scheme    = Some("sql2".ci),
+      scheme    = Uri.Scheme.parse("sql2").toOption,
       authority = Some(Uri.Authority(host = Uri.RegName("".ci))),
       path      = "/",
       query     = Query.fromMap(qryMap)
