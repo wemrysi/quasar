@@ -24,9 +24,7 @@ import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 
-sealed trait DataSourceError[+C] extends QuasarErrorNG
-    with Product
-    with Serializable
+sealed trait DataSourceError[+C] extends Product with Serializable
 
 object DataSourceError extends DataSourceErrorInstances {
   sealed trait CreateError[+C] extends DataSourceError[C]
