@@ -19,7 +19,7 @@ package quasar.impl.datasources
 import slamdata.Predef._
 import quasar.{ConditionMatchers, Data, RenderTreeT}
 import quasar.api._
-import quasar.api.DataSourceError.{DataSourceUnsupported, InitializationError}
+import quasar.api.DataSourceError.{CreateError, DataSourceUnsupported, InitializationError}
 import quasar.api.ResourceError.{CommonError, ReadError}
 import quasar.connector.{DataSource, HeavyweightDataSourceModule, LightweightDataSourceModule}
 import quasar.contrib.scalaz.MonadError_
@@ -31,6 +31,7 @@ import java.lang.IllegalArgumentException
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import argonaut.Json
+import argonaut.JsonScalaz._
 import cats.{Applicative, ApplicativeError}
 import cats.effect.{Async, IO}
 import cats.syntax.applicative._
@@ -40,7 +41,7 @@ import eu.timepit.refined.auto._
 import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
-import scalaz.{\/, IMap}
+import scalaz.{\/, IMap, Show}
 import scalaz.syntax.either._
 import scalaz.syntax.foldable._
 import scalaz.syntax.show._
@@ -62,6 +63,17 @@ final class DataSourceManagementSpec extends quasar.Qspec with ConditionMatchers
       def handleError[A](fa: IO[A])(f: PlannerError => IO[A]): IO[A] =
         fa.recoverWith {
           case PlannerErrorException(pe) => f(pe)
+        }
+    }
+
+  implicit val ioCreateErrorME: MonadError_[IO, CreateError[Json]] =
+    new MonadError_[IO, CreateError[Json]] {
+      def raiseError[A](e: CreateError[Json]): IO[A] =
+        IO.raiseError(new CreateErrorException(e))
+
+      def handleError[A](fa: IO[A])(f: CreateError[Json] => IO[A]): IO[A] =
+        fa.recoverWith {
+          case CreateErrorException(e) => f(e)
         }
     }
 
@@ -93,12 +105,15 @@ final class DataSourceManagementSpec extends quasar.Qspec with ConditionMatchers
       lightMod.kind -> DataSourceModule.Lightweight(lightMod),
       heavyMod.kind -> DataSourceModule.Heavyweight(heavyMod))
 
-  def withMgmt[A](f: (Mgmt, IO[Running]) => IO[A]): A =
+  def withInitialMgmt[A](configured: IMap[ResourceName, DataSourceConfig[Json]])(f: (Mgmt, IO[Running]) => IO[A]): A =
     (for {
-      t <- DataSourceManagement[Fix, IO, IO](modules.pure[IO])
+      t <- DataSourceManagement[Fix, IO, IO](modules, configured)
       (mgmt, run) = t
       a <- f(mgmt, run.get)
     } yield a).unsafeRunSync()
+
+  def withMgmt[A](f: (Mgmt, IO[Running]) => IO[A]): A =
+    withInitialMgmt(IMap.empty)(f)
 
   "control" >> {
     "init" >> {
@@ -294,12 +309,44 @@ final class DataSourceManagementSpec extends quasar.Qspec with ConditionMatchers
         e2 must beNone
       }
     }
+
+    val initCfg: IMap[ResourceName, DataSourceConfig[Json]] =
+      IMap(
+        ResourceName("initlw") -> DataSourceConfig(LightT, Json.jNull),
+        ResourceName("unsupp") -> DataSourceConfig(DataSourceType("nope", 1L), Json.jNull))
+
+    "initial configured datasources report errors" >> withInitialMgmt(initCfg) { (mgmt, running) =>
+      val initlw = ResourceName("initlw")
+      val foo = ResourcePath.root() / ResourceName("foo")
+
+      for {
+        ds1 <- running.map(_.lookup(initlw))
+        light = ds1.flatMap(_.swap.toOption)
+        _  <- light.traverse_(_.children(foo).void).attempt
+        e1 <- mgmt.lookup(initlw)
+      } yield e1.exists(_.getMessage.contains("foo")) must beTrue
+    }
+
+    "initial configured datasources report config errors" >> withInitialMgmt(initCfg) { (mgmt, running) =>
+      val unsupp = ResourceName("unsupp")
+      val foo = ResourcePath.root() / ResourceName("foo")
+
+      for {
+        ds1 <- running.map(_.lookup(unsupp))
+        light = ds1.flatMap(_.swap.toOption)
+        _  <- light.traverse_(_.isResource(foo).void).attempt
+        e1 <- mgmt.lookup(unsupp)
+      } yield e1.exists(_.getMessage.contains("Unsupported")) must beTrue
+    }
   }
 }
 
 object DataSourceManagementSpec {
   final case class PlannerErrorException(pe: PlannerError)
       extends Exception(pe.message)
+
+  final case class CreateErrorException(ce: CreateError[Json])
+      extends Exception(Show[DataSourceError[Json]].shows(ce))
 
   def mkDataSource[Q, F[_]: ApplicativeError[?[_], Throwable], G[_]](kind0: DataSourceType)
       : DataSource[F, Stream[G, ?], Q, Stream[G, Data]] =

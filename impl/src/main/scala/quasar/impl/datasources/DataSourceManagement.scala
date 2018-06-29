@@ -25,6 +25,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.{κ, κ2}
 import quasar.fs.Planner.PlannerErrorME
 import quasar.impl.DataSourceModule
+import quasar.impl.datasource.{ByNeedDataSource, FailedDataSource}
 import quasar.qscript.QScriptEducated
 
 import argonaut.Json
@@ -33,24 +34,20 @@ import cats.effect.concurrent.Ref
 import fs2.Stream
 import fs2.async.{immutable, mutable}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.{\/, EitherT, IMap, ISet, Monad, OptionT}
-import scalaz.std.option._
-import scalaz.syntax.either._
-import scalaz.syntax.foldable._
-import scalaz.syntax.monad._
+import scalaz.{\/, EitherT, IMap, ISet, Monad, OptionT, Scalaz}, Scalaz._
 import shims._
 
 final class DataSourceManagement[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: Async: PlannerErrorME,
     G[_]: Async] private (
-    modules: F[DataSourceManagement.Modules],
-    running: mutable.Signal[F, DataSourceManagement.Running[T, F, G]],
-    errors: Ref[F, IMap[ResourceName, Exception]])
+    modules: DataSourceManagement.Modules,
+    errors: Ref[F, IMap[ResourceName, Exception]],
+    running: mutable.Signal[F, DataSourceManagement.Running[T, F, G]])
     extends DataSourceControl[F, Json]
     with DataSourceErrors[F] {
 
-  import DataSourceManagement.reportCondition
+  import DataSourceManagement.withErrorReporting
 
   type DS = DataSourceManagement.DS[T, F, G]
   type Running = DataSourceManagement.Running[T, F, G]
@@ -76,14 +73,14 @@ final class DataSourceManagement[
       sup <- EitherT.rightU[CreateError[Json]](supported)
 
       mod <-
-        OptionT(modules.map(_.lookup(config.kind)))
+        OptionT(modules.lookup(config.kind).point[F])
           .toRight[CreateError[Json]](DataSourceUnsupported(config.kind, sup))
 
       ds0 <- init0(mod)
 
       ds = ds0.bimap(
-        reportCondition(reportErrors(name), _),
-        reportCondition(reportErrors(name), _))
+        withErrorReporting(errors, name, _),
+        withErrorReporting(errors, name, _))
 
       _ <- EitherT.rightT(modifyAndShutdown(r => (r.insert(name, ds), r.lookupAssoc(name))))
     } yield ()
@@ -117,7 +114,7 @@ final class DataSourceManagement[
   }
 
   val supported: F[ISet[DataSourceType]] =
-    modules.map(_.keySet)
+    modules.keySet.point[F]
 
 
   // DataSourceErrors
@@ -130,9 +127,6 @@ final class DataSourceManagement[
 
 
   ////
-
-  private def reportErrors(name: ResourceName): Condition[Exception] => F[Unit] =
-    cond => errors.update(_.alter(name, κ(Condition.optionIso.get(cond))))
 
   private def modifyAndShutdown(f: Running => (Running, Option[(ResourceName, DS)])): F[Unit] =
     for {
@@ -156,14 +150,38 @@ object DataSourceManagement {
 
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Concurrent: PlannerErrorME,
+      F[_]: Concurrent: PlannerErrorME: MonadError_[?[_], CreateError[Json]],
       G[_]: Async](
-      modules: F[Modules])
+      modules: Modules,
+      configured: IMap[ResourceName, DataSourceConfig[Json]])
       : F[(DataSourceControl[F, Json] with DataSourceErrors[F], immutable.Signal[F, Running[T, F, G]])] =
     for {
-      runningS <- mutable.Signal[F, Running[T, F, G]](IMap.empty)
       errors <- Ref.of[F, IMap[ResourceName, Exception]](IMap.empty)
-      ctrl = new DataSourceManagement[T, F, G](modules, runningS, errors)
+
+      assocs <- configured.toList traverse {
+        case (name, cfg @ DataSourceConfig(kind, _)) =>
+          modules.lookup(kind) match {
+            case None =>
+              val ds = FailedDataSource[CreateError[Json], F, Stream[G, ?], ResourcePath, Stream[G, Data]](
+                kind,
+                DataSourceUnsupported(kind, modules.keySet))
+
+              (name, ds.left[HDS[T, F, G]]).point[F]
+
+            case Some(mod) =>
+              lazyDataSource[T, F, G](mod, cfg).strengthL(name)
+          }
+      }
+
+      running = IMap.fromList(assocs) mapWithKey { (n, ds) =>
+        ds.bimap(
+          withErrorReporting(errors, n, _),
+          withErrorReporting(errors, n, _))
+      }
+
+      runningS <- mutable.Signal[F, Running[T, F, G]](running)
+
+      ctrl = new DataSourceManagement[T, F, G](modules, errors, runningS)
     } yield (ctrl, runningS)
 
   def reportCondition[F[_]: Monad: MonadError_[?[_], Throwable], G[_], Q, R](
@@ -171,6 +189,41 @@ object DataSourceManagement {
       ds: DataSource[F, G, Q, R])
       : DataSource[F, G, Q, R] =
     new ConditionReportingDataSource[F, G, Q, R](f, ds)
+
+  def withErrorReporting[F[_]: Monad: MonadError_[?[_], Throwable], G[_], Q, R](
+      errors: Ref[F, IMap[ResourceName, Exception]],
+      name: ResourceName,
+      ds: DataSource[F, G, Q, R])
+      : DataSource[F, G, Q, R] =
+    reportCondition[F, G, Q, R](
+      c => errors.update(_.alter(name, κ(Condition.optionIso.get(c)))), ds)
+
+  ////
+
+  private def lazyDataSource[
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+      F[_]: Async: PlannerErrorME: MonadError_[?[_], CreateError[Json]],
+      G[_]: Async](
+      module: DataSourceModule,
+      config: DataSourceConfig[Json])
+      : F[DS[T, F, G]] =
+    module match {
+      case DataSourceModule.Lightweight(lw) =>
+        val mklw = MonadError_[F, CreateError[Json]] unattempt {
+          lw.lightweightDataSource[F, G](config.config)
+            .map(_.leftMap(ie => ie: CreateError[Json]))
+        }
+
+        ByNeedDataSource(config.kind, mklw).map(_.left)
+
+      case DataSourceModule.Heavyweight(hw) =>
+        val mkhw = MonadError_[F, CreateError[Json]] unattempt {
+          hw.heavyweightDataSource[T, F, G](config.config)
+            .map(_.leftMap(ie => ie: CreateError[Json]))
+        }
+
+        ByNeedDataSource(config.kind, mkhw).map(_.right)
+    }
 
   private final class ConditionReportingDataSource[
       F[_]: Monad: MonadError_[?[_], Throwable], G[_], Q, R](
