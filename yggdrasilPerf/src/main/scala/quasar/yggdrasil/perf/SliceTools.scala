@@ -20,16 +20,21 @@ package perf
 
 import quasar.yggdrasil.table._
 
-import cats.effect.IO
-
 import org.openjdk.jmh.infra.Blackhole
+
+import cats.effect.IO
+import scalaz.StreamT
+import shims._
 
 object SliceTools {
 
   def consumeSlice(slice: Slice, bh: Blackhole): IO[Unit] =
     IO(bh.consume(slice.materialized))
 
-  def consumeSlices(slices: fs2.Stream[IO, Slice], bh: Blackhole): IO[Unit] =
-    slices.compile.fold(IO.unit)((i, o) => i.flatMap(_ => consumeSlice(o, bh))).flatMap(x => x)
+  def consumeSlices(slices: StreamT[IO, Slice], bh: Blackhole): IO[Unit] =
+    slices.foldLeftRec(IO.unit)((i, o) => i.flatMap(_ => consumeSlice(o, bh))).flatMap(x => x)
+
+  def consumeTable(module: TestColumnarTableModule)(table: module.Table, bh: Blackhole): IO[Unit] =
+    consumeSlices(table.slices, bh) // slices.compile.fold(IO.unit)((i, o) => i.flatMap(_ => consumeSlice(o, bh))).flatMap(x => x)
 
 }

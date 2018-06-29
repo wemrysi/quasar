@@ -1991,7 +1991,7 @@ object Slice {
           // by two.
           // println("we're resizing the columns because we have too many rows")
           val newSize = allocatedColSize * 2
-          inner(next, rows, false, acc.mapValues { _.resize(newSize) }, newSize)
+          inner(next, rows, false, acc.map { case (k, c) => (k, c.resize(newSize)) }.toMap, newSize)
         } else {
           // we already have too many columns, so there's no need to check
           // if the next row would put us over the limit.
@@ -2005,8 +2005,11 @@ object Slice {
             // next `RValue`. we're going to flatten the `RValue`
             // out to find out how many columns we would have
             // if we added that `RValue` to the current slice.
+            // if we have no other rows, we'll start with a two-row
+            // slice, just in case we have too many columns immediately.
             val flattened = next.head.flattenWithPath
-            val newAcc = updateRefs(flattened, acc, rows, allocatedColSize)
+            val newColSize = if (rows <= 1) 2 else allocatedColSize
+            val newAcc = updateRefs(flattened, acc, rows, newColSize)
             val newCols = newAcc.size
             if (newCols > maxColumns && rows > 0) {
               // we would have too many columns in this slice if we added this

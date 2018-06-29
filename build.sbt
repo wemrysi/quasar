@@ -578,7 +578,7 @@ lazy val yggdrasilPerf = project
   .settings(
     name := "quasar-yggdrasil-perf-internal",
     scalacStrictMode := false)
-  .dependsOn(yggdrasil % BothScopes)
+  .dependsOn(yggdrasil % "compile->compile;compile->test")
   .settings(headerLicenseSettings)
   .settings(noPublishSettings)
   .settings(assemblySettings)
