@@ -16,7 +16,7 @@
 
 package quasar.mimir.datasources
 
-import slamdata.Predef.{Boolean, Exception, Map, Option, Unit}
+import slamdata.Predef.{Boolean, Map, Option, Unit}
 
 import quasar.api.{DataSourceType, ResourceName}
 import quasar.blueeyes.json.{JValue, JUndefined}
@@ -197,9 +197,6 @@ object MimirDataSourceConfigs {
       NameField -> JTextT,
       TypeField -> JTextT,
       TypeVersionField -> JNumberT))
-
-  final class ResourceErrorException(error: ResourceError)
-    extends Exception(error.messages.intercalate(", "))
 
   def apply[F[_]: LiftIO: Monad: MonadError_[?[_], ResourceError]](
       precog: Cake,

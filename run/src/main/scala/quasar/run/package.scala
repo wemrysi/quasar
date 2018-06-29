@@ -19,6 +19,6 @@ package quasar
 import quasar.contrib.scalaz.MonadError_
 
 package object run {
-  type MonadQueryErr[F[_]] = MonadError_[F, QueryError]
-  def MonadQueryErr[F[_]](implicit ev: MonadQueryErr[F]): MonadQueryErr[F] = ev
+  type MonadQuasarErr[F[_]] = MonadError_[F, QuasarError]
+  def MonadQuasarErr[F[_]](implicit ev: MonadQuasarErr[F]): MonadQuasarErr[F] = ev
 }

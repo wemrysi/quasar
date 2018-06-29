@@ -20,12 +20,11 @@ import slamdata.Predef.{Long, None}
 import quasar.RenderTreeT
 import quasar.api.QueryEvaluator
 import quasar.common.PhaseResultTell
-import quasar.compile.{queryPlan, MonadSemanticErrs}
-import quasar.contrib.scalaz.MonadError_
+import quasar.compile.queryPlan
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
-import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript.QScriptEducated
 import quasar.qsu.LPtoQS
+import quasar.run.implicits._
 import quasar.sql.parser
 
 import eu.timepit.refined.auto._
@@ -36,7 +35,7 @@ import scalaz.syntax.bind._
 object Sql2QueryEvaluator {
   def apply[
     T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
-    F[_]: Monad: MonadQueryErr: PhaseResultTell,
+    F[_]: Monad: MonadQuasarErr: PhaseResultTell,
     G[_],
     R](
     qScriptEvaluator: QueryEvaluator[F, G, T[QScriptEducated[T, ?]], R])
@@ -47,21 +46,15 @@ object Sql2QueryEvaluator {
 
   def sql2ToQScript[
       T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
-      F[_]: Monad: MonadQueryErr: PhaseResultTell](
+      F[_]: Monad: MonadQuasarErr: PhaseResultTell](
       sqlQuery: SqlQuery)
       : F[T[QScriptEducated[T, ?]]] =
     for {
-      sql <- MonadQueryErr[F].unattempt_(
-        parser[T].parseExpr(sqlQuery.query.value).leftMap(QueryError.parsing(_)))
+      sql <- MonadQuasarErr[F].unattempt_(
+        parser[T].parseExpr(sqlQuery.query.value).leftMap(QuasarError.parsing(_)))
 
       lp  <- queryPlan[F, T, T[LP]](sql, sqlQuery.vars, sqlQuery.basePath, 0L, None)
 
       qs  <- LPtoQS[T].apply[StateT[F, Long, ?]](lp).eval(0)
     } yield qs
-
-  implicit def planningMonadError[F[_]: MonadQueryErr]: PlannerErrorME[F] =
-    MonadError_.facet[F](QueryError.planning)
-
-  implicit def compilingMonadError[F[_]: MonadQueryErr]: MonadSemanticErrs[F] =
-    MonadError_.facet[F](QueryError.compiling)
 }

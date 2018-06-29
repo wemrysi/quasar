@@ -55,7 +55,7 @@ object ExternalDataSources {
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def apply[F[_]: Timer](config: ExternalConfig)(implicit F: Effect[F])
-      : F[IMap[DataSourceType, DataSourceModule]] = {
+      : Stream[F, IMap[DataSourceType, DataSourceModule]] = {
 
     val moduleStream = config match {
       case PluginDirectory(directory) =>
@@ -75,9 +75,8 @@ object ExternalDataSources {
         } yield module
     }
 
-    moduleStream
-      .compile
-      .fold(IMap.empty[DataSourceType, DataSourceModule])((m, d) => m.insert(d.kind, d))
+    moduleStream.fold(IMap.empty[DataSourceType, DataSourceModule])(
+      (m, d) => m.insert(d.kind, d))
   }
 
   ////
