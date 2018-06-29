@@ -16,7 +16,7 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{Exception, None, Option, Some, Throwable, Unit}
+import slamdata.Predef.{Exception, None, Option, Some, Unit}
 import quasar.{Condition, Data, RenderTreeT}
 import quasar.api.{DataSourceType, ResourceName, ResourcePath}
 import quasar.api.DataSourceError.{CreateError, DataSourceUnsupported}
@@ -25,7 +25,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.{κ, κ2}
 import quasar.fs.Planner.PlannerErrorME
 import quasar.impl.DataSourceModule
-import quasar.impl.datasource.{ByNeedDataSource, FailedDataSource}
+import quasar.impl.datasource.{ByNeedDataSource, ConditionReportingDataSource, FailedDataSource}
 import quasar.qscript.QScriptEducated
 
 import argonaut.Json
@@ -184,18 +184,12 @@ object DataSourceManagement {
       ctrl = new DataSourceManagement[T, F, G](modules, errors, runningS)
     } yield (ctrl, runningS)
 
-  def reportCondition[F[_]: Monad: MonadError_[?[_], Throwable], G[_], Q, R](
-      f: Condition[Exception] => F[Unit],
-      ds: DataSource[F, G, Q, R])
-      : DataSource[F, G, Q, R] =
-    new ConditionReportingDataSource[F, G, Q, R](f, ds)
-
-  def withErrorReporting[F[_]: Monad: MonadError_[?[_], Throwable], G[_], Q, R](
+  def withErrorReporting[F[_]: Monad: MonadError_[?[_], Exception], G[_], Q, R](
       errors: Ref[F, IMap[ResourceName, Exception]],
       name: ResourceName,
       ds: DataSource[F, G, Q, R])
       : DataSource[F, G, Q, R] =
-    reportCondition[F, G, Q, R](
+    ConditionReportingDataSource[Exception, F, G, Q, R](
       c => errors.update(_.alter(name, κ(Condition.optionIso.get(c)))), ds)
 
   ////
@@ -224,25 +218,4 @@ object DataSourceManagement {
 
         ByNeedDataSource(config.kind, mkhw).map(_.right)
     }
-
-  private final class ConditionReportingDataSource[
-      F[_]: Monad: MonadError_[?[_], Throwable], G[_], Q, R](
-      report: Condition[Exception] => F[Unit],
-      underlying: DataSource[F, G, Q, R])
-      extends DataSource[F, G, Q, R] {
-
-    def kind = underlying.kind
-    def shutdown = underlying.shutdown
-    def evaluate(query: Q) = reportCondition(underlying.evaluate(query))
-    def children(path: ResourcePath) = reportCondition(underlying.children(path))
-    def descendants(path: ResourcePath) = reportCondition(underlying.descendants(path))
-    def isResource(path: ResourcePath) = reportCondition(underlying.isResource(path))
-
-    private def reportCondition[A](fa: F[A]): F[A] =
-      MonadError_[F, Throwable].ensuring(fa) {
-        case Some(ex: Exception) => report(Condition.abnormal(ex))
-        case Some(other)         => ().point[F]
-        case None                => report(Condition.normal())
-      }
-  }
 }

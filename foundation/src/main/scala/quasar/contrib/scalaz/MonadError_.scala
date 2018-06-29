@@ -116,6 +116,11 @@ sealed abstract class MonadError_Instances extends MonadError_Instances0 {
       def raiseError[A](e: E) =
         StateT(_ => F.raiseError[(S, A)](e))
     }
+
+  implicit def exceptionFacetMonadError_[F[_]: MonadError_[?[_], Throwable]]: MonadError_[F, Exception] =
+    MonadError_.facet[F](Prism.partial[Throwable, Exception] {
+      case ex: Exception => ex
+    } (e => e))
 }
 
 sealed abstract class MonadError_Instances0 {
