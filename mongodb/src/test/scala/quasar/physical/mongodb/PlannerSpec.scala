@@ -175,7 +175,7 @@ class PlannerSpec extends
         beRight.which { cwf =>
           rootPushes(cwf.op) must_== Nil
         }
-    }
+    }.pendingUntilFixed
 
     trackPending(
       "unaggregated field when grouping, second case",
