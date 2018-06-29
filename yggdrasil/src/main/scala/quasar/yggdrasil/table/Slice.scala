@@ -1954,7 +1954,7 @@ object Slice {
   ): (Slice, ArraySliced[RValue]) = {
     @tailrec
     def inner(
-      next: ArraySliced[RValue], rows: Int,
+      next: ArraySliced[RValue], rows: Int, colsOverflowed: Boolean,
       acc: Map[ColumnRef, ArrayColumn[_]], allocatedColSize: Int
     ): (Slice, ArraySliced[RValue]) = {
       if (next.size == 0) {
@@ -1982,7 +1982,7 @@ object Slice {
             val size = rows
             val columns = acc
           }, next)
-        } else if (rows >= allocatedColSize) {
+        } else if (rows >= allocatedColSize && !colsOverflowed) {
           // we'd have more rows than `allocatedColSize` if we added this
           // row to the slice. `allocatedColSize` is the size in rows of
           // all of the columns we've accumulated, so we'll
@@ -1991,32 +1991,41 @@ object Slice {
           // by two.
           // println("we're resizing the columns because we have too many rows")
           val newSize = allocatedColSize * 2
-          inner(next, rows, acc.mapValues { _.resize(newSize) }, newSize)
+          inner(next, rows, false, acc.mapValues { _.resize(newSize) }, newSize)
         } else {
-          // we *may* have enough space in this slice for the
-          // next `RValue`. we're going to flatten the `RValue`
-          // out to find out how many columns we would have
-          // if we added that `RValue` to the current slice.
-          val flattened = next.head.flattenWithPath
-          val newAcc = updateRefs(flattened, acc, rows, allocatedColSize)
-          val newCols = newAcc.size
-          if (newCols > maxColumns && rows > 0) {
-            // we would have too many columns in this slice if we added this
-            // `RValue`. so we're going to pass it back to the caller and
-            // return a slice with the data we have already. we don't have to
-            // clear the new `RValue`'s data out of the accumulated data,
-            // because we've already made sure to set `size` correctly.
-            // println("we would have too many columns with this new value, cutting slice early")
+          // we already have too many columns, so there's no need to check
+          // if the next row would put us over the limit.
+          if (colsOverflowed) {
             (new Slice {
               val size = rows
               val columns = acc
             }, next)
           } else {
-            // we're okay with adding this RValue to the slice!
-            // we already have the slice's data including RValue in `newAcc`,
-            // so we pass that on and advance the data cursor.
-            // println("we're adding an RValue to the slice")
-            inner(next.tail, rows + 1, newAcc, allocatedColSize)
+            // we *may* have enough space in this slice for the
+            // next `RValue`. we're going to flatten the `RValue`
+            // out to find out how many columns we would have
+            // if we added that `RValue` to the current slice.
+            val flattened = next.head.flattenWithPath
+            val newAcc = updateRefs(flattened, acc, rows, allocatedColSize)
+            val newCols = newAcc.size
+            if (newCols > maxColumns && rows > 0) {
+              // we would have too many columns in this slice if we added this
+              // `RValue`. so we're going to pass it back to the caller and
+              // return a slice with the data we have already. we don't have to
+              // clear the new `RValue`'s data out of the accumulated data,
+              // because we've already made sure to set `size` correctly.
+              // println("we would have too many columns with this new value, cutting slice early")
+              (new Slice {
+                val size = rows
+                val columns = acc
+              }, next)
+            } else {
+              // we're okay with adding this RValue to the slice!
+              // we already have the slice's data including RValue in `newAcc`,
+              // so we pass that on and advance the data cursor.
+              // println("we're adding an RValue to the slice")
+              inner(next.tail, rows + 1, newCols > maxColumns, newAcc, allocatedColSize)
+            }
           }
         }
       }
@@ -2039,7 +2048,7 @@ object Slice {
         r = values.arr(ctr)
       }
       val size = Math.min(maxRows, Math.max(nextPowerOfTwo(ctr - values.start), startingSize))
-      inner(values, 0, Map.empty, size)
+      inner(values, 0, false, Map.empty, size)
     }
   }
 

@@ -30,6 +30,6 @@ object SliceTools {
     IO(bh.consume(slice.materialized))
 
   def consumeSlices(slices: fs2.Stream[IO, Slice], bh: Blackhole): IO[Unit] =
-    slices.compile.fold(())((_, o) => consumeSlice(o, bh))
+    slices.compile.fold(IO.unit)((i, o) => i.flatMap(_ => consumeSlice(o, bh))).flatMap(x => x)
 
 }
