@@ -41,9 +41,7 @@ trait RepresentableDataGenerators {
     TimeGenerators.genInterval       ^^ Interval)
 
   implicit val representableDataArbitrary: Arbitrary[RepresentableData] = Arbitrary(
-    Gen.oneOf(
-      atomicData,
-      DataGenerators.genNested(3, DataGenerators.genKey, atomicData)) ^^ RepresentableData)
+    DataGenerators.genDataDefault(atomicData)) ^^ RepresentableData
 }
 
 object RepresentableDataGenerators extends RepresentableDataGenerators
