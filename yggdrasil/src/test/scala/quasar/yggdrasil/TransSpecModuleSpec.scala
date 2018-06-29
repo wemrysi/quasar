@@ -19,7 +19,7 @@ package quasar.yggdrasil
 import org.specs2.execute.Result
 import quasar.ScalazSpecs2Instances
 import quasar.precog.common._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 import quasar.yggdrasil.bytecode.JNumberT
 import quasar.yggdrasil.table.{CF1, CF2, CFN}
 

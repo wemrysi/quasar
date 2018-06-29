@@ -18,7 +18,7 @@ package quasar.blueeyes
 package json
 package serialization
 
-import quasar.precog._, TestSupport._
+import quasar.pkg.tests._
 import DefaultSerialization._
 
 import scala.reflect.ClassTag

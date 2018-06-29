@@ -25,7 +25,7 @@ import shims._
 
 import org.specs2.ScalaCheck
 import org.scalacheck.Gen
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 trait CanonicalizeSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {
   import SampleData._
 
