@@ -20,6 +20,7 @@ import slamdata.Predef.{Boolean, Exception, Map, Option, Unit}
 
 import quasar.api.{DataSourceType, ResourceName}
 import quasar.blueeyes.json.{JValue, JUndefined}
+import quasar.contrib.fs2.convert
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.numeric.Positive
@@ -140,11 +141,8 @@ final class MimirDataSourceConfigs[
 
   ////
 
-  private val tableStr: String =
-    posixCodec.printPath(tableLoc)
-
   private val tablePath: PrecogPath =
-    PrecogPath(tableStr)
+    PrecogPath(posixCodec.printPath(tableLoc))
 
   private def absorbError[A](fa: EitherT[IO, ResourceError, A]): F[A] =
     ME.unattempt(fa.run.to[F])
@@ -166,15 +164,7 @@ final class MimirDataSourceConfigs[
   }
 
   private def loadValues(shape: JType): EitherT[IO, ResourceError, precog.Table] =
-    EitherT(precog.Table.constString(Set(tableStr)).load(shape).run map {
-      case \/-(t) =>
-        \/-(t.transform(constants.SourceValue.Single))
-
-      case -\/(ResourceError.NotFound(_)) =>
-        \/-(precog.Table.empty)
-
-      case -\/(err) => -\/(err)
-    })
+    MimirDataSourceConfigs.loadValues(precog, tableLoc, shape)
 
   private def slicesValues(slices: StreamT[IO, Slice]): IO[List[RValue]] =
     slices.foldLeft(List[RValue]())((v, s) => s.toRValues ::: v)
@@ -251,5 +241,45 @@ object MimirDataSourceConfigs {
     }
 
     Prism(fromRValue)(toRValue)
+  }
+
+  // TODO{logging}: Log any values we weren't able to deserialize properly
+  def allConfigs(precog: Cake, tableLoc: AFile)
+      : EitherT[IO, ResourceError, Stream[IO, (ResourceName, DataSourceConfig[RValue])]] =
+    loadValues(precog, tableLoc, JType.JUniverseT) map { t =>
+      val pairs = for {
+        slice <- convert.fromStreamT(t.slices)
+
+        rvalue <- Stream.emits(slice.toRValues)
+
+        maybePair = for {
+          name <-
+            RValue.rField1(NameField)
+              .composePrism(RValue.rString)
+              .getOption(rvalue)
+
+          cfg <- dataSourceConfigP.getOption(rvalue)
+        } yield (ResourceName(name), cfg)
+      } yield maybePair
+
+      pairs.unNone
+    }
+
+  def loadValues(precog: Cake, tableLoc: AFile, shape: JType)
+      : EitherT[IO, ResourceError, precog.Table] = {
+
+    import precog.trans.constants._
+
+    val source = Set(posixCodec.printPath(tableLoc))
+
+    EitherT(precog.Table.constString(source).load(shape).run map {
+      case \/-(t) =>
+        \/-(t.transform(SourceValue.Single))
+
+      case -\/(ResourceError.NotFound(_)) =>
+        \/-(precog.Table.empty)
+
+      case -\/(err) => -\/(err)
+    })
   }
 }
