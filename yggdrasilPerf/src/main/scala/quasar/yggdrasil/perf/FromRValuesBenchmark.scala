@@ -19,8 +19,8 @@ package yggdrasil
 package perf
 
 import quasar.contrib.cats.effect.liftio._
-import quasar.precog.common._
-import quasar.yggdrasil.table._
+import quasar.precog.common.{CValue, CLong, RArray, RObject, RValue}
+import quasar.yggdrasil.table.TestColumnarTableModule
 
 import cats.effect.IO
 
@@ -30,7 +30,9 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations.{Benchmark, BenchmarkMode, Mode, OutputTimeUnit, Param, Scope, State}
 import org.openjdk.jmh.infra.Blackhole
 
-import scalaz._, Scalaz._
+import scalaz.WriterT
+import scalaz.std.list._
+import scalaz.syntax.applicative._
 import shims._
 
 /* Default settings for benchmarks in this class */
