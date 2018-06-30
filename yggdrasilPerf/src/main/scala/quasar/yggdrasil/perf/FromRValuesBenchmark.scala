@@ -72,7 +72,7 @@ class FromRValuesBenchmark {
       if (streaming) {
         P.Table.fromRValueStream[WriterT[IO, List[IO[Unit]], ?]](
           fs2.Stream.fromIterator[IO, fs2.Stream[IO, RValue]](
-            data.iterator.map(fs2.Stream.emits(_).covary)
+            data.iterator.map(fs2.Stream.emits(_).covary[IO])
           ).flatMap(x => x))
       } else {
         P.Table.fromRValues(data.flatten).pure[WriterT[IO, List[IO[Unit]], ?]]
@@ -100,14 +100,14 @@ class FromRValuesBenchmark {
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
-  def ingestObjectsWithOverflowingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(objects(20, 200, 200, CLong(100)), bh).unsafeRunSync
+  def ingestObjectsWithFittingColumns(bh: Blackhole): Unit = {
+    createAndConsumeTable(objects(20, 200, 80, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
-  def ingestObjectsWithFittingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(objects(20, 200, 80, CLong(100)), bh).unsafeRunSync
+  def ingestObjectsWithOverflowingColumns(bh: Blackhole): Unit = {
+    createAndConsumeTable(objects(20, 200, 200, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark

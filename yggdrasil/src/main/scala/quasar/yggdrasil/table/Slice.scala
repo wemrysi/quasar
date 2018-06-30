@@ -1989,13 +1989,16 @@ object Slice {
           // have to resize those columns to add further data.
           // `allocatedColSize` should always be a power of two, so we multiply
           // by two.
-          // println("we're resizing the columns because we have too many rows")
-          val newSize = allocatedColSize * 2
+          val newSize =
+            if (allocatedColSize == 4 && startingSize != 4) startingSize
+            else allocatedColSize * 2
+          // println(s"we're resizing the columns from $allocatedColSize to $newSize because we have too many rows")
           inner(next, rows, false, acc.map { case (k, c) => (k, c.resize(newSize)) }.toMap, newSize)
         } else {
           // we already have too many columns, so there's no need to check
           // if the next row would put us over the limit.
           if (colsOverflowed) {
+          // println(s"we already have too many columns (${acc.size}), cutting slice early at $rows (allocated size $allocatedColSize)")
             (new Slice {
               val size = rows
               val columns = acc
@@ -2008,8 +2011,7 @@ object Slice {
             // if we have no other rows, we'll start with a two-row
             // slice, just in case we have too many columns immediately.
             val flattened = next.head.flattenWithPath
-            val newColSize = if (rows <= 1) 2 else allocatedColSize
-            val newAcc = updateRefs(flattened, acc, rows, newColSize)
+            val newAcc = updateRefs(flattened, acc, rows, allocatedColSize)
             val newCols = newAcc.size
             if (newCols > maxColumns && rows > 0) {
               // we would have too many columns in this slice if we added this
@@ -2017,7 +2019,7 @@ object Slice {
               // return a slice with the data we have already. we don't have to
               // clear the new `RValue`'s data out of the accumulated data,
               // because we've already made sure to set `size` correctly.
-              // println("we would have too many columns with this new value, cutting slice early")
+              // println(s"we would have too many columns with this new value ($newCols), cutting slice early at $rows")
               (new Slice {
                 val size = rows
                 val columns = acc
@@ -2027,7 +2029,7 @@ object Slice {
               // we already have the slice's data including RValue in `newAcc`,
               // so we pass that on and advance the data cursor.
               // println("we're adding an RValue to the slice")
-              inner(next.tail, rows + 1, newCols > maxColumns, newAcc, allocatedColSize)
+              inner(next.tail, rows + 1, false, newAcc, allocatedColSize) // newCols > maxColumns, newAcc, allocatedColSize)
             }
           }
         }
@@ -2037,20 +2039,7 @@ object Slice {
     if (values.size == 0) {
       (Slice.empty, ArraySliced.noRValues)
     } else {
-      // we can make a guess at a nice starting array size;
-      // if we know that `n` values at the start of the array are
-      // scalars, we know we're going to have at least `min(n, maxRows)`
-      // scalars in this slice.
-      // otherwise, we go with the constant limit we've been passed, because
-      // we have some vector data coming up, so who knows how many rows we'll
-      // get before we have too many columns.
-      var ctr = values.start
-      var r = values.head
-      while (ctr < values.arr.length - 1 && ctr < (values.start + maxRows) && RValue.toCValue(r).nonEmpty) {
-        ctr = ctr + 1
-        r = values.arr(ctr)
-      }
-      val size = Math.min(maxRows, Math.max(nextPowerOfTwo(ctr - values.start), startingSize))
+      val size = Math.min(maxRows, 32)
       inner(values, 0, false, Map.empty, size)
     }
   }
