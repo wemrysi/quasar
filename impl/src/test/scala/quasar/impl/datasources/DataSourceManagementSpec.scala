@@ -33,7 +33,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import argonaut.Json
 import argonaut.JsonScalaz._
 import cats.{Applicative, ApplicativeError}
-import cats.effect.{Async, IO}
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 import cats.syntax.functor._
@@ -83,7 +83,10 @@ final class DataSourceManagementSpec extends quasar.Qspec with ConditionMatchers
   val lightMod = new LightweightDataSourceModule {
     val kind = LightT
 
-    def lightweightDataSource[F[_]: Async, G[_]: Async](config: Json)
+    def lightweightDataSource[
+        F[_]: ConcurrentEffect: Timer,
+        G[_]: ConcurrentEffect: Timer](
+        config: Json)
         : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]] =
       mkDataSource[ResourcePath, F, G](kind).right.pure[F]
   }
@@ -93,8 +96,8 @@ final class DataSourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
     def heavyweightDataSource[
         T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-        F[_]: Async: PlannerErrorME,
-        G[_]: Async](
+        F[_]: ConcurrentEffect: PlannerErrorME: Timer,
+        G[_]: ConcurrentEffect: Timer](
         config: Json)
         : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], T[QScriptEducated[T, ?]], Stream[G, Data]]] =
       mkDataSource[T[QScriptEducated[T, ?]], F, G](kind).right.pure[F]

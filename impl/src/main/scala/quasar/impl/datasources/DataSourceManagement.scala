@@ -29,7 +29,7 @@ import quasar.impl.datasource.{ByNeedDataSource, ConditionReportingDataSource, F
 import quasar.qscript.QScriptEducated
 
 import argonaut.Json
-import cats.effect.{Async, Concurrent}
+import cats.effect.{ConcurrentEffect, Timer}
 import cats.effect.concurrent.Ref
 import fs2.Stream
 import fs2.async.{immutable, mutable}
@@ -39,8 +39,8 @@ import shims._
 
 final class DataSourceManagement[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Async: PlannerErrorME,
-    G[_]: Async] private (
+    F[_]: ConcurrentEffect: PlannerErrorME: Timer,
+    G[_]: ConcurrentEffect: Timer] private (
     modules: DataSourceManagement.Modules,
     errors: Ref[F, IMap[ResourceName, Exception]],
     running: mutable.Signal[F, DataSourceManagement.Running[T, F, G]])
@@ -150,8 +150,8 @@ object DataSourceManagement {
 
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Concurrent: PlannerErrorME: MonadError_[?[_], CreateError[Json]],
-      G[_]: Async](
+      F[_]: ConcurrentEffect: PlannerErrorME: MonadError_[?[_], CreateError[Json]]: Timer,
+      G[_]: ConcurrentEffect: Timer](
       modules: Modules,
       configured: IMap[ResourceName, DataSourceConfig[Json]])
       : F[(DataSourceControl[F, Json] with DataSourceErrors[F], immutable.Signal[F, Running[T, F, G]])] =
@@ -196,8 +196,8 @@ object DataSourceManagement {
 
   private def lazyDataSource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Async: PlannerErrorME: MonadError_[?[_], CreateError[Json]],
-      G[_]: Async](
+      F[_]: ConcurrentEffect: PlannerErrorME: MonadError_[?[_], CreateError[Json]]: Timer,
+      G[_]: ConcurrentEffect: Timer](
       module: DataSourceModule,
       config: DataSourceConfig[Json])
       : F[DS[T, F, G]] =
