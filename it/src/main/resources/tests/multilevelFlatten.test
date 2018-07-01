@@ -5,7 +5,7 @@
         "mongodb_3_6":       "pending"
     },
     "data": "nested.data",
-    "query": "select topObj{_:} as k1, topObj{_}{_:} as k2, topObj{_}{_} as v2 from nested",
+    "query": "select topObj{_:} as k1, topObj{_}{_:} as k2, topObj{_}{_} as v2 from `nested.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

@@ -8,10 +8,10 @@
 
     "data": "subset.data",
 
-    "query": "select a, b from subset order by a limit 3",
+    "query": "select a, b from `subset.data` order by a limit 3",
 
     "predicate": "exactly",
-    
+
     "expected": [
        {"a": 1, "b": 0},
        {"a": 2, "b": 1},

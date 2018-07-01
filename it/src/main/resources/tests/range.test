@@ -5,7 +5,7 @@
         "mongodb_3_6":       "pending"
     },
     "data": "nested.data",
-    "query": "select (topArr[1].botArr[*] .. 9) from nested",
+    "query": "select (topArr[1].botArr[*] .. 9) from `nested.data`",
     "predicate": "exactly",
     "ignoreResultOrder": false,
     "expected": [

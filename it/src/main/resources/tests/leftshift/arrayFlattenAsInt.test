@@ -7,7 +7,7 @@
   },
   "data": "../arrayProcessingInts.data",
 
-  "query": "select integer(a[*]) as b from `../arrayProcessingInts`",
+  "query": "select integer(a[*]) as b from `../arrayProcessingInts.data`",
 
   "predicate": "exactly",
 

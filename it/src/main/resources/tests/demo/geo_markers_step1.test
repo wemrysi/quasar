@@ -5,7 +5,7 @@
        "lwc_local":         "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
-    "query": "SELECT COUNT(*) AS cnt, loc[1] AS lat, loc[0] AS lng FROM patients WHERE state = \"TX\" GROUP BY loc[1], loc[0] ORDER BY loc[1] ASC, loc[0] ASC LIMIT 6",
+    "query": "SELECT COUNT(*) AS cnt, loc[1] AS lat, loc[0] AS lng FROM `patients.data` WHERE state = \"TX\" GROUP BY loc[1], loc[0] ORDER BY loc[1] ASC, loc[0] ASC LIMIT 6",
     "predicate": "exactly",
     "expected": [
          { "cnt": 1, "lat": 26.125242, "lng":  -97.475663 },

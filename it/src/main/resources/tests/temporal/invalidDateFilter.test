@@ -5,7 +5,7 @@
     },
     "data": "../days.data",
 
-    "query": "select day from `../days` where date_part(\"dow\", epoch) >= 3",
+    "query": "select day from `../days.data` where date_part(\"dow\", epoch) >= 3",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

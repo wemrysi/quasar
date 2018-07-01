@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "usa_factbook.data",
-    "query": "select intro from usa_factbook where geo{*}.text = \"19,924 km\"",
+    "query": "select intro from `usa_factbook.data` where geo{*}.text = \"19,924 km\"",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

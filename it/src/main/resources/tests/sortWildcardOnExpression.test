@@ -2,7 +2,7 @@
     "name": "sort wildcard on expression",
     "backends": {},
     "data": "largeZips.data",
-    "query": "select * from largeZips order by pop/10 desc",
+    "query": "select * from `largeZips.data` order by pop/10 desc",
     "predicate": "initial",
     "ignoreFieldOrder": true,
     "expected": [

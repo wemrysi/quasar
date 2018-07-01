@@ -4,7 +4,7 @@
         "mimir":             "ignoreFieldOrder"
     },
     "data": "largeZips.data",
-    "query": "select city, state, loc || [ pop ] as lp from largeZips",
+    "query": "select city, state, loc || [ pop ] as lp from `largeZips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [{ "city": "CUSHMAN",            "state": "MA", "lp": [ -72.51565, 42.377017, 36963] },

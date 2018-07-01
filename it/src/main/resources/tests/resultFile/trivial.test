@@ -6,7 +6,7 @@
 
   "data": "../smallZips.data",
 
-  "query": "select * from `../smallZips`",
+  "query": "select * from `../smallZips.data`",
 
   "predicate": "atLeast",
   "ignoreResultOrder": true,

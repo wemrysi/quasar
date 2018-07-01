@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "zips.data",
-    "query": "SELECT loc[*] AS loc FROM zips",
+    "query": "SELECT loc[*] AS loc FROM `zips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

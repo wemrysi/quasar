@@ -10,7 +10,7 @@
   "query": "select
               date_part(\"day\", timestamp(commit.committer.date)) as dayOfMonth,
               to_string(author.id) as id
-              from `../slamengine_commits`",
+              from `../slamengine_commits.data`",
 
   "predicate": "atLeast",
   "ignoreResultOrder": true,

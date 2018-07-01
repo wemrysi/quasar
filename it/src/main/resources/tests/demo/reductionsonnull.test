@@ -7,7 +7,7 @@
     "mongodb_3_4_13":    "pending",
     "mongodb_3_6":       "pending"
   },
-  "query": "SELECT age AS dimension, SUM(height) AS measure1, null AS size, null AS measure2, null AS series FROM patients WHERE true GROUP BY null, age ORDER BY null ASC, age ASC",
+  "query": "SELECT age AS dimension, SUM(height) AS measure1, null AS size, null AS measure2, null AS series FROM `patients.data` WHERE true GROUP BY null, age ORDER BY null ASC, age ASC",
   "predicate": "exactly",
   "expected": [
     { "series": null, "size": null, "measure1": 668757, "measure2": null, "dimension": 36 }

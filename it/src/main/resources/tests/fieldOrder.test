@@ -6,7 +6,7 @@
     },
     "data": "zips.data",
 
-    "query": "select count(*)/1000, 0 from zips limit 5",
+    "query": "select count(*)/1000, 0 from `zips.data` limit 5",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

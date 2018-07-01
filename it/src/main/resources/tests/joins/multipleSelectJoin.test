@@ -14,7 +14,7 @@
                      extraSmallZips.city AS City,
                      extraSmallZips.state AS State,
                      extraSmallZips.pop AS Pop
-              FROM `../smallZips` JOIN `../extraSmallZips`
+              FROM `../smallZips.data` as smallZips JOIN `../extraSmallZips.data` as extraSmallZips
               ON smallZips.pop = extraSmallZips.pop
               WHERE extraSmallZips.state = \"MA\"",
 

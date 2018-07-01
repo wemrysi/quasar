@@ -6,7 +6,7 @@
     },
     "data": "zips.data",
 
-    "query": "select city, state, loc from zips order by loc[*] desc",
+    "query": "select city, state, loc from `zips.data` order by loc[*] desc",
 
     "predicate": "initial",
 

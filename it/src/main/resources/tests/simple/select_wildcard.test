@@ -3,7 +3,7 @@
 
   "data": "basic.data",
 
-  "query": "select * from basic",
+  "query": "select * from `basic.data`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

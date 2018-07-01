@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "largeZips.data",
-    "query": "select [ city, pop ] as cp from largeZips",
+    "query": "select [ city, pop ] as cp from `largeZips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [{ "cp": ["CUSHMAN",          36963] },

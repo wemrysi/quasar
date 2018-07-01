@@ -3,7 +3,7 @@
 
     "data": "olympics.data",
 
-    "query": "select count(distinct sport) as cnt from olympics",
+    "query": "select count(distinct sport) as cnt from `olympics.data`",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

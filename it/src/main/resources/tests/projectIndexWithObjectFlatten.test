@@ -5,7 +5,7 @@
         "mimir": "ignoreFieldOrder"
     },
     "data": "slamengine_commits.data",
-    "query": "select parents[0] as parent, commit{*} from slamengine_commits",
+    "query": "select parents[0] as parent, commit{*} from `slamengine_commits.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

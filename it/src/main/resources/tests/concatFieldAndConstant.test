@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "largeZips.data",
-    "query": "select array_concat(make_array(pop), array_concat(make_array(1), make_array(2))) as arr from largeZips",
+    "query": "select array_concat(make_array(pop), array_concat(make_array(1), make_array(2))) as arr from `largeZips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [{ "arr": [36963, 1.0, 2.0] },

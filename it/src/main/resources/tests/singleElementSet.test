@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "zips.data",
-    "query": "select * from zips where state in (\"MA\") and pop < 10",
+    "query": "select * from `zips.data` where state in (\"MA\") and pop < 10",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "ignoredFields": ["_id"],

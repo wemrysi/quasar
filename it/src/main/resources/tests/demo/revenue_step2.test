@@ -6,7 +6,7 @@
        "mimir":             "pending"
     },
     "NB": "mimir gets results in wrong order",
-    "query": "SELECT DISTINCT value AS value, quarter AS dimension, region AS series, null AS parallel FROM revenue ORDER BY value DESC, region ASC, quarter ASC LIMIT 6",
+    "query": "SELECT DISTINCT value AS value, quarter AS dimension, region AS series, null AS parallel FROM `revenue.data` ORDER BY value DESC, region ASC, quarter ASC LIMIT 6",
     "predicate": "exactly",
     "expected": [
        { "value": 55000, "dimension": "2015-Q2", "series": "east"  , "parallel": null },

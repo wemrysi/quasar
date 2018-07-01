@@ -6,7 +6,7 @@
 
   "data": ["simple_union.data", "simple_union2.data"],
 
-  "query": "select * from (select * from simple_union union select * from simple_union2) order by b",
+  "query": "select * from (select * from `simple_union.data` union select * from `simple_union2.data`) order by b",
 
   "predicate": "exactly",
 

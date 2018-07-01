@@ -4,7 +4,7 @@
     },
     "NB": "working on mongo_3_4 because it uses version >= 3.4.4. Expected to still fail on version < 3.4.4",
     "data": "newTests.data",
-    "query": "select distinct backends{_:} from newTests",
+    "query": "select distinct backends{_:} from `newTests.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": ["couchbase",

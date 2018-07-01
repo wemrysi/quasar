@@ -5,7 +5,7 @@
   },
   "data": "nullable_distinct.data",
 
-  "query": "select distinct foo from nullable_distinct",
+  "query": "select distinct foo from `nullable_distinct.data`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

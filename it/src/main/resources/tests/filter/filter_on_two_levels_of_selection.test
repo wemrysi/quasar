@@ -3,7 +3,7 @@
 
   "data": "filter.data",
 
-  "query": "select s.num, s.age from (select num, age, name from filter
+  "query": "select s.num, s.age from (select num, age, name from `filter.data`
             where name.first = \"Bob\") as s where age > 34",
 
   "predicate": "exactly",

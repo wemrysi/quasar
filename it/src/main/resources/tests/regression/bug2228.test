@@ -6,10 +6,10 @@
     "mimir":             "ignoreFieldOrder"
   },
   "query": "SELECT o.order_key AS OrderKey, o.purchase_date AS PurchaseDate, c.last_name, c.city AS City, c.state AS State, oi.qty AS Quantity, i.price AS UnitPrice
-            FROM customers AS c
-              JOIN orders AS o ON c.customer_key = o.customer_key
-              JOIN ordered_items AS oi ON oi.order_key = o.order_key
-              JOIN inventory_items AS i ON i.item_key = oi.item_key
+            FROM `customers.data` AS c
+              JOIN `orders.data` AS o ON c.customer_key = o.customer_key
+              JOIN `ordered_items.data` AS oi ON oi.order_key = o.order_key
+              JOIN `inventory_items.data` AS i ON i.item_key = oi.item_key
             ORDER BY c.last_name, o.purchase_date, oi.qty",
   "predicate": "exactly",
   "ignoreResultOrder": true,

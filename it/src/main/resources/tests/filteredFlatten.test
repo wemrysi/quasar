@@ -5,7 +5,7 @@
     },
     "data": "demo/patients.data",
 
-    "query": "select codes[*] as codes, state from `demo/patients` where city = \"BOULDER\" and state = \"UT\"",
+    "query": "select codes[*] as codes, state from `demo/patients.data` where city = \"BOULDER\" and state = \"UT\"",
 
     "predicate": "exactly",
 

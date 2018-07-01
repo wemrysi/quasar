@@ -5,7 +5,7 @@
 
     "data": "zips.data",
 
-    "query": "select distinct city from zips order by pop desc limit 5",
+    "query": "select distinct city from `zips.data` order by pop desc limit 5",
 
     "predicate": "exactly",
 

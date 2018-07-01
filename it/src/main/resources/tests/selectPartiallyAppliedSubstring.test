@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "extraSmallZips.data",
-    "query": "select substring(\"abcdefghijklmnop\", 5, trunc(pop / 10000)) from extraSmallZips",
+    "query": "select substring(\"abcdefghijklmnop\", 5, trunc(pop / 10000)) from `extraSmallZips.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [
