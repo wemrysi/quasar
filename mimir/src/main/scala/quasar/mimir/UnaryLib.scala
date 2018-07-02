@@ -31,7 +31,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
 
       object Comp extends Op1F1 {
         val tpe = UnaryOperationType(JBooleanT, JBooleanT)
-        def f1: F1 = CF1P("builtin::unary::comp") {
+        def f1: F1 = CF1P {
           case c: BoolColumn => new BoolFrom.B(c, !_)
         }
 
@@ -42,7 +42,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
 
       object Neg extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
-        def f1: F1 = CF1P("builtin::unary::neg") {
+        def f1: F1 = CF1P {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, -_)
           case c: LongColumn   => new LongFrom.L(c, n => true, -_)
           case c: NumColumn    => new NumFrom.N(c, n => true, -_)
@@ -57,7 +57,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
       // TODO remove the old ones in MathLib
       object Ceil extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
-        def f1: F1 = CF1P("builtin::unary::ceil") {
+        def f1: F1 = CF1P {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, math.ceil)
 
           case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
@@ -71,7 +71,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
 
       object Floor extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
-        def f1: F1 = CF1P("builtin::unary::floor") {
+        def f1: F1 = CF1P {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, math.floor)
           case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
           case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.FLOOR))
@@ -84,7 +84,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
 
       object Trunc extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
-        def f1: F1 = CF1P("builtin::unary::trunc") {
+        def f1: F1 = CF1P {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, { d =>
             val result = math.round(d)
             // the JVM uses half-up rounding semantics by default
@@ -101,7 +101,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
 
       object Round extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
-        def f1: F1 = CF1P("builtin::unary::round") {
+        def f1: F1 = CF1P {
           // encoding of half-even rounding
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, { d =>
             if (math.abs(d % 1) == 0.5) {
