@@ -166,7 +166,7 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
 
         count mustEqual 2   // shifted read and the *one* collapsed shift
       }
-    }.pendingUntilFixed
+    }
   }
 
   def compileTo(qs: Fix[QScriptEducated]): Matcher[Fix[LogicalPlan]] =

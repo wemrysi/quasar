@@ -56,25 +56,24 @@ import quasar.qscript.{
 }
 import quasar.qsu.{QScriptUniform => QSU}
 
+import iotaz.CopK
+
 import matryoshka.{AlgebraM, BirecursiveT}
 import matryoshka.implicits._
 import matryoshka.patterns.{interpretM, CoEnv}
+
 import pathy.Path.{rootDir, Sandboxed}
-import scalaz.{\/, Free, Monad, StateT}
-import scalaz.std.tuple._
-import scalaz.syntax.bifunctor._
-import scalaz.syntax.either._
-import scalaz.syntax.equal._
-import scalaz.syntax.foldable._
-import scalaz.syntax.monad._
+
+import scalaz.{\/, Free, Monad, StateT, Scalaz}, Scalaz._   // monad/traverse conflict
+
 import shapeless.Sized
-import iotaz.CopK
 
 final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 
   import QSUGraph.Extractors._
 
   private type QSU[A] = QScriptUniform[A]
+  private type LetS = SMap[Symbol, Symbol]
 
   private val IC = CopK.Inject[MapFuncCore, MapFunc]
   private val ID = CopK.Inject[MapFuncDerived, MapFunc]
@@ -82,13 +81,37 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   def apply[
       F[_]: Monad: PlannerErrorME: NameGenerator](
       plan: T[lp.LogicalPlan]): F[QSUGraph] =
-    plan.cataM[StateT[F, RevIdx, ?], QSUGraph](
-      readLPƒ[StateT[F, RevIdx, ?]]).eval(SMap())
+    cataWithLetM[StateT[StateT[F, RevIdx, ?], LetS, ?]](
+      plan,
+      readLPƒ[StateT[StateT[F, RevIdx, ?], LetS, ?]]).eval(SMap()).eval(SMap())
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def cataWithLetM[G[_]: Monad](
+      plan: T[lp.LogicalPlan],
+      alg: AlgebraM[G, lp.LogicalPlan, QSUGraph])(
+      implicit LetS: MonadState_[G, LetS]): G[QSUGraph] = {
+
+    plan.project match {
+      case lp.Let(name, form, in) =>
+        for {
+          formA <- cataWithLetM[G](form, alg)
+          _ <- LetS.modify(_ + (name -> formA.root))
+          inA <- cataWithLetM[G](in, alg)
+          _ <- LetS.modify(_ - name)    // don't assume LP compiler generates globally unique names
+          back <- alg(lp.Let(name, formA, inA))
+        } yield back
+
+      case lpr =>
+        lpr.traverse(cataWithLetM[G](_, alg)).flatMap(alg)
+    }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def readLPƒ[
       G[_]: Monad: PlannerErrorME: NameGenerator](
-      implicit MS: MonadState_[G, RevIdx])
+      implicit
+        MS: MonadState_[G, RevIdx],
+        LetS: MonadState_[G, LetS])
       : AlgebraM[G, lp.LogicalPlan, QSUGraph] = {
 
     case lp.Read(path) =>
@@ -197,6 +220,7 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 
     case lp.Typecheck(expr, tpe, cont, Unary(Unreferenced(), IC(MapFuncsCore.Undefined()))) if expr.root === cont.root =>
       extend1[G](expr)(QSU.Unary[T, Symbol](_, ID(MapFuncsDerived.Typecheck(SrcHole, tpe))))
+
     case lp.Typecheck(expr, tpe, cont, fallback) =>
       autoJoin3[G](expr, cont, fallback)((e, c, f) => IC(MapFuncsCore.Guard[T, JoinSide3](e, tpe, c, f)))
 
@@ -208,22 +232,12 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
         QSU.LPJoin[T, Symbol](_, _, _, tpe, leftN, rightN))
 
     case lp.Free(name) =>
-      QSUGraph[T](name, SMap()).point[G]
-
-    case lp.Let(name, form, in) =>
-      val in2Vertices = in.vertices map {
-        case (key, value) =>
-          val value2 = value map { sym =>
-            if (sym === name)
-              form.root
-            else
-              sym
-          }
-
-          key -> value2
+      LetS.get map { lets =>
+        QSUGraph[T](lets(name), SMap())
       }
 
-      (in.copy(vertices = in2Vertices) :++ form).point[G]
+    // we trust cataWithLetM to deal with renaming things
+    case lp.Let(_, form, in) => (in :++ form).point[G]
 
     case lp.Sort(src, order) =>
       val node = QSU.LPSort[T, Symbol](src.root, order.map(_.leftMap(_.root)))

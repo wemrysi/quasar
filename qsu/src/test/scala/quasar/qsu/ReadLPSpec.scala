@@ -271,6 +271,28 @@ object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with
       }
     }
 
+    "don't absolutely trust let binding collapse" in {
+      lpf.invoke2(
+        SetLib.Take,
+        lpf.let(
+          'tmp0,
+          read("foo"),
+          lpf.invoke2(
+            SetLib.Filter,
+            lpf.free('tmp0),
+            lpf.free('tmp0))),
+        lpf.let(
+          'tmp1,
+          read("foo"),
+          lpf.invoke2(
+            SetLib.Filter,
+            lpf.free('tmp1),
+            lpf.free('tmp1)))) must readQsuAs {
+
+        case qgraph => qgraph.vertices must haveSize(4)
+      }
+    }
+
     "convert a sort" in {
       lpf.sort(
         read("foo"),
