@@ -468,7 +468,7 @@ lazy val it = project
   .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
   .dependsOn(
-    impl,
+    runp,
     interface % BothScopes,
     qscript % "test->test")
   .settings(commonSettings)
