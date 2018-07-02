@@ -16,8 +16,9 @@
 
 package quasar.qsu
 
-import quasar.{Data, Qspec, RenderTree}
-import RenderTree.ops._
+import slamdata.Predef._
+
+import quasar.{Data, Qspec, RenderTree, Type}, RenderTree.ops._
 import quasar.fs.Planner.PlannerError
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, Fixed}
@@ -25,13 +26,18 @@ import quasar.fp._
 import quasar.contrib.iota._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.construction
-import quasar.qscript.{ExcludeId, HoleF, OnUndefined, ReduceFuncs, ReduceIndex, RightSideF, ShiftType, qScriptReadToQscriptTotal}
-import quasar.std.{AggLib, IdentityLib}
-import slamdata.Predef._
+import quasar.qscript.{qScriptReadToQscriptTotal, ExcludeId, HoleF, LeftShift, OnUndefined, ReduceFuncs, ReduceIndex, RightSideF, ShiftType}
+import quasar.std.{AggLib, IdentityLib, StructuralLib}
+
+import iotaz.CopK
+
 import matryoshka._
+import matryoshka.implicits._
 import matryoshka.data.Fix
+
 import org.specs2.matcher.Matcher
 import org.specs2.matcher.MatchersImplicits._
+
 import pathy.Path
 import Path.{Sandboxed, file}
 
@@ -52,6 +58,8 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
 
   val root = Path.rootDir[Sandboxed]
   val afoo = root </> file("foo")
+
+  val QC = CopK.Inject[QScriptCore, QScriptEducated]
 
   "logicalplan -> qscript" >> {
     "constant value" >> {
@@ -99,9 +107,72 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
 
       lp must compileTo(expected)
     }
+
+    "select a[*], a[*] from foo" >> {
+       val lp = lpf.let(
+          '__tmp0,
+        lpf.let(
+          '__tmp1,
+          lpf.read(afoo),
+          lpf.typecheck(
+            lpf.free('__tmp1),
+            Type.AnyObject,
+            lpf.free('__tmp1),
+            lpf.constant(Data.NA))),
+        lpf.invoke1(
+          IdentityLib.Squash,
+          lpf.invoke2(
+            StructuralLib.MapConcat,
+            lpf.invoke2(
+              StructuralLib.MakeMap,
+              lpf.constant(Data.Str("a")),
+              lpf.invoke1(
+                StructuralLib.FlattenArray,
+                lpf.let(
+                  '__tmp2,
+                  lpf.invoke2(
+                    StructuralLib.MapProject,
+                    lpf.free('__tmp0),
+                    lpf.constant(Data.Str("a"))),
+                  lpf.typecheck(
+                    lpf.free('__tmp2),
+                    Type.AnyArray,
+                    lpf.free('__tmp2),
+                    lpf.constant(Data.Arr(List(Data.NA))))))),
+            lpf.invoke2(
+              StructuralLib.MakeMap,
+              lpf.constant(Data.Str("a0")),
+              lpf.invoke1(
+                StructuralLib.FlattenArray,
+                lpf.let(
+                  '__tmp3,
+                  lpf.invoke2(
+                    StructuralLib.MapProject,
+                    lpf.free('__tmp0),
+                    lpf.constant(Data.Str("a"))),
+                  lpf.typecheck(
+                    lpf.free('__tmp3),
+                    Type.AnyArray,
+                    lpf.free('__tmp3),
+                    lpf.constant(Data.Arr(List(Data.NA))))))))))
+
+      lp must compileToMatch { qs =>
+        val count = qs foldMap { fix =>
+          fix.project match {
+            case QC(LeftShift(_, _, _, _, _, _)) => 1
+            case _ => 0
+          }
+        }
+
+        count mustEqual 2   // shifted read and the *one* collapsed shift
+      }
+    }.pendingUntilFixed
   }
 
-  def compileTo(qs: Fix[QScriptEducated]): Matcher[Fix[LogicalPlan]] = { lp: Fix[LogicalPlan] =>
+  def compileTo(qs: Fix[QScriptEducated]): Matcher[Fix[LogicalPlan]] =
+    compileToMatch(Equal[Fix[QScriptEducated]].equal(_, qs))
+
+  def compileToMatch(pred: Fix[QScriptEducated] => Boolean): Matcher[Fix[LogicalPlan]] = { lp: Fix[LogicalPlan] =>
     val result = qsu[F](lp).run.eval(0L).value
 
     result match {
@@ -110,9 +181,9 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
 
       case \/-(compiled) =>
         (
-          Equal[Fix[QScriptEducated]].equal(compiled, qs),
+          pred(compiled),
           s"\n${lp.render.shows}\n\n compiled to:\n\n ${compiled.render.shows}",
-          s"\n${lp.render.shows}\n\n compiled to:\n\n ${compiled.render.shows}\n\n expected:\n\n ${qs.render.shows}")
+          s"\n${lp.render.shows}\n\n compiled to:\n\n ${compiled.render.shows}")
     }
   }
 }
