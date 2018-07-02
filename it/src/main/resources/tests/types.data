@@ -1,0 +1,20 @@
+{ "foo": 11 }
+{ "foo": 1.12345 }
+{ "foo": "13" }
+{ "foo": "zap" }
+{ "foo": true }
+{ "foo": false }
+{ "foo": null }
+{ "foo": { "$offsetdatetime": "2009-02-13T23:31:30.011+12:15:18" } }
+{ "foo": { "$offsetdate": "2009-02-13+12:15:18" } }
+{ "foo": { "$offsettime": "23:31:30.011+12:15:18" } }
+{ "foo": { "$localdatetime" : "2009-02-13T23:31:30.011" } }
+{ "foo": { "$localdate" : "2009-02-13" } }
+{ "foo": { "$localtime" : "23:31:30.011" } }
+{ "foo": { "$interval" : "P7DT12H34M" } }
+{ "foo": [] }
+{ "foo": {} }
+{ "foo": [15, [{ "baz": ["quux"] }]] }
+{ "foo": { "bar": 15, "baz": ["qx"] } }
+{ "bar": 123 }
+{ "baz": "xyz" }

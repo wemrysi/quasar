@@ -16,9 +16,7 @@
 
 package quasar.std
 
-import slamdata.Predef._
 import quasar._
-import quasar.common.PrimaryType
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
@@ -65,25 +63,8 @@ trait IdentityLib extends Library {
     Type.Str,
     Func.Input1(Type.Top),
     noSimplification,
-    {
-      case Sized(typ) =>
-        Some(success(typ.toPrimaryType.fold(
-          if      (Type.Bottom.contains(typ))    Type.Bottom
-          // NB: These cases should be identified via metadata
-          else if (Type.OffsetDateTime.contains(typ)) Type.Const(Data.Str("offsetdatetime"))
-          else if (Type.OffsetDate.contains(typ)) Type.Const(Data.Str("offsetdate"))
-          else if (Type.OffsetTime.contains(typ)) Type.Const(Data.Str("offsettime"))
-          else if (Type.LocalDateTime.contains(typ)) Type.Const(Data.Str("localdatetime"))
-          else if (Type.LocalDate.contains(typ)) Type.Const(Data.Str("localdate"))
-          else if (Type.LocalTime.contains(typ)) Type.Const(Data.Str("localtime"))
-          else if (Type.Interval.contains(typ))  Type.Const(Data.Str("interval"))
-          else                                   Type.Str)(
-          t => Type.Const(Data.Str(PrimaryType.name.reverseGet(t))))))
-    },
-    partialUntyper[nat._1] {
-      case Type.Bottom => Func.Input1(Type.Bottom)
-      case _ => Func.Input1(Type.Top)
-    })
+    basicTyper,
+    basicUntyper)
 }
 
 object IdentityLib extends IdentityLib

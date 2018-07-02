@@ -1,4 +1,4 @@
 #postgresql_metastore = "{\"host\":\"localhost\",\"port\":5432,\"database\":\"metastore_test\",\"userName\":\"postgres\",\"password\":\"postgres\"}"
 #mongodb_3_4_13       = "mongodb://<host>:<port>"
 #mimir                = "<path_to_folder>"
-#lwc_local            = "<path_to_folder>"
+#lwc_local            = "{\"mimirDataDir\": \"<path_to_folder>\"}"
