@@ -22,41 +22,39 @@ trait TypeLibModule extends ColumnarTableLibModule {
   trait TypeLib extends ColumnarTableLib {
     import trans._
 
-    val TypeNamespace = Vector("std", "type")
-
     override def _lib1 = super._lib1 ++ Set(isNumber, isBoolean, isNull, isString, isObject, isArray)
 
-    object isNumber extends Op1(TypeNamespace, "isNumber") {
+    object isNumber extends Op1 {
       val tpe = UnaryOperationType(JType.JUniverseT, JBooleanT)
       def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
         trans.IsType(source, JNumberT)
     }
 
-    object isBoolean extends Op1(TypeNamespace, "isBoolean") {
+    object isBoolean extends Op1 {
       val tpe = UnaryOperationType(JType.JUniverseT, JBooleanT)
       def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
         trans.IsType(source, JBooleanT)
     }
 
-    object isNull extends Op1(TypeNamespace, "isNull") {
+    object isNull extends Op1 {
       val tpe = UnaryOperationType(JType.JUniverseT, JBooleanT)
       def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
         trans.IsType(source, JNullT)
     }
 
-    object isString extends Op1(TypeNamespace, "isString") {
+    object isString extends Op1 {
       val tpe = UnaryOperationType(JType.JUniverseT, JBooleanT)
       def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
         trans.IsType(source, JTextT)
     }
 
-    object isObject extends Op1(TypeNamespace, "isObject") {
+    object isObject extends Op1 {
       val tpe = UnaryOperationType(JType.JUniverseT, JBooleanT)
       def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
         trans.IsType(source, JObjectUnfixedT)
     }
 
-    object isArray extends Op1(TypeNamespace, "isArray") {
+    object isArray extends Op1 {
       val tpe = UnaryOperationType(JType.JUniverseT, JBooleanT)
       def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
         trans.IsType(source, JArrayUnfixedT)

@@ -28,9 +28,8 @@ trait UnaryLibModule extends ColumnarTableLibModule {
     import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, doubleIsDefined }
 
     object Unary {
-      val UnaryNamespace = Vector("std", "unary")
 
-      object Comp extends Op1F1(UnaryNamespace, "comp") {
+      object Comp extends Op1F1 {
         val tpe = UnaryOperationType(JBooleanT, JBooleanT)
         def f1: F1 = CF1P("builtin::unary::comp") {
           case c: BoolColumn => new BoolFrom.B(c, !_)
@@ -41,7 +40,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
         }
       }
 
-      object Neg extends Op1F1(UnaryNamespace, "neg") {
+      object Neg extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::neg") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, -_)
@@ -56,7 +55,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
 
       // use these rather than the ones in MathLib
       // TODO remove the old ones in MathLib
-      object Ceil extends Op1F1(UnaryNamespace, "ceil") {
+      object Ceil extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::ceil") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, math.ceil)
@@ -70,7 +69,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
         }
       }
 
-      object Floor extends Op1F1(UnaryNamespace, "floor") {
+      object Floor extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::floor") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, math.floor)
@@ -83,7 +82,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
         }
       }
 
-      object Trunc extends Op1F1(UnaryNamespace, "trunc") {
+      object Trunc extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::trunc") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, { d =>
@@ -100,7 +99,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
         }
       }
 
-      object Round extends Op1F1(UnaryNamespace, "round") {
+      object Round extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::round") {
           // encoding of half-even rounding

@@ -26,8 +26,6 @@ trait InfixLibModule extends ColumnarTableLibModule {
     import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, doubleIsDefined }
 
     object Infix {
-      val InfixNamespace = Vector("std", "infix")
-
       final def longOk(x: Long, y: Long)            = true
       final def doubleOk(x: Double, y: Double)      = true
       final def numOk(x: BigDecimal, y: BigDecimal) = true
@@ -37,7 +35,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
       final def numNeZero(x: BigDecimal, y: BigDecimal) = y != 0
 
       class InfixOp2(name: String, longf: (Long, Long) => Long, doublef: (Double, Double) => Double, numf: (BigDecimal, BigDecimal) => BigDecimal)
-          extends Op2F2(InfixNamespace, name) {
+          extends Op2F2 {
         val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
         def f2: F2 = CF2P("builtin::infix::op2::" + name) {
           case (c1: LongColumn, c2: LongColumn) =>
@@ -69,7 +67,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
         }
       }
 
-      val Add = new Op2F2(InfixNamespace, "add") {
+      val Add = new Op2F2 {
         val tpe = BinaryOperationType(JType.JRelativeT, JType.JRelativeT, JType.JRelativeT)
         def f2: F2 = CF2P("builtin::infix::op2::add") {
           case (c1: LongColumn, c2: LongColumn) =>
@@ -179,7 +177,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
         }
       }
 
-      val Sub = new Op2F2(InfixNamespace, "subtract") {
+      val Sub = new Op2F2 {
         val tpe = BinaryOperationType(JType.JAbsoluteT, JType.JRelativeT, JType.JAbsoluteT)
         def f2: F2 = CF2P("builtin::infix::op2::subtract") {
           case (c1: LongColumn, c2: LongColumn) =>
@@ -293,7 +291,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
         }
       }
 
-      val Mul = new Op2F2(InfixNamespace, "multiply") {
+      val Mul = new Op2F2 {
         val tpe = BinaryOperationType(JType.JRelativeT, JType.JRelativeT, JType.JRelativeT)
         def f2: F2 = CF2P("builtin::infix::op2::multiply") {
           case (c1: LongColumn, c2: LongColumn) =>
@@ -338,7 +336,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
       }
 
       // div needs to make sure to use Double even for division with longs
-      val Div = new Op2F2(InfixNamespace, "divide") {
+      val Div = new Op2F2 {
         def doublef(x: Double, y: Double) = x / y
 
         val context = java.math.MathContext.DECIMAL128
@@ -375,7 +373,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
         }
       }
 
-      val Mod = new Op2F2(InfixNamespace, "mod") {
+      val Mod = new Op2F2 {
         val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
 
         def longMod(x: Long, y: Long) = x % y
@@ -448,11 +446,11 @@ trait InfixLibModule extends ColumnarTableLibModule {
         }
       }
 
-      object Pow extends Op2F2(InfixNamespace, "pow") with Power {
+      object Pow extends Op2F2 with Power {
         val cf2pName = "builtin::infix::pow"
       }
 
-      class CompareOp2(name: String, f: Int => Boolean) extends Op2F2(InfixNamespace, name) {
+      class CompareOp2(name: String, f: Int => Boolean) extends Op2F2 {
         val tpe = BinaryOperationType(JNumberT, JNumberT, JBooleanT)
         import NumericComparisons.compare
         def f2: F2 = CF2P("builtin::infix::compare") {
@@ -511,7 +509,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
       val Gt   = new CompareOp2("gt", _ > 0)
       val GtEq = new CompareOp2("gte", _ >= 0)
 
-      class BoolOp2(name: String, f: (Boolean, Boolean) => Boolean) extends Op2F2(InfixNamespace, name) {
+      class BoolOp2(name: String, f: (Boolean, Boolean) => Boolean) extends Op2F2 {
         val tpe = BinaryOperationType(JBooleanT, JBooleanT, JBooleanT)
         def f2: F2 = CF2P("builtin::infix::bool") {
           case (c1: BoolColumn, c2: BoolColumn) => new BoolFrom.BB(c1, c2, f)
@@ -519,7 +517,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
       }
 
       // TODO find the commonalities and abstract these two
-      val And = new OpNFN(InfixNamespace, "and") {
+      val And = new OpNFN {
         val fn: FN = CFNP("builtin::infix::bool::and") {
           case List(c: BoolColumn) =>
             new BoolColumn {
@@ -554,7 +552,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
         }
       }
 
-      val Or = new OpNFN(InfixNamespace, "or") {
+      val Or = new OpNFN {
         val fn: FN = CFNP("builtin::infix::bool::or") {
           case List(c: BoolColumn) =>
             new BoolColumn {
@@ -589,7 +587,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
         }
       }
 
-      val concatString = new Op2F2(InfixNamespace, "concatString") {
+      val concatString = new Op2F2 {
         //@deprecated, see the DEPRECATED comment in StringLib
         val tpe = BinaryOperationType(JTextT, JTextT, JTextT)
 
