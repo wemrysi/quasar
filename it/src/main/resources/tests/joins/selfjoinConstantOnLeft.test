@@ -9,7 +9,7 @@
     "data": "../largeZips.data",
 
     "query": "select a.city, b.state
-              from `../largeZips` as a, `../largeZips` as b
+              from `../largeZips.data` as a, `../largeZips.data` as b
               where a.`_id` = b.`_id` and \"CA\" = b.state",
 
     "predicate": "atLeast",

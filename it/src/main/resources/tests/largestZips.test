@@ -5,7 +5,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "zips.data",
-    "query": "select city, pop from zips where pop > 90000 order by city, pop desc",
+    "query": "select city, pop from `zips.data` where pop > 90000 order by city, pop desc",
     "predicate": "exactly",
     "expected": [{ "city": "BELL GARDENS", "pop":  99568 },
                  { "city": "BROOKLYN",     "pop": 111396 },

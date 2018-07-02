@@ -6,7 +6,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "zips.data",
-    "query": "select city, state, sum(pop) as total from zips group by city, state order by sum(pop) desc limit 10",
+    "query": "select city, state, sum(pop) as total from `zips.data` group by city, state order by sum(pop) desc limit 10",
     "predicate": "exactly",
     "expected": [{ "city": "CHICAGO",      "state": "IL", "total": 2452177 },
                  { "city": "BROOKLYN",     "state": "NY", "total": 2300504 },

@@ -8,7 +8,7 @@
     },
     "NB": "Pending on mongo due to #3176",
     "data": "../zips.data",
-    "query": "SELECT state, COUNT(*) AS count, SUM(pop) AS sum, AVG(pop) AS avg, MIN(pop) AS min, MAX(pop) AS max FROM `../zips` WHERE pop > 10000 GROUP BY state ORDER BY max DESC, state OFFSET 1 LIMIT 10",
+    "query": "SELECT state, COUNT(*) AS count, SUM(pop) AS sum, AVG(pop) AS avg, MIN(pop) AS min, MAX(pop) AS max FROM `../zips.data` WHERE pop > 10000 GROUP BY state ORDER BY max DESC, state OFFSET 1 LIMIT 10",
     "predicate": "exactly",
     "expected": [
         { "state": "NY", "count": 489, "sum": 14914135, "avg": 30499.25357873, "min": 10008, "max": 111396 },

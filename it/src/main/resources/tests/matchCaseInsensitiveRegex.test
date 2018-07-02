@@ -1,7 +1,7 @@
 {
     "name": "match on case-insensitive string",
     "data": "zips.data",
-    "query": "select * from zips where city ~* \"^bOu\"",
+    "query": "select * from `zips.data` where city ~* \"^bOu\"",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "ignoredFields": ["_id"],

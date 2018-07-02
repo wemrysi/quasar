@@ -10,7 +10,7 @@
         "state": "\"CO\""
     },
 
-    "query": "select :state as state, count(*) as `count` from zips where state = :state",
+    "query": "select :state as state, count(*) as `count` from `zips.data` where state = :state",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

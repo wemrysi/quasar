@@ -6,7 +6,7 @@
 
   "query": "select
   array_concat(array_concat(make_array(to_string(num)),make_array(name.last)),make_array(name.first))
-   as res from basic",
+   as res from `basic.data`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

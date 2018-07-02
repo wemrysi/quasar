@@ -4,7 +4,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "largeZips.data",
-    "query": "select city, city !~ \"A\" as noA from largeZips where city !~ \"CHI\"",
+    "query": "select city, city !~ \"A\" as noA from `largeZips.data` where city !~ \"CHI\"",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

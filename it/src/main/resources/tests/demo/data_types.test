@@ -6,7 +6,7 @@
        "mimir":             "pending"
     },
     "NB": "mimir failing with missing implementation for typeof",
-    "query": "temp0 := SELECT `_id` AS id, TYPE_OF(`_id`) AS id_Description, field1 AS F1, TYPE_OF(field1) AS F1_Description, field2 AS F2, TYPE_OF(field2) AS F2_Description, field3 AS F3, TYPE_OF(field3) AS F3_Description FROM types;
+    "query": "temp0 := SELECT `_id` AS id, TYPE_OF(`_id`) AS id_Description, field1 AS F1, TYPE_OF(field1) AS F1_Description, field2 AS F2, TYPE_OF(field2) AS F2_Description, field3 AS F3, TYPE_OF(field3) AS F3_Description FROM `types.data`;
              SELECT COUNT(*) AS count FROM (temp0) AS temp1
      ",
     "predicate": "exactly",

@@ -5,7 +5,7 @@
 
   "backends": {},
 
-  "query": "select num from basic",
+  "query": "select num from `basic.data`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

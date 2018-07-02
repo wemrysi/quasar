@@ -7,7 +7,7 @@
     "data": "olympics.data",
     "query": "select * from
                 (select row.city as seriesOne, row.sport as seriesTwo, min(row.year) as measureOne
-                  from (select * from olympics) as row
+                  from (select * from `olympics.data`) as row
                   group by row.city, row.sport
                   order by row.city, row.sport asc) as foo
                 where seriesOne = \"Calgary\"",

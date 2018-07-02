@@ -5,7 +5,7 @@
     },
     "data": "largeZips.data",
     "query": "select length(city) as len, count(*) as cnt
-                from largeZips
+                from `largeZips.data`
                 where state != \"MI\"
                 group by length(city)",
     "predicate": "exactly",

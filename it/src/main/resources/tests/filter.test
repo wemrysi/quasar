@@ -3,7 +3,7 @@
 
     "data": "smallZips.data",
 
-    "query": "select count(*) as cnt from smallZips where pop < 1000 and length(city) < 8",
+    "query": "select count(*) as cnt from `smallZips.data` where pop < 1000 and length(city) < 8",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

@@ -5,7 +5,7 @@
     },
     "data": "zips.data",
 
-    "query": "select distinct city from zips order by city",
+    "query": "select distinct city from `zips.data` order by city",
 
     "predicate": "initial",
 

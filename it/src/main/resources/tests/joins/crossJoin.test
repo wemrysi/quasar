@@ -9,7 +9,7 @@
     "data": ["../smallZips.data", "../zips.data"],
 
     "query": "select smallZips.city, zips.state
-              from `../smallZips`, `../zips`
+              from `../smallZips.data` as smallZips, `../zips.data` as zips
               where smallZips.`_id` = zips.`_id`",
 
     "predicate": "atLeast",

@@ -8,7 +8,7 @@
 
     "data": "largeZips.data",
 
-    "query": "select max(pop) as max_pop, min(city) as min_city from largeZips where length(city) < 6",
+    "query": "select max(pop) as max_pop, min(city) as min_city from `largeZips.data` where length(city) < 6",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

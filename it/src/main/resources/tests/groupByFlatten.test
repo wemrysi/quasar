@@ -7,7 +7,7 @@
         "mongodb_3_6":       "pending"
     },
     "data": "slamengine_commits.data",
-    "query": "select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)",
+    "query": "select substring(parents[*].sha, 0, 1), count(*) from `slamengine_commits.data` group by substring(parents[*].sha, 0, 1)",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [{ "0": "0", "1": 1 },

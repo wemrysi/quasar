@@ -3,7 +3,7 @@
   "data": "fieldtablecollision.data",
   "backends": {
   },
-  "query": "SELECT fieldtablecollision.fieldtablecollision FROM fieldtablecollision",
+  "query": "SELECT fieldtablecollision.fieldtablecollision FROM `fieldtablecollision.data` as fieldtablecollision",
   "predicate": "exactly",
   "expected": [
     1

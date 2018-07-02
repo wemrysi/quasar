@@ -6,7 +6,7 @@
        "mimir":             "ignoreFieldOrder"
 
     },
-    "query": "temp0 := SELECT * FROM timeseries WHERE sensor IN (\"S0\", \"S1\", \"S2\", \"S3\", \"S4\");
+    "query": "temp0 := SELECT * FROM `timeseries.data` WHERE sensor IN (\"S0\", \"S1\", \"S2\", \"S3\", \"S4\");
                       SELECT SUM(value) AS measure, dt AS dimension, sensor AS series FROM (temp0) AS temp1 GROUP BY sensor, dt ORDER BY sensor ASC, dt ASC LIMIT 6
      ",
     "predicate": "exactly",

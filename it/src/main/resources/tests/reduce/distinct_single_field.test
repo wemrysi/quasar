@@ -5,7 +5,7 @@
        "mimir":             "ignoreFieldOrder"
     },
     "data": "../basic2.data",
-    "query": "select distinct b as Boo from `../basic2`",
+    "query": "select distinct b as Boo from `../basic2.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

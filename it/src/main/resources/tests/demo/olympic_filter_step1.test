@@ -6,7 +6,7 @@
        "mimir":             "pending"
     },
     "NB": "mimir is pending because the results are not properly ordered - it can only be fully ASC or DESC, you can not mix sorting orders",
-    "query": "temp0 := SELECT * FROM olympics;
+    "query": "temp0 := SELECT * FROM `olympics.data`;
          SELECT discipline, city, gender, country, type FROM (temp0) AS res WHERE res.country IN (\"AUT\") ORDER BY type DESC, gender DESC, discipline asc, city asc LIMIT 5
          ",
     "predicate": "exactly",

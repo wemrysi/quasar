@@ -7,7 +7,7 @@
 
   "data": "olympics.data",
 
-  "query": "select distinct discipline, event from olympics where event like \"%pursuit\"",
+  "query": "select distinct discipline, event from `olympics.data` where event like \"%pursuit\"",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

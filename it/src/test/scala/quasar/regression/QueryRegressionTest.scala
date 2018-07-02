@@ -86,7 +86,7 @@ abstract class QueryRegressionTest[S[_]](
 
   /** Location in the (Quasar) filesystem where a test dataset will be stored. */
   def dataFile(file: RFile): AFile =
-    renameFile(DataDir </> file, _.dropExtension)
+    DataDir </> file
 
   val query  = QueryFile.Ops[S]
   val write  = WriteFile.Ops[S]

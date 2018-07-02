@@ -2,7 +2,7 @@
     "name": "order by if undefined",
     "backends": {},
     "data": "smallZips.data",
-    "query": "select city ?? \"foo\" as name from smallZips order by city ?? \"foo\"",
+    "query": "select city ?? \"foo\" as name from `smallZips.data` order by city ?? \"foo\"",
     "predicate": "initial",
     "expected": [{ "name": "ADAMS" },
                  { "name": "AGAWAM" },

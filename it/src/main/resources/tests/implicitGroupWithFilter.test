@@ -7,7 +7,7 @@
 
     "data": "zips.data",
 
-    "query": "select avg(pop) as avg_pop, sum(pop) as tot_pop from zips where city = \"BOULDER\" and state = \"CO\"",
+    "query": "select avg(pop) as avg_pop, sum(pop) as tot_pop from `zips.data` where city = \"BOULDER\" and state = \"CO\"",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

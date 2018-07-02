@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "nested.data",
-    "query": "select topObj.midObj{_:} from nested",
+    "query": "select topObj.midObj{_:} from `nested.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": ["botArr", "botObj"]

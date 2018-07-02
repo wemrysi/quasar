@@ -5,7 +5,7 @@
        "lwc_local":         "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
-    "query": "SELECT first_name, last_name, middle_name, age FROM patients WHERE state = \"CO\" AND city = \"DENVER\" ORDER BY last_name ASC LIMIT 10",
+    "query": "SELECT first_name, last_name, middle_name, age FROM `patients.data` WHERE state = \"CO\" AND city = \"DENVER\" ORDER BY last_name ASC LIMIT 10",
     "predicate": "exactly",
     "expected": [
          { "first_name": "Lindsey" , "last_name": "Benjamin" , "middle_name":  "Alice"         , "age":  37 },

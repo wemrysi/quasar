@@ -10,7 +10,7 @@
                 TO_STRING(DATE_PART(\"year\",TIMESTAMP(last_visit)))
                     || \"-\" || \"Q\" ||
                     TO_STRING(DATE_PART(\"quarter\",TIMESTAMP(last_visit))) AS Q
-              FROM otherpatients
+              FROM `otherpatients.data`
               WHERE SUBSTRING(TO_STRING(last_visit),0,4) IN \"2016\"
               GROUP BY
                 TO_STRING(DATE_PART(\"year\",TIMESTAMP(last_visit)))

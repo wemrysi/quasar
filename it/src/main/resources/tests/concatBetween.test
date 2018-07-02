@@ -4,7 +4,7 @@
         "mimir":          "ignoreFieldOrder"
     },
     "data": "smallZips.data",
-    "query": "select city, pop, pop between 1000 and 10000 as midsized from smallZips",
+    "query": "select city, pop, pop between 1000 and 10000 as midsized from `smallZips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [{ "city": "AGAWAM",       "pop": 15338, "midsized": false },

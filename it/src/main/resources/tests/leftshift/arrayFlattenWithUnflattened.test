@@ -6,7 +6,7 @@
   },
   "data": "../arrayProcessing.data",
 
-  "query": "select a, a[*] as b from `../arrayProcessing`",
+  "query": "select a, a[*] as b from `../arrayProcessing.data`",
 
   "predicate": "exactly",
 

@@ -3,7 +3,7 @@
 
     "data": "zips.data",
 
-    "query": "select count(*) as cnt, sum(pop) as sm from zips group by state",
+    "query": "select count(*) as cnt, sum(pop) as sm from `zips.data` group by state",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

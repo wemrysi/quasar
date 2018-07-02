@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "newTests.data",
-    "query": "select backends{_:} as backend, backends{:_} as status, name from newTests",
+    "query": "select backends{_:} as backend, backends{:_} as status, name from `newTests.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [
