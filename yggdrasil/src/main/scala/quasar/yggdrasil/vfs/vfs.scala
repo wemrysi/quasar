@@ -49,10 +49,6 @@ import shims.monoidToCats
 import java.io.File
 import java.util.UUID
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Promise
-import scala.util.{Failure, Success}
-
 final case class VFS(
     baseDir: ADir,
     metaLog: VersionLog,

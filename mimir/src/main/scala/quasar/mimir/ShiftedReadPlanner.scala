@@ -18,14 +18,12 @@ package quasar.mimir
 
 import slamdata.Predef._
 
-import quasar.blueeyes.json.JValue
 import quasar.contrib.fs2.convert.toStreamT
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.contrib.scalaz.concurrent.task._
 import quasar.fs._
 import quasar.mimir.MimirCake._
-import quasar.precog.common.RValue
 import quasar.qscript._
 import quasar.yggdrasil.UnknownSize
 import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
