@@ -2025,20 +2025,7 @@ object Slice {
     if (values.size == 0) {
       (Slice.empty, ArraySliced.noRValues)
     } else {
-      // we can make a guess at a nice starting array size;
-      // if we know that `n` values at the start of the array are
-      // scalars, we know we're going to have at least `min(n, maxRows)`
-      // scalars in this slice.
-      // otherwise, we go with the constant limit we've been passed, because
-      // we have some vector data coming up, so who knows how many rows we'll
-      // get before we have too many columns.
-      var ctr = values.start
-      var r = values.head
-      while (ctr < values.arr.length - 1 && ctr < (values.start + maxRows) && RValue.toCValue(r).nonEmpty) {
-        ctr = ctr + 1
-        r = values.arr(ctr)
-      }
-      val size = Math.min(maxRows, Math.max(nextPowerOfTwo(ctr - values.start), startingSize))
+      val size = Math.min(maxRows, startingSize)
       inner(values, 0, Map.empty, size)
     }
   }
