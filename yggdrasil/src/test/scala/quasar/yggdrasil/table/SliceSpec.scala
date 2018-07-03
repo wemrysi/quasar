@@ -347,21 +347,18 @@ class SliceSpec extends Specification with ScalaCheck {
     }
 
     "increase slice size to the next power of two when slice size cannot be predicted" >> {
-      val data = ArraySliced(Array[RValue](
-        CLong(1), CLong(2), RArray(List(CLong(1)))
-      ), 0, 3)
-      val columnSize = Slice.fromRValuesStep(data, 6, 3, 2)
+      val data = ArraySliced(
+        Array.fill[RValue](64)(CLong(1)) ++ Array(RArray(List(CLong(1)))), 0, 65)
+      val columnSize = Slice.fromRValuesStep(data, 64, 3, 2)
         ._1.columns(ColumnRef(CPath.Identity, CLong)).asInstanceOf[ArrayLongColumn].values.length
-      columnSize must_== 4
+      columnSize must_== 64
     }
 
     "increase slice size to the next power of two when slice size can be predicted" >> {
-      val data = ArraySliced(Array[RValue](
-        CLong(1), CLong(2), CLong(3)
-      ), 0, 3)
-      val columnSize = Slice.fromRValuesStep(data, 6, 3, 2)
+      val data = ArraySliced(Array.fill[RValue](65)(CLong(1)), 0, 64)
+      val columnSize = Slice.fromRValuesStep(data, 64, 3, 2)
         ._1.columns(ColumnRef(CPath.Identity, CLong)).asInstanceOf[ArrayLongColumn].values.length
-      columnSize must_== 4
+      columnSize must_== 64
     }
 
     "stop increasing slice size at maxRows" >> {
