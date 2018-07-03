@@ -109,18 +109,6 @@ class ArrayBoolColumn(val defined: BitSet, val values: BitSet) extends ArrayColu
     new ArrayBoolColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayBoolColumn]) {
-      val otherC = other.asInstanceOf[ArrayBoolColumn]
-      val newValues = values.copy()
-      val newOtherValues = otherC.values.copy()
-      newValues.and(defined)
-      newOtherValues.and(otherC.defined)
-      newValues == newOtherValues
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayBoolColumn {
@@ -154,15 +142,6 @@ class ArrayLongColumn(val defined: BitSet, val values: Array[Long]) extends Arra
     new ArrayLongColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayLongColumn]) {
-      val otherC = other.asInstanceOf[ArrayLongColumn]
-      ArrayColumn.filterDefined(defined, values).deep ==
-        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayLongColumn {
@@ -190,15 +169,6 @@ class ArrayDoubleColumn(val defined: BitSet, val values: Array[Double]) extends 
     new ArrayDoubleColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayDoubleColumn]) {
-      val otherC = other.asInstanceOf[ArrayDoubleColumn]
-      ArrayColumn.filterDefined(defined, values).deep ==
-        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayDoubleColumn {
@@ -226,15 +196,6 @@ class ArrayNumColumn(val defined: BitSet, val values: Array[BigDecimal]) extends
     new ArrayNumColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayNumColumn]) {
-      val otherC = other.asInstanceOf[ArrayNumColumn]
-      ArrayColumn.filterDefined(defined, values).deep ==
-        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayNumColumn {
@@ -262,15 +223,6 @@ class ArrayStrColumn(val defined: BitSet, val values: Array[String]) extends Arr
     new ArrayStrColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayStrColumn]) {
-      val otherC = other.asInstanceOf[ArrayStrColumn]
-      ArrayColumn.filterDefined(defined, values).deep ==
-        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayStrColumn {
@@ -298,15 +250,6 @@ class ArrayOffsetDateTimeColumn(val defined: BitSet, val values: Array[OffsetDat
     new ArrayOffsetDateTimeColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayOffsetDateTimeColumn]) {
-      val otherC = other.asInstanceOf[ArrayOffsetDateTimeColumn]
-      ArrayColumn.filterDefined(defined, values).deep ==
-        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayOffsetDateTimeColumn {
@@ -334,15 +277,6 @@ class ArrayOffsetTimeColumn(val defined: BitSet, val values: Array[OffsetTime]) 
     new ArrayOffsetTimeColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayOffsetTimeColumn]) {
-      val otherC = other.asInstanceOf[ArrayOffsetTimeColumn]
-      ArrayColumn.filterDefined(defined, values).deep ==
-        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayOffsetTimeColumn {
@@ -370,15 +304,6 @@ class ArrayOffsetDateColumn(val defined: BitSet, val values: Array[OffsetDate]) 
     new ArrayOffsetDateColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayOffsetDateColumn]) {
-      val otherC = other.asInstanceOf[ArrayOffsetDateColumn]
-      ArrayColumn.filterDefined(defined, values).deep ==
-        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayOffsetDateColumn {
@@ -406,15 +331,6 @@ class ArrayLocalDateTimeColumn(val defined: BitSet, val values: Array[LocalDateT
     new ArrayLocalDateTimeColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayLocalDateTimeColumn]) {
-      val otherC = other.asInstanceOf[ArrayLocalDateTimeColumn]
-      ArrayColumn.filterDefined(defined, values).deep ==
-        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayLocalDateTimeColumn {
@@ -442,15 +358,6 @@ class ArrayLocalTimeColumn(val defined: BitSet, val values: Array[LocalTime]) ex
     new ArrayLocalTimeColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayLocalTimeColumn]) {
-      val otherC = other.asInstanceOf[ArrayLocalTimeColumn]
-      ArrayColumn.filterDefined(defined, values).deep ==
-        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayLocalTimeColumn {
@@ -478,15 +385,6 @@ class ArrayLocalDateColumn(val defined: BitSet, val values: Array[LocalDate]) ex
     new ArrayLocalDateColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayLocalDateColumn]) {
-      val otherC = other.asInstanceOf[ArrayLocalDateColumn]
-      ArrayColumn.filterDefined(defined, values).deep ==
-        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayLocalDateColumn {
@@ -514,15 +412,6 @@ class ArrayIntervalColumn(val defined: BitSet, val values: Array[DateTimeInterva
     new ArrayIntervalColumn(newDefined, newValues)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[ArrayIntervalColumn]) {
-      val otherC = other.asInstanceOf[ArrayIntervalColumn]
-      ArrayColumn.filterDefined(defined, values).deep ==
-        ArrayColumn.filterDefined(otherC.defined, otherC.values).deep
-    } else {
-      false
-    }
-  }
 }
 
 object ArrayIntervalColumn {
@@ -580,14 +469,6 @@ class MutableNullColumn(val defined: BitSet) extends ArrayColumn[Boolean] with N
     new MutableNullColumn(newDefined)
   }
 
-  override def equals(other: Any): Boolean = {
-    if (other.isInstanceOf[MutableNullColumn]) {
-      val otherC = other.asInstanceOf[MutableNullColumn]
-      defined == otherC.defined
-    } else {
-      false
-    }
-  }
 }
 
 object MutableNullColumn {
