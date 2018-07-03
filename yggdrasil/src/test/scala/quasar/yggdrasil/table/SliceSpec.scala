@@ -29,11 +29,8 @@ import quasar.yggdrasil.TableModule.SortDescending
 import scala.util.Random
 import org.scalacheck.{Arbitrary, Gen}
 import org.specs2.execute.Result
-import org.specs2.matcher.{Matcher, MatchFailure, MatchResult, MatchSuccess}
+import org.specs2.matcher.Matcher
 import Gen.listOfN
-
-import scalaz.{Equal, Show}
-import scalaz.syntax.equal._
 
 class SliceSpec extends Specification with ScalaCheck {
   import ArbitrarySlice._
@@ -117,10 +114,10 @@ class SliceSpec extends Specification with ScalaCheck {
           (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) CNull else CUndefined)
       }
     }
-    def equalIterators[A: Equal](xs: Iterator[A], ys: Iterator[A]): Result = {
+    def equalIterators[A](xs: Iterator[A], ys: Iterator[A]): Result = {
       Result.foreach(xs.toStream.zip(ys.toStream)) {
         case (x, y) =>
-          x must_=== y
+          x must_== y
       }
     }
     val colList1 = slice1.materialized.columns.toList.sortBy(_._1)

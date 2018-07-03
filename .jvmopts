@@ -1,4 +1,4 @@
--Xms512m
+-Xms6g
 -Xmx6g
 -Xss2m
 -XX:+UseG1GC

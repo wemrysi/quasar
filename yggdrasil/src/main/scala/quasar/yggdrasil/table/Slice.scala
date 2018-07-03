@@ -2029,7 +2029,7 @@ object Slice {
               // we already have the slice's data including RValue in `newAcc`,
               // so we pass that on and advance the data cursor.
               // println("we're adding an RValue to the slice")
-              inner(next.tail, rows + 1, false, newAcc, allocatedColSize) // newCols > maxColumns, newAcc, allocatedColSize)
+              inner(next.tail, rows + 1, newCols > maxColumns, newAcc, allocatedColSize)
             }
           }
         }
@@ -2039,7 +2039,7 @@ object Slice {
     if (values.size == 0) {
       (Slice.empty, ArraySliced.noRValues)
     } else {
-      val size = Math.min(maxRows, 32)
+      val size = Math.min(maxRows, startingSize)
       inner(values, 0, false, Map.empty, size)
     }
   }
