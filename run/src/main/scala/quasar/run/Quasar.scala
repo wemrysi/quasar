@@ -42,7 +42,7 @@ import cats.~>
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.functor._
 import cats.syntax.flatMap._
-import fs2.Stream
+import fs2.{Scheduler, Stream}
 import matryoshka.data.Fix
 import pathy.Path._
 import scalaz.IMap
@@ -73,9 +73,9 @@ object Quasar {
     implicit val ec = pool
 
     for {
-      precog <-
-        Stream.bracket(Precog(mimirDir.toFile).to[F])(_.dispose.to[F])
-          .map(_.unsafeValue)
+      precog <- Stream.bracket(Precog(mimirDir.toFile).to[F])(
+        d => Stream.emit(d.unsafeValue),
+        _.dispose.to[F])
 
       configs =
         MimirDataSourceConfigs[F](precog, DataSourceConfigsLocation)
@@ -91,15 +91,17 @@ object Quasar {
           .fold(IMap.empty[ResourceName, DataSourceConfig[Json]])(_ + _)
           .translate(λ[IO ~> F](_.to[F]))
 
-      extMods <- ExternalDataSources[F](extConfig)
+      extMods <- ExternalDataSources[F](extConfig, pool)
 
       modules = extMods.insert(
         LocalDataSourceModule.kind,
         DataSourceModule.Lightweight(LocalDataSourceModule))
 
-      mr <- Stream.bracket(DataSourceManagement[Fix, F, IO](modules, configured)) {
-        case (_, r) => r.get.flatMap(_.traverse_(_.fold(_.shutdown, _.shutdown)))
-      }
+      scheduler <- Scheduler(corePoolSize = 1, threadPrefix = "quasar-scheduler")
+
+      mr <- Stream.bracket(DataSourceManagement[Fix, F, IO](modules, configured, pool, scheduler))(
+        Stream.emit(_),
+        { case (_, r) => r.get.flatMap(_.traverse_(_.fold(_.shutdown, _.shutdown))) })
 
       (mgmt, running) = mr
 

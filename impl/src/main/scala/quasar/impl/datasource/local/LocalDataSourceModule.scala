@@ -22,6 +22,7 @@ import quasar.api.DataSourceError._
 import quasar.connector.{DataSource, LightweightDataSourceModule}
 
 import java.nio.file.Paths
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, Timer}
@@ -53,7 +54,7 @@ object LocalDataSourceModule extends LightweightDataSourceModule {
         EitherT.fromEither(F.attempt(F.delay(Paths.get(lc.rootDir))))
           .leftMap[InitializationError[Json]](
             t => MalformedConfiguration(kind, config, "Invalid path: " + t.getMessage))
-    } yield LocalDataSource[F, G](root, lc.readChunkSizeBytes)
+    } yield LocalDataSource[F, G](root, lc.readChunkSizeBytes, global)
 
     ds.run
   }

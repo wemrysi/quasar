@@ -28,11 +28,12 @@ import quasar.impl.DataSourceModule
 import quasar.impl.datasource.{ByNeedDataSource, ConditionReportingDataSource, FailedDataSource}
 import quasar.qscript.QScriptEducated
 
+import scala.concurrent.ExecutionContext
+
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, Timer}
-import cats.effect.concurrent.Ref
-import fs2.Stream
-import fs2.async.{immutable, mutable}
+import fs2.{Scheduler, Stream}
+import fs2.async.{immutable, mutable, Ref}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import scalaz.{\/, EitherT, IMap, ISet, Monad, OptionT, Scalaz}, Scalaz._
 import shims._
@@ -106,11 +107,11 @@ final class DataSourceManagement[
       }
 
     val renameErrors =
-      errors.update(_.updateLookupWithKey(src, κ2(None)) match {
+      errors.modify(_.updateLookupWithKey(src, κ2(None)) match {
         case (v, m) => m.alter(dst, κ(v))
       })
 
-    renameRunning *> renameErrors
+    renameRunning <* renameErrors
   }
 
   val supported: F[ISet[DataSourceType]] =
@@ -130,10 +131,10 @@ final class DataSourceManagement[
 
   private def modifyAndShutdown(f: Running => (Running, Option[(ResourceName, DS)])): F[Unit] =
     for {
-      t <- running.modify(f)
+      t <- running.modify2(f)
 
-      _  <- t.traverse_ {
-        case (n, ds) => errors.update(_ - n) *> shutdown0(ds)
+      _  <- t._2.traverse_ {
+        case (n, ds) => errors.modify(_ - n) *> shutdown0(ds)
       }
     } yield ()
 
@@ -153,10 +154,15 @@ object DataSourceManagement {
       F[_]: ConcurrentEffect: PlannerErrorME: MonadError_[?[_], CreateError[Json]]: Timer,
       G[_]: ConcurrentEffect: Timer](
       modules: Modules,
-      configured: IMap[ResourceName, DataSourceConfig[Json]])
-      : F[(DataSourceControl[F, Json] with DataSourceErrors[F], immutable.Signal[F, Running[T, F, G]])] =
+      configured: IMap[ResourceName, DataSourceConfig[Json]],
+      pool: ExecutionContext,
+      scheduler: Scheduler)
+      : F[(DataSourceControl[F, Json] with DataSourceErrors[F], immutable.Signal[F, Running[T, F, G]])] = {
+
+    implicit val ec: ExecutionContext = pool
+
     for {
-      errors <- Ref.of[F, IMap[ResourceName, Exception]](IMap.empty)
+      errors <- Ref[F, IMap[ResourceName, Exception]](IMap.empty)
 
       assocs <- configured.toList traverse {
         case (name, cfg @ DataSourceConfig(kind, _)) =>
@@ -169,7 +175,7 @@ object DataSourceManagement {
               (name, ds.left[HDS[T, F, G]]).point[F]
 
             case Some(mod) =>
-              lazyDataSource[T, F, G](mod, cfg).strengthL(name)
+              lazyDataSource[T, F, G](mod, cfg, pool, scheduler).strengthL(name)
           }
       }
 
@@ -183,6 +189,7 @@ object DataSourceManagement {
 
       ctrl = new DataSourceManagement[T, F, G](modules, errors, runningS)
     } yield (ctrl, runningS)
+  }
 
   def withErrorReporting[F[_]: Monad: MonadError_[?[_], Exception], G[_], Q, R](
       errors: Ref[F, IMap[ResourceName, Exception]],
@@ -190,7 +197,7 @@ object DataSourceManagement {
       ds: DataSource[F, G, Q, R])
       : DataSource[F, G, Q, R] =
     ConditionReportingDataSource[Exception, F, G, Q, R](
-      c => errors.update(_.alter(name, κ(Condition.optionIso.get(c)))), ds)
+      c => errors.modify(_.alter(name, κ(Condition.optionIso.get(c)))).void, ds)
 
   ////
 
@@ -199,7 +206,9 @@ object DataSourceManagement {
       F[_]: ConcurrentEffect: PlannerErrorME: MonadError_[?[_], CreateError[Json]]: Timer,
       G[_]: ConcurrentEffect: Timer](
       module: DataSourceModule,
-      config: DataSourceConfig[Json])
+      config: DataSourceConfig[Json],
+      pool: ExecutionContext,
+      scheduler: Scheduler)
       : F[DS[T, F, G]] =
     module match {
       case DataSourceModule.Lightweight(lw) =>
@@ -208,7 +217,7 @@ object DataSourceManagement {
             .map(_.leftMap(ie => ie: CreateError[Json]))
         }
 
-        ByNeedDataSource(config.kind, mklw).map(_.left)
+        ByNeedDataSource(config.kind, mklw, pool, scheduler).map(_.left)
 
       case DataSourceModule.Heavyweight(hw) =>
         val mkhw = MonadError_[F, CreateError[Json]] unattempt {
@@ -216,6 +225,6 @@ object DataSourceManagement {
             .map(_.leftMap(ie => ie: CreateError[Json]))
         }
 
-        ByNeedDataSource(config.kind, mkhw).map(_.right)
+        ByNeedDataSource(config.kind, mkhw, pool, scheduler).map(_.right)
     }
 }

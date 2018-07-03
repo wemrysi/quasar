@@ -22,10 +22,10 @@ import quasar._
 import quasar.api.ResourceError.ReadError
 import quasar.blueeyes.json.{JValue, JUndefined}
 import quasar.connector.QScriptEvaluator
+import quasar.contrib.cats.effect._
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
-import quasar.contrib.scalaz.concurrent.task._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs.Planner.PlannerErrorME
@@ -38,8 +38,8 @@ import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.{IO, LiftIO}
-import cats.effect.implicits._
 import fs2.Stream
+import io.chrisdavenport.scalaz.task._
 import iotaz.CopK
 import matryoshka._
 import matryoshka.implicits._
@@ -100,7 +100,7 @@ final class MimirQScriptEvaluator[
   def plan(cp: T[QSM]): M[Repr] = {
     def qScriptCorePlanner =
       new mimir.QScriptCorePlanner[T, M](
-        λ[ReaderT[Task, Cake, ?] ~> M](_.run(cake).toIO.to[F].liftM[MT]))
+        λ[ReaderT[Task, Cake, ?] ~> M](_.run(cake).to[IO].to[F].liftM[MT]))
 
     def equiJoinPlanner =
       new mimir.EquiJoinPlanner[T, M](λ[IO ~> M](_.to[F].liftM[MT]))

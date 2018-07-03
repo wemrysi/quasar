@@ -10,7 +10,7 @@ object Dependencies {
   private val argonautVersion     = "6.2"
   private val disciplineVersion   = "0.7.2"
   private val doobieVersion       = "0.4.4"
-  private val jawnVersion         = "0.12.1"
+  private val jawnVersion         = "0.11.1"
   private val jacksonVersion      = "2.4.4"
   private val matryoshkaVersion   = "0.18.3"
   private val monocleVersion      = "1.4.0"
@@ -29,7 +29,7 @@ object Dependencies {
   private val specsVersion        = "4.1.0"
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
-  private val fs2Version          = "1.0.0-M1"
+  private val fs2Version          = "0.10.5"
   private val qdataVersion        = "1.0.4"
   private val slf4sVersion        = "1.7.25"
 
@@ -39,7 +39,7 @@ object Dependencies {
     "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
     "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
     "com.codecommit"             %% "shims"                     % "1.2.1",
-    "org.typelevel"              %% "cats-effect"               % "1.0.0-RC2",
+    "org.typelevel"              %% "cats-effect"               % "0.10.1",
     "co.fs2"                     %% "fs2-core"                  % fs2Version,
     "co.fs2"                     %% "fs2-io"                    % fs2Version,
     "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
@@ -110,7 +110,7 @@ object Dependencies {
   )
 
   def impl = Seq(
-    "org.http4s"     %% "jawn-fs2"      % "0.13.0-M1",
+    "org.http4s"     %% "jawn-fs2"      % "0.12.2",
     "org.slf4s"      %% "slf4s-api"     % slf4sVersion,
     "org.spire-math" %% "jawn-argonaut" % jawnVersion
   )
@@ -151,6 +151,10 @@ object Dependencies {
 
   def yggdrasil = Seq(
     "com.codecommit" %% "smock" % "0.4.0-specs2-4.0.2" % "test"
+  )
+
+  def mimir = Seq(
+    "io.chrisdavenport" %% "scalaz-task-effect" % "0.1.0"
   )
 
   def niflheim = Seq(

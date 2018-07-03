@@ -26,7 +26,6 @@ import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.nihdb.NIHDBProjection
 import quasar.yggdrasil.vfs._
 
-import scala.concurrent.ExecutionContext.Implicits.global // FIXME what is this thing
 import scala.concurrent.duration._
 
 import java.util.concurrent.{ConcurrentHashMap, ScheduledThreadPoolExecutor, ThreadFactory}
