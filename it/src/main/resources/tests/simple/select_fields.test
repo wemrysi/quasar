@@ -3,7 +3,7 @@
 
   "data": "basic.data",
 
-  "query": "select num, name from basic",
+  "query": "select num, name from `basic.data`",
 
   "predicate": "exactly",
 

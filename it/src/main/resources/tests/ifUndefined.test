@@ -4,7 +4,7 @@
         "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",
-    "query": "select foo ?? pop as p, city ?? false as c from zips",
+    "query": "select foo ?? pop as p, city ?? false as c from `zips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [{ "p": 15338.0, "c": "AGAWAM"       },

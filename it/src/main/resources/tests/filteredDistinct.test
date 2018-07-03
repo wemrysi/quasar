@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "olympics.data",
-    "query": "select distinct discipline from olympics where event like \"%pursuit\"",
+    "query": "select distinct discipline from `olympics.data` where event like \"%pursuit\"",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": ["Speed skating", "Biathlon", "Cross Country S"]

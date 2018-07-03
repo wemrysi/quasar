@@ -17,7 +17,7 @@
 package quasar.yggdrasil
 package table
 
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 
 class FNSpec extends Specification {
   "function implementations" should {

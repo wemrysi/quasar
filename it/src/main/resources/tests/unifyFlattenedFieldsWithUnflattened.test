@@ -4,7 +4,7 @@
         "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",
-    "query": "select `_id` as zip, loc[*] from zips order by loc[*] limit 10",
+    "query": "select `_id` as zip, loc[*] from `zips.data` order by loc[*] limit 10",
     "predicate": "exactly",
     "expected": [{ "zip": "99742", "loc": -171.701685},
                  { "zip": "99769", "loc": -170.470908},

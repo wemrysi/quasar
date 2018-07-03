@@ -6,7 +6,7 @@
         "mongodb_3_6":       "ignoreFieldOrder"
     },
     "data": "slamengine_commits.data",
-    "query": "select committer.login, count(*) from slamengine_commits",
+    "query": "select committer.login, count(*) from `slamengine_commits.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

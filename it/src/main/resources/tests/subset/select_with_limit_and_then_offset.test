@@ -12,7 +12,7 @@
 
     "data": "subset.data",
 
-    "query": "select a, b from subset order by a limit 2 offset 3",
+    "query": "select a, b from `subset.data` order by a limit 2 offset 3",
 
     "predicate": "exactly",
 

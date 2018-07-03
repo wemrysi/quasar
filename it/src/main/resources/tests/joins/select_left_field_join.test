@@ -7,7 +7,7 @@
 
     "data": ["leftData.data", "rightData.data"],
 
-    "query": "select l.b as b from leftData as l inner join rightData as r on l.a = r.a",
+    "query": "select l.b as b from `leftData.data` as l inner join `rightData.data` as r on l.a = r.a",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

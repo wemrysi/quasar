@@ -18,7 +18,7 @@ package quasar.yggdrasil
 package jdbm3
 
 import quasar.precog.common._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 import quasar.yggdrasil.table._
 
 import org.scalacheck.Shrink

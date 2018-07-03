@@ -7,7 +7,7 @@
     "mongodb_3_4_13":    "pending",
     "mongodb_3_6":       "pending"
   },
-  "query": "SELECT AVG(weight) AS measure, city AS category, gender AS stack, null AS parallel FROM patients AS card468278e5ec90410e8d702ed8f6967066_ WHERE true GROUP BY null, gender, city ORDER BY null ASC, gender ASC, city ASC",
+  "query": "SELECT AVG(weight) AS measure, city AS category, gender AS stack, null AS parallel FROM `patients.data` AS card468278e5ec90410e8d702ed8f6967066_ WHERE true GROUP BY null, gender, city ORDER BY null ASC, gender ASC, city ASC",
   "predicate": "exactly",
   "expected": [
     { "parallel": null, "measure": 185.0, "stack": "female", "category": "ABBOTT" },

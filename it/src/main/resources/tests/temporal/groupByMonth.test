@@ -8,7 +8,7 @@
 
     "data": "../days.data",
 
-    "query": "select avg(epoch), date_part(\"month\", `ts`) from `../days` group by date_part(\"month\", `ts`)",
+    "query": "select avg(epoch), date_part(\"month\", `ts`) from `../days.data` group by date_part(\"month\", `ts`)",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

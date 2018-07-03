@@ -5,7 +5,7 @@
         "mimir": "pending"
     },
     "data": "../slamengine_commits.data",
-    "query": "select count(*) from `../slamengine_commits` where commit.message like \"Merge%\"",
+    "query": "select count(*) from `../slamengine_commits.data` where commit.message like \"Merge%\"",
     "predicate": "exactly",
     "expected": [13]
 }

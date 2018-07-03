@@ -4,7 +4,7 @@
         "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",
-    "query": "SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips",
+    "query": "SELECT `_id` as zip, loc as loc, loc[*] as coord FROM `zips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

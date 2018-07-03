@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "olympics.data",
-    "query": "select count(distinct *) as cnt from olympics",
+    "query": "select count(distinct *) as cnt from `olympics.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [{ "cnt": 2304 }]

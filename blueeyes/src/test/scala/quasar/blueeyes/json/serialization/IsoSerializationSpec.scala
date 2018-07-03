@@ -21,7 +21,7 @@ package serialization
 import DefaultSerialization._
 import IsoSerialization._
 import shapeless._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 
 object IsoSerializationSpec {
   case class Foo(s: String, i: Option[Int], b: Boolean)

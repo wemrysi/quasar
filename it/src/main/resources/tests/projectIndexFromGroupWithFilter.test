@@ -4,7 +4,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "slamengine_commits.data",
-    "query": "select parents[0].sha, count(*) as count from slamengine_commits where parents[0].sha like \"5%\" group by parents[0].sha",
+    "query": "select parents[0].sha, count(*) as count from `slamengine_commits.data` where parents[0].sha like \"5%\" group by parents[0].sha",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

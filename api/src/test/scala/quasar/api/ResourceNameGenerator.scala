@@ -16,11 +16,14 @@
 
 package quasar.api
 
-import quasar.pkg.tests._
+import org.scalacheck.{Arbitrary, Gen}
 
 trait ResourceNameGenerator {
   implicit val resourceNameArbitrary: Arbitrary[ResourceName] =
-    Arbitrary(genString map (ResourceName(_)))
+    Arbitrary(for {
+      cs <- Gen.listOf(Gen.alphaNumChar)
+      a  <- Gen.alphaChar
+    } yield ResourceName((a :: cs).mkString))
 }
 
 object ResourceNameGenerator extends ResourceNameGenerator

@@ -5,7 +5,7 @@
         "mongodb_3_6":       "ignoreFieldOrder"
     },
     "data": "zips.data",
-    "query": "select state, sum(distinct(pop)) from zips group by state",
+    "query": "select state, sum(distinct(pop)) from `zips.data` group by state",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

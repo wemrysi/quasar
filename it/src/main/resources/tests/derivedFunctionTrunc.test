@@ -1,7 +1,7 @@
 {
     "name": "derived function trunc",
     "data": "divide.data",
-    "query": "select nr, trunc(val3) as trunc1 from divide",
+    "query": "select nr, trunc(val3) as trunc1 from `divide.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

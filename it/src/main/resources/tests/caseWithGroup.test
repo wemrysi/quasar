@@ -18,7 +18,7 @@
                   when state = \"VA\" then 4
                   else 100
                 end as funnel
-                from zips
+                from `zips.data`
                 group by state
                 order by funnel, state",
 

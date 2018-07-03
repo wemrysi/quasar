@@ -17,7 +17,7 @@
 package quasar.blueeyes
 package json
 
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 import Examples._
 
 class ExamplesSpec extends Specification {

@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "patients.data",
-    "query": "SELECT DISTINCT (city) as city FROM patients WHERE state = \"TX\" ORDER BY city ASC LIMIT 6",
+    "query": "SELECT DISTINCT (city) as city FROM `patients.data` WHERE state = \"TX\" ORDER BY city ASC LIMIT 6",
     "predicate": "exactly",
     "expected": [
          { "city": "ABBOTT"    },

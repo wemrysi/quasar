@@ -18,7 +18,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes.json._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 
 trait TakeRangeSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {
   import SampleData._

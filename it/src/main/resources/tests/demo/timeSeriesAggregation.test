@@ -7,7 +7,7 @@
     "data": "smalltimeseries.data",
     "query": "
         SELECT SUM(value) AS measure, timestamp(dt) AS dimension, sensor AS series
-        FROM smalltimeseries
+        FROM `smalltimeseries.data`
         GROUP BY sensor, dt
         ORDER BY sensor ASC, dt ASC",
     "NB": "The query is ordered, but not uniquely, so we have to use containsExactly instead of equalsExactly.",

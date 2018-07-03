@@ -3,7 +3,7 @@
 
   "data": "zips.data",
 
-  "query": "select * from zips where `_id` like \"8030%\" group by city",
+  "query": "select * from `zips.data` where `_id` like \"8030%\" group by city",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "nulls.data",
-    "query": "select distinct (val != null) as expr from nulls where val != null",
+    "query": "select distinct (val != null) as expr from `nulls.data` where val != null",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [{ "expr": true }]

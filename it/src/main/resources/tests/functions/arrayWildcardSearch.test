@@ -4,7 +4,7 @@
   "backends": {},
   "data": "../arrayProcessing.data",
 
-  "query": "select * from `../arrayProcessing` where \"1\" in a[_]",
+  "query": "select * from `../arrayProcessing.data` where \"1\" in a[_]",
 
   "predicate": "exactly",
 

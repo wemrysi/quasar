@@ -4,7 +4,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "largeZips.data",
-    "query": "select city, city ~* \"boU\" as a, city !~* \"Bou\" as b from largeZips",
+    "query": "select city, city ~* \"boU\" as a, city !~* \"Bou\" as b from `largeZips.data`",
     "NB": "Should also test `doesNotContain`, see SD-577.",
     "predicate": "atLeast",
     "ignoreResultOrder": true,

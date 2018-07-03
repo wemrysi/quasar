@@ -22,11 +22,9 @@ import quasar.precog.common._
 
 import scalaz._, Scalaz._
 
-import scala.collection.mutable
 import scala.collection.generic.CanBuildFrom
 import scala.util.Random
 
-import org.specs2._
 import org.scalacheck._
 import org.scalacheck.Gen._
 import org.scalacheck.Arbitrary._
@@ -38,17 +36,19 @@ case class SampleData(data: Stream[RValue], schema: Option[(Int, JSchema)] = Non
     "\nschema: " + schema
   }
 
-  def sortBy[B: scala.math.Ordering](f: JValue => B) = copy(data = data.sortBy(f compose (_.toJValue)))
+  def sortBy[B: scala.math.Ordering](f: JValue => B) =
+    copy(data = data.sortBy(f compose (_.toJValue)))
 }
 
 object SampleData extends SJValueGenerators with RCValueGenerators {
-  def apply(data: Stream[JValue]): SampleData = new SampleData(data.flatMap(RValue.fromJValue), None)
+  def apply(data: Stream[JValue]): SampleData =
+    new SampleData(data.flatMap(RValue.fromJValue), None)
 
-  def toRecord(ids: Array[Long], jv: JValue): JValue = {
+  def toRecord(ids: Array[Long], jv: JValue): JValue =
     JObject(Nil).set(JPath(".key"), JArray(ids.map(JNum(_)).toList)).set(JPath(".value"), jv)
-  }
 
-  implicit def keyOrder[A]: scala.math.Ordering[(Identities, A)] = tupledIdentitiesOrder[A](IdentitiesOrder).toScalaOrdering
+  implicit def keyOrder[A]: scala.math.Ordering[(Identities, A)] =
+    tupledIdentitiesOrder[A](IdentitiesOrder).toScalaOrdering
 
   def sample(schema: Int => Gen[JSchema]): Arbitrary[SampleData] = Arbitrary(
     for {
@@ -65,20 +65,6 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
         },
         Some((idCount, jschema)))
     })
-
-  def distinctBy[T, C[X] <: Seq[X], S](c: C[T])(key: T => S)(implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
-    val builder = cbf()
-    val seen = mutable.HashSet[S]()
-
-    for (t <- c) {
-      if (!seen(key(t))) {
-        builder += t
-        seen += key(t)
-      }
-    }
-
-    builder.result
-  }
 
   def randomSubset[T, C[X] <: Seq[X], S](c: C[T], freq: Double)(implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
     val builder = cbf()
@@ -99,41 +85,12 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
       })
   }
 
-  def shuffle(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
-    val gen =
-      for {
-        sampleData <- arbitrary(sample)
-      } yield {
-        SampleData(Random.shuffle(sampleData.data), sampleData.schema)
-      }
-
-    Arbitrary(gen)
-  }
-
   def distinct(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
     Arbitrary(
       for {
         sampleData <- arbitrary(sample)
       } yield {
         SampleData(sampleData.data.distinct, sampleData.schema)
-      })
-  }
-
-  def distinctKeys(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
-    Arbitrary(
-      for {
-        sampleData <- arbitrary(sample)
-      } yield {
-        SampleData(distinctBy(sampleData.data)(_ \ "keys"), sampleData.schema)
-      })
-  }
-
-  def distinctValues(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
-    Arbitrary(
-      for {
-        sampleData <- arbitrary(sample)
-      } yield {
-        SampleData(distinctBy(sampleData.data)(_ \ "value"), sampleData.schema)
       })
   }
 

@@ -4,7 +4,7 @@
   "backends": {},
   "data": "../arrayProcessing.data",
 
-  "query": "select a[1] as a from `../arrayProcessing`",
+  "query": "select a[1] as a from `../arrayProcessing.data`",
 
   "predicate": "exactly",
 

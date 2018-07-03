@@ -6,7 +6,7 @@
 
   "data": "simple_union.data",
 
-  "query": "select * from (select a as a from simple_union union select to_string(b) as a from simple_union) order by a desc",
+  "query": "select * from (select a as a from `simple_union.data` union select to_string(b) as a from `simple_union.data`) order by a desc",
 
   "predicate": "exactly",
 

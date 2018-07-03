@@ -5,7 +5,7 @@
 
     "data": ["cars.data", "smallZips.data"],
 
-    "query": "select (smallZips := select * from cars; select * from smallZips) as result from smallZips",
+    "query": "select (`smallZips.data` := select * from `cars.data`; select * from `smallZips.data`) as result from `smallZips.data`",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

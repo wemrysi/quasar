@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "divide.data",
-    "query": "select nr, round(val3) as round1 from divide",
+    "query": "select nr, round(val3) as round1 from `divide.data`",
     "predicate": "exactly",
     "expected": [
         { "nr":  1, "round1": 1.0 },
