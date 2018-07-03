@@ -4,7 +4,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "largeZips.data",
-    "query": "select city, pop from largeZips where length(city) < 5 and pop < 30000",
+    "query": "select city, pop from `largeZips.data` where length(city) < 5 and pop < 30000",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [{"city": "EDEN" , "pop": 26675},

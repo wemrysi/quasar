@@ -29,7 +29,7 @@ trait RepresentableDataGenerators {
     Null,
     True,
     False,
-    Gen.alphaStr                 ^^ Str,
+    Gen.alphaStr                     ^^ Str,
     DataGenerators.defaultInt        ^^ Int,
     DataGenerators.defaultDec        ^^ Dec,
     TimeGenerators.genOffsetDateTime ^^ OffsetDateTime,
@@ -41,11 +41,7 @@ trait RepresentableDataGenerators {
     TimeGenerators.genInterval       ^^ Interval)
 
   implicit val representableDataArbitrary: Arbitrary[RepresentableData] = Arbitrary(
-    Gen.oneOf(
-      atomicData,
-      DataGenerators.genNested(DataGenerators.genKey, atomicData)
-    ) ^^ RepresentableData
-  )
+    DataGenerators.genDataDefault(atomicData)) ^^ RepresentableData
 }
 
 object RepresentableDataGenerators extends RepresentableDataGenerators

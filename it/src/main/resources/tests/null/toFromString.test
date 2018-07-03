@@ -4,7 +4,7 @@
         "mimir": "ignoreFieldOrder"
     },
     "data": "nulls.data",
-    "query": "select null(name) as n, to_string(val) as s from nulls where name = \"null\"",
+    "query": "select null(name) as n, to_string(val) as s from `nulls.data` where name = \"null\"",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [{ "n": null, "s": "null" }]

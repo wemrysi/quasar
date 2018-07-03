@@ -17,7 +17,7 @@
 package quasar.yggdrasil.table
 
 import quasar.precog.BitSet
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 import quasar.precog.common._
 import quasar.precog.util._
 import quasar.yggdrasil._

@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "zips.data",
-    "query": "select distinct *{*:} from zips",
+    "query": "select distinct *{*:} from `zips.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": ["_id",

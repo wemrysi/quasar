@@ -4,7 +4,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "largeZips.data",
-    "query": "select city, sum(pop) as totalPop from largeZips group by city",
+    "query": "select city, sum(pop) as totalPop from `largeZips.data` group by city",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [{ "city": "BOULDER", "totalPop": 110948 }]

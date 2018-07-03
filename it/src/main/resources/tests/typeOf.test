@@ -7,7 +7,7 @@
         "mongodb_3_6":       "pending"
     },
     "data": "nested_foo.data",
-    "query": "select foo ?? \"nope\" as foo, type_of(foo ?? 42) as type from nested_foo",
+    "query": "select foo ?? \"nope\" as foo, type_of(foo ?? 42) as type from `nested_foo.data`",
     "NB": "The test suite doesn't handle empty objects well.",
     "predicate": "exactly",
     "ignoreResultOrder": true,

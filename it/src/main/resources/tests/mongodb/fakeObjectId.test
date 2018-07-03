@@ -5,7 +5,7 @@
         "mimir":                  "skip"
     },
     "data": "../objectids.data",
-    "query": "select oid(bar), oid(\"5a01ee026546432336042587\") from `../objectids`",
+    "query": "select oid(bar), oid(\"5a01ee026546432336042587\") from `../objectids.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [{ "0": { "$oid": "4f95e00d9060633ce7fbab93" }, "1": { "$oid": "5a01ee026546432336042587" } },

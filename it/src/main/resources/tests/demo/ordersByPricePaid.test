@@ -24,18 +24,18 @@
           ,   sum(i.price * oi.qty) as TotalPaid
           ,   i.clothing_brand as Brand
       from
-              `../customers` as c
+              `../customers.data` as c
       join
-              `../orders` as o
+              `../orders.data` as o
           on
               c.customer_key = o.customer_key
       join
-              `../ordered_items` as oi
+              `../ordered_items.data` as oi
 
           on
               oi.order_key = o.order_key
       join
-              `../inventory_items` as i
+              `../inventory_items.data` as i
           on
               i.item_key = oi.item_key
       group by

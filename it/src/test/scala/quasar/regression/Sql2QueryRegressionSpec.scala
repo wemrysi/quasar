@@ -37,7 +37,7 @@ import quasar.evaluate.FederatingQueryEvaluator
 import quasar.fp._
 import quasar.fs.FileSystemType
 import quasar.fs.Planner.PlannerError
-import quasar.frontend.logicalplan.{LogicalPlan => LP, Read => LPRead}
+import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.higher.HFunctor
 import quasar.impl.datasource.local.LocalDataSource
 import quasar.mimir.Precog
@@ -59,7 +59,6 @@ import cats.effect.{Effect, IO, Sync, Timer}
 import eu.timepit.refined.auto._
 import fs2.{io, text, Stream}
 import matryoshka._
-import matryoshka.implicits._
 import matryoshka.data.Fix
 import org.specs2.execute
 import org.specs2.specification.core.Fragment
@@ -128,12 +127,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
       for {
         lp <- queryPlan[M, Fix, Fix[LP]](expr, vars, basePath, 0L, None)
 
-        dataPaths = lp.transCata[Fix[LP]] {
-          case LPRead(p) => LPRead[Fix[LP]](p <:> "data")
-          case other => other
-        }
-
-        qs <- LPtoQS[Fix].apply[M](dataPaths)
+        qs <- LPtoQS[Fix].apply[M](lp)
 
         r  <- f(qs)
       } yield r.valueOr(e => failS(e.shows))

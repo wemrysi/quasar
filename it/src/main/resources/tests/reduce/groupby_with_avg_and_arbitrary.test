@@ -7,7 +7,7 @@
 
     "data": "../zips.data",
 
-    "query": "select avg(pop) as pop, city from `../zips` group by city order by pop desc limit 5",
+    "query": "select avg(pop) as pop, city from `../zips.data` group by city order by pop desc limit 5",
 
     "predicate": "exactly",
     

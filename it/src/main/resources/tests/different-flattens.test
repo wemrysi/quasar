@@ -8,7 +8,7 @@
     },
     "NB": "skipped on mimir/lwc_local due to timeout on travis",
     "data": "user_comments.data",
-    "query": "select profile from user_comments where (
+    "query": "select profile from `user_comments.data` where (
                 userId                 LIKE \"%Dr%\" OR
                 profile.name           LIKE \"%Dr%\" OR
                 profile.age            LIKE \"%Dr%\" OR

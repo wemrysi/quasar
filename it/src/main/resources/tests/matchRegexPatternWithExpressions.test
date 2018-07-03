@@ -9,7 +9,7 @@
 
   "query":
     "select distinct city, city ~ \"OUL\" as a, \"some text with BOULDER in it\" ~ city as b
-      from largeZips
+      from `largeZips.data`
       where city ~ \"^B[^ ]+ER$\" and \"BOULDER or BEELER\" ~ city",
 
   "predicate": "exactly",

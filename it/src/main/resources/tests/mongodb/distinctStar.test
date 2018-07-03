@@ -5,7 +5,7 @@
         "mimir":           "skip"
     },
     "data": "../cities.data",
-    "query": "select distinct * from `../cities` where city = \"BOSTON\"",
+    "query": "select distinct * from `../cities.data` where city = \"BOSTON\"",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [{ "city": "BOSTON" }]

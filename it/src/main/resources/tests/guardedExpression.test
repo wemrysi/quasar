@@ -3,7 +3,7 @@
   "backends": {
   },
   "data": "zips.data",
-  "query": "select distinct * from zips where pop ~* \"foo\"",
+  "query": "select distinct * from `zips.data` where pop ~* \"foo\"",
   "predicate": "exactly",
   "ignoreResultOrder": true,
   "expected": []

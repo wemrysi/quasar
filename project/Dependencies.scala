@@ -30,7 +30,7 @@ object Dependencies {
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
   private val fs2Version          = "1.0.0-M1"
-  private val qdataVersion        = "1.0.1"
+  private val qdataVersion        = "1.0.4"
 
   def foundation = Seq(
     "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
@@ -75,6 +75,7 @@ object Dependencies {
   def frontend = Seq(
     "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
     "com.slamdata"               %% "qdata-core"    % qdataVersion,
+    "com.slamdata"               %% "qdata-core"    % qdataVersion % "test->test" classifier "tests",
     "com.slamdata"               %% "qdata-time"    % qdataVersion % "test->test" classifier "tests",
     "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test
   )

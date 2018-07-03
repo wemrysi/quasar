@@ -11,7 +11,7 @@
     "data": "../slamengine_commits.data",
 
     "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth
-              from `../slamengine_commits` as l join `../slamengine_commits` as r
+              from `../slamengine_commits.data` as l join `../slamengine_commits.data` as r
               on r.sha = l.parents[0].sha and l.author.login = r.author.login
               where to_string(r.author.login) || \",\" || to_string(r.author.login) = \"jdegoes,jdegoes\"",
 

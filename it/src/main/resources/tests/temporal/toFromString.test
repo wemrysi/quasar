@@ -7,7 +7,7 @@
         "mongodb_3_6":       "pendingIgnoreFieldOrder"
     },
     "data": "../days.data",
-    "query": "select date(substring(str, 0, 10)) as d, time(substring(str, 11, 8)) as t, timestamp(str) as ts, to_string(ts) as s from `../days`",
+    "query": "select date(substring(str, 0, 10)) as d, time(substring(str, 11, 8)) as t, timestamp(str) as ts, to_string(ts) as s from `../days.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

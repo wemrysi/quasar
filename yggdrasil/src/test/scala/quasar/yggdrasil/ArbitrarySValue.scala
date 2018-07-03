@@ -17,11 +17,11 @@
 package quasar.yggdrasil
 
 import quasar.blueeyes._
+import quasar.pkg.tests._
 import quasar.precog.common._
 import quasar.blueeyes.json._
 import quasar.RCValueGenerators
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._, Gen._
 
 object SJValueGenerators {
   type JSchema = Seq[(JPath, CType)]
@@ -45,7 +45,7 @@ trait SJValueGenerators extends ArbitraryBigDecimal with RCValueGenerators {
 
   def schema(depth: Int): Gen[JSchema] = {
     if (depth <= 0) leafSchema
-    else oneOf(1, 2, 3) flatMap {
+    else Gen.oneOf(1, 2, 3) flatMap {
       case 1 => objectSchema(depth, choose(1, 3))
       case 2 => arraySchema(depth, choose(1, 5))
       case 3 => leafSchema
@@ -55,8 +55,8 @@ trait SJValueGenerators extends ArbitraryBigDecimal with RCValueGenerators {
   def objectSchema(depth: Int, sizeGen: Gen[Int]): Gen[JSchema] = {
     for {
       size <- sizeGen
-      names <- containerOfN[Set, String](size, identifier)
-      subschemas <- listOfN(size, schema(depth - 1))
+      names <- Gen.containerOfN[Set, String](size, Gen.identifier)
+      subschemas <- Gen.listOfN(size, schema(depth - 1))
     } yield {
       for {
         (name, subschema) <- names.toList zip subschemas
@@ -70,7 +70,7 @@ trait SJValueGenerators extends ArbitraryBigDecimal with RCValueGenerators {
   def arraySchema(depth: Int, sizeGen: Gen[Int]): Gen[JSchema] = {
     for {
       size <- sizeGen
-      subschemas <- listOfN(size, schema(depth - 1))
+      subschemas <- Gen.listOfN(size, schema(depth - 1))
     } yield {
       for {
         (idx, subschema) <- (0 until size) zip subschemas
@@ -83,7 +83,7 @@ trait SJValueGenerators extends ArbitraryBigDecimal with RCValueGenerators {
 
   def leafSchema: Gen[JSchema] = ctype map { t => (NoJPath -> t) :: Nil }
 
-  def ctype: Gen[CType] = oneOf(
+  def ctype: Gen[CType] = Gen.oneOf(
     CString,
     CBoolean,
     CLong,
@@ -119,13 +119,13 @@ trait SJValueGenerators extends ArbitraryBigDecimal with RCValueGenerators {
     for {
       idCount  <- choose(1, 3)
       dataSize <- choose(0, 20)
-      ids      <- setOfN[List[Long]](dataSize, listOfN[Long](idCount, genPosLong))
-      values   <- listOfN[Seq[(JPath, JValue)]](dataSize, Gen.sequence(jschema map { case (k, v) => jvalue(v) map (k -> _) }))
+      ids      <- setOfN[List[Long]](dataSize, Gen.listOfN[Long](idCount, genPosLong))
+      values   <- Gen.listOfN[Seq[(JPath, JValue)]](dataSize, Gen.sequence(jschema map { case (k, v) => jvalue(v) map (k -> _) }))
       falseDepth  <- choose(1, 3)
       falseSchema <- schema(falseDepth)
       falseSize   <- choose(0, 5)
-      falseIds    <- setOfN[List[Long]](falseSize, listOfN(idCount, genPosLong))
-      falseValues <- listOfN[Seq[(JPath, JValue)]](falseSize, Gen.sequence(falseSchema map { case (k, v) => jvalue(v).map(k -> _) }))
+      falseIds    <- setOfN[List[Long]](falseSize, Gen.listOfN(idCount, genPosLong))
+      falseValues <- Gen.listOfN[Seq[(JPath, JValue)]](falseSize, Gen.sequence(falseSchema map { case (k, v) => jvalue(v).map(k -> _) }))
 
       falseIds2 = falseIds -- ids     // distinct ids
     } yield {
@@ -144,7 +144,7 @@ trait SJValueGenerators extends ArbitraryBigDecimal with RCValueGenerators {
 trait SValueGenerators extends ArbitraryBigDecimal {
   def svalue(depth: Int): Gen[SValue] = {
     if (depth <= 0) sleaf
-    else oneOf(1, 2, 3) flatMap { //it's much faster to lazily compute the subtrees
+    else Gen.oneOf(1, 2, 3) flatMap { //it's much faster to lazily compute the subtrees
       case 1 => sobject(depth)
       case 2 => sarray(depth)
       case 3 => sleaf
@@ -154,8 +154,8 @@ trait SValueGenerators extends ArbitraryBigDecimal {
   def sobject(depth: Int): Gen[SValue] = {
     for {
       size <- choose(0, 3)
-      names <- containerOfN[Set, String](size, identifier)
-      values <- listOfN(size, svalue(depth - 1))
+      names <- Gen.containerOfN[Set, String](size, Gen.identifier)
+      values <- Gen.listOfN(size, svalue(depth - 1))
     } yield {
       SObject((names zip values).toMap)
     }
@@ -164,13 +164,13 @@ trait SValueGenerators extends ArbitraryBigDecimal {
   def sarray(depth: Int): Gen[SValue] = {
     for {
       size <- choose(0, 3)
-      l <- listOfN(size, svalue(depth - 1))
+      l <- Gen.listOfN(size, svalue(depth - 1))
     } yield SArray(Vector(l: _*))
   }
 
 
-  def sleaf: Gen[SValue] = oneOf[SValue](
-    alphaStr map (SString(_: String)),
+  def sleaf: Gen[SValue] = Gen.oneOf[SValue](
+    Gen.alphaStr map (SString(_: String)),
     arbitrary[Boolean] map (SBoolean(_: Boolean)),
     arbitrary[Long]    map (l => SDecimal(BigDecimal(l))),
     arbitrary[Double]  map (d => SDecimal(BigDecimal(d))),
@@ -180,13 +180,13 @@ trait SValueGenerators extends ArbitraryBigDecimal {
 
   def sevent(idCount: Int, vdepth: Int): Gen[SEvent] = {
     for {
-      ids <- containerOfN[Set, Long](idCount, posNum[Long])
+      ids <- Gen.containerOfN[Set, Long](idCount, Gen.posNum[Long])
       value <- svalue(vdepth)
     } yield (ids.toArray, value)
   }
 
   def chunk(size: Int, idCount: Int, vdepth: Int): Gen[Vector[SEvent]] =
-    listOfN(size, sevent(idCount, vdepth)) map { l => Vector(l: _*) }
+    Gen.listOfN(size, sevent(idCount, vdepth)) map { l => Vector(l: _*) }
 }
 
 case class LimitList[A](values: List[A])
@@ -194,7 +194,7 @@ case class LimitList[A](values: List[A])
 object LimitList {
   def genLimitList[A: Gen](size: Int): Gen[LimitList[A]] = for {
     i <- choose(0, size)
-    l <- listOfN(i, implicitly[Gen[A]])
+    l <- Gen.listOfN(i, implicitly[Gen[A]])
   } yield LimitList(l)
 }
 

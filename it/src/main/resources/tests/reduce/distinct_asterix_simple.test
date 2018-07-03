@@ -6,7 +6,7 @@
        "lwc_local":         "ignoreFieldOrder"
     },
     "data": "../basic2.data",
-    "query": "select distinct(*) from `../basic2`",
+    "query": "select distinct(*) from `../basic2.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

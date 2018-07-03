@@ -4,7 +4,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "largeZips.data",
-    "query": "select distinct city, length(city) as len from largeZips where state=\"CO\" and length(city) >= 10",
+    "query": "select distinct city, length(city) as len from `largeZips.data` where state=\"CO\" and length(city) >= 10",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [{ "city": "GRAND LAKE",       "len": 10 },

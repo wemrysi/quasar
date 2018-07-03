@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "extraSmallZips.data",
-    "query": "select city || \", \" || state, sum(pop) from extraSmallZips group by city, state",
+    "query": "select city || \", \" || state, sum(pop) from `extraSmallZips.data` group by city, state",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

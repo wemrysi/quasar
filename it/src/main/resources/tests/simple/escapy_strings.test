@@ -8,7 +8,7 @@
 
   "data": "escapy_strings.data",
 
-  "query": "select * from escapy_strings",
+  "query": "select * from `escapy_strings.data`",
 
   "predicate": "exactly",
 

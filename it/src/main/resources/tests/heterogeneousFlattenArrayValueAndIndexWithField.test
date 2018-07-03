@@ -8,7 +8,7 @@
 
     },
     "data": "heterogeneous.data",
-    "query": "select a, b[*], b[*:] as i from heterogeneous",
+    "query": "select a, b[*], b[*:] as i from `heterogeneous.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

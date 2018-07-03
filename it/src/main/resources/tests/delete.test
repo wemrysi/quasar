@@ -5,7 +5,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "zips.data",
-    "query": "delete from zips where pop < 100000",
+    "query": "delete from `zips.data` where pop < 100000",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "ignoredFields": ["_id"],

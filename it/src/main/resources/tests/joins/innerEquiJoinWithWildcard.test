@@ -8,7 +8,7 @@
 
     "data": ["../smallZips.data", "../zips.data"],
 
-    "query": "select * from `../smallZips` join `../zips` on smallZips.`_id` = zips.`_id`",
+    "query": "select * from `../smallZips.data` as smallZips join `../zips.data` as zips on smallZips.`_id` = zips.`_id`",
 
     "predicate": "atLeast",
     "ignoreResultOrder": true,

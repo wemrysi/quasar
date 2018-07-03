@@ -5,7 +5,7 @@
         "mimir": "pending"
     },
     "data":  "../days.data",
-    "query": "select ts from `../days`
+    "query": "select ts from `../days.data`
               where ts > to_timestamp(1408399200)",
     "predicate": "exactly",
     "ignoreResultOrder": true,

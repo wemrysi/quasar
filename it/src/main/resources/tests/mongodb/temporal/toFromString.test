@@ -5,7 +5,7 @@
         "mimir":             "skip"
     },
     "data": "../../days.data",
-    "query": "select date(substring(str, 0, 10)), time(substring(str, 11, 20)), timestamp(str), to_string(ts) from `../../days`",
+    "query": "select date(substring(str, 0, 10)), time(substring(str, 11, 20)), timestamp(str), to_string(ts) from `../../days.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "NB": "The date and time values here are the wrong type. This is an unfortunate consequence of the way we store them in Mongo.",

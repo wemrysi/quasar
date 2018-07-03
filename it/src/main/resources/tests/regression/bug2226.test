@@ -4,7 +4,7 @@
   "backends": {
     "mimir":             "ignoreFieldOrder"
   },
-  "query": "SELECT DISTINCT Value AS value, Q AS dimension, Region AS series, null AS parallel FROM (SELECT quarter AS Q, value AS Value, region AS Region from revenue) as meh",
+  "query": "SELECT DISTINCT Value AS value, Q AS dimension, Region AS series, null AS parallel FROM (SELECT quarter AS Q, value AS Value, region AS Region from `revenue.data`) as meh",
   "predicate": "exactly",
   "ignoreResultOrder": true,
   "expected": [

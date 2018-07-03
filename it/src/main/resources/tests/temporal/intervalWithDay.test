@@ -8,7 +8,7 @@
 
     "data": "../days.data",
 
-    "query": "select day, ts - interval(\"P2DT12H5M1.2S\") as diff from `../days`",
+    "query": "select day, ts - interval(\"P2DT12H5M1.2S\") as diff from `../days.data`",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

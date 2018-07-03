@@ -20,7 +20,7 @@ import quasar.RCValueGenerators
 import quasar.blueeyes._
 import quasar.blueeyes.json._
 import quasar.precog.BitSet
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 import quasar.precog.common._
 import quasar.precog.util._
 import qdata.time.TimeGenerators
@@ -28,8 +28,12 @@ import quasar.yggdrasil.TableModule.SortDescending
 
 import scala.util.Random
 import org.scalacheck.{Arbitrary, Gen}
-import org.specs2.matcher.Matcher
+import org.specs2.execute.Result
+import org.specs2.matcher.{Matcher, MatchFailure, MatchResult, MatchSuccess}
 import Gen.listOfN
+
+import scalaz.{Equal, Show}
+import scalaz.syntax.equal._
 
 class SliceSpec extends Specification with ScalaCheck {
   import ArbitrarySlice._
@@ -78,6 +82,55 @@ class SliceSpec extends Specification with ScalaCheck {
     val allSliceValues: List[CValue] = sliceValues.foldLeft(List.empty[CValue])(_ ++ _.flatten)
     allSliceValues must_===(values.flatMap(_.flattenWithPath.map(_._2)))
     sliceValues.exists(_.isEmpty) must_===(false)
+  }
+
+  def sliceEqualityAtDefinedRows(slice1: Slice, slice2: Slice): Result = {
+    def colValues(col: ArrayColumn[_]): Iterator[CValue] = {
+      col match {
+        case ac: ArrayLongColumn           =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLong(ac.values(i)) else CUndefined)
+        case ac: ArrayNumColumn            =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CNum(ac.values(i)) else CUndefined)
+        case ac: ArrayDoubleColumn         =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CDouble(ac.values(i)) else CUndefined)
+        case ac: ArrayStrColumn            =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CString(ac.values(i)) else CUndefined)
+        case ac: ArrayOffsetDateTimeColumn =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) COffsetDateTime(ac.values(i)) else CUndefined)
+        case ac: ArrayOffsetTimeColumn     =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) COffsetTime(ac.values(i)) else CUndefined)
+        case ac: ArrayOffsetDateColumn     =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) COffsetDate(ac.values(i)) else CUndefined)
+        case ac: ArrayLocalDateTimeColumn  =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLocalDateTime(ac.values(i)) else CUndefined)
+        case ac: ArrayLocalTimeColumn      =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLocalTime(ac.values(i)) else CUndefined)
+        case ac: ArrayLocalDateColumn      =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLocalDate(ac.values(i)) else CUndefined)
+        case ac: ArrayIntervalColumn       =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CInterval(ac.values(i)) else CUndefined)
+        case ac: MutableEmptyArrayColumn   =>
+          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) CEmptyArray else CUndefined)
+        case ac: MutableEmptyObjectColumn  =>
+          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) CEmptyObject else CUndefined)
+        case ac: MutableNullColumn         =>
+          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) CNull else CUndefined)
+      }
+    }
+    def equalIterators[A: Equal](xs: Iterator[A], ys: Iterator[A]): Result = {
+      Result.foreach(xs.toStream.zip(ys.toStream)) {
+        case (x, y) =>
+          x must_=== y
+      }
+    }
+    val colList1 = slice1.materialized.columns.toList.sortBy(_._1)
+    val colList2 = slice2.materialized.columns.toList.sortBy(_._1)
+    colList1.size must_== colList2.size
+    Result.foreach(colList1.zip(colList2)) {
+      case ((cpath1, col1), (cpath2, col2)) =>
+        cpath1 must_== cpath2
+        equalIterators(colValues(col1.asInstanceOf[ArrayColumn[_]]), colValues(col2.asInstanceOf[ArrayColumn[_]]))
+    }
   }
 
   def valueCalcs(values: List[RValue]): (Int, Int, Int) = {
@@ -195,9 +248,10 @@ class SliceSpec extends Specification with ScalaCheck {
         CNull, CTrue, CLong(2512754280505120381L), CLocalDateTime(LocalDateTime.parse("-7951878-05-18T11:03:35.812478165")), CEmptyArray, CEmptyObject)
 
     "construct slices from pathological example" in {
-      // this example is pathological because when dealing with it there's a difference between cutting off
-      // a slice only when the column limit is reached and deciding beforehand whether adding a value would
-      // exceed the column limit.
+      // a previous (broken) implementation didn't manage the column limit correctly.
+      // instead of holding off on adding an RValue unless we're sure it won't put us over
+      // the column limit, it would stop adding RValues *after* it hit the limit.
+      // this data hits that edge case.
       testFromRValuesFittingIn1Slice(pathological) and
       testFromRValuesMaxSliceRowsOverflow(pathological) and
       testFromRValuesMaxSliceRows1(pathological) and
@@ -337,7 +391,7 @@ class SliceSpec extends Specification with ScalaCheck {
       val expectedRemaining = ArraySliced(data.arr, 2, 1)
       val (actualSlice, actualRemaining) =
         Slice.fromRValuesStep(data, 3, 2, 32)
-      actualSlice must_== expectedSlice
+      sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
       actualRemaining must_== expectedRemaining
     }
 
@@ -356,7 +410,7 @@ class SliceSpec extends Specification with ScalaCheck {
       val expectedRemaining = ArraySliced.noRValues
       val (actualSlice, actualRemaining) =
         Slice.fromRValuesStep(data, 1, 2, 32)
-      actualSlice must_== expectedSlice
+      sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
       actualRemaining must_== expectedRemaining
     }
 
@@ -374,7 +428,7 @@ class SliceSpec extends Specification with ScalaCheck {
       val expectedRemaining = ArraySliced(arraySliced.arr, 8, 2)
       val (actualSlice, actualRemaining) =
         Slice.fromRValuesStep(arraySliced, 8, 10, 32)
-      actualSlice must_== expectedSlice
+      sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
       actualRemaining must_== expectedRemaining
     }
 

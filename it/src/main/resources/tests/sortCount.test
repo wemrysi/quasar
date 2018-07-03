@@ -3,7 +3,7 @@
 
     "data": "olympics.data",
 
-    "query": "select count(*) as cnt from olympics order by cnt",
+    "query": "select count(*) as cnt from `olympics.data` order by cnt",
 
     "predicate": "exactly",
 

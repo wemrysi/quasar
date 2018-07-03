@@ -1,7 +1,7 @@
 {
   "name": "convert ObjectId to String",
   "data": "../objectids.data",
-  "query": "select to_string(`_id`), `_id`, bar from `../objectids` order by `_id`",
+  "query": "select to_string(`_id`), `_id`, bar from `../objectids.data` order by `_id`",
   "backends": {
     "lwc_local":         "skip",
     "mimir":             "skip"

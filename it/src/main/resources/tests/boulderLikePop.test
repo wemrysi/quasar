@@ -7,7 +7,7 @@
 
   "data": "zips.data",
 
-  "query": "select city, state, sum(pop) as totalPop from zips where city like \"BOULDER%\" group by city, state",
+  "query": "select city, state, sum(pop) as totalPop from `zips.data` where city like \"BOULDER%\" group by city, state",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

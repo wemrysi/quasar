@@ -3,7 +3,7 @@
   "data": [ "customers.data", "orders.data" ],
   "backends": {
   },
-  "query": "select * from customers join orders on false",
+  "query": "select * from `customers.data` join `orders.data` on false",
   "predicate": "exactly",
   "ignoreResultOrder": true,
   "expected": []

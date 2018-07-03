@@ -6,7 +6,7 @@
     },
     "data": "zips.data",
 
-    "query": "select substring(city, 0, 1) as `first`, count(*) as numZips from zips group by substring(city, 0, 1)",
+    "query": "select substring(city, 0, 1) as `first`, count(*) as numZips from `zips.data` group by substring(city, 0, 1)",
 
     "predicate": "atLeast",
     "ignoreResultOrder": true,

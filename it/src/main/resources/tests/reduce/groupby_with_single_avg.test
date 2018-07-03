@@ -7,10 +7,10 @@
 
     "data": "../zips.data",
 
-    "query": "select avg(pop) as pop from `../zips` group by city order by pop desc limit 5",
+    "query": "select avg(pop) as pop from `../zips.data` group by city order by pop desc limit 5",
 
     "predicate": "exactly",
-    
+
     "expected": [
        { "pop": 99568 },
        { "pop": 88114 },
