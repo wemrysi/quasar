@@ -16,7 +16,7 @@
 
 package quasar.impl.external
 
-import slamdata.Predef.{Array, Option, String, SuppressWarnings}
+import slamdata.Predef._
 import quasar.api.DataSourceType
 import quasar.connector.{HeavyweightDataSourceModule, LightweightDataSourceModule}
 import quasar.contrib.fs2.convert
@@ -46,9 +46,10 @@ import fs2.io.file
 import jawn.AsyncParser
 import jawn.support.argonaut.Parser._
 import jawnfs2._
+import org.slf4s.Logging
 import scalaz.IMap
 
-object ExternalDataSources {
+object ExternalDataSources extends Logging {
   import ExternalConfig._
 
   val PluginChunkSize = 8192
@@ -94,19 +95,13 @@ object ExternalDataSources {
         .delay(f(clazz.getDeclaredField("MODULE$").get(null)))
         .recoverWith {
           case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
-            // TODO{logging}
-            //log.warn(s"Datasource module '$className' does not appear to be a singleton object", e)
-            Stream.empty
+            warnStream[F](s"Datasource module '$className' does not appear to be a singleton object", Some(e))
 
           case e: ExceptionInInitializerError =>
-            // TODO{logging}
-            //log.warn(s"Datasource module '$className' failed to load with exception", e)
-            Stream.empty
+            warnStream[F](s"Datasource module '$className' failed to load with exception", Some(e))
 
           case _: ClassCastException =>
-            // TODO{logging}
-            //log.warn(s"Datasource module '$className' is not actually a subtype of LightweightDataSourceModule or HeavyweightDataSourceModule")
-            Stream.empty
+            warnStream[F](s"Datasource module '$className' is not actually a subtype of LightweightDataSourceModule or HeavyweightDataSourceModule", None)
         }
 
     def loadLightweight(clazz: Class[_]): Stream[F, DataSourceModule] =
@@ -122,9 +117,7 @@ object ExternalDataSources {
     for {
       clazz <- Sync[Stream[F, ?]].delay(classLoader.loadClass(className)) recoverWith {
         case cnf: ClassNotFoundException =>
-          // TODO{logging}
-          //log.warn(s"Could not locate class for Datasource module '$className'", cnf)
-          Stream.empty
+          warnStream[F](s"Could not locate class for datasource module '$className'", Some(cnf))
       }
 
       module <- loadLightweight(clazz) ++ loadHeavyweight(clazz)
@@ -134,18 +127,18 @@ object ExternalDataSources {
   private def loadPlugin[F[_]: Effect: Timer](pluginFile: Path): Stream[F, DataSourceModule] = {
     val S = Sync[Stream[F, ?]]
 
-    val module: Stream[F, DataSourceModule] = for {
+    for {
       js <-
         file.readAllAsync[F](pluginFile, PluginChunkSize)
           .chunks
           .map(_.toByteBuffer)
           .parseJson[Json](AsyncParser.SingleValue)
 
-      plugin <-
-        Plugin.fromJson[Stream[F, ?]](js)
-          .map(_.toOption)
-          .unNone
-          .flatMap(_.withAbsolutePaths[Stream[F, ?]](pluginFile.getParent))
+      pluginResult <- Plugin.fromJson[Stream[F, ?]](js)
+
+      plugin <- pluginResult.fold(
+        (s, c) => warnStream[F](s"Failed to decode plugin from '$pluginFile': $s ($c)", None),
+        _.withAbsolutePaths[Stream[F, ?]](pluginFile.getParent))
 
       classLoader <- ClassPath.classLoader[Stream[F, ?]](ParentCL, plugin.classPath)
 
@@ -157,22 +150,24 @@ object ExternalDataSources {
             .getManifest
             .getMainAttributes
             .getValue(Plugin.ManifestAttributeName)))
-          .unNone
 
-      moduleClass <- Stream.segment(Segment.array(backendModuleAttr.split(" ")))
+      moduleClasses <- backendModuleAttr match {
+        case None =>
+          warnStream[F](s"No '${Plugin.ManifestAttributeName}' attribute found in Manifest for '$pluginFile'.", None)
+
+        case Some(attr) =>
+          S.pure(attr.split(" "))
+      }
+
+      moduleClass <- if (moduleClasses.isEmpty)
+        warnStream[F](s"No classes defined for '${Plugin.ManifestAttributeName}' attribute in Manifest from '$pluginFile'.", None)
+      else
+        Stream.segment(Segment.array(moduleClasses)).covary[F]
 
       mod <- loadModule[F](moduleClass, classLoader)
     } yield mod
-
-    /* TODO{logging}
-    for {
-      result <- backend.run
-      _ <- if (result.isEmpty) {
-        Task.delay(log.warn(s"unable to load any backends from $pluginFile; perhaps the file is invalid or the 'Backend-Module' attribute is not defined"))
-      } else Task.now(())
-    } yield result
-    */
-
-    module
   }
+
+  private def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
+    Sync[Stream[F, ?]].delay(cause.fold(log.warn(msg))(log.warn(msg, _))).drain
 }

@@ -36,6 +36,7 @@ import cats.effect.{IO, LiftIO}
 import eu.timepit.refined.refineV
 import fs2.Stream
 import monocle.Prism
+import org.slf4s.Logging
 import pathy.Path._
 import scalaz.{\/, -\/, \/-, EitherT, IMap, Monad, NonEmptyList, Scalaz, StreamT}, Scalaz._
 import shims.monadToScalaz
@@ -186,7 +187,7 @@ final class MimirDataSourceConfigs[
   }
 }
 
-object MimirDataSourceConfigs {
+object MimirDataSourceConfigs extends Logging {
   val NameField = "name"
   val TypeField = "type"
   val TypeVersionField = "type_version"
@@ -240,14 +241,13 @@ object MimirDataSourceConfigs {
     Prism(fromRValue)(toRValue)
   }
 
-  // TODO{logging}: Log any values we weren't able to deserialize properly
   def allConfigs(precog: Cake, tableLoc: AFile)
       : EitherT[IO, ResourceError, Stream[IO, (ResourceName, DataSourceConfig[RValue])]] =
     loadValues(precog, tableLoc, JType.JUniverseT) map { t =>
-      val pairs = for {
+      for {
         slice <- convert.fromStreamT(t.slices)
 
-        rvalue <- Stream.emits(slice.toRValues)
+        rvalue <- Stream.emits(slice.toRValues).covary[IO]
 
         maybePair = for {
           name <-
@@ -257,9 +257,15 @@ object MimirDataSourceConfigs {
 
           cfg <- dataSourceConfigP.getOption(rvalue)
         } yield (ResourceName(name), cfg)
-      } yield maybePair
 
-      pairs.unNone
+        pair <- maybePair match {
+          case None =>
+            Stream.eval(IO(log.warn("Failed to decode datasource configuration from: " + rvalue))).drain
+
+          case Some(p) =>
+            Stream.emit(p).covary[IO]
+        }
+      } yield pair
     }
 
   def loadValues(precog: Cake, tableLoc: AFile, shape: JType)
