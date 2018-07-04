@@ -1990,7 +1990,7 @@ object Slice {
           // `allocatedColSize` should always be a power of two, so we multiply
           // by two.
           val newSize =
-            if (allocatedColSize == 4 && startingSize != 4) startingSize
+            if (allocatedColSize == 2 && startingSize != 2) startingSize
             else allocatedColSize * 2
           // println(s"we're resizing the columns from $allocatedColSize to $newSize because we have too many rows")
           inner(next, rows, false, acc.map { case (k, c) => (k, c.resize(newSize)) }.toMap, newSize)
