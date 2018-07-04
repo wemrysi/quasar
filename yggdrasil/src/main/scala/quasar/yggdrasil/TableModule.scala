@@ -16,6 +16,7 @@
 
 package quasar.yggdrasil
 
+import quasar.contrib.scalaz.MonadTell_
 import quasar.precog.common._
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
@@ -23,7 +24,7 @@ import qdata.time.{DateTimeInterval, OffsetDate}
 
 import scala.collection.immutable.Set
 
-import cats.effect.IO
+import cats.effect.{IO, LiftIO}
 
 import scalaz._
 import scalaz.syntax.monad._
@@ -35,6 +36,7 @@ import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTim
 
 // TODO: define better upper/lower bound methods, better comparisons,
 // better names, better everything!
+// TODO: investigate adding columns to TableSize
 
 sealed trait TableSize {
   def maxSize: Long
@@ -153,7 +155,8 @@ trait TableModule extends TransSpecModule {
     def constEmptyObject: Table
     def constEmptyArray: Table
 
-    def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int] = None): Table
+    def fromRValues(values: Stream[RValue], maxSliceRows: Option[Int] = None): Table
+    def fromRValueStream[M[_]: Monad: MonadTell_[?[_], List[IO[Unit]]]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table]
 
     def merge(grouping: GroupingSpec)(body: (RValue, GroupId => IO[Table]) => IO[Table]): IO[Table]
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): IO[(Table, Table)]

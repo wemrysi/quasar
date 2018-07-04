@@ -87,6 +87,8 @@ trait StreamInstances {
       def tailRecM[A, B](a: A)(f: A => Stream[F, Either[A, B]]): Stream[F, B] =
         ME.tailRecM(a)(f)
     }
+
+
 }
 
 object stream extends StreamInstances

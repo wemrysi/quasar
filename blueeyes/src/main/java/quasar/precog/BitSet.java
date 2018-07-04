@@ -97,7 +97,7 @@ public class BitSet {
      *
      * Used internally by copy.
      */
-    private BitSet(long[] _bits, int _len) {
+    public BitSet(long[] _bits, int _len) {
         bits = _bits;
         _length = _len;
     }
@@ -488,6 +488,21 @@ public class BitSet {
                 return false;
         }
         return true;
+    }
+
+    public String toString() {
+        int bitLen = _length << 6;
+        StringBuilder str = new StringBuilder(bitLen);
+        int c = 0;
+        while (c < bitLen) {
+            if (contains(c)) {
+                str.append("1");
+            } else {
+                str.append("0");
+            }
+            c += 1;
+        }
+        return str.toString();
     }
 
     // Optimization.

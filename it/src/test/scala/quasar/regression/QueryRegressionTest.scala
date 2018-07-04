@@ -217,7 +217,7 @@ abstract class QueryRegressionTest[S[_]](
 
     val result =
       exp.predicate(
-        exp.rows.toVector,
+        exp.rows,
         act.map(normalizeJson <<< deleteFields <<< (_.asJson)).translate[Task](liftRun),
 
         // TODO: Error if a backend ignores field order when the query already does.

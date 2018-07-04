@@ -2,7 +2,7 @@
     "name": "group by month",
 
     "backends": {
-      "lwc_local": "pendingIgnoreFieldOrder",
+      "lwc_local": "ignoreFieldOrder",
       "mimir": "pendingIgnoreFieldOrder"
     },
 
