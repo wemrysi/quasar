@@ -24,15 +24,6 @@ trait TypeLibModule extends ColumnarTableLibModule {
   trait TypeLib extends ColumnarTableLib {
     import trans._
 
-    override def _lib1 = super._lib1 ++ Set(
-      typeOf,
-      isNumber,
-      isBoolean,
-      isNull,
-      isString,
-      isObject,
-      isArray)
-
     object typeOf extends Op1F1 {
       val tpe = UnaryOperationType(JType.JUniverseT, JTextT)
       def f1: F1 = CF1P {

@@ -82,10 +82,4 @@ trait Library {
   type Op1 <: Op1Like
   type Op2 <: Op2Like
   type Reduction <: ReductionLike
-
-  def libMorphism1: Set[Morphism1]
-  def libMorphism2: Set[Morphism2]
-  def lib1: Set[Op1]
-  def lib2: Set[Op2]
-  def libReduction: Set[Reduction]
 }

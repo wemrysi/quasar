@@ -36,54 +36,6 @@ import java.time.format.DateTimeParseException
 trait TimeLibModule extends ColumnarTableLibModule {
   trait TimeLib extends ColumnarTableLib {
 
-    override def _lib1 = super._lib1 ++ Set(
-      OffsetDate,
-      OffsetDateTime,
-      OffsetTime,
-      LocalDate,
-      LocalDateTime,
-      LocalTime,
-      Interval,
-
-      ExtractCentury,
-      ExtractDayOfMonth,
-      ExtractDecade,
-      ExtractDayOfWeek,
-      ExtractDayOfYear,
-      ExtractHour,
-      ExtractIsoDayOfWeek,
-      ExtractIsoYear,
-      ExtractMicrosecond,
-      ExtractMillennium,
-      ExtractMillisecond,
-      ExtractMinute,
-      ExtractMonth,
-      ExtractQuarter,
-      ExtractSecond,
-      ExtractTimeZone,
-      ExtractTimeZoneMinute,
-      ExtractTimeZoneHour,
-      ExtractWeek,
-      ExtractYear,
-
-      ExtractEpoch,
-
-      TruncCentury,
-      TruncDay,
-      TruncDecade,
-      TruncHour,
-      TruncMicrosecond,
-      TruncMillennium,
-      TruncMillisecond,
-      TruncMinute,
-      TruncMonth,
-      TruncQuarter,
-      TruncSecond,
-      TruncWeek,
-      TruncYear)
-
-    override def _lib2 = super._lib2
-
     val ExtractEpoch = new Op1F1 {
       val tpe = UnaryOperationType(JOffsetDateTimeT, JNumberT)
       def f1: F1 = CF1P {

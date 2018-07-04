@@ -40,30 +40,6 @@ trait StringLibModule extends ColumnarTableLibModule {
   trait StringLib extends ColumnarTableLib {
     import StdLib._
 
-    override def _lib1 = super._lib1 ++ Set(length, trim, toUpperCase, toLowerCase, isEmpty, intern, parseNum, numToString)
-
-    override def _lib2 =
-      super._lib2 ++ Set(
-        equalsIgnoreCase,
-        codePointAt,
-        startsWith,
-        lastIndexOf,
-        concat,
-        endsWith,
-        codePointBefore,
-        takeLeft,
-        takeRight,
-        dropLeft,
-        dropRight,
-        matches,
-        regexMatch,
-        compare,
-        compareIgnoreCase,
-        equals,
-        indexOf,
-        split,
-        splitRegex)
-
     class Op1SS(name: String, f: String => String) extends Op1F1 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(JTextT, JNumberT)

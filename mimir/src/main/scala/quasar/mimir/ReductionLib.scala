@@ -55,9 +55,6 @@ trait ReductionLibModule extends ColumnarTableLibModule {
   trait ReductionLib extends ColumnarTableLib {
     import BigDecimalOperations._
 
-    override def _libReduction =
-      super._libReduction ++ Set(Count, Max, Min, Sum, Mean, GeometricMean, SumSq, Variance, StdDev, Forall, Exists)
-
     val CountMonoid = implicitly[Monoid[Count.Result]]
     object Count extends Reduction {
       // limiting ourselves to 9.2e18 rows doesn't seem like a problem.
