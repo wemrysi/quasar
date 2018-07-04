@@ -130,6 +130,13 @@ class SliceSpec extends Specification with ScalaCheck {
     }
   }
 
+  // have to override this because of `Array.equals`
+  def arraySlicesEqual[A](expected: Slice.ArraySliced[A], actual: Slice.ArraySliced[A]): Result = {
+    expected.arr.deep must_== actual.arr.deep
+    expected.start must_== actual.start
+    expected.size must_== actual.size
+  }
+
   def valueCalcs(values: List[RValue]): (Int, Int, Int) = {
     val totalRows = values.size
 
@@ -339,8 +346,9 @@ class SliceSpec extends Specification with ScalaCheck {
   "fromRValuesStep" should {
     import Slice.ArraySliced
     "emit an empty slice given no data" >> {
-      Slice.fromRValuesStep(ArraySliced.noRValues, 10, 10, 32) must_==
-        ((Slice.empty, ArraySliced.noRValues))
+      val (actualSlice, actualRemaining) = Slice.fromRValuesStep(ArraySliced.noRValues, 10, 10, 32)
+      sliceEqualityAtDefinedRows(actualSlice, Slice.empty)
+      arraySlicesEqual(actualRemaining, ArraySliced.noRValues)
     }
 
     "increase slice size to the next power of two when slice size cannot be predicted" >> {
@@ -386,7 +394,7 @@ class SliceSpec extends Specification with ScalaCheck {
       val (actualSlice, actualRemaining) =
         Slice.fromRValuesStep(data, 3, 2, 32)
       sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
-      actualRemaining must_== expectedRemaining
+      arraySlicesEqual(actualRemaining, expectedRemaining)
     }
 
     "add a value that overflows the column limit, if otherwise the slice would be empty" >> {
@@ -405,7 +413,7 @@ class SliceSpec extends Specification with ScalaCheck {
       val (actualSlice, actualRemaining) =
         Slice.fromRValuesStep(data, 1, 2, 32)
       sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
-      actualRemaining must_== expectedRemaining
+      arraySlicesEqual(actualRemaining, expectedRemaining)
     }
 
     "grow slices to maxRows given only scalars" >> {
@@ -423,7 +431,7 @@ class SliceSpec extends Specification with ScalaCheck {
       val (actualSlice, actualRemaining) =
         Slice.fromRValuesStep(arraySliced, 8, 10, 32)
       sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
-      actualRemaining must_== expectedRemaining
+      arraySlicesEqual(actualRemaining, expectedRemaining)
     }
 
   }
