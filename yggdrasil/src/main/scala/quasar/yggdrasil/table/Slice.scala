@@ -73,14 +73,6 @@ trait Slice { source =>
     defined
   }
 
-  override def equals(other: Any): Boolean =
-    if (other.isInstanceOf[Slice]) {
-      val otherSlice = other.asInstanceOf[Slice]
-      size == otherSlice.size && columns == otherSlice.columns
-    } else {
-      false
-    }
-
   def mapRoot(f: CF1): Slice = new Slice {
     val size = source.size
 
@@ -1925,14 +1917,6 @@ object Slice {
   final case class ArraySliced[A](arr: Array[A], start: Int, size: Int) {
     def head: A = arr(start)
     def tail: ArraySliced[A] = ArraySliced(arr, start + 1, size - 1)
-    // have to override this because of `Array.equals`
-    override def equals(other: Any): Boolean =
-      if (other.isInstanceOf[ArraySliced[A]]) {
-        val otherA = other.asInstanceOf[ArraySliced[A]]
-        arr.deep == otherA.arr.deep && start == otherA.start && size == otherA.size
-      } else {
-        false
-      }
   }
 
   object ArraySliced {
