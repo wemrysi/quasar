@@ -34,28 +34,9 @@ trait TableLibModule extends TableModule with TransSpecModule {
     private val defaultReductionOpcode = new java.util.concurrent.atomic.AtomicInteger(0)
   }
 
-  trait MorphLogger {
-    def info(msg: String): IO[Unit]
-    def warn(msg: String): IO[Unit]
-    def error(msg: String): IO[Unit]
-    def die(): IO[Unit]
-  }
-
   trait TableLib extends Library {
     import TableLib._
     import trans._
-
-    lazy val libMorphism1 = _libMorphism1
-    lazy val libMorphism2 = _libMorphism2
-    lazy val lib1         = _lib1
-    lazy val lib2         = _lib2
-    lazy val libReduction = _libReduction
-
-    def _libMorphism1: Set[Morphism1] = Set()
-    def _libMorphism2: Set[Morphism2] = Set()
-    def _lib1: Set[Op1]               = Set()
-    def _lib2: Set[Op2]               = Set()
-    def _libReduction: Set[Reduction] = Set()
 
     trait Morph1Apply {
       def apply(input: Table): IO[Table]
@@ -1025,5 +1006,4 @@ object StdLib {
     def isDefinedAt(row: Int): Boolean = c.isDefinedAt(row)
     def apply(row: Int): String        = c(row).toString
   }
-
 }

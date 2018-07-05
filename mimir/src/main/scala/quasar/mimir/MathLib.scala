@@ -22,37 +22,6 @@ import quasar.yggdrasil.table._
 trait MathLibModule extends ColumnarTableLibModule with InfixLibModule {
   trait MathLib extends ColumnarTableLib with InfixLib {
 
-    override def _lib1 =
-      super._lib1 ++ Set(
-        sinh,
-        toDegrees,
-        expm1,
-        getExponent,
-        asin,
-        log10,
-        cos,
-        exp,
-        cbrt,
-        atan,
-        ceil,
-        rint,
-        log1p,
-        sqrt,
-        floor,
-        toRadians,
-        tanh,
-        round,
-        cosh,
-        tan,
-        abs,
-        sin,
-        mathlog,
-        signum,
-        acos,
-        ulp)
-
-    override def _lib2 = super._lib2 ++ Set(minOf, hypot, pow, maxOf, atan2, copySign, roundTo, IEEEremainder)
-
     import StdLib.{ DoubleFrom, doubleIsDefined }
     import java.lang.Math
 

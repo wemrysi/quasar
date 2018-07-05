@@ -146,7 +146,7 @@ object CFNP {
 }
 
 object CF2Array {
-  def apply[A](name: String)(pf: PartialFunction[(Column, Column, Range), (CType, Array[Array[A]], BitSet)]): CMapper = new ArrayMapperS {
+  def apply[A](pf: PartialFunction[(Column, Column, Range), (CType, Array[Array[A]], BitSet)]): CMapper = new ArrayMapperS {
     def apply(columns0: Map[ColumnRef, Column], range: Range) = {
       for {
         (ColumnRef(CPath(CPathIndex(0)), _), col1) <- columns0
