@@ -17,8 +17,8 @@
 package quasar
 
 import slamdata.Predef._
+import qdata.time.{TimeGenerators, OffsetDate}
 import quasar.pkg.tests._
-import quasar.time.{DateGenerators, OffsetDate}
 
 import java.time.{
   LocalDate => JLocalDate,
@@ -28,11 +28,10 @@ import java.time.{
   OffsetTime => JOffsetTime,
   ZoneOffset
 }
+import scala.math.exp
 
 trait DataGenerators {
   import DataGenerators._
-
-  def genKey = Gen.alphaChar ^^ (_.toString)
 
   implicit val dataArbitrary: Arbitrary[Data] = Arbitrary(data)
 
@@ -65,22 +64,39 @@ object DataGenerators extends DataGenerators {
     Gen.oneOf[Double](Gen.choose(-1000.0, 1000.0), IntAsDouble) ^^ (x => BigDecimal(x))
 
   // NB: a (nominally) valid MongoDB id, because we use this generator to test BSON conversion, too
-  val defaultId: Gen[String] = Gen.oneOf[Char]("0123456789abcdef") * 24 ^^ (_.mkString)
+  val defaultId: Gen[String] =
+    Gen.oneOf[Char]("0123456789abcdef") * 24 ^^ (_.mkString)
 
-  // TODO: make this very conservative so as likely to work with as many backends as possible
-  val simpleData: Gen[Data] = genAtomicData(Gen.alphaStr, defaultInt, defaultDec, defaultId)
+  val simpleNonNested: Gen[Data] =
+    genNonNested(Gen.alphaStr, defaultInt, defaultDec, defaultId)
 
-  val data: Gen[Data] = Gen.oneOf(
-    simpleData,
-    genNested(genKey, simpleData))
+  ////
 
-  def genNested(genKey: Gen[String], genAtomicData: Gen[Data]): Gen[Data] = Gen.oneOf[Data](
-    (genKey, genAtomicData).zip.list ^^ (xs => Data.Obj(xs: _*)),
-    genAtomicData.list ^^ Data.Arr)
+  private val maxDepthDefault: Int = 4
+  private val nonNestedWeight: Int = exp(maxDepthDefault.toDouble).toInt
+
+  def genData(maxDepth: Int, atomic: Gen[Data]): Gen[Data] = {
+    val nestedWeight: Int =
+      if (maxDepth < 0) 0 else exp(maxDepth.toDouble).toInt
+
+    Gen.frequency(
+      nestedWeight -> Gen.delay(genNested(maxDepth - 1, genKey, atomic)),
+      nonNestedWeight -> atomic)
+  }
+
+  def genDataDefault(atomic: Gen[Data]): Gen[Data] =
+    genData(maxDepthDefault, atomic)
+
+  val data: Gen[Data] = genDataDefault(simpleNonNested)
+
+  def genNested(max: Int, genKey: Gen[String], atomic: Gen[Data]): Gen[Data] =
+    Gen.oneOf[Data](
+      (genKey, genData(max, atomic)).zip.list ^^ (xs => Data.Obj(xs: _*)),
+      genData(max, atomic).list ^^ Data.Arr)
 
   /** Generator of atomic Data (everything but Obj and Arr). */
-  def genAtomicData(strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal], idSrc: Gen[String])
-      : Gen[Data] = {
+  def genNonNested(strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal], idSrc: Gen[String])
+      : Gen[Data] =
     Gen.oneOf[Data](
       Data.Null,
       Data.True,
@@ -89,16 +105,19 @@ object DataGenerators extends DataGenerators {
       strSrc ^^ Data.Str,
       intSrc ^^ Data.Int,
       decSrc ^^ Data.Dec,
-      DateGenerators.genInterval ^^ Data.Interval,
-      DateGenerators.genOffsetDateTime ^^ Data.OffsetDateTime,
-      DateGenerators.genOffsetDate ^^ Data.OffsetDate,
-      DateGenerators.genOffsetTime ^^ Data.OffsetTime,
-      DateGenerators.genLocalDateTime ^^ Data.LocalDateTime,
-      DateGenerators.genLocalDate ^^ Data.LocalDate,
-      DateGenerators.genLocalTime ^^ Data.LocalTime,
+      TimeGenerators.genInterval ^^ Data.Interval,
+      TimeGenerators.genOffsetDateTime ^^ Data.OffsetDateTime,
+      TimeGenerators.genOffsetDate ^^ Data.OffsetDate,
+      TimeGenerators.genOffsetTime ^^ Data.OffsetTime,
+      TimeGenerators.genLocalDateTime ^^ Data.LocalDateTime,
+      TimeGenerators.genLocalDate ^^ Data.LocalDate,
+      TimeGenerators.genLocalTime ^^ Data.LocalTime,
       arrayOf(genByte) ^^ Data.Binary.fromArray,
       idSrc ^^ Data.Id)
-  }
+
+  def genKey = Gen.alphaChar ^^ (_.toString)
+
+  ////
 
   final case class Builder[-I, +O](f: I => O)
 

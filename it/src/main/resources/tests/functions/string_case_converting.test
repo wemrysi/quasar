@@ -3,7 +3,7 @@
 
   "data": "stringFunctionsCase.data",
 
-  "query": "select upper(lowr) as l2u, upper(uppr) as u2u, upper(mixed) as m2u, lower(lowr) as l2l, lower(uppr) as u2l, lower(mixed) as m2l from stringFunctionsCase",
+  "query": "select upper(lowr) as l2u, upper(uppr) as u2u, upper(mixed) as m2u, lower(lowr) as l2l, lower(uppr) as u2l, lower(mixed) as m2l from `stringFunctionsCase.data`",
 
   "predicate": "exactly",
   "ignoreResultOrder": false,

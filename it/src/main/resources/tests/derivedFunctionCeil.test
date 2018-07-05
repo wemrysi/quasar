@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "divide.data",
-    "query": "select nr, ceil(val3) as ceil1 from divide",
+    "query": "select nr, ceil(val3) as ceil1 from `divide.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

@@ -12,7 +12,7 @@
         "end": "TIMESTAMP(\"2014-08-21T00:00:00Z\") + INTERVAL(\"PT24H\")"
     },
 
-    "query": "select day from days where ts >= start_of_day(:start) and ts <= :end",
+    "query": "select day from `days.data` where ts >= start_of_day(:start) and ts <= :end",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

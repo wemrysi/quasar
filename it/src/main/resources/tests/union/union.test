@@ -5,7 +5,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "../zips.data",
-    "query": "select `_id` as zip from `../zips` union select city, state from `../zips`",
+    "query": "select `_id` as zip from `../zips.data` union select city, state from `../zips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

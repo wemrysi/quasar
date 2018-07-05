@@ -18,11 +18,9 @@ package quasar
 
 import slamdata.Predef._
 
-import quasar.qdata._
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata._
+import qdata.time.{DateTimeInterval, OffsetDate}
 
-import scalaz.ImmutableArray
-import scodec.bits.ByteVector
 import spire.math.{Natural, Real}
 
 import java.math.MathContext
@@ -51,7 +49,7 @@ object QDataData extends QData[Data] {
     case Data.LocalDate(_) => QLocalDate
     case Data.LocalTime(_) => QLocalTime
     case Data.Interval(_) => QInterval
-    case Data.Binary(_) => QBytes
+    case Data.Binary(_) => error(s"Unable to represent `Data.Binary`.")
     case Data.Id(_) => QString
     case Data.NA => error(s"Unable to represent `Data.NA`.")
     case Data.Obj(_) => QObject
@@ -76,12 +74,6 @@ object QDataData extends QData[Data] {
     case _ => error(s"Expected `Data.Dec`. Received $a")
   }
   def makeReal(l: Real): Data = Data.Dec(l.toRational.toBigDecimal(MathContext.UNLIMITED))
-
-  def getBytes(a: Data): ByteVector = a match {
-    case Data.Binary(value) => ByteVector(value.toArray)
-    case _ => error(s"Expected `Data.Binary`. Received $a")
-  }
-  def makeBytes(l: ByteVector): Data = Data.Binary(ImmutableArray.fromArray(l.toArray))
 
   def getString(a: Data): String = a match {
     case Data.Str(value) => value

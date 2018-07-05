@@ -17,8 +17,8 @@
 package quasar
 
 import slamdata.Predef.{Set => _, _}
-import quasar.time.{DateTimeInterval, OffsetDate}
-import quasar.time.DateGenerators._
+import qdata.time.{DateTimeInterval, OffsetDate}
+import qdata.time.TimeGenerators._
 
 import java.time._
 import scala.Predef.implicitly
@@ -114,7 +114,7 @@ trait TypeGenerators {
     Type.OffsetDateTime, Type.OffsetDate, Type.OffsetTime,
     Type.LocalDateTime, Type.LocalDate, Type.LocalTime, Type.Interval)
 
-  def simpleConstGen: Gen[Type] = DataGenerators.simpleData.map(Type.Const(_))
+  def simpleConstGen: Gen[Type] = DataGenerators.simpleNonNested.map(Type.Const(_))
   def constGen: Gen[Type] = DataGenerators.data.map(Type.Const(_))
 
   def fieldGen: Gen[(String, Type)] = for {

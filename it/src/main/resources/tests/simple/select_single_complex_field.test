@@ -6,7 +6,7 @@
 
   "data": "basic.data",
 
-  "query": "select name as name from basic",
+  "query": "select name as name from `basic.data`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

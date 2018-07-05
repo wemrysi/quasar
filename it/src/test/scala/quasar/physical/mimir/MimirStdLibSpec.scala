@@ -26,7 +26,7 @@ import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
 import quasar.precog.common.RValue
 import quasar.qscript._
 import quasar.std.StdLibSpec
-import quasar.time.{DateGenerators, DateTimeInterval}
+import qdata.time.{DateTimeInterval, TimeGenerators}
 
 import org.scalacheck.{Arbitrary, Gen}
 
@@ -87,9 +87,7 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     case MapFuncsCore.ToTimestamp(_) => notImplemented.left
     case MapFuncsCore.ToLocal(_) => notImplemented.left
     case MapFuncsCore.Interval(_) => notImplemented.left
-    case MapFuncsCore.TypeOf(_) => notImplemented.left
     case MapFuncsCore.Negate(_) => notImplemented.left // TODO this isn't passing because -Long.MinValue == Long.MinValue, so basically a limitation in ColumnarTable
-    // case MapFuncsCore.ToString(Data.Date(_) | Data.Timestamp(_) | Data.Time(_) | Data.Interval(_)) => notImplemented.left
     case MapFuncsCore.ToString(_) => notImplemented.left    // TODO it's implemented but not for everything
     case MapFuncsCore.Meta(_) => notImplemented.left
     case _ => ().right
@@ -216,9 +214,9 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
         LocalDate.of(9999, 12, 31).toEpochDay
       ) ∘ (LocalDate.ofEpochDay(_))
 
-    def timeDomain: Gen[LocalTime] = DateGenerators.genLocalTime
-    def intervalDomain: Gen[DateTimeInterval] = DateGenerators.genInterval
-    def timezoneDomain: Gen[ZoneOffset] = DateGenerators.genZoneOffset
+    def timeDomain: Gen[LocalTime] = TimeGenerators.genLocalTime
+    def intervalDomain: Gen[DateTimeInterval] = TimeGenerators.genInterval
+    def timezoneDomain: Gen[ZoneOffset] = TimeGenerators.genZoneOffset
   }
 
   tests(runner)

@@ -18,7 +18,7 @@ package quasar.yggdrasil
 package jdbm3
 
 import quasar.precog.common._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 import quasar.yggdrasil.table._
 
 import org.scalacheck.Shrink
@@ -52,7 +52,7 @@ class RowFormatSpec extends Specification with ScalaCheck with SJValueGenerators
     val generators = groupConsecutive(refs)(_.selector) map (refs =>
       genIndex(refs.size) >> (i =>
         Gen.sequence(refs.zipWithIndex map {
-          case (ColumnRef(_, cType), `i`) => Gen.frequency(5 -> genCValue(cType), 1 -> Gen.const(CUndefined))
+          case (ColumnRef(_, cType), `i`) => Gen.frequency(5 -> genTypedCValue(cType), 1 -> Gen.const(CUndefined))
           case _                          => Gen.const(CUndefined)
         })
       )

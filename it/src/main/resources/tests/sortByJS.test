@@ -7,7 +7,7 @@
 
   "data": "zips.data",
 
-  "query": "select city, pop from zips where pop > 110000 order by length(city)",
+  "query": "select city, pop from `zips.data` where pop > 110000 order by length(city)",
 
   "predicate": "exactly",
   "expected": [

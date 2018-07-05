@@ -8,7 +8,7 @@
 
     "data": "zips.data",
 
-    "query": "select `_id` as zip, city from zips where pop = 18174",
+    "query": "select `_id` as zip, city from `zips.data` where pop = 18174",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

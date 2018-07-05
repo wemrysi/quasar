@@ -8,7 +8,7 @@
 
   "data": "../smallZips.data",
 
-  "query": "select 42 from `../smallZips`",
+  "query": "select 42 from `../smallZips.data`",
 
   "predicate": "exactly",
   "ignoreResultOrder": false,

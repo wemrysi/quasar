@@ -7,7 +7,7 @@
         "mongodb_3_6":       "pendingIgnoreFieldOrder"
     },
     "data": "webapp.data",
-    "query": "select \"servlet-name\", \"init-param\" is not null from webapp where \"init-param\" is null or \"init-param\".\"betaServer\"",
+    "query": "select \"servlet-name\", \"init-param\" is not null from `webapp.data` where \"init-param\" is null or \"init-param\".\"betaServer\"",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [{ "servlet-name": "cofaxTools",  "1": true  },

@@ -86,7 +86,7 @@ abstract class QueryRegressionTest[S[_]](
 
   /** Location in the (Quasar) filesystem where a test dataset will be stored. */
   def dataFile(file: RFile): AFile =
-    renameFile(DataDir </> file, _.dropExtension)
+    DataDir </> file
 
   val query  = QueryFile.Ops[S]
   val write  = WriteFile.Ops[S]
@@ -217,7 +217,7 @@ abstract class QueryRegressionTest[S[_]](
 
     val result =
       exp.predicate(
-        exp.rows.toVector,
+        exp.rows,
         act.map(normalizeJson <<< deleteFields <<< (_.asJson)).translate[Task](liftRun),
 
         // TODO: Error if a backend ignores field order when the query already does.

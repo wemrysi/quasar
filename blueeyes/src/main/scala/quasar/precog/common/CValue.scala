@@ -18,8 +18,10 @@ package quasar.precog
 package common
 
 import quasar.blueeyes._, json._
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate}
 
+import monocle.{Optional, Prism, Traversal}
+import monocle.function.{At, Each, Index}
 import scalaz._, Scalaz._, Ordering._
 
 import java.math.MathContext.UNLIMITED
@@ -31,48 +33,155 @@ sealed trait RValue { self =>
   def toJValue: JValue
   def toJValueRaw: JValue
 
-  def \(fieldName: String): RValue
-
   def unsafeInsert(path: CPath, value: RValue): RValue = {
     RValue.unsafeInsert(self, path, value)
   }
 
-  def flattenWithPath: Vector[(CPath, CValue)] = {
-    def flatten0(path: CPath)(value: RValue): Vector[(CPath, CValue)] = value match {
+  def flattenWithPath: List[(CPath, CValue)] = {
+    val lb = List.newBuilder[(CPath, CValue)]
+    def flatten0(path: CPath, value: RValue): Unit = value match {
       case RObject(fields) if fields.isEmpty =>
-        Vector((path, CEmptyObject))
+        lb += ((path, CEmptyObject))
 
       case RArray(elems) if elems.isEmpty =>
-        Vector((path, CEmptyArray))
+        lb += ((path, CEmptyArray))
 
       case RObject(fields) =>
-        fields.foldLeft(Vector.empty[(CPath, CValue)]) {
-          case (acc, field) =>
-            acc ++ flatten0(path \ field._1)(field._2)
+        val it = fields.iterator
+        while (it.hasNext) {
+          val (k, v) = it.next()
+          flatten0(path \ k, v)
         }
 
       case RArray(elems) =>
-        Vector(elems: _*).zipWithIndex.flatMap { tuple =>
-          val (elem, idx) = tuple
-
-          flatten0(path \ idx)(elem)
+        val it = elems.iterator
+        var i = 0
+        while (it.hasNext) {
+          flatten0(path \ i, it.next())
+          i = i + 1
         }
 
-      case (v: CValue) => Vector((path, v))
+      case (v: CValue) =>
+        lb += ((path, v))
     }
 
-    flatten0(CPath.Identity)(self)
+    flatten0(CPath.Identity, self)
+    lb.result()
   }
 }
 
-object RValue {
+object RValue extends RValueInstances {
+  val rObject: Prism[RValue, Map[String, RValue]] =
+    Prism.partial[RValue, Map[String, RValue]] {
+      case RObject(fields) => fields
+    } (RObject(_))
+
+  def rField(field: String): Optional[RValue, Option[RValue]] =
+    rObject composeLens At.at(field)
+
+  def rField1(field: String): Optional[RValue, RValue] =
+    rField(field) composePrism monocle.std.option.some
+
+  val rFields: Traversal[RValue, RValue] =
+    rObject composeTraversal Each.each
+
+  val rArray: Prism[RValue, List[RValue]] =
+    Prism.partial[RValue, List[RValue]] {
+      case RArray(values) => values
+    } (RArray(_))
+
+  def rElement(index: Int): Optional[RValue, RValue] =
+    rArray composeOptional Index.index(index)
+
+  val rElements: Traversal[RValue, RValue] =
+    rArray composeTraversal Each.each
+
+  val rUndefined: Prism[RValue, Unit] =
+    Prism.partial[RValue, Unit] {
+      case CUndefined => ()
+    } (_ => CUndefined)
+
+  val rNull: Prism[RValue, Unit] =
+    Prism.partial[RValue, Unit] {
+      case CNull => ()
+    } (_ => CNull)
+
+  val rEmptyObject: Prism[RValue, Unit] =
+    Prism.partial[RValue, Unit] {
+      case CEmptyObject => ()
+    } (_ => CEmptyObject)
+
+  val rEmptyArray: Prism[RValue, Unit] =
+    Prism.partial[RValue, Unit] {
+      case CEmptyArray => ()
+    } (_ => CEmptyArray)
+
+  val rBoolean: Prism[RValue, Boolean] =
+    Prism.partial[RValue, Boolean] {
+      case CBoolean(b) => b
+    } (CBoolean(_))
+
+  val rString: Prism[RValue, String] =
+    Prism.partial[RValue, String] {
+      case CString(s) => s
+    } (CString(_))
+
+  val rLong: Prism[RValue, Long] =
+    Prism.partial[RValue, Long] {
+      case CLong(l) => l
+    } (CLong(_))
+
+  val rDouble: Prism[RValue, Double] =
+    Prism.partial[RValue, Double] {
+      case CDouble(d) => d
+    } (CDouble(_))
+
+  val rNum: Prism[RValue, BigDecimal] =
+    Prism.partial[RValue, BigDecimal] {
+      case CNum(n) => n
+    } (CNum(_))
+
+  val rOffsetDateTime: Prism[RValue, OffsetDateTime] =
+    Prism.partial[RValue, OffsetDateTime] {
+      case COffsetDateTime(t) => t
+    } (COffsetDateTime(_))
+
+  val rOffsetDate: Prism[RValue, OffsetDate] =
+    Prism.partial[RValue, OffsetDate] {
+      case COffsetDate(t) => t
+    } (COffsetDate(_))
+
+  val rOffsetTime: Prism[RValue, OffsetTime] =
+    Prism.partial[RValue, OffsetTime] {
+      case COffsetTime(t) => t
+    } (COffsetTime(_))
+
+  val rLocalDateTime: Prism[RValue, LocalDateTime] =
+    Prism.partial[RValue, LocalDateTime] {
+      case CLocalDateTime(t) => t
+    } (CLocalDateTime(_))
+
+  val rLocalDate: Prism[RValue, LocalDate] =
+    Prism.partial[RValue, LocalDate] {
+      case CLocalDate(t) => t
+    } (CLocalDate(_))
+
+  val rLocalTime: Prism[RValue, LocalTime] =
+    Prism.partial[RValue, LocalTime] {
+      case CLocalTime(t) => t
+    } (CLocalTime(_))
+
+  val rInterval: Prism[RValue, DateTimeInterval] =
+    Prism.partial[RValue, DateTimeInterval] {
+      case CInterval(i) => i
+    } (CInterval(_))
+
   def toCValue(rvalue: RValue): Option[CValue] = rvalue match {
     case cvalue: CValue => Some(cvalue)
     case RArray.empty   => Some(CEmptyArray)
     case RObject.empty  => Some(CEmptyObject)
     case _              => None
   }
-
 
   def fromJValueRaw(jv: JValue): RValue = {
     def loop(jv: JValue): Option[RValue] = jv match {
@@ -165,10 +274,17 @@ object RValue {
   }
 }
 
+sealed abstract class RValueInstances {
+  implicit val equal: Equal[RValue] =
+    Equal.equalA
+
+  implicit val show: Show[RValue] =
+    Show.showFromToString
+}
+
 case class RObject(fields: Map[String, RValue]) extends RValue {
-  def toJValue                     = JObject(fields mapValues (_.toJValue) toMap)
-  def toJValueRaw                  = JObject(fields mapValues (_.toJValueRaw) toMap)
-  def \(fieldName: String): RValue = fields(fieldName)
+  def toJValue = JObject(fields mapValues (_.toJValue) toMap)
+  def toJValueRaw = JObject(fields mapValues (_.toJValueRaw) toMap)
 }
 
 object RObject {
@@ -177,9 +293,8 @@ object RObject {
 }
 
 case class RArray(elements: List[RValue]) extends RValue {
-  def toJValue                     = JArray(elements map { _.toJValue })
-  def toJValueRaw                  = JArray(elements map { _.toJValueRaw })
-  def \(fieldName: String): RValue = CUndefined
+  def toJValue = JArray(elements map { _.toJValue })
+  def toJValueRaw = JArray(elements map { _.toJValueRaw })
 }
 
 object RArray {
@@ -189,7 +304,6 @@ object RArray {
 
 sealed trait CValue extends RValue {
   def cType: CType
-  def \(fieldName: String): RValue = CUndefined
 }
 
 sealed trait CNullValue extends CValue { self: CNullType =>

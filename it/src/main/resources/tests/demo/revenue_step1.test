@@ -5,7 +5,7 @@
        "lwc_local":         "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
-    "query": "SELECT SUM(value) AS value, region, quarter FROM revenue GROUP BY region, quarter ORDER BY quarter ASC, value ASC, region ASC",
+    "query": "SELECT SUM(value) AS value, region, quarter FROM `revenue.data` GROUP BY region, quarter ORDER BY quarter ASC, value ASC, region ASC",
     "predicate": "exactly",
     "expected": [
       { "value":   94500, "region": "south", "quarter": "2015-Q1" },

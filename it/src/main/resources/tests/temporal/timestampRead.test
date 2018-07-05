@@ -6,7 +6,7 @@
     },
     "data": "../daysWithArray.data",
 
-    "query": "select cc[*], ts from `../daysWithArray`",
+    "query": "select cc[*], ts from `../daysWithArray.data`",
     "predicate": "exactly",
 
     "expected": [{"cc": "a", "ts":{ "$offsetdatetime": "2014-08-17T06:00:00.000000000Z" }},

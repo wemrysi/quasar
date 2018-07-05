@@ -14,10 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.impl.datasources
 
-/** The supertype of all Quasar errors.
-  *
-  * TODO: Rename to `QuasarError`
-  */
-trait QuasarErrorNG
+import quasar.api.{DataSourceType, DataSourceTypeGenerator}
+
+import org.scalacheck._, Arbitrary.arbitrary
+
+trait DataSourceConfigGenerator {
+  import DataSourceTypeGenerator._
+
+  implicit def dataSourceConfigArbitrary[C: Arbitrary]: Arbitrary[DataSourceConfig[C]] =
+    Arbitrary(for {
+      tpe <- arbitrary[DataSourceType]
+      c   <- arbitrary[C]
+    } yield DataSourceConfig(tpe, c))
+}
+
+object DataSourceConfigGenerator extends DataSourceConfigGenerator

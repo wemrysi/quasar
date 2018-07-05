@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "divide.data",
-    "query": "select nr, val1 / val2 as d from divide",
+    "query": "select nr, val1 / val2 as d from `divide.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

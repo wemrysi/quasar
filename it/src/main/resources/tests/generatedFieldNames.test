@@ -7,7 +7,7 @@
 
   "data": "smallZips.data",
 
-  "query": "select TO_STRING(city), state || \"S\" from smallZips",
+  "query": "select TO_STRING(city), state || \"S\" from `smallZips.data`",
 
   "predicate": "atLeast",
   "ignoreResultOrder": true,

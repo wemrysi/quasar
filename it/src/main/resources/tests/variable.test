@@ -6,7 +6,7 @@
 
     "data": "zips.data",
 
-    "query": "mystate := \"CO\"; select * from zips where state = mystate",
+    "query": "mystate := \"CO\"; select * from `zips.data` where state = mystate",
 
     "ignoredFields": ["_id"],
 

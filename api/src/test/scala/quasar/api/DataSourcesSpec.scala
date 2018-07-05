@@ -288,6 +288,24 @@ abstract class DataSourcesSpec[F[_]: Monad, C: Equal: Show]
         meta.member(bar) must beTrue
       }
     }
+
+    "src to src is no-op" >>* {
+      for {
+        afoo <- datasources.add(
+          foo,
+          supportedType,
+          configA,
+          ConflictResolution.Preserve)
+
+        rn <- datasources.rename(foo, foo, ConflictResolution.Preserve)
+
+        x <- datasources.lookup(foo)
+      } yield {
+        afoo must beNormal
+        rn must beNormal
+        x must beConfigured(configA)
+      }
+    }
   }
 
   ////

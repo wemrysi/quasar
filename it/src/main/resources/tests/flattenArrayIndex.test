@@ -4,7 +4,7 @@
     "backends": {
     },
     "data": "extraSmallZips.data",
-    "query": "select loc[*:] from extraSmallZips where city like \"A%\"",
+    "query": "select loc[*:] from `extraSmallZips.data` where city like \"A%\"",
     "predicate": "exactly",
     "ignoreResultOrder": false,
     "expected": [0, 1, 0, 1, 0, 1]

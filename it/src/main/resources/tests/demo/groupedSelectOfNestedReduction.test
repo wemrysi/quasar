@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "patients.data",
-    "query": "select city, cnt as c from (select city, count(*) as cnt from patients where state = \"NY\"
+    "query": "select city, cnt as c from (select city, count(*) as cnt from `patients.data` where state = \"NY\"
               group by city order by count(*) desc, city limit 10) group by city order by c desc, city",
     "predicate": "exactly",
     "expected": [

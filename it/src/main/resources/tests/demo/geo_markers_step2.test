@@ -5,7 +5,7 @@
        "lwc_local":         "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
-    "query": "temp0 := SELECT COUNT(*) AS cnt, loc[1] AS lat, loc[0] AS lng FROM patients WHERE state = \"TX\" GROUP BY loc[1], loc[0] ORDER BY loc[1] ASC, loc[0] ASC;
+    "query": "temp0 := SELECT COUNT(*) AS cnt, loc[1] AS lat, loc[0] AS lng FROM `patients.data` WHERE state = \"TX\" GROUP BY loc[1], loc[0] ORDER BY loc[1] ASC, loc[0] ASC;
               SELECT lat AS lat, lng AS lng, null AS series, null AS size FROM (temp0) AS temp1 GROUP BY lat, lng ORDER BY lat ASC, lng ASC LIMIT 6
      ",
     "predicate": "exactly",

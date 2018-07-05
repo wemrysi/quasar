@@ -16,7 +16,7 @@
 
 package quasar.precog.util
 
-import quasar.precog._, TestSupport._
+import quasar.pkg.tests._
 
 import scalaz._
 

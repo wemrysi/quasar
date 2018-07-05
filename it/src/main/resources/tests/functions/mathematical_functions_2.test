@@ -6,7 +6,7 @@
 
   "data": "math.data",
 
-  "query": "select (a + nums.b) % nums.c, (nums.c ^ nums.b) - a + nums.b from math",
+  "query": "select (a + nums.b) % nums.c, (nums.c ^ nums.b) - a + nums.b from `math.data`",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

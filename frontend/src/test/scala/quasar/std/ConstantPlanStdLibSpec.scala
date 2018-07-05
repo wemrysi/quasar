@@ -23,7 +23,7 @@ import quasar.common.PhaseResultT
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._
-import quasar.time.DateGenerators
+import qdata.time.TimeGenerators
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -44,6 +44,8 @@ class ConstantPlanStdLibSpec extends StdLibSpec {
 
   def shortCircuit[N <: Nat](func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     case (relations.IfUndefined, _) => notHandled
+
+    case (identity.TypeOf, _) => notHandled
 
     case (date.Now, _) => notHandled
     case (date.NowTime, _) => notHandled
@@ -103,13 +105,13 @@ class ConstantPlanStdLibSpec extends StdLibSpec {
 
     def stringDomain = arbitrary[String]
 
-    def dateDomain = DateGenerators.genLocalDate
+    def dateDomain = TimeGenerators.genLocalDate
 
-    def timeDomain = DateGenerators.genLocalTime
+    def timeDomain = TimeGenerators.genLocalTime
 
-    def timezoneDomain = DateGenerators.genZoneOffset
+    def timezoneDomain = TimeGenerators.genZoneOffset
 
-    def intervalDomain = DateGenerators.genInterval
+    def intervalDomain = TimeGenerators.genInterval
   }
 
   tests(runner)

@@ -8,7 +8,7 @@
     },
     "NB": "Pending for all connectors because of qz-3686",
     "data": "extraSmallZips.data",
-    "query": "select city, sum(pop) from extraSmallZips group by city having sum(pop) > 40000",
+    "query": "select city, sum(pop) from `extraSmallZips.data` group by city having sum(pop) > 40000",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

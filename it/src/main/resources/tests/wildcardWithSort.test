@@ -2,7 +2,7 @@
     "name": "wildcard with sort",
     "backends": {},
     "data": "zips.data",
-    "query": "select * from zips order by pop, city limit 10",
+    "query": "select * from `zips.data` order by pop, city limit 10",
     "predicate": "exactly",
     "ignoredFields": ["_id"],
     "ignoreFieldOrder": true,

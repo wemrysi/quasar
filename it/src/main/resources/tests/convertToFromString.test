@@ -5,7 +5,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "zips.data",
-    "query": "select integer(`_id`) as intId, decimal(`_id`) as decId, to_string(pop) as popStr, to_string(loc[0]) as locStr, to_string(length(city) < 9) as boolStr from zips",
+    "query": "select integer(`_id`) as intId, decimal(`_id`) as decId, to_string(pop) as popStr, to_string(loc[0]) as locStr, to_string(length(city) < 9) as boolStr from `zips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

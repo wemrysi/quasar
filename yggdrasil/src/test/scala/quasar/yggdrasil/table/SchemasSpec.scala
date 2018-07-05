@@ -19,7 +19,7 @@ package table
 
 import quasar.yggdrasil.bytecode._
 import quasar.blueeyes._, json._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 
 trait SchemasSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {
   def testSingleSchema = {

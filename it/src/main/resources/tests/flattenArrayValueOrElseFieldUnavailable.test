@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "flattenable.data",
-    "query": "select t0.b[*] ?? t0.b from flattenable",
+    "query": "select t0.b[*] ?? t0.b from `flattenable.data`",
     "predicate": "exactly",
     "ignoreResultOrder": false,
     "expected": []

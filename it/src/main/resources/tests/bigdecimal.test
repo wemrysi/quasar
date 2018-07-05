@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "bigdecimal.data",
-    "query": "select nr, val1 from bigdecimal",
+    "query": "select nr, val1 from `bigdecimal.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

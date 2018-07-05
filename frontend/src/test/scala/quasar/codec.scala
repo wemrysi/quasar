@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 import quasar.DataEncodingError.{UnrepresentableDataError, UnescapedKeyError}
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.time._
 

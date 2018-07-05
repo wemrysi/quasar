@@ -23,9 +23,7 @@ import scalaz.std.option._
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 
-sealed trait ResourceError extends QuasarErrorNG
-    with Product
-    with Serializable
+sealed trait ResourceError extends Product with Serializable
 
 object ResourceError extends ResourceErrorInstances {
   sealed trait ReadError extends ResourceError

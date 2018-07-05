@@ -19,7 +19,7 @@ package quasar.yggdrasil
 import org.specs2.execute.Result
 import quasar.ScalazSpecs2Instances
 import quasar.precog.common._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 import quasar.yggdrasil.bytecode.JNumberT
 import quasar.yggdrasil.table.{CF1, CF2, CFN}
 
@@ -418,10 +418,10 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
         Typed(_, JNumberT),
         TypedSubsumes(_, JNumberT),
         ArraySwap(_, 1),
-        Map1(_, CF1("id")(Some(_))),
-        DeepMap1(_, CF1("id")(Some(_))),
-        t => Map2(t, t, CF2("id")((c, _) => Some(c))),
-        MapN(_, CFN("id")(_.headOption))
+        Map1(_, CF1(Some(_))),
+        DeepMap1(_, CF1(Some(_))),
+        t => Map2(t, t, CF2((c, _) => Some(c))),
+        MapN(_, CFN(_.headOption))
       )
       testNormalize1P(transformers.map(f =>
         f(DerefArrayStatic(WrapArray(Leaf(Source)), CPathIndex(0))) -> f(Leaf(Source))

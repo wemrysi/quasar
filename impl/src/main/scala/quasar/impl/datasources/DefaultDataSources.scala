@@ -88,8 +88,11 @@ final class DefaultDataSources[F[_]: Monad, C] private (
       onConflict: ConflictResolution)
       : F[Condition[ExistentialError]] = {
 
-    val renamed: EitherT[F, ExistentialError, Unit] = for {
-      rsrc <- EitherT(lookupConfig(src)).leftMap(commonIsExistential)
+    def checkSrc: EitherT[F, ExistentialError, Unit] =
+      EitherT(lookupConfig(src)).leftMap(commonIsExistential).void
+
+    def renamed: EitherT[F, ExistentialError, Unit] = for {
+      _ <- checkSrc
 
       rdst <- EitherT.rightT(lookupConfig(dst))
 
@@ -101,7 +104,10 @@ final class DefaultDataSources[F[_]: Monad, C] private (
 
     } yield ()
 
-    renamed.run.map(Condition.disjunctionIso.reverseGet(_))
+    val result =
+      if (src === dst) checkSrc else renamed
+
+    result.run.map(Condition.disjunctionIso.reverseGet(_))
   }
 
   def supported: F[ISet[DataSourceType]] =

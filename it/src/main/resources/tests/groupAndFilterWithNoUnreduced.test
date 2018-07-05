@@ -3,7 +3,7 @@
 
     "data": "zips.data",
 
-    "query": "select count(*) as cnt from zips where pop < 5 group by pop",
+    "query": "select count(*) as cnt from `zips.data` where pop < 5 group by pop",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

@@ -18,7 +18,7 @@ package quasar.yggdrasil
 
 import quasar.yggdrasil.bytecode._
 import quasar.precog.common._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 
 class SchemaSpec extends Specification {
   "cpath" should {

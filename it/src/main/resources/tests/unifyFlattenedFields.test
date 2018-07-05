@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "zips.data",
-    "query": "select loc[*] from zips where loc[*] < 0",
+    "query": "select loc[*] from `zips.data` where loc[*] < 0",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [-72.622739,

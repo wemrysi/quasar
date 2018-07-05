@@ -14,39 +14,38 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasources
+package quasar.api
 
 import slamdata.Predef.{String, List}
 
-import quasar.api._
-import quasar.api.DataSourceError.InitializationError
 import quasar.Condition
 import quasar.fp.numeric.Positive
-import quasar.impl.datasources.MockDataSourcesSpec.DefaultM
 
+import cats.effect.IO
 import eu.timepit.refined.auto._
 import scalaz.{IMap, ISet, Id, StateT, ~>}, Id.Id
 //import scalaz.std.string._
-import cats.effect.IO
 import shims._
 
+import MockDataSourcesSpec.DefaultM
+
+// FIXME: Disabled due to being a suspect in the case of
+//        https://app.clubhouse.io/data/story/270/soe-on-travis-trace-through-specs2
 final class MockDataSourcesSpec /*extends DataSourcesSpec[DefaultM, String]*/ {
-
-  def datasources: DataSources[DefaultM, String] = quasar.api.MockDataSources[DefaultM, String](acceptedSet, errorCondition)
-  def supportedType = DataSourceType("s3", 3L)
-  def validConfigs = ("one", "five")
-  def run: ~>[DefaultM, Id.Id] = λ[DefaultM ~> Id]( _.eval(IMap.empty).unsafeRunSync )
-
   val s3: DataSourceType    = DataSourceType("s3", Positive(3).get)
   val azure: DataSourceType = DataSourceType("azure", Positive(3).get)
   val mongo: DataSourceType = DataSourceType("mongodb", Positive(3).get)
   val acceptedSet: ISet[DataSourceType] = ISet.fromList(List(s3, azure, mongo))
-  def errorCondition[C](
-      rn: ResourceName,
-      dst: DataSourceType,
-      config: C
-      ): Condition[InitializationError[C]] = Condition.normal()
 
+  def datasources: DataSources[DefaultM, String] =
+    quasar.api.MockDataSources[DefaultM, String](acceptedSet, (_, _, _) => Condition.normal())
+
+  def supportedType = DataSourceType("s3", 3L)
+
+  def validConfigs = ("one", "five")
+
+  def run: DefaultM ~> Id.Id =
+    λ[DefaultM ~> Id]( _.eval(IMap.empty).unsafeRunSync )
 }
 
 object MockDataSourcesSpec {

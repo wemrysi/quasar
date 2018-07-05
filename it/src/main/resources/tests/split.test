@@ -5,7 +5,7 @@
   },
   "data": "cars.data",
 
-  "query": "select split(name, \"-\") from cars",
+  "query": "select split(name, \"-\") from `cars.data`",
 
   "predicate": "exactly",
   "expected": [

@@ -41,7 +41,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 trait BlockStoreColumnarTableModuleConfig {
-  def maxSliceSize: Int
+  def maxSliceRows: Int
   def hashJoins: Boolean = true
 }
 
@@ -888,7 +888,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
           IO.pure(CellState(index, new Array[Byte](0), slice, (k: SortingKey) => IO.pure(none)).some)
 
         case (SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
-          val sortProjection = new JDBMRawSortProjection(dbFile, name, keyColumns, valColumns, sortOrder, Config.maxSliceSize, count)
+          val sortProjection = new JDBMRawSortProjection(dbFile, name, keyColumns, valColumns, sortOrder, Config.maxSliceRows, count)
 
           sortProjection.getBlockAfter(none) map {
             _ map { nextBlock =>
@@ -1013,7 +1013,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       * less than `limit` rows, it will be converted to an `InternalTable`,
       * otherwise it will stay an `ExternalTable`.
       */
-    def toInternalTable(limit: Int = Config.maxSliceSize): EitherT[IO, ExternalTable, InternalTable]
+    def toInternalTable(limit: Int = Config.maxSliceRows): EitherT[IO, ExternalTable, InternalTable]
 
     /**
       * Forces a table to an external table, possibly de-optimizing it.
@@ -1031,16 +1031,6 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       EitherT[IO, ExternalTable, InternalTable](slices.toStream map { slices1 =>
         \/-(new InternalTable(Slice.concat(slices1.toList).takeRange(0, 1)))
       })
-    }
-
-    def toRValue: IO[RValue] = {
-      def loop(stream: StreamT[IO, Slice]): IO[RValue] = stream.uncons flatMap {
-        case Some((head, tail)) if head.size > 0 => IO(head.toRValue(0))
-        case Some((_, tail))                     => loop(tail)
-        case None                                => IO.pure(CUndefined)
-      }
-
-      loop(slices)
     }
 
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): IO[Seq[Table]] = {

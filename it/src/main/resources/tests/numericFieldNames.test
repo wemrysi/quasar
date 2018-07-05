@@ -6,7 +6,7 @@
 
   "data": "smallZips.data",
 
-  "query": "select city as `12`, pop as `42` from smallZips",
+  "query": "select city as `12`, pop as `42` from `smallZips.data`",
 
   "predicate": "atLeast",
   "ignoreResultOrder": true,

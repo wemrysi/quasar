@@ -18,6 +18,7 @@ package quasar.std
 
 import slamdata.Predef._, BigDecimal.RoundingMode
 
+import qdata.time.{DateTimeInterval, OffsetDate => QOffsetDate, TimeGenerators}
 import quasar.{Data, Qspec, Type}
 import quasar.DataGenerators.{dataArbitrary => _, _}
 import quasar.frontend.logicalplan._
@@ -26,9 +27,6 @@ import quasar.time.{
   truncDateTime,
   truncDate,
   truncTime,
-  DateGenerators,
-  DateTimeInterval,
-  OffsetDate => QOffsetDate,
   TemporalPart
 }
 
@@ -129,8 +127,8 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbDataInterval: Arbitrary[Data.Interval] =
       arbInterval ^^ Data.Interval
 
-    implicit val arbDuration: Arbitrary[Duration] = DateGenerators.arbDuration
-    implicit val arbPeriod: Arbitrary[Period] = DateGenerators.arbPeriod
+    implicit val arbDuration: Arbitrary[Duration] = TimeGenerators.arbDuration
+    implicit val arbPeriod: Arbitrary[Period] = TimeGenerators.arbPeriod
 
     def commute(
         prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
@@ -138,6 +136,56 @@ abstract class StdLibSpec extends Qspec {
         expected: Data): Result =
       binary(prg, arg1, arg2, expected) and
         binary(prg, arg2, arg1, expected)
+
+    "IdentityLib" >> {
+      import IdentityLib.TypeOf
+
+      "TypeOf" >> {
+        "any decimal" >> prop { (v: BigDecimal) =>
+          unary(TypeOf(_).embed, Data.Dec(v), Data.Str("number"))
+        }
+        "any integer" >> prop { (v: BigInt) =>
+          unary(TypeOf(_).embed, Data.Int(v), Data.Str("number"))
+        }
+        "any boolean" >> {
+          unary(TypeOf(_).embed, Data.Bool(true), Data.Str("boolean"))
+          unary(TypeOf(_).embed, Data.Bool(false), Data.Str("boolean"))
+        }
+        "any string" >> prop { (v: String) =>
+          unary(TypeOf(_).embed, Data.Str(v), Data.Str("string"))
+        }
+        "null" >> {
+          unary(TypeOf(_).embed, Data.Null, Data.Str("null"))
+        }
+        "any offset datetime" >> prop { (v: JOffsetDateTime) =>
+          unary(TypeOf(_).embed, Data.OffsetDateTime(v), Data.Str("offsetdatetime"))
+        }
+        "any offset date" >> prop { (v: QOffsetDate) =>
+          unary(TypeOf(_).embed, Data.OffsetDate(v), Data.Str("offsetdate"))
+        }
+        "any offset time" >> prop { (v: JOffsetTime) =>
+          unary(TypeOf(_).embed, Data.OffsetTime(v), Data.Str("offsettime"))
+        }
+        "any local datetime" >> prop { (v: JLocalDateTime) =>
+          unary(TypeOf(_).embed, Data.LocalDateTime(v), Data.Str("localdatetime"))
+        }
+        "any local date" >> prop { (v: JLocalDate) =>
+          unary(TypeOf(_).embed, Data.LocalDate(v), Data.Str("localdate"))
+        }
+        "any local time" >> prop { (v: JLocalTime) =>
+          unary(TypeOf(_).embed, Data.LocalTime(v), Data.Str("localtime"))
+        }
+        "any interval" >> prop { (v: DateTimeInterval) =>
+          unary(TypeOf(_).embed, Data.Interval(v), Data.Str("interval"))
+        }
+        "empty object" >> {
+          unary(TypeOf(_).embed, Data.Obj(ListMap[String, Data]()), Data.Str("emptyobject"))
+        }
+        "empty array" >> {
+          unary(TypeOf(_).embed, Data.Arr(List[Data]()), Data.Str("emptyarray"))
+        }
+      }
+    }
 
     "StringLib" >> {
       import StringLib._
@@ -1886,7 +1934,7 @@ abstract class StdLibSpec extends Qspec {
         "Interval/Int" >> prop { (x: DateTimeInterval, y: Int) =>
           val expected = x.multiply(y)
           commute(Multiply(_, _).embed, Data.Interval(x), Data.Int(y), Data.Interval(expected))
-        }.setGens(DateGenerators.genInterval, Gen.choose(-10, 10)) // avoid integer overflow
+        }.setGens(TimeGenerators.genInterval, Gen.choose(-10, 10)) // avoid integer overflow
 
         // TODO: figure out what domain can be tested here (tends to overflow)
         // "any doubles" >> prop { (x: Double, y: Double) =>

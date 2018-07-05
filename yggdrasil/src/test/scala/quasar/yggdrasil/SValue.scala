@@ -126,8 +126,18 @@ sealed trait SValue {
   }
 
   lazy val toRValue: RValue = this match {
-    case SObject(obj) => RObject(obj.map({ case (k, v) => (k, v.toRValue) }))
-    case SArray(arr)  => RArray(arr.map(_.toRValue)(breakOut): _*)
+    case SObject(obj) =>
+      if (obj.isEmpty)
+        CEmptyObject
+      else
+        RObject(obj.map({ case (k, v) => (k, v.toRValue) }))
+
+    case SArray(arr)  =>
+      if (arr.isEmpty)
+        CEmptyArray
+      else
+        RArray(arr.map(_.toRValue)(breakOut): _*)
+
     case SString(s)   => CString(s)
     case STrue        => CBoolean(true)
     case SFalse       => CBoolean(false)

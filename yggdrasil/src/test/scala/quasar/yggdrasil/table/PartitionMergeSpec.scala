@@ -20,7 +20,7 @@ package table
 import quasar.blueeyes._, json._
 import quasar.yggdrasil.bytecode._
 import quasar.precog.common._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 
 import cats.effect.IO
 import scalaz._, Scalaz._

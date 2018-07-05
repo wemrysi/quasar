@@ -21,7 +21,7 @@ package cf
 import quasar.precog.util.NumericComparisons
 
 object std {
-  val Eq = CF2P("builtin::ct::eq") {
+  val Eq = CF2P {
     case (c1: BoolColumn, c2: BoolColumn) =>
       new Map2Column(c1, c2) with BoolColumn {
         def apply(row: Int) = c1(row) == c2(row)
@@ -132,18 +132,17 @@ object std {
       }
   }
 
-  val And = CF2P("builtin::ct::and") {
+  val And = CF2P {
     case (c1: BoolColumn, c2: BoolColumn) =>
       new Map2Column(c1, c2) with BoolColumn {
         def apply(row: Int) = c1(row) && c2(row)
       }
   }
 
-  val Or = CF2P("builtin::ct::or") {
+  val Or = CF2P {
     case (c1: BoolColumn, c2: BoolColumn) =>
       new Map2Column(c1, c2) with BoolColumn {
         def apply(row: Int) = c1(row) || c2(row)
       }
   }
 }
-// type Std

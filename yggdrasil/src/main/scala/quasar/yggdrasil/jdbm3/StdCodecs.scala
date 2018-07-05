@@ -21,7 +21,7 @@ import java.time._
 
 import quasar.precog._
 import quasar.precog.common._
-import quasar.time.{DateTimeInterval, OffsetDate}
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import scala.reflect.ClassTag
 

@@ -16,7 +16,7 @@
 
 package quasar.precog.common
 
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 
 class CPathSpec extends Specification {
   import CPath._

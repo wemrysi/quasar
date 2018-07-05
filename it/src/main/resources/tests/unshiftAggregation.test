@@ -5,7 +5,7 @@
         "mimir":             "ignoreFieldOrder"
     },
     "data": "zips.data",
-    "query": "select state, city, [pop ...] as pop from zips group by state, city",
+    "query": "select state, city, [pop ...] as pop from `zips.data` group by state, city",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

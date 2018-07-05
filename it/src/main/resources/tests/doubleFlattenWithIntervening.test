@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "nested.data",
-    "query": "select topObj{*}.botObj{*} from nested",
+    "query": "select topObj{*}.botObj{*} from `nested.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": ["m", "n", "o"]

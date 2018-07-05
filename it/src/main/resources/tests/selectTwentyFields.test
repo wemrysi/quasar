@@ -9,7 +9,7 @@
       city as a, city as b, city as c, city as d, city as e,
       city as f, city as g, city as h, city as i, city as j,
       city as k, city as l, city as m, city as n, city as o,
-      city as p, city as q, city as r, city as s, city as t from largeZips",
+      city as p, city as q, city as r, city as s, city as t from `largeZips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [{ "a": "CUSHMAN", "b": "CUSHMAN", "c": "CUSHMAN", "d": "CUSHMAN",

@@ -5,7 +5,7 @@
 
     "data": "zips.data",
 
-    "query": "cityzips := select zips.city, zips.state from zips where zips.state = \"CT\";
+    "query": "cityzips := select zips.city, zips.state from `zips.data` as zips where zips.state = \"CT\";
                   select city, state from cityzips where city = \"SOUTHBURY\" ",
 
     "predicate": "exactly",

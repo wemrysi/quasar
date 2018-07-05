@@ -5,7 +5,7 @@
        "lwc_local":         "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
-    "query": "SELECT DISTINCT row.source AS Source, [row.destination...] AS Destination, [row.fuel...] AS Cost FROM flights AS row GROUP BY row.source ORDER BY row.source ASC",
+    "query": "SELECT DISTINCT row.source AS Source, [row.destination...] AS Destination, [row.fuel...] AS Cost FROM `flights.data` AS row GROUP BY row.source ORDER BY row.source ASC",
     "predicate": "exactly",
     "expected": [
         { "Source": "Dallas"     , "Destination": ["New York", "Orlando"]  , "Cost": [800, 600] },

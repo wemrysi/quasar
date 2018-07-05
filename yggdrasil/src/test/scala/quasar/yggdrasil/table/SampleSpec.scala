@@ -19,7 +19,7 @@ package table
 
 import quasar.blueeyes._, json._
 import quasar.precog.common._
-import quasar.precog.TestSupport._
+import quasar.pkg.tests._
 
 trait SampleSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {
   import trans._

@@ -8,7 +8,7 @@
     "data": ["../owners.data", "../cars.data"],
 
     "query": "SELECT owner.name, car.name
-              from `../owners` as owner join `../cars` as car
+              from `../owners.data` as owner join `../cars.data` as car
               on car.`_id` = owner.carId and owner.year = car.year[0]",
 
     "predicate": "exactly",

@@ -16,9 +16,8 @@
 
 package quasar.mimir
 
-import slamdata.Predef.{List, Option, Unit}
+import slamdata.Predef.Option
 import quasar.contrib.pathy.AFile
-import quasar.contrib.scalaz.MonadTell_
 import quasar.evaluate.Source
 
 import scalaz.Kleisli
@@ -26,8 +25,4 @@ import scalaz.Kleisli
 package object evaluate {
   type Associates[T[_[_]], F[_], G[_]] = AFile => Option[Source[QueryAssociate[T, F, G]]]
   type AssociatesT[T[_[_]], F[_], G[_], A] = Kleisli[F, Associates[T, F, G], A]
-
-  type Finalizers[F[_]] = List[F[Unit]]
-  type MonadFinalizers[F[_], G[_]] = MonadTell_[F, Finalizers[G]]
-  def MonadFinalizers[F[_], G[_]](implicit ev: MonadFinalizers[F, G]): MonadFinalizers[F, G] = ev
 }

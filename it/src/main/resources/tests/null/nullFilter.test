@@ -7,7 +7,7 @@
 
     "data": "nulls.data",
 
-    "query": "select distinct (val is null) as expr from nulls where val is null",
+    "query": "select distinct (val is null) as expr from `nulls.data` where val is null",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,
