@@ -34,7 +34,7 @@ import quasar.ScalazSpecs2Instances
 
 sealed abstract class Predicate {
   def apply[F[_]: Catchable: Monad](
-    expected: Vector[Json],
+    expected: List[Json],
     actual: Process[F, Json],
     fieldOrder: OrderSignificance,
     resultOrder: OrderSignificance
@@ -73,7 +73,7 @@ object Predicate extends ScalazSpecs2Instances {
   /** Must contain ALL the elements. */
   final case object AtLeast extends Predicate {
     def apply[F[_]: Catchable: Monad](
-      expected0: Vector[Json],
+      expected0: List[Json],
       actual0: Process[F, Json],
       fieldOrder: OrderSignificance,
       resultOrder: OrderSignificance
@@ -120,7 +120,7 @@ object Predicate extends ScalazSpecs2Instances {
   /** Must ALL and ONLY the elements. */
   final case object Exactly extends Predicate {
     def apply[F[_]: Catchable: Monad](
-      expected0: Vector[Json],
+      expected0: List[Json],
       actual0: Process[F, Json],
       fieldOrder: OrderSignificance,
       resultOrder: OrderSignificance
@@ -140,7 +140,7 @@ object Predicate extends ScalazSpecs2Instances {
           }
           .runLog.map(_.foldMap()(Result.ResultMonoid))
       case OrderIgnored =>
-        actual0.scan((expected0, Vector.empty[Json], None: Option[Json])) {
+        actual0.scan((expected0, List.empty[Json], Option.empty[Json])) {
           case ((expected, wrongOrder, extra), e) =>
             expected.indexOf(e) match {
               case -1 =>
@@ -164,14 +164,16 @@ object Predicate extends ScalazSpecs2Instances {
     }
 
     // Removes the element at `idx` from `as`.
-    private def deleteAt[A](idx: Int, as: Vector[A]): Vector[A] =
-      as.patch(idx, Nil, 1)
+    private def deleteAt[A](idx: Int, as: List[A]): List[A] = {
+      val (i, t) = as.splitAt(idx)
+      i ++ t.drop(1)
+    }
   }
 
   /** Must START WITH the elements, in order. */
   final case object Initial extends Predicate {
     def apply[F[_]: Catchable: Monad](
-      expected0: Vector[Json],
+      expected0: List[Json],
       actual0: Process[F, Json],
       fieldOrder: OrderSignificance,
       resultOrder: OrderSignificance
@@ -200,7 +202,7 @@ object Predicate extends ScalazSpecs2Instances {
   /** Must NOT contain ANY of the elements. */
   final case object DoesNotContain extends Predicate {
     def apply[F[_]: Catchable: Monad](
-      expected0: Vector[Json],
+      expected0: List[Json],
       actual: Process[F, Json],
       fieldOrder: OrderSignificance,
       resultOrder: OrderSignificance

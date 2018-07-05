@@ -28,6 +28,8 @@ import quasar.yggdrasil.TableModule.SortDescending
 
 import scala.util.Random
 import org.scalacheck.{Arbitrary, Gen}
+import org.specs2.execute.Result
+import org.specs2.matcher.Matcher
 import Gen.listOfN
 
 class SliceSpec extends Specification with ScalaCheck {
@@ -68,6 +70,374 @@ class SliceSpec extends Specification with ScalaCheck {
 
   def stripUndefineds(cvals: List[CValue]): Set[CValue] =
     (cvals filter (_ != CUndefined)).toSet
+
+  def assertSlices(values: List[RValue], slices: List[Slice], expectedSliceSize: Matcher[Int]) = {
+    if (values.isEmpty) slices.size must_===(0)
+    else slices.size must expectedSliceSize
+
+    val sliceValues: List[List[List[CValue]]] = slices.map(s => toCValues(s))
+    val allSliceValues: List[CValue] = sliceValues.foldLeft(List.empty[CValue])(_ ++ _.flatten)
+    allSliceValues must_===(values.flatMap(_.flattenWithPath.map(_._2)))
+    sliceValues.exists(_.isEmpty) must_===(false)
+  }
+
+  def sliceEqualityAtDefinedRows(slice1: Slice, slice2: Slice): Result = {
+    def colValues(col: ArrayColumn[_]): Iterator[CValue] = {
+      col match {
+        case ac: ArrayLongColumn           =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLong(ac.values(i)) else CUndefined)
+        case ac: ArrayNumColumn            =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CNum(ac.values(i)) else CUndefined)
+        case ac: ArrayDoubleColumn         =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CDouble(ac.values(i)) else CUndefined)
+        case ac: ArrayStrColumn            =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CString(ac.values(i)) else CUndefined)
+        case ac: ArrayOffsetDateTimeColumn =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) COffsetDateTime(ac.values(i)) else CUndefined)
+        case ac: ArrayOffsetTimeColumn     =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) COffsetTime(ac.values(i)) else CUndefined)
+        case ac: ArrayOffsetDateColumn     =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) COffsetDate(ac.values(i)) else CUndefined)
+        case ac: ArrayLocalDateTimeColumn  =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLocalDateTime(ac.values(i)) else CUndefined)
+        case ac: ArrayLocalTimeColumn      =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLocalTime(ac.values(i)) else CUndefined)
+        case ac: ArrayLocalDateColumn      =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLocalDate(ac.values(i)) else CUndefined)
+        case ac: ArrayIntervalColumn       =>
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CInterval(ac.values(i)) else CUndefined)
+        case ac: MutableEmptyArrayColumn   =>
+          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) CEmptyArray else CUndefined)
+        case ac: MutableEmptyObjectColumn  =>
+          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) CEmptyObject else CUndefined)
+        case ac: MutableNullColumn         =>
+          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) CNull else CUndefined)
+      }
+    }
+    def equalIterators[A](xs: Iterator[A], ys: Iterator[A]): Result = {
+      Result.foreach(xs.toStream.zip(ys.toStream)) {
+        case (x, y) =>
+          x must_== y
+      }
+    }
+    val colList1 = slice1.materialized.columns.toList.sortBy(_._1)
+    val colList2 = slice2.materialized.columns.toList.sortBy(_._1)
+    colList1.size must_== colList2.size
+    Result.foreach(colList1.zip(colList2)) {
+      case ((cpath1, col1), (cpath2, col2)) =>
+        cpath1 must_== cpath2
+        equalIterators(colValues(col1.asInstanceOf[ArrayColumn[_]]), colValues(col2.asInstanceOf[ArrayColumn[_]]))
+    }
+  }
+
+  // have to override this because of `Array.equals`
+  def arraySlicesEqual[A](expected: Slice.ArraySliced[A], actual: Slice.ArraySliced[A]): Result = {
+    expected.arr.deep must_== actual.arr.deep
+    expected.start must_== actual.start
+    expected.size must_== actual.size
+  }
+
+  def valueCalcs(values: List[RValue]): (Int, Int, Int) = {
+    val totalRows = values.size
+
+    val columnsPerValue: List[List[ColumnRef]] = values.map(_.flattenWithPath.map { case (p, v) => ColumnRef(p, v.cType) })
+    val totalColumns = columnsPerValue.flatten.toSet.size
+    val nrColumnsBiggestValue = columnsPerValue.map(_.size).foldLeft(0)(Math.max(_, _))
+
+    (totalRows, nrColumnsBiggestValue, totalColumns)
+  }
+
+  def testFromRValuesMaxSliceColumnsEqualsBiggestValue(values: List[CValue]) = {
+    val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
+
+    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue)).compile.toVector.unsafeRunSync.toList
+    assertSlices(values, slices, be_>(0))
+  }
+
+  def testFromRValuesMaxSliceColumnsLowerThanBiggestValue(values: List[CValue]) = {
+    val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
+
+    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue - 1)).compile.toVector.unsafeRunSync.toList
+    assertSlices(values, slices, be_>(0))
+  }
+
+  def testFromRValuesMaxSliceRowsOverflow(values: List[CValue]) = {
+    val (totalRows, _, totalColumns) = valueCalcs(values)
+    val maxSliceRows = Math.max(1, Math.ceil(totalRows.toDouble / 3).toInt)
+    val expectedNrSlices = Math.min(Math.ceil(totalRows.toDouble / maxSliceRows).toInt, 3)
+    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).compile.toVector.unsafeRunSync.toList
+    assertSlices(values, slices, be_==(expectedNrSlices))
+  }
+
+  def testFromRValuesMaxSliceRows1(values: List[CValue]) = {
+    val (totalRows, _, totalColumns) = valueCalcs(values)
+    val maxSliceRows = 1
+
+    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).compile.toVector.unsafeRunSync.toList
+    assertSlices(values, slices, be_==(totalRows))
+  }
+
+  def testFromRValuesFittingIn1Slice(values: List[RValue]) = {
+    val (totalRows, _, totalColumns) = valueCalcs(values)
+
+    // test with a slice that's just big enough to hold the values
+    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(totalColumns + 1)).compile.toVector.unsafeRunSync.toList
+    assertSlices(values, slices, be_==(1))
+  }
+
+
+  def testFromRValuesTemplate(input: JValue, maxRows: Int, maxCols: Int, expectedNrRows: List[Int], expectedNrCols: List[Int]) = {
+    val data: List[RValue] = input match {
+      case JArray(rows) => rows.toList.flatMap(RValue.fromJValue)
+      case _ => ???
+    }
+
+    val result: List[Slice] = Slice.allFromRValues(fs2.Stream.emits(data), Some(maxRows), Some(maxCols)).compile.toVector.unsafeRunSync.toList
+
+    result.map(s => toCValues(s))
+      .foldLeft(List.empty[CValue])(_ ++ _.flatten)
+      .filter(_ != CUndefined) mustEqual(
+        data.toList.flatMap(_.flattenWithPath.map(_._2)))
+    result.map(_.size) mustEqual expectedNrRows
+    result.map(_.columns.size) mustEqual expectedNrCols
+  }
+
+  "allFromRValues" should {
+
+    val v = List(CString("x"), CNum(42))
+
+    "construct slices from a simple vector" in {
+      "fits in 1 slice" >> testFromRValuesFittingIn1Slice(v)
+      "maxSliceRows < nrRows" >> testFromRValuesMaxSliceRowsOverflow(v)
+      "maxSliceRows = 1" >> testFromRValuesMaxSliceRows1(v)
+      "maxSliceColumns = nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsEqualsBiggestValue(v)
+      "maxSliceColumns < nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsLowerThanBiggestValue(v)
+    }
+
+    val v1 = List.tabulate(10000)(CNum(_))
+
+    "construct slices from a big vector" in {
+      "fits in 1 slice" >> testFromRValuesFittingIn1Slice(v1)
+      "maxSliceRows < nrRows" >> testFromRValuesMaxSliceRowsOverflow(v1)
+      "maxSliceRows = 1" >> testFromRValuesMaxSliceRows1(v1)
+      "maxSliceColumns = nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsEqualsBiggestValue(v1)
+      "maxSliceColumns < nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsLowerThanBiggestValue(v1)
+    }
+
+    val v2 = List.tabulate(2)(i => RArray(v))
+
+    "construct slices from a vector of arrays" in {
+      testFromRValuesFittingIn1Slice(v2)
+    }
+
+    import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
+    import qdata.time.{DateTimeInterval, OffsetDate}
+
+    val pathological =
+      List(CTrue, CEmptyObject, COffsetTime(OffsetTime.parse("16:30:38.540182417-17:24:37")), CLong(-2090824460258735860L),
+        CString("醜ଯ㲙단蠒๨풥⏽★豫᲋⑻鹜컉膌洟ϛ쭪藋냎陇뜰䏧馢藳譓ᱽ鍙掹柔ꠅ"), CLong(-3221228079739133408L), CLocalDate(LocalDate.parse("-8368805-07-09")), CTrue,
+        CEmptyObject, COffsetDate(OffsetDate.parse("-7773852-04-07+04:21:13")),
+        CNum(BigDecimal("-1.0997856332307004858646483628256030000000000000000000000000000000000000000000000000000000000000000000")),
+        CLocalDateTime(LocalDateTime.parse("+9106220-03-03T16:32:18.556437525")), CNull, CEmptyArray,
+        COffsetDateTime(OffsetDateTime.parse("-7216369-10-14T13:59:13.655329534-11:51:09")),
+        CLocalDate(LocalDate.parse("-6941142-08-11")), CNull, CEmptyObject, CNum(BigDecimal("0E-100")),
+        CString("蟙荗ⶔ㪷읮ꑑۧ兹楀墉廸⡳灯懲獼␬ꂅ숬䫗⭜쿠暘Թ"), CNull, CInterval(DateTimeInterval.parse("PT568792H5M22.07172908S").get), CDouble(-2.5553705287306513E199),
+        CLocalTime(LocalTime.parse("23:43:47.888386818")), COffsetTime(OffsetTime.parse("09:52:36.954641932+13:34:32")),
+        CLocalDateTime(LocalDateTime.parse("-5205533-11-05T23:40:19.080489826")), CFalse, CLocalDate(LocalDate.parse("+1751043-09-25")),
+        CEmptyArray, CLong(8180114872082381267L), COffsetDate(OffsetDate.parse("-3678224-01-01+15:25:19")),
+        COffsetDateTime(OffsetDateTime.parse("+28785-12-16T09:45:14.815967029+16:18:49")), CNull,
+        CInterval(DateTimeInterval.parse("P-9036285Y44M-411DT584566H4M1.912409135S").get), CDouble(-2.3703641119979175E233), CLocalDate(LocalDate.parse("+4396657-12-11")),
+        CNull, CNull, CEmptyObject, CInterval(DateTimeInterval.parse("PT550632H50M7.334061745S").get), CLocalTime(LocalTime.parse("17:00:02.808168924")),
+        CLong(-2051368316550135838L), COffsetDateTime(OffsetDateTime.parse("-9897897-05-10T00:02:09.498265366+04:48:25")), CDouble(1.0859578724304194E-147),
+        CNull, CTrue, CLong(2512754280505120381L), CLocalDateTime(LocalDateTime.parse("-7951878-05-18T11:03:35.812478165")), CEmptyArray, CEmptyObject)
+
+    "construct slices from pathological example" in {
+      // a previous (broken) implementation didn't manage the column limit correctly.
+      // instead of holding off on adding an RValue unless we're sure it won't put us over
+      // the column limit, it would stop adding RValues *after* it hit the limit.
+      // this data hits that edge case.
+      testFromRValuesFittingIn1Slice(pathological) and
+      testFromRValuesMaxSliceRowsOverflow(pathological) and
+      testFromRValuesMaxSliceRows1(pathological) and
+      testFromRValuesMaxSliceColumnsEqualsBiggestValue(pathological) and
+      testFromRValuesMaxSliceColumnsLowerThanBiggestValue(pathological)
+    }
+
+
+    "construct slices from arbitrary values" in Prop.forAll(genCValues){ values =>
+      testFromRValuesFittingIn1Slice(values)
+      testFromRValuesMaxSliceRowsOverflow(values) and
+      testFromRValuesMaxSliceRows1(values) and
+      testFromRValuesMaxSliceColumnsEqualsBiggestValue(values) and
+      testFromRValuesMaxSliceColumnsLowerThanBiggestValue(values)
+    }
+
+    "construct slices with various bounds" in {
+
+      val testInput1: JValue = JParser.parseUnsafe("""[
+          {"foo":1, "bar1": 1},
+          {"foo":2, "bar2": 2}
+        ]""".stripMargin)
+
+      "rows just fits in 1 slice (simple)" >>
+        testFromRValuesTemplate(testInput1, 2, 10000, List(2), List(3))
+
+      "columns just fits in 1 slice (simple)" >>
+        testFromRValuesTemplate(testInput1, 1000, 3, List(2), List(3))
+
+      "columns and rows just fits in 1 slice (simple)" >>
+        testFromRValuesTemplate(testInput1, 2, 3, List(2), List(3))
+
+      "columns boundary hit (simple)" >>
+        testFromRValuesTemplate(testInput1, 1000, 2, List(1, 1), List(2, 2))
+
+      "rows boundary hit (simple)" >>
+        testFromRValuesTemplate(testInput1, 1, 1000, List(1, 1), List(2, 2))
+
+      "columns boundary exceeded in 1 row (simple)" >>
+        testFromRValuesTemplate(testInput1, 1000, 1, List(1, 1), List(2, 2))
+
+      val testInput2: JValue = JParser.parseUnsafe("""[
+          {"foo":1},
+          {"foo":2, "bar2": 2},
+          {"foo":3, "bar3": 3, "baz": 3},
+          {"foo":4, "bar4": 4, "baz": 4},
+          {"foo":5, "bar5": 5},
+          {"foo":6},
+          {"foo":7, "bar7": 7, "baz": 7, "quux": 7},
+          {"foo":8, "baz": 8},
+          {"foo":9, "bar9": 9},
+          {"foo":10},
+          {"foo":11, "baz": 11},
+          {"foo":12, "baz": 12},
+          {"foo":13, "baz": 13},
+          {"foo":14, "bar14": 14}
+        ]""".stripMargin)
+
+      "fits in 1 slice" >>
+        testFromRValuesTemplate(testInput2, 1000, 1000, List(14), List(10))
+
+      "columns just fits in 1 slice" >>
+        testFromRValuesTemplate(testInput2, 1000, 11, List(14), List(10))
+
+      "rows just fits in 1 slice" >>
+        testFromRValuesTemplate(testInput2, 14, 1000, List(14), List(10))
+
+      "rows and columns just fits in 1 slice" >>
+        testFromRValuesTemplate(testInput2, 14, 10, List(14), List(10))
+
+      "columns boundary hit" >>
+        testFromRValuesTemplate(testInput2, 1000, 9, List(13, 1), List(9, 2))
+
+      "rows boundary hit" >>
+        testFromRValuesTemplate(testInput2, 13, 1000, List(13, 1), List(9, 2))
+
+      "columns boundary exceeded in 1 row" >>
+        testFromRValuesTemplate(testInput2, 1000, 3, List(2, 1, 1, 2, 1, 6, 1), List(2, 3, 3, 2, 4, 3, 2))
+
+      "columns boundary exceeded in 1 row multiple times" >>
+        testFromRValuesTemplate(testInput2, 1000, 2, List(2, 1, 1, 2, 1, 1, 2, 3, 1), List(2, 3, 3, 2, 4, 2, 2, 2, 2))
+
+      "column and row boundary hit" >>
+        testFromRValuesTemplate(testInput2, 3, 4, List(3, 3, 2, 3, 3), List(4, 4, 4, 3, 3))
+    }
+  }
+
+  "fromRValuesStep" should {
+    import Slice.ArraySliced
+    "emit an empty slice given no data" >> {
+      val (actualSlice, actualRemaining) = Slice.fromRValuesStep(ArraySliced.noRValues, 10, 10, 32)
+      sliceEqualityAtDefinedRows(actualSlice, Slice.empty)
+      arraySlicesEqual(actualRemaining, ArraySliced.noRValues)
+    }
+
+    "increase slice size to the next power of two when slice size cannot be predicted" >> {
+      val data = ArraySliced(Array[RValue](
+        CLong(1), CLong(2), RArray(List(CLong(1)))
+      ), 0, 3)
+      val columnSize = Slice.fromRValuesStep(data, 6, 3, 2)
+        ._1.columns(ColumnRef(CPath.Identity, CLong)).asInstanceOf[ArrayLongColumn].values.length
+      columnSize must_== 4
+    }
+
+    "increase slice size to the next power of two when slice size can be predicted" >> {
+      val data = ArraySliced(Array[RValue](
+        CLong(1), CLong(2), CLong(3)
+      ), 0, 3)
+      val columnSize = Slice.fromRValuesStep(data, 6, 3, 2)
+        ._1.columns(ColumnRef(CPath.Identity, CLong)).asInstanceOf[ArrayLongColumn].values.length
+      columnSize must_== 4
+    }
+
+    "stop increasing slice size at maxRows" >> {
+      val data = ArraySliced(Array[RValue](
+        CLong(1), CLong(2), CLong(3), CLong(4), CLong(5)
+      ), 0, 5)
+      val (slice, rest) = Slice.fromRValuesStep(data, 4, 1, 2)
+      val columnSize =
+        slice.columns(ColumnRef(CPath.Identity, CLong)).asInstanceOf[ArrayLongColumn].values.length
+      columnSize must_== 4
+      rest.size must_== 1
+    }
+
+    "not add values that overflow the column limit" >> {
+      val data = ArraySliced(Array[RValue](
+        CLong(1),
+        CLong(2),
+        RArray(List(CLong(1), CLong(2), CLong(3)))), 0, 3)
+      val expectedDefined = new BitSet(1)
+      expectedDefined.set(0, 2)
+      val expectedSlice = new Slice {
+        def size = 2
+        def columns = Map(
+          ColumnRef(CPath.Identity, CLong) ->
+            new ArrayLongColumn(expectedDefined, Array(1L, 2L)))
+      }
+      val expectedRemaining = ArraySliced(data.arr, 2, 1)
+      val (actualSlice, actualRemaining) =
+        Slice.fromRValuesStep(data, 3, 2, 32)
+      sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
+      arraySlicesEqual(actualRemaining, expectedRemaining)
+    }
+
+    "add a value that overflows the column limit, if otherwise the slice would be empty" >> {
+      val data = ArraySliced(Array[RValue](RArray(List(CLong(1), CLong(2), CLong(3)))), 0, 1)
+      val expectedDefined = new BitSet(1)
+      expectedDefined.set(0)
+      val expectedSlice = new Slice {
+        def size = 1
+        def columns = Map(
+          ColumnRef(CPath.Identity \ 0, CLong) -> new ArrayLongColumn(expectedDefined, Array(1)),
+          ColumnRef(CPath.Identity \ 1, CLong) -> new ArrayLongColumn(expectedDefined, Array(2)),
+          ColumnRef(CPath.Identity \ 2, CLong) -> new ArrayLongColumn(expectedDefined, Array(3))
+        )
+      }
+      val expectedRemaining = ArraySliced.noRValues
+      val (actualSlice, actualRemaining) =
+        Slice.fromRValuesStep(data, 1, 2, 32)
+      sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
+      arraySlicesEqual(actualRemaining, expectedRemaining)
+    }
+
+    "grow slices to maxRows given only scalars" >> {
+      val data = Array[Long](1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+      val arraySliced = ArraySliced(data.map[RValue, Array[RValue]](CLong(_)), start = 0, size = 10)
+      val expectedDefined = new BitSet(8)
+      expectedDefined.set(0, 8)
+      val expectedSlice = new Slice {
+        def size = 8
+        val columns = Map(
+          ColumnRef(CPath.Identity, CLong) ->
+            new ArrayLongColumn(expectedDefined, data))
+      }
+      val expectedRemaining = ArraySliced(arraySliced.arr, 8, 2)
+      val (actualSlice, actualRemaining) =
+        Slice.fromRValuesStep(arraySliced, 8, 10, 32)
+      sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
+      arraySlicesEqual(actualRemaining, expectedRemaining)
+    }
+
+  }
 
   "sortBy" should {
     "stably sort a slice by a projection" in {

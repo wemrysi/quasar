@@ -45,10 +45,8 @@ import scala.util.matching.Regex
 import java.math.{MathContext, RoundingMode}
 import java.nio.file.{Files, Path => JPath, Paths}
 
-import scala.Predef.=:=
-
 import argonaut._, Argonaut._
-import cats.effect.{ConcurrentEffect, Effect, IO, Sync, Timer}
+import cats.effect.{Effect, IO, Sync, Timer}
 import cats.effect.concurrent.Deferred
 import eu.timepit.refined.auto._
 import fs2.{io, text, Stream}
@@ -69,11 +67,6 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   implicit val ioQuasarError: MonadError_[IO, QuasarError] =
     MonadError_.facet[IO](QuasarError.throwableP)
-
-  // Make the `join` syntax from Monad ambiguous.
-  implicit class NoJoin[F[_], A](ffa: F[A]) {
-    def join(implicit ev: A =:= F[A]): F[A] = ???
-  }
 
   val DataDir = rootDir[Sandboxed] </> dir("local")
 
@@ -125,7 +118,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
       } yield {
         suiteName >> {
           tests.toList foreach { case (loc, test) =>
-            regressionExample(loc, test, BackendName("mimir"), f)
+            regressionExample(loc, test, BackendName("lwc_local"), f)
           }
 
           step(sdown.complete(()).unsafeRunSync())
@@ -220,7 +213,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
     val result =
       exp.predicate(
-        exp.rows.toVector,
+        exp.rows,
         actProcess,
         fieldOrderSignificance,
         resultOrderSignificance)
@@ -251,18 +244,18 @@ final class Sql2QueryRegressionSpec extends Qspec {
   /** Returns all the `RegressionTest`s found in the given directory, keyed by
     * file path.
     */
-  def regressionTests[F[_]: ConcurrentEffect: Timer](
+  def regressionTests[F[_]: Effect: Timer](
       testDir: RDir,
       dataDir: RDir)
       : F[Map[RFile, RegressionTest]] =
     descendantsMatching[F](testDir, TestPattern)
-      .map(f => loadRegressionTest[F](f).map((f.relativeTo(dataDir).get, _)))
-      .join(12)
+      .flatMap(f => loadRegressionTest[F](f).map((f.relativeTo(dataDir).get, _)))
       .compile
       .fold(Map[RFile, RegressionTest]())(_ + _)
 
   /** Loads a `RegressionTest` from the given file. */
   def loadRegressionTest[F[_]: Effect: Timer](file: RFile): Stream[F, RegressionTest] =
+    // all test files right now fit into 8K, which is a reasonable chunk size anyway
     io.file.readAllAsync[F](jPath(file), 8192)
       .through(text.utf8Decode)
       .reduce(_ + _)

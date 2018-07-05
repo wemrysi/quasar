@@ -55,8 +55,8 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
 
   // production-path code uses fromRValues, but all the tests use fromJson
   // this will need to be changed when our tests support non-json such as CDate and CPeriod
-  def fromJson0(values: Stream[JValue], maxSliceSize: Option[Int] = None): Table = {
-    val sliceSize = maxSliceSize.getOrElse(Config.maxSliceSize)
+  def fromJson0(values: Stream[JValue], maxSliceRows: Option[Int] = None): Table = {
+    val sliceSize = maxSliceRows.getOrElse(Config.maxSliceRows)
 
     Table(
       StreamT.unfoldM(values) { events =>
@@ -70,8 +70,8 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
     )
   }
 
-  def fromJson(values: Stream[JValue], maxSliceSize: Option[Int] = None): Table =
-    fromJson0(values, maxSliceSize orElse Some(defaultSliceSize))
+  def fromJson(values: Stream[JValue], maxSliceRows: Option[Int] = None): Table =
+    fromJson0(values, maxSliceRows orElse Some(defaultSliceSize))
 
   def lookupF1(namespace: List[String], name: String): F1 = {
     val lib = Map[String, CF1](

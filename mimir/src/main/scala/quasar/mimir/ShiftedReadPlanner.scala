@@ -18,14 +18,12 @@ package quasar.mimir
 
 import slamdata.Predef._
 
-import quasar.blueeyes.json.JValue
 import quasar.contrib.fs2.convert.toStreamT
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.contrib.scalaz.concurrent.task._
 import quasar.fs._
 import quasar.mimir.MimirCake._
-import quasar.precog.common.RValue
 import quasar.qscript._
 import quasar.yggdrasil.UnknownSize
 import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
@@ -83,7 +81,7 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                           val slices = stream.chunks.map { ch =>
                             Slice.fromRValues(
                               ch.toList.toStream.map(data =>
-                                RValue.fromJValueRaw(JValue.fromData(data))))
+                                MapFuncCorePlanner.dataToRValue(data).getOrElse(sys.error("no representation for Data.NA in SlamEngine as a constant"))))
                           }.translate(Lambda[FunctionK[Task, IO]](Effect[Task].toIO(_)))
 
                           // TODO leaks resources

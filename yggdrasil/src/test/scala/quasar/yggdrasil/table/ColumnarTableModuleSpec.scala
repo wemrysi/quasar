@@ -119,9 +119,9 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     loop(stream, new StringBuilder).unsafeRunSync
   }
 
-  def testRenderCsv(json: String, maxSliceSize: Option[Int] = None): String = {
+  def testRenderCsv(json: String, maxSliceRows: Option[Int] = None): String = {
     val es    = JParser.parseManyFromString(json).valueOr(throw _)
-    val table = fromJson(es.toStream, maxSliceSize)
+    val table = fromJson(es.toStream, maxSliceRows)
     streamToString(table.renderCsv())
   }
 
@@ -154,10 +154,10 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     arrayM.unsafeRunSync mustEqual minimized
   }
 
-  def renderLotsToCsv(lots: Int, maxSliceSize: Option[Int] = None) = {
+  def renderLotsToCsv(lots: Int, maxSliceRows: Option[Int] = None) = {
     val event    = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.0}}"
     val events   = event * lots
-    val csv      = testRenderCsv(events, maxSliceSize)
+    val csv      = testRenderCsv(events, maxSliceRows)
     val expected = ".x,.y,.z.xx,.z.yy\r\n" + ("123,foobar,1,2\r\n" * lots)
     csv must_== expected
   }
@@ -284,7 +284,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     "in cross" >> {
       "perform a simple cartesian" in testSimpleCross
 
-      "split a cross that would exceed maxSliceSize boundaries" in {
+      "split a cross that would exceed maxSliceRows boundaries" in {
         val sample: List[JValue] = List(
           JObject(
             JField("key", JArray(JNum(-1L) :: JNum(0L) :: Nil)) ::
@@ -316,7 +316,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
         val dataset1 = fromJson(sample.toStream, Some(3))
 
         dataset1.cross(dataset1)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight))).slices.uncons.unsafeRunSync must beLike {
-          case Some((head, _)) => head.size must beLessThanOrEqualTo(Config.maxSliceSize)
+          case Some((head, _)) => head.size must beLessThanOrEqualTo(Config.maxSliceRows)
         }
       }
 

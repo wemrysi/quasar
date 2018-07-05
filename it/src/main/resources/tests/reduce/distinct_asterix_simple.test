@@ -2,7 +2,8 @@
     "name": "[qa_s08] distinct * simple",
 
     "backends": {
-       "mimir":             "ignoreFieldOrder"
+       "mimir":             "ignoreFieldOrder",
+       "lwc_local":         "ignoreFieldOrder"
     },
     "data": "../basic2.data",
     "query": "select distinct(*) from `../basic2.data`",
