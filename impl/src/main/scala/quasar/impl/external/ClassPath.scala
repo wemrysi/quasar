@@ -14,23 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.impl.external
 
-import quasar.Data
-import quasar.api.{DataSourceType, ResourcePath}
-import quasar.api.DataSourceError.InitializationError
+import slamdata.Predef.List
 
-import argonaut.Json
-import cats.effect.{ConcurrentEffect, Timer}
-import fs2.Stream
-import scalaz.\/
+import java.lang.ClassLoader
+import java.net.URLClassLoader
+import java.nio.file.Path
+import scala.AnyVal
 
-trait LightweightDataSourceModule {
-  def kind: DataSourceType
+import cats.effect.Sync
 
-  def lightweightDataSource[
-      F[_]: ConcurrentEffect: Timer,
-      G[_]: ConcurrentEffect: Timer](
-      config: Json)
-      : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]]
+final case class ClassPath(value: List[Path]) extends AnyVal
+
+object ClassPath {
+  def classLoader[F[_]: Sync](parent: ClassLoader, classPath: ClassPath): F[ClassLoader] =
+    Sync[F].delay(new URLClassLoader(classPath.value.map(_.toUri.toURL).toArray, parent))
 }

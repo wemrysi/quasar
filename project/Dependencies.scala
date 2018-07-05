@@ -31,6 +31,7 @@ object Dependencies {
   private val akkaVersion         = "2.5.1"
   private val fs2Version          = "1.0.0-M1"
   private val qdataVersion        = "1.0.4"
+  private val slf4sVersion        = "1.7.25"
 
   def foundation = Seq(
     "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
@@ -109,8 +110,9 @@ object Dependencies {
   )
 
   def impl = Seq(
-    "org.spire-math" %% "jawn-argonaut" % jawnVersion,
-    "org.spire-math" %% "jawn-parser"   % jawnVersion
+    "org.http4s"     %% "jawn-fs2"      % "0.13.0-M1",
+    "org.slf4s"      %% "slf4s-api"     % slf4sVersion,
+    "org.spire-math" %% "jawn-argonaut" % jawnVersion
   )
 
   def interface = Seq(
@@ -131,7 +133,7 @@ object Dependencies {
   }
 
   def precog = Seq(
-    "org.slf4s"            %% "slf4s-api"       % "1.7.25",
+    "org.slf4s"            %% "slf4s-api"       % slf4sVersion,
     "org.slf4j"            %  "slf4j-log4j12"   % "1.7.16",
     "org.typelevel"        %% "spire"           % spireVersion,
     "org.scodec"           %% "scodec-scalaz"   % scodecScalazVersion,

@@ -14,23 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.run
 
-import quasar.Data
-import quasar.api.{DataSourceType, ResourcePath}
-import quasar.api.DataSourceError.InitializationError
+import quasar.Variables
+import quasar.contrib.pathy.ADir
+import quasar.sql.Query
 
-import argonaut.Json
-import cats.effect.{ConcurrentEffect, Timer}
-import fs2.Stream
-import scalaz.\/
-
-trait LightweightDataSourceModule {
-  def kind: DataSourceType
-
-  def lightweightDataSource[
-      F[_]: ConcurrentEffect: Timer,
-      G[_]: ConcurrentEffect: Timer](
-      config: Json)
-      : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]]
-}
+final case class SqlQuery(query: Query, vars: Variables, basePath: ADir)

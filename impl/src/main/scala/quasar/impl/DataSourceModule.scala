@@ -14,23 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.impl
 
-import quasar.Data
-import quasar.api.{DataSourceType, ResourcePath}
-import quasar.api.DataSourceError.InitializationError
+import quasar.api.DataSourceType
+import quasar.connector.{HeavyweightDataSourceModule, LightweightDataSourceModule}
 
-import argonaut.Json
-import cats.effect.{ConcurrentEffect, Timer}
-import fs2.Stream
-import scalaz.\/
-
-trait LightweightDataSourceModule {
+sealed trait DataSourceModule {
   def kind: DataSourceType
+}
 
-  def lightweightDataSource[
-      F[_]: ConcurrentEffect: Timer,
-      G[_]: ConcurrentEffect: Timer](
-      config: Json)
-      : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]]
+object DataSourceModule {
+  final case class Lightweight(lw: LightweightDataSourceModule) extends DataSourceModule {
+    def kind = lw.kind
+  }
+
+  final case class Heavyweight(hw: HeavyweightDataSourceModule) extends DataSourceModule {
+    def kind = hw.kind
+  }
 }

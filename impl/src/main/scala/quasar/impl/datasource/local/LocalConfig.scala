@@ -14,23 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.impl.datasource.local
 
-import quasar.Data
-import quasar.api.{DataSourceType, ResourcePath}
-import quasar.api.DataSourceError.InitializationError
+import slamdata.Predef.{Int, String}
 
-import argonaut.Json
-import cats.effect.{ConcurrentEffect, Timer}
-import fs2.Stream
-import scalaz.\/
+import argonaut.{Argonaut, DecodeJson}
 
-trait LightweightDataSourceModule {
-  def kind: DataSourceType
+final case class LocalConfig(rootDir: String, readChunkSizeBytes: Int)
 
-  def lightweightDataSource[
-      F[_]: ConcurrentEffect: Timer,
-      G[_]: ConcurrentEffect: Timer](
-      config: Json)
-      : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]]
+object LocalConfig {
+  implicit val decodeJson: DecodeJson[LocalConfig] =
+    Argonaut.jdecode2L(LocalConfig.apply)("rootDir", "readChunkSizeBytes")
 }

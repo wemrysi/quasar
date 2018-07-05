@@ -14,23 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.impl.external
 
-import quasar.Data
-import quasar.api.{DataSourceType, ResourcePath}
-import quasar.api.DataSourceError.InitializationError
+import slamdata.Predef.String
 
-import argonaut.Json
-import cats.effect.{ConcurrentEffect, Timer}
-import fs2.Stream
-import scalaz.\/
+import scala.AnyVal
 
-trait LightweightDataSourceModule {
-  def kind: DataSourceType
-
-  def lightweightDataSource[
-      F[_]: ConcurrentEffect: Timer,
-      G[_]: ConcurrentEffect: Timer](
-      config: Json)
-      : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]]
-}
+final case class ClassName(value: String) extends AnyVal
