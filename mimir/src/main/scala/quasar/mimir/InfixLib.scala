@@ -34,39 +34,6 @@ trait InfixLibModule extends ColumnarTableLibModule {
       final def doubleNeZero(x: Double, y: Double)      = y != 0.0
       final def numNeZero(x: BigDecimal, y: BigDecimal) = y != 0
 
-      class InfixOp2(name: String, longf: (Long, Long) => Long, doublef: (Double, Double) => Double, numf: (BigDecimal, BigDecimal) => BigDecimal)
-          extends Op2F2 {
-        val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
-        def f2: F2 = CF2P {
-          case (c1: LongColumn, c2: LongColumn) =>
-            new LongFrom.LL(c1, c2, longOk, longf)
-
-          case (c1: LongColumn, c2: DoubleColumn) =>
-            new NumFrom.LD(c1, c2, numOk, numf)
-
-          case (c1: LongColumn, c2: NumColumn) =>
-            new NumFrom.LN(c1, c2, numOk, numf)
-
-          case (c1: DoubleColumn, c2: LongColumn) =>
-            new NumFrom.DL(c1, c2, numOk, numf)
-
-          case (c1: DoubleColumn, c2: DoubleColumn) =>
-            new DoubleFrom.DD(c1, c2, doubleOk, doublef)
-
-          case (c1: DoubleColumn, c2: NumColumn) =>
-            new NumFrom.DN(c1, c2, numOk, numf)
-
-          case (c1: NumColumn, c2: LongColumn) =>
-            new NumFrom.NL(c1, c2, numOk, numf)
-
-          case (c1: NumColumn, c2: DoubleColumn) =>
-            new NumFrom.ND(c1, c2, numOk, numf)
-
-          case (c1: NumColumn, c2: NumColumn) =>
-            new NumFrom.NN(c1, c2, numOk, numf)
-        }
-      }
-
       val Add = new Op2F2 {
         val tpe = BinaryOperationType(JType.JRelativeT, JType.JRelativeT, JType.JRelativeT)
         def f2: F2 = CF2P {
@@ -446,7 +413,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
 
       object Pow extends Op2F2 with Power
 
-      class CompareOp2(name: String, f: Int => Boolean) extends Op2F2 {
+      class CompareOp2(f: Int => Boolean) extends Op2F2 {
         val tpe = BinaryOperationType(JNumberT, JNumberT, JBooleanT)
         import NumericComparisons.compare
         def f2: F2 = CF2P {
@@ -500,17 +467,10 @@ trait InfixLibModule extends ColumnarTableLibModule {
         }
       }
 
-      val Lt   = new CompareOp2("lt", _ < 0)
-      val LtEq = new CompareOp2("lte", _ <= 0)
-      val Gt   = new CompareOp2("gt", _ > 0)
-      val GtEq = new CompareOp2("gte", _ >= 0)
-
-      class BoolOp2(name: String, f: (Boolean, Boolean) => Boolean) extends Op2F2 {
-        val tpe = BinaryOperationType(JBooleanT, JBooleanT, JBooleanT)
-        def f2: F2 = CF2P {
-          case (c1: BoolColumn, c2: BoolColumn) => new BoolFrom.BB(c1, c2, f)
-        }
-      }
+      val Lt   = new CompareOp2(_ < 0)
+      val LtEq = new CompareOp2(_ <= 0)
+      val Gt   = new CompareOp2(_ > 0)
+      val GtEq = new CompareOp2(_ >= 0)
 
       // TODO find the commonalities and abstract these two
       val And = new OpNFN {
