@@ -27,13 +27,13 @@ import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTim
 import cats.effect.IO
 
 sealed trait CFId
-case class LeafCFId(identity: String)            extends CFId
-case class ComposedCFId(l: CFId, r: CFId)        extends CFId
-case class PartialLeftCFId(cv: CValue, r: CFId)  extends CFId
+case object LeafCFId extends CFId
+case class ComposedCFId(l: CFId, r: CFId) extends CFId
+case class PartialLeftCFId(cv: CValue, r: CFId) extends CFId
 case class PartialRightCFId(l: CFId, cv: CValue) extends CFId
 
 object CFId {
-  def apply(identity: String) = LeafCFId(identity)
+  val apply = LeafCFId
 }
 
 trait CF {
@@ -41,7 +41,7 @@ trait CF {
 
   override final def equals(other: Any): Boolean = other match {
     case cf: CF => identity == cf.identity
-    case _      => false
+    case _ => false
   }
 
   override final def hashCode: Int = identity.hashCode
@@ -67,16 +67,18 @@ trait CF1 extends CF { self =>
 }
 
 object CF1 {
-  def apply(name: String)(f: Column => Option[Column]): CF1 = apply(CFId(name))(f)
-  def apply(id: CFId)(f: Column => Option[Column]): CF1 = new CF1 {
+  def apply(f: Column => Option[Column]): CF1 = fromCF(CFId.apply)(f)
+
+  def fromCF(id: CFId)(f: Column => Option[Column]): CF1 = new CF1 {
     def apply(c: Column) = f(c)
     val identity = id
   }
 }
 
 object CF1P {
-  def apply(name: String)(f: PartialFunction[Column, Column]): CF1 = apply(CFId(name))(f)
-  def apply(id: CFId)(f: PartialFunction[Column, Column]): CF1 = new CF1 {
+  def apply(f: PartialFunction[Column, Column]): CF1 = fromCF(CFId.apply)(f)
+
+  def fromCF(id: CFId)(f: PartialFunction[Column, Column]): CF1 = new CF1 {
     def apply(c: Column) = f.lift(c)
     val identity = id
   }
@@ -103,16 +105,18 @@ trait CF2 extends CF { self =>
 }
 
 object CF2 {
-  def apply(id: String)(f: (Column, Column) => Option[Column]): CF2 = apply(CFId(id))(f)
-  def apply(id: CFId)(f: (Column, Column) => Option[Column]): CF2 = new CF2 {
+  def apply(f: (Column, Column) => Option[Column]): CF2 = fromCF(CFId.apply)(f)
+
+  def fromCF(id: CFId)(f: (Column, Column) => Option[Column]): CF2 = new CF2 {
     def apply(c1: Column, c2: Column) = f(c1, c2)
     val identity = id
   }
 }
 
 object CF2P {
-  def apply(id: String)(f: PartialFunction[(Column, Column), Column]): CF2 = apply(CFId(id))(f)
-  def apply(id: CFId)(f: PartialFunction[(Column, Column), Column]): CF2 = new CF2 {
+  def apply(f: PartialFunction[(Column, Column), Column]): CF2 = fromCF(CFId.apply)(f)
+
+  def fromCF(id: CFId)(f: PartialFunction[(Column, Column), Column]): CF2 = new CF2 {
     def apply(c1: Column, c2: Column) = f.lift((c1, c2))
     val identity = id
   }
@@ -123,16 +127,18 @@ trait CFN extends CF {
 }
 
 object CFN {
-  def apply(id: String)(f: List[Column] => Option[Column]): CFN = apply(CFId(id))(f)
-  def apply(id: CFId)(f: List[Column] => Option[Column]): CFN = new CFN {
+  def apply(f: List[Column] => Option[Column]): CFN = fromCF(CFId.apply)(f)
+
+  def fromCF(id: CFId)(f: List[Column] => Option[Column]): CFN = new CFN {
     def apply(columns: List[Column]): Option[Column] = f(columns)
     val identity = id
   }
 }
 
 object CFNP {
-  def apply(id: String)(f: PartialFunction[List[Column], Column]): CFN = apply(CFId(id))(f)
-  def apply(id: CFId)(f: PartialFunction[List[Column], Column]): CFN = new CFN {
+  def apply(f: PartialFunction[List[Column], Column]): CFN = fromCF(CFId.apply)(f)
+
+  def fromCF(id: CFId)(f: PartialFunction[List[Column], Column]): CFN = new CFN {
     private val lifted: List[Column] => Option[Column] = f.lift
     def apply(columns: List[Column]): Option[Column] = lifted(columns)
     val identity = id

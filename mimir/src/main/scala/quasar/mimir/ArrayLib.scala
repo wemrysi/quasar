@@ -26,7 +26,7 @@ trait ArrayLibModule extends ColumnarTableLibModule {
     // this isn't really an array function, but I don't know where else to put it
     // this is basically lower <= target <= upper, except with support for strings
     // and dates/times/datetimes
-    lazy val between: CFN = CFNP("std::array::between") {
+    lazy val between: CFN = CFNP {
       case List(target: LongColumn, lower: LongColumn, upper: LongColumn) =>
         new BoolColumn {
           def apply(row: Int) = {

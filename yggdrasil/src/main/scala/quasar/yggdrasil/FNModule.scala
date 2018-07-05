@@ -39,7 +39,6 @@ trait FNModule {
 }
 
 trait FNDummyModule extends FNModule {
-  import table.CFId
   type F1 = table.CF1
   type F2 = table.CF2
   type FN = table.CFN
@@ -53,9 +52,8 @@ trait FNDummyModule extends FNModule {
     def applyl(cv: CValue) = f.partialLeft(cv)
     def applyr(cv: CValue) = f.partialRight(cv)
 
-    def andThen(f1: F1) = table.CF2(CFId("liftF2DummyandThen")) { (c1, c2) =>
+    def andThen(f1: F1) = table.CF2 { (c1, c2) =>
       f(c1, c2) flatMap f1.apply
     }
   }
 }
-

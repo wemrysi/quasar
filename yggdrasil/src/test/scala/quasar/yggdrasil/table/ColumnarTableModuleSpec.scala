@@ -40,7 +40,7 @@ trait TestColumnarTableModule extends ColumnarTableModuleTestSupport { self =>
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = groupId.getAndIncrement
 
-  def addThree: CFN = CFNP("addThree") {
+  def addThree: CFN = CFNP {
     case List(x: LongColumn, y: LongColumn, z: LongColumn) =>
       new LongColumn {
         def apply(row: Int) = x(row) + y(row) + z(row)
@@ -603,18 +603,18 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
 
     "render to CSV in a simple case" in {
       val events = """
-{"a": 1, "b": {"bc": 999, "bd": "foooooo", "be": true, "bf": null, "bg": false}, "c": [1.999], "d": "dog"}
-{"a": 2, "b": {"bc": 998, "bd": "fooooo", "be": null, "bf": false, "bg": true}, "c": [2.999], "d": "dogg"}
-{"a": 3, "b": {"bc": 997, "bd": "foooo", "be": false, "bf": true, "bg": null}, "c": [3.999], "d": "doggg"}
-{"a": 4, "b": {"bc": 996, "bd": "fooo", "be": true, "bf": null, "bg": false}, "c": [4.999], "d": "dogggg"}
-""".trim
+        {"a": 1, "b": {"bc": 999, "bd": "foooooo", "be": true, "bf": null, "bg": false}, "c": [1.999], "d": "dog"}
+        {"a": 2, "b": {"bc": 998, "bd": "fooooo", "be": null, "bf": false, "bg": true}, "c": [2.999], "d": "dogg"}
+        {"a": 3, "b": {"bc": 997, "bd": "foooo", "be": false, "bf": true, "bg": null}, "c": [3.999], "d": "doggg"}
+        {"a": 4, "b": {"bc": 996, "bd": "fooo", "be": true, "bf": null, "bg": false}, "c": [4.999], "d": "dogggg"}
+        """.trim
 
       val expected = "" +
-      ".a,.b.bc,.b.bd,.b.be,.b.bf,.b.bg,.c[0],.d\r\n" +
-      "1,999,foooooo,true,null,false,1.999,dog\r\n" +
-      "2,998,fooooo,null,false,true,2.999,dogg\r\n" +
-      "3,997,foooo,false,true,null,3.999,doggg\r\n" +
-      "4,996,fooo,true,null,false,4.999,dogggg\r\n"
+        ".a,.b.bc,.b.bd,.b.be,.b.bf,.b.bg,.c[0],.d\r\n" +
+        "1,999,foooooo,true,null,false,1.999,dog\r\n" +
+        "2,998,fooooo,null,false,true,2.999,dogg\r\n" +
+        "3,997,foooo,false,true,null,3.999,doggg\r\n" +
+        "4,996,fooo,true,null,false,4.999,dogggg\r\n"
 
       testRenderCsv(events) must_== expected
     }
@@ -630,10 +630,10 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       val csv = testRenderCsv("{\"s\":\"a\\\"b\",\"t\":\",\",\"u\":\"aa\\nbb\",\"v\":\"a,b\\\"c\\r\\nd\"}")
 
       val expected = "" +
-".s,.t,.u,.v\r\n" +
-"\"a\"\"b\",\",\",\"aa\n" +
-"bb\",\"a,b\"\"c\r\n" +
-"d\"\r\n"
+        ".s,.t,.u,.v\r\n" +
+        "\"a\"\"b\",\",\",\"aa\n" +
+        "bb\",\"a,b\"\"c\r\n" +
+        "d\"\r\n"
 
       csv must_== expected
     }
@@ -641,34 +641,34 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     "test mixed rows" in {
 
       val input = """
-{"a": 1}
-{"b": 99.1}
-{"a": true}
-{"c": "jgeiwgjewigjewige"}
-{"b": "foo", "d": 999}
-{"e": null}
-{"f": {"aaa": 9}}
-{"c": 100, "g": 934}
-""".trim
+        {"a": 1}
+        {"b": 99.1}
+        {"a": true}
+        {"c": "jgeiwgjewigjewige"}
+        {"b": "foo", "d": 999}
+        {"e": null}
+        {"f": {"aaa": 9}}
+        {"c": 100, "g": 934}
+        """.trim
 
       val expected = "" +
-".a,.b,.c,.d,.e,.f.aaa,.g\r\n" +
-"1,,,,,,\r\n" +
-",99.1,,,,,\r\n" +
-"true,,,,,,\r\n" +
-",,jgeiwgjewigjewige,,,,\r\n" +
-",foo,,999,,,\r\n" +
-",,,,null,,\r\n" +
-",,,,,9,\r\n" +
-",,100,,,,934\r\n"
+        ".a,.b,.c,.d,.e,.f.aaa,.g\r\n" +
+        "1,,,,,,\r\n" +
+        ",99.1,,,,,\r\n" +
+        "true,,,,,,\r\n" +
+        ",,jgeiwgjewigjewige,,,,\r\n" +
+        ",foo,,999,,,\r\n" +
+        ",,,,null,,\r\n" +
+        ",,,,,9,\r\n" +
+        ",,100,,,,934\r\n"
 
       testRenderCsv(input) must_== expected
 
       val expected2 = "" +
-".a,.b\r\n1,\r\n,99.1\r\n\r\n" +
-".a,.c\r\ntrue,\r\n,jgeiwgjewigjewige\r\n\r\n" +
-".b,.d,.e\r\nfoo,999,\r\n,,null\r\n\r\n" +
-".c,.f.aaa,.g\r\n,9,\r\n100,,934\r\n"
+        ".a,.b\r\n1,\r\n,99.1\r\n\r\n" +
+        ".a,.c\r\ntrue,\r\n,jgeiwgjewigjewige\r\n\r\n" +
+        ".b,.d,.e\r\nfoo,999,\r\n,,null\r\n\r\n" +
+        ".c,.f.aaa,.g\r\n,9,\r\n100,,934\r\n"
 
       testRenderCsv(input, Some(2)) must_== expected2
     }

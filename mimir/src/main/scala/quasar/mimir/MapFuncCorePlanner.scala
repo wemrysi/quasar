@@ -132,7 +132,9 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.SetTimeZoneMinute(v, a1) =>
         (Map2[A](a1, v, cake.Library.SetTimeZoneMinute.f2): TransSpec[A]).point[F]
 
-      case MapFuncsCore.TypeOf(a1) => ???
+      case MapFuncsCore.TypeOf(a1) =>
+        (Map1[A](a1, cake.Library.typeOf.f1): TransSpec[A]).point[F]
+
       case MapFuncsCore.ToId(a1) => ???
 
       case MapFuncsCore.Negate(a1) =>

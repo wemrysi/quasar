@@ -65,7 +65,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
   def tic_aj = JPathField("tic_a")
   def tic_bj = JPathField("tic_b")
 
-  val eq12F1 = CF1P("testing::eq12F1") {
+  val eq12F1 = CF1P {
     case c: DoubleColumn => new Map1Column(c) with BoolColumn {
       def apply(row: Int) = c(row) == 12.0d
     }
@@ -141,7 +141,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
 
     val data = augmentWithIdentities(set.map(JNum(_)))
 
-    val doubleF1 = CF1P("testing::doubleF1") {
+    val doubleF1 = CF1P {
       case c: LongColumn => new Map1Column(c) with LongColumn {
         def apply(row: Int) = c(row) * 2
       }
@@ -199,7 +199,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
 
     val data = augmentWithIdentities(set.map(JNum(_)))
 
-    val mod2 = CF1P("testing::mod2") {
+    val mod2 = CF1P {
       case c: LongColumn => new Map1Column(c) with LongColumn {
         def apply(row: Int) = c(row) % 2
       }

@@ -341,7 +341,7 @@ trait ColumnarTableModule
   type TableCompanion <: ColumnarTableCompanion
   case class TableMetrics(startCount: Int, sliceTraversedCount: Int)
 
-  def newScratchDir(): File    = IOUtils.createTmpDir("ctmscratch").unsafePerformIO
+  def newScratchDir(): File = IOUtils.createTmpDir("ctmscratch").unsafePerformIO
   def jdbmCommitInterval: Long = 200000l
 
   implicit def liftF1(f: F1) = new F1Like {
@@ -350,10 +350,10 @@ trait ColumnarTableModule
   }
 
   implicit def liftF2(f: F2) = new F2Like {
-    def applyl(cv: CValue) = CF1("builtin::liftF2::applyl") { f(Column.const(cv), _) }
-    def applyr(cv: CValue) = CF1("builtin::liftF2::applyl") { f(_, Column.const(cv)) }
+    def applyl(cv: CValue) = CF1{ f(Column.const(cv), _) }
+    def applyr(cv: CValue) = CF1{ f(_, Column.const(cv)) }
 
-    def andThen(f1: F1) = CF2("builtin::liftF2::andThen") { (c1, c2) =>
+    def andThen(f1: F1) = CF2 { (c1, c2) =>
       f(c1, c2) flatMap f1.apply
     }
   }

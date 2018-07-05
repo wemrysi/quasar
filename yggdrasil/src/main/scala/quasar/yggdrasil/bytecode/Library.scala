@@ -60,13 +60,8 @@ object IdentityPolicy {
 
 sealed trait FunctionLike[T] {
   val tpe: T
-  val namespace: Vector[String]
-  val name: String
   val opcode: Int
   val rowLevel: Boolean
-
-  lazy val fqn          = namespace :+ name mkString "::"
-  override def toString = "[0x%06x]".format(opcode) + fqn
 }
 
 trait Morphism1Like extends FunctionLike[UnaryOperationType] {

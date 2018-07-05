@@ -54,13 +54,12 @@ class LongAdder {
 trait ReductionLibModule extends ColumnarTableLibModule {
   trait ReductionLib extends ColumnarTableLib {
     import BigDecimalOperations._
-    val ReductionNamespace = Vector()
 
     override def _libReduction =
       super._libReduction ++ Set(Count, Max, Min, Sum, Mean, GeometricMean, SumSq, Variance, StdDev, Forall, Exists)
 
     val CountMonoid = implicitly[Monoid[Count.Result]]
-    object Count extends Reduction(ReductionNamespace, "count") {
+    object Count extends Reduction {
       // limiting ourselves to 9.2e18 rows doesn't seem like a problem.
       type Result = Long
 
@@ -84,7 +83,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
       def extractValue(res: Result) = Some(CNum(res))
     }
 
-    object Max extends Reduction(ReductionNamespace, "max") {
+    object Max extends Reduction {
       type Result = Option[BigDecimal]
 
       implicit val monoid = new Monoid[Result] {
@@ -147,7 +146,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
 
     val MinMonoid = implicitly[Monoid[Min.Result]]
 
-    object Min extends Reduction(ReductionNamespace, "min") {
+    object Min extends Reduction {
       type Result = Option[BigDecimal]
 
       implicit val monoid = new Monoid[Result] {
@@ -209,7 +208,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
     }
 
     val SumMonoid = implicitly[Monoid[Sum.Result]]
-    object Sum extends Reduction(ReductionNamespace, "sum") {
+    object Sum extends Reduction {
       type Result = Option[BigDecimal]
 
       implicit val monoid = SumMonoid
@@ -259,7 +258,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
     }
 
     val MeanMonoid = implicitly[Monoid[Mean.Result]]
-    object Mean extends Reduction(ReductionNamespace, "mean") {
+    object Mean extends Reduction {
       type Result        = Option[InitialResult]
       type InitialResult = (BigDecimal, Long) // (sum, count)
 
@@ -317,7 +316,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
       def extractValue(res: Result) = perform(res) map { CNum(_) }
     }
 
-    object GeometricMean extends Reduction(ReductionNamespace, "geometricMean") {
+    object GeometricMean extends Reduction {
       type Result        = Option[InitialResult]
       type InitialResult = (BigDecimal, Long)
 
@@ -384,7 +383,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
     }
 
     val SumSqMonoid = implicitly[Monoid[SumSq.Result]]
-    object SumSq extends Reduction(ReductionNamespace, "sumSq") {
+    object SumSq extends Reduction {
       type Result = Option[BigDecimal]
 
       implicit val monoid = SumSqMonoid
@@ -481,7 +480,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
     }
 
     val VarianceMonoid = implicitly[Monoid[Variance.Result]]
-    object Variance extends Reduction(ReductionNamespace, "variance") {
+    object Variance extends Reduction {
       type Result = Option[InitialResult]
 
       type InitialResult = (Long, BigDecimal, BigDecimal)
@@ -509,7 +508,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
     }
 
     val StdDevMonoid = implicitly[Monoid[StdDev.Result]]
-    object StdDev extends Reduction(ReductionNamespace, "stdDev") {
+    object StdDev extends Reduction {
       type Result        = Option[InitialResult]
       type InitialResult = (Long, BigDecimal, BigDecimal) // (count, sum, sumsq)
 
@@ -536,7 +535,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
       def extractValue(res: Result) = perform(res) map { CNum(_) }
     }
 
-    object Forall extends Reduction(ReductionNamespace, "forall") {
+    object Forall extends Reduction {
       type Result = Option[Boolean]
 
       val tpe = UnaryOperationType(JBooleanT, JBooleanT)
@@ -589,7 +588,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
       def extractValue(res: Result) = Some(CBoolean(perform(res)))
     }
 
-    object Exists extends Reduction(ReductionNamespace, "exists") {
+    object Exists extends Reduction {
       type Result = Option[Boolean]
 
       val tpe = UnaryOperationType(JBooleanT, JBooleanT)
@@ -642,7 +641,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
       def extractValue(res: Result) = Some(CBoolean(perform(res)))
     }
 
-    object First extends Reduction(ReductionNamespace, "first") {
+    object First extends Reduction {
       import scala.util.control.Breaks._
 
       type Result = Option[RValue]
@@ -681,7 +680,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
       def extractValue(res: Result) = res
     }
 
-    object Last extends Reduction(ReductionNamespace, "last") {
+    object Last extends Reduction {
       type Result = Option[() => RValue]
 
       implicit val monoid = new Monoid[Option[() => RValue]] {
@@ -722,7 +721,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
       def extractValue(res: Result) = res.map(_())
     }
 
-    object UnshiftArray extends Reduction(ReductionNamespace, "unshiftArray") {
+    object UnshiftArray extends Reduction {
       type Result = List[RValue]
 
       implicit val monoid = Scalaz.listMonoid[RValue]
