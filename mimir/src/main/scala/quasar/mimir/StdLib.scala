@@ -63,19 +63,19 @@ trait TableLibModule extends TableModule with TransSpecModule {
 
     sealed trait MorphismAlignment
     object MorphismAlignment {
-      case class Match(morph: IO[Morph1Apply])                                                    extends MorphismAlignment
-      case class Cross(morph: IO[Morph1Apply])                                                    extends MorphismAlignment
+      case class Match(morph: IO[Morph1Apply]) extends MorphismAlignment
+      case class Cross(morph: IO[Morph1Apply]) extends MorphismAlignment
       case class Custom(alignment: IdentityPolicy, f: (Table, Table) => IO[(Table, Morph1Apply)]) extends MorphismAlignment
     }
 
-    abstract class Morphism1(val namespace: Vector[String], val name: String) extends Morphism1Like with Morph1Apply {
-      val opcode: Int       = defaultMorphism1Opcode.getAndIncrement
+    abstract class Morphism1 extends Morphism1Like with Morph1Apply {
+      val opcode: Int = defaultMorphism1Opcode.getAndIncrement
       val rowLevel: Boolean = false
     }
 
-    abstract class Morphism2(val namespace: Vector[String], val name: String) extends Morphism2Like {
-      val opcode: Int           = defaultMorphism1Opcode.getAndIncrement
-      val rowLevel: Boolean     = false
+    abstract class Morphism2 extends Morphism2Like {
+      val opcode: Int = defaultMorphism1Opcode.getAndIncrement
+      val rowLevel: Boolean = false
       val multivariate: Boolean = false
 
       /**
@@ -86,14 +86,14 @@ trait TableLibModule extends TableModule with TransSpecModule {
       def alignment: MorphismAlignment
     }
 
-    abstract class Op1(namespace: Vector[String], name: String) extends Morphism1(namespace, name) with Op1Like {
+    abstract class Op1 extends Morphism1 with Op1Like {
       def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A]
 
       def fold[A](op1: Op1 => A, op1F1: Op1F1 => A): A = op1(this)
-      def apply(table: Table)       = sys.error("morphism application of an op1 is wrong")
+      def apply(table: Table) = sys.error("morphism application of an op1 is wrong")
     }
 
-    abstract class Op1F1(namespace: Vector[String], name: String) extends Op1(namespace, name) {
+    abstract class Op1F1 extends Op1 {
       def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
         trans.Map1(source, f1)
 
@@ -104,7 +104,7 @@ trait TableLibModule extends TableModule with TransSpecModule {
       override def fold[A](op1: Op1 => A, op1F1: Op1F1 => A): A = op1F1(this)
     }
 
-    abstract class Op2(namespace: Vector[String], name: String) extends Morphism2(namespace, name) with Op2Like {
+    abstract class Op2 extends Morphism2 with Op2Like {
       val alignment = MorphismAlignment.Match(IO.pure {
         new Morph1Apply {
           def apply(input: Table) = sys.error("morphism application of an op2 is wrong")
@@ -126,7 +126,7 @@ trait TableLibModule extends TableModule with TransSpecModule {
       def mapper: Mapper
     }
 
-    abstract class Op2F2(namespace: Vector[String], name: String) extends Op2(namespace, name) {
+    abstract class Op2F2 extends Op2 {
       def spec[A <: SourceType](left: TransSpec[A], right: TransSpec[A]): TransSpec[A] =
         trans.Map2(left, right, f2)
 
@@ -137,8 +137,7 @@ trait TableLibModule extends TableModule with TransSpecModule {
       override def fold[A](op2: Op2 => A, op2F2: Op2F2 => A): A = op2F2(this)
     }
 
-    // TODO remove a ton of the boilerplate in the other F*s that I just omitted here
-    abstract class OpNFN(namespace: Vector[String], name: String) {
+    abstract class OpNFN {
       def spec2[A <: SourceType](left: TransSpec[A], right: TransSpec[A]): TransSpec[A] =
         spec(trans.OuterArrayConcat(trans.WrapArray(left), trans.WrapArray(right)))
 
@@ -148,8 +147,8 @@ trait TableLibModule extends TableModule with TransSpecModule {
       def fn: FN
     }
 
-    abstract class Reduction(val namespace: Vector[String], val name: String) extends ReductionLike with Morph1Apply {
-      val opcode: Int       = defaultReductionOpcode.getAndIncrement
+    abstract class Reduction extends ReductionLike with Morph1Apply {
+      val opcode: Int = defaultReductionOpcode.getAndIncrement
       val rowLevel: Boolean = false
 
       type Result
@@ -168,7 +167,7 @@ trait TableLibModule extends TableModule with TransSpecModule {
 
 trait ColumnarTableLibModule extends TableLibModule with ColumnarTableModule {
   trait ColumnarTableLib extends TableLib {
-    class WrapArrayTableReduction(val r: Reduction, val jtypef: Option[(JType => JType, ColumnRef => Option[ColumnRef])]) extends Reduction(r.namespace, r.name) {
+    class WrapArrayTableReduction(val r: Reduction, val jtypef: Option[(JType => JType, ColumnRef => Option[ColumnRef])]) extends Reduction {
       type Result = r.Result
       val tpe = r.tpe
 
@@ -201,7 +200,7 @@ trait ColumnarTableLibModule extends TableLibModule with ColumnarTableModule {
       def rec(reductions: List[(Reduction, Option[(JType => JType, ColumnRef => Option[ColumnRef])])], acc: Reduction): Reduction = {
         reductions match {
           case (x, jtypef) :: xs => {
-            val impl = new Reduction(Vector(), "") {
+            val impl = new Reduction {
               type Result = (x.Result, acc.Result)
 
               def reducer = new CReducer[Result] {
@@ -285,7 +284,12 @@ object StdLib {
 
   def doubleIsDefined(n: Double) = !(isNaN(n) || isInfinite(n))
 
+  class ConstantStrColumn(c: Column, const: String) extends Map1Column(c) with StrColumn {
+    def apply(row: Int) = const
+  }
+
   object StrFrom {
+
     class L(c: LongColumn, defined: Long => Boolean, f: Long => String) extends Map1Column(c) with StrColumn {
 
       override def isDefinedAt(row: Int) =

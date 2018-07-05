@@ -28,7 +28,7 @@ object util {
   /**
     * Right-biased column union
     */
-  val UnionRight = CF2P("builtin::ct::unionRight") {
+  val UnionRight = CF2P {
     case (c1: BoolColumn, c2: BoolColumn) =>
       new UnionColumn(c1, c2) with BoolColumn {
         def apply(row: Int) = {
@@ -268,7 +268,7 @@ object util {
   }
 
   //it would be nice to generalize these to `CoerceTo[A]`
-  def CoerceToDouble = CF1P("builtin:ct:coerceToDouble") {
+  def CoerceToDouble = CF1P {
     case (c: DoubleColumn) => c
 
     case (c: LongColumn) =>
@@ -282,7 +282,7 @@ object util {
       }
   }
 
-  def CoerceToOffsetDateTime = CF1P("builtin:ct:coerceToOffsetDateTime") {
+  def CoerceToOffsetDateTime = CF1P {
     case (c: OffsetDateTimeColumn) => c
 
     case (c: StrColumn) => new OffsetDateTimeColumn {
@@ -291,7 +291,7 @@ object util {
     }
   }
 
-  def CoerceToOffsetTime = CF1P("builtin:ct:coerceToOffsetTime") {
+  def CoerceToOffsetTime = CF1P {
     case (c: OffsetTimeColumn) => c
 
     case (c: StrColumn) => new OffsetTimeColumn {
@@ -300,7 +300,7 @@ object util {
     }
   }
 
-  def CoerceToOffsetDate = CF1P("builtin:ct:coerceToOffsetDate") {
+  def CoerceToOffsetDate = CF1P {
     case (c: OffsetDateColumn) => c
 
     case (c: StrColumn) => new OffsetDateColumn {
@@ -309,7 +309,7 @@ object util {
     }
   }
 
-  def CoerceToLocalDateTime = CF1P("builtin:ct:coerceToLocalDateTime") {
+  def CoerceToLocalDateTime = CF1P {
     case (c: LocalDateTimeColumn) => c
 
     case (c: StrColumn) => new LocalDateTimeColumn {
@@ -318,7 +318,7 @@ object util {
     }
   }
 
-  def CoerceToLocalTime = CF1P("builtin:ct:coerceToLocalTime") {
+  def CoerceToLocalTime = CF1P {
     case (c: LocalTimeColumn) => c
 
     case (c: StrColumn) => new LocalTimeColumn {
@@ -327,7 +327,7 @@ object util {
     }
   }
 
-  def CoerceToLocalDate = CF1P("builtin:ct:coerceToLocalDate") {
+  def CoerceToLocalDate = CF1P {
     case (c: LocalDateColumn) => c
 
     case (c: StrColumn) => new LocalDateColumn {
@@ -336,7 +336,7 @@ object util {
     }
   }
 
-  def Shift(by: Int) = CF1P("builtin::ct::shift") {
+  def Shift(by: Int) = CF1P {
     case c: BoolColumn =>
       new ShiftColumn(by, c) with BoolColumn {
         def apply(row: Int) = c(row - by)
@@ -408,7 +408,7 @@ object util {
     case c: NullColumn        => new ShiftColumn(by, c) with NullColumn
   }
 
-  def Sparsen(idx: Array[Int], toSize: Int) = CF1P("builtin::ct::sparsen") {
+  def Sparsen(idx: Array[Int], toSize: Int) = CF1P {
     case c: BoolColumn           => new SparsenColumn(c, idx, toSize) with BoolColumn { def apply(row: Int)     =       c(remap(row)) }
     case c: LongColumn           => new SparsenColumn(c, idx, toSize) with LongColumn { def apply(row: Int)     =       c(remap(row)) }
     case c: DoubleColumn         => new SparsenColumn(c, idx, toSize) with DoubleColumn { def apply(row: Int)   =       c(remap(row)) }
@@ -432,7 +432,7 @@ object util {
     case c: NullColumn        => new SparsenColumn(c, idx, toSize) with NullColumn
   }
 
-  val Empty = CF1P("builtin::ct::empty") {
+  val Empty = CF1P {
     case c: BoolColumn          => new EmptyColumn[BoolColumn] with BoolColumn
     case c: LongColumn          => new EmptyColumn[LongColumn] with LongColumn
     case c: DoubleColumn        => new EmptyColumn[DoubleColumn] with DoubleColumn
@@ -451,7 +451,7 @@ object util {
     case c: NullColumn        => new EmptyColumn[NullColumn] with NullColumn
   }
 
-  val Undefined = CF1P("builtin::ct::undefined") {
+  val Undefined = CF1P {
     case c: BoolColumn           => UndefinedColumn.raw
     case c: LongColumn           => UndefinedColumn.raw
     case c: DoubleColumn         => UndefinedColumn.raw
@@ -470,7 +470,7 @@ object util {
     case c: NullColumn        => UndefinedColumn.raw
   }
 
-  def Remap(f: Int => Int) = CF1P("builtin::ct::remap") {
+  def Remap(f: Int => Int) = CF1P {
     case c: BoolColumn           => new RemapColumn(c, f) with BoolColumn { def apply(row: Int)           = c(f(row)) }
     case c: LongColumn           => new RemapColumn(c, f) with LongColumn { def apply(row: Int)           = c(f(row)) }
     case c: DoubleColumn         => new RemapColumn(c, f) with DoubleColumn { def apply(row: Int)         = c(f(row)) }
@@ -493,7 +493,7 @@ object util {
     case c: NullColumn        => new RemapColumn(c, f) with NullColumn
   }
 
-  def RemapFilter(filter: Int => Boolean, offset: Int) = CF1P("builtin::ct::remapFilter") {
+  def RemapFilter(filter: Int => Boolean, offset: Int) = CF1P {
     case c: BoolColumn     => new RemapFilterColumn(c, filter, offset) with BoolColumn { def apply(row: Int)                 = c(row + offset) }
     case c: LongColumn     => new RemapFilterColumn(c, filter, offset) with LongColumn { def apply(row: Int)                 = c(row + offset) }
     case c: DoubleColumn   => new RemapFilterColumn(c, filter, offset) with DoubleColumn { def apply(row: Int)               = c(row + offset) }
@@ -516,7 +516,7 @@ object util {
     case c: NullColumn        => new RemapFilterColumn(c, filter, offset) with NullColumn
   }
 
-  def RemapIndices(indices: ArrayIntList) = CF1P("builtin::ct::remapIndices") {
+  def RemapIndices(indices: ArrayIntList) = CF1P {
     case c: BoolColumn           => new RemapIndicesColumn(c, indices) with BoolColumn { def apply(row: Int)           = c(indices.get(row)) }
     case c: LongColumn           => new RemapIndicesColumn(c, indices) with LongColumn { def apply(row: Int)           = c(indices.get(row)) }
     case c: DoubleColumn         => new RemapIndicesColumn(c, indices) with DoubleColumn { def apply(row: Int)         = c(indices.get(row)) }
@@ -539,7 +539,7 @@ object util {
     case c: NullColumn        => new RemapIndicesColumn(c, indices) with NullColumn
   }
 
-  def filter(from: Int, to: Int, definedAt: BitSet) = CF1P("builtin::ct::filter") {
+  def filter(from: Int, to: Int, definedAt: BitSet) = CF1P {
     case c: BoolColumn           => new BitsetColumn(definedAt & c.definedAt(from, to)) with BoolColumn { def apply(row: Int)           = c(row) }
     case c: LongColumn           => new BitsetColumn(definedAt & c.definedAt(from, to)) with LongColumn { def apply(row: Int)           = c(row) }
     case c: DoubleColumn         => new BitsetColumn(definedAt & c.definedAt(from, to)) with DoubleColumn { def apply(row: Int)         = c(row) }
@@ -562,7 +562,7 @@ object util {
     case c: NullColumn        => new BitsetColumn(definedAt & c.definedAt(from, to)) with NullColumn
   }
 
-  def filterBy(p: Int => Boolean) = CF1P("builtin::ct::filterBy") {
+  def filterBy(p: Int => Boolean) = CF1P {
     case c: BoolColumn           => new BoolColumn { def apply(row: Int)                   = c(row); def isDefinedAt(row: Int) = c.isDefinedAt(row) && p(row) }
     case c: LongColumn           => new LongColumn { def apply(row: Int)                   = c(row); def isDefinedAt(row: Int) = c.isDefinedAt(row) && p(row) }
     case c: DoubleColumn         => new DoubleColumn { def apply(row: Int)                 = c(row); def isDefinedAt(row: Int) = c.isDefinedAt(row) && p(row) }
@@ -586,7 +586,7 @@ object util {
     case c: NullColumn        => new NullColumn { def isDefinedAt(row: Int) = c.isDefinedAt(row) && p(row) }
   }
 
-  val isSatisfied = CF1P("builtin::ct::isSatisfied") {
+  val isSatisfied = CF1P.apply {
     case c: BoolColumn =>
       new BoolColumn {
         def isDefinedAt(row: Int) = c.isDefinedAt(row) && c(row)
@@ -594,7 +594,7 @@ object util {
       }
   }
 
-  def MaskedUnion(leftMask: BitSet) = CF2P("builtin::ct::maskedUnion") {
+  def MaskedUnion(leftMask: BitSet) = CF2P {
     case (left: BoolColumn, right: BoolColumn) =>
       new UnionColumn(left, right) with BoolColumn {
         def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row)

@@ -21,7 +21,6 @@ import quasar.yggdrasil.table._
 
 trait MathLibModule extends ColumnarTableLibModule with InfixLibModule {
   trait MathLib extends ColumnarTableLib with InfixLib {
-    val MathNamespace = Vector("std", "math")
 
     override def _lib1 =
       super._lib1 ++ Set(
@@ -57,77 +56,75 @@ trait MathLibModule extends ColumnarTableLibModule with InfixLibModule {
     import StdLib.{ DoubleFrom, doubleIsDefined }
     import java.lang.Math
 
-    object pow extends Op2F2(MathNamespace, "pow") with Infix.Power {
-      val cf2pName = "builtin::math::op2dd::pow"
-    }
+    object pow extends Op2F2 with Infix.Power
 
-    abstract class Op1DD(name: String, defined: Double => Boolean, f: Double => Double) extends Op1F1(MathNamespace, name) {
+    abstract class Op1DD(defined: Double => Boolean, f: Double => Double) extends Op1F1 {
       val tpe = UnaryOperationType(JNumberT, JNumberT)
-      def f1: F1 = CF1P("builtin::math::op1dd::" + name) {
+      def f1: F1 = CF1P {
         case c: DoubleColumn => new DoubleFrom.D(c, defined, f)
         case c: LongColumn   => new DoubleFrom.L(c, defined, f)
         case c: NumColumn    => new DoubleFrom.N(c, defined, f)
       }
     }
 
-    object sinh extends Op1DD("sinh", doubleIsDefined, Math.sinh)
+    object sinh extends Op1DD(doubleIsDefined, Math.sinh)
 
-    object toDegrees extends Op1DD("toDegrees", doubleIsDefined, Math.toDegrees)
+    object toDegrees extends Op1DD(doubleIsDefined, Math.toDegrees)
 
-    object expm1 extends Op1DD("expm1", doubleIsDefined, Math.expm1)
+    object expm1 extends Op1DD(doubleIsDefined, Math.expm1)
 
-    object getExponent extends Op1DD("getExponent", n => doubleIsDefined(n) && n > 0.0, n => Math.getExponent(n).toDouble)
+    object getExponent extends Op1DD(n => doubleIsDefined(n) && n > 0.0, n => Math.getExponent(n).toDouble)
 
-    object asin extends Op1DD("asin", n => -1.0 <= n && n <= 1.0, Math.asin)
+    object asin extends Op1DD(n => -1.0 <= n && n <= 1.0, Math.asin)
 
-    object log10 extends Op1DD("log10", n => doubleIsDefined(n) && n > 0.0, Math.log10)
+    object log10 extends Op1DD(n => doubleIsDefined(n) && n > 0.0, Math.log10)
 
-    object cos extends Op1DD("cos", doubleIsDefined, Math.cos)
+    object cos extends Op1DD(doubleIsDefined, Math.cos)
 
-    object exp extends Op1DD("exp", doubleIsDefined, Math.exp)
+    object exp extends Op1DD(doubleIsDefined, Math.exp)
 
-    object cbrt extends Op1DD("cbrt", doubleIsDefined, Math.cbrt)
+    object cbrt extends Op1DD(doubleIsDefined, Math.cbrt)
 
-    object atan extends Op1DD("atan", doubleIsDefined, Math.atan)
+    object atan extends Op1DD(doubleIsDefined, Math.atan)
 
-    object ceil extends Op1DD("ceil", doubleIsDefined, Math.ceil)
+    object ceil extends Op1DD(doubleIsDefined, Math.ceil)
 
-    object rint extends Op1DD("rint", doubleIsDefined, Math.rint)
+    object rint extends Op1DD(doubleIsDefined, Math.rint)
 
-    object log1p extends Op1DD("log1p", n => doubleIsDefined(n) && n > -1.0, Math.log1p)
+    object log1p extends Op1DD(n => doubleIsDefined(n) && n > -1.0, Math.log1p)
 
-    object sqrt extends Op1DD("sqrt", n => doubleIsDefined(n) && n >= 0.0, Math.sqrt)
+    object sqrt extends Op1DD(n => doubleIsDefined(n) && n >= 0.0, Math.sqrt)
 
-    object floor extends Op1DD("floor", doubleIsDefined, Math.floor)
+    object floor extends Op1DD(doubleIsDefined, Math.floor)
 
-    object toRadians extends Op1DD("toRadians", doubleIsDefined, Math.toRadians)
+    object toRadians extends Op1DD(doubleIsDefined, Math.toRadians)
 
-    object tanh extends Op1DD("tanh", doubleIsDefined, Math.tanh)
+    object tanh extends Op1DD(doubleIsDefined, Math.tanh)
 
     // Math.round returns Long, so we have to improvise.
     // 4503599627370496.0 is the point where Double can't represent fractional
     // values anymore, so beyond that we just pass the value through
-    object round extends Op1DD("round", doubleIsDefined, n => if (Math.abs(n) >= 4503599627370496.0) n else Math.round(n))
+    object round extends Op1DD(doubleIsDefined, n => if (Math.abs(n) >= 4503599627370496.0) n else Math.round(n))
 
-    object cosh extends Op1DD("cosh", doubleIsDefined, Math.cosh)
+    object cosh extends Op1DD(doubleIsDefined, Math.cosh)
 
-    object tan extends Op1DD("tan", doubleIsDefined, Math.tan)
+    object tan extends Op1DD(doubleIsDefined, Math.tan)
 
-    object abs extends Op1DD("abs", doubleIsDefined, Math.abs)
+    object abs extends Op1DD(doubleIsDefined, Math.abs)
 
-    object sin extends Op1DD("sin", doubleIsDefined, Math.sin)
+    object sin extends Op1DD(doubleIsDefined, Math.sin)
 
-    object mathlog extends Op1DD("log", n => doubleIsDefined(n) && n > 0.0, Math.log)
+    object mathlog extends Op1DD(n => doubleIsDefined(n) && n > 0.0, Math.log)
 
-    object signum extends Op1DD("signum", doubleIsDefined, Math.signum)
+    object signum extends Op1DD(doubleIsDefined, Math.signum)
 
-    object acos extends Op1DD("acos", n => doubleIsDefined(n) && -1.0 <= n && n <= 1.0, Math.acos)
+    object acos extends Op1DD(n => doubleIsDefined(n) && -1.0 <= n && n <= 1.0, Math.acos)
 
-    object ulp extends Op1DD("ulp", doubleIsDefined, Math.ulp)
+    object ulp extends Op1DD(doubleIsDefined, Math.ulp)
 
-    abstract class Op2DDD(name: String, defined: (Double, Double) => Boolean, f: (Double, Double) => Double) extends Op2F2(MathNamespace, name) {
+    abstract class Op2DDD(defined: (Double, Double) => Boolean, f: (Double, Double) => Double) extends Op2F2 {
       val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
-      def f2: F2 = CF2P("builtin::math::op2dd::" + name) {
+      def f2: F2 = CF2P {
         case (c1: DoubleColumn, c2: DoubleColumn) =>
           new DoubleFrom.DD(c1, c2, defined, f)
 
@@ -159,20 +156,20 @@ trait MathLibModule extends ColumnarTableLibModule with InfixLibModule {
 
     def bothDefined(x: Double, y: Double) = doubleIsDefined(x) && doubleIsDefined(y)
 
-    object minOf extends Op2DDD("minOf", bothDefined, Math.min)
+    object minOf extends Op2DDD(bothDefined, Math.min)
 
-    object hypot extends Op2DDD("hypot", bothDefined, Math.hypot)
+    object hypot extends Op2DDD(bothDefined, Math.hypot)
 
-    object maxOf extends Op2DDD("maxOf", bothDefined, Math.max)
+    object maxOf extends Op2DDD(bothDefined, Math.max)
 
-    object atan2 extends Op2DDD("atan2", bothDefined, Math.atan2)
+    object atan2 extends Op2DDD(bothDefined, Math.atan2)
 
-    object copySign extends Op2DDD("copySign", bothDefined, Math.copySign)
+    object copySign extends Op2DDD(bothDefined, Math.copySign)
 
-    object IEEEremainder extends Op2DDD("IEEEremainder", bothDefined, Math.IEEEremainder)
+    object IEEEremainder extends Op2DDD(bothDefined, Math.IEEEremainder)
 
     object roundTo
-        extends Op2DDD("roundTo", bothDefined, { (n, digits) =>
+        extends Op2DDD(bothDefined, { (n, digits) =>
           val adjusted = n * math.pow(10, digits)
           val rounded  = if (Math.abs(n) >= 4503599627370496.0) adjusted else Math.round(adjusted)
 

@@ -19,7 +19,7 @@ package table
 package cf
 
 object math {
-  val Negate = CF1P("builtin::ct::negate") {
+  val Negate = CF1P {
     case c: BoolColumn =>
       new Map1Column(c) with BoolColumn {
         def apply(row: Int) = !c(row)
@@ -38,7 +38,7 @@ object math {
       }
   }
 
-  val Add = CF2P("builtin::ct::add") {
+  val Add = CF2P {
     case (c1: BoolColumn, c2: BoolColumn) =>
       new Map2Column(c1, c2) with BoolColumn {
         def apply(row: Int) = c1(row) || c2(row)
@@ -81,7 +81,7 @@ object math {
       }
   }
 
-  val Mod = CF2P("builtin::ct::mod") {
+  val Mod = CF2P {
     case (c1: LongColumn, c2: LongColumn) =>
       new Map2Column(c1, c2) with LongColumn {
         def apply(row: Int) = c1(row) % c2(row)
@@ -120,5 +120,3 @@ object math {
       }
   }
 }
-
-// type Math

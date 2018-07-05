@@ -77,7 +77,7 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
     val lib = Map[String, CF1](
       "negate" -> cf.math.Negate,
       "coerceToDouble" -> cf.util.CoerceToDouble,
-      "true" -> CF1("testing::true") { _ => Some(Column.const(true)) }
+      "true" -> CF1 { _ => Some(Column.const(true)) }
     )
 
     lib(name)

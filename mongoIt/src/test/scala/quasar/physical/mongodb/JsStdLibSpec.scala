@@ -86,6 +86,9 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
     case (date.Interval, _) => Pending("TODO").left
 
+    /* IDENTITY */
+    case (identity.TypeOf, _) => Pending("TODO").left
+
     /* MATH */
     case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
         if x == 0 && y < 0 =>

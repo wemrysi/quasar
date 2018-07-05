@@ -45,6 +45,8 @@ class ConstantPlanStdLibSpec extends StdLibSpec {
   def shortCircuit[N <: Nat](func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     case (relations.IfUndefined, _) => notHandled
 
+    case (identity.TypeOf, _) => notHandled
+
     case (date.Now, _) => notHandled
     case (date.NowTime, _) => notHandled
     case (date.NowDate, _) => notHandled

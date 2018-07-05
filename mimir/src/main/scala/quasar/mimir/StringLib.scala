@@ -40,8 +40,6 @@ trait StringLibModule extends ColumnarTableLibModule {
   trait StringLib extends ColumnarTableLib {
     import StdLib._
 
-    val StringNamespace = Vector("std", "string")
-
     override def _lib1 = super._lib1 ++ Set(length, trim, toUpperCase, toLowerCase, isEmpty, intern, parseNum, numToString)
 
     override def _lib2 =
@@ -66,19 +64,19 @@ trait StringLibModule extends ColumnarTableLibModule {
         split,
         splitRegex)
 
-    class Op1SS(name: String, f: String => String) extends Op1F1(StringNamespace, name) {
+    class Op1SS(name: String, f: String => String) extends Op1F1 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(JTextT, JNumberT)
-      def f1: F1 = CF1P("builtin::str::op1ss::" + name) {
+      def f1: F1 = CF1P {
         case c: StrColumn => new StrFrom.S(c, _ != null, f)
       }
     }
 
-    class Op1SB(name: String, f: String => Boolean) extends Op1F1(StringNamespace, name) {
+    class Op1SB(name: String, f: String => Boolean) extends Op1F1 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(JTextT, JNumberT)
       private def build(c: StrColumn) = new BoolFrom.S(c, _ != null, f)
-      def f1: F1 = CF1P("builtin::str::op1sb::" + name) {
+      def f1: F1 = CF1P {
         case c: StrColumn => build(c)
       }
     }
@@ -91,33 +89,33 @@ trait StringLibModule extends ColumnarTableLibModule {
 
     object intern extends Op1SS("intern", _.intern)
 
-    object readBoolean extends Op1F1(StringNamespace, "readBoolean") {
+    object readBoolean extends Op1F1 {
       val tpe = UnaryOperationType(JTextT, JBooleanT)
-      def f1: F1 = CF1P("builtin::str::readBoolean") {
+      def f1: F1 = CF1P {
         case c: StrColumn =>
           new BoolFrom.S(c, s => s == "true" || s == "false", _.toBoolean)
       }
     }
 
-    object readInteger extends Op1F1(StringNamespace, "readInteger") {
+    object readInteger extends Op1F1 {
       val tpe = UnaryOperationType(JTextT, JNumberT)
-      def f1: F1 = CF1P("builtin::str::readInteger") {
+      def f1: F1 = CF1P {
         case c: StrColumn =>
           new LongFrom.S(c, s => try { s.toLong; true } catch { case _: Exception => false }, _.toLong)
       }
     }
 
-    object readDecimal extends Op1F1(StringNamespace, "readDecimal") {
+    object readDecimal extends Op1F1 {
       val tpe = UnaryOperationType(JTextT, JNumberT)
-      def f1: F1 = CF1P("builtin::str::readDecimal") {
+      def f1: F1 = CF1P {
         case c: StrColumn =>
           new NumFrom.S(c, s => try { BigDecimal(s); true } catch { case _: Exception => false }, BigDecimal(_))
       }
     }
 
-    object readNull extends Op1F1(StringNamespace, "readNull") {
+    object readNull extends Op1F1 {
       val tpe = UnaryOperationType(JTextT, JNullT)
-      def f1: F1 = CF1P("builtin::str::readNull") {
+      def f1: F1 = CF1P {
         case c: StrColumn =>
           new NullColumn {
             def isDefinedAt(row: Int) = c.isDefinedAt(row) && c(row) == "null"
@@ -125,9 +123,9 @@ trait StringLibModule extends ColumnarTableLibModule {
       }
     }
 
-    object convertToString extends Op1F1(StringNamespace, "toString") {
+    object convertToString extends Op1F1 {
       val tpe = UnaryOperationType(JType.JPrimitiveUnfixedT, JTextT)
-      def f1: F1 = CF1P("builtin::str::toString") {
+      def f1: F1 = CF1P {
         case c: BoolColumn =>
           new StrColumn {
             def apply(row: Int) = c(row).toString
@@ -161,30 +159,30 @@ trait StringLibModule extends ColumnarTableLibModule {
       }
     }
 
-    object isEmpty extends Op1F1(StringNamespace, "isEmpty") {
+    object isEmpty extends Op1F1 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(JTextT, JBooleanT)
-      def f1: F1 = CF1P("builtin::str::isEmpty") {
+      def f1: F1 = CF1P {
         case c: StrColumn  => new BoolFrom.S(c, _ != null, _.isEmpty)
       }
     }
 
     def neitherNull(x: String, y: String) = x != null && y != null
 
-    object length extends Op1F1(StringNamespace, "length") {
+    object length extends Op1F1 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(JTextT, JNumberT)
       private def build(c: StrColumn) = new LongFrom.S(c, _ != null, _.length)
-      def f1: F1 = CF1P("builtin::str::length") {
+      def f1: F1 = CF1P {
         case c: StrColumn => build(c)
       }
     }
 
-    class Op2SSB(name: String, f: (String, String) => Boolean) extends Op2F2(StringNamespace, name) {
+    class Op2SSB(name: String, f: (String, String) => Boolean) extends Op2F2 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JTextT, JBooleanT)
       private def build(c1: StrColumn, c2: StrColumn) = new BoolFrom.SS(c1, c2, neitherNull, f)
-      def f2: F2 = CF2P("builtin::str::op2ss" + name) {
+      def f2: F2 = CF2P {
         case (c1: StrColumn, c2: StrColumn) => build(c1, c2)
       }
     }
@@ -201,7 +199,7 @@ trait StringLibModule extends ColumnarTableLibModule {
     object matches extends Op2SSB("matches", _ matches _)
 
     // like matches, except for quasar, and hilariously less efficient
-    lazy val searchDynamic: CFN = CFNP("builtin::str::searchDynamic") {
+    lazy val searchDynamic: CFN = CFNP {
       case List(target: StrColumn, pattern: StrColumn, flag: BoolColumn) =>
         new BoolColumn {
           def apply(row: Int) = {
@@ -233,7 +231,7 @@ trait StringLibModule extends ColumnarTableLibModule {
 
     // starting to follow a different pattern  since we don't do evaluator lookups anymore
     // note that this different pattern means we can't test in StringLibSpecs
-    lazy val substring = CFNP("builtin::str::substring") {
+    lazy val substring = CFNP {
       case List(s: StrColumn, f: LongColumn, c: LongColumn) =>
         new StrColumn {
           def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
@@ -289,12 +287,12 @@ trait StringLibModule extends ColumnarTableLibModule {
         }
     }
 
-    object regexMatch extends Op2(StringNamespace, "regexMatch") with Op2Array {
+    object regexMatch extends Op2 with Op2Array {
 
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JTextT, JArrayHomogeneousT(JTextT))
 
-      lazy val prepare = CF1("id")(Some(_))
+      lazy val prepare = CF1(Some(_))
 
       val mapper = CF2Array[String]("std::string::regexMatch") {
         case (target: StrColumn, regex: StrColumn, range) => {
@@ -334,19 +332,19 @@ trait StringLibModule extends ColumnarTableLibModule {
       }
     }
 
-    object concat extends Op2F2(StringNamespace, "concat") {
+    object concat extends Op2F2 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JTextT, JTextT)
-      def f2: F2 = CF2P("builtin::str::concat") {
+      def f2: F2 = CF2P {
         case (c1: StrColumn, c2: StrColumn) =>
           new StrFrom.SS(c1, c2, neitherNull, _ concat _)
       }
     }
 
-    class Op2SLL(name: String, defined: (String, Long) => Boolean, f: (String, Long) => Long) extends Op2F2(StringNamespace, name) {
+    class Op2SLL(name: String, defined: (String, Long) => Boolean, f: (String, Long) => Long) extends Op2F2 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JNumberT, JNumberT)
-      def f2: F2 = CF2P("builtin::str::op2sll::" + name) {
+      def f2: F2 = CF2P {
         case (c1: StrColumn, c2: DoubleColumn) =>
           new LongFrom.SD(c1, c2, (s, n) => (n % 1 == 0) && defined(s, n.toLong), (s, n) => f(s, n.toLong))
 
@@ -362,10 +360,10 @@ trait StringLibModule extends ColumnarTableLibModule {
 
     object codePointBefore extends Op2SLL("codePointBefore", (s, n) => n >= 0 && s.length > n, (s, n) => s.codePointBefore(n.toInt))
 
-    class Substring(name: String)(f: (String, Int) => String) extends Op2F2(StringNamespace, name) {
+    class Substring(name: String)(f: (String, Int) => String) extends Op2F2 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JNumberT, JTextT)
-      def f2: F2 = CF2P("builtin::str::substring::" + name) {
+      def f2: F2 = CF2P {
         case (c1: StrColumn, c2: LongColumn) =>
           new StrFrom.SL(c1, c2, (s, n) => n >= 0, { (s, n) =>
             f(s, n.toInt)
@@ -401,10 +399,10 @@ trait StringLibModule extends ColumnarTableLibModule {
           s.substring(0, math.max(0, s.length - n))
         })
 
-    class Op2SSL(name: String, f: (String, String) => Long) extends Op2F2(StringNamespace, name) {
+    class Op2SSL(name: String, f: (String, String) => Long) extends Op2F2 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JTextT, JNumberT)
-      def f2: F2 = CF2P("builtin::str::op2ssl::" + name) {
+      def f2: F2 = CF2P {
         case (c1: StrColumn, c2: StrColumn) =>
           new LongFrom.SS(c1, c2, neitherNull, f)
       }
@@ -418,7 +416,7 @@ trait StringLibModule extends ColumnarTableLibModule {
 
     object lastIndexOf extends Op2SSL("lastIndexOf", _ lastIndexOf _)
 
-    object parseNum extends Op1F1(StringNamespace, "parseNum") {
+    object parseNum extends Op1F1 {
       val intPattern = Pattern.compile("^-?(?:0|[1-9][0-9]*)$")
       val decPattern = Pattern.compile("^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][-+]?[0-9]+)?$")
 
@@ -437,14 +435,14 @@ trait StringLibModule extends ColumnarTableLibModule {
         def apply(row: Int) = BigDecimal(c(row))
       }
 
-      def f1: F1 = CF1P("builtin::str::parseNum") {
+      def f1: F1 = CF1P {
         case c: StrColumn => build(c)
       }
     }
 
-    object numToString extends Op1F1(StringNamespace, "numToString") {
+    object numToString extends Op1F1 {
       val tpe = UnaryOperationType(JNumberT, JTextT)
-      def f1: F1 = CF1P("builtin::str::numToString") {
+      def f1: F1 = CF1P {
         case c: LongColumn => new StrFrom.L(c, _ => true, _.toString)
         case c: DoubleColumn => {
           new StrFrom.D(c, _ => true, { d =>
@@ -459,20 +457,20 @@ trait StringLibModule extends ColumnarTableLibModule {
       }
     }
 
-    object split extends Op2(StringNamespace, "split") with Op2Array {
+    object split extends Op2 with Op2Array {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JTextT, JArrayHomogeneousT(JTextT))
 
-      lazy val prepare = CF1("id")(Some(_))
+      lazy val prepare = CF1(Some(_))
 
       lazy val mapper = splitMapper(true)
     }
 
-    object splitRegex extends Op2(StringNamespace, "splitRegex") with Op2Array {
+    object splitRegex extends Op2 with Op2Array {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JTextT, JArrayHomogeneousT(JTextT))
 
-      lazy val prepare = CF1("id")(Some(_))
+      lazy val prepare = CF1(Some(_))
 
       lazy val mapper = splitMapper(false)
     }
