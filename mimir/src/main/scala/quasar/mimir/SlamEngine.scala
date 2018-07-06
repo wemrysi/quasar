@@ -24,7 +24,6 @@ import quasar.common._
 import quasar.connector._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
-import quasar.contrib.scalaz.concurrent.task._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.numeric._
@@ -47,6 +46,8 @@ import fs2.{async, Stream}
 import fs2.async.mutable.{Queue, Signal}
 
 import iotaz.CopK
+
+import io.chrisdavenport.scalaz.task._
 
 import matryoshka._
 import matryoshka.implicits._

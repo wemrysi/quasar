@@ -38,7 +38,7 @@ import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 import cats.syntax.functor._
 import eu.timepit.refined.auto._
-import fs2.Stream
+import fs2.{Scheduler, Stream}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
 import scalaz.{\/, IMap, Show}
@@ -110,9 +110,11 @@ final class DataSourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
   def withInitialMgmt[A](configured: IMap[ResourceName, DataSourceConfig[Json]])(f: (Mgmt, IO[Running]) => IO[A]): A =
     (for {
-      t <- DataSourceManagement[Fix, IO, IO](modules, configured)
+      s <- Scheduler.allocate[IO](1)
+      t <- DataSourceManagement[Fix, IO, IO](modules, configured, global, s._1)
       (mgmt, run) = t
       a <- f(mgmt, run.get)
+      _ <- s._2
     } yield a).unsafeRunSync()
 
   def withMgmt[A](f: (Mgmt, IO[Running]) => IO[A]): A =

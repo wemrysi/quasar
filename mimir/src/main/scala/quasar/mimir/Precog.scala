@@ -95,7 +95,7 @@ object Precog extends Logging {
 
   def apply(dataDir: File): IO[Disposable[IO, Precog]] =
     for {
-      vfsd <- SerialVFS[IO](dataDir)
+      vfsd <- SerialVFS[IO](dataDir, global)
 
       sysd <- IO {
         val sys = ActorSystem(

@@ -31,6 +31,7 @@ import java.nio.file.{Files, Path => JPath}
 import java.text.ParseException
 
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import cats.effect.{Effect, Sync, Timer}
@@ -52,8 +53,11 @@ import shims._
   */
 final class LocalDataSource[F[_]: Sync, G[_]: Effect: Timer] private (
     root: JPath,
-    readChunkSizeBytes: Int)
+    readChunkSizeBytes: Int,
+    pool: ExecutionContext)
     extends LightweightDataSource[F, Stream[G, ?], Stream[G, Data]] {
+
+  implicit val ec: ExecutionContext = pool
 
   val kind: DataSourceType = LocalType
 
@@ -157,7 +161,8 @@ final class LocalDataSource[F[_]: Sync, G[_]: Effect: Timer] private (
 object LocalDataSource {
   def apply[F[_]: Sync, G[_]: Effect: Timer](
       root: JPath,
-      readChunkSizeBytes: Int)
+      readChunkSizeBytes: Int,
+      pool: ExecutionContext)
       : DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]] =
-    new LocalDataSource[F, G](root, readChunkSizeBytes)
+    new LocalDataSource[F, G](root, readChunkSizeBytes, pool)
 }
