@@ -34,6 +34,7 @@ import iotaz.CopK
 /** A `QueryEvaluator` capable of executing queries against multiple sources. */
 final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, G[_]: ApplicativePlus, S, R] private (
     queryFederation: QueryFederation[T, F, S, R],
+    // TODO: AFile => Option[S]
     sources: F[IMap[ResourceName, (ResourceDiscovery[F, G], S)]])
     extends QueryEvaluator[F, G, T[QScriptEducated[T, ?]], R] {
 

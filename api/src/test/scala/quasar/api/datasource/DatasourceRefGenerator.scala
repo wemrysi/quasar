@@ -18,14 +18,16 @@ package quasar.api.datasource
 
 import org.scalacheck._, Arbitrary.arbitrary
 
-trait DatasourceConfigGenerator {
+trait DatasourceRefGenerator {
+  import DatasourceNameGenerator._
   import DatasourceTypeGenerator._
 
-  implicit def datasourceConfigArbitrary[C: Arbitrary]: Arbitrary[DatasourceConfig[C]] =
+  implicit def datasourceRefArbitrary[C: Arbitrary]: Arbitrary[DatasourceRef[C]] =
     Arbitrary(for {
       tpe <- arbitrary[DatasourceType]
+      n   <- arbitrary[DatasourceName]
       c   <- arbitrary[C]
-    } yield DatasourceConfig(tpe, c))
+    } yield DatasourceRef(tpe, n, c))
 }
 
-object DatasourceConfigGenerator extends DatasourceConfigGenerator
+object DatasourceRefGenerator extends DatasourceRefGenerator

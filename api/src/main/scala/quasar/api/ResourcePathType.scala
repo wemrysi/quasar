@@ -16,24 +16,45 @@
 
 package quasar.api
 
-import slamdata.Predef.{Int, Product, Serializable, Some}
+import slamdata.Predef.{Boolean, Int, Product, Serializable, Some}
 
 import scalaz.{Enum, Show}
 import scalaz.std.anyVal._
 import scalaz.syntax.order._
 
-/** Describes what a `ResourcePath` refers to. */
-sealed trait ResourcePathType extends Product with Serializable
+/** The sorts of paths within a Datasource. */
+sealed trait ResourcePathType extends Product with Serializable {
+  def isPrefix: Boolean =
+    this match {
+      case ResourcePathType.Prefix => true
+      case ResourcePathType.PrefixResource => true
+      case ResourcePathType.LeafResource => false
+    }
+
+  def isResource: Boolean =
+    this match {
+      case ResourcePathType.Prefix => false
+      case ResourcePathType.PrefixResource => true
+      case ResourcePathType.LeafResource => true
+    }
+}
 
 object ResourcePathType extends ResourcePathTypeInstances {
-  case object Resource extends ResourcePathType
-  case object ResourcePrefix extends ResourcePathType
+  /** The path does not refer to a resource, but is a prefix of one or more paths. */
+  case object Prefix extends ResourcePathType
+  /** The path refers to a resource and is a prefix of one or more paths. */
+  case object PrefixResource extends ResourcePathType
+  /** The path refers to a resource and is not a prefix of any other paths. */
+  case object LeafResource extends ResourcePathType
 
-  val resource: ResourcePathType =
-    Resource
+  val leafResource: ResourcePathType =
+    LeafResource
 
-  val resourcePrefix: ResourcePathType =
-    ResourcePrefix
+  val prefixResource: ResourcePathType =
+    PrefixResource
+
+  val prefix: ResourcePathType =
+    Prefix
 }
 
 sealed abstract class ResourcePathTypeInstances {
@@ -44,24 +65,27 @@ sealed abstract class ResourcePathTypeInstances {
 
       def pred(t: ResourcePathType) =
         t match {
-          case ResourcePathType.Resource => ResourcePathType.ResourcePrefix
-          case ResourcePathType.ResourcePrefix  => ResourcePathType.Resource
+          case ResourcePathType.Prefix => ResourcePathType.LeafResource
+          case ResourcePathType.PrefixResource => ResourcePathType.Prefix
+          case ResourcePathType.LeafResource => ResourcePathType.PrefixResource
         }
 
       def succ(t: ResourcePathType) =
         t match {
-          case ResourcePathType.Resource => ResourcePathType.ResourcePrefix
-          case ResourcePathType.ResourcePrefix  => ResourcePathType.Resource
+          case ResourcePathType.Prefix => ResourcePathType.PrefixResource
+          case ResourcePathType.PrefixResource => ResourcePathType.LeafResource
+          case ResourcePathType.LeafResource => ResourcePathType.Prefix
         }
 
-      override val min = Some(ResourcePathType.ResourcePrefix)
+      override val min = Some(ResourcePathType.Prefix)
 
-      override val max = Some(ResourcePathType.Resource)
+      override val max = Some(ResourcePathType.LeafResource)
 
       private def toInt(t: ResourcePathType): Int =
         t match {
-          case ResourcePathType.ResourcePrefix => 0
-          case ResourcePathType.Resource => 1
+          case ResourcePathType.Prefix => 0
+          case ResourcePathType.PrefixResource => 1
+          case ResourcePathType.LeafResource => 2
         }
     }
 

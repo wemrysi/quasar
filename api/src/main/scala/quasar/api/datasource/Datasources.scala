@@ -16,52 +16,58 @@
 
 package quasar.api.datasource
 
+import slamdata.Predef.{Boolean, Exception}
 import quasar.Condition
-import quasar.api.ResourceName
+import quasar.api.{ResourceName, ResourcePath, ResourcePathType}
 
-import scalaz.{\/, IMap, ISet}
+import scalaz.{\/, ISet}
 
-trait Datasources[F[_], C] {
+/** @tparam F effects
+  * @tparam G multple results
+  * @tparam I identity
+  * @tparam C configuration
+  */
+trait Datasources[F[_], G[_], I, C] {
   import DatasourceError._
 
-  /** Returns the result of attempting to add a new datasource to the
-    * set of datasources, `Unit` indicates the operation was successful.
-    *
-    * @name an identifier to assign to the datasource, must not exist unless `onConflict` is `Replace`
-    * @kind uniquely identifies the type of datasource
-    * @config configuration information, the specifics of which are determined by `kind`
-    * @onConflict an enumeration describing how to resolve name conflicts
+  /** Adds the datasource described by the given `DatasourceRef` to the
+    * set of datasources, returning its identifier or an error if it could
+    * not be added.
     */
-  def add(
-      name: ResourceName,
-      kind: DatasourceType,
-      config: C,
-      onConflict: ConflictResolution)
-      : F[Condition[CreateError[C]]]
-
-  /** Returns the metadata and configuration for the specified datasource,
-    * or an error if it doesn't exist.
-    */
-  def lookup(name: ResourceName): F[CommonError \/ (DatasourceMetadata, C)]
+  def addDatasource(ref: DatasourceRef[C]): F[CreateError[C] \/ I]
 
   /** Metadata for all datasources. */
-  def metadata: F[IMap[ResourceName, DatasourceMetadata]]
+  def allDatasourceMetadata: F[G[(I, DatasourceMeta)]]
 
-  /** Removes the specified datasource, making its data unavailable.
-    *
-    * An error is returned if no datasource exists having the specified name.
+  /** Returns the reference to the specified datasource, or an error if
+    * it doesn't exist.
     */
-  def remove(name: ResourceName): F[Condition[CommonError]]
+  def datasourceRef(datasourceId: I): F[ExistentialError[I] \/ DatasourceRef[C]]
 
-  /** Rename `src` to `dst`, handling conflicts at `dst` according to
-    * `onConflict`. An error is returned if `src` does not exist.
+  /** Returns the status of the specified datasource or an error if it doesn't
+    * exist.
     */
-  def rename(
-      src: ResourceName,
-      dst: ResourceName,
-      onConflict: ConflictResolution)
-      : F[Condition[ExistentialError]]
+  def datasourceStatus(datasourceId: I): F[ExistentialError[I] \/ Condition[Exception]]
 
-  /** The set of supported datasources. */
-  def supported: F[ISet[DatasourceType]]
+  /** Returns whether or not the specified path refers to a resource in the
+    * specified datasource.
+    */
+  def pathIsResource(datasourceId: I, path: ResourcePath)
+      : F[ExistentialError[I] \/ Boolean]
+
+  /** Returns the name and type of the `ResourcePath`s within the specified
+    * Datasource implied by concatenating each name to `prefixPath`.
+    */
+  def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
+      : F[DiscoveryError[I] \/ G[(ResourceName, ResourcePathType)]]
+
+  /** Replaces the reference to the specified datasource. */
+  def replaceDatasource(datasourceId: I, ref: DatasourceRef[C])
+      : F[Condition[DatasourceError[I, C]]]
+
+  /** Removes the specified datasource, making its resources unavailable. */
+  def removeDatasource(datasourceId: I): F[Condition[ExistentialError[I]]]
+
+  /** The set of supported datasource types. */
+  def supportedDatasourceTypes: F[ISet[DatasourceType]]
 }
