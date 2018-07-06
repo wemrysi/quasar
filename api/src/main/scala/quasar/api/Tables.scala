@@ -25,26 +25,21 @@ import scalaz.{\/, NonEmptyList}
   * @tparam S table schema
   */
 trait Tables[F[_], G[_], I, D, S] {
+  import TableError.{CreationError, ExistenceError, ModificationError, PreparationError}
+
   def allTables: F[G[(I, Table)]]
 
-  // errors: unparsable query, resource(s) not found, name conflict
-  def createTable(table: Table): F[TableError \/ I]
+  def createTable(table: Table): F[CreationError \/ I]
 
-  // errors: table not found
-  def table(tableId: I): F[TableError \/ Table]
+  def table(tableId: I): F[ExistenceError[I] \/ Table]
 
-  // errors: table not found, conflicting preparation state, unparsable query, resource(s) not found, name conflict
-  def setTableAttributes(tableId: I, attributes: NonEmptyList[TableAttribute]): F[Condition[TableError]]
+  def setTableAttributes(tableId: I, attributes: NonEmptyList[TableAttribute]): F[Condition[ModificationError[I]]]
 
-  // errors: table not found, preparation in progress
-  def prepareTable(tableId: I): F[Condition[TableError]]
+  def prepareTable(tableId: I): F[Condition[PreparationError[I]]]
 
-  // errors: table not found
-  def preparationStatus(tableId: I): F[TableError \/ PreparationStatus]
+  def preparationStatus(tableId: I): F[ExistenceError[I] \/ PreparationStatus]
 
-  // errors: table not found
-  def preparedData(tableId: I): F[TableError \/ PreparationResult[D]]
+  def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[D]]
 
-  // errors: table not found
-  def preparedSchema(tableId: I): F[TableError \/ PreparationResult[S]]
+  def preparedSchema(tableId: I): F[ExistenceError[I] \/ PreparationResult[S]]
 }
