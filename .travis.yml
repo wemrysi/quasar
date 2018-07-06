@@ -169,6 +169,7 @@ cache:
     - $HOME/.coursier/cache
     - $HOME/.ivy2/cache
     - $HOME/.sbt
+    - '.hoarder-cache'
 
 before_cache:
   - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
