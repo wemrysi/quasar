@@ -16,9 +16,8 @@
 
 package quasar.api
 
-import slamdata.Predef.{Product, Serializable}
-
 import java.time.OffsetDateTime
+import slamdata.Predef.{Product, Serializable}
 
 sealed trait PreparationResult[A] extends Product with Serializable
 

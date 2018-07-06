@@ -17,7 +17,6 @@
 package quasar.api
 
 import quasar.Condition
-
 import scalaz.{\/, NonEmptyList}
 
 /** @tparam I identity

@@ -16,8 +16,9 @@
 
 package quasar.api
 
-import slamdata.Predef.{Product, Serializable}
+import java.lang.Throwable
 import java.time.{Duration, OffsetDateTime}
+import slamdata.Predef.{Product, Serializable}
 
 sealed trait PreparationStatus extends Product with Serializable
 
@@ -38,6 +39,6 @@ object PreparationStatus {
   final case class Prepared(startedAt: OffsetDateTime, duration: Duration, size: PreparationSize)
       extends Accessible with Finished
 
-  final case class Errored(startedAt: OffsetDateTime, duration: Duration, error: PreparationError)
+  final case class Errored(startedAt: OffsetDateTime, duration: Duration, error: Throwable)
       extends Inaccessible with Finished
 }
