@@ -16,7 +16,4 @@
 
 package quasar.api
 
-final case class Table(
-  name: TableAttribute.Name,
-  sql2: TableAttribute.Sql2,
-  blackBox: TableAttribute.BlackBox)
+final case class Table(name: TableAttribute.Name, sql2: TableAttribute.Sql2)
