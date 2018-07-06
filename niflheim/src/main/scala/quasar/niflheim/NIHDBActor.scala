@@ -76,10 +76,8 @@ object NIHDB {
   final def create(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Validation[Error, NIHDB]] =
     NIHDBActor.create(chef, baseDir, cookThreshold, timeout, txLogScheduler) map { _ map { actor => new NIHDBImpl(actor, timeout) } }
 
-  final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem) =
+  final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Option[Validation[Error, NIHDB]]] =
     NIHDBActor.open(chef, baseDir, cookThreshold, timeout, txLogScheduler) map { _ map { _ map { actor => new NIHDBImpl(actor, timeout) } } }
-
-  final def hasProjection(dir: File) = NIHDBActor.hasProjection(dir)
 }
 
 trait NIHDB {
@@ -171,9 +169,6 @@ private[niflheim] object NIHDBActor extends Logging {
   final val rawSubdir = "raw_blocks"
   final val lockName = "NIHDBProjection"
 
-  private[niflheim] final val internalDirs =
-    Set(cookedSubdir, rawSubdir, descriptorFilename, CookStateLog.logName + "_1.log", CookStateLog.logName + "_2.log",  lockName + ".lock", CookStateLog.lockName + ".lock")
-
   final def create(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Validation[Error, ActorRef]] = {
     val descriptorFile = new File(baseDir, descriptorFilename)
     val currentState: IO[Validation[Error, ProjectionState]] =
@@ -207,8 +202,6 @@ private[niflheim] object NIHDBActor extends Logging {
 
     currentState map { _ map { _ map { s => actorSystem.actorOf(Props(new NIHDBActor(s, baseDir, chef, cookThreshold, txLogScheduler))) } } }
   }
-
-  final def hasProjection(dir: File) = (new File(dir, descriptorFilename)).exists
 
   private case class BlockState(cooked: List[CookedReader], pending: Map[Long, StorageReader], rawLog: RawHandler)
   private class State(val txLog: CookStateLog, var blockState: BlockState, var currentBlocks: SortedMap[Long, StorageReader])
