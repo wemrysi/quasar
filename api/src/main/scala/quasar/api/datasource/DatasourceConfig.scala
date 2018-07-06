@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasources
-
-import quasar.api.datasource.DatasourceType
+package quasar.api.datasource
 
 import monocle.PLens
 import monocle.macros.Lenses

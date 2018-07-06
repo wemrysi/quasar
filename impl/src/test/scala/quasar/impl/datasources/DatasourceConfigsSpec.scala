@@ -19,6 +19,7 @@ package quasar.impl.datasources
 import slamdata.Predef._
 import quasar.Qspec
 import quasar.api.{ResourceName, ResourceNameGenerator}
+import quasar.api.datasource.{DatasourceConfig, DatasourceConfigGenerator}
 
 import org.scalacheck.Arbitrary
 import org.specs2.scalacheck._

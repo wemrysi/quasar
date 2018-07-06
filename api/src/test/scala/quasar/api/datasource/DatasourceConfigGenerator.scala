@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasources
-
-import quasar.api.datasource.{DatasourceType, DatasourceTypeGenerator}
+package quasar.api.datasource
 
 import org.scalacheck._, Arbitrary.arbitrary
 

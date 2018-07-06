@@ -18,7 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef.{Boolean, Option, Unit}
 import quasar.api.ResourceName
-import quasar.api.datasource.DatasourceType
+import quasar.api.datasource.{DatasourceConfig, DatasourceType}
 import quasar.higher.HFunctor
 
 import scalaz.{~>, Functor, IMap, InvariantFunctor}

@@ -19,7 +19,7 @@ package quasar.impl.datasources
 import slamdata.Predef.{Exception, None, Option, Some, Unit}
 import quasar.{Condition, Data, RenderTreeT}
 import quasar.api.{ResourceName, ResourcePath}
-import quasar.api.datasource.DatasourceType
+import quasar.api.datasource.{DatasourceConfig, DatasourceType}
 import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported}
 import quasar.connector.Datasource
 import quasar.contrib.scalaz.MonadError_

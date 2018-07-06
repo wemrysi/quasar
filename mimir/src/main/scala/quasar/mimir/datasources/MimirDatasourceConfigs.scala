@@ -19,13 +19,13 @@ package quasar.mimir.datasources
 import slamdata.Predef.{Boolean, Map, Option, Unit}
 
 import quasar.api.ResourceName
-import quasar.api.datasource.DatasourceType
+import quasar.api.datasource.{DatasourceConfig, DatasourceType}
 import quasar.blueeyes.json.JValue
 import quasar.contrib.fs2.convert
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.numeric.Positive
-import quasar.impl.datasources.{DatasourceConfig, DatasourceConfigs}
+import quasar.impl.datasources.DatasourceConfigs
 import quasar.mimir.MimirCake.Cake
 import quasar.mimir.slicesToStream
 import quasar.precog.common.{CUndefined, Path => PrecogPath, _}

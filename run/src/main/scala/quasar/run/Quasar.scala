@@ -18,7 +18,7 @@ package quasar.run
 
 import quasar.Data
 import quasar.api.{QueryEvaluator, ResourceDiscovery, ResourceName}
-import quasar.api.datasource.Datasources
+import quasar.api.datasource.{DatasourceConfig, Datasources}
 import quasar.common.PhaseResultTell
 import quasar.contrib.fs2.stream._
 import quasar.contrib.pathy.AFile
@@ -26,7 +26,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.evaluate.FederatingQueryEvaluator
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.local.LocalDatasourceModule
-import quasar.impl.datasources.{DatasourceConfig, DatasourceManagement, DefaultDatasources}
+import quasar.impl.datasources.{DatasourceManagement, DefaultDatasources}
 import quasar.impl.external.{ExternalConfig, ExternalDatasources}
 import quasar.mimir.Precog
 import quasar.mimir.datasources.MimirDatasourceConfigs
