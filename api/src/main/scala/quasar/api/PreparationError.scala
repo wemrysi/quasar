@@ -16,10 +16,11 @@
 
 package quasar.api
 
-import slamdata.Predef.{Product, Serializable, String}
+import java.lang.Throwable
+import slamdata.Predef.{Product, Serializable}
 
 sealed trait PreparationError extends Product with Serializable
 
 object PrepartionError {
-  final case class Failure(reason: String) extends PreparationError
+  final case class Failure(error: Throwable) extends PreparationError
 }
