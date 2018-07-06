@@ -30,8 +30,8 @@ object TableError {
   sealed trait ExistenceError[I] extends TableError
   final case class TableNotFound[I](tableId: I) extends ExistenceError[I]
 
-  sealed trait PreparationError[I] extends ExistenceError[I]
-  final case class PreparationInProgress[I](tableId: I) extends PreparationError[I]
+  sealed trait PrePreparationError[I] extends ExistenceError[I]
+  final case class PreparationInProgress[I](tableId: I) extends PrePreparationError[I]
 
   sealed trait ModificationError[I] extends ExistenceError[I] with CreationError
   final case class ConflictingPreparationState[I](tableId: I) extends ModificationError[I]

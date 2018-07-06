@@ -25,7 +25,7 @@ import scalaz.{\/, NonEmptyList}
   * @tparam S table schema
   */
 trait Tables[F[_], G[_], I, D, S] {
-  import TableError.{CreationError, ExistenceError, ModificationError, PreparationError}
+  import TableError.{CreationError, ExistenceError, ModificationError, PrePreparationError}
 
   def allTables: F[G[(I, Table)]]
 
@@ -35,7 +35,7 @@ trait Tables[F[_], G[_], I, D, S] {
 
   def setTableAttributes(tableId: I, attributes: NonEmptyList[TableAttribute]): F[Condition[ModificationError[I]]]
 
-  def prepareTable(tableId: I): F[Condition[PreparationError[I]]]
+  def prepareTable(tableId: I): F[Condition[PrePreparationError[I]]]
 
   def preparationStatus(tableId: I): F[ExistenceError[I] \/ PreparationStatus]
 
