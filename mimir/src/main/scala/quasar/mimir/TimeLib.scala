@@ -36,54 +36,6 @@ import java.time.format.DateTimeParseException
 trait TimeLibModule extends ColumnarTableLibModule {
   trait TimeLib extends ColumnarTableLib {
 
-    override def _lib1 = super._lib1 ++ Set(
-      OffsetDate,
-      OffsetDateTime,
-      OffsetTime,
-      LocalDate,
-      LocalDateTime,
-      LocalTime,
-      Interval,
-
-      ExtractCentury,
-      ExtractDayOfMonth,
-      ExtractDecade,
-      ExtractDayOfWeek,
-      ExtractDayOfYear,
-      ExtractHour,
-      ExtractIsoDayOfWeek,
-      ExtractIsoYear,
-      ExtractMicrosecond,
-      ExtractMillennium,
-      ExtractMillisecond,
-      ExtractMinute,
-      ExtractMonth,
-      ExtractQuarter,
-      ExtractSecond,
-      ExtractTimeZone,
-      ExtractTimeZoneMinute,
-      ExtractTimeZoneHour,
-      ExtractWeek,
-      ExtractYear,
-
-      ExtractEpoch,
-
-      TruncCentury,
-      TruncDay,
-      TruncDecade,
-      TruncHour,
-      TruncMicrosecond,
-      TruncMillennium,
-      TruncMillisecond,
-      TruncMinute,
-      TruncMonth,
-      TruncQuarter,
-      TruncSecond,
-      TruncWeek,
-      TruncYear)
-
-    override def _lib2 = super._lib2
-
     val ExtractEpoch = new Op1F1 {
       val tpe = UnaryOperationType(JOffsetDateTimeT, JNumberT)
       def f1: F1 = CF1P {
@@ -94,7 +46,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
       }
     }
 
-    final class DateLongExtractor(name: String, extract: JLocalDate => Long) extends Op1F1 {
+    final class DateLongExtractor(extract: JLocalDate => Long) extends Op1F1 {
       val tpe = UnaryOperationType(JType.JDateT, JNumberT)
       def f1: F1 = CF1P {
         case AsDateColumn(c) =>
@@ -104,7 +56,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
       }
     }
 
-    final class TimeLongExtractor(name: String, extract: JLocalTime => Long) extends Op1F1 {
+    final class TimeLongExtractor(extract: JLocalTime => Long) extends Op1F1 {
       val tpe = UnaryOperationType(JType.JTimeT, JNumberT)
       def f1: F1 = CF1P {
         case AsTimeColumn(c) =>
@@ -114,7 +66,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
       }
     }
 
-    final class OffsetIntExtractor(name: String, extract: ZoneOffset => Int) extends Op1F1 {
+    final class OffsetIntExtractor(extract: ZoneOffset => Int) extends Op1F1 {
       val tpe = UnaryOperationType(JType.JOffsetT, JNumberT)
       def f1: F1 = CF1P {
         case c: OffsetDateTimeColumn =>
@@ -132,7 +84,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
       }
     }
 
-    final class OffsetIntSetter(name: String, create: Int => ZoneOffset, set: (Int, ZoneOffset) => ZoneOffset) extends Op2F2 {
+    final class OffsetIntSetter(create: Int => ZoneOffset, set: (Int, ZoneOffset) => ZoneOffset) extends Op2F2 {
       val tpe = BinaryOperationType(JNumberT, JType.JOffsetT, JType.JOffsetT)
       def f2: F2 = CF2P {
         case (n: LongColumn, c: OffsetDateTimeColumn) =>
@@ -171,23 +123,23 @@ trait TimeLibModule extends ColumnarTableLibModule {
       }
     }
 
-    val ExtractCentury = new DateLongExtractor("Century", time.extractCentury)
-    val ExtractDayOfMonth = new DateLongExtractor("DayOfMonth", time.extractDayOfMonth)
-    val ExtractDecade = new DateLongExtractor("Decade", time.extractDecade)
-    val ExtractDayOfWeek = new DateLongExtractor("DayOfWeek", time.extractDayOfWeek)
-    val ExtractDayOfYear = new DateLongExtractor("DayOfYear", time.extractDayOfYear)
-    val ExtractIsoDayOfWeek = new DateLongExtractor("IsoDayOfWeek", time.extractIsoDayOfWeek)
-    val ExtractIsoYear = new DateLongExtractor("IsoYear", time.extractIsoYear)
-    val ExtractMillennium = new DateLongExtractor("Millennium", time.extractMillennium)
-    val ExtractMonth = new DateLongExtractor("Month", time.extractMonth)
-    val ExtractQuarter = new DateLongExtractor("Quarter", time.extractQuarter)
-    val ExtractWeek = new DateLongExtractor("Week", time.extractWeek)
-    val ExtractYear = new DateLongExtractor("Year", time.extractYear)
+    val ExtractCentury = new DateLongExtractor(time.extractCentury)
+    val ExtractDayOfMonth = new DateLongExtractor(time.extractDayOfMonth)
+    val ExtractDecade = new DateLongExtractor(time.extractDecade)
+    val ExtractDayOfWeek = new DateLongExtractor(time.extractDayOfWeek)
+    val ExtractDayOfYear = new DateLongExtractor(time.extractDayOfYear)
+    val ExtractIsoDayOfWeek = new DateLongExtractor(time.extractIsoDayOfWeek)
+    val ExtractIsoYear = new DateLongExtractor(time.extractIsoYear)
+    val ExtractMillennium = new DateLongExtractor(time.extractMillennium)
+    val ExtractMonth = new DateLongExtractor(time.extractMonth)
+    val ExtractQuarter = new DateLongExtractor(time.extractQuarter)
+    val ExtractWeek = new DateLongExtractor(time.extractWeek)
+    val ExtractYear = new DateLongExtractor(time.extractYear)
 
-    val ExtractHour = new TimeLongExtractor("Hour", time.extractHour)
-    val ExtractMicrosecond = new TimeLongExtractor("Microsecond", time.extractMicrosecond)
-    val ExtractMillisecond = new TimeLongExtractor("Millisecond", time.extractMillisecond)
-    val ExtractMinute = new TimeLongExtractor("Minute", time.extractMinute)
+    val ExtractHour = new TimeLongExtractor(time.extractHour)
+    val ExtractMicrosecond = new TimeLongExtractor(time.extractMicrosecond)
+    val ExtractMillisecond = new TimeLongExtractor(time.extractMillisecond)
+    val ExtractMinute = new TimeLongExtractor(time.extractMinute)
 
     val ExtractSecond = new Op1F1 {
       val tpe = UnaryOperationType(JType.JOffsetT, JNumberT)
@@ -199,19 +151,19 @@ trait TimeLibModule extends ColumnarTableLibModule {
       }
     }
 
-    val ExtractTimeZone = new OffsetIntExtractor("TimeZone", time.extractTimeZone)
-    val ExtractTimeZoneMinute = new OffsetIntExtractor("TimeZoneMinute", time.extractTimeZoneMinute)
-    val ExtractTimeZoneHour = new OffsetIntExtractor("TimeZoneHour", time.extractTimeZoneHour)
+    val ExtractTimeZone = new OffsetIntExtractor(time.extractTimeZone)
+    val ExtractTimeZoneMinute = new OffsetIntExtractor(time.extractTimeZoneMinute)
+    val ExtractTimeZoneHour = new OffsetIntExtractor(time.extractTimeZoneHour)
 
-    val SetTimeZone = new OffsetIntSetter("TimeZone",
+    val SetTimeZone = new OffsetIntSetter(
       ZoneOffset.ofTotalSeconds,
       (i, _) => ZoneOffset.ofTotalSeconds(i))
 
-    val SetTimeZoneMinute = new OffsetIntSetter("TimeZoneMinute",
+    val SetTimeZoneMinute = new OffsetIntSetter(
       ZoneOffset.ofHoursMinutes(0, _),
       (i, zo) => time.setTimeZoneMinute(zo, i))
 
-    val SetTimeZoneHour = new OffsetIntSetter("TimeZoneHour",
+    val SetTimeZoneHour = new OffsetIntSetter(
       ZoneOffset.ofHours,
       (i, zo) => time.setTimeZoneHour(zo, i))
 
