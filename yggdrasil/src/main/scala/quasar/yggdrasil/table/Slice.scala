@@ -988,163 +988,11 @@ trait Slice { source =>
     }
   }
 
+  val RenderBufferSize = 1024 * 10 // 10 KB
+
   def renderJson(delimiter: String): (StreamT[IO, CharBuffer], Boolean) = {
-    if (columns.isEmpty) {
-      (StreamT.empty[IO, CharBuffer], false)
-    } else {
-      val BufferSize = 1024 * 10 // 10 KB
-
-      val optSchema = {
-        def insert(target: SchemaNode, ref: ColumnRef, col: Column): SchemaNode = {
-          val ColumnRef(selector, ctype) = ref
-
-          selector.nodes match {
-            case CPathField(name) :: tail => {
-              target match {
-                case SchemaNode.Obj(nodes) => {
-                  val subTarget = nodes get name getOrElse SchemaNode.Union(Set())
-                  val result    = insert(subTarget, ColumnRef(CPath(tail), ctype), col)
-                  SchemaNode.Obj(nodes + (name -> result))
-                }
-
-                case SchemaNode.Union(nodes) => {
-                  val objNode = nodes find {
-                    case _: SchemaNode.Obj => true
-                    case _                 => false
-                  }
-
-                  val subTarget = objNode getOrElse SchemaNode.Obj(Map())
-                  SchemaNode.Union(nodes - subTarget + insert(subTarget, ref, col))
-                }
-
-                case node =>
-                  SchemaNode.Union(Set(node, insert(SchemaNode.Obj(Map()), ref, col)))
-              }
-            }
-
-            case CPathIndex(idx) :: tail => {
-              target match {
-                case SchemaNode.Arr(map) => {
-                  val subTarget = map get idx getOrElse SchemaNode.Union(Set())
-                  val result    = insert(subTarget, ColumnRef(CPath(tail), ctype), col)
-                  SchemaNode.Arr(map + (idx -> result))
-                }
-
-                case SchemaNode.Union(nodes) => {
-                  val objNode = nodes find {
-                    case _: SchemaNode.Arr => true
-                    case _                 => false
-                  }
-
-                  val subTarget = objNode getOrElse SchemaNode.Arr(Map())
-                  SchemaNode.Union(nodes - subTarget + insert(subTarget, ref, col))
-                }
-
-                case node =>
-                  SchemaNode.Union(Set(node, insert(SchemaNode.Arr(Map()), ref, col)))
-              }
-            }
-
-            case CPathMeta(_) :: _ => target
-
-            case CPathArray :: _ => sys.error("todo")
-
-            case Nil => {
-              val node = SchemaNode.Leaf(ctype, col)
-
-              target match {
-                case SchemaNode.Union(nodes) => SchemaNode.Union(nodes + node)
-                case oldNode                 => SchemaNode.Union(Set(oldNode, node))
-              }
-            }
-          }
-        }
-
-        def normalize(schema: SchemaNode): Option[SchemaNode] = schema match {
-          case SchemaNode.Obj(nodes) => {
-            val nodes2 = nodes flatMap {
-              case (key, value) => normalize(value) map { key -> _ }
-            }
-
-            val back =
-              if (nodes2.isEmpty)
-                None
-              else
-                Some(SchemaNode.Obj(nodes2))
-
-            back foreach { obj =>
-              obj.keys = new Array[String](nodes2.size)
-              obj.values = new Array[SchemaNode](nodes2.size)
-            }
-
-            var i = 0
-            back foreach { obj =>
-              for ((key, value) <- nodes2) {
-                obj.keys(i) = key
-                obj.values(i) = value
-                i += 1
-              }
-            }
-
-            back
-          }
-
-          case SchemaNode.Arr(map) => {
-            val map2 = map flatMap {
-              case (idx, value) => normalize(value) map { idx -> _ }
-            }
-
-            val back =
-              if (map2.isEmpty)
-                None
-              else
-                Some(SchemaNode.Arr(map2))
-
-            back foreach { arr =>
-              arr.nodes = new Array[SchemaNode](map2.size)
-            }
-
-            var i = 0
-            back foreach { arr =>
-              val values = map2.toSeq sortBy { _._1 } map { _._2 }
-
-              for (value <- values) {
-                arr.nodes(i) = value
-                i += 1
-              }
-            }
-
-            back
-          }
-
-          case SchemaNode.Union(nodes) => {
-            val nodes2 = nodes flatMap normalize
-
-            if (nodes2.isEmpty)
-              None
-            else if (nodes2.size == 1)
-              nodes2.headOption
-            else {
-              val union = SchemaNode.Union(nodes2)
-              union.possibilities = nodes2.toArray
-              Some(union)
-            }
-          }
-
-          case lf: SchemaNode.Leaf => Some(lf)
-        }
-
-        val schema = columns.foldLeft(SchemaNode.Union(Set()): SchemaNode) {
-          case (acc, (ref, col)) => insert(acc, ref, col)
-        }
-
-        normalize(schema)
-      }
-
-      // don't remove!  @tailrec bugs if you use optSchema.map
-      if (optSchema.isDefined) {
-        val schema = optSchema.get
-
+    sliceSchema match {
+      case Some(schema) =>
         val depth = {
           def loop(schema: SchemaNode): Int = schema match {
             case obj: SchemaNode.Obj =>
@@ -1162,9 +1010,7 @@ trait Slice { source =>
           loop(schema)
         }
 
-        // we have the schema, now emit
-
-        var buffer = CharBuffer.allocate(BufferSize)
+        var buffer = CharBuffer.allocate(RenderBufferSize)
         val vector = new mutable.ArrayBuffer[CharBuffer](math.max(1, size / 10))
 
         @inline
@@ -1173,7 +1019,7 @@ trait Slice { source =>
             buffer.flip()
             vector += buffer
 
-            buffer = CharBuffer.allocate(BufferSize)
+            buffer = CharBuffer.allocate(RenderBufferSize)
           }
         }
 
@@ -1713,8 +1559,9 @@ trait Slice { source =>
         }
 
         (stream, rendered)
-      }
-      else StreamT.empty[IO, CharBuffer] -> false
+
+      case None =>
+        StreamT.empty[IO, CharBuffer] -> false
     }
   }
 
@@ -1786,6 +1633,157 @@ trait Slice { source =>
   }
 
   override def toString = (0 until size).map(toString(_).getOrElse("")).mkString("\n", "\n", "\n")
+
+  private[this] def sliceSchema: Option[SchemaNode] = {
+    if (columns.isEmpty) {
+      None
+    } else {
+      def insert(target: SchemaNode, ref: ColumnRef, col: Column): SchemaNode = {
+        val ColumnRef(selector, ctype) = ref
+
+        selector.nodes match {
+          case CPathField(name) :: tail => {
+            target match {
+              case SchemaNode.Obj(nodes) => {
+                val subTarget = nodes get name getOrElse SchemaNode.Union(Set())
+                val result    = insert(subTarget, ColumnRef(CPath(tail), ctype), col)
+                SchemaNode.Obj(nodes + (name -> result))
+              }
+
+              case SchemaNode.Union(nodes) => {
+                val objNode = nodes find {
+                  case _: SchemaNode.Obj => true
+                  case _                 => false
+                }
+
+                val subTarget = objNode getOrElse SchemaNode.Obj(Map())
+                SchemaNode.Union(nodes - subTarget + insert(subTarget, ref, col))
+              }
+
+              case node =>
+                SchemaNode.Union(Set(node, insert(SchemaNode.Obj(Map()), ref, col)))
+            }
+          }
+
+          case CPathIndex(idx) :: tail => {
+            target match {
+              case SchemaNode.Arr(map) => {
+                val subTarget = map get idx getOrElse SchemaNode.Union(Set())
+                val result    = insert(subTarget, ColumnRef(CPath(tail), ctype), col)
+                SchemaNode.Arr(map + (idx -> result))
+              }
+
+              case SchemaNode.Union(nodes) => {
+                val objNode = nodes find {
+                  case _: SchemaNode.Arr => true
+                  case _                 => false
+                }
+
+                val subTarget = objNode getOrElse SchemaNode.Arr(Map())
+                SchemaNode.Union(nodes - subTarget + insert(subTarget, ref, col))
+              }
+
+              case node =>
+                SchemaNode.Union(Set(node, insert(SchemaNode.Arr(Map()), ref, col)))
+            }
+          }
+
+          case CPathMeta(_) :: _ => target
+
+          case CPathArray :: _ => sys.error("todo")
+
+          case Nil => {
+            val node = SchemaNode.Leaf(ctype, col)
+
+            target match {
+              case SchemaNode.Union(nodes) => SchemaNode.Union(nodes + node)
+              case oldNode                 => SchemaNode.Union(Set(oldNode, node))
+            }
+          }
+        }
+      }
+
+      def normalize(schema: SchemaNode): Option[SchemaNode] = schema match {
+        case SchemaNode.Obj(nodes) => {
+          val nodes2 = nodes flatMap {
+            case (key, value) => normalize(value) map { key -> _ }
+          }
+
+          val back =
+            if (nodes2.isEmpty)
+              None
+            else
+              Some(SchemaNode.Obj(nodes2))
+
+          back foreach { obj =>
+            obj.keys = new Array[String](nodes2.size)
+            obj.values = new Array[SchemaNode](nodes2.size)
+          }
+
+          var i = 0
+          back foreach { obj =>
+            for ((key, value) <- nodes2) {
+              obj.keys(i) = key
+              obj.values(i) = value
+              i += 1
+            }
+          }
+
+          back
+        }
+
+        case SchemaNode.Arr(map) => {
+          val map2 = map flatMap {
+            case (idx, value) => normalize(value) map { idx -> _ }
+          }
+
+          val back =
+            if (map2.isEmpty)
+              None
+            else
+              Some(SchemaNode.Arr(map2))
+
+          back foreach { arr =>
+            arr.nodes = new Array[SchemaNode](map2.size)
+          }
+
+          var i = 0
+          back foreach { arr =>
+            val values = map2.toSeq sortBy { _._1 } map { _._2 }
+
+            for (value <- values) {
+              arr.nodes(i) = value
+              i += 1
+            }
+          }
+
+          back
+        }
+
+        case SchemaNode.Union(nodes) => {
+          val nodes2 = nodes flatMap normalize
+
+          if (nodes2.isEmpty)
+            None
+          else if (nodes2.size == 1)
+            nodes2.headOption
+          else {
+            val union = SchemaNode.Union(nodes2)
+            union.possibilities = nodes2.toArray
+            Some(union)
+          }
+        }
+
+        case lf: SchemaNode.Leaf => Some(lf)
+      }
+
+      val schema = columns.foldLeft(SchemaNode.Union(Set()): SchemaNode) {
+        case (acc, (ref, col)) => insert(acc, ref, col)
+      }
+
+      normalize(schema)
+    }
+  }
 }
 
 object Slice {
