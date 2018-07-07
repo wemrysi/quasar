@@ -1014,7 +1014,7 @@ trait Slice { source =>
         val vector = new mutable.ArrayBuffer[CharBuffer](math.max(1, size / 10))
 
         @inline
-        def checkPush(length: Int) {
+        def checkPush(length: Int): Unit = {
           if (buffer.remaining < length) {
             buffer.flip()
             vector += buffer
@@ -1024,13 +1024,13 @@ trait Slice { source =>
         }
 
         @inline
-        def push(c: Char) {
+        def push(c: Char): Unit = {
           checkPush(1)
           buffer.put(c)
         }
 
         @inline
-        def pushStr(str: String) {
+        def pushStr(str: String): Unit = {
           checkPush(str.length)
           buffer.put(str)
         }
@@ -1039,20 +1039,20 @@ trait Slice { source =>
         val inFlags = new RingDeque[Boolean](depth + 1)
 
         @inline
-        def pushIn(str: String, flag: Boolean) {
+        def pushIn(str: String, flag: Boolean): Unit = {
           in.pushBack(str)
           inFlags.pushBack(flag)
         }
 
         @inline
-        def popIn() {
+        def popIn(): Unit = {
           in.popBack()
           inFlags.popBack()
         }
 
         @inline
         @tailrec
-        def flushIn() {
+        def flushIn(): Unit = {
           if (!in.isEmpty) {
             val str = in.popFront()
 
@@ -1073,7 +1073,7 @@ trait Slice { source =>
 
         @inline
         @tailrec
-        def renderString(str: String, idx: Int = 0) {
+        def renderString(str: String, idx: Int = 0): Unit = {
           if (idx == 0) {
             push('"')
           }
@@ -1107,7 +1107,7 @@ trait Slice { source =>
         }
 
         @inline
-        def renderLong(ln: Long) {
+        def renderLong(ln: Long): Unit = {
 
           @inline
           @tailrec
@@ -1124,7 +1124,7 @@ trait Slice { source =>
 
           @inline
           @tailrec
-          def renderPositive(ln: Long, power: Long) {
+          def renderPositive(ln: Long, power: Long): Unit = {
             if (power > 0) {
               val c = Character.forDigit((ln / power % 10).toInt, 10)
               push(c)
@@ -1150,7 +1150,7 @@ trait Slice { source =>
 
         // TODO is this a problem?
         @inline
-        def renderDouble(d: Double) {
+        def renderDouble(d: Double): Unit = {
           val str = d.toString
           checkPush(str.length)
           buffer.put(str)
@@ -1158,14 +1158,14 @@ trait Slice { source =>
 
         // TODO is this a problem?
         @inline
-        def renderNum(d: BigDecimal) {
+        def renderNum(d: BigDecimal): Unit = {
           val str = d.toString
           checkPush(str.length)
           buffer.put(str)
         }
 
         @inline
-        def renderBoolean(b: Boolean) {
+        def renderBoolean(b: Boolean): Unit = {
           if (b) {
             pushStr("true")
           } else {
@@ -1174,57 +1174,57 @@ trait Slice { source =>
         }
 
         @inline
-        def renderNull() {
+        def renderNull(): Unit = {
           pushStr("null")
         }
 
         @inline
-        def renderEmptyObject() {
+        def renderEmptyObject(): Unit = {
           pushStr("{}")
         }
 
         @inline
-        def renderEmptyArray() {
+        def renderEmptyArray(): Unit = {
           pushStr("[]")
         }
 
         @inline
-        def renderOffsetDateTime(time: OffsetDateTime) {
+        def renderOffsetDateTime(time: OffsetDateTime): Unit = {
           renderString(time.toString)
         }
 
         @inline
-        def renderOffsetTime(time: OffsetTime) {
+        def renderOffsetTime(time: OffsetTime): Unit = {
           renderString(time.toString)
         }
 
         @inline
-        def renderOffsetDate(date: OffsetDate) {
+        def renderOffsetDate(date: OffsetDate): Unit = {
           renderString(date.toString)
         }
 
         @inline
-        def renderLocalDateTime(time: LocalDateTime) {
+        def renderLocalDateTime(time: LocalDateTime): Unit = {
           renderString(time.toString)
         }
 
         @inline
-        def renderLocalTime(time: LocalTime) {
+        def renderLocalTime(time: LocalTime): Unit = {
           renderString(time.toString)
         }
 
         @inline
-        def renderLocalDate(date: LocalDate) {
+        def renderLocalDate(date: LocalDate): Unit = {
           renderString(date.toString)
         }
 
         @inline
-        def renderInterval(duration: DateTimeInterval) {
+        def renderInterval(duration: DateTimeInterval): Unit = {
           renderString(duration.toString)
         }
 
         @inline
-        def renderArray[A](array: Array[A]) {
+        def renderArray[A](array: Array[A]): Unit = {
           renderString(array.deep.toString)
         }
 
