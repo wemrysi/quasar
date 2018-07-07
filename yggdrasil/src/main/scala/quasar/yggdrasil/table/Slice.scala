@@ -39,7 +39,7 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.specialized
 
-trait Slice { source =>
+abstract class Slice { source =>
   import Slice._
   import TableModule._
 
