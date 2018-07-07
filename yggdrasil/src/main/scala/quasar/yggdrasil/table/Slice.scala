@@ -1090,14 +1090,13 @@ trait Slice { source =>
               case '\r' => pushStr("\\r")
               case '\t' => pushStr("\\t")
 
-              case c => {
+              case c =>
                 if ((c >= '\u0000' && c < '\u001f') || (c >= '\u0080' && c < '\u00a0') || (c >= '\u2000' && c < '\u2100')) {
                   pushStr("\\u")
                   pushStr("%04x".format(Character.codePointAt(str, idx)))
                 } else {
                   push(c)
                 }
-              }
             }
 
             renderString(str, idx + 1)
@@ -1166,70 +1165,47 @@ trait Slice { source =>
 
         @inline
         def renderBoolean(b: Boolean): Unit = {
-          if (b) {
+          if (b)
             pushStr("true")
-          } else {
+          else
             pushStr("false")
-          }
         }
 
         @inline
-        def renderNull(): Unit = {
-          pushStr("null")
-        }
+        def renderNull(): Unit = pushStr("null")
 
         @inline
-        def renderEmptyObject(): Unit = {
-          pushStr("{}")
-        }
+        def renderEmptyObject(): Unit = pushStr("{}")
 
         @inline
-        def renderEmptyArray(): Unit = {
-          pushStr("[]")
-        }
+        def renderEmptyArray(): Unit = pushStr("[]")
 
         @inline
-        def renderOffsetDateTime(time: OffsetDateTime): Unit = {
-          renderString(time.toString)
-        }
+        def renderOffsetDateTime(time: OffsetDateTime): Unit = renderString(time.toString)
 
         @inline
-        def renderOffsetTime(time: OffsetTime): Unit = {
-          renderString(time.toString)
-        }
+        def renderOffsetTime(time: OffsetTime): Unit = renderString(time.toString)
 
         @inline
-        def renderOffsetDate(date: OffsetDate): Unit = {
-          renderString(date.toString)
-        }
+        def renderOffsetDate(date: OffsetDate): Unit = renderString(date.toString)
 
         @inline
-        def renderLocalDateTime(time: LocalDateTime): Unit = {
-          renderString(time.toString)
-        }
+        def renderLocalDateTime(time: LocalDateTime): Unit = renderString(time.toString)
 
         @inline
-        def renderLocalTime(time: LocalTime): Unit = {
-          renderString(time.toString)
-        }
+        def renderLocalTime(time: LocalTime): Unit = renderString(time.toString)
 
         @inline
-        def renderLocalDate(date: LocalDate): Unit = {
-          renderString(date.toString)
-        }
+        def renderLocalDate(date: LocalDate): Unit = renderString(date.toString)
 
         @inline
-        def renderInterval(duration: DateTimeInterval): Unit = {
-          renderString(duration.toString)
-        }
+        def renderInterval(duration: DateTimeInterval): Unit = renderString(duration.toString)
 
         @inline
-        def renderArray[A](array: Array[A]): Unit = {
-          renderString(array.deep.toString)
-        }
+        def renderArray[A](array: Array[A]): Unit = renderString(array.deep.toString)
 
         def traverseSchema(row: Int, schema: SchemaNode): Boolean = schema match {
-          case obj: SchemaNode.Obj => {
+          case obj: SchemaNode.Obj =>
             val keys   = obj.keys
             val values = obj.values
 
@@ -1267,16 +1243,14 @@ trait Slice { source =>
             pushIn("{", false)
             val done = loop(0, false)
 
-            if (done) {
+            if (done)
               push('}')
-            } else {
+            else
               popIn()
-            }
 
             done
-          }
 
-          case arr: SchemaNode.Arr => {
+          case arr: SchemaNode.Arr =>
             val values = arr.nodes
 
             @inline
@@ -1304,16 +1278,14 @@ trait Slice { source =>
             pushIn("[", false)
             val done = loop(0, false)
 
-            if (done) {
+            if (done)
               push(']')
-            } else {
+            else
               popIn()
-            }
 
             done
-          }
 
-          case union: SchemaNode.Union => {
+          case union: SchemaNode.Union =>
             val pos = union.possibilities
 
             @inline
@@ -1327,7 +1299,6 @@ trait Slice { source =>
             }
 
             loop(0)
-          }
 
           case SchemaNode.Leaf(tpe, col) =>
             tpe match {
@@ -1355,7 +1326,7 @@ trait Slice { source =>
                 }
               }
 
-              case CLong => {
+              case CLong =>
                 val specCol = col.asInstanceOf[LongColumn]
 
                 if (specCol.isDefinedAt(row)) {
@@ -1365,9 +1336,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case CDouble => {
+              case CDouble =>
                 val specCol = col.asInstanceOf[DoubleColumn]
 
                 if (specCol.isDefinedAt(row)) {
@@ -1377,9 +1347,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case CNum => {
+              case CNum =>
                 val specCol = col.asInstanceOf[NumColumn]
 
                 if (specCol.isDefinedAt(row)) {
@@ -1389,9 +1358,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case CNull => {
+              case CNull =>
                 val specCol = col.asInstanceOf[NullColumn]
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
@@ -1400,9 +1368,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case CEmptyObject => {
+              case CEmptyObject =>
                 val specCol = col.asInstanceOf[EmptyObjectColumn]
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
@@ -1411,9 +1378,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case CEmptyArray => {
+              case CEmptyArray =>
                 val specCol = col.asInstanceOf[EmptyArrayColumn]
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
@@ -1422,9 +1388,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case COffsetDateTime => {
+              case COffsetDateTime =>
                 val specCol = col.asInstanceOf[OffsetDateTimeColumn]
 
                 if (specCol.isDefinedAt(row)) {
@@ -1434,9 +1399,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case COffsetTime => {
+              case COffsetTime =>
                 val specCol = col.asInstanceOf[OffsetTimeColumn]
 
                 if (specCol.isDefinedAt(row)) {
@@ -1446,9 +1410,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case COffsetDate => {
+              case COffsetDate =>
                 val specCol = col.asInstanceOf[OffsetDateColumn]
 
                 if (specCol.isDefinedAt(row)) {
@@ -1458,9 +1421,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case CLocalDateTime => {
+              case CLocalDateTime =>
                 val specCol = col.asInstanceOf[LocalDateTimeColumn]
 
                 if (specCol.isDefinedAt(row)) {
@@ -1470,9 +1432,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case CLocalTime => {
+              case CLocalTime =>
                 val specCol = col.asInstanceOf[LocalTimeColumn]
 
                 if (specCol.isDefinedAt(row)) {
@@ -1482,9 +1443,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case CLocalDate => {
+              case CLocalDate =>
                 val specCol = col.asInstanceOf[LocalDateColumn]
 
                 if (specCol.isDefinedAt(row)) {
@@ -1494,9 +1454,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case CInterval => {
+              case CInterval =>
                 val specCol = col.asInstanceOf[IntervalColumn]
 
                 if (specCol.isDefinedAt(row)) {
@@ -1506,9 +1465,8 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
-              case CArrayType(_) => {
+              case CArrayType(_) =>
                 val specCol = col.asInstanceOf[HomogeneousArrayColumn[_]]
 
                 if (specCol.isDefinedAt(row)) {
@@ -1518,7 +1476,6 @@ trait Slice { source =>
                 } else {
                   false
                 }
-              }
 
               case CUndefined => false
             }
