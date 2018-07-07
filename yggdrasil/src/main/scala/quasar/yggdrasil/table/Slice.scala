@@ -107,7 +107,7 @@ trait Slice { source =>
     val size = source.size
 
     val cols0 = (source.columns).toList sortBy { case (ref, _) => ref.selector }
-    val cols  = cols0 map { case (_, col)                      => col }
+    val cols  = cols0 map { case (_, col) => col }
 
     def inflate[@specialized X: ClassTag](cols: Array[Int => X], row: Int) = {
       val as = new Array[X](cols.length)
@@ -377,7 +377,7 @@ trait Slice { source =>
               case (x, j) =>
                 mappers get j match {
                   case Some(f) => f(x)
-                  case None    => x
+                  case None => x
                 }
             })
           case (JArrayHomogeneousT(jType), CArrayType(cType), CPath(CPathArray, _ *)) if Schema.ctypes(jType)(cType) =>
@@ -408,7 +408,7 @@ trait Slice { source =>
   def deleteFields(prefixes: scala.collection.Set[CPathField]) = new Slice {
     private val (removed, withoutPrefixes) = source.columns partition {
       case (ColumnRef(CPath(head @ CPathField(_), _ @_ *), _), _) => prefixes contains head
-      case _                                                      => false
+      case _ => false
     }
 
     private val becomeEmpty = BitSetUtil.filteredRange(0, source.size) { i =>
@@ -553,7 +553,7 @@ trait Slice { source =>
 
     val columns: Map[ColumnRef, Column] = {
       val resultColumns = for {
-        left <- source.columns collect { case (ref, col) if ref.selector.hasPrefix(froml)  => col }
+        left <- source.columns collect { case (ref, col) if ref.selector.hasPrefix(froml) => col }
         right <- source.columns collect { case (ref, col) if ref.selector.hasPrefix(fromr) => col }
         result <- f(left, right)
       } yield result
@@ -691,8 +691,8 @@ trait Slice { source =>
 
         (lastDefined, firstDefined) match {
           case (Some((prev, i)), Some(j)) => findStraddlingDistinct(prev, i, j)
-          case (_, Some(j))               => acc.add(j); findSelfDistinct(j, j + 1)
-          case _                          => acc
+          case (_, Some(j)) => acc.add(j); findSelfDistinct(j, j + 1)
+          case _ => acc
         }
       }
 
@@ -1082,7 +1082,7 @@ trait Slice { source =>
             val c = str.charAt(idx)
 
             (c: @switch) match {
-              case '"'  => pushStr("\\\"")
+              case '"' => pushStr("\\\"")
               case '\\' => pushStr("\\\\")
               case '\b' => pushStr("\\b")
               case '\f' => pushStr("\\f")
@@ -1539,7 +1539,7 @@ trait Slice { source =>
       if (idx >= 0)
         toRValue(idx) match {
           case CUndefined => loop(idx - 1, rvalues)
-          case rv         => loop(idx - 1, rv :: rvalues)
+          case rv => loop(idx - 1, rv :: rvalues)
         }
       else
         rvalues
@@ -1561,7 +1561,7 @@ trait Slice { source =>
   def toJson(row: Int): Option[JValue] = {
     toJValue(row) match {
       case JUndefined => None
-      case jv         => Some(jv)
+      case jv => Some(jv)
     }
   }
 
@@ -1570,7 +1570,7 @@ trait Slice { source =>
       if (i < source.size) {
         toJValue(i) match {
           case JUndefined => rec(i + 1, acc)
-          case jv         => rec(i + 1, acc :+ jv)
+          case jv => rec(i + 1, acc :+ jv)
         }
       } else acc
     }
@@ -1580,8 +1580,8 @@ trait Slice { source =>
 
   def toString(row: Int): Option[String] = {
     (columns.toList.sortBy(_._1) map { case (ref, col) => ref.toString + ": " + (if (col.isDefinedAt(row)) col.strValue(row) else "(undefined)") }) match {
-      case Nil                                         => None
-      case l                                           => Some(l.mkString("[", ", ", "]"))
+      case Nil => None
+      case l => Some(l.mkString("[", ", ", "]"))
     }
   }
 
@@ -1610,7 +1610,7 @@ trait Slice { source =>
               case SchemaNode.Union(nodes) => {
                 val objNode = nodes find {
                   case _: SchemaNode.Obj => true
-                  case _                 => false
+                  case _ => false
                 }
 
                 val subTarget = objNode getOrElse SchemaNode.Obj(Map())
@@ -1633,7 +1633,7 @@ trait Slice { source =>
               case SchemaNode.Union(nodes) => {
                 val objNode = nodes find {
                   case _: SchemaNode.Arr => true
-                  case _                 => false
+                  case _ => false
                 }
 
                 val subTarget = objNode getOrElse SchemaNode.Arr(Map())
@@ -1654,7 +1654,7 @@ trait Slice { source =>
 
             target match {
               case SchemaNode.Union(nodes) => SchemaNode.Union(nodes + node)
-              case oldNode                 => SchemaNode.Union(Set(oldNode, node))
+              case oldNode => SchemaNode.Union(Set(oldNode, node))
             }
           }
         }
