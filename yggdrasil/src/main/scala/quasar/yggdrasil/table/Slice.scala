@@ -1599,7 +1599,7 @@ trait Slice { source =>
         val ColumnRef(selector, ctype) = ref
 
         selector.nodes match {
-          case CPathField(name) :: tail => {
+          case CPathField(name) :: tail =>
             target match {
               case SchemaNode.Obj(nodes) => {
                 val subTarget = nodes get name getOrElse SchemaNode.Union(Set())
@@ -1620,9 +1620,8 @@ trait Slice { source =>
               case node =>
                 SchemaNode.Union(Set(node, insert(SchemaNode.Obj(Map()), ref, col)))
             }
-          }
 
-          case CPathIndex(idx) :: tail => {
+          case CPathIndex(idx) :: tail =>
             target match {
               case SchemaNode.Arr(map) => {
                 val subTarget = map get idx getOrElse SchemaNode.Union(Set())
@@ -1643,25 +1642,23 @@ trait Slice { source =>
               case node =>
                 SchemaNode.Union(Set(node, insert(SchemaNode.Arr(Map()), ref, col)))
             }
-          }
 
           case CPathMeta(_) :: _ => target
 
           case CPathArray :: _ => sys.error("todo")
 
-          case Nil => {
+          case Nil =>
             val node = SchemaNode.Leaf(ctype, col)
 
             target match {
               case SchemaNode.Union(nodes) => SchemaNode.Union(nodes + node)
               case oldNode => SchemaNode.Union(Set(oldNode, node))
             }
-          }
         }
       }
 
       def normalize(schema: SchemaNode): Option[SchemaNode] = schema match {
-        case SchemaNode.Obj(nodes) => {
+        case SchemaNode.Obj(nodes) =>
           val nodes2 = nodes flatMap {
             case (key, value) => normalize(value) map { key -> _ }
           }
@@ -1687,9 +1684,9 @@ trait Slice { source =>
           }
 
           back
-        }
 
-        case SchemaNode.Arr(map) => {
+
+        case SchemaNode.Arr(map) =>
           val map2 = map flatMap {
             case (idx, value) => normalize(value) map { idx -> _ }
           }
@@ -1715,9 +1712,8 @@ trait Slice { source =>
           }
 
           back
-        }
 
-        case SchemaNode.Union(nodes) => {
+        case SchemaNode.Union(nodes) =>
           val nodes2 = nodes flatMap normalize
 
           if (nodes2.isEmpty)
@@ -1729,7 +1725,6 @@ trait Slice { source =>
             union.possibilities = nodes2.toArray
             Some(union)
           }
-        }
 
         case lf: SchemaNode.Leaf => Some(lf)
       }
