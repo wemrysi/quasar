@@ -70,6 +70,13 @@ trait ColumnarTableModuleConfig {
 }
 
 object ColumnarTableModule extends Logging {
+
+  // shadow instance of scalaz type classes for `Id`,
+  // because with shims we have ambiguous instances
+  // the right-hand side is necessary to prevent `idInstance`
+  // from being marked unused.
+  private val idInstance: Int = idInstance + 1
+
   def renderJson(slices: StreamT[IO, Slice], prefix: String, delimiter: String, suffix: String): StreamT[IO, CharBuffer] = {
     def wrap(stream: StreamT[IO, CharBuffer]) = {
       if (prefix == "" && suffix == "") stream
@@ -81,8 +88,13 @@ object ColumnarTableModule extends Logging {
     def foldFlatMap(slices: StreamT[IO, Slice], rendered: Boolean): StreamT[IO, CharBuffer] = {
       StreamT[IO, CharBuffer](slices.step map {
         case StreamT.Yield(slice, tail) =>
-          val (stream, rendered2) = slice.renderJson(delimiter)
-          val stream2             = if (rendered && rendered2) CharBuffer.wrap(delimiter) :: stream else stream
+          val (seq, rendered2) = slice.renderJson(delimiter)
+          val stream = StreamT.fromIterable(seq).trans(λ[Id ~> IO](IO.pure(_)))
+
+          val stream2 = if (rendered && rendered2)
+            CharBuffer.wrap(delimiter) :: stream
+          else
+            stream
 
           StreamT.Skip(stream2 ++ foldFlatMap(tail(), rendered || rendered2))
 

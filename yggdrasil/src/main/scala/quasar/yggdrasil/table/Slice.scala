@@ -27,7 +27,6 @@ import quasar.yggdrasil.TransSpecModule._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util.CPathUtils
 
-import cats.effect.IO
 import scalaz._, Scalaz._, Ordering._
 import shims._
 
@@ -990,7 +989,7 @@ abstract class Slice { source =>
 
   val RenderBufferSize = 1024 * 10 // 10 KB
 
-  def renderJson(delimiter: String): (StreamT[IO, CharBuffer], Boolean) = {
+  def renderJson(delimiter: String): (Seq[CharBuffer], Boolean) = {
     sliceSchema match {
       case Some(schema) =>
         val depth = {
@@ -1505,20 +1504,11 @@ abstract class Slice { source =>
         buffer.flip()
         vector += buffer
 
-        val stream = StreamT.unfoldM(0) { idx =>
-          val back =
-            if (idx < vector.length)
-              Some((vector(idx), idx + 1))
-            else
-              None
-
-          IO.pure(back)
-        }
-
-        (stream, rendered)
+        // it's safe for us to expose this mutable Seq as "immutable" since we wont' be touching it anymore
+        (vector, rendered)
 
       case None =>
-        StreamT.empty[IO, CharBuffer] -> false
+        Seq.empty[CharBuffer] -> false
     }
   }
 
