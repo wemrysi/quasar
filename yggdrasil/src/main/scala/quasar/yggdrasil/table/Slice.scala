@@ -1014,10 +1014,10 @@ abstract class Slice { source =>
 
     val ctx = BufferContext.csv(size) { (ctx, str) =>
       // fast-path the unescaped case
-      if (str.charAt('"') < 0 &&
-          str.charAt('\n') < 0 &&
-          str.charAt('\r') < 0 &&
-          str.charAt(',') < 0) {
+      if (str.indexOf('"') < 0 &&
+          str.indexOf('\n') < 0 &&
+          str.indexOf('\r') < 0 &&
+          str.indexOf(',') < 0) {
 
         ctx.pushStr(str)
       } else {
