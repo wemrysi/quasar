@@ -1007,7 +1007,43 @@ abstract class Slice { source =>
           loop(schema)
         }
 
-        val ctx = new BufferContext(size)
+        val ctx = BufferContext(size) { (ctx, str) =>
+          @inline
+          @tailrec
+          def loop(str: String, idx: Int): Unit = {
+            if (idx == 0) {
+              ctx.push('"')
+            }
+
+            if (idx < str.length) {
+              val c = str.charAt(idx)
+
+              (c: @switch) match {
+                case '"' => ctx.pushStr("\\\"")
+                case '\\' => ctx.pushStr("\\\\")
+                case '\b' => ctx.pushStr("\\b")
+                case '\f' => ctx.pushStr("\\f")
+                case '\n' => ctx.pushStr("\\n")
+                case '\r' => ctx.pushStr("\\r")
+                case '\t' => ctx.pushStr("\\t")
+
+                case c =>
+                  if ((c >= '\u0000' && c < '\u001f') || (c >= '\u0080' && c < '\u00a0') || (c >= '\u2000' && c < '\u2100')) {
+                    ctx.pushStr("\\u")
+                    ctx.pushStr("%04x".format(Character.codePointAt(str, idx)))
+                  } else {
+                    ctx.push(c)
+                  }
+              }
+
+              loop(str, idx + 1)
+            } else {
+              ctx.push('"')
+            }
+          }
+
+          loop(str, 0)
+        }
 
         val in = new RingDeque[String](depth + 1)
         val inFlags = new RingDeque[Boolean](depth + 1)
@@ -1032,135 +1068,13 @@ abstract class Slice { source =>
             val flag = inFlags.popFront()
 
             if (flag)
-              renderString(str)
+              ctx.renderString(str)
             else
               ctx.pushStr(str)
 
             flushIn()
           }
         }
-
-        // emitters
-
-        @inline
-        @tailrec
-        def renderString(str: String, idx: Int = 0): Unit = {
-          if (idx == 0) {
-            ctx.push('"')
-          }
-
-          if (idx < str.length) {
-            val c = str.charAt(idx)
-
-            (c: @switch) match {
-              case '"' => ctx.pushStr("\\\"")
-              case '\\' => ctx.pushStr("\\\\")
-              case '\b' => ctx.pushStr("\\b")
-              case '\f' => ctx.pushStr("\\f")
-              case '\n' => ctx.pushStr("\\n")
-              case '\r' => ctx.pushStr("\\r")
-              case '\t' => ctx.pushStr("\\t")
-
-              case c =>
-                if ((c >= '\u0000' && c < '\u001f') || (c >= '\u0080' && c < '\u00a0') || (c >= '\u2000' && c < '\u2100')) {
-                  ctx.pushStr("\\u")
-                  ctx.pushStr("%04x".format(Character.codePointAt(str, idx)))
-                } else {
-                  ctx.push(c)
-                }
-            }
-
-            renderString(str, idx + 1)
-          } else {
-            ctx.push('"')
-          }
-        }
-
-        @inline
-        def renderLong(ln: Long): Unit = {
-
-          @inline
-          @tailrec
-          def power10(ln: Long, seed: Long = 1): Long = {
-            // note: we could be doing binary search here
-
-            if (seed * 10 < 0) // overflow
-              seed
-            else if (seed * 10 > ln)
-              seed
-            else
-              power10(ln, seed * 10)
-          }
-
-          @inline
-          @tailrec
-          def renderPositive(ln: Long, power: Long): Unit = {
-            if (power > 0) {
-              val c = Character.forDigit((ln / power % 10).toInt, 10)
-              ctx.push(c)
-              renderPositive(ln, power / 10)
-            }
-          }
-
-          if (ln == Long.MinValue) {
-            ctx.pushStr("-9223372036854775808")
-          } else if (ln == 0) {
-            ctx.push('0')
-          } else if (ln < 0) {
-            ctx.push('-')
-
-            val ln2 = ln * -1
-            renderPositive(ln2, power10(ln2))
-          } else {
-            renderPositive(ln, power10(ln))
-          }
-        }
-
-        // TODO is this a problem?
-        @inline
-        def renderDouble(d: Double): Unit = ctx.pushStr(d.toString)
-
-        // TODO is this a problem?
-        @inline
-        def renderNum(d: BigDecimal): Unit = ctx.pushStr(d.toString)
-
-        @inline
-        def renderBoolean(b: Boolean): Unit = {
-          if (b)
-            ctx.pushStr("true")
-          else
-            ctx.pushStr("false")
-        }
-
-        @inline
-        def renderNull(): Unit = ctx.pushStr("null")
-
-        @inline
-        def renderEmptyObject(): Unit = ctx.pushStr("{}")
-
-        @inline
-        def renderEmptyArray(): Unit = ctx.pushStr("[]")
-
-        @inline
-        def renderOffsetDateTime(time: OffsetDateTime): Unit = renderString(time.toString)
-
-        @inline
-        def renderOffsetTime(time: OffsetTime): Unit = renderString(time.toString)
-
-        @inline
-        def renderOffsetDate(date: OffsetDate): Unit = renderString(date.toString)
-
-        @inline
-        def renderLocalDateTime(time: LocalDateTime): Unit = renderString(time.toString)
-
-        @inline
-        def renderLocalTime(time: LocalTime): Unit = renderString(time.toString)
-
-        @inline
-        def renderLocalDate(date: LocalDate): Unit = renderString(date.toString)
-
-        @inline
-        def renderInterval(duration: DateTimeInterval): Unit = renderString(duration.toString)
 
         def traverseSchema(row: Int, schema: SchemaNode): Boolean = schema match {
           case obj: SchemaNode.Obj =>
@@ -1265,7 +1179,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderString(specCol(row))
+                  ctx.renderString(specCol(row))
                   true
                 } else {
                   false
@@ -1277,7 +1191,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderBoolean(specCol(row))
+                  ctx.renderBoolean(specCol(row))
                   true
                 } else {
                   false
@@ -1289,7 +1203,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderLong(specCol(row))
+                  ctx.renderLong(specCol(row))
                   true
                 } else {
                   false
@@ -1300,7 +1214,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderDouble(specCol(row))
+                  ctx.renderDouble(specCol(row))
                   true
                 } else {
                   false
@@ -1311,7 +1225,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderNum(specCol(row))
+                  ctx.renderNum(specCol(row))
                   true
                 } else {
                   false
@@ -1321,7 +1235,7 @@ abstract class Slice { source =>
                 val specCol = col.asInstanceOf[NullColumn]
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderNull()
+                  ctx.renderNull()
                   true
                 } else {
                   false
@@ -1331,7 +1245,7 @@ abstract class Slice { source =>
                 val specCol = col.asInstanceOf[EmptyObjectColumn]
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderEmptyObject()
+                  ctx.renderEmptyObject()
                   true
                 } else {
                   false
@@ -1341,7 +1255,7 @@ abstract class Slice { source =>
                 val specCol = col.asInstanceOf[EmptyArrayColumn]
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderEmptyArray()
+                  ctx.renderEmptyArray()
                   true
                 } else {
                   false
@@ -1352,7 +1266,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderOffsetDateTime(specCol(row))
+                  ctx.renderOffsetDateTime(specCol(row))
                   true
                 } else {
                   false
@@ -1363,7 +1277,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderOffsetTime(specCol(row))
+                  ctx.renderOffsetTime(specCol(row))
                   true
                 } else {
                   false
@@ -1374,7 +1288,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderOffsetDate(specCol(row))
+                  ctx.renderOffsetDate(specCol(row))
                   true
                 } else {
                   false
@@ -1385,7 +1299,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderLocalDateTime(specCol(row))
+                  ctx.renderLocalDateTime(specCol(row))
                   true
                 } else {
                   false
@@ -1396,7 +1310,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderLocalTime(specCol(row))
+                  ctx.renderLocalTime(specCol(row))
                   true
                 } else {
                   false
@@ -1407,7 +1321,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderLocalDate(specCol(row))
+                  ctx.renderLocalDate(specCol(row))
                   true
                 } else {
                   false
@@ -1418,7 +1332,7 @@ abstract class Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderInterval(specCol(row))
+                  ctx.renderInterval(specCol(row))
                   true
                 } else {
                   false
@@ -2088,7 +2002,13 @@ object Slice {
     final case class Leaf(tpe: CType, col: Column) extends SchemaNode
   }
 
-  private final class BufferContext(size: Int) {
+  /*
+   * The polymorphism on _renderString here is acceptable precisely because we're
+   * only rendering JSON and CSV. In other words, all call-sites will be bimorphic.
+   * If we ever exceed two cases, this code will need to be refactored to avoid the
+   * polymorphism entirely.
+   */
+  private final class BufferContext(size: Int, _renderString: (BufferContext, String) => Unit) {
     val RenderBufferSize = 1024 * 10 // 10 KB
 
     private[this] var buffer = CharBuffer.allocate(RenderBufferSize)
@@ -2113,6 +2033,77 @@ object Slice {
       buffer.put(str)
     }
 
+    def renderString(str: String): Unit = _renderString(this, str)
+
+    def renderLong(ln: Long): Unit = {
+      @tailrec
+      def power10(ln: Long, seed: Long = 1): Long = {
+        // note: we could be doing binary search here
+
+        if (seed * 10 < 0) // overflow
+          seed
+        else if (seed * 10 > ln)
+          seed
+        else
+          power10(ln, seed * 10)
+      }
+
+      @tailrec
+      def renderPositive(ln: Long, power: Long): Unit = {
+        if (power > 0) {
+          val c = Character.forDigit((ln / power % 10).toInt, 10)
+          push(c)
+          renderPositive(ln, power / 10)
+        }
+      }
+
+      if (ln == Long.MinValue) {
+        pushStr("-9223372036854775808")
+      } else if (ln == 0) {
+        push('0')
+      } else if (ln < 0) {
+        push('-')
+
+        val ln2 = ln * -1
+        renderPositive(ln2, power10(ln2))
+      } else {
+        renderPositive(ln, power10(ln))
+      }
+    }
+
+    // TODO is this a problem?
+    def renderDouble(d: Double): Unit = pushStr(d.toString)
+
+    // TODO is this a problem?
+    def renderNum(d: BigDecimal): Unit = pushStr(d.toString)
+
+    def renderBoolean(b: Boolean): Unit = {
+      if (b)
+        pushStr("true")
+      else
+        pushStr("false")
+    }
+
+    def renderNull(): Unit = pushStr("null")
+
+    def renderEmptyObject(): Unit = pushStr("{}")
+
+    def renderEmptyArray(): Unit = pushStr("[]")
+
+    def renderOffsetDateTime(time: OffsetDateTime): Unit = renderString(time.toString)
+
+    def renderOffsetTime(time: OffsetTime): Unit = renderString(time.toString)
+
+    def renderOffsetDate(date: OffsetDate): Unit = renderString(date.toString)
+
+    def renderLocalDateTime(time: LocalDateTime): Unit = renderString(time.toString)
+
+    def renderLocalTime(time: LocalTime): Unit = renderString(time.toString)
+
+    def renderLocalDate(date: LocalDate): Unit = renderString(date.toString)
+
+    def renderInterval(duration: DateTimeInterval): Unit = renderString(duration.toString)
+
     def finish(): Unit = {
       buffer.flip()
       vector += buffer
@@ -2122,5 +2113,11 @@ object Slice {
       buffer = null    // invalidate the state so we throw exceptions later
       vector
     }
+  }
+
+  private object BufferContext {
+    @inline
+    def apply(size: Int)(renderString: (BufferContext, String) => Unit): BufferContext =
+      new BufferContext(size, renderString)
   }
 }
