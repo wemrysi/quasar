@@ -987,8 +987,6 @@ abstract class Slice { source =>
     }
   }
 
-  val RenderBufferSize = 1024 * 10 // 10 KB
-
   def renderJson(delimiter: String): (Seq[CharBuffer], Boolean) = {
     sliceSchema match {
       case Some(schema) =>
@@ -1009,32 +1007,9 @@ abstract class Slice { source =>
           loop(schema)
         }
 
-        var buffer = CharBuffer.allocate(RenderBufferSize)
-        val vector = new mutable.ArrayBuffer[CharBuffer](math.max(1, size / 10))
+        val ctx = new BufferContext(size)
 
-        @inline
-        def checkPush(length: Int): Unit = {
-          if (buffer.remaining < length) {
-            buffer.flip()
-            vector += buffer
-
-            buffer = CharBuffer.allocate(RenderBufferSize)
-          }
-        }
-
-        @inline
-        def push(c: Char): Unit = {
-          checkPush(1)
-          buffer.put(c)
-        }
-
-        @inline
-        def pushStr(str: String): Unit = {
-          checkPush(str.length)
-          buffer.put(str)
-        }
-
-        val in      = new RingDeque[String](depth + 1)
+        val in = new RingDeque[String](depth + 1)
         val inFlags = new RingDeque[Boolean](depth + 1)
 
         @inline
@@ -1054,15 +1029,12 @@ abstract class Slice { source =>
         def flushIn(): Unit = {
           if (!in.isEmpty) {
             val str = in.popFront()
-
             val flag = inFlags.popFront()
 
-            if (flag) {
+            if (flag)
               renderString(str)
-            } else {
-              checkPush(str.length)
-              buffer.put(str)
-            }
+            else
+              ctx.pushStr(str)
 
             flushIn()
           }
@@ -1074,33 +1046,33 @@ abstract class Slice { source =>
         @tailrec
         def renderString(str: String, idx: Int = 0): Unit = {
           if (idx == 0) {
-            push('"')
+            ctx.push('"')
           }
 
           if (idx < str.length) {
             val c = str.charAt(idx)
 
             (c: @switch) match {
-              case '"' => pushStr("\\\"")
-              case '\\' => pushStr("\\\\")
-              case '\b' => pushStr("\\b")
-              case '\f' => pushStr("\\f")
-              case '\n' => pushStr("\\n")
-              case '\r' => pushStr("\\r")
-              case '\t' => pushStr("\\t")
+              case '"' => ctx.pushStr("\\\"")
+              case '\\' => ctx.pushStr("\\\\")
+              case '\b' => ctx.pushStr("\\b")
+              case '\f' => ctx.pushStr("\\f")
+              case '\n' => ctx.pushStr("\\n")
+              case '\r' => ctx.pushStr("\\r")
+              case '\t' => ctx.pushStr("\\t")
 
               case c =>
                 if ((c >= '\u0000' && c < '\u001f') || (c >= '\u0080' && c < '\u00a0') || (c >= '\u2000' && c < '\u2100')) {
-                  pushStr("\\u")
-                  pushStr("%04x".format(Character.codePointAt(str, idx)))
+                  ctx.pushStr("\\u")
+                  ctx.pushStr("%04x".format(Character.codePointAt(str, idx)))
                 } else {
-                  push(c)
+                  ctx.push(c)
                 }
             }
 
             renderString(str, idx + 1)
           } else {
-            push('"')
+            ctx.push('"')
           }
         }
 
@@ -1125,19 +1097,17 @@ abstract class Slice { source =>
           def renderPositive(ln: Long, power: Long): Unit = {
             if (power > 0) {
               val c = Character.forDigit((ln / power % 10).toInt, 10)
-              push(c)
+              ctx.push(c)
               renderPositive(ln, power / 10)
             }
           }
 
           if (ln == Long.MinValue) {
-            val MinString = "-9223372036854775808"
-            checkPush(MinString.length)
-            buffer.put(MinString)
+            ctx.pushStr("-9223372036854775808")
           } else if (ln == 0) {
-            push('0')
+            ctx.push('0')
           } else if (ln < 0) {
-            push('-')
+            ctx.push('-')
 
             val ln2 = ln * -1
             renderPositive(ln2, power10(ln2))
@@ -1148,36 +1118,28 @@ abstract class Slice { source =>
 
         // TODO is this a problem?
         @inline
-        def renderDouble(d: Double): Unit = {
-          val str = d.toString
-          checkPush(str.length)
-          buffer.put(str)
-        }
+        def renderDouble(d: Double): Unit = ctx.pushStr(d.toString)
 
         // TODO is this a problem?
         @inline
-        def renderNum(d: BigDecimal): Unit = {
-          val str = d.toString
-          checkPush(str.length)
-          buffer.put(str)
-        }
+        def renderNum(d: BigDecimal): Unit = ctx.pushStr(d.toString)
 
         @inline
         def renderBoolean(b: Boolean): Unit = {
           if (b)
-            pushStr("true")
+            ctx.pushStr("true")
           else
-            pushStr("false")
+            ctx.pushStr("false")
         }
 
         @inline
-        def renderNull(): Unit = pushStr("null")
+        def renderNull(): Unit = ctx.pushStr("null")
 
         @inline
-        def renderEmptyObject(): Unit = pushStr("{}")
+        def renderEmptyObject(): Unit = ctx.pushStr("{}")
 
         @inline
-        def renderEmptyArray(): Unit = pushStr("[]")
+        def renderEmptyArray(): Unit = ctx.pushStr("[]")
 
         @inline
         def renderOffsetDateTime(time: OffsetDateTime): Unit = renderString(time.toString)
@@ -1199,9 +1161,6 @@ abstract class Slice { source =>
 
         @inline
         def renderInterval(duration: DateTimeInterval): Unit = renderString(duration.toString)
-
-        @inline
-        def renderArray[A](array: Array[A]): Unit = renderString(array.deep.toString)
 
         def traverseSchema(row: Int, schema: SchemaNode): Boolean = schema match {
           case obj: SchemaNode.Obj =>
@@ -1243,7 +1202,7 @@ abstract class Slice { source =>
             val done = loop(0, false)
 
             if (done)
-              push('}')
+              ctx.push('}')
             else
               popIn()
 
@@ -1278,7 +1237,7 @@ abstract class Slice { source =>
             val done = loop(0, false)
 
             if (done)
-              push(']')
+              ctx.push(']')
             else
               popIn()
 
@@ -1465,16 +1424,8 @@ abstract class Slice { source =>
                   false
                 }
 
-              case CArrayType(_) =>
-                val specCol = col.asInstanceOf[HomogeneousArrayColumn[_]]
-
-                if (specCol.isDefinedAt(row)) {
-                  flushIn()
-                  renderArray(specCol(row))
-                  true
-                } else {
-                  false
-                }
+              // NB: I removed this implementation because it was horrible and broken
+              case CArrayType(_) => ???
 
               case CUndefined => false
             }
@@ -1501,11 +1452,10 @@ abstract class Slice { source =>
 
         val rendered = render(0, false)
 
-        buffer.flip()
-        vector += buffer
+        ctx.finish()
 
         // it's safe for us to expose this mutable Seq as "immutable" since we wont' be touching it anymore
-        (vector, rendered)
+        (ctx.toSeq(), rendered)
 
       case None =>
         Seq.empty[CharBuffer] -> false
@@ -2136,5 +2086,41 @@ object Slice {
     }
 
     final case class Leaf(tpe: CType, col: Column) extends SchemaNode
+  }
+
+  private final class BufferContext(size: Int) {
+    val RenderBufferSize = 1024 * 10 // 10 KB
+
+    private[this] var buffer = CharBuffer.allocate(RenderBufferSize)
+    private[this] val vector = new mutable.ArrayBuffer[CharBuffer](math.max(1, size / 10))
+
+    def checkPush(length: Int): Unit = {
+      if (buffer.remaining < length) {
+        buffer.flip()
+        vector += buffer
+
+        buffer = CharBuffer.allocate(RenderBufferSize)
+      }
+    }
+
+    def push(c: Char): Unit = {
+      checkPush(1)
+      buffer.put(c)
+    }
+
+    def pushStr(str: String): Unit = {
+      checkPush(str.length)
+      buffer.put(str)
+    }
+
+    def finish(): Unit = {
+      buffer.flip()
+      vector += buffer
+    }
+
+    def toSeq(): Seq[CharBuffer] = {
+      buffer = null    // invalidate the state so we throw exceptions later
+      vector
+    }
   }
 }
