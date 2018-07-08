@@ -159,6 +159,34 @@ object ColumnarTableModule extends Logging {
     StreamT wrapEffect {
       schemaFirstTailOptM map {
         case Some((schema, head, tail)) =>
+          val schemaRenders = schema map {
+            // TODO doesn't handle multiple columns with the same type
+            case ColumnRef(path, _) =>
+              val candidateHead = path.nodes.head match {
+                case CPathField(name) => name
+                case CPathMeta(name) => name
+                case CPathIndex(index) => index
+                case CPathArray => ???
+              }
+
+              val candidateTail = path.nodes.tail.map(_.toString).mkString
+
+              val candidate = candidateHead + candidateTail
+
+              if (candidate.indexOf('"') < 0 &&
+                  candidate.indexOf('\n') < 0 &&
+                  candidate.indexOf('\r') < 0 &&
+                  candidate.indexOf(',') < 0) {
+
+                "\"" + candidate.replace("\"", "\"\"") + "\""
+              } else {
+                candidate
+              }
+          }
+
+          val schemaRender =
+            CharBuffer.wrap(schemaRenders.mkString("", ",", "\n"))
+
           val headRender =
             StreamT.fromIterable(head.renderCsv(schema)).trans(λ[Id ~> IO](IO.pure(_)))
 
@@ -166,7 +194,7 @@ object ColumnarTableModule extends Logging {
             StreamT.fromIterable(slice.renderCsv(schema)).trans(λ[Id ~> IO](IO.pure(_)))
           }
 
-          headRender ++ tailRender
+          schemaRender :: headRender ++ tailRender
 
         case None => StreamT.empty[IO, CharBuffer]
       }
