@@ -158,7 +158,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     val event    = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.0}}"
     val events   = event * lots
     val csv      = testRenderCsv(events, maxSliceRows)
-    val expected = ".x,.y,.z.xx,.z.yy\r\n" + ("123,foobar,1,2\r\n" * lots)
+    val expected = "x,y,z.xx,z.yy\r\n" + ("123,foobar,1.0,2.0\r\n" * lots)
     csv must_== expected
   }
 
@@ -610,7 +610,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
         """.trim
 
       val expected = "" +
-        ".a,.b.bc,.b.bd,.b.be,.b.bf,.b.bg,.c[0],.d\r\n" +
+        "a,b.bc,b.bd,b.be,b.bf,b.bg,c[0],d\r\n" +
         "1,999,foooooo,true,null,false,1.999,dog\r\n" +
         "2,998,fooooo,null,false,true,2.999,dogg\r\n" +
         "3,997,foooo,false,true,null,3.999,doggg\r\n" +
@@ -630,7 +630,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       val csv = testRenderCsv("{\"s\":\"a\\\"b\",\"t\":\",\",\"u\":\"aa\\nbb\",\"v\":\"a,b\\\"c\\r\\nd\"}")
 
       val expected = "" +
-        ".s,.t,.u,.v\r\n" +
+        "s,t,u,v\r\n" +
         "\"a\"\"b\",\",\",\"aa\n" +
         "bb\",\"a,b\"\"c\r\n" +
         "d\"\r\n"
@@ -652,7 +652,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
         """.trim
 
       val expected = "" +
-        ".a,.b,.c,.d,.e,.f.aaa,.g\r\n" +
+        "a,.b,.c,.d,.e,.f.aaa,.g\r\n" +
         "1,,,,,,\r\n" +
         ",99.1,,,,,\r\n" +
         "true,,,,,,\r\n" +

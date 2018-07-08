@@ -173,10 +173,10 @@ object ColumnarTableModule extends Logging {
 
               val candidate = candidateHead + candidateTail
 
-              if (candidate.indexOf('"') < 0 &&
-                  candidate.indexOf('\n') < 0 &&
-                  candidate.indexOf('\r') < 0 &&
-                  candidate.indexOf(',') < 0) {
+              if (candidate.indexOf('"') >= 0 &&
+                  candidate.indexOf('\n') >= 0 &&
+                  candidate.indexOf('\r') >= 0 &&
+                  candidate.indexOf(',') >= 0) {
 
                 "\"" + candidate.replace("\"", "\"\"") + "\""
               } else {
@@ -185,13 +185,13 @@ object ColumnarTableModule extends Logging {
           }
 
           val schemaRender =
-            CharBuffer.wrap(schemaRenders.mkString("", ",", "\n"))
+            CharBuffer.wrap(schemaRenders.mkString("", ",", "\r\n"))
 
           val headRender =
-            StreamT.fromIterable(head.renderCsv(schema)).trans(λ[Id ~> IO](IO.pure(_)))
+            StreamT.fromIterable(head.renderCsv(schema, assumeHomogeneous)).trans(λ[Id ~> IO](IO.pure(_)))
 
           val tailRender = tail flatMap { slice =>
-            StreamT.fromIterable(slice.renderCsv(schema)).trans(λ[Id ~> IO](IO.pure(_)))
+            StreamT.fromIterable(slice.renderCsv(schema, assumeHomogeneous)).trans(λ[Id ~> IO](IO.pure(_)))
           }
 
           schemaRender :: headRender ++ tailRender

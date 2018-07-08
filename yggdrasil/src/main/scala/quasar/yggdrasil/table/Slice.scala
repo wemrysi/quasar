@@ -992,7 +992,7 @@ abstract class Slice { source =>
 
   // will render a trailing newline
   // caller is responsible for ensuring there are no conflicted paths
-  def renderCsv(headers: List[ColumnRef]): Seq[CharBuffer] = {
+  def renderCsv(headers: List[ColumnRef], assumeHomogeneous: Boolean): Seq[CharBuffer] = {
     // faster caches
     val size = this.size
 
@@ -1041,67 +1041,70 @@ abstract class Slice { source =>
     @tailrec
     def renderColumns(row: Int, col: Int): Unit = {
       if (col < columns.length) {
-        ctypes(col) match {
-          case CString =>
-            val c = columns(col).asInstanceOf[StrColumn]
-            ctx.renderString(c(row))
+        // this recomputes definedness :-(
+        if (assumeHomogeneous || columns(col).isDefinedAt(row)) {
+          ctypes(col) match {
+            case CString =>
+              val c = columns(col).asInstanceOf[StrColumn]
+              ctx.renderString(c(row))
 
-          case CBoolean =>
-            val c = columns(col).asInstanceOf[BoolColumn]
-            ctx.renderBoolean(c(row))
+            case CBoolean =>
+              val c = columns(col).asInstanceOf[BoolColumn]
+              ctx.renderBoolean(c(row))
 
-          case CLong =>
-            val c = columns(col).asInstanceOf[LongColumn]
-            ctx.renderLong(c(row))
+            case CLong =>
+              val c = columns(col).asInstanceOf[LongColumn]
+              ctx.renderLong(c(row))
 
-          case CDouble =>
-            val c = columns(col).asInstanceOf[DoubleColumn]
-            ctx.renderDouble(c(row))
+            case CDouble =>
+              val c = columns(col).asInstanceOf[DoubleColumn]
+              ctx.renderDouble(c(row))
 
-          case CNum =>
-            val c = columns(col).asInstanceOf[NumColumn]
-            ctx.renderNum(c(row))
+            case CNum =>
+              val c = columns(col).asInstanceOf[NumColumn]
+              ctx.renderNum(c(row))
 
-          case CNull =>
-            ctx.renderNull()
+            case CNull =>
+              ctx.renderNull()
 
-          case CEmptyObject =>
-            ctx.renderEmptyObject()
+            case CEmptyObject =>
+              ctx.renderEmptyObject()
 
-          case CEmptyArray =>
-            ctx.renderEmptyArray()
+            case CEmptyArray =>
+              ctx.renderEmptyArray()
 
-          case COffsetDateTime =>
-            val c = columns(col).asInstanceOf[OffsetDateTimeColumn]
-            ctx.renderOffsetDateTime(c(row))
+            case COffsetDateTime =>
+              val c = columns(col).asInstanceOf[OffsetDateTimeColumn]
+              ctx.renderOffsetDateTime(c(row))
 
-          case COffsetTime =>
-            val c = columns(col).asInstanceOf[OffsetTimeColumn]
-            ctx.renderOffsetTime(c(row))
+            case COffsetTime =>
+              val c = columns(col).asInstanceOf[OffsetTimeColumn]
+              ctx.renderOffsetTime(c(row))
 
-          case COffsetDate =>
-            val c = columns(col).asInstanceOf[OffsetDateColumn]
-            ctx.renderOffsetDate(c(row))
+            case COffsetDate =>
+              val c = columns(col).asInstanceOf[OffsetDateColumn]
+              ctx.renderOffsetDate(c(row))
 
-          case CLocalDateTime =>
-            val c = columns(col).asInstanceOf[LocalDateTimeColumn]
-            ctx.renderLocalDateTime(c(row))
+            case CLocalDateTime =>
+              val c = columns(col).asInstanceOf[LocalDateTimeColumn]
+              ctx.renderLocalDateTime(c(row))
 
-          case CLocalTime =>
-            val c = columns(col).asInstanceOf[LocalTimeColumn]
-            ctx.renderLocalTime(c(row))
+            case CLocalTime =>
+              val c = columns(col).asInstanceOf[LocalTimeColumn]
+              ctx.renderLocalTime(c(row))
 
-          case CLocalDate =>
-            val c = columns(col).asInstanceOf[LocalDateColumn]
-            ctx.renderLocalDate(c(row))
+            case CLocalDate =>
+              val c = columns(col).asInstanceOf[LocalDateColumn]
+              ctx.renderLocalDate(c(row))
 
-          case CInterval =>
-            val c = columns(col).asInstanceOf[IntervalColumn]
-            ctx.renderInterval(c(row))
+            case CInterval =>
+              val c = columns(col).asInstanceOf[IntervalColumn]
+              ctx.renderInterval(c(row))
 
-          case CArrayType(_) => ???
+            case CArrayType(_) => ???
 
-          case CUndefined =>
+            case CUndefined =>
+          }
         }
 
         if (col < columns.length - 1) {
@@ -1118,7 +1121,7 @@ abstract class Slice { source =>
       if (row < size) {
         if (isDefinedAt(row)) {
           renderColumns(row, 0)
-          ctx.push('\n')
+          ctx.pushStr("\r\n")
         }
 
         render(row + 1)
