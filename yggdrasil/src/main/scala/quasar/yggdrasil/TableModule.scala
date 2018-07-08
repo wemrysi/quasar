@@ -303,7 +303,7 @@ trait TableModule extends TransSpecModule {
 
     def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[IO, CharBuffer]
 
-    def renderCsv(): StreamT[IO, CharBuffer]
+    def renderCsv(assumeHomogeneous: Boolean): StreamT[IO, CharBuffer]
 
     // for debugging only!!
     def toJson: IO[Iterable[RValue]]

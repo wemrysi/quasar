@@ -122,7 +122,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
   def testRenderCsv(json: String, maxSliceRows: Option[Int] = None): String = {
     val es    = JParser.parseManyFromString(json).valueOr(throw _)
     val table = fromJson(es.toStream, maxSliceRows)
-    streamToString(table.renderCsv())
+    streamToString(table.renderCsv(false))
   }
 
   def testRenderJson(seq: Seq[JValue]) = {

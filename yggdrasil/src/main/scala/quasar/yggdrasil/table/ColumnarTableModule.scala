@@ -20,9 +20,8 @@ package table
 import quasar.blueeyes._
 import quasar.contrib.fs2.convert
 import quasar.contrib.scalaz.MonadTell_
-import quasar.precog.{BitSet, MimeType, MimeTypes}
+import quasar.precog.BitSet
 import quasar.precog.common._
-import quasar.precog.common.ingest.FileContent
 import quasar.precog.util.{BitSetUtil, RawBitSet}
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
@@ -43,7 +42,6 @@ import java.nio.CharBuffer
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.collection.immutable.Set
 
 trait ColumnarTableTypes {
@@ -110,19 +108,6 @@ object ColumnarTableModule extends Logging {
   }
 
   /**
-    * This method renders the entire table into a single string,
-    * encoded as CSV.
-    *
-    * In the future we may want something Stream-based, but for now
-    * the method seems to be "fast enough" for our purposes.
-    *
-    * The column headers are currently stringified CPaths. These are
-    * introduced introduced slice-by-slice in alphabetical order. So
-    * if there is one slice, the headers will be totally
-    * alphabetical. If two slices, the alphabetized headers from the
-    * first slice are first, and then the other headers (also
-    * alphabetized). And so on.
-    *
     * The escaping here should match Microsoft's:
     *
     * If a value contains commas, double-quotes, or CR/LF, it will be
@@ -134,202 +119,63 @@ object ColumnarTableModule extends Logging {
     * becomes:
     *
     * "the fox said: ""hello, my name is fred."""
+    *
+    * If `assumeHomogeneous` is true, the columns from the first slice
+    * will dictate the header only one column from a polymorphic
+    * `ColumnRef` locus (e.g. a field which can be String or Long) will
+    * be used. If `assumeHomogeneous` is false, then the dataset will be
+    * fully traversed to infer the schema, which will then be used to
+    * render the CSV bytes in a second traversal.
     */
-  def renderCsv(slices: StreamT[IO, Slice]): StreamT[IO, CharBuffer] = {
-    import scala.collection.{ Map => GenMap }
+  def renderCsv(slices: StreamT[IO, Slice], assumeHomogeneous: Boolean): StreamT[IO, CharBuffer] = {
+    val schemaFirstTailOptM: IO[Option[(List[ColumnRef], Slice, StreamT[IO, Slice])]] = {
+      if (assumeHomogeneous) {
+        (groupedColumnRefs(slices) |@| slices.uncons) {
+          case (schema, Some((head, tail))) =>
+            val normalized = schema.toList.sortBy(_._1) flatMap {
+              case (path, types) => types.toList.map(ColumnRef(path, _))
+            }
 
-    /**
-      * Represents the column headers we have. We track three things:
-      *
-      *  1. n: the number of headers so far.
-      *  2. m: a map from path strings to header position
-      *  3. a: an array of path strings used.
-      *
-      * The class is immutable so as we find new headers we'll create
-      * new instances. If this proves to be a problem we could easily
-      * make a mutable version.
-      */
-    class Indices(n: Int, m: GenMap[String, Int], a: Array[String]) {
-      def size                        = n
-      def getPaths: Array[String]     = a
-      def columnForPath(path: String) = m(path)
-      def combine(that: Indices): Indices = {
-        val buf = new mutable.ArrayBuffer[String](a.length)
-        buf ++= a
-        that.getPaths.foreach(p => if (!m.contains(p)) buf.append(p))
-        Indices.fromPaths(buf.toArray)
-      }
-      override def equals(that: Any): Boolean = that match {
-        case that: Indices =>
-          val len = n
-          if (len != that.size) return false
-          var i = 0
-          val paths = that.getPaths
-          while (i < len) {
-            if (a(i) != paths(i)) return false
-            i += 1
-          }
-          true
-        case _ =>
-          false
-      }
-      def writeToBuilder(sb: StringBuilder): Unit = {
-        if (n == 0) return ()
-        sb.append(a(0))
-        var i = 1
-        val len = n
-        while (i < len) { sb.append(','); sb.append(a(i)); i += 1 }
-        sb.append("\r\n")
-      }
-    }
+            Some((normalized, head, tail))
 
-    object Indices {
-      def empty: Indices = new Indices(0, Map.empty[String, Int], new Array[String](0))
-
-      def fromPaths(ps: Array[String]): Indices = {
-        val paths = ps.sorted
-        val m = mutable.Map[String, Int]()
-        var i = 0
-        val len = paths.length
-        while (i < len) { m(paths(i)) = i; i += 1 }
-        new Indices(len, m, paths)
-      }
-    }
-
-    // these methods will quote CSV values for us
-    // they could probably be a bit faster but are OK so far.
-    def quoteIfNeeded(s: String): String = if (needsQuoting(s)) quote(s) else s
-    def quote(s: String): String         = "\"" + s.replace("\"", "\"\"") + "\""
-    def needsQuoting(s: String): Boolean = {
-      var i = 0
-      while (i < s.length) {
-        val c = s.charAt(i)
-        if (c == ',' || c == '"' || c == '\r' || c == '\n') return true
-        i += 1
-      }
-      false
-    }
-
-    /**
-      * Render a particular column of a slice into an array of
-      * Strings, handling any escaping that is needed.
-      */
-    def renderColumn(col: Column, rows: Int): Array[String] = {
-      val arr = new Array[String](rows)
-      var row = 0
-      while (row < rows) {
-        arr(row) =
-          if (col.isDefinedAt(row))
-            quoteIfNeeded(col.strValue(row))
-          else
-            ""
-        row += 1
-      }
-      arr
-    }
-
-    /**
-      * Generate indices for this slice.
-      */
-    def indicesForSlice(slice: Slice): Indices =
-      Indices.fromPaths(slice.columns.keys.map(_.selector.toString).toArray)
-
-    /**
-      * Renders a slice into an array of lines, as well as updating
-      * our Indices with any previous unseen paths.
-      *
-      * Since slice's underlying data is column-oriented, we evaluate
-      * each column individually, building an array of values. Then
-      * we stride across these arrays building our rows (Line
-      * objects).
-      *
-      * Since we know in advance how many rows we have, we can return
-      * an array of lines.
-      */
-    def renderSlice(pastIndices: Option[Indices], slice: Slice): (Indices, CharBuffer) = {
-
-      val indices = indicesForSlice(slice)
-      val height  = slice.size
-      val width   = indices.size
-
-      if (width == 0) return (indices, CharBuffer.allocate(0))
-
-      val items = slice.columns.toArray
-      val ncols = items.length
-
-      // load each column into strings
-      val columns = items.map {
-        case (_, col) =>
-          renderColumn(col, height)
-      }
-      val positions = items.map {
-        case (ColumnRef(path, _), _) =>
-          indices.columnForPath(path.toString)
-      }
-
-      val sb = new StringBuilder()
-
-      pastIndices match {
-        case None => indices.writeToBuilder(sb)
-        case Some(ind) =>
-          if (ind != indices) {
-            sb.append("\r\n")
-            indices.writeToBuilder(sb)
-          }
-      }
-
-      var row = 0
-      while (row < height) {
-        // fill in all the buckets for this particular row
-        val buckets = Array.fill(width)("")
-        var i = 0
-        while (i < ncols) {
-          val s = columns(i)(row)
-          if (s != "") buckets(positions(i)) = s
-          i += 1
+          case _ =>
+            None
         }
+      } else {
+        slices.uncons map {
+          case Some((head, tail)) =>
+            val normalized = head.groupedColumnRefs.toList.sortBy(_._1) map {
+              case (path, types) => ColumnRef(path, types.head)
+            }
 
-        // having filled the buckets, add them to the string builder
-        sb.append(buckets(0))
-        i = 1
-        while (i < width) {
-          sb.append(',')
-          sb.append(buckets(i))
-          i += 1
-        }
-        sb.append("\r\n")
+            Some((normalized, head, tail))
 
-        row += 1
-      }
-      (indices, CharBuffer.wrap(sb))
-    }
-
-    StreamT.unfoldM(slices -> none[Indices]) {
-      case (stream, pastIndices) =>
-        stream.uncons.map {
-          case Some((slice, tail)) =>
-            val (indices, cb) = renderSlice(pastIndices, slice)
-            some(cb -> (tail -> some(indices)))
           case None =>
-            none
+            None
         }
+      }
+    }
+
+    StreamT wrapEffect {
+      schemaFirstTailOptM map {
+        case Some((schema, head, tail)) =>
+          val headRender =
+            StreamT.fromIterable(head.renderCsv(schema)).trans(λ[Id ~> IO](IO.pure(_)))
+
+          val tailRender = tail flatMap { slice =>
+            StreamT.fromIterable(slice.renderCsv(schema)).trans(λ[Id ~> IO](IO.pure(_)))
+          }
+
+          headRender ++ tailRender
+
+        case None => StreamT.empty[IO, CharBuffer]
+      }
     }
   }
 
-  def toCharBuffers(output: MimeType, slices: StreamT[IO, Slice]): StreamT[IO, CharBuffer] = {
-    import FileContent._
-    import MimeTypes._
-    val AnyMimeType = anymaintype / anysubtype
-
-    output match {
-      case ApplicationJson | AnyMimeType => ColumnarTableModule.renderJson(slices, "[", ",", "]")
-      case XJsonStream                   => ColumnarTableModule.renderJson(slices, "", "\n", "")
-      case TextCSV                       => ColumnarTableModule.renderCsv(slices)
-      case other                         =>
-        log.warn("Unrecognized output type requested for conversion of slice stream to char buffers: %s".format(output))
-        StreamT.empty[IO, CharBuffer]
-    }
-  }
+  // I love how StreamT#foldMap does almost exactly the opposite of what anyone sane would want
+  def groupedColumnRefs(slices: StreamT[IO, Slice]): IO[Map[CPath, Set[CType]]] =
+    slices.foldLeft(Map[CPath, Set[CType]]())(_ |+| _.groupedColumnRefs)
 }
 
 trait ColumnarTableModule
@@ -2091,8 +1937,8 @@ trait ColumnarTableModule
     def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[IO, CharBuffer] =
       ColumnarTableModule.renderJson(slices, prefix, delimiter, suffix)
 
-    def renderCsv(): StreamT[IO, CharBuffer] =
-      ColumnarTableModule.renderCsv(slices)
+    def renderCsv(assumeHomogeneous: Boolean): StreamT[IO, CharBuffer] =
+      ColumnarTableModule.renderCsv(slices, assumeHomogeneous)
 
     def slicePrinter(prelude: String)(f: Slice => String): Table = {
       Table(

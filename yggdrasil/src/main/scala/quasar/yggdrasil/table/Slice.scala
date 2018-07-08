@@ -48,6 +48,9 @@ abstract class Slice { source =>
 
   def columns: Map[ColumnRef, Column]
 
+  def groupedColumnRefs: Map[CPath, Set[CType]] =
+    columns.keys.groupBy(_.selector).mapValues(_.map(_.ctype).toSet)
+
   def logicalColumns: JType => Set[Column] = { jtpe =>
     // TODO Use a flatMap and:
     // If ColumnRef(_, CArrayType(_)) and jType has a JArrayFixedT of this type,
