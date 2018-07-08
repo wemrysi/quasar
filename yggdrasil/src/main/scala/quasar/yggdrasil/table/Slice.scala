@@ -987,6 +987,147 @@ abstract class Slice { source =>
     }
   }
 
+  // will render a trailing newline
+  // caller is responsible for ensuring there are no conflicted paths
+  def renderCsv(headers: List[ColumnRef]): Seq[CharBuffer] = {
+    // faster caches
+    val size = this.size
+
+    val ctypes = headers.map(_.ctype).toArray
+    val columns = headers.map(this.columns).toArray
+
+    def isDefinedAt(row: Int): Boolean = {
+      var back = false
+      var i = 0
+      while (i < columns.length) {
+        back ||= columns(i).isDefinedAt(i)
+        if (back) {
+          return true
+        }
+        i += 1
+      }
+      back
+    }
+
+    val ctx = BufferContext.csv(size) { (ctx, str) =>
+      // fast-path the unescaped case
+      if (str.charAt('"') < 0 &&
+          str.charAt('\n') < 0 &&
+          str.charAt('\r') < 0 &&
+          str.charAt(',') < 0) {
+
+        ctx.pushStr(str)
+      } else {
+        ctx.push('"')
+
+        var i = 0
+        while (i < str.length) {
+          // pretty sure we don't need anything more elaborate than this?
+          (str.charAt(i): @switch) match {
+            case '"' => ctx.pushStr("\"\"")
+            case c => ctx.push(c)
+          }
+
+          i += 1
+        }
+
+        ctx.push('"')
+      }
+    }
+
+    @tailrec
+    def renderColumns(row: Int, col: Int): Unit = {
+      if (col < columns.length) {
+        ctypes(col) match {
+          case CString =>
+            val c = columns(col).asInstanceOf[StrColumn]
+            ctx.renderString(c(row))
+
+          case CBoolean =>
+            val c = columns(col).asInstanceOf[BoolColumn]
+            ctx.renderBoolean(c(row))
+
+          case CLong =>
+            val c = columns(col).asInstanceOf[LongColumn]
+            ctx.renderLong(c(row))
+
+          case CDouble =>
+            val c = columns(col).asInstanceOf[DoubleColumn]
+            ctx.renderDouble(c(row))
+
+          case CNum =>
+            val c = columns(col).asInstanceOf[NumColumn]
+            ctx.renderNum(c(row))
+
+          case CNull =>
+            ctx.renderNull()
+
+          case CEmptyObject =>
+            ctx.renderEmptyObject()
+
+          case CEmptyArray =>
+            ctx.renderEmptyArray()
+
+          case COffsetDateTime =>
+            val c = columns(col).asInstanceOf[OffsetDateTimeColumn]
+            ctx.renderOffsetDateTime(c(row))
+
+          case COffsetTime =>
+            val c = columns(col).asInstanceOf[OffsetTimeColumn]
+            ctx.renderOffsetTime(c(row))
+
+          case COffsetDate =>
+            val c = columns(col).asInstanceOf[OffsetDateColumn]
+            ctx.renderOffsetDate(c(row))
+
+          case CLocalDateTime =>
+            val c = columns(col).asInstanceOf[LocalDateTimeColumn]
+            ctx.renderLocalDateTime(c(row))
+
+          case CLocalTime =>
+            val c = columns(col).asInstanceOf[LocalTimeColumn]
+            ctx.renderLocalTime(c(row))
+
+          case CLocalDate =>
+            val c = columns(col).asInstanceOf[LocalDateColumn]
+            ctx.renderLocalDate(c(row))
+
+          case CInterval =>
+            val c = columns(col).asInstanceOf[IntervalColumn]
+            ctx.renderInterval(c(row))
+
+          case CArrayType(_) => ???
+
+          case CUndefined =>
+        }
+
+        if (col < columns.length - 1) {
+          ctx.push(',')
+        }
+
+        renderColumns(row, col + 1)
+      }
+    }
+
+    @inline
+    @tailrec
+    def render(row: Int): Unit = {
+      if (row < size) {
+        if (isDefinedAt(row)) {
+          renderColumns(row, 0)
+          ctx.push('\n')
+        }
+
+        render(row + 1)
+      }
+    }
+
+    render(0)
+
+    ctx.finish()
+    ctx.toSeq()
+  }
+
   def renderJson(delimiter: String): (Seq[CharBuffer], Boolean) = {
     sliceSchema match {
       case Some(schema) =>
@@ -1007,7 +1148,7 @@ abstract class Slice { source =>
           loop(schema)
         }
 
-        val ctx = BufferContext(size) { (ctx, str) =>
+        val ctx = BufferContext.json(size) { (ctx, str) =>
           @inline
           @tailrec
           def loop(str: String, idx: Int): Unit = {
@@ -2003,12 +2144,19 @@ object Slice {
   }
 
   /*
-   * The polymorphism on _renderString here is acceptable precisely because we're
-   * only rendering JSON and CSV. In other words, all call-sites will be bimorphic.
-   * If we ever exceed two cases, this code will need to be refactored to avoid the
-   * polymorphism entirely.
+   * We manually encode a bimorphic delegating to these function values
+   * because we're probably going to have over 10k rows in a given dataset.
+   * Having over 10k rows would mean that we would over-specialize to
+   * monomorphism on the very first rendering call, then subsequently
+   * despecialize *entirely* when subsequent renders come in. By manually
+   * encoding the bimorphism, we can ensure that both call-sites get
+   * specialized.
    */
-  private final class BufferContext(size: Int, _renderString: (BufferContext, String) => Unit) {
+  private final class BufferContext(
+      size: Int,
+      _renderJsonString: (BufferContext, String) => Unit,   // maybe null
+      _renderCsvString: (BufferContext, String) => Unit) {  // maybe null
+
     val RenderBufferSize = 1024 * 10 // 10 KB
 
     private[this] var buffer = CharBuffer.allocate(RenderBufferSize)
@@ -2033,7 +2181,12 @@ object Slice {
       buffer.put(str)
     }
 
-    def renderString(str: String): Unit = _renderString(this, str)
+    def renderString(str: String): Unit = {
+      if (_renderJsonString eq null)
+        _renderCsvString(this, str)
+      else
+        _renderJsonString(this, str)
+    }
 
     def renderLong(ln: Long): Unit = {
       @tailrec
@@ -2116,8 +2269,13 @@ object Slice {
   }
 
   private object BufferContext {
+
     @inline
-    def apply(size: Int)(renderString: (BufferContext, String) => Unit): BufferContext =
-      new BufferContext(size, renderString)
+    def json(size: Int)(renderString: (BufferContext, String) => Unit): BufferContext =
+      new BufferContext(size, renderString, null)
+
+    @inline
+    def csv(size: Int)(renderString: (BufferContext, String) => Unit): BufferContext =
+      new BufferContext(size, null, renderString)
   }
 }
