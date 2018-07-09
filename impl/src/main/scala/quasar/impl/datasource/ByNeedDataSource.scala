@@ -67,9 +67,6 @@ final class ByNeedDataSource[F[_], G[_], Q, R] private (
   def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]] =
     getDataSource.flatMap(_.children(path))
 
-  def descendants(path: ResourcePath): F[CommonError \/ G[ResourcePath]] =
-    getDataSource.flatMap(_.descendants(path))
-
   def isResource(path: ResourcePath): F[Boolean] =
     getDataSource.flatMap(_.isResource(path))
 

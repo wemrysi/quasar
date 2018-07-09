@@ -103,38 +103,6 @@ final class FederatingQueryEvaluatorSpec
     }
   }
 
-  "descendants" >> {
-    "returns from all sources for root" >> {
-      val expect = IList(
-        ResourcePath.root() / ResourceName("abs") / ResourceName("b") / ResourceName("a"),
-        ResourcePath.root() / ResourceName("abs") / ResourceName("a"),
-        ResourcePath.root() / ResourceName("xys") / ResourceName("x") / ResourceName("y"),
-        ResourcePath.root() / ResourceName("xys") / ResourceName("y") / ResourceName("y"))
-
-      fqe.descendants(ResourcePath.root()) must_= expect.right
-    }
-
-    "returns PNF when no source" >> {
-      val dne = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
-
-      fqe.descendants(dne) must_= pathNotFound(dne).left
-    }
-
-    "returns correctly prefixed PNF from source" >> {
-      val yz = ResourcePath.root() / ResourceName("xys") / ResourceName("y") / ResourceName("z")
-
-      fqe.descendants(yz) must_= pathNotFound(yz).left
-    }
-
-    "returns results" >> {
-      val expect = IList(
-        ResourcePath.root() / ResourceName("abs") / ResourceName("b") / ResourceName("a"),
-        ResourcePath.root() / ResourceName("abs") / ResourceName("a"))
-
-      fqe.descendants(ResourcePath.root() / ResourceName("abs")) must_= expect.right
-    }
-  }
-
   "isResource" >> {
     "returns false for root" >> {
       fqe.isResource(ResourcePath.root()) must beFalse

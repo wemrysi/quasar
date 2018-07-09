@@ -29,11 +29,6 @@ trait ResourceDiscovery[F[_], G[_]] {
     */
   def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]]
 
-  /** Returns the descendants of the specified resource path or an error if it
-    * does not exist.
-    */
-  def descendants(path: ResourcePath): F[CommonError \/ G[ResourcePath]]
-
   /** Returns whether the specified resource path refers to a resource. */
   def isResource(path: ResourcePath): F[Boolean]
 }
