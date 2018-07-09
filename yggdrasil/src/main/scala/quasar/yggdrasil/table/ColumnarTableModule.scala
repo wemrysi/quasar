@@ -128,29 +128,21 @@ object ColumnarTableModule extends Logging {
     * render the CSV bytes in a second traversal.
     */
   def renderCsv(slices: StreamT[IO, Slice], assumeHomogeneous: Boolean): StreamT[IO, CharBuffer] = {
-    val schemaFirstTailOptM: IO[Option[(List[ColumnRef], Slice, StreamT[IO, Slice])]] = {
+    val schemaFirstTailOptM: IO[Option[(Map[CPath, Set[CType]], Slice, StreamT[IO, Slice])]] = {
       if (assumeHomogeneous) {
-        (groupedColumnRefs(slices) |@| slices.uncons) {
-          case (schema, Some((head, tail))) =>
-            val normalized = schema.toList.sortBy(_._1) flatMap {
-              case (path, types) => types.toList.map(ColumnRef(path, _))
-            }
+        slices.uncons map {
+          case Some((head, tail)) =>
+            Some((head.groupedColumnRefs, head, tail))
 
-            Some((normalized, head, tail))
-
-          case _ =>
+          case None =>
             None
         }
       } else {
-        slices.uncons map {
-          case Some((head, tail)) =>
-            val normalized = head.groupedColumnRefs.toList.sortBy(_._1) map {
-              case (path, types) => ColumnRef(path, types.head)
-            }
+        (groupedColumnRefs(slices) |@| slices.uncons) {
+          case (schema, Some((head, tail))) =>
+            Some((schema, head, tail))
 
-            Some((normalized, head, tail))
-
-          case None =>
+          case _ =>
             None
         }
       }
@@ -158,30 +150,40 @@ object ColumnarTableModule extends Logging {
 
     StreamT wrapEffect {
       schemaFirstTailOptM map {
-        case Some((schema, head, tail)) =>
-          val schemaRenders = schema map {
-            // TODO doesn't handle multiple columns with the same type
-            case ColumnRef(path, _) =>
-              val candidateHead = path.nodes.head match {
-                case CPathField(name) => name
-                case CPathMeta(name) => name
-                case CPathIndex(index) => index
-                case CPathArray => ???
-              }
+        case Some((groupedRefs, head, tail)) =>
+          val schema: List[List[ColumnRef]] = {
+            groupedRefs.toList.sortBy(_._1) map {
+              case (path, tpes) => tpes.toList.map(ColumnRef(path, _))
+            }
+          }
 
-              val candidateTail = path.nodes.tail.map(_.toString).mkString
+          val schemaRenders = {
+            schema map {
+              // render the first path only
+              case ColumnRef(path, _) :: _ =>
+                val candidateHead = path.nodes.head match {
+                  case CPathField(name) => name
+                  case CPathMeta(name) => name
+                  case CPathIndex(index) => index
+                  case CPathArray => ???
+                }
 
-              val candidate = candidateHead + candidateTail
+                val candidateTail = path.nodes.tail.map(_.toString).mkString
 
-              if (candidate.indexOf('"') >= 0 &&
-                  candidate.indexOf('\n') >= 0 &&
-                  candidate.indexOf('\r') >= 0 &&
-                  candidate.indexOf(',') >= 0) {
+                val candidate = candidateHead + candidateTail
 
-                "\"" + candidate.replace("\"", "\"\"") + "\""
-              } else {
-                candidate
-              }
+                if (candidate.indexOf('"') >= 0 &&
+                    candidate.indexOf('\n') >= 0 &&
+                    candidate.indexOf('\r') >= 0 &&
+                    candidate.indexOf(',') >= 0) {
+
+                  "\"" + candidate.replace("\"", "\"\"") + "\""
+                } else {
+                  candidate
+                }
+
+              case Nil => sys.error("list of schema candidates was empty")
+            }
           }
 
           val schemaRender =
@@ -203,7 +205,7 @@ object ColumnarTableModule extends Logging {
 
   // I love how StreamT#foldMap does almost exactly the opposite of what anyone sane would want
   def groupedColumnRefs(slices: StreamT[IO, Slice]): IO[Map[CPath, Set[CType]]] =
-    slices.foldLeft(Map[CPath, Set[CType]]())(_ |+| _.groupedColumnRefs)
+    slices.foldLeftRec(Map[CPath, Set[CType]]())(_ |+| _.groupedColumnRefs)
 }
 
 trait ColumnarTableModule

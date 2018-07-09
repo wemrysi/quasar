@@ -991,19 +991,49 @@ abstract class Slice { source =>
   }
 
   // will render a trailing newline
-  // caller is responsible for ensuring there are no conflicted paths
-  def renderCsv(headers: List[ColumnRef], assumeHomogeneous: Boolean): Seq[CharBuffer] = {
+  // non-singleton inner lists represent type conflicts at a single CPath
+  def renderCsv(
+      headers: List[List[ColumnRef]],
+      assumeHomogeneous: Boolean): Seq[CharBuffer] = {
+
     // faster caches
     val size = this.size
 
-    val ctypes = headers.map(_.ctype).toArray
-    val columns = headers.map(this.columns).toArray
+    // CType | Array[CType]
+    val ctypes: Array[AnyRef] = headers map { refs =>
+      if (assumeHomogeneous)
+        refs.head.ctype
+      else
+        refs.filter(this.columns.contains).map(_.ctype).toArray
+    } toArray
+
+    // Column | Array[Column]
+    val columns: Array[AnyRef] = headers map { refs =>
+      if (assumeHomogeneous)
+        this.columns(refs.head)
+      else
+        refs.flatMap(this.columns.get(_)).toArray
+    } toArray
 
     def isDefinedAt(row: Int): Boolean = {
       var back = false
       var i = 0
       while (i < columns.length) {
-        back ||= columns(i).isDefinedAt(i)
+        if (assumeHomogeneous) {
+          back ||= columns(i).asInstanceOf[Column].isDefinedAt(row)
+        } else {
+          val candidates = columns(i).asInstanceOf[Array[Column]]
+          var j = 0
+          while (j < candidates.length) {
+            back ||= candidates(j).isDefinedAt(row)
+
+            if (back) {
+              return true
+            }
+            j += 1
+          }
+        }
+
         if (back) {
           return true
         }
@@ -1041,27 +1071,36 @@ abstract class Slice { source =>
     @tailrec
     def renderColumns(row: Int, col: Int): Unit = {
       if (col < columns.length) {
-        // this recomputes definedness :-(
-        if (assumeHomogeneous || columns(col).isDefinedAt(row)) {
-          ctypes(col) match {
+        val candidates = if (!assumeHomogeneous)
+          columns(col).asInstanceOf[Array[Column]]
+        else
+          null
+
+        val column = if (assumeHomogeneous)
+          columns(col).asInstanceOf[Column]
+        else
+          null
+
+        def renderColumn(column: Column, tpe: CType): Unit = {
+          tpe match {
             case CString =>
-              val c = columns(col).asInstanceOf[StrColumn]
+              val c = column.asInstanceOf[StrColumn]
               ctx.renderString(c(row))
 
             case CBoolean =>
-              val c = columns(col).asInstanceOf[BoolColumn]
+              val c = column.asInstanceOf[BoolColumn]
               ctx.renderBoolean(c(row))
 
             case CLong =>
-              val c = columns(col).asInstanceOf[LongColumn]
+              val c = column.asInstanceOf[LongColumn]
               ctx.renderLong(c(row))
 
             case CDouble =>
-              val c = columns(col).asInstanceOf[DoubleColumn]
+              val c = column.asInstanceOf[DoubleColumn]
               ctx.renderDouble(c(row))
 
             case CNum =>
-              val c = columns(col).asInstanceOf[NumColumn]
+              val c = column.asInstanceOf[NumColumn]
               ctx.renderNum(c(row))
 
             case CNull =>
@@ -1074,37 +1113,58 @@ abstract class Slice { source =>
               ctx.renderEmptyArray()
 
             case COffsetDateTime =>
-              val c = columns(col).asInstanceOf[OffsetDateTimeColumn]
+              val c = column.asInstanceOf[OffsetDateTimeColumn]
               ctx.renderOffsetDateTime(c(row))
 
             case COffsetTime =>
-              val c = columns(col).asInstanceOf[OffsetTimeColumn]
+              val c = column.asInstanceOf[OffsetTimeColumn]
               ctx.renderOffsetTime(c(row))
 
             case COffsetDate =>
-              val c = columns(col).asInstanceOf[OffsetDateColumn]
+              val c = column.asInstanceOf[OffsetDateColumn]
               ctx.renderOffsetDate(c(row))
 
             case CLocalDateTime =>
-              val c = columns(col).asInstanceOf[LocalDateTimeColumn]
+              val c = column.asInstanceOf[LocalDateTimeColumn]
               ctx.renderLocalDateTime(c(row))
 
             case CLocalTime =>
-              val c = columns(col).asInstanceOf[LocalTimeColumn]
+              val c = column.asInstanceOf[LocalTimeColumn]
               ctx.renderLocalTime(c(row))
 
             case CLocalDate =>
-              val c = columns(col).asInstanceOf[LocalDateColumn]
+              val c = column.asInstanceOf[LocalDateColumn]
               ctx.renderLocalDate(c(row))
 
             case CInterval =>
-              val c = columns(col).asInstanceOf[IntervalColumn]
+              val c = column.asInstanceOf[IntervalColumn]
               ctx.renderInterval(c(row))
 
             case CArrayType(_) => ???
 
             case CUndefined =>
           }
+        }
+
+        if (assumeHomogeneous) {
+          // we assume definedness goes along with homogeneity
+          renderColumn(column, ctypes(col).asInstanceOf[CType])
+        } else {
+          val hetTypes = ctypes(col).asInstanceOf[Array[CType]]
+
+          @inline
+          @tailrec
+          def loop(i: Int): Unit = {
+            if (i < candidates.length) {
+              // this recomputes definedness :-(
+              if (candidates(i).isDefinedAt(row))
+                renderColumn(candidates(i), hetTypes(i))
+              else
+                loop(i + 1)
+            }
+          }
+
+          loop(0)
         }
 
         if (col < columns.length - 1) {

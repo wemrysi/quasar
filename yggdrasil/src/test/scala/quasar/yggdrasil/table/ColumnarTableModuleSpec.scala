@@ -119,10 +119,10 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     loop(stream, new StringBuilder).unsafeRunSync
   }
 
-  def testRenderCsv(json: String, maxSliceRows: Option[Int] = None): String = {
+  def testRenderCsv(json: String, assumeHomogeneity: Boolean = false, maxSliceRows: Option[Int] = None): String = {
     val es    = JParser.parseManyFromString(json).valueOr(throw _)
     val table = fromJson(es.toStream, maxSliceRows)
-    streamToString(table.renderCsv(false))
+    streamToString(table.renderCsv(assumeHomogeneity))
   }
 
   def testRenderJson(seq: Seq[JValue]) = {
@@ -154,10 +154,10 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     arrayM.unsafeRunSync mustEqual minimized
   }
 
-  def renderLotsToCsv(lots: Int, maxSliceRows: Option[Int] = None) = {
+  def renderLotsToCsv(lots: Int, assumeHomogeneity: Boolean, maxSliceRows: Option[Int] = None) = {
     val event    = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.0}}"
     val events   = event * lots
-    val csv      = testRenderCsv(events, maxSliceRows)
+    val csv      = testRenderCsv(events, assumeHomogeneity, maxSliceRows)
     val expected = "x,y,z.xx,z.yy\r\n" + ("123,foobar,1.0,2.0\r\n" * lots)
     csv must_== expected
   }
@@ -620,10 +620,17 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     }
 
     "test rendering uniform tables of varying sizes" in {
-      renderLotsToCsv(100)
-      renderLotsToCsv(1000)
-      renderLotsToCsv(10000)
-      renderLotsToCsv(100000)
+      renderLotsToCsv(100, false)
+      renderLotsToCsv(1000, false)
+      renderLotsToCsv(10000, false)
+      renderLotsToCsv(100000, false)
+    }
+
+    "test rendering uniform tables of varying sizes assuming homogeneity" in {
+      renderLotsToCsv(100, true)
+      renderLotsToCsv(1000, true)
+      renderLotsToCsv(10000, true)
+      renderLotsToCsv(100000, true)
     }
 
     "test string escaping" in {
@@ -652,7 +659,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
         """.trim
 
       val expected = "" +
-        "a,.b,.c,.d,.e,.f.aaa,.g\r\n" +
+        "a,b,c,d,e,f.aaa,g\r\n" +
         "1,,,,,,\r\n" +
         ",99.1,,,,,\r\n" +
         "true,,,,,,\r\n" +
@@ -663,14 +670,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
         ",,100,,,,934\r\n"
 
       testRenderCsv(input) must_== expected
-
-      val expected2 = "" +
-        ".a,.b\r\n1,\r\n,99.1\r\n\r\n" +
-        ".a,.c\r\ntrue,\r\n,jgeiwgjewigjewige\r\n\r\n" +
-        ".b,.d,.e\r\nfoo,999,\r\n,,null\r\n\r\n" +
-        ".c,.f.aaa,.g\r\n,9,\r\n100,,934\r\n"
-
-      testRenderCsv(input, Some(2)) must_== expected2
+      testRenderCsv(input, maxSliceRows = Some(2)) must_== expected
     }
   }
 }
