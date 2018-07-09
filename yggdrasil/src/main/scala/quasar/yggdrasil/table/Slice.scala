@@ -27,6 +27,8 @@ import quasar.yggdrasil.TransSpecModule._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util.CPathUtils
 
+import cats.effect.IO
+
 import scalaz._, Scalaz._, Ordering._
 import shims._
 
