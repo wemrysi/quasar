@@ -14,11 +14,6 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.table
 
-import slamdata.Predef.{Product, Serializable}
-
-sealed trait PreparationSize extends Product with Serializable
-
-// TODO we need to be able to represent any size data
-object PreparationSize
+final case class Table(name: TableAttribute.Name, sql2: TableAttribute.Sql2)

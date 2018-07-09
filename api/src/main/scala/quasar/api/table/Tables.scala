@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.table
 
 import quasar.Condition
 import scalaz.{\/, NonEmptyList}

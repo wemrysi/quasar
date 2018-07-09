@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.table
 
+import quasar.api.ResourceName
 import scalaz.NonEmptyList
 import slamdata.Predef.{Product, Serializable}
 

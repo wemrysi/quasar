@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.table
 
-import slamdata.Predef.{Product, Serializable, String}
+import java.time.OffsetDateTime
+import slamdata.Predef.{Product, Serializable}
 
-sealed trait TableAttribute extends Product with Serializable
+sealed trait PreparationResult[A] extends Product with Serializable
 
-object TableAttribute {
-  final case class Name(value: String) extends TableAttribute
-  final case class Sql2(value: String) extends TableAttribute
+object PreparationResult {
+  final case class Available[A](since: OffsetDateTime, value: A) extends PreparationResult[A]
+  final case class Unavailable[A](reason: Inaccessible) extends PreparationResult[A]
 }

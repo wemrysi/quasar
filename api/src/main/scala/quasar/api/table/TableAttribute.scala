@@ -14,6 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.table
 
-final case class Table(name: TableAttribute.Name, sql2: TableAttribute.Sql2)
+import slamdata.Predef.{Product, Serializable, String}
+
+sealed trait TableAttribute extends Product with Serializable
+
+object TableAttribute {
+  final case class Name(value: String) extends TableAttribute
+  final case class Sql2(value: String) extends TableAttribute
+}
