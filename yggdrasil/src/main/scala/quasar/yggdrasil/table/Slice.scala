@@ -1914,18 +1914,9 @@ object Slice {
     acc
   }
 
-  final case class ArraySliced[A](arr: Array[A], start: Int, size: Int) {
-    def head: A = arr(start)
-    def tail: ArraySliced[A] = ArraySliced(arr, start + 1, size - 1)
-  }
-
-  object ArraySliced {
-    val noRValues = Slice.ArraySliced(new Array[RValue](0), 0, 0)
-  }
-
   // doesn't return the next power of two
   // when the input is already a power of two
-  def nextPowerOfTwo(i: Int): Int = {
+  private[table] def nextPowerOfTwo(i: Int): Int = {
     val highestOneBit = Integer.highestOneBit(i)
     if (i == highestOneBit)
       i
@@ -1933,7 +1924,7 @@ object Slice {
       highestOneBit << 1
   }
 
-  def fromRValuesStep(
+  private[table] def fromRValuesStep(
     values: ArraySliced[RValue], maxRows: Int, maxColumns: Int, startingSize: Int
   ): (Slice, ArraySliced[RValue]) = {
     @tailrec
@@ -2020,14 +2011,14 @@ object Slice {
     val maxRowsC = maxRows.getOrElse(Config.maxSliceRows)
     val maxColumnsC = maxColumns.getOrElse(Config.maxSliceColumns)
     // println(s"maxRows: $maxRowsC, maxCols: $maxColumnsC")
-    def rec(next: Slice.ArraySliced[RValue], values: fs2.Stream[IO, RValue]): fs2.Pull[IO, Slice, Unit] =
+    def rec(next: ArraySliced[RValue], values: fs2.Stream[IO, RValue]): fs2.Pull[IO, Slice, Unit] =
       if (next.size == 0) {
         for {
           uncons <- values.pull.unconsChunk
           _ <- uncons match {
             case Some((chunk, next)) =>
               val chunkArr = chunk.toArray
-              rec(Slice.ArraySliced(chunkArr, 0, chunkArr.length), next)
+              rec(ArraySliced(chunkArr, 0, chunkArr.length), next)
             case None                =>
               // println("Finished top-level loop")
               fs2.Pull.done
@@ -2035,18 +2026,20 @@ object Slice {
         } yield ()
       } else {
         // println(s"extracting slice from data with size ${next.size}")
-        val (nextSlice, remainingData) = Slice.fromRValuesStep(next, maxRowsC, maxColumnsC, 32)
+        val (nextSlice, remainingData) = Slice.fromRValuesStep(next, maxRowsC, maxColumnsC, Config.defaultMinRows)
         fs2.Pull.output1(nextSlice) >> rec(remainingData, values)
       }
 
-    rec(Slice.ArraySliced(new Array[RValue](0), 0, 0), values).stream
+    rec(ArraySliced(new Array[RValue](0), 0, 0), values).stream
   }
 
+  @deprecated
   def fromJValues(values: Stream[JValue]): Slice =
     fromRValues(values.map(RValue.fromJValueRaw))
 
   // don't use this anymore. It doesn't limit the slice size properly,
   // unlike allFromRValues and fromRValuesStep.
+  @deprecated
   def fromRValues(values: Stream[RValue]): Slice = {
     val sliceSize = values.size
 

@@ -594,13 +594,14 @@ final class SerialVFS[F[_]] private (
     serialize(run)
   }
 
-  private def serialize[A](fa: F[A]): F[A] =
+  private def serialize[A](fa: F[A]): F[A] = {
     for {
       ref <- async.Promise.empty[F, Either[Throwable, A]]
       _ <- worker.enqueue1(F.attempt(fa).flatMap(ref.complete))
       r <- ref.get
       a <- F.fromEither(r)
     } yield a
+  }
 }
 
 object SerialVFS {

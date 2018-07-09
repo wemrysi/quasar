@@ -29,4 +29,8 @@ object Config {
   // This is what we consider a "small" slice. This may affect points where
   // we take proactive measures to prevent problems caused by small slices.
   def smallSliceRows: Int = 50
+
+  // This is the smallest slice we'll construct while ingesting a potentially
+  // unknown number of RValues.
+  def defaultMinRows: Int = 32
 }

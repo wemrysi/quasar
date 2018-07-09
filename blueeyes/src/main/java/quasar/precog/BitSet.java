@@ -97,7 +97,7 @@ public class BitSet {
      *
      * Used internally by copy.
      */
-    public BitSet(long[] _bits, int _len) {
+    private BitSet(long[] _bits, int _len) {
         bits = _bits;
         _length = _len;
     }
@@ -533,6 +533,13 @@ public class BitSet {
             bits[i] = 0;
         }
         _length = arrayLength;
+    }
+
+    public final BitSet resizeBits(final int newBits) {
+        int howManyLongs = ((newBits - 1) >> 6) + 1;
+        long[] arr = new long[howManyLongs];
+        System.arraycopy(this.getBits(), 0, arr, 0, Math.min(howManyLongs, this._length));
+        return new BitSet(arr, howManyLongs);
     }
 
     private static final long serialVersionUID = 1L;
