@@ -18,27 +18,20 @@ package quasar.api.table
 
 import java.lang.Throwable
 import java.time.{Duration, OffsetDateTime}
-import slamdata.Predef.{Product, Serializable}
+import slamdata.Predef.{Option, Product, Serializable}
 
 sealed trait PreparationStatus extends Product with Serializable
 
-sealed trait Accessible extends PreparationStatus
-sealed trait Finished extends PreparationStatus
-sealed trait Inaccessible extends PreparationStatus
-
 object PreparationStatus {
   case object Unprepared
-      extends Inaccessible
+      extends PreparationStatus
 
-  final case class Preparing(startedAt: OffsetDateTime)
-      extends Inaccessible
-
-  final case class Repreparing(startedAt: OffsetDateTime, previous: Finished)
-      extends Accessible
+  final case class Preparing(startedAt: OffsetDateTime, previous: Option[Prepared])
+      extends PreparationStatus
 
   final case class Prepared(startedAt: OffsetDateTime, duration: Duration, size: PreparationSize)
-      extends Accessible with Finished
+      extends PreparationStatus
 
-  final case class Errored(startedAt: OffsetDateTime, duration: Duration, error: Throwable)
-      extends Inaccessible with Finished
+  final case class Errored(startedAt: OffsetDateTime, duration: Duration, error: Throwable, previous: Option[Prepared])
+      extends PreparationStatus
 }

@@ -23,5 +23,5 @@ sealed trait PreparationResult[A] extends Product with Serializable
 
 object PreparationResult {
   final case class Available[A](since: OffsetDateTime, value: A) extends PreparationResult[A]
-  final case class Unavailable[A](reason: Inaccessible) extends PreparationResult[A]
+  final case class Unavailable[A]() extends PreparationResult[A]
 }
