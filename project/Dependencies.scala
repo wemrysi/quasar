@@ -7,7 +7,7 @@ import sbt._
 
 object Dependencies {
   private val algebraVersion      = "0.7.0"
-  private val argonautVersion     = "6.2"
+  private val argonautVersion     = "6.2.2"
   private val disciplineVersion   = "0.7.2"
   private val doobieVersion       = "0.4.4"
   private val jawnVersion         = "0.11.1"
