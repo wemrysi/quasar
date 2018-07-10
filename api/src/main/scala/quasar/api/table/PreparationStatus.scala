@@ -29,7 +29,7 @@ object PreparationStatus {
   final case class Preparing(startedAt: OffsetDateTime, previous: Option[Prepared])
       extends PreparationStatus
 
-  final case class Prepared(startedAt: OffsetDateTime, duration: Duration, size: PreparationSize)
+  final case class Prepared(startedAt: OffsetDateTime, duration: Duration)
       extends PreparationStatus
 
   final case class Errored(startedAt: OffsetDateTime, duration: Duration, error: Throwable, previous: Option[Prepared])
