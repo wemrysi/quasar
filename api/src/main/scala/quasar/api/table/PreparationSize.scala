@@ -14,14 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.table
 
-import java.time.OffsetDateTime
 import slamdata.Predef.{Product, Serializable}
 
-sealed trait PreparationResult[A] extends Product with Serializable
+sealed trait PreparationSize extends Product with Serializable
 
-object PreparationResult {
-  final case class Available[A](since: OffsetDateTime, value: A) extends PreparationResult[A]
-  final case class Unavailable[A](reason: Inaccessible) extends PreparationResult[A]
-}
+// TODO we need to be able to represent any size data
+object PreparationSize
