@@ -40,9 +40,6 @@ final class ConditionReportingDataSource[
   def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]] =
     reportCondition(underlying.children(path))
 
-  def descendants(path: ResourcePath): F[CommonError \/ G[ResourcePath]] =
-    reportCondition(underlying.descendants(path))
-
   def isResource(path: ResourcePath): F[Boolean] =
     reportCondition(underlying.isResource(path))
 

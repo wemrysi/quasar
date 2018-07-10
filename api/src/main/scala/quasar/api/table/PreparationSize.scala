@@ -14,21 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.table
 
-import slamdata.Predef.Boolean
-import quasar.api.ResourceError.CommonError
+import slamdata.Predef.{Product, Serializable}
 
-import scalaz.\/
+sealed trait PreparationSize extends Product with Serializable
 
-/** Provides for discovering the resources in a datasource. */
-trait ResourceDiscovery[F[_], G[_]] {
-
-  /** Returns the children of the specified resource path or an error if it
-    * does not exist.
-    */
-  def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]]
-
-  /** Returns whether the specified resource path refers to a resource. */
-  def isResource(path: ResourcePath): F[Boolean]
-}
+// TODO we need to be able to represent any size data
+object PreparationSize

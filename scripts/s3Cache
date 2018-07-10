@@ -8,7 +8,6 @@ if ! type "aws" > /dev/null; then
 fi
 
 TARGETS=".targets"
-HOARDER=".hoarder-cache"
 NUM=$TRAVIS_BUILD_NUMBER
 TRAVISIP=$(curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//')
 
@@ -18,14 +17,12 @@ export AWS_SECRET_ACCESS_KEY=$(openssl rsautl -inkey ./scripts/key.txt -decrypt 
 echo "Travis public IP is: $TRAVISIP"
 
 if [[ "$1" = "upload" ]]; then
-  echo "uploading $TARGETS and $HOARDER to s3://quasar-build-cache/$NUM ..."
+  echo "uploading $TARGETS to s3://quasar-build-cache/$NUM ..."
   aws s3 --only-show-errors cp $TARGETS s3://quasar-build-cache/$NUM/$TARGETS --recursive
-  aws s3 --only-show-errors cp $HOARDER s3://quasar-build-cache/$NUM/$HOARDER --recursive
   echo "done uploading!"
 elif [[ "$1" = "download" ]]; then
-  echo "downloading $TARGETS and $HOARDER from s3://quasar-build-cache/$NUM ..."
+  echo "downloading $TARGETS from s3://quasar-build-cache/$NUM ..."
   aws s3 --only-show-errors cp s3://quasar-build-cache/$NUM/$TARGETS $TARGETS --recursive
-  aws s3 --only-show-errors cp s3://quasar-build-cache/$NUM/$HOARDER $HOARDER --recursive
   echo "done downloading!"
 elif [[ "$1" = "cleanup" ]]; then
   echo "cleaning up s3://quasar-build-cache/$NUM ..."

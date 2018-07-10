@@ -14,21 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.table
 
-import slamdata.Predef.Boolean
-import quasar.api.ResourceError.CommonError
+import java.time.OffsetDateTime
+import slamdata.Predef.{Product, Serializable}
 
-import scalaz.\/
+sealed trait PreparationResult[A] extends Product with Serializable
 
-/** Provides for discovering the resources in a datasource. */
-trait ResourceDiscovery[F[_], G[_]] {
-
-  /** Returns the children of the specified resource path or an error if it
-    * does not exist.
-    */
-  def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]]
-
-  /** Returns whether the specified resource path refers to a resource. */
-  def isResource(path: ResourcePath): F[Boolean]
+object PreparationResult {
+  final case class Available[A](since: OffsetDateTime, value: A) extends PreparationResult[A]
+  final case class Unavailable[A](reason: Inaccessible) extends PreparationResult[A]
 }

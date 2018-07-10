@@ -22,13 +22,12 @@ import quasar.api._
 import quasar.build.BuildInfo
 import quasar.common.PhaseResults
 import quasar.contrib.argonaut._
+import quasar.contrib.cats.effect._
 import quasar.contrib.fs2.convert
-import quasar.contrib.fs2.stream._
 import quasar.contrib.iota._
 import quasar.contrib.nio.{file => contribFile}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.{MonadError_, MonadTell_}
-import quasar.contrib.scalaz.concurrent.task._
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
 import quasar.fp._
@@ -47,9 +46,10 @@ import java.nio.file.{Files, Path => JPath, Paths}
 
 import argonaut._, Argonaut._
 import cats.effect.{Effect, IO, Sync, Timer}
-import cats.effect.concurrent.Deferred
 import eu.timepit.refined.auto._
 import fs2.{io, text, Stream}
+import fs2.async.Promise
+import _root_.io.chrisdavenport.scalaz.task._
 import matryoshka._
 import org.specs2.execute
 import org.specs2.specification.core.Fragment
@@ -76,6 +76,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
   val Q = for {
     tmpPath <-
       Stream.bracket(IO(Files.createTempDirectory("quasar-test-")))(
+        Stream.emit(_),
         contribFile.deleteRecursively[IO](_))
 
     q <- Quasar[IO](tmpPath, ExternalConfig.Empty, global)
@@ -94,7 +95,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
   } yield q
 
   val lwcLocalConfigs =
-    Effect[Task].toIO(TestConfig.fileSystemConfigs(FileSystemType("lwc_local")))
+    TestConfig.fileSystemConfigs(FileSystemType("lwc_local")).to[IO]
 
   ////
 
@@ -102,8 +103,8 @@ final class Sql2QueryRegressionSpec extends Qspec {
     lwcLocalConfigs.map(_.isEmpty).ifM(
       IO(suiteName >> skipped("to run, enable the 'lwc_local' test configuration.")),
       for {
-        qdef <- Deferred[IO, Quasar[IO, IO]]
-        sdown <- Deferred[IO, Unit]
+        qdef <- Promise.empty[IO, Quasar[IO, IO]]
+        sdown <- Promise.empty[IO, Unit]
 
         tests <- regressionTests[IO](TestsRoot, TestDataRoot)
 

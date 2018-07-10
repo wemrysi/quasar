@@ -14,21 +14,6 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.table
 
-import slamdata.Predef.Boolean
-import quasar.api.ResourceError.CommonError
-
-import scalaz.\/
-
-/** Provides for discovering the resources in a datasource. */
-trait ResourceDiscovery[F[_], G[_]] {
-
-  /** Returns the children of the specified resource path or an error if it
-    * does not exist.
-    */
-  def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]]
-
-  /** Returns whether the specified resource path refers to a resource. */
-  def isResource(path: ResourcePath): F[Boolean]
-}
+final case class Table(name: TableAttribute.Name, sql2: TableAttribute.Sql2)

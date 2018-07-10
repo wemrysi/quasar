@@ -18,13 +18,13 @@ package quasar.mimir
 
 import quasar.Data
 import quasar.contrib.pathy.{ADir, AFile, PathSegment}
-import quasar.contrib.scalaz.concurrent.task._
 import quasar.fp.PrismNT
 import quasar.fs.{FileSystem, FileSystemType, Local, QueryFile, ReadFile}
 import quasar.fs.mount.ConnectionUri
 
 import eu.timepit.refined.auto._
 import fs2.Stream
+import io.chrisdavenport.scalaz.task._
 import scalaz.{:<:, EitherT, OptionT}
 import scalaz.Scalaz._
 import scalaz.concurrent.Task

@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.api.DataSourceType
 import quasar.connector.{HeavyweightDataSourceModule, LightweightDataSourceModule}
 import quasar.contrib.fs2.convert
-import quasar.contrib.fs2.stream._
 import quasar.impl.DataSourceModule
 
 import java.lang.{
@@ -37,6 +36,7 @@ import java.lang.{
 }
 import java.nio.file.{Files, Path}
 import java.util.jar.JarFile
+import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import cats.effect.{Effect, Sync, Timer}
@@ -55,8 +55,10 @@ object ExternalDataSources extends Logging {
   val PluginChunkSize = 8192
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def apply[F[_]: Timer](config: ExternalConfig)(implicit F: Effect[F])
+  def apply[F[_]: Timer](config: ExternalConfig, pool: ExecutionContext)(implicit F: Effect[F])
       : Stream[F, IMap[DataSourceType, DataSourceModule]] = {
+
+    implicit val ec: ExecutionContext = pool
 
     val moduleStream = config match {
       case PluginDirectory(directory) =>
@@ -124,7 +126,11 @@ object ExternalDataSources extends Logging {
     } yield module
   }
 
-  private def loadPlugin[F[_]: Effect: Timer](pluginFile: Path): Stream[F, DataSourceModule] = {
+  private def loadPlugin[F[_]: Effect: Timer](
+      pluginFile: Path)(
+      implicit ec: ExecutionContext)
+      : Stream[F, DataSourceModule] = {
+
     val S = Sync[Stream[F, ?]]
 
     for {
