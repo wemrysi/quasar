@@ -3,7 +3,7 @@
 
   "data": "sort.data",
 
-  "query": "select age, name.first from sort order by name.first desc, age desc",
+  "query": "select age, name.first from `sort.data` order by name.first desc, age desc",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

@@ -8,7 +8,7 @@
 
   "data": "../zips.data",
 
-  "query": "select sum(when) from ((select date_part(\"milliseconds\", now()) as when, pop from `../zips` order by pop desc limit 1) union (select -date_part(\"milliseconds\", now()) as when, pop from `../zips` order by pop asc limit 1)) as times",
+  "query": "select sum(when) from ((select date_part(\"milliseconds\", now()) as when, pop from `../zips.data` order by pop desc limit 1) union (select -date_part(\"milliseconds\", now()) as when, pop from `../zips.data` order by pop asc limit 1)) as times",
 
   "predicate": "exactly",
 

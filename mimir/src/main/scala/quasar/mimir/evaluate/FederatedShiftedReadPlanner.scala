@@ -20,21 +20,16 @@ import slamdata.Predef.{Stream => _, _}
 
 import quasar.Data
 import quasar.api._, ResourceError._
-import quasar.blueeyes.json.JValue
-import quasar.contrib.fs2.convert
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.MonadTell_
 import quasar.evaluate.{Source => EvalSource}
 import quasar.fs.PathError
 import quasar.fs.Planner.{InternalError, PlannerErrorME, PlanPathError}
 import quasar.mimir._, MimirCake._
 import quasar.precog.common.RValue
 import quasar.qscript._
-import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
-import quasar.yggdrasil.UnknownSize
-import quasar.yggdrasil.table.Slice
-
-import scala.concurrent.ExecutionContext.Implicits.global
+import quasar.yggdrasil.TransSpecModule
 
 import cats.effect.{IO, LiftIO}
 import fs2.Stream
@@ -44,7 +39,7 @@ import scalaz._, Scalaz._
 
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
-    F[_]: LiftIO: Monad: PlannerErrorME: MonadFinalizers[?[_], IO]](
+    F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], List[IO[Unit]]]](
     val P: Cake) {
 
   type Assocs = Associates[T, F, IO]
@@ -112,33 +107,24 @@ final class FederatedShiftedReadPlanner[
 
   private def tableFromStream(s: Stream[IO, Data]): F[P.Table] = {
     val dataToRValue: Data => RValue =
-      d => RValue.fromJValueRaw(JValue.fromData(d))
-
-    // TODO{fs2}: Chunkiness
-    val sliceStream =
-      s.mapChunks(_.map(dataToRValue).toSegment)
-        .segments
-        .map(seg => Slice.fromRValues(seg.force.toList.toStream))
+      d => MapFuncCorePlanner.dataToRValue(d).getOrElse(sys.error("There is no representation of CUndefined in SlamDB as a value"))
 
     for {
-      d <- convert.toStreamT(sliceStream).to[F]
-
-      _ <- MonadFinalizers[F, IO].tell(List(d.dispose))
-
-      slices = d.unsafeValue
+      // TODO{fs2}: Chunkiness
+      table <- P.Table.fromRValueStream[F](s.mapChunks(_.map(dataToRValue).toSegment))
     } yield {
 
       import P.trans._
 
       // TODO depending on the id status we may not need to wrap the table
-      P.Table(slices, UnknownSize)
+      table
         .transform(OuterObjectConcat(
           WrapObject(
             Scan(Leaf(Source), P.freshIdScanner),
-            Key.name),
+            TransSpecModule.paths.Key.name),
           WrapObject(
             Leaf(Source),
-            Value.name)))
+            TransSpecModule.paths.Value.name)))
     }
   }
 

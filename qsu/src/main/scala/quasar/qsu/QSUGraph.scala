@@ -164,14 +164,14 @@ final case class QSUGraph[T[_[_]]](
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(g: QSUGraph[T]): F[QSUGraph[T]] =
       pf.applyOrElse[QSUGraph[T], F[QSUGraph[T]]](g, _ => g.point[F]) >>= { transformed =>
-        val added: QSUVerts[T] = transformed.vertices -- g.vertices.keySet
+        val changed: QSUVerts[T] = transformed.vertices
         transformed.unfold.traverse[ModifiedT[F, ?], QSUGraph[T]] { g0 =>
           for {
             prevVertices <- MS.get
             newGraph     <- inner(g0.copy(vertices = g0.vertices ++ prevVertices)).liftM[ModifiedT]
             _            <- MS.modify(_ ++ newGraph.vertices)
           } yield newGraph
-        }.map(qsu => QSUGraph.refold(g.root, qsu)).eval(added)
+        }.map(qsu => QSUGraph.refold(g.root, qsu)).eval(changed)
       }
 
     inner(this)

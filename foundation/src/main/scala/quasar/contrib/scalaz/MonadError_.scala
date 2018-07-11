@@ -18,6 +18,7 @@ package quasar.contrib.scalaz
 
 import slamdata.Predef._
 
+import monocle.Prism
 import scalaz._, Scalaz._
 import scalaz.Liskov._
 
@@ -57,6 +58,26 @@ trait MonadError_[F[_], E] {
 
 object MonadError_ extends MonadError_Instances {
   def apply[F[_], E](implicit F: MonadError_[F, E]): MonadError_[F, E] = F
+
+  object facet {
+    def apply[F[_]]: PartiallyApplied[F] =
+      new PartiallyApplied[F]
+
+    final class PartiallyApplied[F[_]] {
+      def apply[E1, E2](P: Prism[E1, E2])(implicit ME: MonadError_[F, E1])
+          : MonadError_[F, E2] =
+        new MonadError_[F, E2] {
+          def raiseError[A](e: E2): F[A] =
+            ME.raiseError(P(e))
+
+          def handleError[A](fa: F[A])(f: E2 => F[A]): F[A] =
+            ME.handleWith(fa) {
+              case P(e2) => f(e2)
+              case e1    => ME.raiseError(e1)
+            }
+        }
+    }
+  }
 }
 
 sealed abstract class MonadError_Instances extends MonadError_Instances0 {
@@ -95,6 +116,11 @@ sealed abstract class MonadError_Instances extends MonadError_Instances0 {
       def raiseError[A](e: E) =
         StateT(_ => F.raiseError[(S, A)](e))
     }
+
+  implicit def exceptionFacetMonadError_[F[_]: MonadError_[?[_], Throwable]]: MonadError_[F, Exception] =
+    MonadError_.facet[F](Prism.partial[Throwable, Exception] {
+      case ex: Exception => ex
+    } (e => e))
 }
 
 sealed abstract class MonadError_Instances0 {

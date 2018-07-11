@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "zips.data",
-    "query": "select *{_:} from zips",
+    "query": "select *{_:} from `zips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": ["_id",

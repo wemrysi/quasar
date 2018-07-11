@@ -7,7 +7,7 @@
         "cutoff": "1000"
     },
 
-    "query": "select count(*) as cnt from smallZips where pop < :cutoff",
+    "query": "select count(*) as cnt from `smallZips.data` where pop < :cutoff",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

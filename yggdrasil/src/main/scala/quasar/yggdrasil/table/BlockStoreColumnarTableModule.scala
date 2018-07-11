@@ -41,7 +41,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 trait BlockStoreColumnarTableModuleConfig {
-  def maxSliceSize: Int
+  def maxSliceRows: Int
   def hashJoins: Boolean = true
 }
 
@@ -888,7 +888,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
           IO.pure(CellState(index, new Array[Byte](0), slice, (k: SortingKey) => IO.pure(none)).some)
 
         case (SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
-          val sortProjection = new JDBMRawSortProjection(dbFile, name, keyColumns, valColumns, sortOrder, Config.maxSliceSize, count)
+          val sortProjection = new JDBMRawSortProjection(dbFile, name, keyColumns, valColumns, sortOrder, Config.maxSliceRows, count)
 
           sortProjection.getBlockAfter(none) map {
             _ map { nextBlock =>
@@ -1013,7 +1013,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       * less than `limit` rows, it will be converted to an `InternalTable`,
       * otherwise it will stay an `ExternalTable`.
       */
-    def toInternalTable(limit: Int = Config.maxSliceSize): EitherT[IO, ExternalTable, InternalTable]
+    def toInternalTable(limit: Int = Config.maxSliceRows): EitherT[IO, ExternalTable, InternalTable]
 
     /**
       * Forces a table to an external table, possibly de-optimizing it.

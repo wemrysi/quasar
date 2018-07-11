@@ -5,7 +5,7 @@
     },
     "data": "largeZips.data",
 
-    "query": "select *, '1' as one, '2' as two from largeZips",
+    "query": "select *, '1' as one, '2' as two from `largeZips.data`",
 
     "predicate": "atLeast",
     "ignoreResultOrder": true,

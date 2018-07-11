@@ -100,6 +100,9 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
     case (date.Interval, _) => notHandled.left
 
+    /* IDENTITY */
+    case (identity.TypeOf, _) => notHandled.left
+
     /* MATH */
     case (math.Add, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Pending("TODO").left
     case (math.Subtract, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Pending("TODO").left

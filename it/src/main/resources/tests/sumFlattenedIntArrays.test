@@ -5,7 +5,7 @@
         "mongodb_3_6":       "pending"
     },
     "data": "intArrays.data",
-    "query": "select b[*] + c[*] from intArrays",
+    "query": "select b[*] + c[*] from `intArrays.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [12, 14, 16, 18, 20, 22, 24, 26]

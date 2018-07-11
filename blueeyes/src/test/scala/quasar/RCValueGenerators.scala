@@ -25,20 +25,12 @@ trait RCValueGenerators {
 
   def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[Seq[CValue]]] = containerOfN[List,Seq[CValue]](size, values.map(_.toSeq))
 
-  private def genNonArrayCValueType: Gen[CValueType[_]] =
+  def genCValueType: Gen[CValueType[_]] =
     Gen.oneOf[CValueType[_]](CString, CBoolean, CLong, CDouble, CNum,
       COffsetDateTime, COffsetTime, COffsetDate,
       CLocalDateTime, CLocalTime, CLocalDate, CInterval)
 
-  def genCValueType(maxDepth: Int = maxArrayDepth): Gen[CValueType[_]] = {
-    if (maxDepth > 0) {
-      genNonArrayCValueType
-    } else {
-      frequency(0 -> (genCValueType(maxDepth - 1) map (CArrayType(_))), 6 -> genNonArrayCValueType)
-    }
-  }
-
-  def genCType: Gen[CType] = frequency(7 -> genCValueType(), 3 -> Gen.oneOf(CNull, CEmptyObject, CEmptyArray))
+  def genCType: Gen[CType] = frequency(7 -> genCValueType, 3 -> Gen.oneOf(CNull, CEmptyObject, CEmptyArray))
 
   def genValueForCValueType[A](cType: CValueType[A]): Gen[CWrappedValue[A]] = cType match {
     case CString  => genJSONString map (CString(_))
@@ -53,13 +45,21 @@ trait RCValueGenerators {
     case COffsetTime => genOffsetTime.map(COffsetTime(_))
     case COffsetDate => genOffsetDate.map(COffsetDate(_))
     case CInterval => genInterval.map(CInterval(_))
-    case CArrayType(elemType) =>
-      vectorOf(genValueForCValueType(elemType) map (_.value)) map { xs =>
-        CArray(xs.toArray(elemType.classTag), CArrayType(elemType))
-      }
+    case CArrayType(_) =>
+      scala.sys.error("CArrayType not supported")
   }
 
-  def genCValue(tpe: CType): Gen[CValue] = tpe match {
+  def genCValue: Gen[CValue] = for {
+    tp <- genCType
+    v <- genTypedCValue(tp)
+  } yield v
+
+  def genCValues: Gen[List[CValue]] = for {
+    n <- Gen.choose(0, 100)
+    l <- Gen.listOfN(n, genCValue)
+  } yield l
+
+  def genTypedCValue(tpe: CType): Gen[CValue] = tpe match {
     case tpe: CValueType[_] => genValueForCValueType(tpe)
     case CNull              => Gen.const(CNull)
     case CEmptyObject       => Gen.const(CEmptyObject)

@@ -3,7 +3,7 @@
     "backends": {
     },
     "data": "largeZips.data",
-    "query": "select ([6, 7] || loc)[1] from largeZips",
+    "query": "select ([6, 7] || loc)[1] from `largeZips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [7,

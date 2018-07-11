@@ -5,7 +5,7 @@
         "mimir": "pending"
     },
     "data":  "../days.data",
-    "query": "select ts from `../days` where ts > timestamp(\"1970-10-14T08:22:06Z\")",
+    "query": "select ts from `../days.data` where ts > timestamp(\"1970-10-14T08:22:06Z\")",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

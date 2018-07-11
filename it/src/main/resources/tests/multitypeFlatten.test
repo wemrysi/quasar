@@ -7,7 +7,7 @@
         "mongodb_3_6":       "skip"
     },
     "data": "nested_foo.data",
-    "query": "select * from nested_foo where (
+    "query": "select * from `nested_foo.data` where (
                 foo{*} LIKE \"%15%\" OR
                 foo{*} = 15 OR
                 foo[*] LIKE \"%15%\" OR

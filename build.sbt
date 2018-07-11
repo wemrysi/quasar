@@ -204,7 +204,7 @@ lazy val root = project.in(file("."))
     niflheim,
     precog,
     qscript, qsu,
-    repl,
+    repl, runp,
     sql, sst,
     yggdrasil
   ).enablePlugins(AutomateHeaderPlugin)
@@ -435,6 +435,18 @@ lazy val impl = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val runp = (project in file("run"))
+  .settings(name := "quasar-run")
+  .dependsOn(
+    core,
+    impl,
+    mimir)
+  .settings(commonSettings)
+  .settings(publishTestsSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
 /** An interactive REPL application for Quasar.
   */
 lazy val repl = project
@@ -456,7 +468,7 @@ lazy val it = project
   .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
   .dependsOn(
-    impl,
+    runp,
     interface % BothScopes,
     qscript % "test->test")
   .settings(commonSettings)
@@ -520,7 +532,7 @@ lazy val precog = project
   .settings(
     name := "quasar-precog-internal",
     scalacStrictMode := false)
-  .dependsOn(common % BothScopes)
+  .dependsOn(common)
   .settings(libraryDependencies ++= Dependencies.precog)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
@@ -535,7 +547,7 @@ lazy val blueeyes = project
     scalacStrictMode := false,
     scalacOptions += "-language:postfixOps")
   .dependsOn(
-    precog % BothScopes,
+    precog,
     frontend % BothScopes)
   .settings(libraryDependencies ++= Dependencies.blueeyes)
   .settings(headerLicenseSettings)
@@ -584,6 +596,7 @@ lazy val mimir = project
     impl % BothScopes,
     core,
     connector)
+  .settings(libraryDependencies ++= Dependencies.mimir)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)

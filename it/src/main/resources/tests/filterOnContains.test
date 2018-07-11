@@ -4,7 +4,7 @@
         "mimir":"ignoreFieldOrder"
     },
     "data": "zips.data",
-    "query": "select * from zips where 43.058514 in loc[_]",
+    "query": "select * from `zips.data` where 43.058514 in loc[_]",
     "predicate": "exactly",
     "ignoreFieldOrder": true,
     "expected": [{ "city": "CANDIA", "state": "NH", "pop": 3557, "_id":"03034", "loc": [-71.304857, 43.058514] }]

@@ -28,7 +28,7 @@
                 case
                   when pop > 5 then pop - 5
                 end as grade
-                from zips
+                from `zips.data`
                 where pop <= 10
                 order by pop",
 

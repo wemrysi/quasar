@@ -18,8 +18,10 @@ package quasar.impl.datasources
 
 import slamdata.Predef.{Boolean, Option, Unit}
 import quasar.api.{DataSourceType, ResourceName}
+import quasar.higher.HFunctor
 
-import scalaz.IMap
+import scalaz.{~>, Functor, IMap, InvariantFunctor}
+import scalaz.syntax.functor._
 
 /** A primitive facility for managing datasource configurations.
   *
@@ -46,4 +48,50 @@ trait DataSourceConfigs[F[_], C] {
     * association at `dst`.
     */
   def rename(src: ResourceName, dst: ResourceName): F[Unit]
+}
+
+object DataSourceConfigs extends DataSourceConfigsInstances
+
+sealed abstract class DataSourceConfigsInstances {
+  implicit def hFunctor[C]: HFunctor[DataSourceConfigs[?[_], C]] =
+    new HFunctor[DataSourceConfigs[?[_], C]] {
+      def hmap[F[_], G[_]](dsc: DataSourceConfigs[F, C])(f: F ~> G): DataSourceConfigs[G, C] =
+        new DataSourceConfigs[G, C] {
+          def add(name: ResourceName, config: DataSourceConfig[C]): G[Unit] =
+            f(dsc.add(name, config))
+
+          def configured: G[IMap[ResourceName, DataSourceType]] =
+            f(dsc.configured)
+
+          def lookup(name: ResourceName): G[Option[DataSourceConfig[C]]] =
+            f(dsc.lookup(name))
+
+          def remove(name: ResourceName): G[Boolean] =
+            f(dsc.remove(name))
+
+          def rename(src: ResourceName, dst: ResourceName): G[Unit] =
+            f(dsc.rename(src, dst))
+        }
+    }
+
+  implicit def invariantFunctor[F[_]: Functor]: InvariantFunctor[DataSourceConfigs[F, ?]] =
+    new InvariantFunctor[DataSourceConfigs[F, ?]] {
+      def xmap[A, B](fa: DataSourceConfigs[F, A], f: A => B, g: B => A): DataSourceConfigs[F, B] =
+        new DataSourceConfigs[F, B] {
+          def add(name: ResourceName, config: DataSourceConfig[B]): F[Unit] =
+            fa.add(name, config.map(g))
+
+          def configured: F[IMap[ResourceName, DataSourceType]] =
+            fa.configured
+
+          def lookup(name: ResourceName): F[Option[DataSourceConfig[B]]] =
+            fa.lookup(name).map(_.map(_.map(f)))
+
+          def remove(name: ResourceName): F[Boolean] =
+            fa.remove(name)
+
+          def rename(src: ResourceName, dst: ResourceName): F[Unit] =
+            fa.rename(src, dst)
+        }
+    }
 }

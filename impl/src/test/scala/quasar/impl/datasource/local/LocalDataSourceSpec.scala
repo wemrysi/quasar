@@ -31,7 +31,7 @@ final class LocalDataSourceSpec
     extends ResourceDiscoverySpec[IO, Stream[IO, ?]] {
 
   val discovery =
-    LocalDataSource[IO, IO](Paths.get("./it/src/main/resources/tests"), 1024)
+    LocalDataSource[IO, IO](Paths.get("./it/src/main/resources/tests"), 1024, global)
 
   val nonExistentPath =
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")

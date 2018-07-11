@@ -27,8 +27,7 @@ import quasar.fs.MoveSemantics
 
 import argonaut.{Argonaut, Parse}
 
-import cats.effect.{Concurrent, IO, LiftIO}
-import cats.effect.concurrent.Deferred
+import cats.effect.{Concurrent, ConcurrentEffect, Effect, IO, LiftIO}
 
 import fs2.Stream
 import fs2.async, async.mutable
@@ -50,6 +49,7 @@ import java.io.File
 import java.util.UUID
 
 import scala.util.Either
+import scala.concurrent.ExecutionContext
 
 final case class VFS(
     baseDir: ADir,
@@ -539,7 +539,7 @@ final class SerialVFS[F[_]] private (
     @volatile private var current: VFS,
     worker: mutable.Queue[F, F[Unit]],    // this exists solely for #serialize
     interp: POSIXWithIO ~> F)(
-    implicit F: Concurrent[F]) {
+    implicit F: Effect[F], ec: ExecutionContext) {
 
   import SerialVFS.S
   import shims.monadToScalaz
@@ -594,14 +594,13 @@ final class SerialVFS[F[_]] private (
     serialize(run)
   }
 
-  private def serialize[A](fa: F[A]): F[A] = {
+  private def serialize[A](fa: F[A]): F[A] =
     for {
-      ref <- Deferred[F, Either[Throwable, A]]
+      ref <- async.Promise.empty[F, Either[Throwable, A]]
       _ <- worker.enqueue1(F.attempt(fa).flatMap(ref.complete))
       r <- ref.get
       a <- F.fromEither(r)
     } yield a
-  }
 }
 
 object SerialVFS {
@@ -615,8 +614,12 @@ object SerialVFS {
    * TODO: Return a `Stream[F, SerialVFS[F]]` to allow for better resource
    *       handling once we're rid of `BackendModule`.
    */
-  def apply[F[_]: Concurrent](root: File): F[Disposable[F, SerialVFS[F]]] = {
+  def apply[F[_]: ConcurrentEffect](root: File, pool: ExecutionContext)
+      : F[Disposable[F, SerialVFS[F]]] = {
+
     import shims.monadToScalaz
+
+    implicit val ec: ExecutionContext = pool
 
     val ioToF = λ[IO ~> F](LiftIO[F].liftIO(_))
 

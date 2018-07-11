@@ -5,7 +5,7 @@
         "mimir":             "pending"
     },
     "data": "zips.data",
-    "query": "select distinct length(meh) as meh_len, meh.mep, length(meh.mep) as mep_len from zips",
+    "query": "select distinct length(meh) as meh_len, meh.mep, length(meh.mep) as mep_len from `zips.data`",
     "predicate": "exactly",
     "expected": [{}]
 }

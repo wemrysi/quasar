@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar
 
-/** The supertype of all Quasar errors.
-  *
-  * TODO: Rename to `QuasarError`
-  */
-trait QuasarErrorNG
+import quasar.contrib.scalaz.MonadError_
+
+package object run {
+  type MonadQuasarErr[F[_]] = MonadError_[F, QuasarError]
+  def MonadQuasarErr[F[_]](implicit ev: MonadQuasarErr[F]): MonadQuasarErr[F] = ev
+}

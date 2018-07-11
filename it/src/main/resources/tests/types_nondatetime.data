@@ -1,0 +1,13 @@
+{ "foo": 11 }
+{ "foo": 1.12345 }
+{ "foo": "13" }
+{ "foo": "zap" }
+{ "foo": true }
+{ "foo": false }
+{ "foo": null }
+{ "foo": [] }
+{ "foo": {} }
+{ "foo": [15, [{ "baz": ["quux"] }]] }
+{ "foo": { "bar": 15, "baz": ["qx"] } }
+{ "bar": 123 }
+{ "baz": "xyz" }

@@ -16,7 +16,7 @@
 
 package quasar.mimir.evaluate
 
-import slamdata.Predef.{List, Option}
+import slamdata.Predef.Option
 import quasar.{Data, RenderTreeT}
 import quasar.api.ResourceError.ReadError
 import quasar.contrib.cats.effect.liftio._
@@ -42,10 +42,10 @@ final class MimirQueryFederation[
     P: Cake)
     extends QueryFederation[T, F, QueryAssociate[T, F, IO], Stream[IO, Data]] {
 
-  type FinalizersT[X[_], A] = WriterT[X, Finalizers[IO], A]
+  type FinalizersT[X[_], A] = WriterT[X, List[IO[Unit]], A]
 
   private val qscriptEvaluator =
-    MimirQScriptEvaluator[T, WriterT[F, Finalizers[IO], ?]](P)
+    MimirQScriptEvaluator[T, WriterT[F, List[IO[Unit]], ?]](P)
 
   def evaluateFederated(q: FederatedQuery[T, QueryAssociate[T, F, IO]]): F[ReadError \/ Stream[IO, Data]] = {
     val finalize: ((List[IO[Unit]], Stream[IO, Data])) => Stream[IO, Data] = {
@@ -55,6 +55,7 @@ final class MimirQueryFederation[
     val srcs: AFile => Option[Source[QueryAssociate[T, FinalizersT[F, ?], IO]]] =
       q.sources.andThen(_.map(_.map(HFunctor[QueryAssociate[T, ?[_], IO]].hmap(_)(liftMT[F, FinalizersT]))))
 
+    // TODO: if we fail to materialize a stream, we should run finalizers immediately.
     qscriptEvaluator
       .evaluate(q.query)
       .run(srcs)

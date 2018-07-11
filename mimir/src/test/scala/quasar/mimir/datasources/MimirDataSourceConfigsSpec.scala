@@ -31,9 +31,13 @@ import java.util.UUID
 import cats.effect.IO
 import pathy.Path.{file => afile, _}
 import scalaz.{~>, EitherT, Id}, Id.Id
+import scalaz.std.string._
+import scalaz.syntax.foldable._
 import shims._
 
 final class MimirDataSourceConfigsSpec extends DataSourceConfigsSpec[EitherT[IO, ResourceError, ?], RValue] {
+  import MimirDataSourceConfigsSpec._
+
   lazy val P: Disposable[IO, Cake] = {
     val init = for {
       tmpPath <- IO(Files.createTempDirectory("mimir-datasource-configs-spec-"))
@@ -58,9 +62,14 @@ final class MimirDataSourceConfigsSpec extends DataSourceConfigsSpec[EitherT[IO,
     λ[EitherT[IO, ResourceError, ?] ~> Id](
       _.run
         .flatMap(_.fold(
-          e => IO.raiseError(new MimirDataSourceConfigs.ResourceErrorException(e)),
+          e => IO.raiseError(new ResourceErrorException(e)),
           IO.pure(_)))
         .unsafeRunSync())
 
   step(P.dispose.unsafeRunSync())
+}
+
+object MimirDataSourceConfigsSpec {
+  final class ResourceErrorException(error: ResourceError)
+    extends Exception(error.messages.intercalate(", "))
 }

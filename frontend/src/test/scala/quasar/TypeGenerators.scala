@@ -114,7 +114,7 @@ trait TypeGenerators {
     Type.OffsetDateTime, Type.OffsetDate, Type.OffsetTime,
     Type.LocalDateTime, Type.LocalDate, Type.LocalTime, Type.Interval)
 
-  def simpleConstGen: Gen[Type] = DataGenerators.simpleData.map(Type.Const(_))
+  def simpleConstGen: Gen[Type] = DataGenerators.simpleNonNested.map(Type.Const(_))
   def constGen: Gen[Type] = DataGenerators.data.map(Type.Const(_))
 
   def fieldGen: Gen[(String, Type)] = for {

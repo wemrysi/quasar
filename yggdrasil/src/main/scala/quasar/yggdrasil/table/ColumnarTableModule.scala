@@ -18,6 +18,8 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
+import quasar.contrib.fs2.convert
+import quasar.contrib.scalaz.MonadTell_
 import quasar.precog.{BitSet, MimeType, MimeTypes}
 import quasar.precog.common._
 import quasar.precog.common.ingest.FileContent
@@ -27,7 +29,7 @@ import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
 import qdata.time.{DateTimeInterval, OffsetDate}
 
-import cats.effect.IO
+import cats.effect.{IO, LiftIO}
 
 import TransSpecModule._
 import org.slf4j.Logger
@@ -55,16 +57,16 @@ trait ColumnarTableTypes {
 }
 
 trait ColumnarTableModuleConfig {
-  def maxSliceSize: Int
+  def maxSliceRows: Int
 
   // This is a slice size that we'd like our slices to be at least as large as.
-  def minIdealSliceSize: Int = maxSliceSize / 4
+  def minIdealSliceRows: Int = maxSliceRows / 4
 
   // This is what we consider a "small" slice. This may affect points where
   // we take proactive measures to prevent problems caused by small slices.
-  def smallSliceSize: Int
+  def smallSliceRows: Int
 
-  def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
+  def maxSaneCrossRows: Long = 2400000000L // 2.4 billion
 }
 
 object ColumnarTableModule extends Logging {
@@ -339,7 +341,7 @@ trait ColumnarTableModule
   type TableCompanion <: ColumnarTableCompanion
   case class TableMetrics(startCount: Int, sliceTraversedCount: Int)
 
-  def newScratchDir(): File    = IOUtils.createTmpDir("ctmscratch").unsafePerformIO
+  def newScratchDir(): File = IOUtils.createTmpDir("ctmscratch").unsafePerformIO
   def jdbmCommitInterval: Long = 200000l
 
   implicit def liftF1(f: F1) = new F1Like {
@@ -348,10 +350,10 @@ trait ColumnarTableModule
   }
 
   implicit def liftF2(f: F2) = new F2Like {
-    def applyl(cv: CValue) = CF1("builtin::liftF2::applyl") { f(Column.const(cv), _) }
-    def applyr(cv: CValue) = CF1("builtin::liftF2::applyl") { f(_, Column.const(cv)) }
+    def applyl(cv: CValue) = CF1{ f(Column.const(cv), _) }
+    def applyr(cv: CValue) = CF1{ f(_, Column.const(cv)) }
 
-    def andThen(f1: F1) = CF2("builtin::liftF2::andThen") { (c1, c2) =>
+    def andThen(f1: F1) = CF2 { (c1, c2) =>
       f(c1, c2) flatMap f1.apply
     }
   }
@@ -368,7 +370,7 @@ trait ColumnarTableModule
     def uniformDistribution(init: MmixPrng): Table = {
       val gen: StreamT[IO, Slice] = StreamT.unfoldM[IO, Slice, MmixPrng](init) { prng =>
         val (column, nextGen) = Column.uniformDistribution(prng)
-        (Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), Config.maxSliceSize), nextGen).some.point[IO]
+        (Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), Config.maxSliceRows), nextGen).some.point[IO]
       }
 
       Table(gen, InfiniteSize)
@@ -619,8 +621,20 @@ trait ColumnarTableModule
       }
     }
 
-    def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int] = None): Table = {
-      val sliceSize = maxSliceSize.getOrElse(Config.maxSliceSize)
+    def fromRValueStream[M[_]: Monad: MonadTell_[?[_], List[IO[Unit]]]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table] = {
+      val sliceStream = Slice.allFromRValues(values)
+
+      for {
+        d <- LiftIO[M].liftIO(convert.toStreamT(sliceStream))
+
+        _ <- MonadTell_[M, List[IO[Unit]]].tell(List(d.dispose))
+
+        slices = d.unsafeValue
+      } yield Table(slices, UnknownSize)
+    }
+
+    def fromRValues(values: Stream[RValue], maxSliceRows: Option[Int] = None): Table = {
+      val sliceSize = maxSliceRows.getOrElse(Config.maxSliceRows)
 
       def makeSlice(data: Stream[RValue]): (Slice, Stream[RValue]) = {
         val (prefix, suffix) = data.splitAt(sliceSize)
@@ -817,7 +831,7 @@ trait ColumnarTableModule
         case slice :: Nil => slice
         case slices =>
           val slice = Slice.concat(slices)
-          if (slices.size > (slice.size / Config.smallSliceSize)) {
+          if (slices.size > (slice.size / Config.smallSliceRows)) {
             slice.materialized // Deal w/ lots of small slices by materializing them.
           } else {
             slice
@@ -1345,7 +1359,7 @@ trait ColumnarTableModule
           // We try to fill out the slices as much as possible, so we work with
           // several rows from the left at a time.
 
-          val lrowsPerSlice = math.max(1, Config.maxSliceSize / rhead.size)
+          val lrowsPerSlice = math.max(1, Config.maxSliceRows / rhead.size)
           val sliceSize     = lrowsPerSlice * rhead.size
 
           // Note that this is still memory efficient, as the columns are re-used
@@ -1432,8 +1446,8 @@ trait ColumnarTableModule
         }
 
         // We canonicalize the tables so that no slices are too small.
-        val left  = this.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceSize))
-        val right = that.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceSize))
+        val left  = this.canonicalize(Config.minIdealSliceRows, Some(Config.maxSliceRows))
+        val right = that.canonicalize(Config.minIdealSliceRows, Some(Config.maxSliceRows))
 
         (left.slices.uncons |@| right.slices.uncons).tupled flatMap {
           case (Some((lhead, ltail)), Some((rhead, rtail))) =>
@@ -1687,11 +1701,11 @@ trait ColumnarTableModule
         val highWaterMark: Int =
           math.max(innerHeads.length, primitiveMax)
 
-        val resplit: Vector[Slice] = if (slice.size * highWaterMark > Config.maxSliceSize) {
+        val resplit: Vector[Slice] = if (slice.size * highWaterMark > Config.maxSliceRows) {
           val numSplits =
-            math.ceil((slice.size * highWaterMark).toDouble / Config.maxSliceSize).toInt
+            math.ceil((slice.size * highWaterMark).toDouble / Config.maxSliceRows).toInt
 
-          val size = math.ceil(Config.maxSliceSize.toDouble / highWaterMark).toInt
+          val size = math.ceil(Config.maxSliceRows.toDouble / highWaterMark).toInt
 
           // we repeatedly apply windowing to slice.  this avoids linear delegation through Remap
           val acc = (0 until numSplits).foldLeft(Vector.empty[Slice]) {

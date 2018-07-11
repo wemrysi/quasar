@@ -5,7 +5,7 @@
         "mimir": "ignoreFieldOrder"
     },
     "data": "usa_factbook.data",
-    "query": "select geo{*} from usa_factbook",
+    "query": "select geo{*} from `usa_factbook.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

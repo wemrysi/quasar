@@ -6,7 +6,7 @@
     },
     "description": "combines an aggregate function (min) with a function implemented in JS (length)",
     "data": "zips.data",
-    "query": "select state, min(city) as first, length(min(city)) as len from zips group by state order by len, first, state limit 5",
+    "query": "select state, min(city) as first, length(min(city)) as len from `zips.data` group by state order by len, first, state limit 5",
     "predicate": "exactly",
     "expected": [{ "state": "MI" , "first": "ADA",  "len": 3 },
                  { "state": "OK" , "first": "ADA",  "len": 3 },

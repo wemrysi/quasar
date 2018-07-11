@@ -4,7 +4,7 @@
         "mimir":             "ignoreFieldOrder"
     },
     "data": "smallZips.data",
-    "query": "select integer(`_id`) as intId, decimal(`_id`) as decId from smallZips",
+    "query": "select integer(`_id`) as intId, decimal(`_id`) as decId from `smallZips.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [

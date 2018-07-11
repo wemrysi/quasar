@@ -64,8 +64,6 @@ script:
   - docker/scripts/assembleTestingConf -i quasar_$CONNECTOR
   - cat it/testing.conf
 
-  - ./sbt preBuild
-
   - |-
     SPECIFIC_DELEGATE=
 
@@ -97,14 +95,10 @@ jobs:
 
         - travis_wait 30 scripts/s3Cache cleanup
 
-        - ./sbt preBuild
-
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             checkHeaders \
             test:compile
-
-        - ./sbt postBuild
 
         - travis_wait 30 scripts/s3Cache upload
 
@@ -115,7 +109,6 @@ jobs:
       env:
       script:
         - travis_wait 30 scripts/s3Cache download
-        - ./sbt preBuild
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             it/sideEffectTestFSConfig \
@@ -128,7 +121,6 @@ jobs:
         - set -e
 
         - travis_wait 30 scripts/s3Cache download
-        - ./sbt preBuild
 
         - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc repl/assembly'
 
@@ -166,15 +158,9 @@ branches:
 
 cache:
   directories:
-    - $HOME/.cache/quasar/fileDownloads
     - $HOME/.coursier/cache
     - $HOME/.ivy2/cache
     - $HOME/.sbt
-    - target
-    - .targets
-    - '.hoarder-cache'
-    - project/project/target
-    - project/target
 
 before_cache:
   - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm

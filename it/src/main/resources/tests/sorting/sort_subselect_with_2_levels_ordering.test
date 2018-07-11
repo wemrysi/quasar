@@ -3,7 +3,7 @@
 
   "data": "sort.data",
 
-  "query": "select l1.num, l1.name.first from (select num, age, name from sort order by age desc) as l1 order by l1.name.first desc",
+  "query": "select l1.num, l1.name.first from (select num, age, name from `sort.data` order by age desc) as l1 order by l1.name.first desc",
 
   "predicate": "exactly",
   "ignoreResultOrder": true,

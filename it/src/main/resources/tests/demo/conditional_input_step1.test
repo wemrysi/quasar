@@ -1,7 +1,7 @@
 {
     "name": "conditional_input_step1",
     "data": "patients.data",
-    "query": "SELECT DISTINCT (state) as state FROM patients ORDER BY state ASC LIMIT 10",
+    "query": "SELECT DISTINCT (state) as state FROM `patients.data` ORDER BY state ASC LIMIT 10",
     "predicate": "exactly",
     "expected": [
          { "state": "AK" },

@@ -9,7 +9,7 @@
     "query": "select
                 c.city ?? c.state as ct,
                 c.details.code ?? c.details.street as cd
-              from functions as c",
+              from `functions.data` as c",
 
   "predicate": "exactly",
 

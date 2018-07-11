@@ -31,13 +31,13 @@ import java.nio.file.{Files, Path => JPath}
 import java.text.ParseException
 
 import scala.collection.JavaConverters._
-import scala.collection.Seq
+import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import cats.effect.{Effect, Sync, Timer}
 import fs2.{io, Chunk, Stream}
-import jawn.AsyncParser
 import jawn.support.argonaut.Parser.facade
+import jawnfs2._
 import pathy.Path
 import scalaz.{\/, EitherT, Scalaz}, Scalaz._
 import shims._
@@ -53,8 +53,11 @@ import shims._
   */
 final class LocalDataSource[F[_]: Sync, G[_]: Effect: Timer] private (
     root: JPath,
-    readChunkSizeBytes: Int)
+    readChunkSizeBytes: Int,
+    pool: ExecutionContext)
     extends LightweightDataSource[F, Stream[G, ?], Stream[G, Data]] {
+
+  implicit val ec: ExecutionContext = pool
 
   val kind: DataSourceType = LocalType
 
@@ -75,8 +78,10 @@ final class LocalDataSource[F[_]: Sync, G[_]: Effect: Timer] private (
           else notAResource[ReadError](path).left[Unit]
         })
       } yield {
-        Stream.eval(G.delay(AsyncParser[Json](AsyncParser.ValueStream)))
-          .flatMap(parseJsonAsync(_, jp))
+        io.file.readAllAsync[G](jp, readChunkSizeBytes)
+          .chunks
+          .map(_.toByteBuffer)
+          .parseJsonStream[Json]
           .chunks
           .flatMap(decodeChunk)
       }
@@ -94,17 +99,6 @@ final class LocalDataSource[F[_]: Sync, G[_]: Effect: Timer] private (
       convert.fromJavaStream(G.delay(Files.list(jp))).evalMap(withType))
   }
 
-  def descendants(path: ResourcePath): F[CommonError \/ Stream[G, ResourcePath]] = {
-    def emitFile(p: JPath): Stream[G, JPath] =
-      Stream.eval(G.delay(Files.isRegularFile(p)))
-        .ifM(Stream.emit(p), Stream.empty)
-
-    ifExists[CommonError](path)(jp =>
-      convert.fromJavaStream(G.delay(Files.walk(jp)))
-        .flatMap(emitFile)
-        .map(f => fromNio(root.relativize(f))))
-  }
-
   def isResource(path: ResourcePath): F[Boolean] =
     toNio(path) >>= (jp => F.delay(Files.isRegularFile(jp)))
 
@@ -113,19 +107,6 @@ final class LocalDataSource[F[_]: Sync, G[_]: Effect: Timer] private (
   private val F = Sync[F]
   private val G = Effect[G]
   private val ME = MonadError_[F, Throwable]
-
-  private def parseJsonAsync(parser: AsyncParser[Json], path: JPath): Stream[G, Json] = {
-    def unattemptChunk(at: Either[Exception, Seq[Json]]): Stream[G, Json] =
-      at.fold(Stream.raiseError, Stream.emits).covary[G]
-
-    val initial =
-      io.file.readAllAsync[G](path, readChunkSizeBytes)
-        .chunks
-        .map(_.toByteBuffer)
-        .flatMap(buf => unattemptChunk(parser.absorb(buf)))
-
-    initial ++ unattemptChunk(parser.finish())
-  }
 
   private def decodeChunk(c: Chunk[Json]): Stream[G, Data] =
     c.traverse(Precise.decode)
@@ -169,7 +150,8 @@ final class LocalDataSource[F[_]: Sync, G[_]: Effect: Timer] private (
 object LocalDataSource {
   def apply[F[_]: Sync, G[_]: Effect: Timer](
       root: JPath,
-      readChunkSizeBytes: Int)
+      readChunkSizeBytes: Int,
+      pool: ExecutionContext)
       : DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]] =
-    new LocalDataSource[F, G](root, readChunkSizeBytes)
+    new LocalDataSource[F, G](root, readChunkSizeBytes, pool)
 }

@@ -1505,6 +1505,38 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       //       shift common to both sides of the `Or`
       leftShiftCount must_= 4
     }
+
+    "create a single AutoJoin2 when there are exactly two sources" in {
+      val reduce =
+        qsu.qsReduce(
+          shiftedRead,
+          Nil,
+          List(ReduceFuncs.Arbitrary(func.ProjectKeyS(func.Hole, "b"))),
+          Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0))))
+
+      val twoSources =
+        QSUGraph.fromTree[Fix](
+          qsu._autojoin2(
+            (qsu._autojoin2(
+              (qsu.map(shiftedRead, recFunc.MakeMapS("a", recFunc.ProjectKeyS(recFunc.Hole, "a"))),
+                qsu.map(reduce, recFunc.MakeMapS("b", recFunc.Hole)),
+                func.ConcatMaps(func.LeftSide, func.RightSide))),
+              qsu.map(shiftedRead, recFunc.MakeMapS("c", recFunc.ProjectKeyS(recFunc.Hole, "c"))),
+              func.ConcatMaps(func.LeftSide, func.RightSide))))
+
+      runOn(twoSources) must beLike {
+        case AutoJoin2(
+          LeftShift(Read(_), _, _, _, _, _),
+          QSReduce(_, _, _, _),
+          repair) =>
+
+          repair must beTreeEqual(
+            func.StaticMapS(
+              "a" -> func.ProjectKeyS(func.LeftSide, "a"),
+              "b" -> func.RightSide,
+              "c" -> func.ProjectKeyS(func.LeftSide, "c")))
+      }
+    }
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph =

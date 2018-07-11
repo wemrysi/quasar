@@ -5,7 +5,7 @@
         "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",
-    "query": "select city, state from zips order by state desc, city asc",
+    "query": "select city, state from `zips.data` order by state desc, city asc",
     "predicate": "initial",
     "expected": [{ "city": "ACME", "state": "WY" },
                  { "city": "AFTON", "state": "WY" },

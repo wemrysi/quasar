@@ -6,7 +6,7 @@
         "mongodb_3_6":       "ignoreFieldOrder"
     },
     "data": "extraSmallZips.data",
-    "query": "select city, sum(pop) from extraSmallZips group by lower(city)",
+    "query": "select city, sum(pop) from `extraSmallZips.data` group by lower(city)",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

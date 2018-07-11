@@ -22,9 +22,10 @@ import quasar._
 import quasar.api.ResourceError.ReadError
 import quasar.blueeyes.json.{JValue, JUndefined}
 import quasar.connector.QScriptEvaluator
+import quasar.contrib.cats.effect._
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.concurrent.task._
+import quasar.contrib.scalaz.MonadTell_
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs.Planner.PlannerErrorME
@@ -37,8 +38,8 @@ import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.{IO, LiftIO}
-import cats.effect.implicits._
 import fs2.Stream
+import io.chrisdavenport.scalaz.task._
 import iotaz.CopK
 import matryoshka._
 import matryoshka.implicits._
@@ -50,7 +51,7 @@ import shims._
 
 final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: LiftIO: Monad: PlannerErrorME: MonadFinalizers[?[_], IO]] private (
+    F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], List[IO[Unit]]]] private (
     cake: Cake)
     extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] {
 
@@ -99,7 +100,7 @@ final class MimirQScriptEvaluator[
   def plan(cp: T[QSM]): M[Repr] = {
     def qScriptCorePlanner =
       new mimir.QScriptCorePlanner[T, M](
-        λ[ReaderT[Task, Cake, ?] ~> M](_.run(cake).toIO.to[F].liftM[MT]))
+        λ[ReaderT[Task, Cake, ?] ~> M](_.run(cake).to[IO].to[F].liftM[MT]))
 
     def equiJoinPlanner =
       new mimir.EquiJoinPlanner[T, M](λ[IO ~> M](_.to[F].liftM[MT]))
@@ -138,7 +139,7 @@ final class MimirQScriptEvaluator[
 object MimirQScriptEvaluator {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: LiftIO: Monad: PlannerErrorME: MonadFinalizers[?[_], IO]](
+      F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], List[IO[Unit]]]](
       cake: Cake)
       : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] =
     new MimirQScriptEvaluator[T, F](cake)
