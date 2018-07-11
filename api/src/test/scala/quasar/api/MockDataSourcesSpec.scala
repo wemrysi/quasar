@@ -24,14 +24,12 @@ import quasar.fp.numeric.Positive
 import cats.effect.IO
 import eu.timepit.refined.auto._
 import scalaz.{IMap, ISet, Id, StateT, ~>}, Id.Id
-//import scalaz.std.string._
+import scalaz.std.string._
 import shims._
 
 import MockDataSourcesSpec.DefaultM
 
-// FIXME: Disabled due to being a suspect in the case of
-//        https://app.clubhouse.io/data/story/270/soe-on-travis-trace-through-specs2
-final class MockDataSourcesSpec /*extends DataSourcesSpec[DefaultM, String]*/ {
+final class MockDataSourcesSpec extends DataSourcesSpec[DefaultM, String] {
   val s3: DataSourceType    = DataSourceType("s3", Positive(3).get)
   val azure: DataSourceType = DataSourceType("azure", Positive(3).get)
   val mongo: DataSourceType = DataSourceType("mongodb", Positive(3).get)
