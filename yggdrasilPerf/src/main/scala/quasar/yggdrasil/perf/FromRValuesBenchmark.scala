@@ -69,6 +69,16 @@ class FromRValuesBenchmark {
       List.tabulate(chunkSize)(s =>
         RObject(List.tabulate(keys)(i => ("k" + c + s + i) -> scalar).toMap)))
 
+  // Each chunk should look like:
+  // { k1: v1, k2: v2, k3: v3 }, { k4: v1, k1: v2, k2: v3 }
+  // don't set `keysPerObject` lower than `keys` or you will have duplicates.
+  def scrollingFieldObjects(chunks: Int, chunkSize: Int, keys: Int, keysPerObject: Int, scalar: CValue): Stream[List[RValue]] =
+    Stream.fill(chunks)(
+      List.tabulate(chunkSize)(s =>
+        RObject(List.tabulate(keysPerObject)(i =>
+          ("k" + ((s * keysPerObject + i) % keys)) -> scalar
+        ).toMap)))
+
   def createAndConsumeTable(data: Stream[List[RValue]], bh: Blackhole): IO[Unit] = {
     val table: WriterT[IO, List[IO[Unit]], P.Table] =
       if (streaming) {
@@ -85,37 +95,49 @@ class FromRValuesBenchmark {
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestLongs(bh: Blackhole): Unit = {
-    createAndConsumeTable(scalars(20, 50000, CLong(100)), bh).unsafeRunSync
+    createAndConsumeTable(scalars(10, 50000, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestArrsWithFittingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(arrays(20, 200, 80, CLong(100)), bh).unsafeRunSync
+    createAndConsumeTable(arrays(10, 500, 80, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestArrsWithOverflowingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(arrays(20, 200, 200, CLong(100)), bh).unsafeRunSync
+    createAndConsumeTable(arrays(10, 500, 200, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestObjectsWithFittingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(objects(20, 200, 80, CLong(100)), bh).unsafeRunSync
+    createAndConsumeTable(objects(10, 500, 80, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestObjectsWithOverflowingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(objects(20, 200, 200, CLong(100)), bh).unsafeRunSync
+    createAndConsumeTable(objects(10, 500, 200, CLong(100)), bh).unsafeRunSync
   }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestObjectsWithDistinctColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(distinctFieldObjects(20, 200, 100, CLong(100)), bh).unsafeRunSync
+    createAndConsumeTable(distinctFieldObjects(10, 500, 100, CLong(100)), bh).unsafeRunSync
+  }
+
+  @Benchmark
+  @BenchmarkMode(Array(Mode.AverageTime))
+  def ingestObjectsWithWideScrollingColumns(bh: Blackhole): Unit = {
+    createAndConsumeTable(scrollingFieldObjects(10, 500, 200, 100, CLong(100)), bh).unsafeRunSync
+  }
+
+  @Benchmark
+  @BenchmarkMode(Array(Mode.AverageTime))
+  def ingestObjectsWithNarrowScrollingColumns(bh: Blackhole): Unit = {
+    createAndConsumeTable(scrollingFieldObjects(10, 500, 80, 50, CLong(100)), bh).unsafeRunSync
   }
 
 }
