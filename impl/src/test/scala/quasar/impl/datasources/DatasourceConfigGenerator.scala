@@ -14,12 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasource
+package quasar.impl.datasources
 
-import quasar.api.datasource.DatasourceType
+import quasar.api.datasource.{DatasourceType, DatasourceTypeGenerator}
 
-import eu.timepit.refined.auto._
+import org.scalacheck._, Arbitrary.arbitrary
 
-package object local {
-  val LocalType = DatasourceType("local", 1L)
+trait DatasourceConfigGenerator {
+  import DatasourceTypeGenerator._
+
+  implicit def dataSourceConfigArbitrary[C: Arbitrary]: Arbitrary[DatasourceConfig[C]] =
+    Arbitrary(for {
+      tpe <- arbitrary[DatasourceType]
+      c   <- arbitrary[C]
+    } yield DatasourceConfig(tpe, c))
 }
+
+object DatasourceConfigGenerator extends DatasourceConfigGenerator

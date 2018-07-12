@@ -35,7 +35,7 @@ object ExternalConfig {
    */
   val Empty: ExternalConfig = ExplodedDirs(Nil)
 
-  def fromDataSources[F[_]: Sync](datasources: List[(String, List[Path])]): F[ExternalConfig] = {
+  def fromDatasources[F[_]: Sync](datasources: List[(String, List[Path])]): F[ExternalConfig] = {
     val entriesF = datasources traverse {
       case (name, paths) =>
         Sync[F] delay {
@@ -49,8 +49,8 @@ object ExternalConfig {
   /**
    * A single directory containing plugin files, each of which will be
    * loaded as a backend. Plugin is defined by a json file containing
-   * a path to the main plugin jar from which `LightweightDataSourceModule`
-   * or `HeavyweightDataSourceModule` class name will be determined using the
+   * a path to the main plugin jar from which `LightweightDatasourceModule`
+   * or `HeavyweightDatasourceModule` class name will be determined using the
    * `Manifest.mf` file. The other thing in plugin file is a classpath that
    * will be loaded for this plugin.
    */
@@ -60,8 +60,8 @@ object ExternalConfig {
    * Any files in the classpath will be loaded as jars; any directories
    * will be assumed to contain class files (e.g. the target output of
    * SBT compile).  The class name should be the fully qualified Java
-   * class name of the `LightweightDataSourceModule` or
-   * `HeavyweightDataSourceModule` implemented as a Scala object.
+   * class name of the `LightweightDatasourceModule` or
+   * `HeavyweightDatasourceModule` implemented as a Scala object.
    * In most cases, this means the class name here will end with a `$`
    */
   final case class ExplodedDirs(modules: List[(ClassName, ClassPath)]) extends ExternalConfig
