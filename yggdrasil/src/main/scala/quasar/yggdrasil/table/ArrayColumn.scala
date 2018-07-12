@@ -43,13 +43,6 @@ object ArrayColumn {
     System.arraycopy(arr, 0, newArr, 0, Math.min(size, arr.length))
     newArr
   }
-
-  private[table] def resizeBitSet(bs: BitSet, size: Int): BitSet = {
-    bs.resizeBits(size)
-  }
-
-  private[table] def filterDefined[A: ClassTag](d: BitSet, arr: Array[A]): Array[A] =
-    arr.zipWithIndex.collect { case (v, i) if d(i) => v }.toArray
 }
 
 class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val defined: BitSet, val values: Array[Array[A]])(implicit val tpe: CArrayType[A])
