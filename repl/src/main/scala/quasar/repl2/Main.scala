@@ -42,10 +42,10 @@ object Main extends QuasarApp {
   def quasarStream: Stream[IO, Quasar[IO, IO]] =
     for {
       basePath <- Paths.getBasePath[Stream[IO, ?]]
-      dataDir = basePath.resolve(Paths.quasarDataDirName)
+      dataDir = basePath.resolve(Paths.QuasarDataDirName)
       _ <- Paths.mkdirs[Stream[IO, ?]](dataDir)
       dataPath <- Stream.eval(IO(dataDir))
-      pluginDir = basePath.resolve(Paths.quasarPluginsDirName)
+      pluginDir = basePath.resolve(Paths.QuasarPluginsDirName)
       _ <- Paths.mkdirs[Stream[IO, ?]](pluginDir)
       pluginPath <- Stream.eval(IO(pluginDir))
       q <- Quasar[IO](dataPath, ExternalConfig.PluginDirectory(pluginPath), global)

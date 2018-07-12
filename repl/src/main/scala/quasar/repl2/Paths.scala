@@ -27,22 +27,22 @@ import scalaz._, Scalaz._
 import shims._
 
 object Paths {
-  val userHome = "user.home"
+  val UserHome = "user.home"
 
-  val tmpQuasarReplDirNames = NonEmptyList("tmp", "quasar-repl")
-  val quasarDirNames = NonEmptyList(".config", "quasar")
-  val quasarDataDirName = "data"
-  val quasarPluginsDirName = "plugins"
+  val TmpQuasarReplDirNames = NonEmptyList("tmp", "quasar-repl")
+  val QuasarDirNames = NonEmptyList(".config", "quasar")
+  val QuasarDataDirName = "data"
+  val QuasarPluginsDirName = "plugins"
 
   def getBasePath[F[_]](implicit F: Sync[F]): F[JPath] =
-    getUserHome.map(h => h.map(_.resolve(getPath(quasarDirNames)))
-      .getOrElse(getPath(tmpQuasarReplDirNames)))
+    getUserHome.map(h => h.map(_.resolve(getPath(QuasarDirNames)))
+      .getOrElse(getPath(TmpQuasarReplDirNames)))
 
   def getProp[F[_]](p: String)(implicit F: Sync[F]): F[Option[String]] =
     F.delay(Option(System.getProperty(p)))
 
   def getUserHome[F[_]](implicit F: Sync[F]): F[Option[JPath]] =
-    getProp(userHome).map(_.map(JPaths.get(_)))
+    getProp(UserHome).map(_.map(JPaths.get(_)))
 
   def mkdirs[F[_]](p: JPath)(implicit F: Sync[F]): F[Boolean] =
     F.delay(p.toFile.mkdirs())
