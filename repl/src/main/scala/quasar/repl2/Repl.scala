@@ -26,6 +26,7 @@ import java.io.File
 
 import argonaut.Json
 import cats.effect._
+import cats.syntax.{applicative, flatMap, functor}, applicative._, flatMap._, functor._
 import fs2.Stream
 import fs2.async.Ref
 import org.apache.commons.io.FileUtils
@@ -33,7 +34,7 @@ import org.jline.reader._
 import org.jline.terminal._
 import scalaz._, Scalaz._
 
-final class Repl[F[_]: Monad: ConcurrentEffect](
+final class Repl[F[_]: ConcurrentEffect](
   prompt: String,
   reader: LineReader,
   evaluator: Command => F[Evaluator.Result]) {
@@ -54,19 +55,19 @@ final class Repl[F[_]: Monad: ConcurrentEffect](
       res <- eval(cmd)
       Evaluator.Result(exitCode, string) = res
       _ <- print(string)
-      next <- exitCode.fold(loop)(_.point[F])
+      next <- exitCode.fold(loop)(_.pure[F])
     } yield next
 }
 
 object Repl {
-  def apply[F[_]: Monad: ConcurrentEffect](
+  def apply[F[_]: ConcurrentEffect](
     prompt: String,
     reader: LineReader,
     evaluator: Command => F[Evaluator.Result]):
       Repl[F] =
     new Repl[F](prompt, reader, evaluator)
 
-  def mk[F[_]: Monad: ConcurrentEffect, G[_]: Functor: Effect](
+  def mk[F[_]: ConcurrentEffect, G[_]: Effect](
     ref: Ref[F, ReplState],
     datasources: DataSources[F, Json],
     queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]])
@@ -87,7 +88,7 @@ object Repl {
       }
     }
 
-  private def historyFile[F[_]: Monad](implicit F: Sync[F]): F[Option[File]] =
+  private def historyFile[F[_]](implicit F: Sync[F]): F[Option[File]] =
     Paths.getProp("quasar.historyfile") >>=
       (_ match {
         case Some(p) => touch(new File(p))
@@ -95,7 +96,7 @@ object Repl {
           Paths.getUserHome >>=
             (_ match {
               case Some(h) => touch(new File(h.toFile, ".quasar.history"))
-              case None => none[File].point[F]
+              case None => none[File].pure[F]
             })
       })
 

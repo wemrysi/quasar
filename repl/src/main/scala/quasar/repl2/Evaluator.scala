@@ -41,8 +41,9 @@ import fs2.Stream
 import fs2.async.Ref
 import pathy.Path._
 import scalaz._, Scalaz._
+import shims._
 
-final class Evaluator[F[_]: Monad: Effect, G[_]: Functor: Effect](
+final class Evaluator[F[_]: Effect, G[_]: Effect](
   stateRef: Ref[F, ReplState],
   sources: DataSources[F, Json],
   queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]]) {
@@ -299,7 +300,7 @@ object Evaluator {
 
   final class EvalError(msg: String) extends java.lang.RuntimeException(msg)
 
-  def apply[F[_]: Monad: Effect, G[_]: Functor: Effect](
+  def apply[F[_]: Effect, G[_]: Effect](
     stateRef: Ref[F, ReplState],
     sources: DataSources[F, Json],
     queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]])
