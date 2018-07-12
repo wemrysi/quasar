@@ -17,7 +17,8 @@
 package quasar.impl.datasources
 
 import slamdata.Predef.{Boolean, None, Option, Some, Unit}
-import quasar.api.{DataSourceType, ResourceName}
+import quasar.api.ResourceName
+import quasar.api.datasource.DataSourceType
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp.ski.κ2
 import MockDataSourceConfigs.{Configs, MonadConfigs}

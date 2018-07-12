@@ -18,6 +18,7 @@ package quasar.impl.datasource
 
 import slamdata.Predef.{Boolean, None, Some, Throwable, Unit}
 import quasar.api._, ResourceError._
+import quasar.api.datasource.DataSourceType
 import quasar.connector.DataSource
 
 import java.lang.IllegalStateException

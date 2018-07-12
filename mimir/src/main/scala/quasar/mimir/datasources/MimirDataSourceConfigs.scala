@@ -18,7 +18,8 @@ package quasar.mimir.datasources
 
 import slamdata.Predef.{Boolean, Map, Option, Unit}
 
-import quasar.api.{DataSourceType, ResourceName}
+import quasar.api.ResourceName
+import quasar.api.datasource.DataSourceType
 import quasar.blueeyes.json.{JValue, JUndefined}
 import quasar.contrib.fs2.convert
 import quasar.contrib.pathy.AFile

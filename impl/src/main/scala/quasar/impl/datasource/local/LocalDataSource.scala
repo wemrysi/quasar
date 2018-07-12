@@ -19,8 +19,9 @@ package quasar.impl.datasource.local
 import slamdata.Predef.{Stream => _, Seq => _, _}
 import quasar.Data
 import quasar.DataCodec.Precise
-import quasar.api.{DataSourceType, ResourceName, ResourcePath, ResourcePathType}
+import quasar.api.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.api.ResourceError._
+import quasar.api.datasource.DataSourceType
 import quasar.connector.DataSource
 import quasar.connector.datasource.LightweightDataSource
 import quasar.contrib.fs2.convert

@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.datasource
 
 import quasar.Condition
+import quasar.api.ResourceName
 
 import scalaz.{\/, IMap, ISet}
 

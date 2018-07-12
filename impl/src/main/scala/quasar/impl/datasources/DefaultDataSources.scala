@@ -19,7 +19,8 @@ package quasar.impl.datasources
 import slamdata.Predef.Unit
 import quasar.Condition
 import quasar.api._
-import quasar.api.DataSourceError._
+import quasar.api.datasource._
+import quasar.api.datasource.DataSourceError._
 
 import scalaz.{\/, EitherT, IMap, ISet, Liskov, Monad, OptionT}, Liskov.<~<
 import scalaz.syntax.equal._

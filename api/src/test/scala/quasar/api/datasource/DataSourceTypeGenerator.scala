@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.datasource
 
 import slamdata.Predef._
 import quasar.pkg.tests._

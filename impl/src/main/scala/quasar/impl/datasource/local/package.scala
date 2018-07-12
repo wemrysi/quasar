@@ -16,7 +16,7 @@
 
 package quasar.impl.datasource
 
-import quasar.api.DataSourceType
+import quasar.api.datasource.DataSourceType
 
 import eu.timepit.refined.auto._
 

@@ -16,7 +16,7 @@
 
 package quasar.impl.datasources
 
-import quasar.api.{DataSourceType, DataSourceTypeGenerator}
+import quasar.api.datasource.{DataSourceType, DataSourceTypeGenerator}
 
 import org.scalacheck._, Arbitrary.arbitrary
 

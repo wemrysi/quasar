@@ -18,8 +18,9 @@ package quasar.impl.datasources
 
 import slamdata.Predef.{List, None, Option, Some, Unit}
 import quasar.Condition
-import quasar.api.{DataSourceType, ResourceName}
-import quasar.api.DataSourceError._
+import quasar.api.ResourceName
+import quasar.api.datasource.DataSourceType
+import quasar.api.datasource.DataSourceError._
 import quasar.contrib.scalaz.{MonadState_, MonadTell_}
 import MockDataSourceControl.{Initialized, MonadInit, MonadShutdown, Shutdowns}
 

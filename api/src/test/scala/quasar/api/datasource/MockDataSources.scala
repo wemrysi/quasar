@@ -14,18 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.datasource
 
 import slamdata.Predef.{None, Some}
-import quasar.api.DataSourceError.{CommonError, CreateError, DataSourceNotFound, ExistentialError, InitializationError}
 import quasar.Condition
+import quasar.api.ResourceName
 import quasar.contrib.scalaz.MonadState_
+
 import scalaz.{IMap, ISet, Monad, \/}
 import scalaz.syntax.monad._
 import scalaz.syntax.equal._
 import scalaz.syntax.std.option._
-import MockDataSources.DSMockState
 
+import DataSourceError.{CommonError, CreateError, DataSourceNotFound, ExistentialError, InitializationError}
+import MockDataSources.DSMockState
 
 final class MockDataSources[F[_]: Monad: DSMockState[?[_], C], C] private (
   supportedDataSources: ISet[DataSourceType],

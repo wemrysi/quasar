@@ -17,7 +17,7 @@
 package quasar.impl.external
 
 import slamdata.Predef._
-import quasar.api.DataSourceType
+import quasar.api.datasource.DataSourceType
 import quasar.connector.{HeavyweightDataSourceModule, LightweightDataSourceModule}
 import quasar.contrib.fs2.convert
 import quasar.impl.DataSourceModule

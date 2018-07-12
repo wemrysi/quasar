@@ -17,7 +17,8 @@
 package quasar.connector
 
 import slamdata.Predef.Unit
-import quasar.api.{DataSourceType, QueryEvaluator}
+import quasar.api.QueryEvaluator
+import quasar.api.datasource.DataSourceType
 
 trait DataSource[F[_], G[_], Q, R] extends QueryEvaluator[F, G, Q, R] {
   def kind: DataSourceType

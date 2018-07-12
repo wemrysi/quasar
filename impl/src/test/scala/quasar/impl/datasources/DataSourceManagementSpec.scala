@@ -19,8 +19,9 @@ package quasar.impl.datasources
 import slamdata.Predef._
 import quasar.{ConditionMatchers, Data, RenderTreeT}
 import quasar.api._
-import quasar.api.DataSourceError.{CreateError, DataSourceUnsupported, InitializationError}
 import quasar.api.ResourceError.{CommonError, ReadError}
+import quasar.api.datasource._
+import quasar.api.datasource.DataSourceError.{CreateError, DataSourceUnsupported, InitializationError}
 import quasar.connector.{DataSource, HeavyweightDataSourceModule, LightweightDataSourceModule}
 import quasar.contrib.scalaz.MonadError_
 import quasar.fs.Planner.{PlannerError, PlannerErrorME}

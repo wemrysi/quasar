@@ -17,7 +17,8 @@
 package quasar.run
 
 import quasar.Data
-import quasar.api.{DataSources, QueryEvaluator, ResourceDiscovery, ResourceName}
+import quasar.api.{QueryEvaluator, ResourceDiscovery, ResourceName}
+import quasar.api.datasource.DataSources
 import quasar.common.PhaseResultTell
 import quasar.contrib.fs2.stream._
 import quasar.contrib.pathy.AFile

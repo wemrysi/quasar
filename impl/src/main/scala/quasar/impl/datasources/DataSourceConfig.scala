@@ -16,7 +16,7 @@
 
 package quasar.impl.datasources
 
-import quasar.api.DataSourceType
+import quasar.api.datasource.DataSourceType
 
 import monocle.PLens
 import monocle.macros.Lenses

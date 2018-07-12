@@ -18,8 +18,9 @@ package quasar.impl.datasources
 
 import slamdata.Predef.Unit
 import quasar.Condition
-import quasar.api.{DataSourceType, ResourceName}
-import quasar.api.DataSourceError.CreateError
+import quasar.api.ResourceName
+import quasar.api.datasource.DataSourceType
+import quasar.api.datasource.DataSourceError.CreateError
 
 import scalaz.ISet
 

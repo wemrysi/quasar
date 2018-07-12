@@ -17,8 +17,8 @@
 package quasar.connector
 
 import quasar.{Data, RenderTreeT}
-import quasar.api.DataSourceType
-import quasar.api.DataSourceError.InitializationError
+import quasar.api.datasource.DataSourceType
+import quasar.api.datasource.DataSourceError.InitializationError
 import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript.QScriptEducated
 

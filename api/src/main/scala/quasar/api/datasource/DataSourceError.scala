@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.datasource
 
 import slamdata.Predef._
+import quasar.api.ResourceName
 
 import scalaz.{Cord, Equal, ISet, NonEmptyList, Show}
 import scalaz.std.option._

@@ -19,7 +19,8 @@ package quasar.impl.datasources
 import slamdata.Predef._
 import quasar.Condition
 import quasar.api._
-import quasar.api.DataSourceError._
+import quasar.api.datasource._
+import quasar.api.datasource.DataSourceError._
 import DefaultDataSourcesSpec.DefaultM
 
 import java.io.IOException

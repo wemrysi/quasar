@@ -17,8 +17,9 @@
 package quasar.connector
 
 import quasar.Data
-import quasar.api.{DataSourceType, ResourcePath}
-import quasar.api.DataSourceError.InitializationError
+import quasar.api.ResourcePath
+import quasar.api.datasource.DataSourceType
+import quasar.api.datasource.DataSourceError.InitializationError
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, Timer}

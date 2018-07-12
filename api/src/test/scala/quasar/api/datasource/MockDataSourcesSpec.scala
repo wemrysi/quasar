@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.datasource
 
 import slamdata.Predef.{String, List}
+import quasar.api.ResourceName
 
 import quasar.Condition
 import quasar.fp.numeric.Positive
@@ -36,7 +37,7 @@ final class MockDataSourcesSpec extends DataSourcesSpec[DefaultM, String] {
   val acceptedSet: ISet[DataSourceType] = ISet.fromList(List(s3, azure, mongo))
 
   def datasources: DataSources[DefaultM, String] =
-    quasar.api.MockDataSources[DefaultM, String](acceptedSet, (_, _, _) => Condition.normal())
+    MockDataSources[DefaultM, String](acceptedSet, (_, _, _) => Condition.normal())
 
   def supportedType = DataSourceType("s3", 3L)
 

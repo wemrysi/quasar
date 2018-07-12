@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.datasource
 
 import slamdata.Predef.{Some, String}
 import quasar.{Condition, ConditionMatchers, Qspec}
+import quasar.api.ResourceName
 
 import scala.Predef.assert
 

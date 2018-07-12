@@ -19,6 +19,7 @@ package quasar.impl.datasource
 import slamdata.Predef.{Boolean, None, Some, Unit}
 import quasar.Condition
 import quasar.api._, ResourceError._
+import quasar.api.datasource.DataSourceType
 import quasar.connector.DataSource
 import quasar.contrib.scalaz.MonadError_
 

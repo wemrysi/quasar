@@ -17,8 +17,8 @@
 package quasar.impl.datasource.local
 
 import quasar.Data
-import quasar.api.{DataSourceType, ResourcePath}
-import quasar.api.DataSourceError._
+import quasar.api.ResourcePath
+import quasar.api.datasource.{DataSourceError, DataSourceType}, DataSourceError._
 import quasar.connector.{DataSource, LightweightDataSourceModule}
 
 import java.nio.file.Paths

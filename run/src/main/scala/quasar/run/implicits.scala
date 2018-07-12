@@ -16,7 +16,7 @@
 
 package quasar.run
 
-import quasar.api.DataSourceError.CreateError
+import quasar.api.datasource.DataSourceError.CreateError
 import quasar.contrib.scalaz.MonadError_
 import quasar.compile.SemanticErrors
 import quasar.fs.Planner.PlannerError
