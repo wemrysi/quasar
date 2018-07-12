@@ -153,15 +153,15 @@ final class Evaluator[F[_]: Monad: Effect, G[_]: Functor: Effect](
         } yield s"cwd is now ${printPath(dir)}".some
 
       case Ls(path: Option[ReplPath]) =>
-        def printType(tpe: ResourcePathType): String = tpe match {
-          case ResourcePathType.ResourcePrefix => "prefix  "
-          case ResourcePathType.Resource       => "resource"
+        def postfix(tpe: ResourcePathType): String = tpe match {
+          case ResourcePathType.ResourcePrefix => "/"
+          case ResourcePathType.Resource => ""
         }
 
         def convert(s: Stream[G, (ResourceName, ResourcePathType)])
             : G[Option[String]] =
-          s.map { case (name, tpe) => s"${printType(tpe)} ${name.value}" }
-            .compile.toVector.map(_.mkString("type     name\n---------------------\n", "\n", "").some)
+          s.map { case (name, tpe) => s"${name.value}${postfix(tpe)}" }
+            .compile.toVector.map(_.mkString("\n").some)
 
         for {
           cwd <- stateRef.get.map(_.cwd)
