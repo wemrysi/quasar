@@ -83,7 +83,10 @@ final class Evaluator[F[_]: Monad: Effect, G[_]: Functor: Effect](
         count match {
           case None => F.pure("Rows must be a positive integer or 0 to indicate no limit".some)
           case Some(c) => stateRef.modify(_.copy(summaryCount = c)) *>
-            F.pure(s"Set rows to show in result: $rows".some)
+            F.pure {
+              val r = c.map(_.toString).getOrElse("unlimited")
+              s"Set rows to show in result: $r".some
+            }
         }
 
       case Format(fmt) =>

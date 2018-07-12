@@ -66,7 +66,6 @@ object Command {
   final case object DataSourceTypes extends Command
   final case class DataSourceLookup(name: ResourceName) extends Command
   final case class DataSourceAdd(name: ResourceName, tp: DataSourceType.Name, config: String, onConflict: ConflictResolution) extends Command
-  //final case class DataSourceMove
   final case class DataSourceRemove(name: ResourceName) extends Command
 
   implicit val equalCommand: Equal[Command] = Equal.equalA
