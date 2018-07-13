@@ -28,12 +28,12 @@ object TableError {
   final case class UnparsableQuery[Q](sql2: TableAttribute.Query[Q]) extends CreationError
   final case class ResourcesNotFound(resources: NonEmptyList[ResourceName]) extends CreationError
 
-  sealed trait ExistenceError[I] extends TableError
-  final case class TableNotFound[I](tableId: I) extends ExistenceError[I]
-
-  sealed trait PrePreparationError[I] extends ExistenceError[I]
+  sealed trait PrePreparationError[I] extends TableError
   final case class PreparationInProgress[I](tableId: I) extends PrePreparationError[I]
 
-  sealed trait ModificationError[I] extends ExistenceError[I] with CreationError
+  sealed trait ModificationError[I] extends TableError
   final case class ConflictingPreparationState[I](tableId: I) extends ModificationError[I]
+
+  sealed trait ExistenceError[I] extends ModificationError[I] with PrePreparationError[I]
+  final case class TableNotFound[I](tableId: I) extends ExistenceError[I]
 }
