@@ -17,6 +17,7 @@
 package quasar.api.table
 
 import quasar.Condition
+import slamdata.Predef.Unit
 import scalaz.\/
 
 /** @tparam I identity
@@ -37,6 +38,10 @@ trait Tables[F[_], G[_], I, Q, D] {
   def prepareTable(tableId: I): F[Condition[PrePreparationError[I]]]
 
   def preparationStatus(tableId: I): F[ExistenceError[I] \/ PreparationStatus]
+
+  def cancelPreparation(tableId: I): F[Condition[ExistenceError[I]]]
+
+  def cancelAllPreparations: F[Unit]
 
   def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[D]]
 }
