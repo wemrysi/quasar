@@ -14,12 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasource
+package quasar.connector.datasource
 
-import quasar.api.datasource.DatasourceType
+import quasar.RenderTreeT
+import quasar.connector.{Datasource, QScriptEvaluator}
+import quasar.fs.Planner.PlannerErrorME
+import quasar.qscript.QScriptEducated
 
-import eu.timepit.refined.auto._
+import fs2.Stream
+import matryoshka.{BirecursiveT, EqualT, ShowT}
+import scalaz.Monad
 
-package object local {
-  val LocalType = DatasourceType("local", 1L)
-}
+/** A Datasource capable of executing QScript. */
+abstract class HeavyweightDatasource[
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    F[_]: Monad: PlannerErrorME,
+    G[_],
+    R]
+    extends QScriptEvaluator[T, F, R]
+    with Datasource[F, Stream[G, ?], T[QScriptEducated[T, ?]], R]

@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasource
+package quasar.connector.datasource
 
-import quasar.api.datasource.DatasourceType
+import quasar.api.ResourcePath
+import quasar.connector.Datasource
 
-import eu.timepit.refined.auto._
-
-package object local {
-  val LocalType = DatasourceType("local", 1L)
-}
+/** A Datasource capable of returning the contents of resources. */
+trait LightweightDatasource[F[_], G[_], R] extends Datasource[F, G, ResourcePath, R]

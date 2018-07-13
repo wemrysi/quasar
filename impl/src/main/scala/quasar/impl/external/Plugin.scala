@@ -35,7 +35,7 @@ final case class Plugin(mainJar: Path, classPath: ClassPath) {
 
 object Plugin {
   val FileExtension = "plugin"
-  val ManifestAttributeName = "DataSource-Module"
+  val ManifestAttributeName = "Datasource-Module"
 
   def fromJson[F[_]: Sync](json: Json): F[DecodeResult[Plugin]] =
     Sync[F].delay(pluginDecodeJson.decodeJson(json))
