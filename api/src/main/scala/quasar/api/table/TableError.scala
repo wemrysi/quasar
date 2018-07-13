@@ -24,11 +24,11 @@ object TableError {
   sealed trait CreationError extends TableError
   final case class NameConflict(name: TableName) extends CreationError
 
-  sealed trait PrePreparationError[I] extends TableError
-  final case class PreparationInProgress[I](tableId: I) extends PrePreparationError[I]
-
   sealed trait ModificationError[I] extends TableError
-  final case class ConflictingPreparationState[I](tableId: I) extends ModificationError[I]
+  final case class PreparationExists[I](tableId: I) extends ModificationError[I]
+
+  sealed trait PrePreparationError[I] extends ModificationError[I]
+  final case class PreparationInProgress[I](tableId: I) extends PrePreparationError[I]
 
   sealed trait ExistenceError[I] extends ModificationError[I] with PrePreparationError[I]
   final case class TableNotFound[I](tableId: I) extends ExistenceError[I]
