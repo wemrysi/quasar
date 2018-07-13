@@ -115,24 +115,24 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
           _.toList.map { case (VarName(name), VarValue(value)) => s"$name = $value" }
             .mkString("Variables:\n", "\n", "").some)
 
-      case DataSources =>
+      case DatasourceList =>
         sources.metadata.map(
           _.toList.map { case (k, v) => s"${k.value} - ${printMetadata(v)}" }
             .mkString("Datasources:\n", "\n", "").some)
 
-      case DataSourceTypes =>
+      case DatasourceTypes =>
         doSupportedTypes.map(
           _.toList.map(tp => s"${tp.name} (${tp.version})")
             .mkString("Supported datasource types:\n", "\n", "").some)
 
-      case DataSourceLookup(name) =>
+      case DatasourceLookup(name) =>
         (sources.lookup(name) >>=
           fromEither[CommonError, (DataSourceMetadata, Json)]).map
           { case (metadata, cfg) =>
               List("Datasource:", s"${printMetadata(metadata)} $cfg").mkString("\n").some
           }
 
-      case DataSourceAdd(name, tp, cfg, onConflict) =>
+      case DatasourceAdd(name, tp, cfg, onConflict) =>
         for {
           tps <- supportedTypes
           dsType <- findTypeF(tps, tp)
@@ -141,7 +141,7 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
           _ <- ensureNormal(c)
         } yield s"Added datasource ${name.value}".some
 
-      case DataSourceRemove(name) =>
+      case DatasourceRemove(name) =>
         (sources.remove(name) >>= ensureNormal[CommonError]).map(
           κ(s"Removed datasource $name".some))
 
