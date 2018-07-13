@@ -16,8 +16,6 @@
 
 package quasar.api.table
 
-import quasar.api.ResourceName
-import scalaz.NonEmptyList
 import slamdata.Predef.{Product, Serializable}
 
 sealed trait TableError extends Product with Serializable
@@ -25,8 +23,6 @@ sealed trait TableError extends Product with Serializable
 object TableError {
   sealed trait CreationError extends TableError
   final case class NameConflict(name: TableName) extends CreationError
-  final case class UnparsableQuery[Q](query: Q) extends CreationError
-  final case class ResourcesNotFound(resources: NonEmptyList[ResourceName]) extends CreationError
 
   sealed trait PrePreparationError[I] extends TableError
   final case class PreparationInProgress[I](tableId: I) extends PrePreparationError[I]
