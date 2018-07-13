@@ -18,7 +18,7 @@ package quasar
 package repl2
 
 import slamdata.Predef._
-import quasar.api._
+import quasar.api._, datasource._
 import quasar.contrib.cats.effect._
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
@@ -45,11 +45,11 @@ import shims._
 
 final class Evaluator[F[_]: Effect, G[_]: Effect](
   stateRef: Ref[F, ReplState],
-  sources: DataSources[F, Json],
+  sources: Datasources[F, Json],
   queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]]) {
 
   import Command._
-  import DataSourceError._
+  import DatasourceError._
   import Evaluator._
 
   val F = Effect[F]
@@ -127,7 +127,7 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
 
       case DatasourceLookup(name) =>
         (sources.lookup(name) >>=
-          fromEither[CommonError, (DataSourceMetadata, Json)]).map
+          fromEither[CommonError, (DatasourceMetadata, Json)]).map
           { case (metadata, cfg) =>
               List("Datasource:", s"${printMetadata(metadata)} $cfg").mkString("\n").some
           }
@@ -185,7 +185,7 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
         F.pure("Exiting...".some)
     }
 
-    private def doSupportedTypes: F[ISet[DataSourceType]] =
+    private def doSupportedTypes: F[ISet[DatasourceType]] =
       sources.supported >>!
         (types => stateRef.modify(_.copy(supportedTypes = types.some)))
 
@@ -213,10 +213,10 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
         fromEither[ResourceError.ReadError, Stream[G, Data]]).map(s =>
           summaryCount.map(c => s.take(c.value.toLong)).getOrElse(s))
 
-    private def findType(tps: ISet[DataSourceType], tp: DataSourceType.Name): Option[DataSourceType] =
+    private def findType(tps: ISet[DatasourceType], tp: DatasourceType.Name): Option[DatasourceType] =
       tps.toList.find(_.name === tp)
 
-    private def findTypeF(tps: ISet[DataSourceType], tp: DataSourceType.Name): F[DataSourceType] =
+    private def findTypeF(tps: ISet[DatasourceType], tp: DatasourceType.Name): F[DatasourceType] =
       findType(tps, tp) match {
         case None => raiseEvalError(s"Unsupported datasource type: $tp")
         case Some(z) => z.point[F]
@@ -251,7 +251,7 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
         case ReplPath.Relative(p) => interpretDotsAsParent(cwd ++ p)
       }
 
-    private def printMetadata(m: DataSourceMetadata): String =
+    private def printMetadata(m: DatasourceMetadata): String =
       s"${m.kind.name} ${m.kind.version} ${printCondition[Exception](m.status, _.getMessage)}"
 
     private def printCondition[A](c: Condition[A], onAbnormal: A => String) =
@@ -284,7 +284,7 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
           Prettify.renderValues(ds).map(CsvWriter(none)(_).trim)
       }).mkString("\n")
 
-    private def supportedTypes: F[ISet[DataSourceType]] =
+    private def supportedTypes: F[ISet[DatasourceType]] =
       stateRef.get.map(_.supportedTypes) >>=
         (_.map(_.point[F]).getOrElse(doSupportedTypes))
 
@@ -300,7 +300,7 @@ object Evaluator {
 
   def apply[F[_]: Effect, G[_]: Effect](
     stateRef: Ref[F, ReplState],
-    sources: DataSources[F, Json],
+    sources: Datasources[F, Json],
     queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]])
       : Evaluator[F, G] =
     new Evaluator[F, G](stateRef, sources, queryEvaluator)

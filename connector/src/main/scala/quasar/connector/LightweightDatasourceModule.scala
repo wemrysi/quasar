@@ -14,12 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasource
+package quasar.connector
 
+import quasar.Data
+import quasar.api.ResourcePath
 import quasar.api.datasource.DatasourceType
+import quasar.api.datasource.DatasourceError.InitializationError
 
-import eu.timepit.refined.auto._
+import argonaut.Json
+import cats.effect.{ConcurrentEffect, Timer}
+import fs2.Stream
+import scalaz.\/
 
-package object local {
-  val LocalType = DatasourceType("local", 1L)
+trait LightweightDatasourceModule {
+  def kind: DatasourceType
+
+  def lightweightDatasource[
+      F[_]: ConcurrentEffect: Timer,
+      G[_]: ConcurrentEffect: Timer](
+      config: Json)
+      : F[InitializationError[Json] \/ Datasource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]]
 }

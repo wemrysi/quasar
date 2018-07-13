@@ -19,7 +19,8 @@ package repl2
 
 import slamdata.Predef._
 
-import quasar.api._
+import quasar.api.ResourcePath
+import quasar.api.datasource.DatasourceType
 import quasar.fp.numeric.widenPositive
 import quasar.repl._
 
@@ -36,7 +37,7 @@ import scalaz._, Scalaz._
     format:             OutputFormat,
     variables:          Variables,
     timingFormat:       TimingFormat,
-    supportedTypes:     Option[ISet[DataSourceType]]
+    supportedTypes:     Option[ISet[DatasourceType]]
   )
 
 object ReplState {

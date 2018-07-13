@@ -19,6 +19,7 @@ package quasar.regression
 import slamdata.Predef._
 import quasar._
 import quasar.api._
+import quasar.api.datasource.ConflictResolution
 import quasar.build.BuildInfo
 import quasar.common.PhaseResults
 import quasar.contrib.argonaut._

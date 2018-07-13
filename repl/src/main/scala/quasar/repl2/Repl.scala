@@ -18,7 +18,8 @@ package quasar
 package repl2
 
 import slamdata.Predef._
-import quasar.api.{DataSources, QueryEvaluator}
+import quasar.api.QueryEvaluator
+import quasar.api.datasource.Datasources
 import quasar.build.BuildInfo
 import quasar.run.SqlQuery
 
@@ -69,7 +70,7 @@ object Repl {
 
   def mk[F[_]: ConcurrentEffect, G[_]: Effect](
     ref: Ref[F, ReplState],
-    datasources: DataSources[F, Json],
+    datasources: Datasources[F, Json],
     queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]])
       : F[Repl[F]] = {
     val evaluator = Evaluator[F, G](ref, datasources, queryEvaluator)

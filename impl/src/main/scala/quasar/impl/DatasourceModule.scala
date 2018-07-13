@@ -14,12 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasource
+package quasar.impl
 
 import quasar.api.datasource.DatasourceType
+import quasar.connector.{HeavyweightDatasourceModule, LightweightDatasourceModule}
 
-import eu.timepit.refined.auto._
+sealed trait DatasourceModule {
+  def kind: DatasourceType
+}
 
-package object local {
-  val LocalType = DatasourceType("local", 1L)
+object DatasourceModule {
+  final case class Lightweight(lw: LightweightDatasourceModule) extends DatasourceModule {
+    def kind = lw.kind
+  }
+
+  final case class Heavyweight(hw: HeavyweightDatasourceModule) extends DatasourceModule {
+    def kind = hw.kind
+  }
 }

@@ -18,7 +18,7 @@ package quasar
 package repl2
 
 import slamdata.Predef._
-import quasar.api._
+import quasar.api._, datasource._
 import quasar.repl._
 import quasar.sql.Query
 
@@ -65,7 +65,7 @@ object Command {
   final case object DatasourceList extends Command
   final case object DatasourceTypes extends Command
   final case class DatasourceLookup(name: ResourceName) extends Command
-  final case class DatasourceAdd(name: ResourceName, tp: DataSourceType.Name, config: String, onConflict: ConflictResolution) extends Command
+  final case class DatasourceAdd(name: ResourceName, tp: DatasourceType.Name, config: String, onConflict: ConflictResolution) extends Command
   final case class DatasourceRemove(name: ResourceName) extends Command
 
   implicit val equalCommand: Equal[Command] = Equal.equalA
@@ -89,7 +89,7 @@ object Command {
       case DatasourceListPattern()                  => DatasourceList
       case DatasourceTypesPattern()                 => DatasourceTypes
       case DatasourceLookupPattern(n)               => DatasourceLookup(ResourceName(n))
-      case DatasourceAddPattern(n, DataSourceType.string(tp), onConflict, cfg) =>
+      case DatasourceAddPattern(n, DatasourceType.string(tp), onConflict, cfg) =>
                                                        DatasourceAdd(ResourceName(n), tp, cfg,
                                                          ConflictResolution.string.getOption(onConflict) | ConflictResolution.Preserve)
       case DatasourceRemovePattern(n)               => DatasourceRemove(ResourceName(n))

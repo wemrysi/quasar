@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasource
+package quasar.connector
 
+import slamdata.Predef.Unit
+import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
 
-import eu.timepit.refined.auto._
-
-package object local {
-  val LocalType = DatasourceType("local", 1L)
+trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, G, Q, R] {
+  def kind: DatasourceType
+  def shutdown: F[Unit]
 }
