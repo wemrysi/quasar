@@ -16,11 +16,11 @@
 
 package quasar.api.table
 
-import slamdata.Predef.{Product, Serializable, String}
+import slamdata.Predef.{Nothing, Product, Serializable, String}
 
-sealed trait TableAttribute extends Product with Serializable
+sealed trait TableAttribute[Q] extends Product with Serializable
 
 object TableAttribute {
-  final case class Name(value: String) extends TableAttribute
-  final case class Sql2(value: String) extends TableAttribute
+  final case class Name(value: String) extends TableAttribute[Nothing]
+  final case class Query[Q](value: Q) extends TableAttribute[Q]
 }

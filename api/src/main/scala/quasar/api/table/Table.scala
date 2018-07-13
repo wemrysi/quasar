@@ -16,4 +16,4 @@
 
 package quasar.api.table
 
-final case class Table(name: TableAttribute.Name, sql2: TableAttribute.Sql2)
+final case class Table[Q](name: TableAttribute.Name, sql2: TableAttribute.Query[Q])

@@ -25,7 +25,7 @@ sealed trait TableError extends Product with Serializable
 object TableError {
   sealed trait CreationError extends TableError
   final case class NameConflict(name: TableAttribute.Name) extends CreationError
-  final case class UnparsableQuery(sql2: TableAttribute.Sql2) extends CreationError
+  final case class UnparsableQuery[Q](sql2: TableAttribute.Query[Q]) extends CreationError
   final case class ResourcesNotFound(resources: NonEmptyList[ResourceName]) extends CreationError
 
   sealed trait ExistenceError[I] extends TableError

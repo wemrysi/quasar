@@ -20,18 +20,20 @@ import quasar.Condition
 import scalaz.{\/, NonEmptyList}
 
 /** @tparam I identity
+  * @tparam Q query type
   * @tparam D materialized table data
   */
-trait Tables[F[_], G[_], I, D] {
+trait Tables[F[_], G[_], I, Q, D] {
   import TableError.{CreationError, ExistenceError, ModificationError, PrePreparationError}
 
-  def allTables: F[G[(I, Table)]]
+  def allTables: F[G[(I, Table[Q])]]
 
-  def createTable(table: Table): F[CreationError \/ I]
+  def createTable(table: Table[Q]): F[CreationError \/ I]
 
-  def table(tableId: I): F[ExistenceError[I] \/ Table]
+  def table(tableId: I): F[ExistenceError[I] \/ Table[Q]]
 
-  def setTableAttributes(tableId: I, attributes: NonEmptyList[TableAttribute]): F[Condition[ModificationError[I]]]
+  def setTableAttributes(tableId: I, attributes: NonEmptyList[TableAttribute[Q]])
+      : F[Condition[ModificationError[I]]]
 
   def prepareTable(tableId: I): F[Condition[PrePreparationError[I]]]
 
