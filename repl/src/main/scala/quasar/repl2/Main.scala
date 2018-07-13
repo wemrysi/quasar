@@ -21,17 +21,22 @@ import slamdata.Predef._
 import quasar.impl.external.ExternalConfig
 import quasar.common.PhaseResults
 import quasar.contrib.scalaz.{MonadError_, MonadTell_}
-import quasar.run.{Quasar, QuasarApp, QuasarError}
+import quasar.run.{Quasar, QuasarError}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.IO
-import fs2.Stream
+import fs2.{Stream, StreamApp}, StreamApp.ExitCode
 import fs2.async.Ref
 import scalaz._, Scalaz._
 import shims._
 
-object Main extends QuasarApp {
+object Main {
+
+  private class ReplStreamApp(s: Stream[IO, ExitCode]) extends StreamApp[IO] {
+    override def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] =
+      s
+  }
 
   implicit val ignorePhaseResults: MonadTell_[IO, PhaseResults] =
     MonadTell_.ignore[IO, PhaseResults]
@@ -39,7 +44,7 @@ object Main extends QuasarApp {
   implicit val ioQuasarError: MonadError_[IO, QuasarError] =
     MonadError_.facet[IO](QuasarError.throwableP)
 
-  def quasarStream: Stream[IO, Quasar[IO, IO]] =
+  val quasarStream: Stream[IO, Quasar[IO, IO]] =
     for {
       basePath <- Paths.getBasePath[Stream[IO, ?]]
       dataDir = basePath.resolve(Paths.QuasarDataDirName)
@@ -49,17 +54,17 @@ object Main extends QuasarApp {
       q <- Quasar[IO](dataDir, ExternalConfig.PluginDirectory(pluginDir), global)
     } yield q
 
-  def repl(q: Quasar[IO, IO]): IO[Unit] =
+  def repl(q: Quasar[IO, IO]): IO[ExitCode] =
     for {
       ref <- Ref[IO, ReplState](ReplState.mk)
       repl <- Repl.mk[IO, IO](ref, q.dataSources, q.queryEvaluator)
       l <- repl.loop
     } yield l
 
-  def run(args: List[String]): IO[Unit] =
-    runQuasar(quasarStream, repl)
+  val replStream: Stream[IO, ExitCode] =
+    quasarStream >>= (q => Stream.eval(repl(q)))
 
   def main(args: Array[String]): Unit =
-    run(args.toList).unsafeRunSync
+    new ReplStreamApp(replStream).main(args)
 
 }

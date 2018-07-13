@@ -37,7 +37,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.scalaz._
-import fs2.Stream
+import fs2.{Stream, StreamApp}, StreamApp.ExitCode
 import fs2.async.Ref
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -56,7 +56,7 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
   val G = Effect[G]
 
   def evaluate(cmd: Command): F[Result] = {
-    val exitCode = if (cmd === Exit) Some(()) else None
+    val exitCode = if (cmd === Exit) Some(ExitCode.Success) else None
     recoverSomeErrors(doEvaluate(cmd))
       .map(Result(exitCode, _))
   }
@@ -294,9 +294,7 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
 }
 
 object Evaluator {
-  //TODO change back to exitCode: Option[ExitCode] once we are back on
-  //cats-effect 1.0.0
-  final case class Result(exitCode: Option[Unit], string: Option[String])
+  final case class Result(exitCode: Option[ExitCode], string: Option[String])
 
   final class EvalError(msg: String) extends java.lang.RuntimeException(msg)
 
