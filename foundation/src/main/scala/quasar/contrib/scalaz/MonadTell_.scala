@@ -30,6 +30,11 @@ trait MonadTell_[F[_], W] {
 
 object MonadTell_ extends MonadTell_Instances {
   def apply[F[_], W](implicit T: MonadTell_[F, W]): MonadTell_[F, W] = T
+
+  def ignore[F[_], W](implicit F: Applicative[F]): MonadTell_[F, W] =
+    new MonadTell_[F, W] {
+      def writer[A](w: W, a: A) = a.point[F]
+    }
 }
 
 sealed abstract class MonadTell_Instances extends MonadTell_Instances0 {

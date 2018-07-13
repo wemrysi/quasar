@@ -25,9 +25,10 @@ import quasar.contrib.iota.copkTraverse
 
 import java.io.File
 import scala.Console, Console.{RED, RESET}
+import scala.concurrent.ExecutionContext.Implicits.global
 
-import cats.effect.{ExitCode, IO, IOApp, Sync}
-import cats.syntax.functor._
+import cats.effect.{IO, Sync}
+import cats.syntax.applicativeError._
 import fs2.Stream
 import fs2.text
 import fs2.io.file
@@ -39,7 +40,7 @@ import scalaz.syntax.either._
 import scalaz.syntax.show._
 import spire.std.double._
 
-object Main extends IOApp {
+object Main {
 
   def run(args: List[String]) =
     Stream.eval(CliOptions.parse[IO](args))
@@ -50,10 +51,10 @@ object Main extends IOApp {
           .take(opts.outSize.value)
           .intersperse("\n")
           .through(text.utf8Encode)
-          .through(file.writeAllAsync(opts.outFile.toPath, opts.writeOptions)))
+          .through(file.writeAllAsync[IO](opts.outFile.toPath, opts.writeOptions)))
       .compile
       .drain
-      .redeemWith(printErrors, _ => IO.pure(ExitCode.Success))
+      .recoverWith(printErrors)
 
   ////
 
@@ -86,7 +87,7 @@ object Main extends IOApp {
         ).fold(decodingErr, Stream.emit(_).covary[F]))
   }
 
-  val printErrors: PartialFunction[Throwable, IO[ExitCode]] = {
+  val printErrors: PartialFunction[Throwable, IO[Unit]] = {
     case alreadyExists: java.nio.file.FileAlreadyExistsException =>
       printError(s"Output file already exists: ${alreadyExists.getFile}.")
 
@@ -97,7 +98,6 @@ object Main extends IOApp {
       printError(other.getMessage)
   }
 
-  def printError(msg: String): IO[ExitCode] =
+  def printError(msg: String): IO[Unit] =
     IO(Console.err.println(s"${RESET}${RED}[ERROR] ${msg}${RESET}"))
-      .as(ExitCode.Error)
 }

@@ -21,13 +21,16 @@ import quasar.api.{DataSourceType, ResourcePath}
 import quasar.api.DataSourceError.InitializationError
 
 import argonaut.Json
-import cats.effect.Async
+import cats.effect.{ConcurrentEffect, Timer}
 import fs2.Stream
 import scalaz.\/
 
 trait LightweightDataSourceModule {
   def kind: DataSourceType
 
-  def lightweightDataSource[F[_]: Async, G[_]: Async](config: Json)
+  def lightweightDataSource[
+      F[_]: ConcurrentEffect: Timer,
+      G[_]: ConcurrentEffect: Timer](
+      config: Json)
       : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]]
 }

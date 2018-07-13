@@ -58,13 +58,7 @@ final class Precog private (
 
   object Library extends StdLib
 
-  object Config {
-    val howManyChefsInTheKitchen: Int = 4
-    val quiescenceTimeout: FiniteDuration = new FiniteDuration(300, SECONDS)
-    val maxOpenPaths: Int = 500
-    val dataDir: File = dataDir0
-  }
-
+  val HowManyChefsInTheKitchen: Int = 4
   val CookThreshold: Int = 20000
   val StorageTimeout: FiniteDuration = 300.seconds
 
@@ -73,7 +67,7 @@ final class Precog private (
     VersionedSegmentFormat(Map(1 -> V1SegmentFormat))))
 
   private def chefs(system: ActorSystem): IndexedSeq[Routee] =
-    (1 to Config.howManyChefsInTheKitchen).map { _ =>
+    (1 to HowManyChefsInTheKitchen).map { _ =>
       ActorRefRoutee(system.actorOf(props))
     }
 
@@ -95,7 +89,7 @@ object Precog extends Logging {
 
   def apply(dataDir: File): IO[Disposable[IO, Precog]] =
     for {
-      vfsd <- SerialVFS[IO](dataDir)
+      vfsd <- SerialVFS[IO](dataDir, global)
 
       sysd <- IO {
         val sys = ActorSystem(

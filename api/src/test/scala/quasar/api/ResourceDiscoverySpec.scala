@@ -22,9 +22,7 @@ import quasar.Qspec
 import org.specs2.execute.AsResult
 import org.specs2.matcher.Matcher
 import org.specs2.specification.core.Fragment
-import scalaz.{\/, ~>, Foldable, Id, ISet, Monad}, Id.Id
-import scalaz.std.tuple._
-import scalaz.syntax.either._
+import scalaz.{\/, ~>, Foldable, Id, Monad}, Id.Id
 import scalaz.syntax.foldable._
 import scalaz.syntax.monad._
 
@@ -50,18 +48,8 @@ abstract class ResourceDiscoverySpec[F[_]: Monad, G[_]: Foldable]
       discovery.children(nonExistentPath).map(_ must beNotFound(nonExistentPath))
     }
 
-    "descendants of non-existent is not found" >>* {
-      discovery.descendants(nonExistentPath).map(_ must beNotFound(nonExistentPath))
-    }
-
     "non-existent is not a resource" >>* {
       discovery.isResource(nonExistentPath).map(_ must beFalse)
-    }
-
-    "all descendants are resources" >>* {
-      discovery
-        .descendants(ResourcePath.root())
-        .flatMap(_.anyM(_.allM(discovery.isResource)))
     }
 
     "child status agrees with isResource" >>* {
@@ -77,34 +65,11 @@ abstract class ResourceDiscoverySpec[F[_]: Monad, G[_]: Foldable]
               .map(!_)
         }))
     }
-
-    "descendants and children agree" >>* {
-      (
-        discovery.descendants(ResourcePath.root()) |@|
-        descendantsFromChildren(ResourcePath.root())
-      )((ds, cs) => ds.map(ISet.fromFoldable(_)) must_= cs.right)
-    }
   }
 
   ////
 
   val orG = Foldable[CommonError \/ ?].compose[G]
-
-  def descendantsFromChildren(path: ResourcePath): F[ISet[ResourcePath]] =
-    for {
-      progeny <- discovery.children(path)
-
-      (leaves, prefixes) = orG.foldMap(progeny) {
-        case (n, ResourcePathType.Resource) =>
-          (ISet.singleton(path / n), ISet.empty[ResourcePath])
-
-        case (n, ResourcePathType.ResourcePrefix) =>
-          (ISet.empty[ResourcePath], ISet.singleton(path / n))
-      }
-
-      rest <- prefixes.foldMapM(descendantsFromChildren)
-
-    } yield leaves union rest
 
   def beNotFound[A](path: ResourcePath): Matcher[CommonError \/ A] =
     be_-\/(equal[ResourceError](PathNotFound(path)))

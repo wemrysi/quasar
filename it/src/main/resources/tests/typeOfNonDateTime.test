@@ -1,0 +1,28 @@
+{
+    "name": "use type_of function for non-datetimes",
+    "backends": {
+        "lwc_local":         "ignoreFieldOrder",
+        "mimir":             "ignoreFieldOrder",
+        "mongodb_3_4_13":    "pending",
+        "mongodb_3_6":       "pending"
+    },
+    "data": "types_nondatetime.data",
+    "query": "select foo ?? \"nope\" as foo, type_of(foo ?? 42) as type from `types_nondatetime.data`",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      { "foo": 11, "type": "number" },
+      { "foo": 1.12345, "type": "number" },
+      { "foo": "13", "type": "string" },
+      { "foo": "zap", "type": "string" },
+      { "foo": true, "type": "boolean" },
+      { "foo": false, "type": "boolean" },
+      { "foo": null, "type": "null" },
+      { "foo": [], "type": "emptyarray" },
+      { "foo": {}, "type": "emptyobject" },
+      { "foo": [15, [{ "baz": ["quux"] }]] },
+      { "foo": { "bar": 15, "baz": ["qx"] } },
+      { "foo": "nope", "type": "number" },
+      { "foo": "nope", "type": "number" }
+    ]
+}

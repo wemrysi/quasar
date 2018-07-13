@@ -63,23 +63,6 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, G[_]: A
         } yield r).run
     }
 
-  def descendants(path: ResourcePath): F[CommonError \/ G[ResourcePath]] =
-    (path match {
-      case ResourcePath.Root =>
-        for {
-          rds <- discoveries.liftM[EitherT[?[_], CommonError, ?]]
-
-          descs <- rds.foldMapM({
-            case (n, rd) => descendantsOf(n, rd, ResourcePath.root())
-          })(implicitly, ApplicativePlus[G].monoid)
-        } yield descs
-
-      case ResourcePath.Leaf(f) =>
-        lookupLeaf[CommonError](f).flatMap {
-          case (n, d, s) => descendantsOf(n, d, s.path)
-        }
-    }).run
-
   def isResource(path: ResourcePath): F[Boolean] =
     path match {
       case ResourcePath.Root =>
@@ -149,15 +132,6 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, G[_]: A
           } yield GtoF(Const(QRead(f)))
       }
     }
-
-  private def descendantsOf(
-      name: ResourceName,
-      rd: ResourceDiscovery[F, G],
-      path: ResourcePath)
-      : EitherT[F, CommonError, G[ResourcePath]] =
-    EitherT(rd.descendants(path))
-      .leftMap(prefixCommonError(name))
-      .map(_.map(name /: _))
 
   private def discoveries: F[List[(ResourceName, ResourceDiscovery[F, G])]] =
     sources.map(_.map(_._1).toAscList)

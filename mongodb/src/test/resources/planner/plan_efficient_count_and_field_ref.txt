@@ -2,9 +2,6 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
-│  │  ├─ $ProjectF
-│  │  │  ├─ Name("city" -> "$city")
-│  │  │  ╰─ ExcludeId
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
@@ -22,12 +19,9 @@ Chain
 │     │  ├─ Grouped
 │     │  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
 │     │  ╰─ By({ "$literal": null })
-│     ├─ $ProjectF
-│     │  ├─ Name("cnt" -> "$f0")
-│     │  ╰─ ExcludeId
 │     ├─ $GroupF
 │     │  ├─ Grouped
-│     │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
+│     │  │  ╰─ Name("0" -> { "$push": "$f0" })
 │     │  ╰─ By({ "$literal": null })
 │     ├─ $ProjectF
 │     │  ├─ Name("right" -> "$0")
@@ -53,11 +47,9 @@ Chain
 │  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $UnwindF
 │  ╰─ Path(DocField(BsonField.Name("left")))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ SpliceObjects
-│  │     ├─ JsCore(_.left)
-│  │     ╰─ JsCore(_.right)
-│  ╰─ Scope(ListMap())
+├─ $ProjectF
+│  ├─ Name("city" -> "$left.city")
+│  ├─ Name("cnt" -> "$right")
+│  ╰─ ExcludeId
 ╰─ $SortF
    ╰─ SortKey(cnt -> Descending)

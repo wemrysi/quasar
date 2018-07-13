@@ -21,12 +21,10 @@ import quasar.yggdrasil.table._
 trait ArrayLibModule extends ColumnarTableLibModule {
   trait ArrayLib extends ColumnarTableLib {
 
-    override def _libMorphism1 = super._libMorphism1
-
     // this isn't really an array function, but I don't know where else to put it
     // this is basically lower <= target <= upper, except with support for strings
     // and dates/times/datetimes
-    lazy val between: CFN = CFNP("std::array::between") {
+    lazy val between: CFN = CFNP {
       case List(target: LongColumn, lower: LongColumn, upper: LongColumn) =>
         new BoolColumn {
           def apply(row: Int) = {

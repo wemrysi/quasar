@@ -150,11 +150,6 @@ abstract class QueryRegressionTest[S[_]](
         case TestDirective.Skip    => skipped
         case TestDirective.SkipCI  =>
           BuildInfo.isCIBuild.fold(execute.Skipped("(skipped during CI build)"), runTest)
-        case TestDirective.Timeout =>
-          // NB: To locally skip tests that time out, make `Skipped` unconditional.
-          BuildInfo.isCIBuild.fold(
-            execute.Skipped("(skipped because it times out)"),
-            runTest)
         case TestDirective.Pending | TestDirective.PendingIgnoreFieldOrder =>
           runTest.pendingUntilFixed
       } getOrElse runTest
@@ -215,44 +210,26 @@ abstract class QueryRegressionTest[S[_]](
     val deleteFields: Json => Json =
       _.withObject(exp.ignoredFields.foldLeft(_)(_ - _))
 
-    val result =
-      exp.predicate(
-        exp.rows,
-        act.map(normalizeJson <<< deleteFields <<< (_.asJson)).translate[Task](liftRun),
+    exp.predicate(
+      exp.rows,
+      act.map(normalizeJson <<< deleteFields <<< (_.asJson)).translate[Task](liftRun),
 
-        // TODO: Error if a backend ignores field order when the query already does.
-        if (exp.ignoreFieldOrder)
-          OrderIgnored
-        else
-          collectFirstDirective[OrderSignificance](exp.backends, backendName) {
-            case TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder | TestDirective.PendingIgnoreFieldOrder =>
-              OrderIgnored
-          } | OrderPreserved,
+      // TODO: Error if a backend ignores field order when the query already does.
+      if (exp.ignoreFieldOrder)
+        OrderIgnored
+      else
+        collectFirstDirective[OrderSignificance](exp.backends, backendName) {
+          case TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder | TestDirective.PendingIgnoreFieldOrder =>
+            OrderIgnored
+        } | OrderPreserved,
 
-        if (exp.ignoreResultOrder)
-          OrderIgnored
-        else
-          collectFirstDirective[OrderSignificance](exp.backends, backendName) {
-            case TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder | TestDirective.PendingIgnoreFieldOrder =>
-              OrderIgnored
-          } | OrderPreserved)
-
-    collectFirstDirective(exp.backends, backendName) {
-      case TestDirective.Timeout =>
-        result.map {
-          case execute.Success(_, _) =>
-            execute.Failure(s"Fixed now, you should remove the “timeout” status.")
-          case execute.Failure(m, _, _, _) =>
-            execute.Failure(s"Failed with “$m”, you should change the “timeout” status.")
-          case x => x
-        }.handle {
-          case e: java.util.concurrent.TimeoutException => execute.Pending(s"times out: ${e.getMessage}")
-          case e => execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.")
-        }
-    } getOrElse result.handle {
-      case e: java.util.concurrent.TimeoutException =>
-        execute.Failure(s"Times out (${e.getMessage}), you should use the “timeout” status.")
-    }
+      if (exp.ignoreResultOrder)
+        OrderIgnored
+      else
+        collectFirstDirective[OrderSignificance](exp.backends, backendName) {
+          case TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder | TestDirective.PendingIgnoreFieldOrder =>
+            OrderIgnored
+        } | OrderPreserved)
   }
 
   /** Parse and execute the given query, returning a stream of results. */

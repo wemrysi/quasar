@@ -23,7 +23,7 @@ import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript.QScriptEducated
 
 import argonaut.Json
-import cats.effect.Async
+import cats.effect.{ConcurrentEffect, Timer}
 import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import scalaz.\/
@@ -33,8 +33,8 @@ trait HeavyweightDataSourceModule {
 
   def heavyweightDataSource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Async: PlannerErrorME,
-      G[_]: Async](
+      F[_]: ConcurrentEffect: PlannerErrorME: Timer,
+      G[_]: ConcurrentEffect: Timer](
       config: Json)
       : F[InitializationError[Json] \/ DataSource[F, Stream[G, ?], T[QScriptEducated[T, ?]], Stream[G, Data]]]
 }

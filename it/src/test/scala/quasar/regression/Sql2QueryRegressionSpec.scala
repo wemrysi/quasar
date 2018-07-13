@@ -18,33 +18,24 @@ package quasar.regression
 
 import slamdata.Predef._
 import quasar._
-import quasar.api.{QueryEvaluator, ResourceDiscovery, ResourceName, ResourcePath}
-import quasar.api.ResourceError.ReadError
+import quasar.api._
 import quasar.build.BuildInfo
 import quasar.common.PhaseResults
-import quasar.compile.{queryPlan, SemanticErrors}
 import quasar.contrib.argonaut._
-import quasar.contrib.cats.effect.liftio._
+import quasar.contrib.cats.effect._
 import quasar.contrib.fs2.convert
-import quasar.contrib.fs2.stream._
 import quasar.contrib.iota._
 import quasar.contrib.nio.{file => contribFile}
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.concurrent.task._
+import quasar.contrib.scalaz.{MonadError_, MonadTell_}
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
-import quasar.evaluate.FederatingQueryEvaluator
 import quasar.fp._
 import quasar.fs.FileSystemType
-import quasar.fs.Planner.PlannerError
-import quasar.frontend.logicalplan.{LogicalPlan => LP}
-import quasar.higher.HFunctor
-import quasar.impl.datasource.local.LocalDataSource
-import quasar.mimir.Precog
-import quasar.mimir.evaluate.{MimirQueryFederation, QueryAssociate}
-import quasar.qscript.QScriptEducated
-import quasar.qsu.LPtoQS
-import quasar.sql, sql.Sql
+import quasar.impl.datasource.local.LocalType
+import quasar.impl.external.ExternalConfig
+import quasar.run.{Quasar, QuasarError, SqlQuery}
+import quasar.sql.Query
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -52,14 +43,14 @@ import scala.util.matching.Regex
 
 import java.math.{MathContext, RoundingMode}
 import java.nio.file.{Files, Path => JPath, Paths}
-import java.text.ParseException
 
 import argonaut._, Argonaut._
 import cats.effect.{Effect, IO, Sync, Timer}
 import eu.timepit.refined.auto._
 import fs2.{io, text, Stream}
+import fs2.async.Promise
+import _root_.io.chrisdavenport.scalaz.task._
 import matryoshka._
-import matryoshka.data.Fix
 import org.specs2.execute
 import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
@@ -71,92 +62,71 @@ import shims.{monadErrorToScalaz, monadToScalaz}
 final class Sql2QueryRegressionSpec extends Qspec {
   import Sql2QueryRegressionSpec._
 
-  type M[A] = EitherT[EitherT[StateT[WriterT[Stream[IO, ?], PhaseResults, ?], Long, ?], SemanticErrors, ?], PlannerError, A]
+  implicit val ignorePhaseResults: MonadTell_[IO, PhaseResults] =
+    MonadTell_.ignore[IO, PhaseResults]
+
+  implicit val ioQuasarError: MonadError_[IO, QuasarError] =
+    MonadError_.facet[IO](QuasarError.throwableP)
 
   val DataDir = rootDir[Sandboxed] </> dir("local")
 
   /** A name to identify the suite in test output. */
   val suiteName: String = "SQL^2 Regression Queries"
 
-  val streamToM: Stream[IO, ?] ~> M =
-    λ[Stream[IO, ?] ~> M](
-      _.liftM[WriterT[?[_], PhaseResults, ?]]
-        .liftM[StateT[?[_], Long, ?]]
-        .liftM[EitherT[?[_], SemanticErrors,?]]
-        .liftM[EitherT[?[_], PlannerError,?]])
+  val Q = for {
+    tmpPath <-
+      Stream.bracket(IO(Files.createTempDirectory("quasar-test-")))(
+        Stream.emit(_),
+        contribFile.deleteRecursively[IO](_))
 
-  val queryEvaluator =
-    for {
-      tmpPath <- IO(Files.createTempDirectory("quasar-test-"))
-      tmpDir = tmpPath.toFile
+    q <- Quasar[IO](tmpPath, ExternalConfig.Empty, global)
 
-      cake <- Precog(tmpDir)
-
+    localCfg =
+      ("rootDir" := posixCodec.printPath(TestDataRoot)) ->:
       // 64 KB chunks, chosen mostly arbitrarily.
-      local = LocalDataSource[Stream[IO, ?], IO](jPath(TestDataRoot), 65535)
+      ("readChunkSizeBytes" := 65535) ->:
+      jEmptyObject
 
-      localM = HFunctor[QueryEvaluator[?[_], Stream[IO, ?], ResourcePath, Stream[IO, Data]]].hmap(local)(streamToM)
+    _ <- Stream.eval(q.dataSources.add(
+      ResourceName("local"),
+      LocalType,
+      localCfg,
+      ConflictResolution.Preserve))
+  } yield q
 
-      sdown =
-        cake.dispose
-          .guarantee(contribFile.deleteRecursively[IO](tmpPath))
-          .guarantee(local.shutdown.compile.drain)
-
-      mimirFederation = MimirQueryFederation[Fix, M](cake.unsafeValue)
-
-      qassoc = QueryAssociate.lightweight[Fix, M, IO](localM.evaluate)
-      discovery = (localM : ResourceDiscovery[M, Stream[IO, ?]])
-
-      federated = FederatingQueryEvaluator(
-        mimirFederation,
-        IMap((ResourceName("local"), (discovery, qassoc))).point[M])
-    } yield (federated, sdown)
-
-  /** Return the results of evaluating the given query as a stream. */
-  def queryResults(
-      f: Fix[QScriptEducated[Fix, ?]] => M[ReadError \/ Stream[IO, Data]])(
-      expr: Fix[Sql],
-      vars: Variables,
-      basePath: ADir)
-      : Stream[IO, Data] = {
-
-    def failS(msg: String): Stream[IO, Data] =
-      Stream.raiseError(new RuntimeException(msg)).covary[IO]
-
-    val results =
-      for {
-        lp <- queryPlan[M, Fix, Fix[LP]](expr, vars, basePath, 0L, None)
-
-        qs <- LPtoQS[Fix].apply[M](lp)
-
-        r  <- f(qs)
-      } yield r.valueOr(e => failS(e.shows))
-
-    results
-      .valueOr(e => failS(e.shows))
-      .valueOr(e => failS(e.shows))
-      .eval(0)
-      .value(streamApplicativePlus)
-      .flatMap(x => x)
-  }
+  val lwcLocalConfigs =
+    TestConfig.fileSystemConfigs(FileSystemType("lwc_local")).to[IO]
 
   ////
 
-  Effect[Task].toIO(TestConfig.fileSystemConfigs(FileSystemType("lwc_local"))).flatMap({cfgs =>
-    if (cfgs.isEmpty)
-      IO(suiteName >> skipped("to run, enable the 'lwc_local' test configuration."))
-    else
-      (regressionTests[IO](TestsRoot, TestDataRoot) |@| queryEvaluator)({
-        case (tests, (eval, sdown)) =>
-          suiteName >> {
-            tests.toList foreach { case (f, t) =>
-              regressionExample(f, t, BackendName("lwc_local"), queryResults(eval.evaluate))
-            }
+  val buildSuite =
+    lwcLocalConfigs.map(_.isEmpty).ifM(
+      IO(suiteName >> skipped("to run, enable the 'lwc_local' test configuration.")),
+      for {
+        qdef <- Promise.empty[IO, Quasar[IO, IO]]
+        sdown <- Promise.empty[IO, Unit]
 
-            step(sdown.unsafeRunSync)
+        tests <- regressionTests[IO](TestsRoot, TestDataRoot)
+
+        _ <- Q.evalMap(q => qdef.complete(q) *> sdown.get).compile.drain.start
+        q <- qdef.get
+
+        f = (squery: SqlQuery) =>
+          Stream.eval(q.queryEvaluator.evaluate(squery))
+            .flatMap(_.valueOr(err =>
+              Stream.raiseError(new RuntimeException(err.shows)).covary[IO]))
+
+      } yield {
+        suiteName >> {
+          tests.toList foreach { case (loc, test) =>
+            regressionExample(loc, test, BackendName("lwc_local"), f)
           }
+
+          step(sdown.complete(()).unsafeRunSync())
+        }
       })
-  }).unsafeRunSync
+
+  buildSuite.unsafeRunSync()
 
   ////
 
@@ -165,16 +135,16 @@ final class Sql2QueryRegressionSpec extends Qspec {
       loc: RFile,
       test: RegressionTest,
       backendName: BackendName,
-      results: (Fix[Sql], Variables, ADir) => Stream[IO, Data])
+      results: SqlQuery => Stream[IO, Data])
       : Fragment = {
     def runTest: execute.Result = {
-      val data = testQuery(
-        test.data.nonEmpty.fold(DataDir </> fileParent(loc), rootDir),
-        test.query,
-        test.variables,
-        results)
+      val query =
+        SqlQuery(
+          Query(test.query),
+          Variables.fromMap(test.variables),
+          test.data.nonEmpty.fold(DataDir </> fileParent(loc), rootDir))
 
-      verifyResults(test.expected, data, backendName)
+      verifyResults(test.expected, results(query), backendName)
         .timed(2.minutes)
         .unsafePerformSync
     }
@@ -184,11 +154,6 @@ final class Sql2QueryRegressionSpec extends Qspec {
         case TestDirective.Skip    => skipped
         case TestDirective.SkipCI  =>
           BuildInfo.isCIBuild.fold(execute.Skipped("(skipped during CI build)"), runTest)
-        case TestDirective.Timeout =>
-          // NB: To locally skip tests that time out, make `Skipped` unconditional.
-          BuildInfo.isCIBuild.fold(
-            execute.Skipped("(skipped because it times out)"),
-            runTest)
         case TestDirective.Pending | TestDirective.PendingIgnoreFieldOrder =>
           runTest.pendingUntilFixed
       } getOrElse runTest
@@ -242,46 +207,12 @@ final class Sql2QueryRegressionSpec extends Qspec {
         .map(normalizeJson <<< deleteFields <<< (_.asJson))
         .translate(λ[IO ~> Task](_.to[Task]))
 
-    val result =
-      exp.predicate(
-        exp.rows,
-        actProcess,
-        fieldOrderSignificance,
-        resultOrderSignificance)
-
-    collectFirstDirective(exp.backends, backendName) {
-      case TestDirective.Timeout =>
-        result.map {
-          case execute.Success(_, _) =>
-            execute.Failure(s"Fixed now, you should remove the “timeout” status.")
-
-          case execute.Failure(m, _, _, _) =>
-            execute.Failure(s"Failed with “$m”, you should change the “timeout” status.")
-
-          case x => x
-        }.handle {
-          case e: java.util.concurrent.TimeoutException =>
-            execute.Pending(s"times out: ${e.getMessage}")
-
-          case e =>
-            execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.")
-        }
-    } getOrElse result.handle {
-      case e: java.util.concurrent.TimeoutException =>
-        execute.Failure(s"Times out (${e.getMessage}), you should use the “timeout” status.")
-    }
+    exp.predicate(
+      exp.rows,
+      actProcess,
+      fieldOrderSignificance,
+      resultOrderSignificance)
   }
-
-  /** Parse and execute the given query, returning a stream of results. */
-  def testQuery[F[_]](
-      loc: ADir,
-      qry: String,
-      vars: Map[String, String],
-      results: (Fix[Sql], Variables, ADir) => Stream[F, Data])
-      : Stream[F, Data] =
-    sql.fixParser.parseExpr(qry).fold(
-      e => Stream.raiseError(new ParseException(e.message, -1)).covary[F],
-      s => results(s.mkPathsAbsolute(loc), Variables.fromMap(vars), loc))
 
   /** Returns all the `RegressionTest`s found in the given directory, keyed by
     * file path.

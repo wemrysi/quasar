@@ -18,10 +18,10 @@ package quasar.mimir
 
 import slamdata.Predef._
 
+import quasar.contrib.cats.effect._
 import quasar.contrib.fs2.convert.toStreamT
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
-import quasar.contrib.scalaz.concurrent.task._
 import quasar.fs._
 import quasar.mimir.MimirCake._
 import quasar.qscript._
@@ -31,7 +31,8 @@ import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.table.Slice
 
 import cats.arrow.FunctionK
-import cats.effect.{Effect, IO}
+import cats.effect.IO
+import io.chrisdavenport.scalaz.task._
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -81,8 +82,9 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                           val slices = stream.chunks.map { ch =>
                             Slice.fromRValues(
                               ch.toList.toStream.map(data =>
-                                MapFuncCorePlanner.dataToRValue(data).getOrElse(sys.error("no representation for Data.NA in SlamEngine as a constant"))))
-                          }.translate(Lambda[FunctionK[Task, IO]](Effect[Task].toIO(_)))
+                                MapFuncCorePlanner.dataToRValue(data)
+                                  .getOrElse(sys.error("no representation for Data.NA in SlamEngine as a constant"))))
+                          }.translate(Lambda[FunctionK[Task, IO]](_.to[IO]))
 
                           // TODO leaks resources
                           val resultIO = toStreamT(slices).map(_.unsafeValue) map { slicesT =>
