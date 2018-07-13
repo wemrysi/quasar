@@ -312,10 +312,10 @@ object Evaluator {
       |  exit
       |  help
       |  types
-      |  datasources
-      |  add [name] [type] (preserve | replace) [cfg]
-      |  rm [name]
-      |  get [name]
+      |  ds (list | ls)
+      |  ds add [name] [type] (preserve | replace) [cfg]
+      |  ds (remove | rm) [name]
+      |  ds (lookup | get) [name]
       |  cd [path]
       |  ls [path]
       |  [query]
