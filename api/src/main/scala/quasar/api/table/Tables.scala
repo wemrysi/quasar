@@ -17,25 +17,31 @@
 package quasar.api.table
 
 import quasar.Condition
-import scalaz.{\/, NonEmptyList}
+import slamdata.Predef.Unit
+import scalaz.\/
 
 /** @tparam I identity
+  * @tparam Q query type
   * @tparam D materialized table data
   */
-trait Tables[F[_], G[_], I, D] {
+trait Tables[F[_], G[_], I, Q, D] {
   import TableError.{CreationError, ExistenceError, ModificationError, PrePreparationError}
 
-  def allTables: F[G[(I, Table)]]
+  def allTables: F[G[(I, Table[Q])]]
 
-  def createTable(table: Table): F[CreationError \/ I]
+  def table(tableId: I): F[ExistenceError[I] \/ Table[Q]]
 
-  def table(tableId: I): F[ExistenceError[I] \/ Table]
+  def createTable(table: Table[Q]): F[CreationError \/ I]
 
-  def setTableAttributes(tableId: I, attributes: NonEmptyList[TableAttribute]): F[Condition[ModificationError[I]]]
+  def replaceTable(tableId: I, table: Table[Q]): F[Condition[ModificationError[I]]]
 
   def prepareTable(tableId: I): F[Condition[PrePreparationError[I]]]
 
   def preparationStatus(tableId: I): F[ExistenceError[I] \/ PreparationStatus]
+
+  def cancelPreparation(tableId: I): F[Condition[ExistenceError[I]]]
+
+  def cancelAllPreparations: F[Unit]
 
   def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[D]]
 }

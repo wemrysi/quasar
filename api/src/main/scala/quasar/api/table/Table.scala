@@ -16,4 +16,8 @@
 
 package quasar.api.table
 
-final case class Table(name: TableAttribute.Name, sql2: TableAttribute.Sql2)
+import slamdata.Predef.String
+
+final case class Table[Q](name: TableName, query: Q)
+
+final case class TableName(name: String)
