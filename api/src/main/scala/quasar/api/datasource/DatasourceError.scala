@@ -85,13 +85,18 @@ sealed abstract class DatasourceErrorInstances {
         (none, none, none, none, none, none, some((k, c, rs)))
     }
 
-  implicit def show[C: Show]: Show[DatasourceError[C]] =
+  implicit def showCommonError: Show[CommonError] =
+    Show.show {
+      case DatasourceNotFound(n) =>
+        Cord("DatasourceNotFound(") ++ n.show ++ Cord(")")
+    }
+
+  implicit def showCreateError[C: Show]: Show[CreateError[C]] =
     Show.show {
       case DatasourceExists(n) =>
         Cord("DatasourceExists(") ++ n.show ++ Cord(")")
 
-      case DatasourceNotFound(n) =>
-        Cord("DatasourceNotFound(") ++ n.show ++ Cord(")")
+      case e: CommonError => showCommonError.shows(e)
 
       case DatasourceUnsupported(k, s) =>
         Cord("DatasourceUnsupported(") ++ k.show ++ Cord(", ") ++ s.show ++ Cord(")")
@@ -107,5 +112,10 @@ sealed abstract class DatasourceErrorInstances {
 
       case InvalidConfiguration(k, c, rs) =>
         Cord("InvalidConfiguration(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ rs.show ++ Cord(")")
+    }
+
+  implicit def showDatasourceError[C: Show]: Show[DatasourceError[C]] =
+    Show.show {
+      case e: CreateError[C] => showCreateError[C].shows(e)
     }
 }

@@ -18,24 +18,28 @@ fi
 QUASAR_SUCCESS_OUTPUT="(v$QUASAR_VERSION) 💪 $"
 QUASAR_LOG_FILE="$TEMP_DIR/quasarout.log"
 
-echo "Initializing Quasar MetaStore..."
-
-java -jar "$QUASAR_REPL_JAR_PATH" initUpdateMetaStore
-
 echo "Launching Quasar REPL JAR..."
 
+# This should launch the repl but opposed to the aeshell based repl
+# the jline3 based one also terminates immediately after launching
+# with an org.jline.reader.EndOfFileException
+# As a consequence later in this script the process won't typically be there
+# when we try to kill it. Still we attempt to kill it, if for some reason the
+# process is still there.
 java -jar "$QUASAR_REPL_JAR_PATH" &> "$QUASAR_LOG_FILE" &
 QUASAR_PID=$!
 
 echo "Quasar PID: $QUASAR_PID"
 
-sleep 10
+sleep 20
 
 cat $QUASAR_LOG_FILE
 
-echo "Killing Quasar JAR..."
+echo "Killing Quasar JAR if necessary..."
 
+set +e
 kill -9 $QUASAR_PID
+set -e
 KILL_STATUS=$?
 
 echo "Status code from killing Quasar: $KILL_STATUS"
