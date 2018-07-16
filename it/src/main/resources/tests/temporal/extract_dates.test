@@ -2,8 +2,8 @@
   "name": "extract date parts",
 
   "backends": {
-    "lwc_local": "skip",
-    "mimir": "skip"
+    "lwc_local": "pendingIgnoreFieldOrder",
+    "mimir": "pendingIgnoreFieldOrder"
   },
   "data": "../dates.data",
 
