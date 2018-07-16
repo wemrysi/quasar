@@ -15,7 +15,7 @@
  */
 
 package quasar
-package repl2
+package repl
 
 import slamdata.Predef._
 import quasar.api._, datasource._
@@ -25,7 +25,6 @@ import quasar.csv.CsvWriter
 import quasar.fp.minspace
 import quasar.fp.ski._
 import quasar.main.Prettify
-import quasar.repl._
 import quasar.run.{QuasarError, SqlQuery}
 
 import java.lang.Exception
@@ -311,8 +310,8 @@ object Evaluator {
       |Available commands:
       |  exit
       |  help
-      |  types
       |  ds (list | ls)
+      |  ds types
       |  ds add [name] [type] (preserve | replace) [cfg]
       |  ds (remove | rm) [name]
       |  ds (lookup | get) [name]

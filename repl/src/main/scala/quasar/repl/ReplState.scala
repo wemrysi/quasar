@@ -15,14 +15,13 @@
  */
 
 package quasar
-package repl2
+package repl
 
 import slamdata.Predef._
 
 import quasar.api.ResourcePath
 import quasar.api.datasource.DatasourceType
 import quasar.fp.numeric.widenPositive
-import quasar.repl._
 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
