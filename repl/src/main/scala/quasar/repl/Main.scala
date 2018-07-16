@@ -15,7 +15,7 @@
  */
 
 package quasar
-package repl2
+package repl
 
 import slamdata.Predef._
 import quasar.impl.external.ExternalConfig

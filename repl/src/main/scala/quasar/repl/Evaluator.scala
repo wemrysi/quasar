@@ -15,7 +15,7 @@
  */
 
 package quasar
-package repl2
+package repl
 
 import slamdata.Predef._
 import quasar.api._, datasource._
@@ -25,7 +25,6 @@ import quasar.csv.CsvWriter
 import quasar.fp.minspace
 import quasar.fp.ski._
 import quasar.main.Prettify
-import quasar.repl._
 import quasar.run.{QuasarError, SqlQuery}
 
 import java.lang.Exception

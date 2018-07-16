@@ -456,9 +456,7 @@ lazy val repl = project
   .settings(targetSettings)
   .settings(backendRewrittenRunSettings)
   .settings(
-    //TODO move classes in package repl2 into repl
-    //once we clean up old repl
-    mainClass in Compile := Some("quasar.repl2.Main"),
+    mainClass in Compile := Some("quasar.repl.Main"),
     fork in run := true,
     connectInput in run := true,
     outputStrategy := Some(StdoutOutput))

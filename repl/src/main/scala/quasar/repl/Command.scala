@@ -15,11 +15,10 @@
  */
 
 package quasar
-package repl2
+package repl
 
 import slamdata.Predef._
 import quasar.api._, datasource._
-import quasar.repl._
 import quasar.sql.Query
 
 import eu.timepit.refined.auto._

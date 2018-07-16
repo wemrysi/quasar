@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.repl2
+package quasar.repl
 
 import slamdata.Predef._
 import quasar.api.{ResourceName, ResourcePath}
