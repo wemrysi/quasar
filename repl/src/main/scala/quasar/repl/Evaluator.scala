@@ -310,8 +310,8 @@ object Evaluator {
       |Available commands:
       |  exit
       |  help
-      |  types
       |  ds (list | ls)
+      |  ds types
       |  ds add [name] [type] (preserve | replace) [cfg]
       |  ds (remove | rm) [name]
       |  ds (lookup | get) [name]
