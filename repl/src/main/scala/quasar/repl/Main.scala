@@ -31,12 +31,7 @@ import fs2.async.Ref
 import scalaz._, Scalaz._
 import shims._
 
-object Main {
-
-  private class ReplStreamApp(s: Stream[IO, ExitCode]) extends StreamApp[IO] {
-    override def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] =
-      s
-  }
+object Main extends StreamApp[IO] {
 
   implicit val ignorePhaseResults: MonadTell_[IO, PhaseResults] =
     MonadTell_.ignore[IO, PhaseResults]
@@ -61,10 +56,7 @@ object Main {
       l <- repl.loop
     } yield l
 
-  val replStream: Stream[IO, ExitCode] =
+  override def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] =
     quasarStream >>= (q => Stream.eval(repl(q)))
-
-  def main(args: Array[String]): Unit =
-    new ReplStreamApp(replStream).main(args)
 
 }
