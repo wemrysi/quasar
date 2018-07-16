@@ -43,5 +43,5 @@ trait Tables[F[_], G[_], I, Q, D] {
 
   def cancelAllPreparations: F[Unit]
 
-  def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[D]]
+  def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, D]]
 }
