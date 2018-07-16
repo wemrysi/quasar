@@ -16,19 +16,17 @@
 
 package quasar.evaluate
 
-import quasar.api.ResourceError.ReadError
-
 import scalaz.{\/, Contravariant, Functor, Profunctor}
 import scalaz.syntax.functor._
 
 /** Represents the ability to evaluate QScript over potentially many sources. */
 trait QueryFederation[T[_[_]], F[_], S, R] {
-  def evaluateFederated(q: FederatedQuery[T, S]): F[ReadError \/ R]
+  def evaluateFederated(q: FederatedQuery[T, S]): F[EvaluateError \/ R]
 }
 
 object QueryFederation extends QueryFederationInstances {
   def apply[T[_[_]], F[_], S, R](
-      f: FederatedQuery[T, S] => F[ReadError \/ R])
+      f: FederatedQuery[T, S] => F[EvaluateError \/ R])
       : QueryFederation[T, F, S, R] =
     new QueryFederation[T, F, S, R] {
       def evaluateFederated(q: FederatedQuery[T, S]) = f(q)

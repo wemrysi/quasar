@@ -17,115 +17,41 @@
 package quasar.evaluate
 
 import slamdata.Predef._
-import quasar.TreeMatchers
-import quasar.api._, ResourceError._
+import quasar.{Qspec, TreeMatchers}
+import quasar.api._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.iota.{copkTraverse, copkEqual}
-import quasar.fp.{constEqual, reflNT}
+import quasar.fp.constEqual
 import quasar.qscript._
 
 import matryoshka._
 import matryoshka.data.Fix
 import pathy.Path._
-import scalaz.{Id, IList, IMap, Show, Tree}, Id.Id
+import scalaz.{\/, IMap, Show, Tree}
 import scalaz.std.anyVal._
 import scalaz.std.option._
-import scalaz.std.tuple._
-import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 
-final class FederatingQueryEvaluatorSpec
-    extends ResourceDiscoverySpec[Id, IList]
-    with TreeMatchers {
+final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
+  import EvaluateError._
 
   implicit val showTree: Show[Tree[ResourceName]] =
     Show.shows(_.drawTree)
 
-  val abForest =
-    Stream(
-      Tree.Node(ResourceName("b"), Stream(
-        Tree.Leaf(ResourceName("a")))),
-      Tree.Leaf(ResourceName("a")))
+  val abs = ResourcePath.root() / ResourceName("resource") / ResourceName("abs")
+  val xys = ResourcePath.root() / ResourceName("resource") / ResourceName("xys")
 
-  val xyForest =
-    Stream(
-      Tree.Node(ResourceName("x"), Stream(
-        Tree.Leaf(ResourceName("y")))),
-      Tree.Node(ResourceName("y"), Stream(
-        Tree.Leaf(ResourceName("y")))))
+  val srcs = IMap(
+    abs -> Source(abs, 1),
+    xys -> Source(xys, 2))
 
-  val abs = MockQueryEvaluator.resourceDiscovery[Id, IList](abForest)
-
-  val xys = MockQueryEvaluator.resourceDiscovery[Id, IList](xyForest)
-
-  val qfed = new QueryFederation[Fix, Id, Int, FederatedQuery[Fix, Int]] {
-    def evaluateFederated(q: FederatedQuery[Fix, Int]) = q.right[ReadError]
+  val qfed = new QueryFederation[Fix, EvaluateError \/ ?, Int, FederatedQuery[Fix, Int]] {
+    def evaluateFederated(q: FederatedQuery[Fix, Int]) = q.right[EvaluateError].right[EvaluateError]
   }
 
   val fqe =
-    FederatingQueryEvaluator(qfed, IMap(
-      ResourceName("abs") -> ((abs, 1)),
-      ResourceName("xys") -> ((xys, 2))).point[Id])
-
-  // ResourceDiscoverySpec
-  val discovery = fqe
-  val nonExistentPath = ResourcePath.root() / ResourceName("non") / ResourceName("existent")
-  val run = reflNT[Id]
-
-  "children" >> {
-    "returns possible keys for root" >> {
-      val progeny =
-        IList(
-          ResourceName("abs") -> ResourcePathType.resourcePrefix,
-          ResourceName("xys") -> ResourcePathType.resourcePrefix)
-
-      fqe.children(ResourcePath.root()) must_= progeny.right
-    }
-
-    "returns PNF when no source" >> {
-      val dne = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
-
-      fqe.children(dne) must_= pathNotFound(dne).left
-    }
-
-    "returns correctly prefixed PNF from source" >> {
-      val abx = ResourcePath.root() / ResourceName("abs") / ResourceName("a") / ResourceName("x")
-
-      fqe.children(abx) must_= pathNotFound(abx).left
-    }
-
-    "returns results" >> {
-      val xx = ResourcePath.root() / ResourceName("xys") / ResourceName("x")
-
-      val expect = IList(ResourceName("y") -> ResourcePathType.resource)
-
-      fqe.children(xx) must_= expect.right
-    }
-  }
-
-  "isResource" >> {
-    "returns false for root" >> {
-      fqe.isResource(ResourcePath.root()) must beFalse
-    }
-
-    "returns false when no source" >> {
-      val noSource = ResourcePath.root() / ResourceName("baz") / ResourceName("bar")
-
-      fqe.isResource(noSource) must beFalse
-    }
-
-    "returns false when not a resource" >> {
-      val prefix = ResourcePath.root() / ResourceName("xys") / ResourceName("x")
-
-      fqe.isResource(prefix) must beFalse
-    }
-
-    "returns true when a resource" >> {
-      val resource = ResourcePath.root() / ResourceName("abs") / ResourceName("a")
-
-      fqe.isResource(resource) must beTrue
-    }
-  }
+    FederatingQueryEvaluator[Fix, EvaluateError \/ ?, Int, FederatedQuery[Fix, Int]](
+      qfed, f => srcs.lookup(ResourcePath.leaf(f)).right[EvaluateError])
 
   "evaluate" >> {
     val qs = construction.mkDefaults[Fix, QScriptRead[Fix, ?]]
@@ -159,51 +85,51 @@ final class FederatingQueryEvaluatorSpec
           qs.free.Read[AFile](rootDir </> dir("foo") </> file("bar")))
 
       val rp =
-        ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
+        ResourcePath.root() / ResourceName("abs") / ResourceName("a")
 
       fqe.evaluate(query).swap.toOption must_= Some(pathNotFound(rp))
     }
 
     "builds federated query when all sources found" >> {
-      val absa: AFile =
-        rootDir </> dir("abs") </> file("a")
+      val absf: AFile =
+        rootDir </> dir("resource") </> file("abs")
 
-      val xysy: AFile =
-        rootDir </> dir("xys") </> file("y")
+      val xysf: AFile =
+        rootDir </> dir("resource") </> file("xys")
 
       val query =
         qs.fix.Filter(
           qs.fix.Union(
             qs.fix.Unreferenced,
-            qs.free.Read[AFile](absa),
-            qs.free.Read[AFile](xysy)),
+            qs.free.Read[AFile](absf),
+            qs.free.Read[AFile](xysf)),
           qs.recFunc.Gt(
             qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
             qs.recFunc.Now))
 
       fqe.evaluate(query) map { fq =>
         fq.query must beTreeEqual(query)
-        fq.sources(absa) must_= Some(Source(ResourcePath.root() / ResourceName("a"), 1))
-        fq.sources(xysy) must_= Some(Source(ResourcePath.root() / ResourceName("y"), 2))
+        fq.sources(absf) must_= Some(Source(ResourcePath.leaf(absf), 1))
+        fq.sources(xysf) must_= Some(Source(ResourcePath.leaf(xysf), 2))
       } getOrElse ko("Unexpected evaluate failure.")
     }
 
     "converts any directory paths to files" >> {
-      val absabD: ADir =
-        rootDir </> dir("abs") </> dir("a") </> dir("b")
+      val absd: ADir =
+        rootDir </> dir("resource") </> dir("abs")
 
-      val absabF: AFile =
-        rootDir </> dir("abs") </> dir("a") </> file("b")
+      val absf: AFile =
+        rootDir </> dir("resource") </> file("abs")
 
-      val xysy: AFile =
-        rootDir </> dir("xys") </> file("y")
+      val xysf: AFile =
+        rootDir </> dir("resource") </> file("xys")
 
       val query =
         qs.fix.Filter(
           qs.fix.Union(
             qs.fix.Unreferenced,
-            qs.free.Read[ADir](absabD),
-            qs.free.Read[AFile](xysy)),
+            qs.free.Read[ADir](absd),
+            qs.free.Read[AFile](xysf)),
           qs.recFunc.Gt(
             qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
             qs.recFunc.Now))
@@ -212,15 +138,15 @@ final class FederatingQueryEvaluatorSpec
         qs.fix.Filter(
           qs.fix.Union(
             qs.fix.Unreferenced,
-            qs.free.Read[AFile](absabF),
-            qs.free.Read[AFile](xysy)),
+            qs.free.Read[AFile](absf),
+            qs.free.Read[AFile](xysf)),
           qs.recFunc.Gt(
             qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
             qs.recFunc.Now))
 
       fqe.evaluate(query) map { fq =>
         fq.query must beTreeEqual(expected)
-        fq.sources(absabF) must_= Some(Source(ResourcePath.root() / ResourceName("a") / ResourceName("b"), 1))
+        fq.sources(absf) must_= Some(Source(ResourcePath.leaf(absf), 1))
       } getOrElse ko("Unexpected evaluate failure.")
     }
   }
