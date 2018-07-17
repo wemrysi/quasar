@@ -28,6 +28,7 @@ import quasar.main.Prettify
 import quasar.run.{QuasarError, SqlQuery}
 
 import java.lang.Exception
+import scala.util.control.NonFatal
 
 import argonaut.{Json, JsonParser, JsonScalaz}, JsonScalaz._
 import cats.effect._
@@ -56,7 +57,7 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
 
   def evaluate(cmd: Command): F[Result] = {
     val exitCode = if (cmd === Exit) Some(ExitCode.Success) else None
-    recoverSomeErrors(doEvaluate(cmd))
+    recoverErrors(doEvaluate(cmd))
       .map(Result(exitCode, _))
   }
 
@@ -265,10 +266,13 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
     private def raiseEvalError[A](s: String): F[A] =
       F.raiseError(new EvalError(s))
 
-    private def recoverSomeErrors(fa: F[Option[String]]): F[Option[String]] =
+    private def recoverErrors(fa: F[Option[String]]): F[Option[String]] =
       F.recover(fa) {
         case ee: EvalError => s"Evaluation error: ${ee.getMessage}".some
         case QuasarError.throwableP(qe) => s"Quasar error: $qe".some
+        case NonFatal(t) =>
+          (s"Unexpected error: ${t.getClass.getCanonicalName}: ${t.getMessage}" +
+            t.getStackTrace.mkString("\n  ", "\n  ", "")).some
       }
 
     private def renderData(format: OutputFormat, ds: List[Data]): String =
