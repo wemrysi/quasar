@@ -369,7 +369,7 @@ lazy val qsu = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
-    api,
+    api % BothScopes,
     qsu)
   .settings(commonSettings)
   .settings(publishTestsSettings)

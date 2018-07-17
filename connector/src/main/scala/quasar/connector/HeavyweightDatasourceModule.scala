@@ -16,7 +16,7 @@
 
 package quasar.connector
 
-import quasar.{Data, RenderTreeT}
+import quasar.{Data, Disposable, RenderTreeT}
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.fs.Planner.PlannerErrorME
@@ -33,8 +33,7 @@ trait HeavyweightDatasourceModule {
 
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: ConcurrentEffect: PlannerErrorME: Timer,
-      G[_]: ConcurrentEffect: Timer](
+      F[_]: ConcurrentEffect: PlannerErrorME: Timer](
       config: Json)
-      : F[InitializationError[Json] \/ Datasource[F, Stream[G, ?], T[QScriptEducated[T, ?]], Stream[G, Data]]]
+      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], Stream[F, Data]]]]
 }

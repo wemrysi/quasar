@@ -21,7 +21,6 @@ import quasar.connector.{Datasource, QScriptEvaluator}
 import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript.QScriptEducated
 
-import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import scalaz.Monad
 
@@ -32,4 +31,4 @@ abstract class HeavyweightDatasource[
     G[_],
     R]
     extends QScriptEvaluator[T, F, R]
-    with Datasource[F, Stream[G, ?], T[QScriptEducated[T, ?]], R]
+    with Datasource[F, G, T[QScriptEducated[T, ?]], R]
