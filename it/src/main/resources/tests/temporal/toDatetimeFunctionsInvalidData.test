@@ -1,0 +1,16 @@
+{
+    "name": "convert to datetime functions with invalid data",
+
+    "backends": {
+        "mimir": "pending"
+    },
+
+    "data": "../types.data",
+
+    "query": "select localdatetime(foo), date(foo), localdate(foo), time(foo), localtime(foo), offsetdatetime(foo), offsetdate(foo), offsettime(foo), timestamp(foo) from `../types.data`",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
+    "expected": []
+}

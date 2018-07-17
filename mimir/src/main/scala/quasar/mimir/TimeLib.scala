@@ -175,7 +175,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
             try {
               JLocalDate.parse(c(row))
               true
-            } catch { case (_: DateTimeParseException) =>
+            } catch { case (_: DateTimeParseException | _: NullPointerException) =>
               false
             }
           }
@@ -192,7 +192,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
             try {
               JLocalDateTime.parse(c(row))
               true
-            } catch { case (_: DateTimeParseException) =>
+            } catch { case (_: DateTimeParseException | _: NullPointerException) =>
               false
             }
           }
@@ -209,7 +209,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
             try {
               JLocalTime.parse(c(row))
               true
-            } catch { case (_: DateTimeParseException) =>
+            } catch { case (_: DateTimeParseException | _: NullPointerException) =>
               false
             }
           }
@@ -227,7 +227,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
               try {
                 QOffsetDate.parse(c(row))
                 true
-              } catch { case (_: DateTimeParseException) =>
+              } catch { case (_: DateTimeParseException | _: NullPointerException) =>
                 false
               }
             }
@@ -244,7 +244,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
             try {
               JOffsetDateTime.parse(c(row))
               true
-            } catch { case (_: DateTimeParseException) =>
+            } catch { case (_: DateTimeParseException | _: NullPointerException) =>
               false
             }
           }
@@ -261,7 +261,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
             try {
               JOffsetTime.parse(c(row))
               true
-            } catch { case (_: DateTimeParseException) =>
+            } catch { case (_: DateTimeParseException | _: NullPointerException) =>
               false
             }
           }
