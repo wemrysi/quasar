@@ -451,11 +451,12 @@ lazy val runp = (project in file("run"))
   */
 lazy val repl = project
   .settings(name := "quasar-repl")
-  .dependsOn(interface)
+  .dependsOn(api, interface, runp)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(backendRewrittenRunSettings)
   .settings(
+    mainClass in Compile := Some("quasar.repl.Main"),
     fork in run := true,
     connectInput in run := true,
     outputStrategy := Some(StdoutOutput))

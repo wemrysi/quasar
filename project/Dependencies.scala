@@ -7,7 +7,7 @@ import sbt._
 
 object Dependencies {
   private val algebraVersion      = "0.7.0"
-  private val argonautVersion     = "6.2"
+  private val argonautVersion     = "6.2.2"
   private val disciplineVersion   = "0.7.2"
   private val doobieVersion       = "0.4.4"
   private val jawnVersion         = "0.11.1"
@@ -117,7 +117,8 @@ object Dependencies {
 
   def interface = Seq(
     "com.github.scopt" %% "scopt" % scoptVersion,
-    "org.jboss.aesh"    % "aesh"  % "0.66.17"
+    "org.jboss.aesh"    % "aesh"  % "0.66.17",
+    "org.jline" % "jline" % "3.8.0"
   )
 
   def mongodb = {

@@ -13,6 +13,8 @@ stages:
   - name: compile
   - name: unit test
   - name: test
+  - name: testjar
+    if: type = pull_request
   - name: publish
     # weirdly, we have to add the extra PR check
     if: NOT type = pull_request
@@ -64,8 +66,6 @@ script:
   - docker/scripts/assembleTestingConf -i quasar_$CONNECTOR
   - cat it/testing.conf
 
-  - ./sbt preBuild
-
   - |-
     SPECIFIC_DELEGATE=
 
@@ -97,14 +97,10 @@ jobs:
 
         - travis_wait 30 scripts/s3Cache cleanup
 
-        - ./sbt preBuild
-
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             checkHeaders \
             test:compile
-
-        - ./sbt postBuild
 
         - travis_wait 30 scripts/s3Cache upload
 
@@ -115,12 +111,24 @@ jobs:
       env:
       script:
         - travis_wait 30 scripts/s3Cache download
-        - ./sbt preBuild
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             it/sideEffectTestFSConfig \
             "testOnly -- xonly failtrace" \
             "exclusive:testOnly -- xonly failtrace"
+
+    - stage: testjar
+      env:
+      script:
+        - set -e
+
+        - travis_wait 30 scripts/s3Cache download
+
+        - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc repl/assembly'
+
+        - scripts/testJar
+
+        - set +e
 
     - stage: publish
       env:
@@ -128,7 +136,6 @@ jobs:
         - set -e
 
         - travis_wait 30 scripts/s3Cache download
-        - ./sbt preBuild
 
         - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc repl/assembly'
 
@@ -169,7 +176,6 @@ cache:
     - $HOME/.coursier/cache
     - $HOME/.ivy2/cache
     - $HOME/.sbt
-    - '.hoarder-cache'
 
 before_cache:
   - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm

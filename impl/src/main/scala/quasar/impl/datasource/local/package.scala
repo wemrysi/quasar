@@ -16,10 +16,10 @@
 
 package quasar.impl.datasource
 
-import quasar.api.DataSourceType
+import quasar.api.datasource.DatasourceType
 
 import eu.timepit.refined.auto._
 
 package object local {
-  val LocalType = DataSourceType("local", 1L)
+  val LocalType = DatasourceType("local", 1L)
 }

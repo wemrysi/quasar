@@ -19,6 +19,7 @@ package quasar.regression
 import slamdata.Predef._
 import quasar._
 import quasar.api._
+import quasar.api.datasource.ConflictResolution
 import quasar.build.BuildInfo
 import quasar.common.PhaseResults
 import quasar.contrib.argonaut._
@@ -154,11 +155,6 @@ final class Sql2QueryRegressionSpec extends Qspec {
         case TestDirective.Skip    => skipped
         case TestDirective.SkipCI  =>
           BuildInfo.isCIBuild.fold(execute.Skipped("(skipped during CI build)"), runTest)
-        case TestDirective.Timeout =>
-          // NB: To locally skip tests that time out, make `Skipped` unconditional.
-          BuildInfo.isCIBuild.fold(
-            execute.Skipped("(skipped because it times out)"),
-            runTest)
         case TestDirective.Pending | TestDirective.PendingIgnoreFieldOrder =>
           runTest.pendingUntilFixed
       } getOrElse runTest
@@ -212,34 +208,11 @@ final class Sql2QueryRegressionSpec extends Qspec {
         .map(normalizeJson <<< deleteFields <<< (_.asJson))
         .translate(λ[IO ~> Task](_.to[Task]))
 
-    val result =
-      exp.predicate(
-        exp.rows,
-        actProcess,
-        fieldOrderSignificance,
-        resultOrderSignificance)
-
-    collectFirstDirective(exp.backends, backendName) {
-      case TestDirective.Timeout =>
-        result.map {
-          case execute.Success(_, _) =>
-            execute.Failure(s"Fixed now, you should remove the “timeout” status.")
-
-          case execute.Failure(m, _, _, _) =>
-            execute.Failure(s"Failed with “$m”, you should change the “timeout” status.")
-
-          case x => x
-        }.handle {
-          case e: java.util.concurrent.TimeoutException =>
-            execute.Pending(s"times out: ${e.getMessage}")
-
-          case e =>
-            execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.")
-        }
-    } getOrElse result.handle {
-      case e: java.util.concurrent.TimeoutException =>
-        execute.Failure(s"Times out (${e.getMessage}), you should use the “timeout” status.")
-    }
+    exp.predicate(
+      exp.rows,
+      actProcess,
+      fieldOrderSignificance,
+      resultOrderSignificance)
   }
 
   /** Returns all the `RegressionTest`s found in the given directory, keyed by

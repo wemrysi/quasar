@@ -17,18 +17,19 @@
 package quasar.run
 
 import quasar.Data
-import quasar.api.{DataSources, QueryEvaluator, ResourceDiscovery, ResourceName}
+import quasar.api.{QueryEvaluator, ResourceDiscovery, ResourceName}
+import quasar.api.datasource.Datasources
 import quasar.common.PhaseResultTell
 import quasar.contrib.fs2.stream._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.MonadError_
 import quasar.evaluate.FederatingQueryEvaluator
-import quasar.impl.DataSourceModule
-import quasar.impl.datasource.local.LocalDataSourceModule
-import quasar.impl.datasources.{DataSourceConfig, DataSourceManagement, DefaultDataSources}
-import quasar.impl.external.{ExternalConfig, ExternalDataSources}
+import quasar.impl.DatasourceModule
+import quasar.impl.datasource.local.LocalDatasourceModule
+import quasar.impl.datasources.{DatasourceConfig, DatasourceManagement, DefaultDatasources}
+import quasar.impl.external.{ExternalConfig, ExternalDatasources}
 import quasar.mimir.Precog
-import quasar.mimir.datasources.MimirDataSourceConfigs
+import quasar.mimir.datasources.MimirDatasourceConfigs
 import quasar.mimir.evaluate.{MimirQueryFederation, QueryAssociate}
 import quasar.run.data.{jsonToRValue, rValueToJson}
 import quasar.run.implicits._
@@ -51,12 +52,12 @@ import scalaz.syntax.invariantFunctor._
 import shims._
 
 final class Quasar[F[_], G[_]](
-    val dataSources: DataSources[F, Json],
+    val dataSources: Datasources[F, Json],
     val queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]])
 
 object Quasar {
   // The location the datasource configs table within `mimir`.
-  val DataSourceConfigsLocation: AFile =
+  val DatasourceConfigsLocation: AFile =
     rootDir </> dir("quasar") </> file("datasource-configs")
 
   /** What it says on the tin.
@@ -78,34 +79,34 @@ object Quasar {
         _.dispose.to[F])
 
       configs =
-        MimirDataSourceConfigs[F](precog, DataSourceConfigsLocation)
+        MimirDatasourceConfigs[F](precog, DatasourceConfigsLocation)
           .xmap(rValueToJson, jsonToRValue)
 
       configStream <- Stream.eval(MonadError_[F, ResourceError] unattempt {
-        MimirDataSourceConfigs.allConfigs(precog, DataSourceConfigsLocation).run.to[F]
+        MimirDatasourceConfigs.allConfigs(precog, DatasourceConfigsLocation).run.to[F]
       })
 
       configured <-
         configStream
           .map { case (n, c) => (n, c.map(rValueToJson)) }
-          .fold(IMap.empty[ResourceName, DataSourceConfig[Json]])(_ + _)
+          .fold(IMap.empty[ResourceName, DatasourceConfig[Json]])(_ + _)
           .translate(λ[IO ~> F](_.to[F]))
 
-      extMods <- ExternalDataSources[F](extConfig, pool)
+      extMods <- ExternalDatasources[F](extConfig, pool)
 
       modules = extMods.insert(
-        LocalDataSourceModule.kind,
-        DataSourceModule.Lightweight(LocalDataSourceModule))
+        LocalDatasourceModule.kind,
+        DatasourceModule.Lightweight(LocalDatasourceModule))
 
       scheduler <- Scheduler(corePoolSize = 1, threadPrefix = "quasar-scheduler")
 
-      mr <- Stream.bracket(DataSourceManagement[Fix, F, IO](modules, configured, pool, scheduler))(
+      mr <- Stream.bracket(DatasourceManagement[Fix, F, IO](modules, configured, pool, scheduler))(
         Stream.emit(_),
         { case (_, r) => r.get.flatMap(_.traverse_(_.fold(_.shutdown, _.shutdown))) })
 
       (mgmt, running) = mr
 
-      dataSources = DefaultDataSources(configs, mgmt, mgmt)
+      dataSources = DefaultDatasources(configs, mgmt, mgmt)
 
       federation = MimirQueryFederation[Fix, F](precog)
 

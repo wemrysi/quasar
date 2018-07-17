@@ -66,7 +66,6 @@ sealed abstract class QueryEvaluatorInstances extends QueryEvaluatorInstances0 {
         new QueryEvaluator[B, G, Q, R] {
           def evaluate(query: Q) = f(fa.evaluate(query))
           def children(path: ResourcePath) = f(fa.children(path))
-          def descendants(path: ResourcePath) = f(fa.descendants(path))
           def isResource(path: ResourcePath) = f(fa.isResource(path))
         }
     }
@@ -121,6 +120,5 @@ private[api] final class DelegatingQueryEvaluator[F[_], G[_], Q, R, S, T](
 
   def evaluate(query: S) = f(underlying.evaluate)(query)
   def children(path: ResourcePath) = underlying.children(path)
-  def descendants(path: ResourcePath) = underlying.descendants(path)
   def isResource(path: ResourcePath) = underlying.isResource(path)
 }
