@@ -164,7 +164,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       table <-
         Table.fromRValueStream[X](fs2.Stream(seq: _*).map(RValue.fromData).unNone.covary[IO])
 
-      jsonStr <- table.renderJson("[", ",", "]").foldLeft("")(_ + _.toString).liftM[XT]
+      jsonStr <- table.renderJson("[", ",", "]", precise = true).foldLeft("")(_ + _.toString).liftM[XT]
     } yield jsonStr
 
     val ioa = eff.run flatMap {
@@ -228,7 +228,32 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     }
 
     "verify renderJson (precise) round tripping" in {
-      prop { data: List[Data] =>
+      def removal(data: Data): Option[Data] = data match {
+        case Data.Binary(_) =>
+          None
+
+        case Data.Id(_) =>
+          None
+
+        case Data.NA =>
+          None
+
+        case Data.Arr(values) =>
+          Some(Data.Arr(values.flatMap(removal)))
+
+        case Data.Obj(map) =>
+          val map2 = map flatMap {
+            case (key, value) => removal(value).map(key -> _)
+          }
+
+          Some(Data.Obj(map2))
+
+        case other => Some(other)
+      }
+
+      prop { data0: List[Data] =>
+        val data = data0.flatMap(removal)
+
         testRenderJsonPrecise(data)
       }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
     }
