@@ -2019,13 +2019,17 @@ object Slice {
     }
   }
 
-  def allFromRValues(
-    values: fs2.Stream[IO, RValue], maxRows: Option[Int] = None, maxColumns: Option[Int] = None
-  ): fs2.Stream[IO, Slice] = {
+  def allFromRValues[F[_]](
+      values: fs2.Stream[F, RValue],
+      maxRows: Option[Int] = None,
+      maxColumns: Option[Int] = None )
+      : fs2.Stream[F, Slice] = {
+
     val maxRowsC = maxRows.getOrElse(Config.maxSliceRows)
     val maxColumnsC = maxColumns.getOrElse(Config.maxSliceColumns)
     // println(s"maxRows: $maxRowsC, maxCols: $maxColumnsC")
-    def rec(next: ArraySliced[RValue], values: fs2.Stream[IO, RValue]): fs2.Pull[IO, Slice, Unit] =
+
+    def rec(next: ArraySliced[RValue], values: fs2.Stream[F, RValue]): fs2.Pull[F, Slice, Unit] =
       if (next.size == 0) {
         for {
           uncons <- values.pull.unconsChunk
@@ -2047,13 +2051,13 @@ object Slice {
     rec(ArraySliced(new Array[RValue](0), 0, 0), values).stream
   }
 
-  @deprecated
+  @deprecated("use allFromRValues", "52.0.2")
   def fromJValues(values: Stream[JValue]): Slice =
     fromRValues(values.map(RValue.fromJValueRaw))
 
   // don't use this anymore. It doesn't limit the slice size properly,
   // unlike allFromRValues and fromRValuesStep.
-  @deprecated
+  @deprecated("use allFromRValues", "52.0.2")
   def fromRValues(values: Stream[RValue]): Slice = {
     val sliceSize = values.size
 
