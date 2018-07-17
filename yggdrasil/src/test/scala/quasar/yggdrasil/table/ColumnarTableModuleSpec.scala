@@ -634,7 +634,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     }
 
     "test string escaping" in {
-      val csv = testRenderCsv("{\"s\":\"a\\\"b\",\"t\":\",\",\"u\":\"aa\\nbb\",\"v\":\"a,b\\\"c\\r\\nd\"}")
+      val csv = testRenderCsv("""{"s":"a\"b","t":",","u":"aa\nbb","v":"a,b\"c\r\nd"}""")
 
       val expected = "" +
         "s,t,u,v\r\n" +
