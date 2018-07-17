@@ -1001,6 +1001,13 @@ abstract class Slice { source =>
     // faster caches
     val size = this.size
 
+    /*
+     * In the arrays below, use the scalar case of the union if
+     * assumeHomogeneous = true, since we're assuming that we can't
+     * have path-locus conflicts (i.e. multiple column types at the
+     * same path). This is a significant fastpath.
+     */
+
     // CType | Array[CType]
     val ctypes: Array[AnyRef] = headers map { refs =>
       if (assumeHomogeneous)
@@ -1073,6 +1080,8 @@ abstract class Slice { source =>
     @tailrec
     def renderColumns(row: Int, col: Int): Unit = {
       if (col < columns.length) {
+        // we use assumeHomogeneous to determine the case in the union
+
         val candidates = if (!assumeHomogeneous)
           columns(col).asInstanceOf[Array[Column]]
         else
