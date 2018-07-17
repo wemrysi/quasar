@@ -21,7 +21,7 @@ object Config {
 
   def hashJoins            = true
   def maxSliceRows: Int    = 16384
-  def maxSliceColumns: Int = 150
+  def maxSliceColumns: Int = 100
 
   // This is a slice size that we'd like our slices to be at least as large as.
   def minIdealSliceRows: Int = maxSliceRows / 4

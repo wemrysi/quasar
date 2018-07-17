@@ -206,7 +206,7 @@ lazy val root = project.in(file("."))
     qscript, qsu,
     repl, runp,
     sql, sst,
-    yggdrasil
+    yggdrasil, yggdrasilPerf
   ).enablePlugins(AutomateHeaderPlugin)
 
 /** Very general utilities, ostensibly not Quasar-specific, but they just aren’t
@@ -586,6 +586,19 @@ lazy val yggdrasil = project
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
+
+lazy val yggdrasilPerf = project
+  .settings(
+    name := "quasar-yggdrasil-perf-internal",
+    scalacStrictMode := false)
+  .dependsOn(yggdrasil % "compile->compile;compile->test")
+  .settings(headerLicenseSettings)
+  .settings(noPublishSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+  .enablePlugins(JmhPlugin)
 
 lazy val mimir = project
   .settings(
