@@ -126,6 +126,16 @@ object ColumnarTableModule extends Logging {
     * be used. If `assumeHomogeneous` is false, then the dataset will be
     * fully traversed to infer the schema, which will then be used to
     * render the CSV bytes in a second traversal.
+    *
+    * If `assumeHomogeneous` is true and the data is *not* homogeneous,
+    * the results are going to be quite bizarre. You're almost certainly
+    * going to see some missing columns, some map deref errors as you
+    * cross slice boundaries, etc. It's just bad. The only for of
+    * heterogeneity which is allowed when `assumeHomogeneous` is true is
+    * holes in data. In other words, you can have columns which are
+    * undefined for a particular row, so long as it's the same column set
+    * throughout the entire dataset *and* so long as you don't have any
+    * locus conflicts (i.e. a column which could be String or Long).
     */
   def renderCsv(slices: StreamT[IO, Slice], assumeHomogeneous: Boolean): StreamT[IO, CharBuffer] = {
     val schemaFirstTailOptM: IO[Option[(Map[CPath, Set[CType]], Slice, StreamT[IO, Slice])]] = {
