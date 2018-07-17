@@ -40,20 +40,9 @@ trait ArrayColumn[@specialized(Boolean, Long, Double) A] extends DefinedAtIndex 
 object ArrayColumn {
   private[table] def resizeArray[A](arr: Array[A], size: Int)(implicit A: ClassTag[A]): Array[A] = {
     val newArr = new Array[A](size)
-    System.arraycopy(arr, 0, newArr, 0, Math.min(size, arr.length));
+    System.arraycopy(arr, 0, newArr, 0, Math.min(size, arr.length))
     newArr
   }
-
-  private[table] def resizeBitSet(bs: BitSet, size: Int): BitSet = {
-    // 64 bits per long, 2^6 == 64
-    val howManyLongs = ((size - 1) >> 6) + 1
-    val arr = new Array[Long](howManyLongs)
-    System.arraycopy(bs.getBits(), 0, arr, 0, Math.min(howManyLongs, bs.getBits().length))
-    new BitSet(arr, howManyLongs)
-  }
-
-  private[table] def filterDefined[A: ClassTag](d: BitSet, arr: Array[A]): Array[A] =
-    arr.zipWithIndex.collect { case (v, i) if d(i) => v }.toArray
 }
 
 class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val defined: BitSet, val values: Array[Array[A]])(implicit val tpe: CArrayType[A])
@@ -72,7 +61,7 @@ class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val def
   def resize(size: Int): ArrayColumn[Array[A]] = {
     implicit val ct: ClassTag[Array[A]] = tpe.classTag
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayHomogeneousArrayColumn(newDefined, newValues)
   }
 }
@@ -104,8 +93,8 @@ class ArrayBoolColumn(val defined: BitSet, val values: BitSet) extends ArrayColu
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Boolean] = {
-    val newValues = ArrayColumn.resizeBitSet(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newValues = values.resizeBits(size)
+    val newDefined = defined.resizeBits(size)
     new ArrayBoolColumn(newDefined, newValues)
   }
 
@@ -138,7 +127,7 @@ class ArrayLongColumn(val defined: BitSet, val values: Array[Long]) extends Arra
 
   def resize(size: Int): ArrayColumn[Long] = {
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayLongColumn(newDefined, newValues)
   }
 
@@ -165,7 +154,7 @@ class ArrayDoubleColumn(val defined: BitSet, val values: Array[Double]) extends 
 
   def resize(size: Int): ArrayColumn[Double] = {
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayDoubleColumn(newDefined, newValues)
   }
 
@@ -192,7 +181,7 @@ class ArrayNumColumn(val defined: BitSet, val values: Array[BigDecimal]) extends
 
   def resize(size: Int): ArrayColumn[BigDecimal] = {
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayNumColumn(newDefined, newValues)
   }
 
@@ -219,7 +208,7 @@ class ArrayStrColumn(val defined: BitSet, val values: Array[String]) extends Arr
 
   def resize(size: Int): ArrayColumn[String] = {
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayStrColumn(newDefined, newValues)
   }
 
@@ -246,7 +235,7 @@ class ArrayOffsetDateTimeColumn(val defined: BitSet, val values: Array[OffsetDat
 
   def resize(size: Int): ArrayColumn[OffsetDateTime] = {
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayOffsetDateTimeColumn(newDefined, newValues)
   }
 
@@ -273,7 +262,7 @@ class ArrayOffsetTimeColumn(val defined: BitSet, val values: Array[OffsetTime]) 
 
   def resize(size: Int): ArrayColumn[OffsetTime] = {
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayOffsetTimeColumn(newDefined, newValues)
   }
 
@@ -300,7 +289,7 @@ class ArrayOffsetDateColumn(val defined: BitSet, val values: Array[OffsetDate]) 
 
   def resize(size: Int): ArrayColumn[OffsetDate] = {
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayOffsetDateColumn(newDefined, newValues)
   }
 
@@ -327,7 +316,7 @@ class ArrayLocalDateTimeColumn(val defined: BitSet, val values: Array[LocalDateT
 
   def resize(size: Int): ArrayColumn[LocalDateTime] = {
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayLocalDateTimeColumn(newDefined, newValues)
   }
 
@@ -354,7 +343,7 @@ class ArrayLocalTimeColumn(val defined: BitSet, val values: Array[LocalTime]) ex
 
   def resize(size: Int): ArrayColumn[LocalTime] = {
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayLocalTimeColumn(newDefined, newValues)
   }
 
@@ -381,7 +370,7 @@ class ArrayLocalDateColumn(val defined: BitSet, val values: Array[LocalDate]) ex
 
   def resize(size: Int): ArrayColumn[LocalDate] = {
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayLocalDateColumn(newDefined, newValues)
   }
 
@@ -408,7 +397,7 @@ class ArrayIntervalColumn(val defined: BitSet, val values: Array[DateTimeInterva
 
   def resize(size: Int): ArrayColumn[DateTimeInterval] = {
     val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new ArrayIntervalColumn(newDefined, newValues)
   }
 
@@ -431,7 +420,7 @@ class MutableEmptyArrayColumn(val defined: BitSet) extends ArrayColumn[Boolean] 
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Boolean] = {
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new MutableEmptyArrayColumn(newDefined)
   }
 }
@@ -448,7 +437,7 @@ class MutableEmptyObjectColumn(val defined: BitSet) extends ArrayColumn[Boolean]
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Boolean] = {
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new MutableEmptyObjectColumn(newDefined)
   }
 }
@@ -465,7 +454,7 @@ class MutableNullColumn(val defined: BitSet) extends ArrayColumn[Boolean] with N
   def clear(row: Int): Unit = defined.clear(row)
 
   def resize(size: Int): ArrayColumn[Boolean] = {
-    val newDefined = ArrayColumn.resizeBitSet(defined, size)
+    val newDefined = defined.resizeBits(size)
     new MutableNullColumn(newDefined)
   }
 

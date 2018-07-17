@@ -27,10 +27,13 @@ import qdata.time.TimeGenerators
 import quasar.yggdrasil.TableModule.SortDescending
 
 import scala.util.Random
+import scala.{Stream => SStream}
 import org.scalacheck.{Arbitrary, Gen}
 import org.specs2.execute.Result
 import org.specs2.matcher.Matcher
 import Gen.listOfN
+
+import fs2.Stream
 
 class SliceSpec extends Specification with ScalaCheck {
   import ArbitrarySlice._
@@ -82,36 +85,36 @@ class SliceSpec extends Specification with ScalaCheck {
   }
 
   def sliceEqualityAtDefinedRows(slice1: Slice, slice2: Slice): Result = {
-    def colValues(col: ArrayColumn[_]): Iterator[CValue] = {
+    def colValues(col: ArrayColumn[_]): Iterator[Option[CValue]] = {
       col match {
         case ac: ArrayLongColumn           =>
-          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLong(ac.values(i)) else CUndefined)
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) Some(CLong(ac.values(i))) else None)
         case ac: ArrayNumColumn            =>
-          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CNum(ac.values(i)) else CUndefined)
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) Some(CNum(ac.values(i))) else None)
         case ac: ArrayDoubleColumn         =>
-          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CDouble(ac.values(i)) else CUndefined)
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) Some(CDouble(ac.values(i))) else None)
         case ac: ArrayStrColumn            =>
-          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CString(ac.values(i)) else CUndefined)
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) Some(CString(ac.values(i))) else None)
         case ac: ArrayOffsetDateTimeColumn =>
-          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) COffsetDateTime(ac.values(i)) else CUndefined)
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) Some(COffsetDateTime(ac.values(i))) else None)
         case ac: ArrayOffsetTimeColumn     =>
-          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) COffsetTime(ac.values(i)) else CUndefined)
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) Some(COffsetTime(ac.values(i))) else None)
         case ac: ArrayOffsetDateColumn     =>
-          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) COffsetDate(ac.values(i)) else CUndefined)
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) Some(COffsetDate(ac.values(i))) else None)
         case ac: ArrayLocalDateTimeColumn  =>
-          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLocalDateTime(ac.values(i)) else CUndefined)
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) Some(CLocalDateTime(ac.values(i))) else None)
         case ac: ArrayLocalTimeColumn      =>
-          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLocalTime(ac.values(i)) else CUndefined)
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) Some(CLocalTime(ac.values(i))) else None)
         case ac: ArrayLocalDateColumn      =>
-          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CLocalDate(ac.values(i)) else CUndefined)
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) Some(CLocalDate(ac.values(i))) else None)
         case ac: ArrayIntervalColumn       =>
-          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) CInterval(ac.values(i)) else CUndefined)
+          (0 until ac.values.length).iterator.map(i => if (ac.defined(i)) Some(CInterval(ac.values(i))) else None)
         case ac: MutableEmptyArrayColumn   =>
-          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) CEmptyArray else CUndefined)
+          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) Some(CEmptyArray) else None)
         case ac: MutableEmptyObjectColumn  =>
-          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) CEmptyObject else CUndefined)
+          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) Some(CEmptyObject) else None)
         case ac: MutableNullColumn         =>
-          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) CNull else CUndefined)
+          (0 until (ac.defined.length << 6)).iterator.map(i => if (ac.defined(i)) Some(CNull) else None)
       }
     }
     def equalIterators[A](xs: Iterator[A], ys: Iterator[A]): Result = {
@@ -131,7 +134,7 @@ class SliceSpec extends Specification with ScalaCheck {
   }
 
   // have to override this because of `Array.equals`
-  def arraySlicesEqual[A](expected: Slice.ArraySliced[A], actual: Slice.ArraySliced[A]): Result = {
+  def arraySlicesEqual[A](expected: ArraySliced[A], actual: ArraySliced[A]): Result = {
     expected.arr.deep must_== actual.arr.deep
     expected.start must_== actual.start
     expected.size must_== actual.size
@@ -150,14 +153,14 @@ class SliceSpec extends Specification with ScalaCheck {
   def testFromRValuesMaxSliceColumnsEqualsBiggestValue(values: List[CValue]) = {
     val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
 
-    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue)).compile.toVector.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue)).compile.toVector.unsafeRunSync.toList
     assertSlices(values, slices, be_>(0))
   }
 
   def testFromRValuesMaxSliceColumnsLowerThanBiggestValue(values: List[CValue]) = {
     val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
 
-    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue - 1)).compile.toVector.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue - 1)).compile.toVector.unsafeRunSync.toList
     assertSlices(values, slices, be_>(0))
   }
 
@@ -165,7 +168,7 @@ class SliceSpec extends Specification with ScalaCheck {
     val (totalRows, _, totalColumns) = valueCalcs(values)
     val maxSliceRows = Math.max(1, Math.ceil(totalRows.toDouble / 3).toInt)
     val expectedNrSlices = Math.min(Math.ceil(totalRows.toDouble / maxSliceRows).toInt, 3)
-    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).compile.toVector.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).compile.toVector.unsafeRunSync.toList
     assertSlices(values, slices, be_==(expectedNrSlices))
   }
 
@@ -173,7 +176,7 @@ class SliceSpec extends Specification with ScalaCheck {
     val (totalRows, _, totalColumns) = valueCalcs(values)
     val maxSliceRows = 1
 
-    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).compile.toVector.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).compile.toVector.unsafeRunSync.toList
     assertSlices(values, slices, be_==(totalRows))
   }
 
@@ -181,7 +184,7 @@ class SliceSpec extends Specification with ScalaCheck {
     val (totalRows, _, totalColumns) = valueCalcs(values)
 
     // test with a slice that's just big enough to hold the values
-    val slices = Slice.allFromRValues(fs2.Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(totalColumns + 1)).compile.toVector.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(totalColumns + 1)).compile.toVector.unsafeRunSync.toList
     assertSlices(values, slices, be_==(1))
   }
 
@@ -192,7 +195,7 @@ class SliceSpec extends Specification with ScalaCheck {
       case _ => ???
     }
 
-    val result: List[Slice] = Slice.allFromRValues(fs2.Stream.emits(data), Some(maxRows), Some(maxCols)).compile.toVector.unsafeRunSync.toList
+    val result: List[Slice] = Slice.allFromRValues(Stream.emits(data), Some(maxRows), Some(maxCols)).compile.toVector.unsafeRunSync.toList
 
     result.map(s => toCValues(s))
       .foldLeft(List.empty[CValue])(_ ++ _.flatten)
@@ -277,7 +280,7 @@ class SliceSpec extends Specification with ScalaCheck {
       val testInput1: JValue = JParser.parseUnsafe("""[
           {"foo":1, "bar1": 1},
           {"foo":2, "bar2": 2}
-        ]""".stripMargin)
+        ]""")
 
       "rows just fits in 1 slice (simple)" >>
         testFromRValuesTemplate(testInput1, 2, 10000, List(2), List(3))
@@ -312,7 +315,7 @@ class SliceSpec extends Specification with ScalaCheck {
           {"foo":12, "baz": 12},
           {"foo":13, "baz": 13},
           {"foo":14, "bar14": 14}
-        ]""".stripMargin)
+        ]""")
 
       "fits in 1 slice" >>
         testFromRValuesTemplate(testInput2, 1000, 1000, List(14), List(10))
@@ -344,7 +347,6 @@ class SliceSpec extends Specification with ScalaCheck {
   }
 
   "fromRValuesStep" should {
-    import Slice.ArraySliced
     "emit an empty slice given no data" >> {
       val (actualSlice, actualRemaining) = Slice.fromRValuesStep(ArraySliced.noRValues, 10, 10, 32)
       sliceEqualityAtDefinedRows(actualSlice, Slice.empty)
@@ -443,7 +445,7 @@ class SliceSpec extends Specification with ScalaCheck {
         { "city": "LOPEZ", "state": "WA" },
         { "city": "SPOKANE", "state": "WA" },
         { "city": "WASCO", "state": "CA" }
-        ]""".stripMargin)
+        ]""")
 
       val data = array match {
         case JArray(rows) => rows.toStream
@@ -453,14 +455,14 @@ class SliceSpec extends Specification with ScalaCheck {
       val target = Slice.fromJValues(data)
 
       // Note the monitonically decreasing sequence
-      // associated with the keys, due having repated
+      // associated with the keys, due to having repeated
       // states being sorted in descending order.
       val keyArray = JParser.parseUnsafe("""[
           [ "CA", 0 ],
           [ "WA", -1 ],
           [ "WA", -2 ],
           [ "CA", -3 ]
-        ]""".stripMargin)
+        ]""")
 
       val keyData = keyArray match {
         case JArray(rows) => rows.toStream
@@ -476,7 +478,7 @@ class SliceSpec extends Specification with ScalaCheck {
         { "city": "SPOKANE", "state": "WA" },
         { "city": "ANEHEIM", "state": "CA" },
         { "city": "WASCO", "state": "CA" }
-        ]""".stripMargin)
+        ]""")
 
       val expected = expectedArray match {
         case JArray(rows) => rows.toVector
