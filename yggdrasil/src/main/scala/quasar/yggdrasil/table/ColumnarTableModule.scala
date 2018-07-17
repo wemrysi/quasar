@@ -531,6 +531,7 @@ trait ColumnarTableModule
       } yield Table(slices, UnknownSize)
     }
 
+    @deprecated("use fromRValueStream", "52.0.2")
     def fromRValues(values: Stream[RValue], maxSliceRows: Option[Int] = None): Table = {
       val sliceSize = maxSliceRows.getOrElse(Config.maxSliceRows)
 
