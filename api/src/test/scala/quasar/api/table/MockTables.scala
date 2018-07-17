@@ -20,7 +20,8 @@ import java.time.{Duration, OffsetDateTime}
 import java.util.UUID
 import quasar.Condition
 import quasar.contrib.scalaz.MonadState_
-import scalaz.{\/, IMap, Monad, Order, Ordering, Show}
+import quasar.contrib.std.uuid._
+import scalaz.{\/, IMap, Monad}
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
@@ -156,17 +157,4 @@ object MockTables {
   type TablesMockState[F[_]] = MonadState_[F, IMap[UUID, MockTable]]
 
   def apply[F[_]: Monad: TablesMockState[?[_]]] = new MockTables[F]
-
-  // TODO put this somewhere else
-  implicit val uuidOrder: Order[UUID] = new Order[UUID] {
-    def order(x: UUID, y: UUID): Ordering = {
-      val compare = x.compareTo(y)
-
-      if (compare < 0) Ordering.LT
-      else if (compare == 0) Ordering.EQ
-      else Ordering.GT
-    }
-  }
-
-  implicit val showUUID: Show[UUID] = Show.showFromToString
 }

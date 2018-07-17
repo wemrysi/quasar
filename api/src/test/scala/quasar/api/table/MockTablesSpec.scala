@@ -20,13 +20,13 @@ import cats.data.StateT
 import cats.effect.IO
 import java.util.UUID
 import quasar.contrib.scalaz.MonadState_
+import quasar.contrib.std.uuid._
 import scalaz.{~>, Id, IMap, Monad}, Id.Id
 import scalaz.std.string._
 import shims._
 import slamdata.Predef._
 
 import MockTablesSpec.Store
-import MockTables._
 
 final class MockTablesSpec extends TablesSpec[StateT[IO, Store, ?], List, UUID, String, String] {
 
