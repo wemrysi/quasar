@@ -1149,8 +1149,10 @@ abstract class Slice { source =>
         }
 
         if (assumeHomogeneous) {
-          // we assume definedness goes along with homogeneity
-          renderColumn(column, ctypes(col).asInstanceOf[CType])
+          // this recomputes definedness :-(
+          if (column.isDefinedAt(row)) {
+            renderColumn(column, ctypes(col).asInstanceOf[CType])
+          }
         } else {
           val hetTypes = ctypes(col).asInstanceOf[Array[CType]]
 
@@ -1181,7 +1183,7 @@ abstract class Slice { source =>
     @tailrec
     def render(row: Int): Unit = {
       if (row < size) {
-        if (isDefinedAt(row)) {
+        if (isDefinedAt(row)) {   // TODO do we want to just force a compact?
           renderColumns(row, 0)
           ctx.pushStr("\r\n")
         }

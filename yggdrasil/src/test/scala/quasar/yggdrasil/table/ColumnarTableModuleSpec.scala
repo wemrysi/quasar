@@ -633,6 +633,22 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       renderLotsToCsv(100000, true)
     }
 
+    "render homogeneous (but with holes) assuming homogeneity" in {
+      val events = """
+        {"a": 1, "b": true}
+        {"a": 2}
+        {"a": 3, "b": false}
+        """.trim
+
+      val expected =
+        "a,b\r\n" +
+        "1,true\r\n" +
+        "2,\r\n" +
+        "3,false\r\n"
+
+      testRenderCsv(events, assumeHomogeneity = true) must_== expected
+    }
+
     "test string escaping" in {
       val csv = testRenderCsv("""{"s":"a\"b","t":",","u":"aa\nbb","v":"a,b\"c\r\nd"}""")
 
