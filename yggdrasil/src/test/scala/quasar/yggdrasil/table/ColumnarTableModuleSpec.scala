@@ -645,6 +645,18 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       csv must_== expected
     }
 
+    "test header string escaping" in {
+      val csv = testRenderCsv("""{"a\"b":"s",",":"t","aa\nbb":"u","a,b\"c\r\nd":"v"}""")
+
+      val expected = "" +
+        "\",\",\"a\"\"b\",\"a,b\"\"c\r\n" +
+        "d\",\"aa\n" +
+        "bb\"\r\n" +
+        "t,s,v,u\r\n"
+
+      csv must_== expected
+    }
+
     "test mixed rows" in {
 
       val input = """

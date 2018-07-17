@@ -172,9 +172,9 @@ object ColumnarTableModule extends Logging {
 
                 val candidate = candidateHead + candidateTail
 
-                if (candidate.indexOf('"') >= 0 &&
-                    candidate.indexOf('\n') >= 0 &&
-                    candidate.indexOf('\r') >= 0 &&
+                if (candidate.indexOf('"') >= 0 ||
+                    candidate.indexOf('\n') >= 0 ||
+                    candidate.indexOf('\r') >= 0 ||
                     candidate.indexOf(',') >= 0) {
 
                   "\"" + candidate.replace("\"", "\"\"") + "\""
