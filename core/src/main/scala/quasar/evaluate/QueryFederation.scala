@@ -16,17 +16,16 @@
 
 package quasar.evaluate
 
-import scalaz.{\/, Contravariant, Functor, Profunctor}
+import scalaz.{Contravariant, Functor, Profunctor}
 import scalaz.syntax.functor._
 
 /** Represents the ability to evaluate QScript over potentially many sources. */
 trait QueryFederation[T[_[_]], F[_], S, R] {
-  def evaluateFederated(q: FederatedQuery[T, S]): F[EvaluateError \/ R]
+  def evaluateFederated(q: FederatedQuery[T, S]): F[R]
 }
 
 object QueryFederation extends QueryFederationInstances {
-  def apply[T[_[_]], F[_], S, R](
-      f: FederatedQuery[T, S] => F[EvaluateError \/ R])
+  def apply[T[_[_]], F[_], S, R](f: FederatedQuery[T, S] => F[R])
       : QueryFederation[T, F, S, R] =
     new QueryFederation[T, F, S, R] {
       def evaluateFederated(q: FederatedQuery[T, S]) = f(q)
@@ -43,7 +42,7 @@ sealed abstract class QueryFederationInstances {
   implicit def functor[T[_[_]], F[_]: Functor, S]: Functor[QueryFederation[T, F, S, ?]] =
     new Functor[QueryFederation[T, F, S, ?]] {
       def map[A, B](fa: QueryFederation[T, F, S, A])(f: A => B) =
-        QueryFederation(fq => fa.evaluateFederated(fq).map(_.map(f)))
+        QueryFederation(fq => fa.evaluateFederated(fq) map f)
     }
 
   implicit def profunctor[T[_[_]], F[_]: Functor]: Profunctor[QueryFederation[T, F, ?, ?]] =

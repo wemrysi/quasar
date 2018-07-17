@@ -18,7 +18,7 @@ package quasar.api.datasource
 
 import slamdata.Predef._
 import quasar.{Condition, ConditionMatchers, Qspec}
-import quasar.api.ResourcePath
+import quasar.common.resource.ResourcePath
 
 import scala.Predef.assert
 import scala.concurrent.ExecutionContext.Implicits.global

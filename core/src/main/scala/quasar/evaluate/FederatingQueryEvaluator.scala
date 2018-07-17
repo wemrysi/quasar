@@ -17,9 +17,10 @@
 package quasar.evaluate
 
 import slamdata.Predef.{None, Option, Some}
-import quasar.api.{QueryEvaluator, ResourcePath}
+import quasar.api.QueryEvaluator
+import quasar.common.resource.{MonadResourceErr, ResourceError, ResourcePath}
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.{MonadError_, MonadTell_}
+import quasar.contrib.scalaz.MonadTell_
 import quasar.fp.PrismNT
 import quasar.contrib.iota.copkTraverse
 import quasar.qscript.{Read => QRead, _}
@@ -32,7 +33,7 @@ import iotaz.CopK
 /** A `QueryEvaluator` capable of executing queries against multiple sources. */
 final class FederatingQueryEvaluator[
     T[_[_]]: BirecursiveT,
-    F[_]: Monad: MonadError_[?[_], EvaluateError],
+    F[_]: Monad: MonadResourceErr,
     S, R] private (
     queryFederation: QueryFederation[T, F, S, R],
     sources: AFile => F[Option[Source[S]]])
@@ -51,7 +52,7 @@ final class FederatingQueryEvaluator[
 
       fq = FederatedQuery(qr, srcMap.lookup)
 
-      r <- MonadError_[F, EvaluateError].unattempt(queryFederation.evaluateFederated(fq))
+      r <- queryFederation.evaluateFederated(fq)
     } yield r
 
   ////
@@ -89,8 +90,8 @@ final class FederatingQueryEvaluator[
                 f.point[M]
 
               case None =>
-                MonadError_[M, EvaluateError].raiseError(
-                  EvaluateError.notAResource(ResourcePath.root()))
+                MonadResourceErr[M].raiseError(
+                  ResourceError.notAResource(ResourcePath.root()))
             }
 
           for {
@@ -109,15 +110,15 @@ final class FederatingQueryEvaluator[
         src.point[M]
 
       case None =>
-        MonadError_[M, EvaluateError].raiseError(
-          EvaluateError.pathNotFound(ResourcePath.leaf(file)))
+        MonadResourceErr[M].raiseError(
+          ResourceError.pathNotFound(ResourcePath.leaf(file)))
     }
 }
 
 object FederatingQueryEvaluator {
   def apply[
       T[_[_]]: BirecursiveT,
-      F[_]: Monad: MonadError_[?[_], EvaluateError],
+      F[_]: Monad: MonadResourceErr,
       S, R](
     queryFederation: QueryFederation[T, F, S, R],
     sources: AFile => F[Option[Source[S]]])

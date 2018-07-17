@@ -14,20 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.common.resource
 
-import quasar.contrib.pathy.AFile
-import quasar.pkg.tests._
+import org.scalacheck.{Arbitrary, Gen}
 
-import pathy.scalacheck.PathyArbitrary._
-
-trait ResourcePathGenerator {
-  implicit val resourcePathArbitrary: Arbitrary[ResourcePath] =
+trait ResourceNameGenerator {
+  implicit val resourceNameArbitrary: Arbitrary[ResourceName] =
     Arbitrary(for {
-      n <- choose(1, 10)
-      p <- if (n > 2) arbitrary[AFile].map(ResourcePath.leaf(_))
-           else const(ResourcePath.root())
-    } yield p)
+      cs <- Gen.listOf(Gen.alphaNumChar)
+      a  <- Gen.alphaChar
+    } yield ResourceName((a :: cs).mkString))
 }
 
-object ResourcePathGenerator extends ResourcePathGenerator
+object ResourceNameGenerator extends ResourceNameGenerator

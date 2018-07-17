@@ -18,7 +18,7 @@ package quasar.evaluate
 
 import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers}
-import quasar.api._
+import quasar.common.resource._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.iota.{copkTraverse, copkEqual}
 import quasar.fp.constEqual
@@ -33,7 +33,7 @@ import scalaz.std.option._
 import scalaz.syntax.either._
 
 final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
-  import EvaluateError._
+  import ResourceError._
 
   implicit val showTree: Show[Tree[ResourceName]] =
     Show.shows(_.drawTree)
@@ -45,13 +45,13 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
     abs -> Source(abs, 1),
     xys -> Source(xys, 2))
 
-  val qfed = new QueryFederation[Fix, EvaluateError \/ ?, Int, FederatedQuery[Fix, Int]] {
-    def evaluateFederated(q: FederatedQuery[Fix, Int]) = q.right[EvaluateError].right[EvaluateError]
+  val qfed = new QueryFederation[Fix, ResourceError \/ ?, Int, FederatedQuery[Fix, Int]] {
+    def evaluateFederated(q: FederatedQuery[Fix, Int]) = q.right[ResourceError]
   }
 
   val fqe =
-    FederatingQueryEvaluator[Fix, EvaluateError \/ ?, Int, FederatedQuery[Fix, Int]](
-      qfed, f => srcs.lookup(ResourcePath.leaf(f)).right[EvaluateError])
+    FederatingQueryEvaluator[Fix, ResourceError \/ ?, Int, FederatedQuery[Fix, Int]](
+      qfed, f => srcs.lookup(ResourcePath.leaf(f)).right[ResourceError])
 
   "evaluate" >> {
     val qs = construction.mkDefaults[Fix, QScriptRead[Fix, ?]]

@@ -14,16 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.common.resource
 
-import org.scalacheck.{Arbitrary, Gen}
+import slamdata.Predef.String
 
-trait ResourceNameGenerator {
-  implicit val resourceNameArbitrary: Arbitrary[ResourceName] =
-    Arbitrary(for {
-      cs <- Gen.listOf(Gen.alphaNumChar)
-      a  <- Gen.alphaChar
-    } yield ResourceName((a :: cs).mkString))
+import scalaz.{Order, Show}
+import scalaz.std.string._
+
+final case class ResourceName(value: String)
+
+object ResourceName extends ResourceNameInstances
+
+sealed abstract class ResourceNameInstances {
+  implicit val order: Order[ResourceName] =
+    Order.orderBy(_.value)
+
+  implicit val show: Show[ResourceName] =
+    Show.shows(_.value)
 }
-
-object ResourceNameGenerator extends ResourceNameGenerator

@@ -240,7 +240,7 @@ lazy val foundation = project
 /** Types and interfaces describing Quasar's functionality. */
 lazy val api = project
   .settings(name := "quasar-api-internal")
-  .dependsOn(foundation % BothScopes)
+  .dependsOn(common % BothScopes)
   .settings(libraryDependencies ++= Dependencies.api)
   .settings(commonSettings)
   .settings(publishTestsSettings)
@@ -283,11 +283,7 @@ lazy val js = project
   */
 lazy val common = project
   .settings(name := "quasar-common-internal")
-  // TODO: The dependency on `js` is because `Data` encapsulates its `toJs`,
-  //       which should be extracted.
-  .dependsOn(
-    ejson % BothScopes,
-    js % BothScopes)
+  .dependsOn(foundation % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -300,7 +296,9 @@ lazy val frontend = project
   .settings(name := "quasar-frontend-internal")
   .dependsOn(
     common % BothScopes,
-    effect)
+    effect,
+    ejson % BothScopes,
+    js)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)

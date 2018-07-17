@@ -17,7 +17,7 @@
 package quasar.api.datasource
 
 import slamdata.Predef._
-import quasar.api.ResourcePath
+import quasar.common.resource.ResourcePath
 
 import monocle.Prism
 import scalaz.{Cord, Equal, ISet, NonEmptyList, Show}

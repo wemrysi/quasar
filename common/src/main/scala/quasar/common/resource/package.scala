@@ -14,21 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.common
 
-import slamdata.Predef.String
+import quasar.contrib.scalaz.MonadError_
 
-import scalaz.{Order, Show}
-import scalaz.std.string._
+package object resource {
+  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
 
-final case class ResourceName(value: String)
-
-object ResourceName extends ResourceNameInstances
-
-sealed abstract class ResourceNameInstances {
-  implicit val order: Order[ResourceName] =
-    Order.orderBy(_.value)
-
-  implicit val show: Show[ResourceName] =
-    Show.shows(_.value)
+  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
+      : MonadResourceErr[F] = ev
 }

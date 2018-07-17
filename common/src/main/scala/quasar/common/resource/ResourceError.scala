@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package quasar.evaluate
+package quasar.common.resource
 
 import slamdata.Predef.{Product, Serializable}
-import quasar.api.ResourcePath
 
 import monocle.Prism
 import scalaz.{Cord, Equal, Show}
@@ -25,35 +24,36 @@ import scalaz.syntax.show._
 import scalaz.std.option._
 import scalaz.std.tuple._
 
-sealed trait EvaluateError extends Product with Serializable
+sealed trait ResourceError extends Product with Serializable
 
-object EvaluateError extends EvaluateErrorInstances{
-  final case class NotAResource(path: ResourcePath) extends EvaluateError
-  final case class PathNotFound(path: ResourcePath) extends EvaluateError
+object ResourceError extends ResourceErrorInstances{
+  final case class NotAResource(path: ResourcePath) extends ResourceError
+  sealed trait ExistentialError extends ResourceError
+  final case class PathNotFound(path: ResourcePath) extends ExistentialError
 
-  val notAResource: Prism[EvaluateError, ResourcePath] =
-    Prism.partial[EvaluateError, ResourcePath] {
+  val notAResource: Prism[ResourceError, ResourcePath] =
+    Prism.partial[ResourceError, ResourcePath] {
       case NotAResource(p) => p
     } (NotAResource(_))
 
-  val pathNotFound: Prism[EvaluateError, ResourcePath] =
-    Prism.partial[EvaluateError, ResourcePath] {
+  def pathNotFound[E >: ExistentialError <: ResourceError]: Prism[E, ResourcePath] =
+    Prism.partial[E, ResourcePath] {
       case PathNotFound(p) => p
     } (PathNotFound(_))
 }
 
-sealed abstract class EvaluateErrorInstances {
-  implicit val equal: Equal[EvaluateError] =
+sealed abstract class ResourceErrorInstances {
+  implicit val equal: Equal[ResourceError] =
     Equal.equalBy(e => (
-      EvaluateError.notAResource.getOption(e),
-      EvaluateError.pathNotFound.getOption(e)))
+      ResourceError.notAResource.getOption(e),
+      ResourceError.pathNotFound.getOption(e)))
 
-  implicit val show: Show[EvaluateError] =
+  implicit val show: Show[ResourceError] =
     Show.show {
-      case EvaluateError.NotAResource(p) =>
+      case ResourceError.NotAResource(p) =>
         Cord("NotAResource(") ++ p.show ++ Cord(")")
 
-      case EvaluateError.PathNotFound(p) =>
+      case ResourceError.PathNotFound(p) =>
         Cord("PathNotFound(") ++ p.show ++ Cord(")")
     }
 }
