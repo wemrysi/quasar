@@ -152,14 +152,14 @@ class SliceSpec extends Specification with ScalaCheck {
   def testFromRValuesMaxSliceColumnsEqualsBiggestValue(values: List[CValue]) = {
     val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
 
-    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue)).compile.toVector.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue)).toList
     assertSlices(values, slices, be_>(0))
   }
 
   def testFromRValuesMaxSliceColumnsLowerThanBiggestValue(values: List[CValue]) = {
     val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
 
-    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue - 1)).compile.toVector.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue - 1)).toList
     assertSlices(values, slices, be_>(0))
   }
 
@@ -167,7 +167,7 @@ class SliceSpec extends Specification with ScalaCheck {
     val (totalRows, _, totalColumns) = valueCalcs(values)
     val maxSliceRows = Math.max(1, Math.ceil(totalRows.toDouble / 3).toInt)
     val expectedNrSlices = Math.min(Math.ceil(totalRows.toDouble / maxSliceRows).toInt, 3)
-    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).compile.toVector.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).toList
     assertSlices(values, slices, be_==(expectedNrSlices))
   }
 
@@ -175,7 +175,7 @@ class SliceSpec extends Specification with ScalaCheck {
     val (totalRows, _, totalColumns) = valueCalcs(values)
     val maxSliceRows = 1
 
-    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).compile.toVector.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).toList
     assertSlices(values, slices, be_==(totalRows))
   }
 
@@ -183,7 +183,7 @@ class SliceSpec extends Specification with ScalaCheck {
     val (totalRows, _, totalColumns) = valueCalcs(values)
 
     // test with a slice that's just big enough to hold the values
-    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(totalColumns + 1)).compile.toVector.unsafeRunSync.toList
+    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(totalColumns + 1)).toList
     assertSlices(values, slices, be_==(1))
   }
 
@@ -194,7 +194,7 @@ class SliceSpec extends Specification with ScalaCheck {
       case _ => ???
     }
 
-    val result: List[Slice] = Slice.allFromRValues(Stream.emits(data), Some(maxRows), Some(maxCols)).compile.toVector.unsafeRunSync.toList
+    val result: List[Slice] = Slice.allFromRValues(Stream.emits(data), Some(maxRows), Some(maxCols)).toList
 
     result.map(s => toCValues(s))
       .foldLeft(List.empty[CValue])(_ ++ _.flatten)
