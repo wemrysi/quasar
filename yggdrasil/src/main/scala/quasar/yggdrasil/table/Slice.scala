@@ -2047,13 +2047,13 @@ object Slice {
     rec(ArraySliced(new Array[RValue](0), 0, 0), values).stream
   }
 
-  @deprecated
+  @deprecated("use allFromRValues", "52.0.2")
   def fromJValues(values: Stream[JValue]): Slice =
     fromRValues(values.map(RValue.fromJValueRaw))
 
   // don't use this anymore. It doesn't limit the slice size properly,
   // unlike allFromRValues and fromRValuesStep.
-  @deprecated
+  @deprecated("use allFromRValues", "52.0.2")
   def fromRValues(values: Stream[RValue]): Slice = {
     val sliceSize = values.size
 

@@ -27,7 +27,6 @@ import qdata.time.TimeGenerators
 import quasar.yggdrasil.TableModule.SortDescending
 
 import scala.util.Random
-import scala.{Stream => SStream}
 import org.scalacheck.{Arbitrary, Gen}
 import org.specs2.execute.Result
 import org.specs2.matcher.Matcher
@@ -134,7 +133,7 @@ class SliceSpec extends Specification with ScalaCheck {
   }
 
   // have to override this because of `Array.equals`
-  def arraySlicesEqual[A](expected: ArraySliced[A], actual: ArraySliced[A]): Result = {
+  private[table] def arraySlicesEqual[A](expected: ArraySliced[A], actual: ArraySliced[A]): Result = {
     expected.arr.deep must_== actual.arr.deep
     expected.start must_== actual.start
     expected.size must_== actual.size
