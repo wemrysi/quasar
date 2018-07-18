@@ -40,6 +40,26 @@ trait IndexedStore[F[_], I, V] {
 }
 
 object IndexedStore extends IndexedStoreInstances {
+  /** Transform the index of a store. */
+  def xmapIndex[F[_]: Functor, I, V, J](
+      s: IndexedStore[F, I, V])(
+      f: I => J)(
+      g: J => I)
+      : IndexedStore[F, J, V] =
+    new IndexedStore[F, J, V] {
+      def entries: Stream[F, (J, V)] =
+        s.entries.map(_.leftMap(f))
+
+      def lookup(j: J): F[Option[V]] =
+        s.lookup(g(j))
+
+      def insert(j: J, v: V): F[Unit] =
+        s.insert(g(j), v)
+
+      def delete(j: J): F[Unit] =
+        s.delete(g(j))
+    }
+
   /** Effectfully transform the index of a store. */
   def xmapIndexF[F[_], I, V, J](
       s: IndexedStore[F, I, V])(
@@ -103,24 +123,6 @@ sealed abstract class IndexedStoreInstances {
 
           def delete(i: I): B[Unit] =
             f(fa.delete(i))
-        }
-    }
-
-  implicit def indexInvariantFunctor[F[_]: Functor, V]: InvariantFunctor[IndexedStore[F, ?, V]] =
-    new InvariantFunctor[IndexedStore[F, ?, V]] {
-      def xmap[I, J](fa: IndexedStore[F, I, V], f: I => J, g: J => I): IndexedStore[F, J, V] =
-        new IndexedStore[F, J, V] {
-          def entries: Stream[F, (J, V)] =
-            fa.entries.map(_.leftMap(f))
-
-          def lookup(j: J): F[Option[V]] =
-            fa.lookup(g(j))
-
-          def insert(j: J, v: V): F[Unit] =
-            fa.insert(g(j), v)
-
-          def delete(j: J): F[Unit] =
-            fa.delete(g(j))
         }
     }
 
