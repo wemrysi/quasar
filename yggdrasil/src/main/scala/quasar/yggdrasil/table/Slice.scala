@@ -28,6 +28,7 @@ import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util.CPathUtils
 
 import cats.effect.IO
+
 import scalaz._, Scalaz._, Ordering._
 import shims._
 
@@ -39,7 +40,7 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.specialized
 
-trait Slice { source =>
+abstract class Slice { source =>
   import Slice._
   import TableModule._
 
@@ -48,6 +49,9 @@ trait Slice { source =>
   def nonEmpty         = !isEmpty
 
   def columns: Map[ColumnRef, Column]
+
+  def groupedColumnRefs: Map[CPath, Set[CType]] =
+    columns.keys.groupBy(_.selector).mapValues(_.map(_.ctype).toSet)
 
   def logicalColumns: JType => Set[Column] = { jtpe =>
     // TODO Use a flatMap and:
@@ -107,7 +111,7 @@ trait Slice { source =>
     val size = source.size
 
     val cols0 = (source.columns).toList sortBy { case (ref, _) => ref.selector }
-    val cols  = cols0 map { case (_, col)                      => col }
+    val cols  = cols0 map { case (_, col) => col }
 
     def inflate[@specialized X: ClassTag](cols: Array[Int => X], row: Int) = {
       val as = new Array[X](cols.length)
@@ -377,7 +381,7 @@ trait Slice { source =>
               case (x, j) =>
                 mappers get j match {
                   case Some(f) => f(x)
-                  case None    => x
+                  case None => x
                 }
             })
           case (JArrayHomogeneousT(jType), CArrayType(cType), CPath(CPathArray, _ *)) if Schema.ctypes(jType)(cType) =>
@@ -408,7 +412,7 @@ trait Slice { source =>
   def deleteFields(prefixes: scala.collection.Set[CPathField]) = new Slice {
     private val (removed, withoutPrefixes) = source.columns partition {
       case (ColumnRef(CPath(head @ CPathField(_), _ @_ *), _), _) => prefixes contains head
-      case _                                                      => false
+      case _ => false
     }
 
     private val becomeEmpty = BitSetUtil.filteredRange(0, source.size) { i =>
@@ -553,7 +557,7 @@ trait Slice { source =>
 
     val columns: Map[ColumnRef, Column] = {
       val resultColumns = for {
-        left <- source.columns collect { case (ref, col) if ref.selector.hasPrefix(froml)  => col }
+        left <- source.columns collect { case (ref, col) if ref.selector.hasPrefix(froml) => col }
         right <- source.columns collect { case (ref, col) if ref.selector.hasPrefix(fromr) => col }
         result <- f(left, right)
       } yield result
@@ -691,8 +695,8 @@ trait Slice { source =>
 
         (lastDefined, firstDefined) match {
           case (Some((prev, i)), Some(j)) => findStraddlingDistinct(prev, i, j)
-          case (_, Some(j))               => acc.add(j); findSelfDistinct(j, j + 1)
-          case _                          => acc
+          case (_, Some(j)) => acc.add(j); findSelfDistinct(j, j + 1)
+          case _ => acc
         }
       }
 
@@ -988,163 +992,229 @@ trait Slice { source =>
     }
   }
 
-  def renderJson(delimiter: String): (StreamT[IO, CharBuffer], Boolean) = {
-    if (columns.isEmpty) {
-      (StreamT.empty[IO, CharBuffer], false)
-    } else {
-      val BufferSize = 1024 * 10 // 10 KB
+  // will render a trailing newline
+  // non-singleton inner lists represent type conflicts at a single CPath
+  def renderCsv(
+      headers: List[List[ColumnRef]],
+      assumeHomogeneous: Boolean): Seq[CharBuffer] = {
 
-      val optSchema = {
-        def insert(target: SchemaNode, ref: ColumnRef, col: Column): SchemaNode = {
-          val ColumnRef(selector, ctype) = ref
+    // faster caches
+    val size = this.size
 
-          selector.nodes match {
-            case CPathField(name) :: tail => {
-              target match {
-                case SchemaNode.Obj(nodes) => {
-                  val subTarget = nodes get name getOrElse SchemaNode.Union(Set())
-                  val result    = insert(subTarget, ColumnRef(CPath(tail), ctype), col)
-                  SchemaNode.Obj(nodes + (name -> result))
-                }
+    // the goal here is to fill in empty values wherever we get an unknown column from a previous slice
+    val DummyColumn = new NullColumn {
+      def isDefinedAt(row: Int) = false
+    }
 
-                case SchemaNode.Union(nodes) => {
-                  val objNode = nodes find {
-                    case _: SchemaNode.Obj => true
-                    case _                 => false
-                  }
+    /*
+     * In the arrays below, use the scalar case of the union if
+     * assumeHomogeneous = true, since we're assuming that we can't
+     * have path-locus conflicts (i.e. multiple column types at the
+     * same path). This is a significant fastpath.
+     */
 
-                  val subTarget = objNode getOrElse SchemaNode.Obj(Map())
-                  SchemaNode.Union(nodes - subTarget + insert(subTarget, ref, col))
-                }
+    // CType | Array[CType]
+    val ctypes: Array[AnyRef] = headers map { refs =>
+      if (assumeHomogeneous)
+        refs.head.ctype
+      else
+        refs.filter(this.columns.contains).map(_.ctype).toArray
+    } toArray
 
-                case node =>
-                  SchemaNode.Union(Set(node, insert(SchemaNode.Obj(Map()), ref, col)))
-              }
+    // Column | Array[Column]
+    val columns: Array[AnyRef] = headers map { refs =>
+      if (assumeHomogeneous)
+        this.columns.getOrElse(refs.head, DummyColumn)
+      else
+        refs.flatMap(this.columns.get(_)).toArray
+    } toArray
+
+    def isDefinedAt(row: Int): Boolean = {
+      var back = false
+      var i = 0
+      while (i < columns.length) {
+        if (assumeHomogeneous) {
+          back ||= columns(i).asInstanceOf[Column].isDefinedAt(row)
+        } else {
+          val candidates = columns(i).asInstanceOf[Array[Column]]
+          var j = 0
+          while (j < candidates.length) {
+            back ||= candidates(j).isDefinedAt(row)
+
+            if (back) {
+              return true
             }
-
-            case CPathIndex(idx) :: tail => {
-              target match {
-                case SchemaNode.Arr(map) => {
-                  val subTarget = map get idx getOrElse SchemaNode.Union(Set())
-                  val result    = insert(subTarget, ColumnRef(CPath(tail), ctype), col)
-                  SchemaNode.Arr(map + (idx -> result))
-                }
-
-                case SchemaNode.Union(nodes) => {
-                  val objNode = nodes find {
-                    case _: SchemaNode.Arr => true
-                    case _                 => false
-                  }
-
-                  val subTarget = objNode getOrElse SchemaNode.Arr(Map())
-                  SchemaNode.Union(nodes - subTarget + insert(subTarget, ref, col))
-                }
-
-                case node =>
-                  SchemaNode.Union(Set(node, insert(SchemaNode.Arr(Map()), ref, col)))
-              }
-            }
-
-            case CPathMeta(_) :: _ => target
-
-            case CPathArray :: _ => sys.error("todo")
-
-            case Nil => {
-              val node = SchemaNode.Leaf(ctype, col)
-
-              target match {
-                case SchemaNode.Union(nodes) => SchemaNode.Union(nodes + node)
-                case oldNode                 => SchemaNode.Union(Set(oldNode, node))
-              }
-            }
+            j += 1
           }
         }
 
-        def normalize(schema: SchemaNode): Option[SchemaNode] = schema match {
-          case SchemaNode.Obj(nodes) => {
-            val nodes2 = nodes flatMap {
-              case (key, value) => normalize(value) map { key -> _ }
-            }
-
-            val back =
-              if (nodes2.isEmpty)
-                None
-              else
-                Some(SchemaNode.Obj(nodes2))
-
-            back foreach { obj =>
-              obj.keys = new Array[String](nodes2.size)
-              obj.values = new Array[SchemaNode](nodes2.size)
-            }
-
-            var i = 0
-            back foreach { obj =>
-              for ((key, value) <- nodes2) {
-                obj.keys(i) = key
-                obj.values(i) = value
-                i += 1
-              }
-            }
-
-            back
-          }
-
-          case SchemaNode.Arr(map) => {
-            val map2 = map flatMap {
-              case (idx, value) => normalize(value) map { idx -> _ }
-            }
-
-            val back =
-              if (map2.isEmpty)
-                None
-              else
-                Some(SchemaNode.Arr(map2))
-
-            back foreach { arr =>
-              arr.nodes = new Array[SchemaNode](map2.size)
-            }
-
-            var i = 0
-            back foreach { arr =>
-              val values = map2.toSeq sortBy { _._1 } map { _._2 }
-
-              for (value <- values) {
-                arr.nodes(i) = value
-                i += 1
-              }
-            }
-
-            back
-          }
-
-          case SchemaNode.Union(nodes) => {
-            val nodes2 = nodes flatMap normalize
-
-            if (nodes2.isEmpty)
-              None
-            else if (nodes2.size == 1)
-              nodes2.headOption
-            else {
-              val union = SchemaNode.Union(nodes2)
-              union.possibilities = nodes2.toArray
-              Some(union)
-            }
-          }
-
-          case lf: SchemaNode.Leaf => Some(lf)
+        if (back) {
+          return true
         }
-
-        val schema = columns.foldLeft(SchemaNode.Union(Set()): SchemaNode) {
-          case (acc, (ref, col)) => insert(acc, ref, col)
-        }
-
-        normalize(schema)
+        i += 1
       }
+      back
+    }
 
-      // don't remove!  @tailrec bugs if you use optSchema.map
-      if (optSchema.isDefined) {
-        val schema = optSchema.get
+    val ctx = BufferContext.csv(size) { (ctx, str) =>
+      // fast-path the unescaped case
+      if (str.indexOf('"') < 0 &&
+          str.indexOf('\n') < 0 &&
+          str.indexOf('\r') < 0 &&
+          str.indexOf(',') < 0) {
 
+        ctx.pushStr(str)
+      } else {
+        ctx.push('"')
+
+        var i = 0
+        while (i < str.length) {
+          // pretty sure we don't need anything more elaborate than this?
+          (str.charAt(i): @switch) match {
+            case '"' => ctx.pushStr("\"\"")
+            case c => ctx.push(c)
+          }
+
+          i += 1
+        }
+
+        ctx.push('"')
+      }
+    }
+
+    @tailrec
+    def renderColumns(row: Int, col: Int): Unit = {
+      if (col < columns.length) {
+        // we use assumeHomogeneous to determine the case in the union
+
+        val candidates = if (!assumeHomogeneous)
+          columns(col).asInstanceOf[Array[Column]]
+        else
+          null
+
+        val column = if (assumeHomogeneous)
+          columns(col).asInstanceOf[Column]
+        else
+          null
+
+        def renderColumn(column: Column, tpe: CType): Unit = {
+          tpe match {
+            case CString =>
+              val c = column.asInstanceOf[StrColumn]
+              ctx.renderString(c(row))
+
+            case CBoolean =>
+              val c = column.asInstanceOf[BoolColumn]
+              ctx.renderBoolean(c(row))
+
+            case CLong =>
+              val c = column.asInstanceOf[LongColumn]
+              ctx.renderLong(c(row))
+
+            case CDouble =>
+              val c = column.asInstanceOf[DoubleColumn]
+              ctx.renderDouble(c(row))
+
+            case CNum =>
+              val c = column.asInstanceOf[NumColumn]
+              ctx.renderNum(c(row))
+
+            case CNull =>
+              ctx.renderNull()
+
+            case CEmptyObject =>
+              ctx.renderEmptyObject()
+
+            case CEmptyArray =>
+              ctx.renderEmptyArray()
+
+            case COffsetDateTime =>
+              val c = column.asInstanceOf[OffsetDateTimeColumn]
+              ctx.renderOffsetDateTime(c(row))
+
+            case COffsetTime =>
+              val c = column.asInstanceOf[OffsetTimeColumn]
+              ctx.renderOffsetTime(c(row))
+
+            case COffsetDate =>
+              val c = column.asInstanceOf[OffsetDateColumn]
+              ctx.renderOffsetDate(c(row))
+
+            case CLocalDateTime =>
+              val c = column.asInstanceOf[LocalDateTimeColumn]
+              ctx.renderLocalDateTime(c(row))
+
+            case CLocalTime =>
+              val c = column.asInstanceOf[LocalTimeColumn]
+              ctx.renderLocalTime(c(row))
+
+            case CLocalDate =>
+              val c = column.asInstanceOf[LocalDateColumn]
+              ctx.renderLocalDate(c(row))
+
+            case CInterval =>
+              val c = column.asInstanceOf[IntervalColumn]
+              ctx.renderInterval(c(row))
+
+            case CArrayType(_) => ???
+
+            case CUndefined =>
+          }
+        }
+
+        if (assumeHomogeneous) {
+          // this recomputes definedness :-(
+          if (column.isDefinedAt(row)) {
+            renderColumn(column, ctypes(col).asInstanceOf[CType])
+          }
+        } else {
+          val hetTypes = ctypes(col).asInstanceOf[Array[CType]]
+
+          @inline
+          @tailrec
+          def loop(i: Int): Unit = {
+            if (i < candidates.length) {
+              // this recomputes definedness :-(
+              if (candidates(i).isDefinedAt(row))
+                renderColumn(candidates(i), hetTypes(i))
+              else
+                loop(i + 1)
+            }
+          }
+
+          loop(0)
+        }
+
+        if (col < columns.length - 1) {
+          ctx.push(',')
+        }
+
+        renderColumns(row, col + 1)
+      }
+    }
+
+    @inline
+    @tailrec
+    def render(row: Int): Unit = {
+      if (row < size) {
+        if (isDefinedAt(row)) {   // TODO do we want to just force a compact?
+          renderColumns(row, 0)
+          ctx.pushStr("\r\n")
+        }
+
+        render(row + 1)
+      }
+    }
+
+    render(0)
+
+    ctx.finish()
+    ctx.toSeq()
+  }
+
+  def renderJson(delimiter: String): (Seq[CharBuffer], Boolean) = {
+    sliceSchema match {
+      case Some(schema) =>
         val depth = {
           def loop(schema: SchemaNode): Int = schema match {
             case obj: SchemaNode.Obj =>
@@ -1162,228 +1232,77 @@ trait Slice { source =>
           loop(schema)
         }
 
-        // we have the schema, now emit
+        val ctx = BufferContext.json(size) { (ctx, str) =>
+          @inline
+          @tailrec
+          def loop(str: String, idx: Int): Unit = {
+            if (idx == 0) {
+              ctx.push('"')
+            }
 
-        var buffer = CharBuffer.allocate(BufferSize)
-        val vector = new mutable.ArrayBuffer[CharBuffer](math.max(1, size / 10))
+            if (idx < str.length) {
+              val c = str.charAt(idx)
 
-        @inline
-        def checkPush(length: Int) {
-          if (buffer.remaining < length) {
-            buffer.flip()
-            vector += buffer
+              (c: @switch) match {
+                case '"' => ctx.pushStr("\\\"")
+                case '\\' => ctx.pushStr("\\\\")
+                case '\b' => ctx.pushStr("\\b")
+                case '\f' => ctx.pushStr("\\f")
+                case '\n' => ctx.pushStr("\\n")
+                case '\r' => ctx.pushStr("\\r")
+                case '\t' => ctx.pushStr("\\t")
 
-            buffer = CharBuffer.allocate(BufferSize)
+                case c =>
+                  if ((c >= '\u0000' && c < '\u001f') || (c >= '\u0080' && c < '\u00a0') || (c >= '\u2000' && c < '\u2100')) {
+                    ctx.pushStr("\\u")
+                    ctx.pushStr("%04x".format(Character.codePointAt(str, idx)))
+                  } else {
+                    ctx.push(c)
+                  }
+              }
+
+              loop(str, idx + 1)
+            } else {
+              ctx.push('"')
+            }
           }
+
+          loop(str, 0)
         }
 
-        @inline
-        def push(c: Char) {
-          checkPush(1)
-          buffer.put(c)
-        }
-
-        @inline
-        def pushStr(str: String) {
-          checkPush(str.length)
-          buffer.put(str)
-        }
-
-        val in      = new RingDeque[String](depth + 1)
+        val in = new RingDeque[String](depth + 1)
         val inFlags = new RingDeque[Boolean](depth + 1)
 
         @inline
-        def pushIn(str: String, flag: Boolean) {
+        def pushIn(str: String, flag: Boolean): Unit = {
           in.pushBack(str)
           inFlags.pushBack(flag)
         }
 
         @inline
-        def popIn() {
+        def popIn(): Unit = {
           in.popBack()
           inFlags.popBack()
         }
 
         @inline
         @tailrec
-        def flushIn() {
+        def flushIn(): Unit = {
           if (!in.isEmpty) {
             val str = in.popFront()
-
             val flag = inFlags.popFront()
 
-            if (flag) {
-              renderString(str)
-            } else {
-              checkPush(str.length)
-              buffer.put(str)
-            }
+            if (flag)
+              ctx.renderString(str)
+            else
+              ctx.pushStr(str)
 
             flushIn()
           }
         }
 
-        // emitters
-
-        @inline
-        @tailrec
-        def renderString(str: String, idx: Int = 0) {
-          if (idx == 0) {
-            push('"')
-          }
-
-          if (idx < str.length) {
-            val c = str.charAt(idx)
-
-            (c: @switch) match {
-              case '"'  => pushStr("\\\"")
-              case '\\' => pushStr("\\\\")
-              case '\b' => pushStr("\\b")
-              case '\f' => pushStr("\\f")
-              case '\n' => pushStr("\\n")
-              case '\r' => pushStr("\\r")
-              case '\t' => pushStr("\\t")
-
-              case c => {
-                if ((c >= '\u0000' && c < '\u001f') || (c >= '\u0080' && c < '\u00a0') || (c >= '\u2000' && c < '\u2100')) {
-                  pushStr("\\u")
-                  pushStr("%04x".format(Character.codePointAt(str, idx)))
-                } else {
-                  push(c)
-                }
-              }
-            }
-
-            renderString(str, idx + 1)
-          } else {
-            push('"')
-          }
-        }
-
-        @inline
-        def renderLong(ln: Long) {
-
-          @inline
-          @tailrec
-          def power10(ln: Long, seed: Long = 1): Long = {
-            // note: we could be doing binary search here
-
-            if (seed * 10 < 0) // overflow
-              seed
-            else if (seed * 10 > ln)
-              seed
-            else
-              power10(ln, seed * 10)
-          }
-
-          @inline
-          @tailrec
-          def renderPositive(ln: Long, power: Long) {
-            if (power > 0) {
-              val c = Character.forDigit((ln / power % 10).toInt, 10)
-              push(c)
-              renderPositive(ln, power / 10)
-            }
-          }
-
-          if (ln == Long.MinValue) {
-            val MinString = "-9223372036854775808"
-            checkPush(MinString.length)
-            buffer.put(MinString)
-          } else if (ln == 0) {
-            push('0')
-          } else if (ln < 0) {
-            push('-')
-
-            val ln2 = ln * -1
-            renderPositive(ln2, power10(ln2))
-          } else {
-            renderPositive(ln, power10(ln))
-          }
-        }
-
-        // TODO is this a problem?
-        @inline
-        def renderDouble(d: Double) {
-          val str = d.toString
-          checkPush(str.length)
-          buffer.put(str)
-        }
-
-        // TODO is this a problem?
-        @inline
-        def renderNum(d: BigDecimal) {
-          val str = d.toString
-          checkPush(str.length)
-          buffer.put(str)
-        }
-
-        @inline
-        def renderBoolean(b: Boolean) {
-          if (b) {
-            pushStr("true")
-          } else {
-            pushStr("false")
-          }
-        }
-
-        @inline
-        def renderNull() {
-          pushStr("null")
-        }
-
-        @inline
-        def renderEmptyObject() {
-          pushStr("{}")
-        }
-
-        @inline
-        def renderEmptyArray() {
-          pushStr("[]")
-        }
-
-        @inline
-        def renderOffsetDateTime(time: OffsetDateTime) {
-          renderString(time.toString)
-        }
-
-        @inline
-        def renderOffsetTime(time: OffsetTime) {
-          renderString(time.toString)
-        }
-
-        @inline
-        def renderOffsetDate(date: OffsetDate) {
-          renderString(date.toString)
-        }
-
-        @inline
-        def renderLocalDateTime(time: LocalDateTime) {
-          renderString(time.toString)
-        }
-
-        @inline
-        def renderLocalTime(time: LocalTime) {
-          renderString(time.toString)
-        }
-
-        @inline
-        def renderLocalDate(date: LocalDate) {
-          renderString(date.toString)
-        }
-
-        @inline
-        def renderInterval(duration: DateTimeInterval) {
-          renderString(duration.toString)
-        }
-
-        @inline
-        def renderArray[A](array: Array[A]) {
-          renderString(array.deep.toString)
-        }
-
         def traverseSchema(row: Int, schema: SchemaNode): Boolean = schema match {
-          case obj: SchemaNode.Obj => {
+          case obj: SchemaNode.Obj =>
             val keys   = obj.keys
             val values = obj.values
 
@@ -1421,16 +1340,14 @@ trait Slice { source =>
             pushIn("{", false)
             val done = loop(0, false)
 
-            if (done) {
-              push('}')
-            } else {
+            if (done)
+              ctx.push('}')
+            else
               popIn()
-            }
 
             done
-          }
 
-          case arr: SchemaNode.Arr => {
+          case arr: SchemaNode.Arr =>
             val values = arr.nodes
 
             @inline
@@ -1458,16 +1375,14 @@ trait Slice { source =>
             pushIn("[", false)
             val done = loop(0, false)
 
-            if (done) {
-              push(']')
-            } else {
+            if (done)
+              ctx.push(']')
+            else
               popIn()
-            }
 
             done
-          }
 
-          case union: SchemaNode.Union => {
+          case union: SchemaNode.Union =>
             val pos = union.possibilities
 
             @inline
@@ -1481,7 +1396,6 @@ trait Slice { source =>
             }
 
             loop(0)
-          }
 
           case SchemaNode.Leaf(tpe, col) =>
             tpe match {
@@ -1490,7 +1404,7 @@ trait Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderString(specCol(row))
+                  ctx.renderString(specCol(row))
                   true
                 } else {
                   false
@@ -1502,177 +1416,155 @@ trait Slice { source =>
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderBoolean(specCol(row))
+                  ctx.renderBoolean(specCol(row))
                   true
                 } else {
                   false
                 }
               }
 
-              case CLong => {
+              case CLong =>
                 val specCol = col.asInstanceOf[LongColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderLong(specCol(row))
+                  ctx.renderLong(specCol(row))
                   true
                 } else {
                   false
                 }
-              }
 
-              case CDouble => {
+              case CDouble =>
                 val specCol = col.asInstanceOf[DoubleColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderDouble(specCol(row))
+                  ctx.renderDouble(specCol(row))
                   true
                 } else {
                   false
                 }
-              }
 
-              case CNum => {
+              case CNum =>
                 val specCol = col.asInstanceOf[NumColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderNum(specCol(row))
+                  ctx.renderNum(specCol(row))
                   true
                 } else {
                   false
                 }
-              }
 
-              case CNull => {
+              case CNull =>
                 val specCol = col.asInstanceOf[NullColumn]
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderNull()
+                  ctx.renderNull()
                   true
                 } else {
                   false
                 }
-              }
 
-              case CEmptyObject => {
+              case CEmptyObject =>
                 val specCol = col.asInstanceOf[EmptyObjectColumn]
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderEmptyObject()
+                  ctx.renderEmptyObject()
                   true
                 } else {
                   false
                 }
-              }
 
-              case CEmptyArray => {
+              case CEmptyArray =>
                 val specCol = col.asInstanceOf[EmptyArrayColumn]
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderEmptyArray()
+                  ctx.renderEmptyArray()
                   true
                 } else {
                   false
                 }
-              }
 
-              case COffsetDateTime => {
+              case COffsetDateTime =>
                 val specCol = col.asInstanceOf[OffsetDateTimeColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderOffsetDateTime(specCol(row))
+                  ctx.renderOffsetDateTime(specCol(row))
                   true
                 } else {
                   false
                 }
-              }
 
-              case COffsetTime => {
+              case COffsetTime =>
                 val specCol = col.asInstanceOf[OffsetTimeColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderOffsetTime(specCol(row))
+                  ctx.renderOffsetTime(specCol(row))
                   true
                 } else {
                   false
                 }
-              }
 
-              case COffsetDate => {
+              case COffsetDate =>
                 val specCol = col.asInstanceOf[OffsetDateColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderOffsetDate(specCol(row))
+                  ctx.renderOffsetDate(specCol(row))
                   true
                 } else {
                   false
                 }
-              }
 
-              case CLocalDateTime => {
+              case CLocalDateTime =>
                 val specCol = col.asInstanceOf[LocalDateTimeColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderLocalDateTime(specCol(row))
+                  ctx.renderLocalDateTime(specCol(row))
                   true
                 } else {
                   false
                 }
-              }
 
-              case CLocalTime => {
+              case CLocalTime =>
                 val specCol = col.asInstanceOf[LocalTimeColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderLocalTime(specCol(row))
+                  ctx.renderLocalTime(specCol(row))
                   true
                 } else {
                   false
                 }
-              }
 
-              case CLocalDate => {
+              case CLocalDate =>
                 val specCol = col.asInstanceOf[LocalDateColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderLocalDate(specCol(row))
+                  ctx.renderLocalDate(specCol(row))
                   true
                 } else {
                   false
                 }
-              }
 
-              case CInterval => {
+              case CInterval =>
                 val specCol = col.asInstanceOf[IntervalColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderInterval(specCol(row))
+                  ctx.renderInterval(specCol(row))
                   true
                 } else {
                   false
                 }
-              }
 
-              case CArrayType(_) => {
-                val specCol = col.asInstanceOf[HomogeneousArrayColumn[_]]
-
-                if (specCol.isDefinedAt(row)) {
-                  flushIn()
-                  renderArray(specCol(row))
-                  true
-                } else {
-                  false
-                }
-              }
+              // NB: I removed this implementation because it was horrible and broken
+              case CArrayType(_) => ???
 
               case CUndefined => false
             }
@@ -1699,22 +1591,13 @@ trait Slice { source =>
 
         val rendered = render(0, false)
 
-        buffer.flip()
-        vector += buffer
+        ctx.finish()
 
-        val stream = StreamT.unfoldM(0) { idx =>
-          val back =
-            if (idx < vector.length)
-              Some((vector(idx), idx + 1))
-            else
-              None
+        // it's safe for us to expose this mutable Seq as "immutable" since we wont' be touching it anymore
+        (ctx.toSeq(), rendered)
 
-          IO.pure(back)
-        }
-
-        (stream, rendered)
-      }
-      else StreamT.empty[IO, CharBuffer] -> false
+      case None =>
+        Seq.empty[CharBuffer] -> false
     }
   }
 
@@ -1735,7 +1618,7 @@ trait Slice { source =>
       if (idx >= 0)
         toRValue(idx) match {
           case CUndefined => loop(idx - 1, rvalues)
-          case rv         => loop(idx - 1, rv :: rvalues)
+          case rv => loop(idx - 1, rv :: rvalues)
         }
       else
         rvalues
@@ -1757,7 +1640,7 @@ trait Slice { source =>
   def toJson(row: Int): Option[JValue] = {
     toJValue(row) match {
       case JUndefined => None
-      case jv         => Some(jv)
+      case jv => Some(jv)
     }
   }
 
@@ -1766,7 +1649,7 @@ trait Slice { source =>
       if (i < source.size) {
         toJValue(i) match {
           case JUndefined => rec(i + 1, acc)
-          case jv         => rec(i + 1, acc :+ jv)
+          case jv => rec(i + 1, acc :+ jv)
         }
       } else acc
     }
@@ -1776,8 +1659,8 @@ trait Slice { source =>
 
   def toString(row: Int): Option[String] = {
     (columns.toList.sortBy(_._1) map { case (ref, col) => ref.toString + ": " + (if (col.isDefinedAt(row)) col.strValue(row) else "(undefined)") }) match {
-      case Nil                                         => None
-      case l                                           => Some(l.mkString("[", ", ", "]"))
+      case Nil => None
+      case l => Some(l.mkString("[", ", ", "]"))
     }
   }
 
@@ -1786,6 +1669,152 @@ trait Slice { source =>
   }
 
   override def toString = (0 until size).map(toString(_).getOrElse("")).mkString("\n", "\n", "\n")
+
+  private[this] def sliceSchema: Option[SchemaNode] = {
+    if (columns.isEmpty) {
+      None
+    } else {
+      def insert(target: SchemaNode, ref: ColumnRef, col: Column): SchemaNode = {
+        val ColumnRef(selector, ctype) = ref
+
+        selector.nodes match {
+          case CPathField(name) :: tail =>
+            target match {
+              case SchemaNode.Obj(nodes) => {
+                val subTarget = nodes get name getOrElse SchemaNode.Union(Set())
+                val result    = insert(subTarget, ColumnRef(CPath(tail), ctype), col)
+                SchemaNode.Obj(nodes + (name -> result))
+              }
+
+              case SchemaNode.Union(nodes) => {
+                val objNode = nodes find {
+                  case _: SchemaNode.Obj => true
+                  case _ => false
+                }
+
+                val subTarget = objNode getOrElse SchemaNode.Obj(Map())
+                SchemaNode.Union(nodes - subTarget + insert(subTarget, ref, col))
+              }
+
+              case node =>
+                SchemaNode.Union(Set(node, insert(SchemaNode.Obj(Map()), ref, col)))
+            }
+
+          case CPathIndex(idx) :: tail =>
+            target match {
+              case SchemaNode.Arr(map) => {
+                val subTarget = map get idx getOrElse SchemaNode.Union(Set())
+                val result    = insert(subTarget, ColumnRef(CPath(tail), ctype), col)
+                SchemaNode.Arr(map + (idx -> result))
+              }
+
+              case SchemaNode.Union(nodes) => {
+                val objNode = nodes find {
+                  case _: SchemaNode.Arr => true
+                  case _ => false
+                }
+
+                val subTarget = objNode getOrElse SchemaNode.Arr(Map())
+                SchemaNode.Union(nodes - subTarget + insert(subTarget, ref, col))
+              }
+
+              case node =>
+                SchemaNode.Union(Set(node, insert(SchemaNode.Arr(Map()), ref, col)))
+            }
+
+          case CPathMeta(_) :: _ => target
+
+          case CPathArray :: _ => sys.error("todo")
+
+          case Nil =>
+            val node = SchemaNode.Leaf(ctype, col)
+
+            target match {
+              case SchemaNode.Union(nodes) => SchemaNode.Union(nodes + node)
+              case oldNode => SchemaNode.Union(Set(oldNode, node))
+            }
+        }
+      }
+
+      def normalize(schema: SchemaNode): Option[SchemaNode] = schema match {
+        case SchemaNode.Obj(nodes) =>
+          val nodes2 = nodes flatMap {
+            case (key, value) => normalize(value) map { key -> _ }
+          }
+
+          val back =
+            if (nodes2.isEmpty)
+              None
+            else
+              Some(SchemaNode.Obj(nodes2))
+
+          back foreach { obj =>
+            obj.keys = new Array[String](nodes2.size)
+            obj.values = new Array[SchemaNode](nodes2.size)
+          }
+
+          var i = 0
+          back foreach { obj =>
+            for ((key, value) <- nodes2) {
+              obj.keys(i) = key
+              obj.values(i) = value
+              i += 1
+            }
+          }
+
+          back
+
+
+        case SchemaNode.Arr(map) =>
+          val map2 = map flatMap {
+            case (idx, value) => normalize(value) map { idx -> _ }
+          }
+
+          val back =
+            if (map2.isEmpty)
+              None
+            else
+              Some(SchemaNode.Arr(map2))
+
+          back foreach { arr =>
+            arr.nodes = new Array[SchemaNode](map2.size)
+          }
+
+          var i = 0
+          back foreach { arr =>
+            val values = map2.toSeq sortBy { _._1 } map { _._2 }
+
+            for (value <- values) {
+              arr.nodes(i) = value
+              i += 1
+            }
+          }
+
+          back
+
+        case SchemaNode.Union(nodes) =>
+          val nodes2 = nodes flatMap normalize
+
+          if (nodes2.isEmpty)
+            None
+          else if (nodes2.size == 1)
+            nodes2.headOption
+          else {
+            val union = SchemaNode.Union(nodes2)
+            union.possibilities = nodes2.toArray
+            Some(union)
+          }
+
+        case lf: SchemaNode.Leaf => Some(lf)
+      }
+
+      val schema = columns.foldLeft(SchemaNode.Union(Set()): SchemaNode) {
+        case (acc, (ref, col)) => insert(acc, ref, col)
+      }
+
+      normalize(schema)
+    }
+  }
 }
 
 object Slice {
@@ -2207,5 +2236,141 @@ object Slice {
     }
 
     final case class Leaf(tpe: CType, col: Column) extends SchemaNode
+  }
+
+  /*
+   * We manually encode a bimorphic delegating to these function values
+   * because we're probably going to have over 10k rows in a given dataset.
+   * Having over 10k rows would mean that we would over-specialize to
+   * monomorphism on the very first rendering call, then subsequently
+   * despecialize *entirely* when subsequent renders come in. By manually
+   * encoding the bimorphism, we can ensure that both call-sites get
+   * specialized.
+   */
+  private final class BufferContext(
+      size: Int,
+      _renderJsonString: (BufferContext, String) => Unit,   // maybe null
+      _renderCsvString: (BufferContext, String) => Unit) {  // maybe null
+
+    val RenderBufferSize = 1024 * 10 // 10 KB
+
+    private[this] var buffer = CharBuffer.allocate(RenderBufferSize)
+    private[this] val vector = new mutable.ArrayBuffer[CharBuffer](math.max(1, size / 10))
+
+    def checkPush(length: Int): Unit = {
+      if (buffer.remaining < length) {
+        buffer.flip()
+        vector += buffer
+
+        buffer = CharBuffer.allocate(RenderBufferSize)
+      }
+    }
+
+    def push(c: Char): Unit = {
+      checkPush(1)
+      buffer.put(c)
+    }
+
+    def pushStr(str: String): Unit = {
+      checkPush(str.length)
+      buffer.put(str)
+    }
+
+    def renderString(str: String): Unit = {
+      if (_renderJsonString eq null)
+        _renderCsvString(this, str)
+      else
+        _renderJsonString(this, str)
+    }
+
+    def renderLong(ln: Long): Unit = {
+      @tailrec
+      def power10(ln: Long, seed: Long = 1): Long = {
+        // note: we could be doing binary search here
+
+        if (seed * 10 < 0) // overflow
+          seed
+        else if (seed * 10 > ln)
+          seed
+        else
+          power10(ln, seed * 10)
+      }
+
+      @tailrec
+      def renderPositive(ln: Long, power: Long): Unit = {
+        if (power > 0) {
+          val c = Character.forDigit((ln / power % 10).toInt, 10)
+          push(c)
+          renderPositive(ln, power / 10)
+        }
+      }
+
+      if (ln == Long.MinValue) {
+        pushStr("-9223372036854775808")
+      } else if (ln == 0) {
+        push('0')
+      } else if (ln < 0) {
+        push('-')
+
+        val ln2 = ln * -1
+        renderPositive(ln2, power10(ln2))
+      } else {
+        renderPositive(ln, power10(ln))
+      }
+    }
+
+    // TODO is this a problem?
+    def renderDouble(d: Double): Unit = pushStr(d.toString)
+
+    // TODO is this a problem?
+    def renderNum(d: BigDecimal): Unit = pushStr(d.toString)
+
+    def renderBoolean(b: Boolean): Unit = {
+      if (b)
+        pushStr("true")
+      else
+        pushStr("false")
+    }
+
+    def renderNull(): Unit = pushStr("null")
+
+    def renderEmptyObject(): Unit = pushStr("{}")
+
+    def renderEmptyArray(): Unit = pushStr("[]")
+
+    def renderOffsetDateTime(time: OffsetDateTime): Unit = renderString(time.toString)
+
+    def renderOffsetTime(time: OffsetTime): Unit = renderString(time.toString)
+
+    def renderOffsetDate(date: OffsetDate): Unit = renderString(date.toString)
+
+    def renderLocalDateTime(time: LocalDateTime): Unit = renderString(time.toString)
+
+    def renderLocalTime(time: LocalTime): Unit = renderString(time.toString)
+
+    def renderLocalDate(date: LocalDate): Unit = renderString(date.toString)
+
+    def renderInterval(duration: DateTimeInterval): Unit = renderString(duration.toString)
+
+    def finish(): Unit = {
+      buffer.flip()
+      vector += buffer
+    }
+
+    def toSeq(): Seq[CharBuffer] = {
+      buffer = null    // invalidate the state so we throw exceptions later
+      vector
+    }
+  }
+
+  private object BufferContext {
+
+    @inline
+    def json(size: Int)(renderString: (BufferContext, String) => Unit): BufferContext =
+      new BufferContext(size, renderString, null)
+
+    @inline
+    def csv(size: Int)(renderString: (BufferContext, String) => Unit): BufferContext =
+      new BufferContext(size, null, renderString)
   }
 }
