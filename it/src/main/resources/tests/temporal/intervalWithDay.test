@@ -2,8 +2,8 @@
     "name": "interval with days",
 
     "backends": {
-        "lwc_local":"pendingIgnoreFieldOrder",
-        "mimir":"pendingIgnoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "pendingIgnoreFieldOrder"
     },
 
     "data": "../days.data",

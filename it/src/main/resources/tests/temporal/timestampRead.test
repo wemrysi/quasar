@@ -1,8 +1,8 @@
 {
     "name": "reads timestamps with flatten",
     "backends": {
-        "lwc_local": "pending",
-        "mimir":     "pending"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir":     "pendingIgnoreFieldOrder"
     },
     "data": "../daysWithArray.data",
 

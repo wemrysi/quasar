@@ -1,7 +1,6 @@
 {
     "name": "simple filter using timestamp literals",
     "backends": {
-        "lwc_local": "pending",
         "mimir": "pending"
     },
     "data":  "../days.data",
