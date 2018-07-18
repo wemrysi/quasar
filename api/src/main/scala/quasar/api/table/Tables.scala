@@ -16,8 +16,10 @@
 
 package quasar.api.table
 
-import quasar.Condition
 import slamdata.Predef.Unit
+
+import quasar.Condition
+
 import scalaz.\/
 
 /** @tparam I identity

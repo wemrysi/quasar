@@ -19,19 +19,12 @@ package quasar.contrib.std
 import java.util.UUID
 
 import scalaz.{Order, Ordering, Show}
-import scalaz.std.anyVal._
-import scalaz.syntax.equal._
 
 object uuid {
 
   implicit val uuidOrder: Order[UUID] = new Order[UUID] {
-    def order(x: UUID, y: UUID): Ordering = {
-      val compare = x.compareTo(y)
-
-      if (compare < 0) Ordering.LT
-      else if (compare === 0) Ordering.EQ
-      else Ordering.GT
-    }
+    def order(x: UUID, y: UUID): Ordering =
+      Ordering.fromInt(x.compareTo(y))
   }
 
   implicit val showUUID: Show[UUID] = Show.showFromToString

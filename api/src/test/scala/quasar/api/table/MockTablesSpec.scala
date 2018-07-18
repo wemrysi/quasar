@@ -16,15 +16,18 @@
 
 package quasar.api.table
 
-import cats.data.StateT
-import cats.effect.IO
-import java.util.UUID
+import slamdata.Predef._
+
 import quasar.contrib.scalaz.MonadState_
 import quasar.contrib.std.uuid._
+
+import java.util.UUID
+
+import cats.data.StateT
+import cats.effect.IO
 import scalaz.{~>, Id, IMap, Monad}, Id.Id
 import scalaz.std.string._
 import shims._
-import slamdata.Predef._
 
 import MockTablesSpec.Store
 

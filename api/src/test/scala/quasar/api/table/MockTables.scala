@@ -16,18 +16,21 @@
 
 package quasar.api.table
 
-import java.time.{Duration, OffsetDateTime}
-import java.util.UUID
+import slamdata.Predef.{List, None, Option, Some, String, Unit}
+
 import quasar.Condition
 import quasar.contrib.scalaz.MonadState_
 import quasar.contrib.std.uuid._
+
+import java.time.{Duration, OffsetDateTime}
+import java.util.UUID
+
 import scalaz.{\/, IMap, Monad}
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
-import slamdata.Predef.{List, None, Option, Some, String, Unit}
 
-final class MockTables[F[_]: Monad: MockTables.TablesMockState[?[_]]]
+final class MockTables[F[_]: Monad: MockTables.TablesMockState]
   extends Tables[F, List, UUID, String, String] {
 
   import MockTables._

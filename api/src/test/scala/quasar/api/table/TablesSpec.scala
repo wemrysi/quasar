@@ -16,14 +16,16 @@
 
 package quasar.api.table
 
+import slamdata.Predef._
+
+import quasar.{ConditionMatchers, Qspec}
+
 import cats.effect.Sync
 import org.specs2.execute.AsResult
 import org.specs2.specification.core.Fragment
-import quasar.{ConditionMatchers, Qspec}
 import scalaz.{~>, \/, \/-, -\/, Equal, Id, Monad, Show}, Id.Id
 import scalaz.syntax.monad._
 import scalaz.std.list._
-import slamdata.Predef._
 
 abstract class TablesSpec[F[_]: Monad: Sync, G[_], I: Equal: Show, Q: Equal: Show, D]
     extends Qspec
@@ -45,6 +47,10 @@ abstract class TablesSpec[F[_]: Monad: Sync, G[_], I: Equal: Show, Q: Equal: Sho
   def toList[A](as: G[A]): List[A]
 
   def run: F ~> Id
+
+  "test data is compliant" >> {
+    table1.name must_!= table2.name
+  }
 
   "failures" >> {
     "fail to access a nonexistent table" >>* {

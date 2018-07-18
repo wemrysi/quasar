@@ -16,10 +16,11 @@
 
 package quasar.api.table
 
-import scalaz.{Cord, Equal, Show}
-import scalaz.syntax.equal._
-import scalaz.syntax.show._
 import slamdata.Predef._
+
+import scalaz.{Cord, Equal, Show}
+import scalaz.std.tuple._
+import scalaz.syntax.show._
 
 final case class Table[Q](name: TableName, query: Q)
 
@@ -34,10 +35,7 @@ object Table {
   import TableName._
 
   implicit def equalTable[Q: Equal]: Equal[Table[Q]] =
-    Equal.equal {
-      case (t1: Table[Q], t2: Table[Q]) =>
-        t1.name === t2.name && t1.query === t2.query
-    }
+    Equal.equalBy(t => (t.name, t.query))
 
   implicit def showTable[Q: Show]: Show[Table[Q]] =
     Show.show { t =>
