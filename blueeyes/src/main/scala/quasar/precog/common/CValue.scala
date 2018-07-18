@@ -281,9 +281,20 @@ object RValue extends RValueInstances {
     case Data.Null => CNull.some
     case Data.Bool(b) => CBoolean(b).some
     case Data.Str(s) => CString(s).some
-    case Data.Dec(k) => CNum(k).some
+
+    case Data.Dec(k) =>
+      val back = if (k.isValidLong)
+        CLong(k.toLong)
+      else if (k.isExactDouble)
+        CDouble(k.toDouble)
+      else
+        CNum(k)
+
+      back.some
+
     case Data.Int(k) =>
       (if (k.isValidLong) CLong(k.toLong) else CNum(BigDecimal(k))).some
+
     case Data.OffsetDateTime(v) => COffsetDateTime(v).some
     case Data.OffsetDate(v) => COffsetDate(v).some
     case Data.OffsetTime(v) => COffsetTime(v).some
