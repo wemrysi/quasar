@@ -16,8 +16,8 @@
 
 package quasar.connector
 
-import slamdata.Predef.{Either, String, Throwable}
-import quasar.Qspec
+import slamdata.Predef.{Either, List, String, Throwable}
+import quasar.EffectfulQSpec
 import quasar.common.resource._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -26,23 +26,23 @@ import cats.effect.{Effect, IO}
 import fs2.async.Promise
 import org.specs2.execute.AsResult
 import org.specs2.specification.core.Fragment
-import scalaz.Foldable
-import scalaz.std.option._
-import scalaz.syntax.foldable._
-import scalaz.syntax.monad._
+import scalaz.Scalaz._
 import shims._
 
-abstract class DatasourceSpec[F[_]: Effect, G[_]: Foldable, Q, R]
-    extends Qspec {
+abstract class DatasourceSpec[F[_]: Effect, G[_]]
+    extends EffectfulQSpec[F] {
 
-  def datasource: Datasource[F, G, Q, R]
+  def datasource: Datasource[F, G, _, _]
 
   def nonExistentPath: ResourcePath
+
+  def gatherMultiple[A](fga: G[A]): F[List[A]]
 
   "resource discovery" >> {
     "must not be empty" >>* {
       datasource
         .prefixedChildPaths(ResourcePath.root())
+        .flatMap(_.traverse(gatherMultiple))
         .map(_.any(g => !g.empty))
     }
 
@@ -61,6 +61,7 @@ abstract class DatasourceSpec[F[_]: Effect, G[_]: Foldable, Q, R]
     "prefixed child status agrees with pathIsResource" >>* {
       datasource
         .prefixedChildPaths(ResourcePath.root())
+        .flatMap(_.traverse(gatherMultiple))
         .flatMap(_.anyM(_.allM {
           case (n, ResourcePathType.LeafResource | ResourcePathType.PrefixResource) =>
             datasource.pathIsResource(ResourcePath.root() / n)
@@ -68,21 +69,6 @@ abstract class DatasourceSpec[F[_]: Effect, G[_]: Foldable, Q, R]
           case (n, ResourcePathType.Prefix) =>
             datasource.pathIsResource(ResourcePath.root() / n).map(!_)
         }))
-    }
-  }
-
-  ////
-
-  implicit class RunExample(s: String) {
-    def >>*[A: AsResult](fa: => F[A]): Fragment = {
-      val run = for {
-        p <- Promise.empty[IO, Either[Throwable, A]]
-        _ <- Effect[F].runAsync(fa)(p.complete(_))
-        r <- p.get
-        a <- IO.fromEither(r)
-      } yield a
-
-      s >> run.unsafeRunSync
     }
   }
 }

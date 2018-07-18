@@ -16,14 +16,14 @@
 
 package quasar.impl.datasource
 
-import slamdata.Predef.{Boolean, None, Some, Unit}
+import slamdata.Predef.{Boolean, None, Option, Some, Unit}
 import quasar.Condition
-import quasar.api._, ResourceError._
 import quasar.api.datasource.DatasourceType
+import quasar.common.resource._
 import quasar.connector.Datasource
 import quasar.contrib.scalaz.MonadError_
 
-import scalaz.{\/, Monad}
+import scalaz.Monad
 
 final class ConditionReportingDatasource[
     E, F[_]: Monad: MonadError_[?[_], E], G[_], Q, R] private (
@@ -33,16 +33,15 @@ final class ConditionReportingDatasource[
 
   val kind: DatasourceType = underlying.kind
 
-  val shutdown: F[Unit] = underlying.shutdown
-
-  def evaluate(query: Q): F[ReadError \/ R] =
+  def evaluate(query: Q): F[R] =
     reportCondition(underlying.evaluate(query))
 
-  def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]] =
-    reportCondition(underlying.children(path))
+  def pathIsResource(path: ResourcePath): F[Boolean] =
+    reportCondition(underlying.pathIsResource(path))
 
-  def isResource(path: ResourcePath): F[Boolean] =
-    reportCondition(underlying.isResource(path))
+  def prefixedChildPaths(path: ResourcePath)
+      : F[Option[G[(ResourceName, ResourcePathType)]]] =
+    reportCondition(underlying.prefixedChildPaths(path))
 
   ////
 

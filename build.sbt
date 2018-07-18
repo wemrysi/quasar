@@ -434,7 +434,7 @@ lazy val impl = project
   .settings(name := "quasar-impl-internal")
   .dependsOn(
     api % BothScopes,
-    connector,
+    connector % BothScopes,
     frontend)
   .settings(commonSettings)
   .settings(targetSettings)

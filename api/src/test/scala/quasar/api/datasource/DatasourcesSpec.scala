@@ -17,29 +17,27 @@
 package quasar.api.datasource
 
 import slamdata.Predef._
-import quasar.{Condition, ConditionMatchers, Qspec}
+import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
 import quasar.common.resource.ResourcePath
 
 import scala.Predef.assert
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import java.util.UUID
 
-import cats.effect.{Effect, IO}
+import cats.effect.Effect
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import eu.timepit.refined.auto._
-import fs2.async.Promise
-import org.specs2.execute.AsResult
 import org.specs2.matcher.Matcher
-import org.specs2.specification.core.Fragment
-import scalaz.{\/, Equal, Foldable, IMap, Order, Show}
+import scalaz.{\/, Equal, IMap, Order, Show}
 import scalaz.syntax.equal._
 import scalaz.syntax.foldable._
+import scalaz.std.list._
 
-abstract class DatasourcesSpec[F[_], G[_]: Foldable, I: Order: Show, C: Equal: Show](
-    implicit F: Effect[F])
-    extends Qspec
+abstract class DatasourcesSpec[F[_], G[_], I: Order: Show, C: Equal: Show](
+    implicit F: Effect[F], ec: ExecutionContext)
+    extends EffectfulQSpec[F]
     with ConditionMatchers {
 
   import DatasourceError._
@@ -50,6 +48,8 @@ abstract class DatasourcesSpec[F[_], G[_]: Foldable, I: Order: Show, C: Equal: S
 
   // Must be distinct.
   def validConfigs: (C, C)
+
+  def gatherMultiple[A](fga: G[A]): F[List[A]]
 
   assert(validConfigs._1 =/= validConfigs._2, "validConfigs must be distinct!")
 
@@ -181,8 +181,9 @@ abstract class DatasourcesSpec[F[_], G[_]: Foldable, I: Order: Show, C: Equal: S
         ib <- createRef(b)
 
         g <- datasources.allDatasourceMetadata
+        ts <- gatherMultiple(g)
 
-        m = IMap.fromFoldable(g)
+        m = IMap.fromFoldable(ts)
       } yield {
         m.lookup(ia).exists(v => v.kind ≟ a.kind && v.name ≟ a.name) must beTrue
         m.lookup(ib).exists(v => v.kind ≟ b.kind && v.name ≟ b.name) must beTrue
@@ -224,11 +225,13 @@ abstract class DatasourcesSpec[F[_], G[_]: Foldable, I: Order: Show, C: Equal: S
 
         i <- createRef(a)
 
-        metaBefore <- datasources.allDatasourceMetadata
+        gBefore <- datasources.allDatasourceMetadata
+        metaBefore <- gatherMultiple(gBefore)
 
         _ <- datasources.removeDatasource(i)
 
-        metaAfter <- datasources.allDatasourceMetadata
+        gAfter <- datasources.allDatasourceMetadata
+        metaAfter <- gatherMultiple(gAfter)
       } yield {
         metaBefore.any(_._1 ≟ i) must beTrue
         metaAfter.any(_._1 ≟ i) must beFalse
@@ -237,19 +240,6 @@ abstract class DatasourcesSpec[F[_], G[_]: Foldable, I: Order: Show, C: Equal: S
   }
 
   ////
-
-  implicit class RunExample(s: String) {
-    def >>*[A: AsResult](fa: => F[A]): Fragment = {
-      val run = for {
-        p <- Promise.empty[IO, Either[Throwable, A]]
-        _ <- F.runAsync(fa)(p.complete(_))
-        r <- p.get
-        a <- IO.fromEither(r)
-      } yield a
-
-      s >> run.unsafeRunSync
-    }
-  }
 
   type Err = DatasourceError[I, C]
 

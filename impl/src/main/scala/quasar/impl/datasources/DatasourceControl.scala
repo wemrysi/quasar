@@ -16,39 +16,45 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.Unit
+import slamdata.Predef.{Boolean, Unit}
 import quasar.Condition
-import quasar.api.ResourceName
-import quasar.api.datasource.{DatasourceConfig, DatasourceType}
-import quasar.api.datasource.DatasourceError.CreateError
+import quasar.api.datasource.{DatasourceRef, DatasourceType}
+import quasar.api.datasource.DatasourceError.{CreateError, DiscoveryError, ExistentialError}
+import quasar.common.resource.{ResourceName, ResourcePath, ResourcePathType}
 
-import scalaz.ISet
+import scalaz.{\/, ISet}
 
-/** A primitive facility for managing the lifecycle of datasources.
+/** A primitive facility for managing the lifecycle of datasources and
+  * discovering resources.
   *
   * All mutating operations replace existing datasources as this is intended
   * to be used as a dependency in another context, such as `DefaultDatasources`,
   * that decides whether doing so is appropriate.
   */
-trait DatasourceControl[F[_], C] {
-  /** Initialize a datasource as `name` using the provided `config`. If a
-    * datasource exists at `name`, it is shut down.
+trait DatasourceControl[F[_], G[_], I, C] {
+  /** Initialize a datasource as `datasourceId` using the provided `ref`. If a
+    * datasource exists at `datasourceId`, it is shut down.
     */
-  def init(
-      name: ResourceName,
-      config: DatasourceConfig[C])
+  def initDatasource(datasourceId: I, ref: DatasourceRef[C])
       : F[Condition[CreateError[C]]]
+
+  /** Returns whether or not the specified path refers to a resource in the
+    * specified datasource.
+    */
+  def pathIsResource(datasourceId: I, path: ResourcePath)
+      : F[ExistentialError[I] \/ Boolean]
+
+  /** Returns the name and type of the `ResourcePath`s within the specified
+    * Datasource implied by concatenating each name to `prefixPath`.
+    */
+  def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
+      : F[DiscoveryError[I] \/ G[(ResourceName, ResourcePathType)]]
 
   /** Stop the named datasource, discarding it and freeing any resources it may
     * be using.
     */
-  def shutdown(name: ResourceName): F[Unit]
-
-  /** Update the name of the datasource at `src` to `dst`. If a datasource exists
-    * at `dst`, it is shut down.
-    */
-  def rename(src: ResourceName, dst: ResourceName): F[Unit]
+  def shutdownDatasource(datasourceId: I): F[Unit]
 
   /** The types of datasources supported. */
-  def supported: F[ISet[DatasourceType]]
+  def supportedDatasourceTypes: F[ISet[DatasourceType]]
 }

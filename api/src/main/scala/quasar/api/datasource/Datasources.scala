@@ -61,12 +61,12 @@ trait Datasources[F[_], G[_], I, C] {
   def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
       : F[DiscoveryError[I] \/ G[(ResourceName, ResourcePathType)]]
 
+  /** Removes the specified datasource, making its resources unavailable. */
+  def removeDatasource(datasourceId: I): F[Condition[ExistentialError[I]]]
+
   /** Replaces the reference to the specified datasource. */
   def replaceDatasource(datasourceId: I, ref: DatasourceRef[C])
       : F[Condition[DatasourceError[I, C]]]
-
-  /** Removes the specified datasource, making its resources unavailable. */
-  def removeDatasource(datasourceId: I): F[Condition[ExistentialError[I]]]
 
   /** The set of supported datasource types. */
   def supportedDatasourceTypes: F[ISet[DatasourceType]]

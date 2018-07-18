@@ -18,6 +18,7 @@ package quasar.contrib.scalaz
 
 import slamdata.Predef._
 
+import monocle.Lens
 import scalaz.{Bind, Functor, Monad, Monoid, MonadState, StateT, WriterT}
 import scalaz.syntax.monad._
 
@@ -37,6 +38,19 @@ trait MonadState_[F[_], S] {
 
 object MonadState_ extends MonadState_Instances {
   def apply[F[_], S](implicit F: MonadState_[F, S]): MonadState_[F, S] = F
+
+  object zoom {
+    def apply[F[_]] = new PartiallyApplied[F]
+    final class PartiallyApplied[F[_]] {
+      def apply[S, A](lens: Lens[S, A])(
+          implicit S: MonadState_[F, S], F: Bind[F])
+          : MonadState_[F, A] =
+        new MonadState_[F, A] {
+          def get: F[A] = S.gets(lens.get)
+          def put(a: A): F[Unit] = S.modify(lens.set(a))
+        }
+    }
+  }
 }
 
 sealed abstract class MonadState_Instances extends MonadState_Instances0 {

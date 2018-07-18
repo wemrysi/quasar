@@ -14,26 +14,24 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.contrib.cats.effect
 
-import slamdata.Predef.String
-import quasar.contrib.cats.effect.effect._
+import slamdata.Predef.{Either, Throwable}
 
 import scala.concurrent.ExecutionContext
 
-import cats.effect.Effect
-import org.specs2.execute.AsResult
-import org.specs2.specification.core.Fragment
+import cats.effect.{Effect, IO}
+import fs2.async.Promise
 
-abstract class EffectfulQSpec[F[_]: Effect](implicit ec: ExecutionContext) extends Qspec {
-  /** Provides syntax for defining effectful examples:
-    *
-    * "some example name" >>* {
-    *   <example body returning F[A]>
-    * }
-    */
-  implicit class RunExample(s: String) {
-    def >>*[A: AsResult](fa: => F[A]): Fragment =
-      s >> unsafeRunEffect(fa)
+object effect {
+  def unsafeRunEffect[F[_]: Effect, A](fa: F[A])(implicit ec: ExecutionContext): A = {
+    val ioa = for {
+      p <- Promise.empty[IO, Either[Throwable, A]]
+      _ <- Effect[F].runAsync(fa)(p.complete(_))
+      r <- p.get
+      a <- IO.fromEither(r)
+    } yield a
+
+    ioa.unsafeRunSync()
   }
 }

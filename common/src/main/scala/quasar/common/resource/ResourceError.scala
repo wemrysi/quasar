@@ -16,7 +16,7 @@
 
 package quasar.common.resource
 
-import slamdata.Predef.{Product, Serializable}
+import slamdata.Predef.{Exception, Product, Serializable, Throwable}
 
 import monocle.Prism
 import scalaz.{Cord, Equal, Show}
@@ -40,6 +40,16 @@ object ResourceError extends ResourceErrorInstances{
     Prism.partial[E, ResourcePath] {
       case PathNotFound(p) => p
     } (PathNotFound(_))
+
+  val throwableP: Prism[Throwable, ResourceError] =
+    Prism.partial[Throwable, ResourceError] {
+      case ResourceErrorException(re) => re
+    } (ResourceErrorException(_))
+
+  ////
+
+  private final case class ResourceErrorException(err: ResourceError)
+      extends Exception(err.shows)
 }
 
 sealed abstract class ResourceErrorInstances {

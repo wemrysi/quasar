@@ -16,72 +16,80 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{List, None, Option, Some, Unit}
+import slamdata.Predef.{Boolean, List, None, Option, Some, Unit}
 import quasar.Condition
-import quasar.api.ResourceName
-import quasar.api.datasource.{DatasourceConfig, DatasourceType}
+import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError._
+import quasar.common.resource._
 import quasar.contrib.scalaz.{MonadState_, MonadTell_}
-import MockDatasourceControl.{Initialized, MonadInit, MonadShutdown, Shutdowns}
+import MockDatasourceControl.{MonadInit, MonadShutdown}
 
-import scalaz.{ISet, Monad}
+import scalaz.{\/, ISet, Monad, Order, PlusEmpty}
+import scalaz.syntax.either._
 import scalaz.syntax.monad._
+import scalaz.syntax.plusEmpty._
 import scalaz.syntax.std.boolean._
 
 /** Provides for control over the lifecycle of external Datasources. */
-final class MockDatasourceControl[F[_]: Monad: MonadInit: MonadShutdown, C] private (
+final class MockDatasourceControl[F[_]: Monad, G[_]: PlusEmpty, I: Order, C] private (
     supportedTypes: ISet[DatasourceType],
-    initErrors: C => Option[InitializationError[C]])
-    extends DatasourceControl[F, C] {
+    initErrors: C => Option[InitializationError[C]])(
+    implicit initd: MonadInit[F, I], sdown: MonadShutdown[F, I])
+    extends DatasourceControl[F, G, I, C] {
 
-  private val initd = MonadState_[F, Initialized]
-  private val sdown = MonadTell_[F, Shutdowns]
-
-  def init(
-      name: ResourceName,
-      config: DatasourceConfig[C])
+  def initDatasource(
+      datasourceId: I,
+      ref: DatasourceRef[C])
       : F[Condition[CreateError[C]]] =
-    if (supportedTypes.member(config.kind))
-      initErrors(config.config) match {
+    if (supportedTypes.member(ref.kind))
+      initErrors(ref.config) match {
         case Some(err) =>
           Condition.abnormal[CreateError[C]](err).point[F]
 
         case None =>
           for {
             inits <- initd.get
-            _ <- inits.member(name).whenM(shutdown(name))
-            _ <- initd.put(inits.insert(name))
+            _ <- inits.member(datasourceId).whenM(shutdownDatasource(datasourceId))
+            _ <- initd.put(inits.insert(datasourceId))
           } yield Condition.normal[CreateError[C]]()
       }
     else
       Condition.abnormal[CreateError[C]](
-        DatasourceUnsupported(config.kind, supportedTypes))
+        DatasourceUnsupported(ref.kind, supportedTypes))
         .point[F]
 
-  def shutdown(name: ResourceName): F[Unit] =
-    sdown.tell(List(name)) >> initd.modify(_.delete(name))
+  def pathIsResource(datasourceId: I, path: ResourcePath)
+      : F[ExistentialError[I] \/ Boolean] =
+    initd.gets(_.member(datasourceId)) map { exists =>
+      if (exists) false.right
+      else datasourceNotFound[I, ExistentialError[I]](datasourceId).left
+    }
 
-  def rename(src: ResourceName, dst: ResourceName): F[Unit] =
-    for {
-      inits <- initd.get
-      _ <- inits.member(dst).whenM(shutdown(dst))
-      _ <- initd.put(inits.delete(src).insert(dst))
-    } yield ()
+  def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
+      : F[DiscoveryError[I] \/ G[(ResourceName, ResourcePathType)]] =
+    initd.gets(_.member(datasourceId)) map { exists =>
+      if (exists) mempty[G, (ResourceName, ResourcePathType)].right
+      else datasourceNotFound[I, DiscoveryError[I]](datasourceId).left
+    }
 
-  def supported: F[ISet[DatasourceType]] =
+  def shutdownDatasource(datasourceId: I): F[Unit] =
+    sdown.tell(List(datasourceId)) >> initd.modify(_.delete(datasourceId))
+
+  def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     supportedTypes.point[F]
 }
 
 object MockDatasourceControl {
-  type Initialized = ISet[ResourceName]
-  type MonadInit[F[_]] = MonadState_[F, Initialized]
+  type Initialized[I] = ISet[I]
+  type MonadInit[F[_], I] = MonadState_[F, Initialized[I]]
 
-  type Shutdowns = List[ResourceName]
-  type MonadShutdown[F[_]] = MonadTell_[F, Shutdowns]
+  type Shutdowns[I] = List[I]
+  type MonadShutdown[F[_], I] = MonadTell_[F, Shutdowns[I]]
 
-  def apply[F[_]: Monad: MonadInit: MonadShutdown, C](
+  def apply[F[_]: Monad, G[_]: PlusEmpty, I: Order, C](
       supportedTypes: ISet[DatasourceType],
-      initErrors: C => Option[InitializationError[C]])
-      : DatasourceControl[F, C] =
-    new MockDatasourceControl[F, C](supportedTypes, initErrors)
+      initErrors: C => Option[InitializationError[C]])(
+      implicit MI: MonadInit[F, I], MS: MonadShutdown[F, I])
+      : DatasourceControl[F, G, I, C] =
+    new MockDatasourceControl[F, G, I, C](supportedTypes, initErrors)
 }

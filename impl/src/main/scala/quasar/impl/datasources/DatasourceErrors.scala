@@ -17,24 +17,27 @@
 package quasar.impl.datasources
 
 import slamdata.Predef.{Exception, Option}
-import quasar.api.ResourceName
 
-import scalaz.{Functor, IMap}
+import scalaz.{Functor, IMap, Order}
 import scalaz.syntax.functor._
 
 /** Allows querying the error status of datasources. */
-trait DatasourceErrors[F[_]] {
+trait DatasourceErrors[F[_], I] {
   /** Datasources currently in an error state. */
-  def errored: F[IMap[ResourceName, Exception]]
+  def erroredDatasources: F[IMap[I, Exception]]
 
-  /** Retrieve the error associated with the named datasource. */
-  def lookup(name: ResourceName): F[Option[Exception]]
+  /** Retrieve the error associated with the specified datasource. */
+  def datasourceError(datasourceId: I): F[Option[Exception]]
 }
 
 object DatasourceErrors {
-  def fromMap[F[_]: Functor](errors: F[IMap[ResourceName, Exception]]): DatasourceErrors[F] =
-    new DatasourceErrors[F] {
-      val errored = errors
-      def lookup(name: ResourceName) = errored.map(_.lookup(name))
+  def fromMap[F[_]: Functor, I: Order](
+      errors: F[IMap[I, Exception]])
+      : DatasourceErrors[F, I] =
+    new DatasourceErrors[F, I] {
+      val erroredDatasources = errors
+
+      def datasourceError(datasourceId: I) =
+        erroredDatasources.map(_.lookup(datasourceId))
     }
 }

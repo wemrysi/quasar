@@ -18,10 +18,13 @@ package quasar.api.datasource
 
 import slamdata.Predef.{Int, List, String, Stream => SStream}
 import quasar.Condition
-import quasar.contrib.scalaz.MonadState_
+import quasar.contrib.cats.stateT._
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.IO
 import cats.data.StateT
+import cats.syntax.applicative._
 import eu.timepit.refined.auto._
 import scalaz.ISet
 import scalaz.std.anyVal._
@@ -46,16 +49,11 @@ final class MockDatasourcesSpec
   def supportedType = DatasourceType("s3", 1L)
 
   def validConfigs = ("bucket1", "bucket2")
+
+  def gatherMultiple[A](xs: List[A]) = xs.pure[MockM]
 }
 
 object MockDatasourcesSpec {
   import MockDatasources.MockState
-
   type MockM[A] = StateT[IO, MockState[String], A]
-
-  implicit def scalazMonadMockState: MonadState_[MockM, MockState[String]] =
-    new MonadState_[MockM, MockState[String]] {
-      val get = StateT.get
-      def put(ms: MockState[String]) = StateT.set(ms)
-    }
 }

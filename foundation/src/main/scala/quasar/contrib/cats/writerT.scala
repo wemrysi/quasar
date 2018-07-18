@@ -14,26 +14,16 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.contrib.cats
 
-import slamdata.Predef.String
-import quasar.contrib.cats.effect.effect._
+import quasar.contrib.scalaz.MonadTell_
 
-import scala.concurrent.ExecutionContext
+import cats.Applicative
+import cats.data.WriterT
 
-import cats.effect.Effect
-import org.specs2.execute.AsResult
-import org.specs2.specification.core.Fragment
-
-abstract class EffectfulQSpec[F[_]: Effect](implicit ec: ExecutionContext) extends Qspec {
-  /** Provides syntax for defining effectful examples:
-    *
-    * "some example name" >>* {
-    *   <example body returning F[A]>
-    * }
-    */
-  implicit class RunExample(s: String) {
-    def >>*[A: AsResult](fa: => F[A]): Fragment =
-      s >> unsafeRunEffect(fa)
-  }
+object writerT {
+  implicit def catsWriterTMonadTell_[F[_]: Applicative, W]: MonadTell_[WriterT[F, W, ?], W] =
+    new MonadTell_[WriterT[F, W, ?], W] {
+      def writer[A](w: W, a: A) = WriterT.put(a)(w)
+    }
 }
