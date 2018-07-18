@@ -16,8 +16,29 @@
 
 package quasar.api.table
 
-import slamdata.Predef.String
+import slamdata.Predef._
+
+import scalaz.{Cord, Equal, Show}
+import scalaz.std.tuple._
+import scalaz.syntax.show._
 
 final case class Table[Q](name: TableName, query: Q)
 
 final case class TableName(name: String)
+
+object TableName {
+  implicit val equalTableName: Equal[TableName] = Equal.equalA
+  implicit val showTableName: Show[TableName] = Show.showFromToString
+}
+
+object Table {
+  import TableName._
+
+  implicit def equalTable[Q: Equal]: Equal[Table[Q]] =
+    Equal.equalBy(t => (t.name, t.query))
+
+  implicit def showTable[Q: Show]: Show[Table[Q]] =
+    Show.show { t =>
+      Cord("Table(") ++ t.name.show ++ Cord(", ") ++ t.query.show ++ Cord(")")
+    }
+}
