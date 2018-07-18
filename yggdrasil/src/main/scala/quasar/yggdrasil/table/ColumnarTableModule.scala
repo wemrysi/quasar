@@ -199,14 +199,11 @@ object ColumnarTableModule extends Logging {
           val schemaRender =
             CharBuffer.wrap(schemaRenders.mkString("", ",", "\r\n"))
 
-          val headRender =
-            StreamT.fromIterable(head.renderCsv(schema, assumeHomogeneous)).trans(λ[Id ~> IO](IO.pure(_)))
-
-          val tailRender = tail flatMap { slice =>
+          val bodyRender = (head :: tail) flatMap { slice =>
             StreamT.fromIterable(slice.renderCsv(schema, assumeHomogeneous)).trans(λ[Id ~> IO](IO.pure(_)))
           }
 
-          schemaRender :: headRender ++ tailRender
+          schemaRender :: bodyRender
 
         case None => StreamT.empty[IO, CharBuffer]
       }
