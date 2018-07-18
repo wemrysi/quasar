@@ -75,7 +75,7 @@ object ColumnarTableModule extends Logging {
   // from being marked unused.
   private val idInstance: Int = idInstance + 1
 
-  def renderJson(slices: StreamT[IO, Slice], prefix: String, delimiter: String, suffix: String): StreamT[IO, CharBuffer] = {
+  def renderJson(slices: StreamT[IO, Slice], prefix: String, delimiter: String, suffix: String, precise: Boolean): StreamT[IO, CharBuffer] = {
     def wrap(stream: StreamT[IO, CharBuffer]) = {
       if (prefix == "" && suffix == "") stream
       else if (suffix == "") CharBuffer.wrap(prefix) :: stream
@@ -86,7 +86,7 @@ object ColumnarTableModule extends Logging {
     def foldFlatMap(slices: StreamT[IO, Slice], rendered: Boolean): StreamT[IO, CharBuffer] = {
       StreamT[IO, CharBuffer](slices.step map {
         case StreamT.Yield(slice, tail) =>
-          val (seq, rendered2) = slice.renderJson(delimiter)
+          val (seq, rendered2) = slice.renderJson(delimiter, precise)
           val stream = StreamT.fromIterable(seq).trans(λ[Id ~> IO](IO.pure(_)))
 
           val stream2 = if (rendered && rendered2)
@@ -199,14 +199,11 @@ object ColumnarTableModule extends Logging {
           val schemaRender =
             CharBuffer.wrap(schemaRenders.mkString("", ",", "\r\n"))
 
-          val headRender =
-            StreamT.fromIterable(head.renderCsv(schema, assumeHomogeneous)).trans(λ[Id ~> IO](IO.pure(_)))
-
-          val tailRender = tail flatMap { slice =>
+          val bodyRender = (head :: tail) flatMap { slice =>
             StreamT.fromIterable(slice.renderCsv(schema, assumeHomogeneous)).trans(λ[Id ~> IO](IO.pure(_)))
           }
 
-          schemaRender :: headRender ++ tailRender
+          schemaRender :: bodyRender
 
         case None => StreamT.empty[IO, CharBuffer]
       }
@@ -1975,8 +1972,8 @@ trait ColumnarTableModule
       collectSchemas(Set.empty, slices)
     }
 
-    def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[IO, CharBuffer] =
-      ColumnarTableModule.renderJson(slices, prefix, delimiter, suffix)
+    def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = "", precise: Boolean = false): StreamT[IO, CharBuffer] =
+      ColumnarTableModule.renderJson(slices, prefix, delimiter, suffix, precise)
 
     def renderCsv(assumeHomogeneous: Boolean): StreamT[IO, CharBuffer] =
       ColumnarTableModule.renderCsv(slices, assumeHomogeneous)

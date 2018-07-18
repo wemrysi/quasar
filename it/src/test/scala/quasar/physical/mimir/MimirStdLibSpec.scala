@@ -114,12 +114,12 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     cake.Table.constString(Set("")).transform(transSpec)
 
   private def dataToTransSpec(data: Data): cake.trans.TransSpec1 = {
-    val rvalue: Option[RValue] = MapFuncCorePlanner.dataToRValue(data)
+    val rvalue: Option[RValue] = RValue.fromData(data)
     rvalue.map(cake.trans.transRValue(_, cake.trans.TransSpec1.Id)).getOrElse(cake.trans.TransSpec1.Undef)
   }
 
   private def actual(table: cake.Table): List[Data] = {
-    table.toJson.map(_.toList.map(MapFuncCorePlanner.rValueToData)).unsafeRunSync
+    table.toJson.map(_.toList.map(RValue.toData)).unsafeRunSync
   }
 
   def runner = new MapFuncStdLibTestRunner {
