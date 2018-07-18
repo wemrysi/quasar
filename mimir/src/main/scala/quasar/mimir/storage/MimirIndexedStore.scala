@@ -26,7 +26,6 @@ import quasar.yggdrasil.vfs.ResourceError
 
 import cats.{Applicative, Monad, Show}
 import cats.effect.LiftIO
-import cats.instances.string._
 import cats.syntax.applicative._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
@@ -42,24 +41,22 @@ final class MimirIndexedStore[F[_]: LiftIO: Monad] private (
     precog: Cake,
     tablesPrefix: ADir)(
     implicit ME: MonadError_[F, ResourceError])
-    extends IndexedStore[F, String, RValue] {
+    extends IndexedStore[F, StoreKey, RValue] {
 
   import precog.trans.constants._
 
-  val entries: Stream[F, (String, RValue)] =
+  val entries: Stream[F, (StoreKey, RValue)] =
     for {
       rpaths <- Stream.eval(precog.vfs.ls(tablesPrefix).to[F])
-
       rpath <- Stream.emits(rpaths).covary[F]
-
       rfile <- Stream.emit(Path.refineType(rpath).toOption).unNone.covary[F]
 
-      s = Path.fileName(rfile).value
+      k = StoreKey(Path.fileName(rfile).value)
 
-      v <- Stream.eval(lookup(s)).unNone
-    } yield (s, v)
+      v <- Stream.eval(lookup(k)).unNone
+    } yield (k, v)
 
-  def lookup(s: String): F[Option[RValue]] = {
+  def lookup(k: StoreKey): F[Option[RValue]] = {
     def headValue(t: precog.Table): F[Option[RValue]] =
       for {
         firstSlice <-
@@ -74,7 +71,7 @@ final class MimirIndexedStore[F[_]: LiftIO: Monad] private (
       } yield firstValue
 
     val loaded =
-      precog.Table.constString(Set(keyFileStr(s)))
+      precog.Table.constString(Set(keyFileStr(k)))
         .load(JType.JUniverseT)
         .run.to[F]
 
@@ -87,21 +84,21 @@ final class MimirIndexedStore[F[_]: LiftIO: Monad] private (
     }
   }
 
-  def insert(s: String, v: RValue): F[Unit] =
+  def insert(k: StoreKey, v: RValue): F[Unit] =
     ME.unattempt(precog.ingest(
-      PrecogPath(keyFileStr(s)),
+      PrecogPath(keyFileStr(k)),
       Stream.emit(v.toJValue)).run.to[F])
 
-  def delete(s: String): F[Unit] =
-    precog.vfs.delete(keyFile(s)).void.to[F]
+  def delete(k: StoreKey): F[Unit] =
+    precog.vfs.delete(keyFile(k)).void.to[F]
 
   ////
 
-  private def keyFile(s: String): AFile =
-    tablesPrefix </> Path.file(s)
+  private def keyFile(k: StoreKey): AFile =
+    tablesPrefix </> Path.file(k.value)
 
-  private def keyFileStr(s: String): String =
-    Path.posixCodec.printPath(keyFile(s))
+  private def keyFileStr(k: StoreKey): String =
+    Path.posixCodec.printPath(keyFile(k))
 }
 
 object MimirIndexedStore {
@@ -109,17 +106,17 @@ object MimirIndexedStore {
       precog: Cake,
       tablesPrefix: ADir)(
       implicit ME: MonadError_[F, ResourceError])
-      : IndexedStore[F, String, RValue] =
+      : IndexedStore[F, StoreKey, RValue] =
     new MimirIndexedStore[F](precog, tablesPrefix)
 
   def transformIndex[F[_]: Monad, I, V](
-      s: IndexedStore[F, String, V],
+      s: IndexedStore[F, StoreKey, V],
       indexName: String,
-      prism: Prism[String, I])(
+      prism: Prism[StoreKey, I])(
       implicit ME: MonadError_[F, ResourceError])
       : IndexedStore[F, I, V] =
     IndexedStore.xmapIndexF(s)(
-      decodeP[F, String, I](indexName, prism))(
+      decodeP[F, StoreKey, I](indexName, prism))(
       i => prism(i).pure[F])
 
   def transformValue[F[_]: Monad, I, V](

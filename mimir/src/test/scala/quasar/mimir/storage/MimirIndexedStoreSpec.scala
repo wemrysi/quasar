@@ -31,10 +31,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import cats.effect.IO
 import monocle.Prism
 import pathy.Path._
-import scalaz.std.string._
 import shims._
 
-final class MimirIndexedStoreSpec extends IndexedStoreSpec[IO, String, RValue] {
+final class MimirIndexedStoreSpec extends IndexedStoreSpec[IO, StoreKey, RValue] {
   implicit val ioMonadResourceError: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](Prism.partial[Throwable, ResourceError] {
       case e: RuntimeException => ResourceError.corrupt(e.getMessage)
@@ -52,12 +51,12 @@ final class MimirIndexedStoreSpec extends IndexedStoreSpec[IO, String, RValue] {
 
   val emptyStore =
     IO(Random.nextInt(100000)) map { i =>
-      MimirIndexedStore(
+      MimirIndexedStore[IO](
         P.unsafeValue,
         rootDir </> dir("store") </> dir(i.toString))
     }
 
-  val freshIndex = IO(Random.alphanumeric.take(8).mkString)
+  val freshIndex = IO(StoreKey(Random.alphanumeric.take(8).mkString))
 
   val valueA = RValue.rObject(Map(("value", RValue.rNum(42))))
 
