@@ -23,7 +23,7 @@ import org.scalacheck._, Arbitrary.arbitrary
 trait DatasourceConfigGenerator {
   import DatasourceTypeGenerator._
 
-  implicit def dataSourceConfigArbitrary[C: Arbitrary]: Arbitrary[DatasourceConfig[C]] =
+  implicit def datasourceConfigArbitrary[C: Arbitrary]: Arbitrary[DatasourceConfig[C]] =
     Arbitrary(for {
       tpe <- arbitrary[DatasourceType]
       c   <- arbitrary[C]

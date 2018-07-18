@@ -40,13 +40,13 @@ import scalaz.\/
 import ByNeedDatasource.NeedState
 
 final class ByNeedDatasource[F[_], G[_], Q, R] private (
-    dataSourceType: DatasourceType,
+    datasourceType: DatasourceType,
     mvar: mutable.Queue[F, NeedState[F, Datasource[F, G, Q, R]]],
     scheduler: Scheduler)(
     implicit F: MonadError[F, Throwable])
     extends Datasource[F, G, Q, R] {
 
-  val kind: DatasourceType = dataSourceType
+  val kind: DatasourceType = datasourceType
 
   val shutdown: F[Unit] =
     for {

@@ -107,7 +107,7 @@ final class FederatedShiftedReadPlanner[
 
   private def tableFromStream(s: Stream[IO, Data]): F[P.Table] = {
     val dataToRValue: Data => RValue =
-      d => MapFuncCorePlanner.dataToRValue(d).getOrElse(sys.error("There is no representation of CUndefined in SlamDB as a value"))
+      d => RValue.fromData(d).getOrElse(sys.error("There is no representation of CUndefined in SlamDB as a value"))
 
     for {
       // TODO{fs2}: Chunkiness
