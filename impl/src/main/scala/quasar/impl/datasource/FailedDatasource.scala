@@ -28,11 +28,11 @@ final class FailedDatasource[
     E,
     F[_]: Applicative: MonadError_[?[_], E],
     G[_], Q, R] private (
-    dataSourceType: DatasourceType,
+    datasourceType: DatasourceType,
     error: E)
     extends Datasource[F, G, Q, R] {
 
-  val kind: DatasourceType = dataSourceType
+  val kind: DatasourceType = datasourceType
 
   val shutdown: F[Unit] = Applicative[F].point(())
 

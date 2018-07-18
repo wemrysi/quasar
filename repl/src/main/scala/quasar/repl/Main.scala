@@ -52,7 +52,7 @@ object Main extends StreamApp[IO] {
   def repl(q: Quasar[IO, IO]): IO[ExitCode] =
     for {
       ref <- Ref[IO, ReplState](ReplState.mk)
-      repl <- Repl.mk[IO, IO](ref, q.dataSources, q.queryEvaluator)
+      repl <- Repl.mk[IO, IO](ref, q.datasources, q.queryEvaluator)
       l <- repl.loop
     } yield l
 

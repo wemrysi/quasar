@@ -51,7 +51,7 @@ final class MimirDatasourceConfigsSpec extends DatasourceConfigsSpec[EitherT[IO,
     init.unsafeRunSync()
   }
 
-  val dataSourceConfigs =
+  val datasourceConfigs =
     EitherT.rightU[ResourceError](IO(UUID.randomUUID)) map { uuid =>
       MimirDatasourceConfigs[EitherT[IO, ResourceError, ?]](
         P.unsafeValue,

@@ -26,7 +26,7 @@ import eu.timepit.refined.scalacheck.numeric._
 import org.scalacheck.Gen
 
 trait DatasourceTypeGenerator {
-  implicit val dataSourceTypeArbitrary: Arbitrary[DatasourceType] =
+  implicit val datasourceTypeArbitrary: Arbitrary[DatasourceType] =
     Arbitrary(for {
       name <- genName
       ver  <- chooseRefinedNum[Refined, Long, RPositive](1L, 100L)

@@ -39,19 +39,19 @@ final class DefaultDatasources[F[_]: Monad, C] private (
       onConflict: ConflictResolution)
       : F[Condition[CreateError[C]]] = {
 
-    val dataSourceConfig =
+    val datasourceConfig =
       DatasourceConfig(kind, config)
 
     lookupConfig(name) flatMap { r =>
       if (r.isRight && onConflict === ConflictResolution.Preserve)
         Condition.abnormal[CreateError[C]](DatasourceExists(name)).point[F]
       else
-        control.init(name, dataSourceConfig) flatMap {
+        control.init(name, datasourceConfig) flatMap {
           case Condition.Abnormal(e) =>
             Condition.abnormal[CreateError[C]](e).point[F]
 
           case Condition.Normal() =>
-            configs.add(name, dataSourceConfig)
+            configs.add(name, datasourceConfig)
               .as(Condition.normal[CreateError[C]]())
         }
     }
