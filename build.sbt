@@ -34,7 +34,8 @@ lazy val buildSettings = Seq(
     Wart.PublicInference,       // - creates many compile errors when enabled - needs to be enabled incrementally
     Wart.ImplicitParameter,     // - creates many compile errors when enabled - needs to be enabled incrementally
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
-    Wart.Nothing),              // - see wartremover/wartremover#263
+    Wart.Nothing,               // - see wartremover/wartremover#263
+    Wart.NonUnitStatements),    // better-monadic-for causes some spurious warnings from this
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive", "showtimes")),
   // Exclusive tests include only those tagged with 'exclusive'.
@@ -42,7 +43,15 @@ lazy val buildSettings = Seq(
 
   logBuffered in Test := isTravisBuild.value,
 
-  console := { (console in Test).value }) // console alias test:console
+  console := { (console in Test).value },
+
+  /*
+   * This plugin fixes a number of problematic cases in the for-comprehension
+   * desugaring. Notably, it eliminates a non-tail-recursive case which causes
+   * Slice#allFromRValues to not free memory, so it's not just a convenience or
+   * an optimization.
+   */
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4")) // console alias test:console
 
 val targetSettings = Seq(
   target := {
