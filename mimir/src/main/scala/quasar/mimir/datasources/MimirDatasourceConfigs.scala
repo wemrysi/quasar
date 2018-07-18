@@ -20,7 +20,7 @@ import slamdata.Predef.{Boolean, Map, Option, Unit}
 
 import quasar.api.ResourceName
 import quasar.api.datasource.DatasourceType
-import quasar.blueeyes.json.{JValue, JUndefined}
+import quasar.blueeyes.json.JValue
 import quasar.contrib.fs2.convert
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.MonadError_
@@ -28,7 +28,7 @@ import quasar.fp.numeric.Positive
 import quasar.impl.datasources.{DatasourceConfig, DatasourceConfigs}
 import quasar.mimir.MimirCake.Cake
 import quasar.mimir.slicesToStream
-import quasar.precog.common.{Path => PrecogPath, _}
+import quasar.precog.common.{CUndefined, Path => PrecogPath, _}
 import quasar.yggdrasil.bytecode.{JObjectFixedT, JType, JTextT, JNumberT}
 import quasar.yggdrasil.table.Slice
 import quasar.yggdrasil.vfs.ResourceError
@@ -183,7 +183,7 @@ final class MimirDatasourceConfigs[
 
     loadValues(JType.JUniverseT) map { t =>
       slicesToStream(t.transform(Filter(TransSpec1.Id, tspec)).slices)
-        .filter(_ =/= JUndefined)
+        .filter(_ =/= CUndefined).map(_.toJValue)
     }
   }
 }

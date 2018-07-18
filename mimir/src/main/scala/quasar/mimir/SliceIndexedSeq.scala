@@ -17,29 +17,29 @@
 package quasar.mimir
 
 import slamdata.Predef.{IndexedSeq, Int}
-import quasar.blueeyes.json.JValue
+import quasar.precog.common.RValue
 import quasar.yggdrasil.table.Slice
 
 import scalaz.syntax.bifunctor._
 import scalaz.std.tuple._
 
-final class SliceIndexedSeq private (slice: Slice) extends IndexedSeq[JValue] {
+final class SliceIndexedSeq private (slice: Slice) extends IndexedSeq[RValue] {
   val length: Int = slice.size
 
-  def apply(idx: Int): JValue =
-    slice.toJValue(idx)
+  def apply(idx: Int): RValue =
+    slice.toRValue(idx)
 
-  override def drop(n: Int): IndexedSeq[JValue] =
+  override def drop(n: Int): IndexedSeq[RValue] =
     SliceIndexedSeq(slice.drop(n))
 
-  override def take(n: Int): IndexedSeq[JValue] =
+  override def take(n: Int): IndexedSeq[RValue] =
     SliceIndexedSeq(slice.take(n))
 
-  override def splitAt(n: Int): (IndexedSeq[JValue], IndexedSeq[JValue]) =
+  override def splitAt(n: Int): (IndexedSeq[RValue], IndexedSeq[RValue]) =
     slice.split(n).umap(SliceIndexedSeq(_))
 }
 
 object SliceIndexedSeq {
-  def apply(slice: Slice): IndexedSeq[JValue] =
+  def apply(slice: Slice): IndexedSeq[RValue] =
     new SliceIndexedSeq(slice)
 }

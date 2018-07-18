@@ -16,12 +16,12 @@
 
 package quasar
 
-import quasar.blueeyes.json.JValue
 import quasar.contrib.fs2.convert
 import quasar.contrib.iota.SubInject
 import quasar.contrib.pathy.AFile
 import quasar.fp.Injectable
 import quasar.qscript._
+import quasar.precog.common.RValue
 import quasar.yggdrasil.table.Slice
 
 import fs2.{Chunk, Stream}
@@ -48,6 +48,6 @@ package object mimir {
   implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], CopK[MimirQScriptCP[T], ?]] =
     Injectable.inject[Const[ShiftedRead[AFile], ?], CopK[MimirQScriptCP[T], ?]]
 
-  def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, JValue] =
+  def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, RValue] =
     convert.fromChunkedStreamT(slices.map(s => Chunk.indexedSeq(SliceIndexedSeq(s))))
 }

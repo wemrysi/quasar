@@ -49,7 +49,7 @@ trait TablePagerModule extends ColumnarTableModule {
           flag <- IO(running.get())
 
           _ <- if (flag && !slice.isEmpty) {
-            val json = slice.toJsonElements.map(JValue.toData)
+            val json = slice.toRJsonElements.map(MapFuncCorePlanner.rValueToData)
 
             if (json.isEmpty)
               IO.pure(())
