@@ -30,7 +30,7 @@ import quasar.fp.numeric._
 import quasar.fs.Planner.PlannerErrorME
 import quasar.mimir
 import quasar.mimir.MimirCake._
-import quasar.precog.common.CUndefined
+import quasar.precog.common.{CUndefined, RValue}
 import quasar.qscript._
 import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
 
@@ -89,7 +89,7 @@ final class MimirQScriptEvaluator[
     mimir.slicesToStream(repr.table.slices)
       // TODO{fs2}: Chunkiness
       .mapSegments(s =>
-        s.filter(_ != CUndefined).map(mimir.MapFuncCorePlanner.rValueToData).force.toChunk.toSegment)
+        s.filter(_ != CUndefined).map(RValue.toData).force.toChunk.toSegment)
       .right[ReadError]
       .point[M]
 
