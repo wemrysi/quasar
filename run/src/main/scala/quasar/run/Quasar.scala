@@ -52,7 +52,7 @@ import scalaz.syntax.invariantFunctor._
 import shims._
 
 final class Quasar[F[_], G[_]](
-    val dataSources: Datasources[F, Json],
+    val datasources: Datasources[F, Json],
     val queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]])
 
 object Quasar {
@@ -106,7 +106,7 @@ object Quasar {
 
       (mgmt, running) = mr
 
-      dataSources = DefaultDatasources(configs, mgmt, mgmt)
+      datasources = DefaultDatasources(configs, mgmt, mgmt)
 
       federation = MimirQueryFederation[Fix, F](precog)
 
@@ -121,6 +121,6 @@ object Quasar {
       queryEvaluator =
         Sql2QueryEvaluator(FederatingQueryEvaluator(federation, sources))
 
-    } yield new Quasar(dataSources, queryEvaluator)
+    } yield new Quasar(datasources, queryEvaluator)
   }
 }

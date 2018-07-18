@@ -57,7 +57,7 @@ final class MimirDatasourceConfigs[
     val namedCfg =
       RValue.rField(NameField)
         .set(Some(CString(name.value)))
-        .apply(dataSourceConfigP(config))
+        .apply(datasourceConfigP(config))
 
     absorbError(for {
       noName <- without(name.wrapNel)
@@ -113,7 +113,7 @@ final class MimirDatasourceConfigs[
 
       cfg <- rval traverse { v =>
         ME.unattempt_(
-          dataSourceConfigP
+          datasourceConfigP
             .getOption(v)
             .toRightDisjunction(ResourceError.corrupt("Malformed data source config: " + v)))
       }
@@ -206,7 +206,7 @@ object MimirDatasourceConfigs extends Logging {
       : DatasourceConfigs[F, RValue] =
     new MimirDatasourceConfigs[F](precog, tableLoc)
 
-  val dataSourceConfigP: Prism[RValue, DatasourceConfig[RValue]] = {
+  val datasourceConfigP: Prism[RValue, DatasourceConfig[RValue]] = {
     def fromRValue(rv: RValue): Option[DatasourceConfig[RValue]] =
       for {
         name <-
@@ -256,7 +256,7 @@ object MimirDatasourceConfigs extends Logging {
               .composePrism(RValue.rString)
               .getOption(rvalue)
 
-          cfg <- dataSourceConfigP.getOption(rvalue)
+          cfg <- datasourceConfigP.getOption(rvalue)
         } yield (ResourceName(name), cfg)
 
         pair <- maybePair match {
