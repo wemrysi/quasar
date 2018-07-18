@@ -1000,6 +1000,11 @@ abstract class Slice { source =>
     // faster caches
     val size = this.size
 
+    // the goal here is to fill in empty values wherever we get an unknown column from a previous slice
+    val DummyColumn = new NullColumn {
+      def isDefinedAt(row: Int) = false
+    }
+
     /*
      * In the arrays below, use the scalar case of the union if
      * assumeHomogeneous = true, since we're assuming that we can't
@@ -1018,7 +1023,7 @@ abstract class Slice { source =>
     // Column | Array[Column]
     val columns: Array[AnyRef] = headers map { refs =>
       if (assumeHomogeneous)
-        this.columns(refs.head)
+        this.columns.getOrElse(refs.head, DummyColumn)
       else
         refs.flatMap(this.columns.get(_)).toArray
     } toArray

@@ -88,7 +88,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
       ("readChunkSizeBytes" := 65535) ->:
       jEmptyObject
 
-    _ <- Stream.eval(q.dataSources.add(
+    _ <- Stream.eval(q.datasources.add(
       ResourceName("local"),
       LocalType,
       localCfg,

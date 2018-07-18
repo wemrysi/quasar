@@ -32,7 +32,7 @@ abstract class DatasourceConfigsSpec[F[_]: Monad, C: Arbitrary: Equal: Show]
     with ResourceNameGenerator
     with DatasourceConfigGenerator {
 
-  def dataSourceConfigs: F[DatasourceConfigs[F, C]]
+  def datasourceConfigs: F[DatasourceConfigs[F, C]]
 
   def run: F ~> Id
 
@@ -40,7 +40,7 @@ abstract class DatasourceConfigsSpec[F[_]: Monad, C: Arbitrary: Equal: Show]
   implicit val params = Parameters(minTestsOk = 5)
 
   def withDatasourceConfigs[A](f: DatasourceConfigs[F, C] => F[A]): A =
-    run(dataSourceConfigs flatMap f)
+    run(datasourceConfigs flatMap f)
 
   "add" >> {
     "creates new config" >> prop { (n: ResourceName, c: DatasourceConfig[C]) =>
