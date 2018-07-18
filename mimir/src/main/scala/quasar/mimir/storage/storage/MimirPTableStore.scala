@@ -20,8 +20,10 @@ import slamdata.Predef._
 
 import quasar.contrib.fs2.convert._
 import quasar.contrib.pathy.{ADir, AFile}
+import quasar.contrib.scalaz.MonadError_
 import quasar.mimir.MimirCake.Cake
 import quasar.yggdrasil.ExactSize
+import quasar.yggdrasil.vfs.ResourceError
 import quasar.niflheim.NIHDB
 import quasar.yggdrasil.nihdb.NIHDBProjection
 
@@ -32,7 +34,7 @@ import fs2.Stream
 
 import pathy.Path
 
-import scalaz.{Monad, OptionT}
+import scalaz.{-\/, \/-, Monad, OptionT}
 import scalaz.syntax.monad._
 
 import shims._
@@ -44,7 +46,8 @@ import shims._
  */
 final class MimirPTableStore[F[_]: Monad: LiftIO] private (
     val cake: Cake,
-    tablesPrefix: ADir) {
+    tablesPrefix: ADir)(
+    implicit ME: MonadError_[F, ResourceError]) {
 
   import cake.{Table => PTable}
 
@@ -72,13 +75,19 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
   }
 
   def read(key: StoreKey): F[Option[PTable]] = {
-    val ioaOpt: OptionT[IO, PTable] = for {
-      // this just swallows error messages; should probably log them or something
-      db <- OptionT(cake.openDB(keyToFile(key)).run.map(_.flatMap(_.toOption)))
-      proj <- NIHDBProjection.wrap(db).liftM[OptionT]
+    val ioaOpt: OptionT[F, PTable] = for {
+      dbOr <- cake.openDB(keyToFile(key)).mapT(LiftIO[F].liftIO(_))
+
+      db <- dbOr match {
+        case \/-(db) => db.point[OptionT[F, ?]]
+        case -\/(ResourceError.NotFound(_)) => OptionT.none[F, NIHDB]
+        case -\/(err) => ME.raiseError(err).liftM[OptionT]
+      }
+
+      proj <- LiftIO[F].liftIO(NIHDBProjection.wrap(db)).liftM[OptionT]
     } yield PTable(proj.getBlockStream(None), ExactSize(proj.length))
 
-    LiftIO[F].liftIO(ioaOpt.run)
+    ioaOpt.run
   }
 
   def exists(key: StoreKey): F[Boolean] =
@@ -95,6 +104,9 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
 
 object MimirPTableStore {
 
-  def apply[F[_]: Monad: LiftIO](cake: Cake, tablesPrefix: ADir): MimirPTableStore[F] =
+  def apply[F[_]: Monad: LiftIO: MonadError_[?[_], ResourceError]](
+      cake: Cake,
+      tablesPrefix: ADir)
+      : MimirPTableStore[F] =
     new MimirPTableStore[F](cake, tablesPrefix)
 }
