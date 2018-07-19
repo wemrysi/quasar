@@ -85,7 +85,10 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
       }
 
       proj <- LiftIO[F].liftIO(NIHDBProjection.wrap(db)).liftM[OptionT]
-    } yield PTable(proj.getBlockStream(None), ExactSize(proj.length))
+      table = PTable(proj.getBlockStream(None), ExactSize(proj.length))
+
+      back = table.transform(cake.trans.constants.SourceValue.Single)
+    } yield back
 
     ioaOpt.run
   }
