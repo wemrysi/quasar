@@ -16,7 +16,7 @@
 
 package quasar.impl.storage
 
-import slamdata.Predef.{Option, Unit}
+import slamdata.Predef.{Boolean, Option, Unit}
 import quasar.higher.HFunctor
 
 import cats.arrow.FunctionK
@@ -35,8 +35,10 @@ trait IndexedStore[F[_], I, V] {
     */
   def insert(i: I, v: V): F[Unit]
 
-  /** Remove any value associated with the specified index. */
-  def delete(i: I): F[Unit]
+  /** Remove any value associated with the specified index, returning whether
+    * it existed.
+    */
+  def delete(i: I): F[Boolean]
 }
 
 object IndexedStore extends IndexedStoreInstances {
@@ -56,7 +58,7 @@ object IndexedStore extends IndexedStoreInstances {
       def insert(j: J, v: V): F[Unit] =
         s.insert(g(j), v)
 
-      def delete(j: J): F[Unit] =
+      def delete(j: J): F[Boolean] =
         s.delete(g(j))
     }
 
@@ -79,7 +81,7 @@ object IndexedStore extends IndexedStoreInstances {
       def insert(j: J, v: V): F[Unit] =
         F.bind(g(j))(s.insert(_, v))
 
-      def delete(j: J): F[Unit] =
+      def delete(j: J): F[Boolean] =
         F.bind(g(j))(s.delete)
     }
 
@@ -102,7 +104,7 @@ object IndexedStore extends IndexedStoreInstances {
       def insert(i: I, v: B): F[Unit] =
         F.bind(g(v))(s.insert(i, _))
 
-      def delete(i: I): F[Unit] =
+      def delete(i: I): F[Boolean] =
         s.delete(i)
     }
 }
@@ -121,7 +123,7 @@ sealed abstract class IndexedStoreInstances {
           def insert(i: I, v: V): B[Unit] =
             f(fa.insert(i, v))
 
-          def delete(i: I): B[Unit] =
+          def delete(i: I): B[Boolean] =
             f(fa.delete(i))
         }
     }
@@ -139,7 +141,7 @@ sealed abstract class IndexedStoreInstances {
           def insert(i: I, v: B): F[Unit] =
             fa.insert(i, g(v))
 
-          def delete(i: I): F[Unit] =
+          def delete(i: I): F[Boolean] =
             fa.delete(i)
         }
     }

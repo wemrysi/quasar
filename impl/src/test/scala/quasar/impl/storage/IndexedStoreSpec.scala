@@ -106,12 +106,12 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
     }
 
     "remove" >> {
-      "no-op when key does not exist" >>* {
+      "false when key does not exist" >>* {
         for {
           store <- emptyStore
           i <- freshIndex
-          _ <- store.delete(i)
-        } yield ok
+          d <- store.delete(i)
+        } yield d must beFalse
       }
 
       "lookup no longer returns value" >>* {
@@ -120,10 +120,11 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
           i <- freshIndex
           _ <- store.insert(i, valueA)
           vBefore <- store.lookup(i)
-          _ <- store.delete(i)
+          d <- store.delete(i)
           vAfter <- store.lookup(i)
         } yield {
           vBefore must_= Some(valueA)
+          d must beTrue
           vAfter must beNone
         }
       }
@@ -140,13 +141,14 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
 
           esBefore <- store.entries.compile.toList
 
-          _ <- store.delete(ia)
+          d <- store.delete(ia)
 
           esAfter <- store.entries.compile.toList
 
           vs = List((ia, valueA), (ib, valueB))
         } yield {
           esBefore must containTheSameElementsAs(vs)
+          d must beTrue
           esAfter must containTheSameElementsAs(vs.drop(1))
         }
       }
