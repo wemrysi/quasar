@@ -148,6 +148,22 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
     } yield disj.map(n => (blob, version, n))
   }
 
+  /**
+   * Closes the database and removes it from the internal state. This doesn't
+   * remove the dataset from disk.
+   */
+  def closeDB(path: AFile): IO[Unit] = {
+    val back = for {
+      blob <- OptionT(vfs.readPath(path))
+      head <- OptionT(vfs.headOfBlob(blob))
+      db <- OptionT(IO(Option(dbs.get((blob, head)))))
+      _ <- IO.fromFuture(IO(db.close)).liftM[OptionT]
+      _ <- IO(dbs.remove((blob, head), db)).liftM[OptionT]
+    } yield ()
+
+    back.run.map(_ => ())
+  }
+
   def commitDB(blob: Blob, version: Version, db: NIHDB): IO[Unit] = {
     // last-wins semantics
     lazy val replaceM: OptionT[IO, Unit] = for {
