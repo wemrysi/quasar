@@ -86,6 +86,40 @@ object MimirPTableStoreSpec extends EffectfulQSpec[IO] {
       }
     }
 
+    "write repeatedly and then read back last results" >>* {
+      val firstTestData = CLong(1)
+
+      val testData = RObject(
+        "foo" -> CLong(42),
+        "bar" -> CString("hi!"),
+        "baz" -> RObject(
+          "qux" -> CDouble(3.14)))
+
+      val key = StoreKey("key1")
+
+      for {
+        store <- EmptyStore
+        _ <- store.write(key, store.cake.Table.fromRValues(Stream(firstTestData))).compile.drain
+        _ <- store.write(key, store.cake.Table.fromRValues(Stream(testData))).compile.drain
+        readBack <- store.read(key)
+        rvaluesOpt <- readBack.traverse(_.toJson)
+      } yield {
+        val results = rvaluesOpt.toIterable.flatten
+
+        results must haveSize(1)
+        results must contain(testData)
+      }
+    }
+
+    "fail read on a non-existent key" >>* {
+      val key = StoreKey("key1")
+
+      for {
+        store <- EmptyStore
+        check <- store.read(key).map(a => a: Option[AnyRef])    // workaround for scalac's failure to unify an existential type
+      } yield check must beNone
+    }
+
     "fail existence on a non-existent key" >>* {
       val key = StoreKey("key1")
 
