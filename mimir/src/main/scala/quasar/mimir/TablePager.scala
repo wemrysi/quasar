@@ -17,7 +17,7 @@
 package quasar.mimir
 
 import quasar.Data
-import quasar.blueeyes.json.JValue
+import quasar.precog.common.RValue
 import quasar.yggdrasil.table.{ColumnarTableModule, Slice}
 
 import cats.effect.IO
@@ -49,7 +49,7 @@ trait TablePagerModule extends ColumnarTableModule {
           flag <- IO(running.get())
 
           _ <- if (flag && !slice.isEmpty) {
-            val json = slice.toJsonElements.map(JValue.toData)
+            val json = slice.toRJsonElements.map(RValue.toData)
 
             if (json.isEmpty)
               IO.pure(())

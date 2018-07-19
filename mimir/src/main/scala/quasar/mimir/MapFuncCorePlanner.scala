@@ -49,7 +49,7 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Constant(ejson) =>
         // EJson => Data => RValue => Table
         val data: Data = ejson.cata(Data.fromEJson)
-        val rvalue = MapFuncCorePlanner.dataToRValue(data)
+        val rvalue = RValue.fromData(data)
         rvalue.map(transRValue(_, id)).getOrElse(undefined(id)).point[F]
 
       case MapFuncsCore.JoinSideName(_) => ??? // should never be received
@@ -273,54 +273,4 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         (Cond(IsType(src, JType.fromType(tpe)), a2, a3): TransSpec[A]).point[F]
     }
   }
-}
-
-object MapFuncCorePlanner {
-
-  import scalaz.syntax.std.option._
-  import scalaz.syntax.functor._
-  import scalaz.std.option._
-  def dataToRValue(data: Data): Option[RValue] = data match {
-    case Data.Arr(d) => RArray(d.flatMap(dataToRValue)).some
-    case Data.Obj(o) => RObject(o.flatMap { case (k, v) => dataToRValue(v).strengthL(k) }).some
-    case Data.Null => CNull.some
-    case Data.Bool(b) => CBoolean(b).some
-    case Data.Str(s) => CString(s).some
-    case Data.Dec(k) => CNum(k).some
-    case Data.Int(k) =>
-      (if (k.isValidLong) CLong(k.toLong) else CNum(BigDecimal(k))).some
-    case Data.OffsetDateTime(v) => COffsetDateTime(v).some
-    case Data.OffsetDate(v) => COffsetDate(v).some
-    case Data.OffsetTime(v) => COffsetTime(v).some
-    case Data.LocalDateTime(v) => CLocalDateTime(v).some
-    case Data.LocalDate(v) => CLocalDate(v).some
-    case Data.LocalTime(v) => CLocalTime(v).some
-    case Data.Interval(k) => CInterval(k).some
-    case Data.Binary(k) => CArray[Long](k.map(l => l.toLong).toArray).some
-    case Data.Id(s) => CString(s).some
-    case Data.NA => None
-  }
-
-  def rValueToData(rvalue: RValue): Data = rvalue match {
-    case RArray(a)           => Data.Arr(a.map(rValueToData))
-    case CArray(a, ty)       => Data.Arr(a.map(k => rValueToData(ty.elemType(k))).toList)
-    case RObject(a)          => Data.Obj(a.mapValues(rValueToData).toList: _*)
-    case CEmptyArray         => Data.Arr(Nil)
-    case CEmptyObject        => Data.Obj()
-    case CString(as)         => Data.Str(as)
-    case CBoolean(ab)        => Data.Bool(ab)
-    case CLong(al)           => Data.Int(BigInt(al))
-    case CDouble(ad)         => Data.Dec(BigDecimal(ad))
-    case CNum(an)            => Data.Dec(an)
-    case CLocalDateTime(ad)  => Data.LocalDateTime(ad)
-    case CLocalDate(ad)      => Data.LocalDate(ad)
-    case CLocalTime(ad)      => Data.LocalTime(ad)
-    case COffsetDateTime(ad) => Data.OffsetDateTime(ad)
-    case COffsetDate(ad)     => Data.OffsetDate(ad)
-    case COffsetTime(ad)     => Data.OffsetTime(ad)
-    case CInterval(ad)       => Data.Interval(ad)
-    case CUndefined          => Data.NA
-    case CNull               => Data.Null
-  }
-
 }

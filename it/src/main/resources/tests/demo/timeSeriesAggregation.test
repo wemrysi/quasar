@@ -1,8 +1,8 @@
 {
     "name": "time series aggregation",
     "backends": {
-        "lwc_local":"pendingIgnoreFieldOrder",
-        "mimir":"pendingIgnoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "smalltimeseries.data",
     "query": "

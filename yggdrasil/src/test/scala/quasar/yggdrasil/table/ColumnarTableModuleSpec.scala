@@ -17,7 +17,9 @@
 package quasar.yggdrasil
 package table
 
+import quasar.{Data, DataCodec, DataGenerators}
 import quasar.blueeyes._, json._
+import quasar.contrib.cats.effect.liftio._
 import quasar.precog.common._
 import quasar.pkg.tests._, Gen._
 import quasar.yggdrasil.bytecode.JType
@@ -82,9 +84,9 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     with ToArraySpec
     with SampleSpec
     with DistinctSpec
-    with SchemasSpec
-    { spec =>
+    with SchemasSpec { spec =>
 
+  import DataGenerators._
   import trans._
 
   def testConcat = {
@@ -154,6 +156,31 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     arrayM.unsafeRunSync mustEqual minimized
   }
 
+  def testRenderJsonPrecise(seq: List[Data]) = {
+    type XT[F[_], A] = WriterT[F, List[IO[Unit]], A]
+    type X[A] = XT[IO, A]
+
+    val eff = for {
+      table <-
+        Table.fromRValueStream[X](fs2.Stream(seq: _*).map(RValue.fromData).unNone.covary[IO])
+
+      jsonStr <- table.renderJson("[", ",", "]", precise = true).foldLeft("")(_ + _.toString).liftM[XT]
+    } yield jsonStr
+
+    val ioa = eff.run flatMap {
+      case (finalizers, result) =>
+        finalizers.sequence.as(result)
+    }
+
+    val jsonStr = ioa.unsafeRunSync
+
+    val parsed = argonaut.Parse.parse(jsonStr) flatMap { json =>
+      DataCodec.Precise.decode(json).leftMap(_.toString).toEither
+    }
+
+    parsed must beRight(Data.Arr(seq))
+  }
+
   def renderLotsToCsv(lots: Int, assumeHomogeneity: Boolean, maxSliceRows: Option[Int] = None) = {
     val event    = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.0}}"
     val events   = event * lots
@@ -192,11 +219,42 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
 
     "verify bijection from JSON" in checkMappings(this)
 
-    "verify renderJson round tripping" in {
+    "verify renderJson (readable) round tripping" in {
       implicit val gen = sample(schema)
 
       prop { data: SampleData =>
         testRenderJson(data.data.map(_.toJValueRaw))
+      }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
+    }
+
+    "verify renderJson (precise) round tripping" in {
+      def removal(data: Data): Option[Data] = data match {
+        case Data.Binary(_) =>
+          None
+
+        case Data.Id(_) =>
+          None
+
+        case Data.NA =>
+          None
+
+        case Data.Arr(values) =>
+          Some(Data.Arr(values.flatMap(removal)))
+
+        case Data.Obj(map) =>
+          val map2 = map flatMap {
+            case (key, value) => removal(value).map(key -> _)
+          }
+
+          Some(Data.Obj(map2))
+
+        case other => Some(other)
+      }
+
+      prop { data0: List[Data] =>
+        val data = data0.flatMap(removal)
+
+        testRenderJsonPrecise(data)
       }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
     }
 

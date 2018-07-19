@@ -172,12 +172,14 @@ trait TimeLibModule extends ColumnarTableLibModule {
         case c: StrColumn => new LocalDateColumn {
           def apply(row: Int) = JLocalDate.parse(c(row))
           def isDefinedAt(row: Int) = {
-            try {
-              JLocalDate.parse(c(row))
-              true
-            } catch { case (_: DateTimeParseException) =>
-              false
-            }
+            if (c.isDefinedAt(row)) {
+              try {
+                JLocalDate.parse(c(row))
+                true
+              } catch { case (_: DateTimeParseException) =>
+                false
+              }
+            } else false
           }
         }
       }
@@ -189,12 +191,14 @@ trait TimeLibModule extends ColumnarTableLibModule {
         case c: StrColumn => new LocalDateTimeColumn {
           def apply(row: Int) = JLocalDateTime.parse(c(row))
           def isDefinedAt(row: Int) = {
-            try {
-              JLocalDateTime.parse(c(row))
-              true
-            } catch { case (_: DateTimeParseException) =>
-              false
-            }
+            if (c.isDefinedAt(row)) {
+              try {
+                JLocalDateTime.parse(c(row))
+                true
+              } catch { case (_: DateTimeParseException) =>
+                false
+              }
+            } else false
           }
         }
       }
@@ -206,12 +210,14 @@ trait TimeLibModule extends ColumnarTableLibModule {
         case c: StrColumn => new LocalTimeColumn {
           def apply(row: Int) = JLocalTime.parse(c(row))
           def isDefinedAt(row: Int) = {
-            try {
-              JLocalTime.parse(c(row))
-              true
-            } catch { case (_: DateTimeParseException) =>
-              false
-            }
+            if (c.isDefinedAt(row)) {
+              try {
+                JLocalTime.parse(c(row))
+                true
+              } catch { case (_: DateTimeParseException) =>
+                false
+              }
+            } else false
           }
         }
       }
@@ -224,12 +230,14 @@ trait TimeLibModule extends ColumnarTableLibModule {
           new OffsetDateColumn {
             def apply(row: Int) = QOffsetDate.parse(c(row))
             def isDefinedAt(row: Int) = {
-              try {
-                QOffsetDate.parse(c(row))
-                true
-              } catch { case (_: DateTimeParseException) =>
-                false
-              }
+              if (c.isDefinedAt(row)) {
+                try {
+                  QOffsetDate.parse(c(row))
+                  true
+                } catch { case (_: DateTimeParseException) =>
+                  false
+                }
+              } else false
             }
           }
       }
@@ -241,12 +249,14 @@ trait TimeLibModule extends ColumnarTableLibModule {
         case c: StrColumn => new OffsetDateTimeColumn {
           def apply(row: Int) = JOffsetDateTime.parse(c(row))
           def isDefinedAt(row: Int) = {
-            try {
-              JOffsetDateTime.parse(c(row))
-              true
-            } catch { case (_: DateTimeParseException) =>
-              false
-            }
+            if (c.isDefinedAt(row)) {
+              try {
+                JOffsetDateTime.parse(c(row))
+                true
+              } catch { case (_: DateTimeParseException) =>
+                false
+              }
+            } else false
           }
         }
       }
@@ -258,12 +268,14 @@ trait TimeLibModule extends ColumnarTableLibModule {
         case c: StrColumn => new OffsetTimeColumn {
           def apply(row: Int) = JOffsetTime.parse(c(row))
           def isDefinedAt(row: Int) = {
-            try {
-              JOffsetTime.parse(c(row))
-              true
-            } catch { case (_: DateTimeParseException) =>
-              false
-            }
+            if (c.isDefinedAt(row)) {
+              try {
+                JOffsetTime.parse(c(row))
+                true
+              } catch { case (_: DateTimeParseException) =>
+                false
+              }
+            } else false
           }
         }
       }
@@ -274,7 +286,11 @@ trait TimeLibModule extends ColumnarTableLibModule {
       def f1: F1 = CF1P {
         case c: StrColumn => new IntervalColumn {
           def apply(row: Int) = DateTimeInterval.parse(c(row)).get
-          def isDefinedAt(row: Int) = DateTimeInterval.parse(c(row)).isDefined
+          def isDefinedAt(row: Int) = {
+            if (c.isDefinedAt(row)) {
+              DateTimeInterval.parse(c(row)).isDefined
+            } else false
+          }
         }
       }
       val tpe = UnaryOperationType(JTextT, JIntervalT)

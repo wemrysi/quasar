@@ -14,14 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.contrib.cats
 
-import java.time.OffsetDateTime
-import slamdata.Predef.{Product, Serializable}
+import quasar.contrib.scalaz.MonadState_
 
-sealed trait PreparationResult[I, A] extends Product with Serializable
+import cats.Applicative
+import cats.data.StateT
 
-object PreparationResult {
-  final case class Available[I, A](tableId: I, since: OffsetDateTime, value: A) extends PreparationResult[I, A]
-  final case class Unavailable[I, A](tableId: I) extends PreparationResult[I, A]
+object stateT {
+  implicit def catsStateTMonadState_[F[_]: Applicative, S]: MonadState_[StateT[F, S, ?], S] =
+    new MonadState_[StateT[F, S, ?], S] {
+      def get = StateT.get[F, S]
+      def put(s: S) = StateT.set[F, S](s)
+    }
 }

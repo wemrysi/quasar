@@ -23,6 +23,7 @@ import quasar.contrib.fs2.convert.toStreamT
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fs._
+import quasar.precog.common.RValue
 import quasar.mimir.MimirCake._
 import quasar.qscript._
 import quasar.yggdrasil.UnknownSize
@@ -82,7 +83,7 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                           val slices = stream.chunks.map { ch =>
                             Slice.fromRValues(
                               ch.toList.toStream.map(data =>
-                                MapFuncCorePlanner.dataToRValue(data)
+                                RValue.fromData(data)
                                   .getOrElse(sys.error("no representation for Data.NA in SlamEngine as a constant"))))
                           }.translate(Lambda[FunctionK[Task, IO]](_.to[IO]))
 

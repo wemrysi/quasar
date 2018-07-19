@@ -16,6 +16,7 @@
 
 package quasar.yggdrasil.table
 
+import quasar.DataCodec
 import quasar.blueeyes._, json._
 import quasar.precog._
 import quasar.precog.common._
@@ -1210,8 +1211,8 @@ abstract class Slice { source =>
     ctx.toSeq()
   }
 
-  def renderJson(delimiter: String): (Seq[CharBuffer], Boolean) = {
-    sliceSchema match {
+  def renderJson(delimiter: String, precise: Boolean): (Seq[CharBuffer], Boolean) = {
+    sliceSchema.map(transformSchemaPrecise(precise)) match {
       case Some(schema) =>
         val depth = {
           def loop(schema: SchemaNode): Int = schema match {
@@ -1655,6 +1656,19 @@ abstract class Slice { source =>
     rec(0, Vector())
   }
 
+  def toRJsonElements: Vector[RValue] = {
+    @tailrec def rec(i: Int, acc: Vector[RValue]): Vector[RValue] = {
+      if (i < source.size) {
+        toRValue(i) match {
+          case CUndefined => rec(i + 1, acc)
+          case jv => rec(i + 1, acc :+ jv)
+        }
+      } else acc
+    }
+
+    rec(0, Vector())
+  }
+
   def toString(row: Int): Option[String] = {
     (columns.toList.sortBy(_._1) map { case (ref, col) => ref.toString + ": " + (if (col.isDefinedAt(row)) col.strValue(row) else "(undefined)") }) match {
       case Nil => None
@@ -1667,6 +1681,52 @@ abstract class Slice { source =>
   }
 
   override def toString = (0 until size).map(toString(_).getOrElse("")).mkString("\n", "\n", "\n")
+
+  private[this] def transformSchemaPrecise(precise: Boolean)(node: SchemaNode): SchemaNode = {
+    import DataCodec.PreciseKeys._
+
+    def inner(node: SchemaNode): SchemaNode = node match {
+      case obj @ SchemaNode.Obj(nodes) if obj.keys.exists(_.contains("$")) =>
+        SchemaNode.Obj(Map(ObjKey -> SchemaNode.Obj(nodes.mapValues(inner))))
+
+      case SchemaNode.Obj(nodes) =>
+        SchemaNode.Obj(nodes.mapValues(inner))
+
+      case SchemaNode.Arr(map) =>
+        SchemaNode.Arr(map.mapValues(inner))
+
+      case SchemaNode.Union(nodes) =>
+        SchemaNode.Union(nodes.map(inner))
+
+      case lf @ SchemaNode.Leaf(CLocalDateTime, col) =>
+        SchemaNode.Obj(Map(LocalDateTimeKey -> lf))
+
+      case lf @ SchemaNode.Leaf(CLocalDate, col) =>
+        SchemaNode.Obj(Map(LocalDateKey -> lf))
+
+      case lf @ SchemaNode.Leaf(CLocalTime, col) =>
+        SchemaNode.Obj(Map(LocalTimeKey -> lf))
+
+      case lf @ SchemaNode.Leaf(COffsetDateTime, col) =>
+        SchemaNode.Obj(Map(OffsetDateTimeKey -> lf))
+
+      case lf @ SchemaNode.Leaf(COffsetDate, col) =>
+        SchemaNode.Obj(Map(OffsetDateKey -> lf))
+
+      case lf @ SchemaNode.Leaf(COffsetTime, col) =>
+        SchemaNode.Obj(Map(OffsetTimeKey -> lf))
+
+      case lf @ SchemaNode.Leaf(CInterval, col) =>
+        SchemaNode.Obj(Map(IntervalKey -> lf))
+
+      case lf @ SchemaNode.Leaf(_, _) => lf
+    }
+
+    if (precise)
+      normalizeSchema(inner(node)).getOrElse(sys.error("weird failure in precise transform"))
+    else
+      node
+  }
 
   private[this] def sliceSchema: Option[SchemaNode] = {
     if (columns.isEmpty) {
@@ -1734,84 +1794,84 @@ abstract class Slice { source =>
         }
       }
 
-      def normalize(schema: SchemaNode): Option[SchemaNode] = schema match {
-        case SchemaNode.Obj(nodes) =>
-          val nodes2 = nodes flatMap {
-            case (key, value) => normalize(value) map { key -> _ }
-          }
-
-          val back =
-            if (nodes2.isEmpty)
-              None
-            else
-              Some(SchemaNode.Obj(nodes2))
-
-          back foreach { obj =>
-            obj.keys = new Array[String](nodes2.size)
-            obj.values = new Array[SchemaNode](nodes2.size)
-          }
-
-          var i = 0
-          back foreach { obj =>
-            for ((key, value) <- nodes2) {
-              obj.keys(i) = key
-              obj.values(i) = value
-              i += 1
-            }
-          }
-
-          back
-
-
-        case SchemaNode.Arr(map) =>
-          val map2 = map flatMap {
-            case (idx, value) => normalize(value) map { idx -> _ }
-          }
-
-          val back =
-            if (map2.isEmpty)
-              None
-            else
-              Some(SchemaNode.Arr(map2))
-
-          back foreach { arr =>
-            arr.nodes = new Array[SchemaNode](map2.size)
-          }
-
-          var i = 0
-          back foreach { arr =>
-            val values = map2.toSeq sortBy { _._1 } map { _._2 }
-
-            for (value <- values) {
-              arr.nodes(i) = value
-              i += 1
-            }
-          }
-
-          back
-
-        case SchemaNode.Union(nodes) =>
-          val nodes2 = nodes flatMap normalize
-
-          if (nodes2.isEmpty)
-            None
-          else if (nodes2.size == 1)
-            nodes2.headOption
-          else {
-            val union = SchemaNode.Union(nodes2)
-            union.possibilities = nodes2.toArray
-            Some(union)
-          }
-
-        case lf: SchemaNode.Leaf => Some(lf)
-      }
-
       val schema = columns.foldLeft(SchemaNode.Union(Set()): SchemaNode) {
         case (acc, (ref, col)) => insert(acc, ref, col)
       }
 
-      normalize(schema)
+      normalizeSchema(schema)
     }
+  }
+
+  private[this] def normalizeSchema(schema: SchemaNode): Option[SchemaNode] = schema match {
+    case SchemaNode.Obj(nodes) =>
+      val nodes2 = nodes flatMap {
+        case (key, value) => normalizeSchema(value) map { key -> _ }
+      }
+
+      val back =
+        if (nodes2.isEmpty)
+          None
+        else
+          Some(SchemaNode.Obj(nodes2))
+
+      back foreach { obj =>
+        obj.keys = new Array[String](nodes2.size)
+        obj.values = new Array[SchemaNode](nodes2.size)
+      }
+
+      var i = 0
+      back foreach { obj =>
+        for ((key, value) <- nodes2) {
+          obj.keys(i) = key
+          obj.values(i) = value
+          i += 1
+        }
+      }
+
+      back
+
+
+    case SchemaNode.Arr(map) =>
+      val map2 = map flatMap {
+        case (idx, value) => normalizeSchema(value) map { idx -> _ }
+      }
+
+      val back =
+        if (map2.isEmpty)
+          None
+        else
+          Some(SchemaNode.Arr(map2))
+
+      back foreach { arr =>
+        arr.nodes = new Array[SchemaNode](map2.size)
+      }
+
+      var i = 0
+      back foreach { arr =>
+        val values = map2.toSeq sortBy { _._1 } map { _._2 }
+
+        for (value <- values) {
+          arr.nodes(i) = value
+          i += 1
+        }
+      }
+
+      back
+
+    case SchemaNode.Union(nodes) =>
+      val nodes2 = nodes.flatMap(normalizeSchema)
+
+      if (nodes2.isEmpty)
+        None
+      else if (nodes2.size == 1)
+        nodes2.headOption
+      else {
+        val union = SchemaNode.Union(nodes2)
+        union.possibilities = nodes2.toArray
+        Some(union)
+      }
+
+    case lf: SchemaNode.Leaf => Some(lf)
   }
 }
 

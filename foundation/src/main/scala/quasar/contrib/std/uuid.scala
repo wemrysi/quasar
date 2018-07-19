@@ -14,14 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.contrib.std
 
-import java.time.OffsetDateTime
-import slamdata.Predef.{Product, Serializable}
+import java.util.UUID
 
-sealed trait PreparationResult[I, A] extends Product with Serializable
+import scalaz.{Order, Ordering, Show}
 
-object PreparationResult {
-  final case class Available[I, A](tableId: I, since: OffsetDateTime, value: A) extends PreparationResult[I, A]
-  final case class Unavailable[I, A](tableId: I) extends PreparationResult[I, A]
+object uuid {
+
+  implicit val uuidOrder: Order[UUID] = new Order[UUID] {
+    def order(x: UUID, y: UUID): Ordering =
+      Ordering.fromInt(x.compareTo(y))
+  }
+
+  implicit val showUUID: Show[UUID] = Show.showFromToString
 }

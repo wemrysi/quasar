@@ -55,6 +55,7 @@ trait QuasarSpecification extends AnyRef
 
   implicit class Specs2ScalazOps[A : Equal : Show](lhs: A) {
     def must_=(rhs: A) = lhs must equal(rhs)
+    def must_!=(rhs: A) = lhs must not(equal(rhs))
   }
 
   /** Allows marking non-deterministically failing tests as such,

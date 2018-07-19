@@ -14,14 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.mimir.storage
 
-import java.time.OffsetDateTime
-import slamdata.Predef.{Product, Serializable}
+import slamdata.Predef.String
 
-sealed trait PreparationResult[I, A] extends Product with Serializable
+import scalaz.{Order, Show}
+import scalaz.std.string._
 
-object PreparationResult {
-  final case class Available[I, A](tableId: I, since: OffsetDateTime, value: A) extends PreparationResult[I, A]
-  final case class Unavailable[I, A](tableId: I) extends PreparationResult[I, A]
+final case class StoreKey(value: String)
+
+object StoreKey {
+  implicit val order: Order[StoreKey] =
+    Order.orderBy(_.value)
+
+  implicit val show: Show[StoreKey] =
+    Show.shows(_.value)
 }

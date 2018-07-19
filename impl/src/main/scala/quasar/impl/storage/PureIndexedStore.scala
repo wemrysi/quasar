@@ -14,14 +14,28 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.impl.storage
 
-import java.time.OffsetDateTime
-import slamdata.Predef.{Product, Serializable}
+import quasar.contrib.scalaz.MonadState_
 
-sealed trait PreparationResult[I, A] extends Product with Serializable
+import fs2.Stream
+import scalaz.{IMap, Monad, Order}
 
-object PreparationResult {
-  final case class Available[I, A](tableId: I, since: OffsetDateTime, value: A) extends PreparationResult[I, A]
-  final case class Unavailable[I, A](tableId: I) extends PreparationResult[I, A]
+/** An indexed store backed by an immutable map. */
+object PureIndexedStore {
+  def apply[F[_]: Monad, I: Order, V](implicit F: MonadState_[F, IMap[I, V]])
+      : IndexedStore[F, I, V] =
+    new IndexedStore[F, I, V] {
+      val entries =
+        Stream.eval(F.get).flatMap(m => Stream.emits(m.toList))
+
+      def lookup(i: I) =
+        F.gets(_.lookup(i))
+
+      def insert(i: I, v: V) =
+        F.modify(_.insert(i, v))
+
+      def delete(i: I) =
+        F.modify(_.delete(i))
+    }
 }

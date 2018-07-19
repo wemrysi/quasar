@@ -301,7 +301,7 @@ trait TableModule extends TransSpecModule {
 
     def schemas: IO[Set[JType]]
 
-    def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[IO, CharBuffer]
+    def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = "", precise: Boolean = false): StreamT[IO, CharBuffer]
 
     def renderCsv(assumeHomogeneous: Boolean): StreamT[IO, CharBuffer]
 

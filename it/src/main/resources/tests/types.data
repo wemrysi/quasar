@@ -1,20 +1,20 @@
-{ "foo": 11 }
-{ "foo": 1.12345 }
-{ "foo": "13" }
-{ "foo": "zap" }
-{ "foo": true }
-{ "foo": false }
-{ "foo": null }
-{ "foo": { "$offsetdatetime": "2009-02-13T23:31:30.011+12:15:18" } }
-{ "foo": { "$offsetdate": "2009-02-13+12:15:18" } }
-{ "foo": { "$offsettime": "23:31:30.011+12:15:18" } }
-{ "foo": { "$localdatetime" : "2009-02-13T23:31:30.011" } }
-{ "foo": { "$localdate" : "2009-02-13" } }
-{ "foo": { "$localtime" : "23:31:30.011" } }
-{ "foo": { "$interval" : "P7DT12H34M" } }
-{ "foo": [] }
-{ "foo": {} }
-{ "foo": [15, [{ "baz": ["quux"] }]] }
-{ "foo": { "bar": 15, "baz": ["qx"] } }
-{ "bar": 123 }
-{ "baz": "xyz" }
+{ "num": 1, "foo": 11 }
+{ "num": 2, "foo": 1.12345 }
+{ "num": 3, "foo": "13" }
+{ "num": 4, "foo": "zap" }
+{ "num": 5, "foo": true }
+{ "num": 6, "foo": false }
+{ "num": 7, "foo": null }
+{ "num": 8, "foo": { "$offsetdatetime": "2009-02-13T23:31:30.011+12:15:18" } }
+{ "num": 9, "foo": { "$offsetdate": "2009-02-13+12:15:18" } }
+{ "num": 10, "foo": { "$offsettime": "23:31:30.011+12:15:18" } }
+{ "num": 11, "foo": { "$localdatetime" : "2009-02-13T23:31:30.011" } }
+{ "num": 12, "foo": { "$localdate" : "2009-02-13" } }
+{ "num": 13, "foo": { "$localtime" : "23:31:30.011" } }
+{ "num": 14, "foo": { "$interval" : "P7DT12H34M" } }
+{ "num": 15, "foo": [] }
+{ "num": 16, "foo": {} }
+{ "num": 17, "foo": [15, [{ "baz": ["quux"] }]] }
+{ "num": 18, "foo": { "bar": 15, "baz": ["qx"] } }
+{ "num": 19, "bar": 123 }
+{ "num": 20, "baz": "xyz" }
