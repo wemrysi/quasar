@@ -1656,6 +1656,19 @@ abstract class Slice { source =>
     rec(0, Vector())
   }
 
+  def toRJsonElements: Vector[RValue] = {
+    @tailrec def rec(i: Int, acc: Vector[RValue]): Vector[RValue] = {
+      if (i < source.size) {
+        toRValue(i) match {
+          case CUndefined => rec(i + 1, acc)
+          case jv => rec(i + 1, acc :+ jv)
+        }
+      } else acc
+    }
+
+    rec(0, Vector())
+  }
+
   def toString(row: Int): Option[String] = {
     (columns.toList.sortBy(_._1) map { case (ref, col) => ref.toString + ": " + (if (col.isDefinedAt(row)) col.strValue(row) else "(undefined)") }) match {
       case Nil => None

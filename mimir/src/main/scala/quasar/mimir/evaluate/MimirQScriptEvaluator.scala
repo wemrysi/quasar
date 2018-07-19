@@ -20,7 +20,6 @@ import slamdata.Predef._
 
 import quasar._
 import quasar.api.ResourceError.ReadError
-import quasar.blueeyes.json.{JValue, JUndefined}
 import quasar.connector.QScriptEvaluator
 import quasar.contrib.cats.effect._
 import quasar.contrib.iota._
@@ -31,6 +30,7 @@ import quasar.fp.numeric._
 import quasar.fs.Planner.PlannerErrorME
 import quasar.mimir
 import quasar.mimir.MimirCake._
+import quasar.precog.common.{CUndefined, RValue}
 import quasar.qscript._
 import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
 
@@ -89,7 +89,7 @@ final class MimirQScriptEvaluator[
     mimir.slicesToStream(repr.table.slices)
       // TODO{fs2}: Chunkiness
       .mapSegments(s =>
-        s.filter(_ != JUndefined).map(JValue.toData).force.toChunk.toSegment)
+        s.filter(_ != CUndefined).map(RValue.toData).force.toChunk.toSegment)
       .right[ReadError]
       .point[M]
 
