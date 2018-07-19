@@ -54,7 +54,7 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
   // has overwrite semantics
   def write(key: StoreKey, table: PTable): Stream[F, Unit] = {
     val ios = Stream.bracket(cake.createDB(keyToFile(key)).map(_.toOption))({
-      case Some((blob, version, db)) =>
+      case Some((_, _, db)) =>
         fromStreamT(table.slices).zipWithIndex evalMap {
           case (slice, offset) =>
             val jvs = slice.toJsonElements
