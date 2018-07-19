@@ -359,6 +359,30 @@ trait TimeLibModule extends ColumnarTableLibModule {
     val TruncWeek = Trunc(TemporalPart.Week)
     val TruncYear = Trunc(TemporalPart.Year)
 
+    val ToTimestamp = new Op1F1 {
+      def f1: F1 = CF1P {
+        case c: DoubleColumn =>
+          new Map1Column(c) with OffsetDateTimeColumn {
+            def apply(row: Int) = {
+              time.epochMilliToOffsetDateTime(c(row).longValue)
+            }
+          }
+        case c: LongColumn =>
+          new Map1Column(c) with OffsetDateTimeColumn {
+            def apply(row: Int) = {
+              time.epochMilliToOffsetDateTime(c(row))
+            }
+          }
+        case c: NumColumn =>
+          new Map1Column(c) with OffsetDateTimeColumn {
+            def apply(row: Int) = {
+              time.epochMilliToOffsetDateTime(c(row).longValue)
+            }
+          }
+      }
+      val tpe = UnaryOperationType(JNumberT, JOffsetDateTimeT)
+    }
+
     val TimeOfDay = new Op1F1 {
       def f1: F1 = CF1P {
         case c: LocalDateTimeColumn =>

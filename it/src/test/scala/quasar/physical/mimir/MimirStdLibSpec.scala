@@ -84,7 +84,6 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     case MapFuncsCore.NowTime() => notImplemented.left
     case MapFuncsCore.NowDate() => notImplemented.left
     case MapFuncsCore.CurrentTimeZone() => notImplemented.left
-    case MapFuncsCore.ToTimestamp(_) => notImplemented.left
     case MapFuncsCore.ToLocal(_) => notImplemented.left
     case MapFuncsCore.Interval(_) => notImplemented.left
     case MapFuncsCore.Negate(_) => notImplemented.left // TODO this isn't passing because -Long.MinValue == Long.MinValue, so basically a limitation in ColumnarTable
