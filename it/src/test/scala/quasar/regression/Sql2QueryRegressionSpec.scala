@@ -18,8 +18,7 @@ package quasar.regression
 
 import slamdata.Predef._
 import quasar._
-import quasar.api._
-import quasar.api.datasource.ConflictResolution
+import quasar.api.datasource._
 import quasar.build.BuildInfo
 import quasar.common.PhaseResults
 import quasar.contrib.argonaut._
@@ -36,6 +35,7 @@ import quasar.fs.FileSystemType
 import quasar.impl.datasource.local.LocalType
 import quasar.impl.external.ExternalConfig
 import quasar.run.{Quasar, QuasarError, SqlQuery}
+import quasar.run.implicits._
 import quasar.sql.Query
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -44,6 +44,7 @@ import scala.util.matching.Regex
 
 import java.math.{MathContext, RoundingMode}
 import java.nio.file.{Files, Path => JPath, Paths}
+import java.util.UUID
 
 import argonaut._, Argonaut._
 import cats.effect.{Effect, IO, Sync, Timer}
@@ -69,7 +70,11 @@ final class Sql2QueryRegressionSpec extends Qspec {
   implicit val ioQuasarError: MonadError_[IO, QuasarError] =
     MonadError_.facet[IO](QuasarError.throwableP)
 
-  val DataDir = rootDir[Sandboxed] </> dir("local")
+  implicit val streamQuasarError: MonadError_[Stream[IO, ?], QuasarError] =
+    MonadError_.facet[Stream[IO, ?]](QuasarError.throwableP)
+
+  def DataDir(id: UUID) =
+    rootDir[Sandboxed] </> dir("datasource") </> dir(id.toString)
 
   /** A name to identify the suite in test output. */
   val suiteName: String = "SQL^2 Regression Queries"
@@ -88,12 +93,16 @@ final class Sql2QueryRegressionSpec extends Qspec {
       ("readChunkSizeBytes" := 65535) ->:
       jEmptyObject
 
-    _ <- Stream.eval(q.datasources.add(
-      ResourceName("local"),
-      LocalType,
-      localCfg,
-      ConflictResolution.Preserve))
-  } yield q
+    localRef =
+      DatasourceRef(LocalType, DatasourceName("local"), localCfg)
+
+    r <- Stream.eval(q.datasources.addDatasource(localRef))
+
+    i <- r.fold(
+      e => MonadError_[Stream[IO, ?], DatasourceError.CreateError[Json]].raiseError(e),
+      i => Stream.emit(i).covary[IO])
+
+  } yield (q, i)
 
   val lwcLocalConfigs =
     TestConfig.fileSystemConfigs(FileSystemType("lwc_local")).to[IO]
@@ -104,19 +113,17 @@ final class Sql2QueryRegressionSpec extends Qspec {
     lwcLocalConfigs.map(_.isEmpty).ifM(
       IO(suiteName >> skipped("to run, enable the 'lwc_local' test configuration.")),
       for {
-        qdef <- Promise.empty[IO, Quasar[IO, IO]]
+        tdef <- Promise.empty[IO, (Quasar[IO], UUID)]
         sdown <- Promise.empty[IO, Unit]
 
         tests <- regressionTests[IO](TestsRoot, TestDataRoot)
 
-        _ <- Q.evalMap(q => qdef.complete(q) *> sdown.get).compile.drain.start
-        q <- qdef.get
+        _ <- Q.evalMap(t => tdef.complete(t) *> sdown.get).compile.drain.start
+        t <- tdef.get
+        (q, i) = t
 
-        f = (squery: SqlQuery) =>
-          Stream.eval(q.queryEvaluator.evaluate(squery))
-            .flatMap(_.valueOr(err =>
-              Stream.raiseError(new RuntimeException(err.shows)).covary[IO]))
-
+        f = (squery: UUID => SqlQuery) =>
+          Stream.force(q.queryEvaluator.evaluate(squery(i)))
       } yield {
         suiteName >> {
           tests.toList foreach { case (loc, test) =>
@@ -136,14 +143,14 @@ final class Sql2QueryRegressionSpec extends Qspec {
       loc: RFile,
       test: RegressionTest,
       backendName: BackendName,
-      results: SqlQuery => Stream[IO, Data])
+      results: (UUID => SqlQuery) => Stream[IO, Data])
       : Fragment = {
     def runTest: execute.Result = {
-      val query =
+      val query = (id: UUID) =>
         SqlQuery(
           Query(test.query),
           Variables.fromMap(test.variables),
-          test.data.nonEmpty.fold(DataDir </> fileParent(loc), rootDir))
+          test.data.nonEmpty.fold(DataDir(id) </> fileParent(loc), rootDir))
 
       verifyResults(test.expected, results(query), backendName)
         .timed(2.minutes)

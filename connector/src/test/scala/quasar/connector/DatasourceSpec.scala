@@ -16,16 +16,13 @@
 
 package quasar.connector
 
-import slamdata.Predef.{Either, List, String, Throwable}
+import slamdata.Predef.List
 import quasar.EffectfulQSpec
 import quasar.common.resource._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import cats.effect.{Effect, IO}
-import fs2.async.Promise
-import org.specs2.execute.AsResult
-import org.specs2.specification.core.Fragment
+import cats.effect.Effect
 import scalaz.Scalaz._
 import shims._
 

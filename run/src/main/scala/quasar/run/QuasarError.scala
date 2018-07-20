@@ -18,10 +18,11 @@ package quasar.run
 
 import slamdata.Predef.{Exception, Product, Serializable, Throwable}
 import quasar.api.datasource.DatasourceError.CreateError
+import quasar.common.resource.ResourceError
 import quasar.compile.SemanticErrors
 import quasar.fs.Planner.PlannerError
 import quasar.sql.ParsingError
-import quasar.yggdrasil.vfs.ResourceError
+import quasar.yggdrasil.vfs.{ResourceError => MimirResourceError}
 
 import argonaut.Json
 import monocle.Prism
@@ -31,9 +32,10 @@ sealed abstract trait QuasarError extends Product with Serializable
 object QuasarError {
   final case class Compiling(errors: SemanticErrors) extends QuasarError
   final case class Connecting(error: CreateError[Json]) extends QuasarError
+  final case class Evaluating(error: ResourceError) extends QuasarError
   final case class Parsing(error: ParsingError) extends QuasarError
   final case class Planning(error: PlannerError) extends QuasarError
-  final case class Storing(error: ResourceError) extends QuasarError
+  final case class Storing(error: MimirResourceError) extends QuasarError
 
   val compiling: Prism[QuasarError, SemanticErrors] =
     Prism.partial[QuasarError, SemanticErrors] {
@@ -45,6 +47,11 @@ object QuasarError {
       case Connecting(err) => err
     } (Connecting(_))
 
+  val evaluating: Prism[QuasarError, ResourceError] =
+    Prism.partial[QuasarError, ResourceError] {
+      case Evaluating(err) => err
+    } (Evaluating(_))
+
   val parsing: Prism[QuasarError, ParsingError] =
     Prism.partial[QuasarError, ParsingError] {
       case Parsing(err) => err
@@ -55,8 +62,8 @@ object QuasarError {
       case Planning(err) => err
     } (Planning(_))
 
-  val storing: Prism[QuasarError, ResourceError] =
-    Prism.partial[QuasarError, ResourceError] {
+  val storing: Prism[QuasarError, MimirResourceError] =
+    Prism.partial[QuasarError, MimirResourceError] {
       case Storing(err) => err
     } (Storing(_))
 

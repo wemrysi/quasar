@@ -36,10 +36,9 @@ object Sql2QueryEvaluator {
   def apply[
     T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
     F[_]: Monad: MonadQuasarErr: PhaseResultTell,
-    G[_],
     R](
-    qScriptEvaluator: QueryEvaluator[F, G, T[QScriptEducated[T, ?]], R])
-    : QueryEvaluator[F, G, SqlQuery, R] =
+    qScriptEvaluator: QueryEvaluator[F, T[QScriptEducated[T, ?]], R])
+    : QueryEvaluator[F, SqlQuery, R] =
   QueryEvaluator.mapEval(qScriptEvaluator) { eval => squery =>
     sql2ToQScript[T, F](squery) >>= eval
   }
