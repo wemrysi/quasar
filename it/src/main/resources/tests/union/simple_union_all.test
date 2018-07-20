@@ -1,0 +1,21 @@
+{
+  "name": "[qa_s06] simple union all",
+
+  "backends": {
+    "mongodb_3_4_13": "pending",
+    "mongodb_3_6":    "pending"
+  },
+
+  "data": ["simple_union.data", "simple_union2.data"],
+
+  "query": "select * from (select * from `simple_union.data` union all select * from `simple_union2.data`) order by b",
+
+  "predicate": "exactly",
+
+  "expected": [
+    {"a": "1", "b": 1},
+    {"a": "1", "b": 1},
+    {"a": "2", "b": 2},
+    {"a": "3", "b": 3}
+  ]
+}

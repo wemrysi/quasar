@@ -1,0 +1,51 @@
+{
+  "name": "[qa_s06] multiple union alls merging fields of different types",
+
+  "backends": {
+    "lwc_local":      "ignoreFieldOrder",
+    "mimir":          "ignoreFieldOrder",
+    "mongodb_3_4_13": "pending",
+    "mongodb_3_6":    "pending"
+  },
+
+  "data": ["../largeZips.data", "../zips.data", "../smallZips.data"],
+
+  "query": "select city as f1, loc as f2 from `../largeZips.data` union all select state as f1, pop as f2 from `../zips.data` union all select `_id` as f1, state as f2 from `../smallZips.data`",
+
+  "predicate": "atLeast",
+
+  "ignoreResultOrder": true,
+
+  "expected": [
+    { "f1": "CUSHMAN", "f2": [ -72.51565, 42.377017 ] },
+    { "f1": "CHICOPEE", "f2": [ -72.576142, 42.176443 ] },
+    { "f1": "HOLYOKE", "f2": [ -72.626193, 42.202007 ] },
+    { "f1": "FLORENCE", "f2": [ -72.654245, 42.324662 ] },
+    { "f1": "MONTGOMERY", "f2": [ -72.754318, 42.129484 ] },
+    { "f1": "WEST SPRINGFIELD", "f2": [ -72.641109, 42.115066 ] },
+    { "f1": "SPRINGFIELD", "f2": [ -72.558432, 42.085314 ] },
+    { "f1": "SPRINGFIELD", "f2": [ -72.554349, 42.114455 ] },
+    { "f1": "PITTSFIELD", "f2": [ -73.247088, 42.453086 ] },
+    { "f1": "FITCHBURG", "f2": [ -71.803133, 42.579563 ] },
+    { "f1": "MA", "f2": 15338 },
+    { "f1": "MA", "f2": 36963 },
+    { "f1": "MA", "f2": 4546 },
+    { "f1": "MA", "f2": 10579 },
+    { "f1": "MA", "f2": 1240 },
+    { "f1": "MA", "f2": 3706 },
+    { "f1": "MA", "f2": 1688 },
+    { "f1": "MA", "f2": 177 },
+    { "f1": "MA", "f2": 23396 },
+    { "f1": "MA", "f2": 31495 },
+    { "f1": "01001", "f2": "MA" },
+    { "f1": "01002", "f2": "MA" },
+    { "f1": "01005", "f2": "MA" },
+    { "f1": "01007", "f2": "MA" },
+    { "f1": "01008", "f2": "MA" },
+    { "f1": "01010", "f2": "MA" },
+    { "f1": "01011", "f2": "MA" },
+    { "f1": "01012", "f2": "MA" },
+    { "f1": "01013", "f2": "MA" },
+    { "f1": "01020", "f2": "MA" }
+  ]
+}

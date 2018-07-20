@@ -1,0 +1,16 @@
+{
+  "name": "[qa_s06] union all merging 1 field",
+
+  "backends": {
+  },
+
+  "data": [ "simple_union.data", "simple_union2.data" ],
+
+  "query": "select a from `simple_union.data` union all select b from `simple_union2.data`",
+
+  "predicate": "exactly",
+
+  "ignoreResultOrder": true,
+
+  "expected": [ "1", "2", 1, 3 ]
+}

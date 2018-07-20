@@ -1,0 +1,51 @@
+{
+  "name": "[qa_s06] union all on heterogeneous data",
+
+  "backends": {
+    "lwc_local":      "ignoreFieldOrder",
+    "mimir":          "pendingIgnoreFieldOrder",
+    "mongodb_3_4_13": "pending",
+    "mongodb_3_6":    "pending"
+  },
+
+  "data": ["../heterogeneous.data", "../types.data"],
+
+  "query": "select a as num, b from `../heterogeneous.data` union all select num + 10 as num, foo as b from `../types.data`",
+
+  "predicate": "exactly",
+
+  "ignoreResultOrder": true,
+
+  "expected": [
+    { "num": 1, "b": { "y": 21, "x": 42 } },
+    { "num": 2, "b": [ "u", "v" ] },
+    { "num": 3, "b": {  } },
+    { "num": 4, "b": [] },
+    { "num": 5, "b": { "z": "string" } },
+    { "num": 6, "b": [ "w" ] },
+    { "num": 7, "b": "string" },
+    { "num": 8, "b": null },
+    { "num": 9, "b": { "e": { "n": 1 }, "f": null, "i": [], "g": "foo", "h": {  }, "d": [ 1, 2, 3 ] } },
+    { "num": 10, "b": [ [ 4, 5, 6 ], { "m": 1 }, null, "foo", {  }, [] ] },
+    { "num": 11, "b": 11 },
+    { "num": 12, "b": 1.12345 },
+    { "num": 13, "b": "13" },
+    { "num": 14, "b": "zap" },
+    { "num": 15, "b": true },
+    { "num": 16, "b": false },
+    { "num": 17, "b": null },
+    { "num": 18, "b": { "$offsetdatetime": "2009-02-13T23:31:30.011000000+12:15:18" } },
+    { "num": 19, "b": { "$offsetdate": "2009-02-13+12:15:18" } },
+    { "num": 20, "b": { "$offsettime": "23:31:30.011000000+12:15:18" } },
+    { "b": { "$localdatetime": "2009-02-13T23:31:30.011000000" }, "num": 21 },
+    { "num": 22, "b": { "$localdate": "2009-02-13" } },
+    { "num": 23, "b": { "$localtime": "23:31:30.011000000" } },
+    { "num": 24, "b": { "$interval": "P7DT12H34M" } },
+    { "num": 25, "b": [] },
+    { "num": 26, "b": {  } },
+    { "num": 27, "b": [ 15, [ { "baz": [ "quux" ] } ] ] },
+    { "num": 28, "b": { "baz": [ "qx" ], "bar": 15 } },
+    { "num": 29 },
+    { "num": 30 }
+  ]
+}

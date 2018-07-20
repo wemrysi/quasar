@@ -1,0 +1,25 @@
+{
+  "name": "[qa_s06] union all on heterogeneous data with filter",
+
+  "backends": {
+    "lwc_local":      "ignoreFieldOrder",
+    "mimir":          "pendingIgnoreFieldOrder",
+    "mongodb_3_4_13": "pending",
+    "mongodb_3_6":    "pending"
+  },
+
+  "data": ["../heterogeneous.data", "../types.data"],
+
+  "query": "select a as num, b from `../heterogeneous.data` where a < 3 union all select num + 10 as num, foo as b from `../types.data` where type_of(foo) = \"string\"",
+
+  "predicate": "exactly",
+
+  "ignoreResultOrder": true,
+
+  "expected": [
+    { "num": 1, "b": { "y": 21, "x": 42 } },
+    { "num": 2, "b": [ "u", "v" ] },
+    { "num": 13, "b": "13" },
+    { "num": 14, "b": "zap" }
+  ]
+}

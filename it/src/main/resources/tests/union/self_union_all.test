@@ -1,0 +1,21 @@
+{
+  "name": "[qa_s06] select all self union all",
+
+  "backends": {
+    "mongodb_3_4_13": "pending",
+    "mongodb_3_6":    "pending"
+  },
+
+  "data": "simple_union.data",
+
+  "query": "select * from (select * from `simple_union.data` union all select * from `simple_union.data`) order by a",
+
+  "predicate": "exactly",
+
+  "expected": [
+    {"a": "1", "b": 1},
+    {"a": "1", "b": 1},
+    {"a": "2", "b": 2},
+    {"a": "2", "b": 2}
+  ]
+}
