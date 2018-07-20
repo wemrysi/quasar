@@ -2118,17 +2118,14 @@ object Slice {
 
     def rec(next: ArraySliced[RValue], values: fs2.Stream[F, RValue]): fs2.Pull[F, Slice, Unit] =
       if (next.size == 0) {
-        for {
-          uncons <- values.pull.unconsChunk
-          _ <- uncons match {
-            case Some((chunk, next)) =>
-              val chunkArr = chunk.toArray
-              rec(ArraySliced(chunkArr, 0, chunkArr.length), next)
-            case None                =>
-              // println("Finished top-level loop")
-              fs2.Pull.done
-          }
-        } yield ()
+        values.pull.unconsChunk flatMap {
+          case Some((chunk, next)) =>
+            val chunkArr = chunk.toArray
+            rec(ArraySliced(chunkArr, 0, chunkArr.length), next)
+          case None =>
+            // println("Finished top-level loop")
+            fs2.Pull.done
+        }
       } else {
         // println(s"extracting slice from data with size ${next.size}")
         val (nextSlice, remainingData) = Slice.fromRValuesStep(next, maxRowsC, maxColumnsC, Config.defaultMinRows)
