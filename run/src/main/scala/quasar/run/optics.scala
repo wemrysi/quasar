@@ -61,7 +61,7 @@ object optics {
             .composePrism(cfgP)
             .getOption(rv)
 
-        tname <- refineV[DatasourceType.NameP](name).toOption
+        tname <- refineV[DatasourceType.NameP](kind).toOption
 
         tver <- Positive(ver.longValue)
 

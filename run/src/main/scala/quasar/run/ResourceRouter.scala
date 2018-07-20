@@ -17,7 +17,7 @@
 package quasar.run
 
 import slamdata.Predef._
-import quasar.common.resource.{ResourceName, ResourcePath}
+import quasar.common.resource._
 import quasar.contrib.cats.effect._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.std.uuid._
@@ -33,9 +33,7 @@ import cats.effect.{Effect, IO}
 import cats.syntax.applicative._
 import cats.syntax.functor._
 import fs2.Stream
-import pathy.Path
 import scalaz.~>
-import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.syntax.foldable._
 
@@ -54,18 +52,12 @@ object ResourceRouter {
           fa.to[IO].map(_.translate(λ[FunctionK[F, IO]](_.to[IO])))
       }
 
-    val segments =
-      Path.flatten[List[String]](Nil, Nil, Nil, List(_), List(_), file).fold
-
-    segments match {
-      case DatasourceResourcePrefix :: UuidString(id) :: tail =>
+    ResourcePath.leaf(file) match {
+      case DatasourceResourcePrefix /: UuidString(id) /: qaPath =>
         datasources.map(_.lookup(id) map { d =>
           val qa = d.unsafeValue.fold[QueryAssociate[T, IO]](
             lw => QueryAssociate.lightweight(f => resultsToIO(lw.evaluate(f))),
             hw => QueryAssociate.heavyweight(q => resultsToIO(hw.evaluate(q))))
-
-          val qaPath =
-            tail.foldLeft(ResourcePath.root())((p, s) => p / ResourceName(s))
 
           Source(qaPath, qa)
         })

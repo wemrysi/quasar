@@ -37,6 +37,7 @@ object Command {
   private val HelpPattern                  = "(?i)(?:help)|(?:commands)|\\?".r
   private val CdPattern                    = "(?i)cd(?: +(.+))?".r
   private val LsPattern                    = "(?i)ls(?: +(.+))?".r
+  private val PwdPattern                   = "(?i)pwd".r
   private val SetPhaseFormatPattern        = "(?i)(?:set +)?phaseFormat *= *(tree|code)".r
   private val SetTimingFormatPattern       = "(?i)(?:set +)?timingFormat *= *(tree|onlytotal)".r
   private val DebugPattern                 = "(?i)(?:set +)?debug *= *(0|1|2)".r
@@ -54,6 +55,7 @@ object Command {
   final case object Exit extends Command
   final case object Help extends Command
   final case object ListVars extends Command
+  final case object Pwd extends Command
   final case class Cd(dir: ReplPath) extends Command
   final case class Select(query: Query) extends Command
   final case class Ls(dir: Option[ReplPath]) extends Command
@@ -89,6 +91,7 @@ object Command {
       case SetVarPattern(name, value)               => SetVar(VarName(name), VarValue(value))
       case UnsetVarPattern(name)                    => UnsetVar(VarName(name))
       case ListVarPattern()                         => ListVars
+      case PwdPattern()                             => Pwd
       case DatasourceListPattern()                  => DatasourceList
       case DatasourceTypesPattern()                 => DatasourceTypes
       case DatasourceLookupPattern(UuidString(u))   => DatasourceLookup(u)

@@ -27,6 +27,7 @@ import quasar.fp.minspace
 import quasar.fp.ski._
 import quasar.main.Prettify
 import quasar.run.{QuasarError, SqlQuery}
+import quasar.run.ResourceRouter.DatasourceResourcePrefix
 import quasar.run.optics.{stringUUIDP => UuidString}
 
 import java.lang.Exception
@@ -65,18 +66,22 @@ final class Evaluator[F[_]: Effect](
 
   private def children(path: ResourcePath)
       : F[Stream[F, (ResourceName, ResourcePathType)]] =
-    path.uncons match {
-      case None =>
+    path match {
+      case ResourcePath.Root =>
+        Stream.emit((ResourceName(DatasourceResourcePrefix), ResourcePathType.prefix))
+          .covary[F].point[F]
+
+      case DatasourceResourcePrefix /: ResourcePath.Root =>
         sources.allDatasourceMetadata.map(_.evalMap {
           case (id, DatasourceMeta(_, n, _)) =>
             sources.pathIsResource(id, ResourcePath.root())
               .flatMap(fromEither[ExistentialError[UUID], Boolean])
               .map(b => (
-                ResourceName(s"$id (${n.shows})"),
+                ResourceName(s"$id"),
                 if (b) ResourcePathType.leafResource else ResourcePathType.prefix))
         })
 
-      case Some((ResourceName(UuidString(id)), p)) =>
+      case DatasourceResourcePrefix /: UuidString(id) /: p =>
         sources.prefixedChildPaths(id, p)
           .flatMap(fromEither[DiscoveryError[UUID], Stream[F, (ResourceName, ResourcePathType)]])
 
@@ -139,14 +144,14 @@ final class Evaluator[F[_]: Effect](
 
       case DatasourceTypes =>
         doSupportedTypes.map(
-          _.toList.map(tp => s"${tp.name} (${tp.version})")
+          _.toList.map(printType)
             .mkString("Supported datasource types:\n", "\n", "").some)
 
       case DatasourceLookup(id) =>
         sources.datasourceRef(id)
           .flatMap(fromEither[ExistentialError[UUID], DatasourceRef[Json]])
           .map(ref =>
-            List(s"Datasource[$id](name = ${ref.name.shows}, type = ${ref.kind.name.shows}-v${ref.kind.version.shows})", ref.config.spaces2).mkString("\n").some)
+            List(s"Datasource[$id](name = ${ref.name.shows}, type = ${printType(ref.kind)})", ref.config.spaces2).mkString("\n").some)
 
       case DatasourceAdd(name, tp, cfg) =>
         for {
@@ -187,6 +192,9 @@ final class Evaluator[F[_]: Effect](
           res <- convert(cs)
         } yield res
 
+      case Pwd =>
+        stateRef.get.map(s => printPath(s.cwd).some)
+
       case Select(q) =>
         def convert(format: OutputFormat, s: Stream[F, Data]): F[Option[String]] =
           s.compile.toList.map(ds => renderData(format, ds).some)
@@ -216,7 +224,7 @@ final class Evaluator[F[_]: Effect](
         f => children(ResourcePath.fromPath(fileParent(f))) flatMap { s =>
           s.exists(t => t._1 === ResourceName(fileName(f).value) && t._2 =/= ResourcePathType.leafResource)
             .compile.fold(false)(_ || _)
-            .flatMap(_.unlessM(raiseEvalError(s"$p is not a directory")))
+            .flatMap(_.unlessM(raiseEvalError(s"${printPath(p)} is not a directory")))
         },
         F.unit)
 
@@ -261,8 +269,11 @@ final class Evaluator[F[_]: Effect](
         case ReplPath.Relative(p) => interpretDotsAsParent(cwd ++ p)
       }
 
+    private def printType(t: DatasourceType): String =
+      s"${t.name}-v${t.version}"
+
     private def printMetadata(m: DatasourceMeta): String =
-      s"${m.name.shows} (${m.kind.name}-v${m.kind.version}): ${printCondition[Exception](m.status, _.getMessage)}"
+      s"${m.name.shows} (${printType(m.kind)}): ${printCondition[Exception](m.status, _.getMessage)}"
 
     private def printCondition[A](c: Condition[A], onAbnormal: A => String) =
       c match {
@@ -331,6 +342,7 @@ object Evaluator {
       |  ds (lookup | get) [uuid]
       |  cd [path]
       |  ls [path]
+      |  pwd
       |  [query]
       |  set format = table | precise | readable | csv
       |  set summaryCount = [rows]
