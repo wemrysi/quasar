@@ -27,13 +27,13 @@ import scalaz.{~>, \/, \/-, -\/, Equal, Id, Monad, Show}, Id.Id
 import scalaz.syntax.monad._
 import scalaz.std.list._
 
-abstract class TablesSpec[F[_]: Monad: Sync, G[_], I: Equal: Show, Q: Equal: Show, D]
+abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
     extends Qspec
     with ConditionMatchers {
 
   import Table._
 
-  def tables: Tables[F, G, I, Q, D]
+  def tables: Tables[F, I, Q, D]
 
   // `table1` and `table2` must have distinct names
   val table1: Table[Q]
@@ -43,8 +43,6 @@ abstract class TablesSpec[F[_]: Monad: Sync, G[_], I: Equal: Show, Q: Equal: Sho
   val preparation2: D  // preparation for table2
 
   val uniqueId: I  // generate a unique value of type `I`
-
-  def toList[A](as: G[A]): List[A]
 
   def run: F ~> Id
 
@@ -161,10 +159,11 @@ abstract class TablesSpec[F[_]: Monad: Sync, G[_], I: Equal: Show, Q: Equal: Sho
       for {
         errorOrId1 <- tables.createTable(table1)
         errorOrId2 <- tables.createTable(table2)
-        result <- tables.allTables
+        resultStream <- tables.allTables
+        result <- resultStream.compile.toList
       } yield {
-        (toList(result).map(_._2) must_= List(table1, table2)) or
-          (toList(result).map(_._2) must_= List(table2, table1))
+        (result.map(_._2) must_= List(table1, table2)) or
+          (result.map(_._2) must_= List(table2, table1))
       }
     }
 

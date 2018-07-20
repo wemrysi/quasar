@@ -31,7 +31,7 @@ import shims._
 
 import MockTablesSpec.Store
 
-final class MockTablesSpec extends TablesSpec[StateT[IO, Store, ?], List, UUID, String, String] {
+final class MockTablesSpec extends TablesSpec[StateT[IO, Store, ?], UUID, String, String] {
 
   // TODO why doesn't this resolve if I put it anywhere but here
   implicit def monadState[F[_]: Monad, S] =
@@ -40,7 +40,7 @@ final class MockTablesSpec extends TablesSpec[StateT[IO, Store, ?], List, UUID, 
       def put(s: S) = StateT.set(s)
     }
 
-  val tables: Tables[StateT[IO, Store, ?], List, UUID, String, String] =
+  val tables: Tables[StateT[IO, Store, ?], UUID, String, String] =
     MockTables[StateT[IO, Store, ?]]
 
   val table1: Table[String] = Table(TableName("table1"), "select * from table1")
@@ -50,8 +50,6 @@ final class MockTablesSpec extends TablesSpec[StateT[IO, Store, ?], List, UUID, 
   val preparation2: String = table2.query
 
   val uniqueId: UUID = UUID.randomUUID
-
-  def toList[A](as: List[A]): List[A] = as
 
   def run: StateT[IO, Store, ?] ~> Id.Id =
     λ[StateT[IO, Store, ?] ~> Id](
