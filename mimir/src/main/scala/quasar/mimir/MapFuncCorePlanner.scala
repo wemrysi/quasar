@@ -118,7 +118,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         (Map1[A](a1, cake.Library.truncPart(part).f1): TransSpec[A]).point[F]
       case MapFuncsCore.TimeOfDay(a1) =>
         (Map1[A](a1, cake.Library.TimeOfDay.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.ToTimestamp(a1) => ???
+      case MapFuncsCore.ToTimestamp(a1) =>
+        (Map1[A](a1, cake.Library.ToTimestamp.f1): TransSpec[A]).point[F]
 
       case MapFuncsCore.Now() => ???
       case MapFuncsCore.NowTime() => ???

@@ -104,6 +104,8 @@ package object time {
       _.offset)(
       o => (od => OffsetDate(od.date, o)))
 
+  def epochMilliToOffsetDateTime(epochMilli: Long): OffsetDateTime =
+    OffsetDateTime.ofInstant(Instant.ofEpochMilli(epochMilli), ZoneOffset.UTC)
 
   // Set
 
