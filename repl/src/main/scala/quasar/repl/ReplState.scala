@@ -19,8 +19,8 @@ package repl
 
 import slamdata.Predef._
 
-import quasar.api.ResourcePath
 import quasar.api.datasource.DatasourceType
+import quasar.common.resource.ResourcePath
 import quasar.fp.numeric.widenPositive
 
 import eu.timepit.refined.api.Refined

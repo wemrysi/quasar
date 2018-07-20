@@ -19,13 +19,15 @@ package repl
 
 import slamdata.Predef._
 import quasar.api._, datasource._
-import quasar.contrib.cats.effect._
+import quasar.common.resource._
 import quasar.contrib.pathy._
+import quasar.contrib.std.uuid._
 import quasar.csv.CsvWriter
 import quasar.fp.minspace
 import quasar.fp.ski._
 import quasar.main.Prettify
 import quasar.run.{QuasarError, SqlQuery}
+import quasar.run.optics.{stringUUIDP => UuidString}
 
 import java.lang.Exception
 import scala.util.control.NonFatal
@@ -43,30 +45,45 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import shims._
 
-final class Evaluator[F[_]: Effect, G[_]: Effect](
-  stateRef: Ref[F, ReplState],
-  sources: Datasources[F, Json],
-  queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]]) {
+final class Evaluator[F[_]: Effect](
+    stateRef: Ref[F, ReplState],
+    sources: Datasources[F, Stream[F, ?], UUID, Json],
+    queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]]) {
 
   import Command._
   import DatasourceError._
   import Evaluator._
 
   val F = Effect[F]
-  val G = Effect[G]
 
   def evaluate(cmd: Command): F[Result] = {
     val exitCode = if (cmd === Exit) Some(ExitCode.Success) else None
-    recoverErrors(doEvaluate(cmd))
-      .map(Result(exitCode, _))
+    recoverErrors(doEvaluate(cmd)).map(Result(exitCode, _))
   }
 
   ////
 
   private def children(path: ResourcePath)
-      : F[Stream[G, (ResourceName, ResourcePathType)]] =
-    queryEvaluator.children(path) >>=
-      fromEither[ResourceError.CommonError, Stream[G, (ResourceName, ResourcePathType)]]
+      : F[Stream[F, (ResourceName, ResourcePathType)]] =
+    path.uncons match {
+      case None =>
+        sources.allDatasourceMetadata.map(_.evalMap {
+          case (id, DatasourceMeta(_, n, _)) =>
+            sources.pathIsResource(id, ResourcePath.root())
+              .flatMap(fromEither[ExistentialError[UUID], Boolean])
+              .map(b => (
+                ResourceName(s"$id (${n.shows})"),
+                if (b) ResourcePathType.leafResource else ResourcePathType.prefix))
+        })
+
+      case Some((ResourceName(UuidString(id)), p)) =>
+        sources.prefixedChildPaths(id, p)
+          .flatMap(fromEither[DiscoveryError[UUID], Stream[F, (ResourceName, ResourcePathType)]])
+
+      case _ =>
+        fromEither[DiscoveryError[UUID], Stream[F, (ResourceName, ResourcePathType)]](
+          pathNotFound[DiscoveryError[UUID]](path).left)
+    }
 
   private def doEvaluate(cmd: Command): F[Option[String]] =
     cmd match {
@@ -116,34 +133,33 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
             .mkString("Variables:\n", "\n", "").some)
 
       case DatasourceList =>
-        sources.metadata.map(
-          _.toList.map { case (k, v) => s"${k.value} - ${printMetadata(v)}" }
-            .mkString("Datasources:\n", "\n", "").some)
+        sources.allDatasourceMetadata
+          .flatMap(_.map({ case (k, v) => s"$k ${printMetadata(v)}" }).compile.toList)
+          .map(_.mkString("Datasources:\n", "\n", "").some)
 
       case DatasourceTypes =>
         doSupportedTypes.map(
           _.toList.map(tp => s"${tp.name} (${tp.version})")
             .mkString("Supported datasource types:\n", "\n", "").some)
 
-      case DatasourceLookup(name) =>
-        (sources.lookup(name) >>=
-          fromEither[CommonError, (DatasourceMetadata, Json)]).map
-          { case (metadata, cfg) =>
-              List("Datasource:", s"${printMetadata(metadata)} $cfg").mkString("\n").some
-          }
+      case DatasourceLookup(id) =>
+        sources.datasourceRef(id)
+          .flatMap(fromEither[ExistentialError[UUID], DatasourceRef[Json]])
+          .map(ref =>
+            List(s"Datasource[$id](name = ${ref.name.shows}, type = ${ref.kind.name.shows}-v${ref.kind.version.shows})", ref.config.spaces2).mkString("\n").some)
 
-      case DatasourceAdd(name, tp, cfg, onConflict) =>
+      case DatasourceAdd(name, tp, cfg) =>
         for {
           tps <- supportedTypes
           dsType <- findTypeF(tps, tp)
           cfgJson <- JsonParser.parse(cfg).fold(raiseEvalError, _.point[F])
-          c <- sources.add(name, dsType, cfgJson, onConflict)
-          _ <- ensureNormal(c)
-        } yield s"Added datasource ${name.value}".some
+          r <- sources.addDatasource(DatasourceRef(dsType, name, cfgJson))
+          i <- r.fold(e => raiseEvalError(e.shows), _.point[F])
+        } yield s"Added datasource $i (${name.value})".some
 
-      case DatasourceRemove(name) =>
-        (sources.remove(name) >>= ensureNormal[CommonError]).map(
-          κ(s"Removed datasource $name".some))
+      case DatasourceRemove(id) =>
+        (sources.removeDatasource(id) >>= ensureNormal[ExistentialError[UUID]]).map(
+          κ(s"Removed datasource $id".some))
 
       case Cd(path: ReplPath) =>
         for {
@@ -155,12 +171,12 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
 
       case Ls(path: Option[ReplPath]) =>
         def postfix(tpe: ResourcePathType): String = tpe match {
-          case ResourcePathType.ResourcePrefix => "/"
-          case ResourcePathType.Resource => ""
+          case ResourcePathType.LeafResource => ""
+          case _ => "/"
         }
 
-        def convert(s: Stream[G, (ResourceName, ResourcePathType)])
-            : G[Option[String]] =
+        def convert(s: Stream[F, (ResourceName, ResourcePathType)])
+            : F[Option[String]] =
           s.map { case (name, tpe) => s"${name.value}${postfix(tpe)}" }
             .compile.toVector.map(_.mkString("\n").some)
 
@@ -168,17 +184,17 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
           cwd <- stateRef.get.map(_.cwd)
           p = path.map(newPath(cwd, _)).getOrElse(cwd)
           cs <- children(p)
-          res <- gTof(convert(cs))
+          res <- convert(cs)
         } yield res
 
       case Select(q) =>
-        def convert(format: OutputFormat, s: Stream[G, Data]): G[Option[String]] =
+        def convert(format: OutputFormat, s: Stream[F, Data]): F[Option[String]] =
           s.compile.toList.map(ds => renderData(format, ds).some)
 
         for {
           state <- stateRef.get
           qres <- evaluateQuery(SqlQuery(q, state.variables, toADir(state.cwd)), state.summaryCount)
-          res <- gTof(convert(state.format, qres))
+          res <- convert(state.format, qres)
         } yield res
 
       case Exit =>
@@ -186,7 +202,7 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
     }
 
     private def doSupportedTypes: F[ISet[DatasourceType]] =
-      sources.supported >>!
+      sources.supportedDatasourceTypes >>!
         (types => stateRef.modify(_.copy(supportedTypes = types.some)))
 
     private def ensureNormal[E: Show](c: Condition[E]): F[Unit] =
@@ -195,23 +211,19 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
         case Condition.Abnormal(err) => raiseEvalError(err.shows)
       }
 
-    // TODO
-    // We could enhance isResource(path): F[Boolean] to
-    // getResourceTypes(path): ISet[ResourcePathType]
-    // Then this impl would only need 1 api call.
-    // Note that with the current impl we assume that a path cannot be both
-    // a prefix and a resource
     private def ensureValidDir(p: ResourcePath): F[Unit] =
-      children(p) *>
-        (queryEvaluator.isResource(p) >>= { b =>
-          if (b) raiseEvalError(s"$p is a resource not a dir")
-          else F.unit
-        })
+      p.fold[F[Unit]](
+        f => children(ResourcePath.fromPath(fileParent(f))) flatMap { s =>
+          s.exists(t => t._1 === ResourceName(fileName(f).value) && t._2 =/= ResourcePathType.leafResource)
+            .compile.fold(false)(_ || _)
+            .flatMap(_.unlessM(raiseEvalError(s"$p is not a directory")))
+        },
+        F.unit)
 
-    private def evaluateQuery(q: SqlQuery, summaryCount: Option[Int Refined Positive]): F[Stream[G, Data]] =
-      (queryEvaluator.evaluate(q) >>=
-        fromEither[ResourceError.ReadError, Stream[G, Data]]).map(s =>
-          summaryCount.map(c => s.take(c.value.toLong)).getOrElse(s))
+    private def evaluateQuery(q: SqlQuery, summaryCount: Option[Int Refined Positive]): F[Stream[F, Data]] =
+      queryEvaluator.evaluate(q) map { s =>
+        summaryCount.map(c => s.take(c.value.toLong)).getOrElse(s)
+      }
 
     private def findType(tps: ISet[DatasourceType], tp: DatasourceType.Name): Option[DatasourceType] =
       tps.toList.find(_.name === tp)
@@ -231,8 +243,6 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
         case \/-(a) => a.point[F]
       }
 
-    private def gTof[A](ga: G[A]): F[A] = LiftIO[F].liftIO(ga.to[IO])
-
     // This is just similar to `..` from file systems, not meant to
     // be equivalent. E.g. a difference with `..`` from filesystem is that
     // `cd ../..` from dir `/mydir` won't give an error but evaluates to `/`
@@ -251,8 +261,8 @@ final class Evaluator[F[_]: Effect, G[_]: Effect](
         case ReplPath.Relative(p) => interpretDotsAsParent(cwd ++ p)
       }
 
-    private def printMetadata(m: DatasourceMetadata): String =
-      s"${m.kind.name} ${m.kind.version} ${printCondition[Exception](m.status, _.getMessage)}"
+    private def printMetadata(m: DatasourceMeta): String =
+      s"${m.name.shows} (${m.kind.name}-v${m.kind.version}): ${printCondition[Exception](m.status, _.getMessage)}"
 
     private def printCondition[A](c: Condition[A], onAbnormal: A => String) =
       c match {
@@ -301,12 +311,12 @@ object Evaluator {
 
   final class EvalError(msg: String) extends java.lang.RuntimeException(msg)
 
-  def apply[F[_]: Effect, G[_]: Effect](
-    stateRef: Ref[F, ReplState],
-    sources: Datasources[F, Json],
-    queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]])
-      : Evaluator[F, G] =
-    new Evaluator[F, G](stateRef, sources, queryEvaluator)
+  def apply[F[_]: Effect](
+      stateRef: Ref[F, ReplState],
+      sources: Datasources[F, Stream[F, ?], UUID, Json],
+      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
+      : Evaluator[F] =
+    new Evaluator[F](stateRef, sources, queryEvaluator)
 
   val helpMsg =
     """Quasar REPL, Copyright © 2014–2018 SlamData Inc.
@@ -316,9 +326,9 @@ object Evaluator {
       |  help
       |  ds (list | ls)
       |  ds types
-      |  ds add [name] [type] (preserve | replace) [cfg]
-      |  ds (remove | rm) [name]
-      |  ds (lookup | get) [name]
+      |  ds add [name] [type] [cfg]
+      |  ds (remove | rm) [uuid]
+      |  ds (lookup | get) [uuid]
       |  cd [path]
       |  ls [path]
       |  [query]

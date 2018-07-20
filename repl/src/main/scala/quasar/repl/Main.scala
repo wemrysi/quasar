@@ -39,7 +39,7 @@ object Main extends StreamApp[IO] {
   implicit val ioQuasarError: MonadError_[IO, QuasarError] =
     MonadError_.facet[IO](QuasarError.throwableP)
 
-  val quasarStream: Stream[IO, Quasar[IO, IO]] =
+  val quasarStream: Stream[IO, Quasar[IO]] =
     for {
       basePath <- Paths.getBasePath[Stream[IO, ?]]
       dataDir = basePath.resolve(Paths.QuasarDataDirName)
@@ -49,10 +49,10 @@ object Main extends StreamApp[IO] {
       q <- Quasar[IO](dataDir, ExternalConfig.PluginDirectory(pluginDir), global)
     } yield q
 
-  def repl(q: Quasar[IO, IO]): IO[ExitCode] =
+  def repl(q: Quasar[IO]): IO[ExitCode] =
     for {
       ref <- Ref[IO, ReplState](ReplState.mk)
-      repl <- Repl.mk[IO, IO](ref, q.datasources, q.queryEvaluator)
+      repl <- Repl.mk[IO](ref, q.datasources, q.queryEvaluator)
       l <- repl.loop
     } yield l
 
