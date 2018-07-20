@@ -363,18 +363,31 @@ trait TimeLibModule extends ColumnarTableLibModule {
       def f1: F1 = CF1P {
         case c: DoubleColumn =>
           new Map1Column(c) with OffsetDateTimeColumn {
+            override def isDefinedAt(row: Int) = {
+              super.isDefinedAt(row) && {
+                val d = c(row)
+                (d == Math.rint(d))
+              }
+            }
+
             def apply(row: Int) = {
               time.epochMilliToOffsetDateTime(c(row).longValue)
             }
           }
+
         case c: LongColumn =>
           new Map1Column(c) with OffsetDateTimeColumn {
             def apply(row: Int) = {
               time.epochMilliToOffsetDateTime(c(row))
             }
           }
+
         case c: NumColumn =>
           new Map1Column(c) with OffsetDateTimeColumn {
+            override def isDefinedAt(row: Int) = {
+              super.isDefinedAt(row) && c(row).isValidLong
+            }
+
             def apply(row: Int) = {
               time.epochMilliToOffsetDateTime(c(row).longValue)
             }
