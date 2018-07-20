@@ -23,6 +23,6 @@ import quasar.evaluate.Source
 import scalaz.Kleisli
 
 package object evaluate {
-  type Associates[T[_[_]], F[_], G[_]] = AFile => Option[Source[QueryAssociate[T, F, G]]]
-  type AssociatesT[T[_[_]], F[_], G[_], A] = Kleisli[F, Associates[T, F, G], A]
+  type Associates[T[_[_]], F[_]] = AFile => Option[Source[QueryAssociate[T, F]]]
+  type AssociatesT[T[_[_]], F[_], G[_], A] = Kleisli[F, Associates[T, G], A]
 }

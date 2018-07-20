@@ -19,7 +19,6 @@ package quasar.mimir.evaluate
 import slamdata.Predef._
 
 import quasar._
-import quasar.api.ResourceError.ReadError
 import quasar.connector.QScriptEvaluator
 import quasar.contrib.cats.effect._
 import quasar.contrib.iota._
@@ -43,7 +42,6 @@ import iotaz.CopK
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._
-import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.concurrent.Task
 import shims._
@@ -54,7 +52,7 @@ final class MimirQScriptEvaluator[
     cake: Cake)
     extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] {
 
-  type MT[X[_], A] = Kleisli[X, Associates[T, F, IO], A]
+  type MT[X[_], A] = Kleisli[X, Associates[T, IO], A]
   type M[A] = MT[F, A]
 
   type QS[U[_[_]]] = mimir.MimirQScriptCP[U]
@@ -85,12 +83,11 @@ final class MimirQScriptEvaluator[
   def UnicoalesceCap: Unicoalesce.Capture[T, QS[T]] =
     Unicoalesce.Capture[T, QS[T]]
 
-  def execute(repr: Repr): M[ReadError \/ Stream[IO, Data]] =
+  def execute(repr: Repr): M[Stream[IO, Data]] =
     mimir.slicesToStream(repr.table.slices)
       // TODO{fs2}: Chunkiness
       .mapSegments(s =>
         s.filter(_ != CUndefined).map(RValue.toData).force.toChunk.toSegment)
-      .right[ReadError]
       .point[M]
 
   def optimize: QSM[T[QSM]] => QSM[T[QSM]] =
