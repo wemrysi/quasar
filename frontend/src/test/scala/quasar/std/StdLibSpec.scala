@@ -1510,7 +1510,7 @@ abstract class StdLibSpec extends Qspec {
             Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T23:31:30.011Z")))
         }
 
-        "arbitrary long" >> prop { (l : Long) =>
+        "arbitrary long" >> prop { (l: Long) =>
           unary(
             ToTimestamp(_).embed,
             Data.Int(BigInt(l)),
