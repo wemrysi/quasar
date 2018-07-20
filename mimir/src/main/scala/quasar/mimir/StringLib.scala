@@ -132,6 +132,41 @@ trait StringLibModule extends ColumnarTableLibModule {
             def apply(row: Int) = "null"
             def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
+        case c: OffsetDateTimeColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: OffsetTimeColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: OffsetDateColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: LocalDateTimeColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: LocalTimeColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: LocalDateColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: IntervalColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
       }
     }
 

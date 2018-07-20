@@ -88,7 +88,6 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     case MapFuncsCore.ToLocal(_) => notImplemented.left
     case MapFuncsCore.Interval(_) => notImplemented.left
     case MapFuncsCore.Negate(_) => notImplemented.left // TODO this isn't passing because -Long.MinValue == Long.MinValue, so basically a limitation in ColumnarTable
-    case MapFuncsCore.ToString(_) => notImplemented.left    // TODO it's implemented but not for everything
     case MapFuncsCore.Meta(_) => notImplemented.left
     case _ => ().right
   }
