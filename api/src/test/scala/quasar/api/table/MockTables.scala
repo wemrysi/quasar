@@ -16,7 +16,7 @@
 
 package quasar.api.table
 
-import slamdata.Predef.{List, None, Option, Some, String, Unit}
+import slamdata.Predef.{None, Option, Some, String, Unit}
 
 import quasar.Condition
 import quasar.contrib.scalaz.MonadState_
@@ -25,13 +25,14 @@ import quasar.contrib.std.uuid._
 import java.time.{Duration, OffsetDateTime}
 import java.util.UUID
 
+import fs2.Stream
 import scalaz.{\/, IMap, Monad}
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 
 final class MockTables[F[_]: Monad: MockTables.TablesMockState]
-  extends Tables[F, List, UUID, String, String] {
+  extends Tables[F, UUID, String, String] {
 
   import MockTables._
   import PreparationStatus._
@@ -39,8 +40,12 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
 
   val store = MonadState_[F, IMap[UUID, MockTable]]
 
-  def allTables: F[List[(UUID, Table[String])]] =
-    store.get.map(_.map(_.table).toList)
+  def allTables: F[Stream[F, (UUID, Table[String], PreparationStatus)]] =
+    store.get.map { s =>
+      Stream.emits(s.toList.map {
+        case (uuid, MockTable(table, status)) => (uuid, table, status)
+      }).covary[F]
+    }
 
   def table(tableId: UUID): F[ExistenceError[UUID] \/ Table[String]] =
     store.gets(_.lookup(tableId)

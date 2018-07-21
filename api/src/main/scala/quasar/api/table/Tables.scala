@@ -20,16 +20,17 @@ import slamdata.Predef.Unit
 
 import quasar.Condition
 
+import fs2.Stream
 import scalaz.\/
 
 /** @tparam I identity
   * @tparam Q query type
   * @tparam D materialized table data
   */
-trait Tables[F[_], G[_], I, Q, D] {
+trait Tables[F[_], I, Q, D] {
   import TableError.{CreationError, ExistenceError, ModificationError, PrePreparationError}
 
-  def allTables: F[G[(I, Table[Q])]]
+  def allTables: F[Stream[F, (I, Table[Q], PreparationStatus)]]
 
   def table(tableId: I): F[ExistenceError[I] \/ Table[Q]]
 
