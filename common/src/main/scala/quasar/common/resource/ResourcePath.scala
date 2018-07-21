@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.common.resource
 
 import slamdata.Predef._
 import quasar.contrib.pathy.{firstSegmentName, rebaseA, stripPrefixA, AFile, APath}

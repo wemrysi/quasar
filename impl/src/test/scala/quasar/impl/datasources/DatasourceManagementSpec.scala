@@ -17,11 +17,10 @@
 package quasar.impl.datasources
 
 import slamdata.Predef._
-import quasar.{ConditionMatchers, Data, RenderTreeT}
-import quasar.api._
-import quasar.api.ResourceError.{CommonError, ReadError}
+import quasar.{ConditionMatchers, Data, Disposable, RenderTreeT}
 import quasar.api.datasource._
-import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported, InitializationError}
+import quasar.api.datasource.DatasourceError._
+import quasar.common.resource._
 import quasar.connector.{Datasource, HeavyweightDatasourceModule, LightweightDatasourceModule}
 import quasar.contrib.scalaz.MonadError_
 import quasar.fs.Planner.{PlannerError, PlannerErrorME}
@@ -33,18 +32,16 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import argonaut.Json
 import argonaut.JsonScalaz._
-import cats.{Applicative, ApplicativeError}
+import cats.{Applicative, ApplicativeError, MonadError}
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
-import cats.syntax.functor._
 import eu.timepit.refined.auto._
 import fs2.{Scheduler, Stream}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
-import scalaz.{\/, IMap, Show}
+import scalaz.{\/, -\/, IMap, Show}
 import scalaz.syntax.either._
-import scalaz.syntax.foldable._
 import scalaz.syntax.show._
 import scalaz.std.anyVal._
 import scalaz.std.option._
@@ -53,8 +50,8 @@ import shims._
 final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers {
   import DatasourceManagementSpec._
 
-  type Mgmt = DatasourceControl[IO, Json] with DatasourceErrors[IO]
-  type Running = DatasourceManagement.Running[Fix, IO, IO]
+  type Mgmt = DatasourceControl[IO, Stream[IO, ?], Int, Json] with DatasourceErrors[IO, Int]
+  type Running = DatasourceManagement.Running[Int, Fix, IO]
 
   implicit val ioPlannerErrorME: MonadError_[IO, PlannerError] =
     new MonadError_[IO, PlannerError] {
@@ -78,18 +75,18 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
         }
     }
 
+  implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
+    MonadError_.facet[IO](ResourceError.throwableP)
+
   val LightT = DatasourceType("light", 1L)
   val HeavyT = DatasourceType("heavy", 2L)
 
   val lightMod = new LightweightDatasourceModule {
     val kind = LightT
 
-    def lightweightDatasource[
-        F[_]: ConcurrentEffect: Timer,
-        G[_]: ConcurrentEffect: Timer](
-        config: Json)
-        : F[InitializationError[Json] \/ Datasource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]] =
-      mkDatasource[ResourcePath, F, G](kind).right.pure[F]
+    def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
+        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]]]] =
+      mkDatasource[ResourcePath, F](kind).right.pure[F]
   }
 
   val heavyMod = new HeavyweightDatasourceModule {
@@ -97,11 +94,10 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
     def heavyweightDatasource[
         T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-        F[_]: ConcurrentEffect: PlannerErrorME: Timer,
-        G[_]: ConcurrentEffect: Timer](
+        F[_]: ConcurrentEffect: PlannerErrorME: Timer](
         config: Json)
-        : F[InitializationError[Json] \/ Datasource[F, Stream[G, ?], T[QScriptEducated[T, ?]], Stream[G, Data]]] =
-      mkDatasource[T[QScriptEducated[T, ?]], F, G](kind).right.pure[F]
+        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], Stream[F, Data]]]] =
+      mkDatasource[T[QScriptEducated[T, ?]], F](kind).right.pure[F]
   }
 
   val modules: DatasourceManagement.Modules =
@@ -109,10 +105,10 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
       lightMod.kind -> DatasourceModule.Lightweight(lightMod),
       heavyMod.kind -> DatasourceModule.Heavyweight(heavyMod))
 
-  def withInitialMgmt[A](configured: IMap[ResourceName, DatasourceConfig[Json]])(f: (Mgmt, IO[Running]) => IO[A]): A =
+  def withInitialMgmt[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgmt, IO[Running]) => IO[A]): A =
     (for {
       s <- Scheduler.allocate[IO](1)
-      t <- DatasourceManagement[Fix, IO, IO](modules, configured, global, s._1)
+      t <- DatasourceManagement[Fix, IO, Int](modules, configured, global, s._1)
       (mgmt, run) = t
       a <- f(mgmt, run.get)
       _ <- s._2
@@ -122,35 +118,35 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
     withInitialMgmt(IMap.empty)(f)
 
   "control" >> {
-    "init" >> {
+    "init datasource" >> {
       "creates a datasource successfully" >> withMgmt { (mgmt, running) =>
         for {
           r0 <- running
-          c <- mgmt.init(ResourceName("foo"), DatasourceConfig(LightT, Json.jNull))
+          c <- mgmt.initDatasource(1, DatasourceRef(LightT, DatasourceName("foo"), Json.jNull))
           r1 <- running
         } yield {
           r0.size must_= 0
           c must beNormal
-          r1.member(ResourceName("foo")) must beTrue
+          r1.member(1) must beTrue
         }
       }
 
-      "errors when kind is unsupported" >> withMgmt { (mgmt, running) =>
+      "error when kind is unsupported" >> withMgmt { (mgmt, running) =>
         val unkT = DatasourceType("unknown", 1L)
 
-        mgmt.init(ResourceName("foo"), DatasourceConfig(unkT, Json.jNull)) map { c =>
+        mgmt.initDatasource(1, DatasourceRef(unkT, DatasourceName("nope"), Json.jNull)) map { c =>
           c must beAbnormal(DatasourceUnsupported(unkT, modules.keySet))
         }
       }
 
       "finalizes an existing datasource when replaced" >> withMgmt { (mgmt, running) =>
-        val a = ResourceName("a")
+        val a = DatasourceName("a")
 
         for {
-          c1 <- mgmt.init(a, DatasourceConfig(LightT, Json.jNull))
-          ds1 <- running.map(_.lookup(a))
-          c2 <- mgmt.init(a, DatasourceConfig(HeavyT, Json.jNull))
-          ds2 <- running.map(_.lookup(a))
+          c1 <- mgmt.initDatasource(1, DatasourceRef(LightT, a, Json.jNull))
+          ds1 <- running.map(_.lookup(1))
+          c2 <- mgmt.initDatasource(1, DatasourceRef(HeavyT, a, Json.jNull))
+          ds2 <- running.map(_.lookup(1))
         } yield {
           c1 must beNormal
           c2 must beNormal
@@ -160,14 +156,12 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
       "clears errors from an existing datasource when replaced" >> withMgmt { (mgmt, running) =>
         for {
-          c1 <- mgmt.init(ResourceName("a"), DatasourceConfig(LightT, Json.jNull))
-          ds <- running.map(_.lookup(ResourceName("a")))
-          light = ds.flatMap(_.swap.toOption)
-          _  <- light.traverse_(_.children(ResourcePath.root()).void).attempt
-          e1 <- mgmt.lookup(ResourceName("a"))
-          c2 <- mgmt.init(ResourceName("a"), DatasourceConfig(HeavyT, Json.jNull))
-          r  <- running.map(_.lookup(ResourceName("a")))
-          e2 <- mgmt.lookup(ResourceName("a"))
+          c1 <- mgmt.initDatasource(2, DatasourceRef(LightT, DatasourceName("a"), Json.jNull))
+          _  <- mgmt.prefixedChildPaths(2, ResourcePath.root()).attempt
+          e1 <- mgmt.datasourceError(2)
+          c2 <- mgmt.initDatasource(2, DatasourceRef(HeavyT, DatasourceName("a"), Json.jNull))
+          r  <- running.map(_.lookup(2))
+          e2 <- mgmt.datasourceError(2)
         } yield {
           c1 must beNormal
           e1 must beSome(beAnInstanceOf[IllegalArgumentException])
@@ -180,17 +174,13 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
     "shutdown" >> {
       "finalizes the datasource and clears errors" >> withMgmt { (mgmt, running) =>
-        val a = ResourceName("a")
-
         for {
-          c1 <- mgmt.init(a, DatasourceConfig(LightT, Json.jNull))
-          ds1 <- running.map(_.lookup(a))
-          light = ds1.flatMap(_.swap.toOption)
-          _  <- light.traverse_(_.children(ResourcePath.root()).void).attempt
-          e1 <- mgmt.lookup(a)
-          _ <- mgmt.shutdown(a)
-          e2 <- mgmt.lookup(a)
-          ds2 <- running.map(_.lookup(a))
+          c1 <- mgmt.initDatasource(3, DatasourceRef(LightT, DatasourceName("f"), Json.jNull))
+          _  <- mgmt.prefixedChildPaths(3, ResourcePath.root()).attempt
+          e1 <- mgmt.datasourceError(3)
+          _ <- mgmt.shutdownDatasource(3)
+          e2 <- mgmt.datasourceError(3)
+          ds2 <- running.map(_.lookup(3))
         } yield {
           e1 must beSome
           e2 must beNone
@@ -200,96 +190,80 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
       "no-op for a datasource that doesn't exist" >> withMgmt { (mgmt, running) =>
         for {
-          c1 <- mgmt.init(ResourceName("a"), DatasourceConfig(LightT, Json.jNull))
+          c1 <- mgmt.initDatasource(4, DatasourceRef(LightT, DatasourceName("a"), Json.jNull))
           r1 <- running
-          _ <- mgmt.shutdown(ResourceName("nope"))
+          _ <- mgmt.shutdownDatasource(-1)
           r2 <- running
         } yield {
-          r1.member(ResourceName("a")) must beTrue
-          r2.member(ResourceName("a")) must beTrue
+          r1.member(4) must beTrue
+          r2.member(4) must beTrue
         }
       }
     }
 
-    "rename" >> {
-      "no-op when src doesn't exist" >> withMgmt { (mgmt, running) =>
+    "path is resource" >> {
+      "pass through to underlying datasource" >> withMgmt { (mgmt, _) =>
         for {
-          c1 <- mgmt.init(ResourceName("a"), DatasourceConfig(LightT, Json.jNull))
-          r1 <- running
-          _ <- mgmt.rename(ResourceName("nope"), ResourceName("a"))
-          r2 <- running
-        } yield {
-          r1.member(ResourceName("a")) must beTrue
-          (r1 eq r2) must beTrue
-        }
-      }
-
-      "updates the control handle" >> withMgmt { (mgmt, running) =>
-        val (a, b) = (ResourceName("a"), ResourceName("b"))
-
-        for {
-          c1 <- mgmt.init(a, DatasourceConfig(LightT, Json.jNull))
-          r1 <- running
-          _ <- mgmt.rename(a, b)
-          r2 <- running
-        } yield {
-          r1.member(a) must beTrue
-          r2.member(a) must beFalse
-          Applicative[Option].map2(r1.lookup(a), r2.lookup(b))(_ eq _) must beSome(true)
-        }
-      }
-
-      "preserves any associated errors" >> withMgmt { (mgmt, running) =>
-        val (a, b) = (ResourceName("a"), ResourceName("b"))
-
-        for {
-          c <- mgmt.init(a, DatasourceConfig(LightT, Json.jNull))
-          ds1 <- running.map(_.lookup(a))
-          light = ds1.flatMap(_.swap.toOption)
-          _  <- light.traverse_(_.children(ResourcePath.root()).void).attempt
-          e1 <- mgmt.lookup(a)
-          _ <- mgmt.rename(a, b)
-          e2 <- mgmt.lookup(b)
+          c <- mgmt.initDatasource(1, DatasourceRef(LightT, DatasourceName("b"), Json.jNull))
+          b <- mgmt.pathIsResource(1, ResourcePath.root())
         } yield {
           c must beNormal
-          e1 must beSome
-          Applicative[Option].map2(e1, e2)(_ eq _) must beSome(true)
+          b must be_\/-(false)
         }
       }
 
-      "shutdown an existing destination" >> withMgmt { (mgmt, running) =>
-        val (a, b) = (ResourceName("a"), ResourceName("b"))
+      "datasource not found when no datasource having id" >> withMgmt { (mgmt, _) =>
+        mgmt.pathIsResource(-1, ResourcePath.root()).map(_ must beLike {
+          case -\/(DatasourceNotFound(-1)) => ok
+        })
+      }
+    }
+
+    "prefixed child paths" >> {
+      "delegate to found datasource" >> withMgmt { (mgmt, _) =>
+        for {
+          c <- mgmt.initDatasource(1, DatasourceRef(LightT, DatasourceName("b"), Json.jNull))
+          b <- mgmt.prefixedChildPaths(1, ResourcePath.root() / ResourceName("data"))
+        } yield {
+          c must beNormal
+          b must be_\/-
+        }
+      }
+
+      "path not found when underlying returns none" >> withMgmt { (mgmt, _) =>
+        val dne = ResourcePath.root() / ResourceName("dne")
 
         for {
-          ca <- mgmt.init(a, DatasourceConfig(LightT, Json.jNull))
-          cb <- mgmt.init(a, DatasourceConfig(HeavyT, Json.jNull))
-          dsa <- running.map(_.lookup(a))
-          _ <- mgmt.rename(a, b)
-          r <- running
+          c <- mgmt.initDatasource(1, DatasourceRef(LightT, DatasourceName("b"), Json.jNull))
+          b <- mgmt.prefixedChildPaths(1, dne)
         } yield {
-          ca must beNormal
-          cb must beNormal
-          r.lookup(a) must beNone
-          Applicative[Option].map2(dsa, r.lookup(b))(_ eq _) must beSome(true)
+          c must beNormal
+          b must beLike {
+            case -\/(PathNotFound(p)) => p must_= dne
+          }
         }
+      }
+
+
+      "datasource not found when no datasource having id" >> withMgmt { (mgmt, _) =>
+        mgmt.prefixedChildPaths(-1, ResourcePath.root() / ResourceName("data")).map(_ must beLike {
+          case -\/(DatasourceNotFound(-1)) => ok
+        })
       }
     }
   }
 
   "errors" >> {
-    "lookup returns latest error" >> withMgmt { (mgmt, running) =>
-      val a = ResourceName("a")
-      val foo = ResourcePath.root() / ResourceName("foo")
-      val bar = ResourcePath.root() / ResourceName("bar")
+    "datasource error returns latest error" >> withMgmt { (mgmt, running) =>
+      val foo = ResourcePath.root() / ResourceName("error") / ResourceName("foo")
+      val bar = ResourcePath.root() / ResourceName("error") / ResourceName("bar")
 
       for {
-        ca <- mgmt.init(a, DatasourceConfig(LightT, Json.jNull))
-        ds1 <- running.map(_.lookup(a))
-        light = ds1.flatMap(_.swap.toOption)
-        _  <- light.traverse_(_.children(foo).void).attempt
-        e1 <- mgmt.lookup(a)
-        _  <- light.traverse_(_.children(bar).void).attempt
-        e2 <- mgmt.lookup(a)
+        ca <- mgmt.initDatasource(1, DatasourceRef(LightT, DatasourceName("c"), Json.jNull))
+        _  <- mgmt.prefixedChildPaths(1, foo).attempt
+        e1 <- mgmt.datasourceError(1)
+        _  <- mgmt.prefixedChildPaths(1, bar).attempt
+        e2 <- mgmt.datasourceError(1)
       } yield {
         ca must beNormal
         e1.exists(_.getMessage.contains("foo")) must beTrue
@@ -298,50 +272,35 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
     }
 
     "lookup returns none once a previously erroring datasource succeeds" >> withMgmt { (mgmt, running) =>
-      val a = ResourceName("a")
-      val foo = ResourcePath.root() / ResourceName("foo")
-
       for {
-        ca <- mgmt.init(a, DatasourceConfig(LightT, Json.jNull))
-        ds1 <- running.map(_.lookup(a))
-        light = ds1.flatMap(_.swap.toOption)
-        _  <- light.traverse_(_.children(foo).void).attempt
-        e1 <- mgmt.lookup(a)
-        _  <- light.traverse_(_.isResource(foo).void).attempt
-        e2 <- mgmt.lookup(a)
+        ca <- mgmt.initDatasource(1, DatasourceRef(LightT, DatasourceName("d"), Json.jNull))
+        _  <- mgmt.prefixedChildPaths(1, ResourcePath.root() / ResourceName("error") / ResourceName("quux")).attempt
+        e1 <- mgmt.datasourceError(1)
+        _  <- mgmt.prefixedChildPaths(1, ResourcePath.root() / ResourceName("data")).attempt
+        e2 <- mgmt.datasourceError(1)
       } yield {
         ca must beNormal
-        e1.exists(_.getMessage.contains("foo")) must beTrue
+        e1.exists(_.getMessage.contains("quux")) must beTrue
         e2 must beNone
       }
     }
 
-    val initCfg: IMap[ResourceName, DatasourceConfig[Json]] =
+    val initCfg: IMap[Int, DatasourceRef[Json]] =
       IMap(
-        ResourceName("initlw") -> DatasourceConfig(LightT, Json.jNull),
-        ResourceName("unsupp") -> DatasourceConfig(DatasourceType("nope", 1L), Json.jNull))
+        1 -> DatasourceRef(LightT, DatasourceName("initlw"), Json.jNull),
+        -1 -> DatasourceRef(DatasourceType("nope", 1L), DatasourceName("nope"), Json.jNull))
 
     "initial configured datasources report errors" >> withInitialMgmt(initCfg) { (mgmt, running) =>
-      val initlw = ResourceName("initlw")
-      val foo = ResourcePath.root() / ResourceName("foo")
-
       for {
-        ds1 <- running.map(_.lookup(initlw))
-        light = ds1.flatMap(_.swap.toOption)
-        _  <- light.traverse_(_.children(foo).void).attempt
-        e1 <- mgmt.lookup(initlw)
+        _  <- mgmt.prefixedChildPaths(1, ResourcePath.root() / ResourceName("error") / ResourceName("foo")).attempt
+        e1 <- mgmt.datasourceError(1)
       } yield e1.exists(_.getMessage.contains("foo")) must beTrue
     }
 
     "initial configured datasources report config errors" >> withInitialMgmt(initCfg) { (mgmt, running) =>
-      val unsupp = ResourceName("unsupp")
-      val foo = ResourcePath.root() / ResourceName("foo")
-
       for {
-        ds1 <- running.map(_.lookup(unsupp))
-        light = ds1.flatMap(_.swap.toOption)
-        _  <- light.traverse_(_.isResource(foo).void).attempt
-        e1 <- mgmt.lookup(unsupp)
+        _  <- mgmt.pathIsResource(-1, ResourcePath.root() / ResourceName("foo")).attempt
+        e1 <- mgmt.datasourceError(-1)
       } yield e1.exists(_.getMessage.contains("Unsupported")) must beTrue
     }
   }
@@ -352,26 +311,34 @@ object DatasourceManagementSpec {
       extends Exception(pe.message)
 
   final case class CreateErrorException(ce: CreateError[Json])
-      extends Exception(Show[DatasourceError[Json]].shows(ce))
+      extends Exception(Show[DatasourceError[Int, Json]].shows(ce))
 
-  def mkDatasource[Q, F[_]: ApplicativeError[?[_], Throwable], G[_]](kind0: DatasourceType)
-      : Datasource[F, Stream[G, ?], Q, Stream[G, Data]] =
-    new Datasource[F, Stream[G, ?], Q, Stream[G, Data]] {
-      val kind = kind0
+  def mkDatasource[Q, F[_]: MonadError[?[_], Throwable]](kind0: DatasourceType)
+      : Disposable[F, Datasource[F, Stream[F, ?], Q, Stream[F, Data]]] =
+    new Datasource[F, Stream[F, ?], Q, Stream[F, Data]] {
+      def kind = kind0
 
-      val shutdown = ().pure[F]
+      def evaluate(query: Q): F[Stream[F, Data]] =
+        Stream.empty.covaryAll[F, Data].pure[F]
 
-      def evaluate(query: Q): F[ReadError \/ Stream[G, Data]] =
-        Stream.empty.covaryAll[G, Data].right[ReadError].pure[F]
-
-      def children(path: ResourcePath): F[CommonError \/ Stream[G, (ResourceName, ResourcePathType)]] =
-        ApplicativeError[F, Throwable]
-          .raiseError(new IllegalArgumentException(s"InvalidPath: ${path.shows}"))
-
-      def descendants(path: ResourcePath): F[CommonError \/ Stream[G, ResourcePath]] =
-        Stream.empty.covaryAll[G, ResourcePath].right.pure[F]
-
-      def isResource(path: ResourcePath): F[Boolean] =
+      def pathIsResource(path: ResourcePath): F[Boolean] =
         false.pure[F]
-    }
+
+      def prefixedChildPaths(path: ResourcePath): F[Option[Stream[F, (ResourceName, ResourcePathType)]]] =
+        path.uncons match {
+          case None =>
+            ApplicativeError[F, Throwable]
+              .raiseError(new IllegalArgumentException(s"InvalidPath: /"))
+
+          case Some((ResourceName("error"), _)) =>
+            ApplicativeError[F, Throwable]
+              .raiseError(new IllegalArgumentException(s"InvalidPath: ${path.shows}"))
+
+          case Some((ResourceName("dne"), _)) =>
+            none[Stream[F, (ResourceName, ResourcePathType)]].pure[F]
+
+          case _ =>
+            some(Stream.empty.covaryAll[F, (ResourceName, ResourcePathType)]).pure[F]
+        }
+    }.pure[Disposable[F, ?]]
 }

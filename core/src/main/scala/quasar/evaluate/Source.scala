@@ -16,7 +16,7 @@
 
 package quasar.evaluate
 
-import quasar.api.ResourcePath
+import quasar.common.resource.ResourcePath
 
 import monocle.macros.Lenses
 import scalaz.{Applicative, Cord, Equal, Order, Show, Traverse}

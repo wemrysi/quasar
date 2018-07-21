@@ -16,34 +16,28 @@
 
 package quasar.impl.datasource.local
 
-import quasar.api.{ResourceDiscoverySpec, ResourceName, ResourcePath}
-import LocalDatasourceSpec._
+import quasar.common.resource.{ResourceError, ResourceName, ResourcePath}
+import quasar.connector.DatasourceSpec
+import quasar.contrib.scalaz.MonadError_
 
 import java.nio.file.Paths
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.IO
 import fs2.Stream
-import scalaz.{~>, Foldable, Id, Monoid}, Id.Id
 import shims._
 
 final class LocalDatasourceSpec
-    extends ResourceDiscoverySpec[IO, Stream[IO, ?]] {
+    extends DatasourceSpec[IO, Stream[IO, ?]] {
 
-  val discovery =
-    LocalDatasource[IO, IO](Paths.get("./it/src/main/resources/tests"), 1024, global)
+  implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
+    MonadError_.facet[IO](ResourceError.throwableP)
+
+  val datasource =
+    LocalDatasource[IO](Paths.get("./it/src/main/resources/tests"), 1024, global)
 
   val nonExistentPath =
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")
 
-  val run =
-    λ[IO ~> Id](_.unsafeRunSync)
-}
-
-object LocalDatasourceSpec {
-  implicit val unsafeStreamFoldable: Foldable[Stream[IO, ?]] =
-    new Foldable[Stream[IO, ?]] with Foldable.FromFoldMap[Stream[IO, ?]] {
-      def foldMap[A, M](fa: Stream[IO, A])(f: A => M)(implicit M: Monoid[M]) =
-        fa.compile.fold(M.zero)((m, a) => M.append(m, f(a))).unsafeRunSync
-    }
+  def gatherMultiple[A](g: Stream[IO, A]) = g.compile.toList
 }

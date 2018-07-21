@@ -18,12 +18,16 @@ package quasar.mimir.storage
 
 import slamdata.Predef.String
 
+import monocle.Iso
 import scalaz.{Order, Show}
 import scalaz.std.string._
 
 final case class StoreKey(value: String)
 
 object StoreKey {
+  val stringIso: Iso[StoreKey, String] =
+    Iso((_: StoreKey).value)(StoreKey(_))
+
   implicit val order: Order[StoreKey] =
     Order.orderBy(_.value)
 

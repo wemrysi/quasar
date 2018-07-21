@@ -19,13 +19,11 @@ package quasar.mimir.evaluate
 import slamdata.Predef.{Stream => _, _}
 
 import quasar.Data
-import quasar.api._, ResourceError._
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
 import quasar.evaluate.{Source => EvalSource}
-import quasar.fs.PathError
-import quasar.fs.Planner.{InternalError, PlannerErrorME, PlanPathError}
+import quasar.fs.Planner.{InternalError, PlannerErrorME}
 import quasar.mimir._, MimirCake._
 import quasar.precog.common.RValue
 import quasar.qscript._
@@ -42,7 +40,7 @@ final class FederatedShiftedReadPlanner[
     F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], List[IO[Unit]]]](
     val P: Cake) {
 
-  type Assocs = Associates[T, F, IO]
+  type Assocs = Associates[T, IO]
   type M[A] = AssociatesT[T, F, IO, A]
 
   val plan: AlgebraM[M, Const[ShiftedRead[AFile], ?], MimirRepr] = {
@@ -82,7 +80,7 @@ final class FederatedShiftedReadPlanner[
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
 
-  private def sourceTable(source: EvalSource[QueryAssociate[T, F, IO]]): F[P.Table] = {
+  private def sourceTable(source: EvalSource[QueryAssociate[T, IO]]): F[P.Table] = {
     val queryResult =
       source.src match {
         case QueryAssociate.Lightweight(f) =>
@@ -102,17 +100,15 @@ final class FederatedShiftedReadPlanner[
           f(shiftedRead)
       }
 
-    queryResult.flatMap(_.fold(handleReadError[P.Table], tableFromStream))
+    queryResult.to[F].flatMap(tableFromStream)
   }
 
   private def tableFromStream(s: Stream[IO, Data]): F[P.Table] = {
     val dataToRValue: Data => RValue =
       d => RValue.fromData(d).getOrElse(sys.error("There is no representation of CUndefined in SlamDB as a value"))
 
-    for {
-      // TODO{fs2}: Chunkiness
-      table <- P.Table.fromRValueStream[F](s.mapChunks(_.map(dataToRValue).toSegment))
-    } yield {
+    // TODO{fs2}: Chunkiness
+    P.Table.fromRValueStream[F](s.mapChunks(_.map(dataToRValue).toSegment)) map { table =>
 
       import P.trans._
 
@@ -127,13 +123,4 @@ final class FederatedShiftedReadPlanner[
             TransSpecModule.paths.Value.name)))
     }
   }
-
-  private def handleReadError[A](rerr: ReadError): F[A] =
-    PlannerErrorME[F].raiseError[A](PlanPathError(rerr match {
-      case NotAResource(rp) =>
-        PathError.invalidPath(rp.toPath, "does not refer to a resource.")
-
-      case PathNotFound(rp) =>
-        PathError.pathNotFound(rp.toPath)
-    }))
 }

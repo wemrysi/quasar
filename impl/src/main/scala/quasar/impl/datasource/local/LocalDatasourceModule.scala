@@ -16,9 +16,9 @@
 
 package quasar.impl.datasource.local
 
-import quasar.Data
-import quasar.api.ResourcePath
+import quasar.{Data, Disposable}
 import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
+import quasar.common.resource.{MonadResourceErr, ResourcePath}
 import quasar.connector.{Datasource, LightweightDatasourceModule}
 
 import java.nio.file.Paths
@@ -35,11 +35,8 @@ object LocalDatasourceModule extends LightweightDatasourceModule {
 
   val kind: DatasourceType = LocalType
 
-  def lightweightDatasource[
-      F[_]: ConcurrentEffect: Timer,
-      G[_]: ConcurrentEffect: Timer](
-      config: Json)
-      : F[InitializationError[Json] \/ Datasource[F, Stream[G, ?], ResourcePath, Stream[G, Data]]] = {
+  def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
+      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]]]] = {
 
     val F = ConcurrentEffect[F]
 
@@ -54,7 +51,7 @@ object LocalDatasourceModule extends LightweightDatasourceModule {
         EitherT.fromEither(F.attempt(F.delay(Paths.get(lc.rootDir))))
           .leftMap[InitializationError[Json]](
             t => MalformedConfiguration(kind, config, "Invalid path: " + t.getMessage))
-    } yield LocalDatasource[F, G](root, lc.readChunkSizeBytes, global)
+    } yield LocalDatasource[F](root, lc.readChunkSizeBytes, global).point[Disposable[F, ?]]
 
     ds.run
   }

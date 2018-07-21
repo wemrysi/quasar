@@ -16,7 +16,7 @@
 
 package quasar.contrib.cats
 
-import quasar.contrib.scalaz.MonadState_
+import quasar.contrib.scalaz.{MonadState_, MonadTell_}
 
 import cats.Applicative
 import cats.data.StateT
@@ -26,5 +26,11 @@ object stateT {
     new MonadState_[StateT[F, S, ?], S] {
       def get = StateT.get[F, S]
       def put(s: S) = StateT.set[F, S](s)
+    }
+
+  implicit def catsStateTMonadTell_[F[_]: Applicative, S, W](implicit F: MonadTell_[F, W])
+      : MonadTell_[StateT[F, S, ?], W] =
+    new MonadTell_[StateT[F, S, ?], W] {
+      def writer[A](w: W, a: A) = StateT.liftF(F.writer(w, a))
     }
 }

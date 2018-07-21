@@ -14,21 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.connector.datasource
+package quasar.common
 
-import quasar.RenderTreeT
-import quasar.connector.{Datasource, QScriptEvaluator}
-import quasar.fs.Planner.PlannerErrorME
-import quasar.qscript.QScriptEducated
+import slamdata.Predef.{Option, String}
+import quasar.contrib.scalaz.MonadError_
 
-import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.Monad
+package object resource {
+  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
 
-/** A Datasource capable of executing QScript. */
-abstract class HeavyweightDatasource[
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: PlannerErrorME,
-    G[_],
-    R]
-    extends QScriptEvaluator[T, F, R]
-    with Datasource[F, G, T[QScriptEducated[T, ?]], R]
+  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
+      : MonadResourceErr[F] = ev
+
+  object /: {
+    def unapply(p: ResourcePath): Option[(String, ResourcePath)] =
+      p.uncons.map { case (ResourceName(s), p) => (s, p) }
+  }
+}

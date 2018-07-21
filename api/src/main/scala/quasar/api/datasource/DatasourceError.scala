@@ -17,23 +17,27 @@
 package quasar.api.datasource
 
 import slamdata.Predef._
-import quasar.api.ResourceName
+import quasar.common.resource.ResourcePath
 
+import monocle.Prism
 import scalaz.{Cord, Equal, ISet, NonEmptyList, Show}
 import scalaz.std.option._
 import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 
-sealed trait DatasourceError[+C] extends Product with Serializable
+sealed trait DatasourceError[+I, +C] extends Product with Serializable
 
 object DatasourceError extends DatasourceErrorInstances {
-  sealed trait CreateError[+C] extends DatasourceError[C]
+  sealed trait CreateError[+C] extends DatasourceError[Nothing, C]
 
   final case class DatasourceUnsupported(kind: DatasourceType, supported: ISet[DatasourceType])
       extends CreateError[Nothing]
 
-  sealed trait InitializationError[C] extends CreateError[C]
+  final case class DatasourceNameExists(name: DatasourceName)
+      extends CreateError[Nothing]
+
+  sealed trait InitializationError[+C] extends CreateError[C]
 
   final case class MalformedConfiguration[C](kind: DatasourceType, config: C, reason: String)
       extends InitializationError[C]
@@ -41,81 +45,124 @@ object DatasourceError extends DatasourceErrorInstances {
   final case class InvalidConfiguration[C](kind: DatasourceType, config: C, reasons: NonEmptyList[String])
       extends InitializationError[C]
 
-  final case class UnprocessableEntity[C](kind: DatasourceType, config: C, reason: String)
-    extends InitializationError[C]
-
   final case class ConnectionFailed[C](kind: DatasourceType, config: C, cause: Exception)
     extends InitializationError[C]
 
-  sealed trait ExistentialError extends CreateError[Nothing]
+  sealed trait DiscoveryError[+I] extends DatasourceError[I, Nothing]
 
-  final case class DatasourceExists(name: ResourceName)
-      extends ExistentialError
+  final case class PathNotFound(path: ResourcePath)
+    extends DiscoveryError[Nothing]
 
-  sealed trait CommonError extends ExistentialError
+  sealed trait ExistentialError[+I] extends DiscoveryError[I]
 
-  final case class DatasourceNotFound(name: ResourceName)
-      extends CommonError
+  final case class DatasourceNotFound[I](datasourceId: I)
+      extends ExistentialError[I]
+
+  def connectionFailed[C, E >: InitializationError[C] <: DatasourceError[_, C]]
+      : Prism[E, (DatasourceType, C, Exception)] =
+    Prism.partial[E, (DatasourceType, C, Exception)] {
+      case ConnectionFailed(k, c, e) => (k, c, e)
+    } {
+      case (t, c, e) => ConnectionFailed(t, c, e)
+    }
+
+  def datasourceNameExists[E >: CreateError[Nothing] <: DatasourceError[_, _]]
+      : Prism[E, DatasourceName] =
+    Prism.partial[E, DatasourceName] {
+      case DatasourceNameExists(n) => n
+    } (DatasourceNameExists(_))
+
+  def datasourceNotFound[I, E >: ExistentialError[I] <: DatasourceError[I, _]]
+      : Prism[E, I] =
+    Prism.partial[E, I] {
+      case DatasourceNotFound(id) => id
+    } (DatasourceNotFound(_))
+
+  def datasourceUnsupported[E >: CreateError[Nothing] <: DatasourceError[_, _]]
+      : Prism[E, (DatasourceType, ISet[DatasourceType])] =
+    Prism.partial[E, (DatasourceType, ISet[DatasourceType])] {
+      case DatasourceUnsupported(k, s) => (k, s)
+    } {
+      case (k, s) => DatasourceUnsupported(k, s)
+    }
+
+  def invalidConfiguration[C, E >: InitializationError[C] <: DatasourceError[_, C]]
+      : Prism[E, (DatasourceType, C, NonEmptyList[String])] =
+    Prism.partial[E, (DatasourceType, C, NonEmptyList[String])] {
+      case InvalidConfiguration(t, c, rs) => (t, c, rs)
+    } {
+      case (t, c, rs) => InvalidConfiguration(t, c, rs)
+    }
+
+  def malformedConfiguration[C, E >: InitializationError[C] <: DatasourceError[_, C]]
+      : Prism[E, (DatasourceType, C, String)] =
+    Prism.partial[E, (DatasourceType, C, String)] {
+      case MalformedConfiguration(t, c, r) => (t, c, r)
+    } {
+      case (t, c, r) => MalformedConfiguration(t, c, r)
+    }
+
+  def pathNotFound[E >: DiscoveryError[Nothing] <: DatasourceError[_, _]]
+      : Prism[E, ResourcePath] =
+    Prism.partial[E, ResourcePath] {
+      case PathNotFound(p) => p
+    } (PathNotFound(_))
 }
 
 sealed abstract class DatasourceErrorInstances {
   import DatasourceError._
 
-  implicit def equal[C: Equal]: Equal[DatasourceError[C]] =
-    Equal.equalBy {
-      case DatasourceExists(n) =>
-        (some(n), none, none, none, none, none, none)
+  implicit def equal[I: Equal, C: Equal]: Equal[DatasourceError[I, C]] = {
+    implicit val ignoreExceptions: Equal[Exception] =
+      Equal.equal((_, _) => true)
 
-      case DatasourceNotFound(n) =>
-        (none, some(n), none, none, none, none, none)
+    Equal.equalBy { de => (
+      connectionFailed[C, DatasourceError[I, C]].getOption(de),
+      datasourceNameExists[DatasourceError[I, C]].getOption(de),
+      datasourceNotFound[I, DatasourceError[I, C]].getOption(de),
+      datasourceUnsupported[DatasourceError[I, C]].getOption(de),
+      invalidConfiguration[C, DatasourceError[I, C]].getOption(de),
+      malformedConfiguration[C, DatasourceError[I, C]].getOption(de),
+      pathNotFound[DatasourceError[I, C]].getOption(de)
+    )}
+  }
 
-      case DatasourceUnsupported(k, s) =>
-        (none, none, some((k, s)), none, none, none, none)
-
-      case MalformedConfiguration(k, c, r) =>
-        (none, none, none, some((k, c, r)), none, none, none)
-
-      case UnprocessableEntity(k, c, r) =>
-        (none, none, none, none, some((k, c, r)), none, none)
-
-      case ConnectionFailed(k, c, _) =>
-        (none, none, none, none, none, some((k, c)), none)
-
-      case InvalidConfiguration(k, c, rs) =>
-        (none, none, none, none, none, none, some((k, c, rs)))
+  implicit def show[I: Show, C: Show]: Show[DatasourceError[I, C]] =
+    Show.show {
+      case e: CreateError[C]    => showCreateError[C].show(e)
+      case e: DiscoveryError[I] => showDiscoveryError[I].show(e)
     }
 
-  implicit def showCommonError: Show[CommonError] =
+  implicit def showExistentialError[I: Show]: Show[ExistentialError[I]] =
     Show.show {
-      case DatasourceNotFound(n) =>
-        Cord("DatasourceNotFound(") ++ n.show ++ Cord(")")
+      case DatasourceNotFound(i) =>
+        Cord("DatasourceNotFound(") ++ i.show ++ Cord(")")
+    }
+
+  implicit def showDiscoveryError[I: Show]: Show[DiscoveryError[I]] =
+    Show.show {
+      case PathNotFound(p) =>
+        Cord("PathNotFound(") ++ p.show ++ Cord(")")
+
+      case e: ExistentialError[I] =>
+        showExistentialError[I].show(e)
     }
 
   implicit def showCreateError[C: Show]: Show[CreateError[C]] =
     Show.show {
-      case DatasourceExists(n) =>
-        Cord("DatasourceExists(") ++ n.show ++ Cord(")")
-
-      case e: CommonError => showCommonError.shows(e)
+      case DatasourceNameExists(n) =>
+        Cord("DatasourceNameExists(") ++ n.show ++ Cord(")")
 
       case DatasourceUnsupported(k, s) =>
         Cord("DatasourceUnsupported(") ++ k.show ++ Cord(", ") ++ s.show ++ Cord(")")
 
+      case InvalidConfiguration(k, c, rs) =>
+        Cord("InvalidConfiguration(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ rs.show ++ Cord(")")
+
       case MalformedConfiguration(k, c, r) =>
         Cord("MalformedConfiguration(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ r.show ++ Cord(")")
 
-      case UnprocessableEntity(k, c, r) =>
-        Cord("UnprocessableEntity(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ r.show ++ Cord(")")
-
       case ConnectionFailed(k, c, e) =>
         Cord("ConnectionFailed(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(s")\n\n$e")
-
-      case InvalidConfiguration(k, c, rs) =>
-        Cord("InvalidConfiguration(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ rs.show ++ Cord(")")
-    }
-
-  implicit def showDatasourceError[C: Show]: Show[DatasourceError[C]] =
-    Show.show {
-      case e: CreateError[C] => showCreateError[C].shows(e)
     }
 }

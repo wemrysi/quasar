@@ -16,12 +16,12 @@
 
 package quasar
 
-import slamdata.Predef.{Either, String, Throwable}
+import slamdata.Predef.String
+import quasar.contrib.cats.effect.effect._
 
 import scala.concurrent.ExecutionContext
 
-import cats.effect.{Effect, IO}
-import fs2.async.Promise
+import cats.effect.Effect
 import org.specs2.execute.AsResult
 import org.specs2.specification.core.Fragment
 
@@ -33,15 +33,7 @@ abstract class EffectfulQSpec[F[_]: Effect](implicit ec: ExecutionContext) exten
     * }
     */
   implicit class RunExample(s: String) {
-    def >>*[A: AsResult](fa: => F[A]): Fragment = {
-      val run = for {
-        p <- Promise.empty[IO, Either[Throwable, A]]
-        _ <- Effect[F].runAsync(fa)(p.complete(_))
-        r <- p.get
-        a <- IO.fromEither(r)
-      } yield a
-
-      s >> run.unsafeRunSync
-    }
+    def >>*[A: AsResult](fa: => F[A]): Fragment =
+      s >> unsafeRunEffect(fa)
   }
 }

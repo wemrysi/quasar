@@ -16,13 +16,13 @@
 
 package quasar.impl.datasource
 
-import slamdata.Predef.{Boolean, Unit}
-import quasar.api._, ResourceError._
+import slamdata.Predef.{Boolean, Option}
 import quasar.api.datasource.DatasourceType
+import quasar.common.resource._
 import quasar.connector.Datasource
 import quasar.contrib.scalaz.MonadError_
 
-import scalaz.{\/, Applicative}
+import scalaz.Applicative
 
 final class FailedDatasource[
     E,
@@ -34,18 +34,14 @@ final class FailedDatasource[
 
   val kind: DatasourceType = datasourceType
 
-  val shutdown: F[Unit] = Applicative[F].point(())
-
-  def evaluate(query: Q): F[ReadError \/ R] =
+  def evaluate(query: Q): F[R] =
     MonadError_[F, E].raiseError(error)
 
-  def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]] =
+  def pathIsResource(path: ResourcePath): F[Boolean] =
     MonadError_[F, E].raiseError(error)
 
-  def descendants(path: ResourcePath): F[CommonError \/ G[ResourcePath]] =
-    MonadError_[F, E].raiseError(error)
-
-  def isResource(path: ResourcePath): F[Boolean] =
+  def prefixedChildPaths(path: ResourcePath)
+      : F[Option[G[(ResourceName, ResourcePathType)]]] =
     MonadError_[F, E].raiseError(error)
 }
 

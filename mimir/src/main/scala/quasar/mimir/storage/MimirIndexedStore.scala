@@ -89,8 +89,8 @@ final class MimirIndexedStore[F[_]: LiftIO: Monad] private (
       PrecogPath(keyFileStr(k)),
       Stream.emit(v.toJValue)).run.to[F])
 
-  def delete(k: StoreKey): F[Unit] =
-    precog.vfs.delete(keyFile(k)).void.to[F]
+  def delete(k: StoreKey): F[Boolean] =
+    precog.vfs.delete(keyFile(k)).to[F]
 
   ////
 

@@ -18,7 +18,6 @@ package quasar.connector
 
 import slamdata.Predef.Set
 import quasar.RenderTreeT
-import quasar.api.ResourceError.ReadError
 import quasar.contrib.iota.:<<:
 import quasar.contrib.pathy._
 import quasar.fp._
@@ -30,7 +29,7 @@ import quasar.qscript.rewrites._
 import iotaz.{CopK, TListK}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.implicits._
-import scalaz.{\/, Functor, Monad}
+import scalaz.{Functor, Monad}
 import scalaz.syntax.monad._
 
 /** Provides for evaluating QScript to a result. */
@@ -53,7 +52,7 @@ abstract class QScriptEvaluator[
   def UnicoalesceCap: Unicoalesce.Capture[T, QS[T]]
 
   /** Returns the result of executing the `Repr`. */
-  def execute(repr: Repr): F[ReadError \/ R]
+  def execute(repr: Repr): F[R]
 
   /** Returns a function that optimizes QScript for this evaluator. */
   def optimize: QSM[T[QSM]] => QSM[T[QSM]]
@@ -63,7 +62,7 @@ abstract class QScriptEvaluator[
 
   ////
 
-  def evaluate(qsr: T[QScriptEducated[T, ?]]): F[ReadError \/ R] =
+  def evaluate(qsr: T[QScriptEducated[T, ?]]): F[R] =
     for {
       shifted <- Unirewrite[T, QS[T], F](new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
 

@@ -16,11 +16,29 @@
 
 package quasar.connector
 
-import slamdata.Predef.Unit
+import slamdata.Predef.{Boolean, Option}
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
+import quasar.common.resource._
 
-trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, G, Q, R] {
+/** @tparam F effects
+  * @tparam G multiple results
+  * @tparam Q query
+  * @tparam R result
+  */
+trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, Q, R] {
+
+  /** The type of this datasource. */
   def kind: DatasourceType
-  def shutdown: F[Unit]
+
+  /** Returns whether or not the specified path refers to a resource in the
+    * specified datasource.
+    */
+  def pathIsResource(path: ResourcePath): F[Boolean]
+
+  /** Returns the name and type of the `ResourcePath`s within the specified
+    * Datasource implied by concatenating each name to `prefixPath`.
+    */
+  def prefixedChildPaths(prefixPath: ResourcePath)
+      : F[Option[G[(ResourceName, ResourcePathType)]]]
 }

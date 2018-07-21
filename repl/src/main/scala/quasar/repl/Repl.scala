@@ -24,6 +24,7 @@ import quasar.build.BuildInfo
 import quasar.run.SqlQuery
 
 import java.io.File
+import java.util.UUID
 
 import argonaut.Json
 import cats.effect._
@@ -36,9 +37,9 @@ import org.jline.terminal._
 import scalaz._, Scalaz._
 
 final class Repl[F[_]: ConcurrentEffect](
-  prompt: String,
-  reader: LineReader,
-  evaluator: Command => F[Evaluator.Result]) {
+    prompt: String,
+    reader: LineReader,
+    evaluator: Command => F[Evaluator.Result]) {
 
   val F = ConcurrentEffect[F]
 
@@ -62,18 +63,18 @@ final class Repl[F[_]: ConcurrentEffect](
 
 object Repl {
   def apply[F[_]: ConcurrentEffect](
-    prompt: String,
-    reader: LineReader,
-    evaluator: Command => F[Evaluator.Result]):
-      Repl[F] =
+      prompt: String,
+      reader: LineReader,
+      evaluator: Command => F[Evaluator.Result])
+      : Repl[F] =
     new Repl[F](prompt, reader, evaluator)
 
-  def mk[F[_]: ConcurrentEffect, G[_]: Effect](
-    ref: Ref[F, ReplState],
-    datasources: Datasources[F, Json],
-    queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]])
+  def mk[F[_]: ConcurrentEffect](
+      ref: Ref[F, ReplState],
+      datasources: Datasources[F, Stream[F, ?], UUID, Json],
+      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
       : F[Repl[F]] = {
-    val evaluator = Evaluator[F, G](ref, datasources, queryEvaluator)
+    val evaluator = Evaluator[F](ref, datasources, queryEvaluator)
     historyFile[F].map(f => Repl[F](prompt, mkLineReader(f), evaluator.evaluate))
   }
 

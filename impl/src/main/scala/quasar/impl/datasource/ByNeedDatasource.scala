@@ -16,12 +16,12 @@
 
 package quasar.impl.datasource
 
-import slamdata.Predef.{Boolean, None, Some, Throwable, Unit}
-import quasar.api._, ResourceError._
+import slamdata.Predef.{Boolean, None, Option, Some, Throwable, Unit}
+import quasar.Disposable
 import quasar.api.datasource.DatasourceType
+import quasar.common.resource._
 import quasar.connector.Datasource
 
-import java.lang.IllegalStateException
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration
@@ -35,46 +35,29 @@ import cats.syntax.functor._
 import fs2.Scheduler
 import fs2.async
 import fs2.async.mutable
-import scalaz.\/
 
 import ByNeedDatasource.NeedState
 
 final class ByNeedDatasource[F[_], G[_], Q, R] private (
     datasourceType: DatasourceType,
-    mvar: mutable.Queue[F, NeedState[F, Datasource[F, G, Q, R]]],
+    mvar: mutable.Queue[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]],
     scheduler: Scheduler)(
     implicit F: MonadError[F, Throwable])
     extends Datasource[F, G, Q, R] {
 
   val kind: DatasourceType = datasourceType
 
-  val shutdown: F[Unit] =
-    for {
-      needState <- mvar.dequeue1
-
-      e <- F.attempt(needState match {
-        case NeedState.Initialized(ds) => ds.shutdown
-        case other => ().pure[F]
-      })
-
-      _ <- mvar.enqueue1(NeedState.Shutdown())
-
-      _ <- F.fromEither(e)
-    } yield ()
-
-  def evaluate(query: Q): F[ReadError \/ R] =
+  def evaluate(query: Q): F[R] =
     getDatasource.flatMap(_.evaluate(query))
 
-  def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]] =
-    getDatasource.flatMap(_.children(path))
+  def pathIsResource(path: ResourcePath): F[Boolean] =
+    getDatasource.flatMap(_.pathIsResource(path))
 
-  def isResource(path: ResourcePath): F[Boolean] =
-    getDatasource.flatMap(_.isResource(path))
+  def prefixedChildPaths(path: ResourcePath)
+      : F[Option[G[(ResourceName, ResourcePathType)]]] =
+    getDatasource.flatMap(_.prefixedChildPaths(path))
 
   ////
-
-  private def alreadyShutdown[A]: F[A] =
-    F.raiseError[A](new IllegalStateException("ByNeedDatasource: Shutdown"))
 
   private def getDatasource: F[Datasource[F, G, Q, R]] =
     for {
@@ -85,10 +68,7 @@ final class ByNeedDatasource[F[_], G[_], Q, R] private (
           initAndGet
 
         case NeedState.Initialized(ds) =>
-          ds.pure[F]
-
-        case NeedState.Shutdown() =>
-          alreadyShutdown
+          ds.unsafeValue.pure[F]
       }
     } yield ds
 
@@ -98,17 +78,14 @@ final class ByNeedDatasource[F[_], G[_], Q, R] private (
         val doInit = for {
           ds <- init
           _  <- mvar.enqueue1(NeedState.Initialized(ds))
-        } yield ds
+        } yield ds.unsafeValue
 
         F.handleErrorWith(doInit) { e =>
           mvar.enqueue1(s) *> F.raiseError(e)
         }
 
       case Some(s @ NeedState.Initialized(ds)) =>
-        mvar.enqueue1(s).as(ds)
-
-      case Some(s @ NeedState.Shutdown()) =>
-        mvar.enqueue1(s) *> alreadyShutdown
+        mvar.enqueue1(s).as(ds.unsafeValue)
 
       case None =>
         getDatasource
@@ -121,17 +98,24 @@ object ByNeedDatasource {
   object NeedState {
     final case class Uninitialized[F[_], A](init: F[A]) extends NeedState[F, A]
     final case class Initialized[F[_], A](a: A) extends NeedState[F, A]
-    final case class Shutdown[F[_], A]() extends NeedState[F, A]
   }
 
   def apply[F[_]: Effect, G[_], Q, R](
       kind: DatasourceType,
-      init: F[Datasource[F, G, Q, R]],
+      init: F[Disposable[F, Datasource[F, G, Q, R]]],
       pool: ExecutionContext,
       scheduler: Scheduler)
-      : F[Datasource[F, G, Q, R]] =
+      : F[Disposable[F, Datasource[F, G, Q, R]]] = {
+
+    def dispose(q: mutable.Queue[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]]): F[Unit] =
+      q.dequeue1 flatMap {
+        case NeedState.Initialized(ds) => ds.dispose
+        case _ => ().pure[F]
+      }
+
     for {
-      mvar <- async.boundedQueue[F, NeedState[F, Datasource[F, G, Q, R]]](1)(implicitly, pool)
+      mvar <- async.boundedQueue[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]](1)(implicitly, pool)
       _    <- mvar.enqueue1(NeedState.Uninitialized(init))
-    } yield new ByNeedDatasource(kind, mvar, scheduler)
+    } yield Disposable(new ByNeedDatasource(kind, mvar, scheduler), dispose(mvar))
+  }
 }

@@ -16,324 +16,254 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{Some, String}
-import quasar.{Condition, ConditionMatchers, Qspec}
-import quasar.api.ResourceName
+import slamdata.Predef._
+import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
+import quasar.common.resource.ResourcePath
 
 import scala.Predef.assert
+import scala.concurrent.ExecutionContext
+import java.util.UUID
 
+import cats.effect.Effect
+import cats.syntax.apply._
+import cats.syntax.flatMap._
+import cats.syntax.functor._
 import eu.timepit.refined.auto._
-import org.specs2.execute.AsResult
 import org.specs2.matcher.Matcher
-import org.specs2.specification.core.Fragment
-import scalaz.{\/, \/-, ~>, Equal, Id, Monad, Show}, Id.Id
+import scalaz.{\/, Equal, IMap, Order, Show}
 import scalaz.syntax.equal._
-import scalaz.syntax.monad._
+import scalaz.syntax.foldable._
+import scalaz.std.list._
 
-abstract class DatasourcesSpec[F[_]: Monad, C: Equal: Show]
-    extends Qspec
+abstract class DatasourcesSpec[F[_], G[_], I: Order: Show, C: Equal: Show](
+    implicit F: Effect[F], ec: ExecutionContext)
+    extends EffectfulQSpec[F]
     with ConditionMatchers {
 
   import DatasourceError._
 
-  def datasources: Datasources[F, C]
+  def datasources: Datasources[F, G, I, C]
 
   def supportedType: DatasourceType
 
   // Must be distinct.
   def validConfigs: (C, C)
 
-  def run: F ~> Id
+  def gatherMultiple[A](fga: G[A]): F[List[A]]
 
-  assert(configA =/= configB, "validConfigs must be distinct!")
+  assert(validConfigs._1 =/= validConfigs._2, "validConfigs must be distinct!")
 
-  "add" >> {
+  def mutationExamples(f: DatasourceRef[C] => F[Err \/ I]) = {
     "lookup on success" >>* {
       for {
-        cond <- datasources.add(
-          foo,
-          supportedType,
-          configA,
-          ConflictResolution.Preserve)
+        a <- refA
 
-        r <- datasources.lookup(foo)
+        fr <- f(a)
+
+        i <- expectSuccess(fr)
+
+        r <- datasources.datasourceRef(i)
       } yield {
-        cond must beNormal
-        r must beConfigured(configA)
+        r must beRef(a)
       }
     }
 
-    "metadata on success" >>* {
+    "normal status on success" >>* {
       for {
-        cond <- datasources.add(
-          foo,
-          supportedType,
-          configA,
-          ConflictResolution.Preserve)
+        a <- refA
 
-        m <- datasources.metadata
+        fr <- f(a)
+
+        i <- expectSuccess(fr)
+
+        r <- datasources.datasourceStatus(i)
       } yield {
-        cond must beNormal
-
-        m.lookup(foo) must beLike {
-          case Some(DatasourceMetadata(t, Condition.Normal())) =>
-            t must_= supportedType
-        }
+        r must be_\/-(beNormal[Exception])
       }
     }
 
-    "replace existing" >>* {
+    "error when name exists" >>* {
       for {
-        afoo <- datasources.add(
-          foo,
-          supportedType,
-          configA,
-          ConflictResolution.Preserve)
+        n <- randomName
 
-        a <- datasources.lookup(foo)
+        x = DatasourceRef(supportedType, n, validConfigs._1)
+        y = DatasourceRef(supportedType, n, validConfigs._2)
 
-        bfoo <- datasources.add(
-          foo,
-          supportedType,
-          configB,
-          ConflictResolution.Replace)
-
-        b <- datasources.lookup(foo)
+        r <- f(x) *> f(y)
       } yield {
-        a must beConfigured(configA)
-        b must beConfigured(configB)
+        r must be_-\/(equal[Err](DatasourceNameExists(n)))
       }
     }
 
-    "preserve existing" >>* {
-      for {
-        afoo <- datasources.add(
-          foo,
-          supportedType,
-          configA,
-          ConflictResolution.Preserve)
-
-        a <- datasources.lookup(foo)
-
-        bfoo <- datasources.add(
-          foo,
-          supportedType,
-          configB,
-          ConflictResolution.Preserve)
-
-        b <- datasources.lookup(foo)
-      } yield {
-        a must beConfigured(configA)
-        bfoo must beAbnormal(equal[Err](DatasourceExists(foo)))
-        b must beConfigured(configA)
-      }
-    }
-
-    "unsupported" >>* {
+    "error when type not supported" >>* {
       val unsup = DatasourceType("--unsupported--", 17L)
 
       for {
-        ubar <- datasources.add(
-          bar,
-          unsup,
-          configB,
-          ConflictResolution.Replace)
+        n <- randomName
 
-        types <- datasources.supported
+        uref = DatasourceRef(unsup, n, validConfigs._1)
+
+        u <- datasources.addDatasource(uref)
+
+        types <- datasources.supportedDatasourceTypes
       } yield {
-        ubar must beAbnormal(equal[Err](DatasourceUnsupported(unsup, types)))
+        u must be_-\/(equal[Err](DatasourceUnsupported(unsup, types)))
       }
     }
   }
 
-  "lookup" >> {
-    "error when not found" >>* {
-      datasources.lookup(nope).map(_ must beNotFound(nope))
+  def resultsInNotFound[E >: ExistentialError[I] <: Err, A](f: I => F[E \/ A]) =
+    for {
+      i <- refA >>= createRef
+
+      c <- datasources.removeDatasource(i)
+
+      fr <- f(i)
+    } yield {
+      c must beNormal
+      fr must beNotFound[E](i)
+    }
+
+  def discoveryExamples[E >: ExistentialError[I] <: Err, A](f: (I, ResourcePath) => F[E \/ A]) = {
+
+    "error when datasource not found" >>* {
+      resultsInNotFound(f(_, ResourcePath.root()))
+    }
+
+    "respond when datasource exists" >>* {
+      for {
+        i <- refA >>= createRef
+
+        fr <- f(i, ResourcePath.root())
+      } yield {
+        fr must not(beNotFound[E](i))
+      }
     }
   }
 
-  "remove" >> {
-    "error when not found" >>* {
-      datasources.remove(nope)
-        .map(_ must beAbnormal(equal[Err](DatasourceNotFound(nope))))
-    }
+  "add datasource" >> mutationExamples { ref =>
+    datasources
+      .addDatasource(ref)
+      .map(_.leftMap[DatasourceError[I, C]](e => e))
+  }
 
-    "lookup fails on success" >>* {
+  "replace datasource" >> {
+    mutationExamples(ref => for {
+      b <- refB
+
+      i <- createRef(b)
+
+      c <- datasources.replaceDatasource(i, ref)
+    } yield {
+      Condition.disjunctionIso
+        .get(c.map[DatasourceError[I, C]](e => e))
+        .map(_ => i)
+    })
+
+    "fails when datasource not found" >>* resultsInNotFound { i =>
       for {
-        afoo <- datasources.add(
-          foo,
-          supportedType,
-          configA,
-          ConflictResolution.Preserve)
-
-        rfoo <- datasources.remove(foo)
-
-        a <- datasources.lookup(foo)
+        b <- refB
+        c <- datasources.replaceDatasource(i, b)
       } yield {
-        afoo must beNormal
-        rfoo must beNormal
-        a must beNotFound(foo)
+        Condition.disjunctionIso
+          .get(c.map[DatasourceError[I, C]](e => e))
+      }
+    }
+  }
+
+  "all metadata" >> {
+    "returns metadata for all datasources" >>* {
+      for {
+        a <- refA
+        ia <- createRef(a)
+
+        b <- refB
+        ib <- createRef(b)
+
+        g <- datasources.allDatasourceMetadata
+        ts <- gatherMultiple(g)
+
+        m = IMap.fromFoldable(ts)
+      } yield {
+        m.lookup(ia).exists(v => v.kind ≟ a.kind && v.name ≟ a.name) must beTrue
+        m.lookup(ib).exists(v => v.kind ≟ b.kind && v.name ≟ b.name) must beTrue
+      }
+    }
+  }
+
+  "lookup ref" >> {
+    "error when not found" >>* {
+      resultsInNotFound(datasources.datasourceRef)
+    }
+  }
+
+  "lookup status" >> {
+    "error when not found" >>* {
+      resultsInNotFound(datasources.datasourceStatus)
+    }
+  }
+
+  "path is resource" >> {
+    discoveryExamples(datasources.pathIsResource)
+  }
+
+  "prefixed child paths" >> {
+    discoveryExamples(datasources.prefixedChildPaths)
+  }
+
+  "remove datasource" >> {
+    "error when not found" >>* {
+      resultsInNotFound { id =>
+        datasources.removeDatasource(id)
+          .map(Condition.disjunctionIso.get(_))
       }
     }
 
     "not in metadata on success" >>* {
       for {
-        afoo <- datasources.add(
-          foo,
-          supportedType,
-          configA,
-          ConflictResolution.Preserve)
+        a <- refA
 
-        rfoo <- datasources.remove(foo)
+        i <- createRef(a)
 
-        meta <- datasources.metadata
+        gBefore <- datasources.allDatasourceMetadata
+        metaBefore <- gatherMultiple(gBefore)
+
+        _ <- datasources.removeDatasource(i)
+
+        gAfter <- datasources.allDatasourceMetadata
+        metaAfter <- gatherMultiple(gAfter)
       } yield {
-        afoo must beNormal
-        rfoo must beNormal
-        meta.member(foo) must beFalse
-      }
-    }
-  }
-
-  "rename" >> {
-    "source nonexistent" >>* {
-      datasources.rename(foo, bar, ConflictResolution.Preserve)
-        .map(_ must beAbnormal(equal[Err](DatasourceNotFound(foo))))
-    }
-
-    "destination nonexistent" >>* {
-      for {
-        afoo <- datasources.add(
-          foo,
-          supportedType,
-          configA,
-          ConflictResolution.Preserve)
-
-        rn <- datasources.rename(foo, bar, ConflictResolution.Preserve)
-
-        x <- datasources.lookup(foo)
-        y <- datasources.lookup(bar)
-      } yield {
-        afoo must beNormal
-        rn must beNormal
-        x must beNotFound(foo)
-        y must beConfigured(configA)
-      }
-    }
-
-    "replace existing destination" >>* {
-      for {
-        afoo <- datasources.add(
-          foo,
-          supportedType,
-          configA,
-          ConflictResolution.Preserve)
-
-        bbar <- datasources.add(
-          bar,
-          supportedType,
-          configB,
-          ConflictResolution.Preserve)
-
-        rn <- datasources.rename(foo, bar, ConflictResolution.Replace)
-
-        a <- datasources.lookup(bar)
-      } yield {
-        afoo must beNormal
-        bbar must beNormal
-        rn must beNormal
-        a must beConfigured(configA)
-      }
-    }
-
-    "preserve existing destination" >>* {
-      for {
-        afoo <- datasources.add(
-          foo,
-          supportedType,
-          configA,
-          ConflictResolution.Preserve)
-
-        bbar <- datasources.add(
-          bar,
-          supportedType,
-          configB,
-          ConflictResolution.Preserve)
-
-        rn <- datasources.rename(foo, bar, ConflictResolution.Preserve)
-
-        b <- datasources.lookup(bar)
-      } yield {
-        afoo must beNormal
-        bbar must beNormal
-        rn must beAbnormal(equal[Err](DatasourceExists(bar)))
-        b must beConfigured(configB)
-      }
-    }
-
-    "metadata reflects change" >>* {
-      for {
-        afoo <- datasources.add(
-          foo,
-          supportedType,
-          configA,
-          ConflictResolution.Preserve)
-
-        rn <- datasources.rename(foo, bar, ConflictResolution.Preserve)
-
-        meta <- datasources.metadata
-      } yield {
-        afoo must beNormal
-        rn must beNormal
-        meta.member(foo) must beFalse
-        meta.member(bar) must beTrue
-      }
-    }
-
-    "src to src is no-op" >>* {
-      for {
-        afoo <- datasources.add(
-          foo,
-          supportedType,
-          configA,
-          ConflictResolution.Preserve)
-
-        rn <- datasources.rename(foo, foo, ConflictResolution.Preserve)
-
-        x <- datasources.lookup(foo)
-      } yield {
-        afoo must beNormal
-        rn must beNormal
-        x must beConfigured(configA)
+        metaBefore.any(_._1 ≟ i) must beTrue
+        metaAfter.any(_._1 ≟ i) must beFalse
       }
     }
   }
 
   ////
 
-  implicit class RunExample(s: String) {
-    def >>*[A: AsResult](fa: => F[A]): Fragment =
-      s >> run(fa)
-  }
+  type Err = DatasourceError[I, C]
 
-  type Err = DatasourceError[C]
+  // To allow control over conflicts.
+  val randomName: F[DatasourceName] =
+    F.delay(DatasourceName("ds-" + UUID.randomUUID()))
 
-  val foo = ResourceName("foo")
-  val bar = ResourceName("bar")
-  val nope = ResourceName("nope")
+  def refA: F[DatasourceRef[C]] =
+    randomName map (DatasourceRef(supportedType, _, validConfigs._1))
 
-  def configA: C =
-    validConfigs._1
+  def refB: F[DatasourceRef[C]] =
+    randomName map (DatasourceRef(supportedType, _, validConfigs._2))
 
-  def configB: C =
-    validConfigs._2
+  def createRef(r: DatasourceRef[C]): F[I] =
+    datasources.addDatasource(r) >>= expectSuccess
 
-  def beConfigured(cfg: C): Matcher[CommonError \/ (DatasourceMetadata, C)] =
-    beLike {
-      case \/-((DatasourceMetadata(t, Condition.Normal()), c)) =>
-        (t must_= supportedType) and (c must_= cfg)
-    }
+  def expectSuccess[E <: Err, A](r: E \/ A): F[A] =
+    r.fold(
+      e => F.raiseError(new RuntimeException(s"Operation failed: ${Show[Err].shows(e)}")),
+      F.pure(_))
 
-  def beNotFound[A](name: ResourceName): Matcher[CommonError \/ A] =
-    be_-\/(equal[Err](DatasourceNotFound(name)))
+  def beRef(ref: DatasourceRef[C]): Matcher[ExistentialError[I] \/ DatasourceRef[C]] =
+    be_\/-(equal(ref))
+
+  def beNotFound[E >: ExistentialError[I] <: Err](id: I): Matcher[E \/ _] =
+    be_-\/[E](equal[Err](DatasourceNotFound(id)) ^^ { (e: E) => e: Err })
 }

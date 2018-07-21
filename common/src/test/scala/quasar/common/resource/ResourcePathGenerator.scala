@@ -14,21 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.connector.datasource
+package quasar.common.resource
 
-import quasar.RenderTreeT
-import quasar.connector.{Datasource, QScriptEvaluator}
-import quasar.fs.Planner.PlannerErrorME
-import quasar.qscript.QScriptEducated
+import quasar.contrib.pathy.AFile
+import quasar.pkg.tests._
 
-import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.Monad
+import pathy.scalacheck.PathyArbitrary._
 
-/** A Datasource capable of executing QScript. */
-abstract class HeavyweightDatasource[
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: PlannerErrorME,
-    G[_],
-    R]
-    extends QScriptEvaluator[T, F, R]
-    with Datasource[F, G, T[QScriptEducated[T, ?]], R]
+trait ResourcePathGenerator {
+  implicit val resourcePathArbitrary: Arbitrary[ResourcePath] =
+    Arbitrary(for {
+      n <- choose(1, 10)
+      p <- if (n > 2) arbitrary[AFile].map(ResourcePath.leaf(_))
+           else const(ResourcePath.root())
+    } yield p)
+}
+
+object ResourcePathGenerator extends ResourcePathGenerator

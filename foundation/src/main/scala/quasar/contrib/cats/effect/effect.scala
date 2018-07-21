@@ -14,20 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.contrib.cats.effect
 
-import quasar.contrib.pathy.AFile
-import quasar.pkg.tests._
+import slamdata.Predef.{Either, Throwable}
 
-import pathy.scalacheck.PathyArbitrary._
+import scala.concurrent.ExecutionContext
 
-trait ResourcePathGenerator {
-  implicit val resourcePathArbitrary: Arbitrary[ResourcePath] =
-    Arbitrary(for {
-      n <- choose(1, 10)
-      p <- if (n > 2) arbitrary[AFile].map(ResourcePath.leaf(_))
-           else const(ResourcePath.root())
-    } yield p)
+import cats.effect.{Effect, IO}
+import fs2.async.Promise
+
+object effect {
+  def unsafeRunEffect[F[_]: Effect, A](fa: F[A])(implicit ec: ExecutionContext): A = {
+    val ioa = for {
+      p <- Promise.empty[IO, Either[Throwable, A]]
+      _ <- Effect[F].runAsync(fa)(p.complete(_))
+      r <- p.get
+      a <- IO.fromEither(r)
+    } yield a
+
+    ioa.unsafeRunSync()
+  }
 }
-
-object ResourcePathGenerator extends ResourcePathGenerator

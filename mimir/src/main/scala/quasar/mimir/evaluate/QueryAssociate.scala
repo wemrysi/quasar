@@ -17,46 +17,35 @@
 package quasar.mimir.evaluate
 
 import quasar.Data
-import quasar.api.ResourcePath
-import quasar.api.ResourceError.ReadError
-import quasar.higher.HFunctor
+import quasar.common.resource.ResourcePath
 import quasar.qscript.QScriptEducated
 
 import fs2.Stream
-import scalaz.{\/, ~>}
+import scalaz.~>
 
-sealed trait QueryAssociate[T[_[_]], F[_], G[_]]
+sealed trait QueryAssociate[T[_[_]], F[_]]
 
-object QueryAssociate extends QueryAssociateInstances {
-  final case class Lightweight[T[_[_]], F[_], G[_]](
-      f: ResourcePath => F[ReadError \/ Stream[G, Data]])
-      extends QueryAssociate[T, F, G]
+object QueryAssociate {
+  final case class Lightweight[T[_[_]], F[_]](f: ResourcePath => F[Stream[F, Data]])
+      extends QueryAssociate[T, F]
 
-  final case class Heavyweight[T[_[_]], F[_], G[_]](
-      f: T[QScriptEducated[T, ?]] => F[ReadError \/ Stream[G, Data]])
-      extends QueryAssociate[T, F, G]
+  final case class Heavyweight[T[_[_]], F[_]](f: T[QScriptEducated[T, ?]] => F[Stream[F, Data]])
+      extends QueryAssociate[T, F]
 
-  def lightweight[T[_[_]], F[_], G[_]](
-      f: ResourcePath => F[ReadError \/ Stream[G, Data]])
-      : QueryAssociate[T, F, G] =
+  def lightweight[T[_[_]], F[_]](f: ResourcePath => F[Stream[F, Data]])
+      : QueryAssociate[T, F] =
     Lightweight(f)
 
-  def heavyweight[T[_[_]], F[_], G[_]](
-      f: T[QScriptEducated[T, ?]] => F[ReadError \/ Stream[G, Data]])
-      : QueryAssociate[T, F, G] =
+  def heavyweight[T[_[_]], F[_]](f: T[QScriptEducated[T, ?]] => F[Stream[F, Data]])
+      : QueryAssociate[T, F] =
     Heavyweight(f)
-}
 
-sealed abstract class QueryAssociateInstances {
-  implicit def lhfunctor[T[_[_]], G[_]]: HFunctor[QueryAssociate[T, ?[_], G]] =
-    new HFunctor[QueryAssociate[T, ?[_], G]] {
-      def hmap[A[_], B[_]](qa: QueryAssociate[T, A, G])(f: A ~> B) =
-        qa match {
-          case QueryAssociate.Lightweight(q) =>
-            QueryAssociate.Lightweight(q andThen (f(_)))
-
-          case QueryAssociate.Heavyweight(q) =>
-            QueryAssociate.Heavyweight(q andThen (f(_)))
-        }
+  def transformResult[T[_[_]], F[_], G[_]](
+      qa: QueryAssociate[T, F])(
+      f: λ[a => F[Stream[F, a]]] ~> λ[a => G[Stream[G, a]]])
+      : QueryAssociate[T, G] =
+    qa match {
+      case Lightweight(k) => Lightweight(k andThen (f(_)))
+      case Heavyweight(k) => Heavyweight(k andThen (f(_)))
     }
 }

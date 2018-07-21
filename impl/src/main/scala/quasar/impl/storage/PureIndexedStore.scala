@@ -16,10 +16,12 @@
 
 package quasar.impl.storage
 
+import slamdata.Predef.None
 import quasar.contrib.scalaz.MonadState_
 
 import fs2.Stream
 import scalaz.{IMap, Monad, Order}
+import scalaz.syntax.bind._
 
 /** An indexed store backed by an immutable map. */
 object PureIndexedStore {
@@ -36,6 +38,13 @@ object PureIndexedStore {
         F.modify(_.insert(i, v))
 
       def delete(i: I) =
-        F.modify(_.delete(i))
+        for {
+          m <- F.get
+
+          r = m.updateLookupWithKey(i, (_, _) => None)
+          (old, m2) = r
+
+          _ <- F.put(m2)
+        } yield old.isDefined
     }
 }

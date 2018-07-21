@@ -24,23 +24,28 @@ import scalaz.{Cord, Show}
 import scalaz.syntax.show._
 
 @Lenses
-final case class DatasourceMetadata(
+final case class DatasourceMeta(
     kind: DatasourceType,
+    name: DatasourceName,
     status: Condition[Exception])
 
-object DatasourceMetadata extends DatasourceMetadataInstances {
-  def fromOption(kind: DatasourceType, optErr: Option[Exception]): DatasourceMetadata =
-    DatasourceMetadata(kind, Condition.optionIso.reverseGet(optErr))
+object DatasourceMeta extends DatasourceMetaInstances {
+  def fromOption(
+      kind: DatasourceType,
+      name: DatasourceName,
+      optErr: Option[Exception])
+      : DatasourceMeta =
+    DatasourceMeta(kind, name, Condition.optionIso.reverseGet(optErr))
 }
 
-sealed abstract class DatasourceMetadataInstances {
-  implicit val show: Show[DatasourceMetadata] = {
+sealed abstract class DatasourceMetaInstances {
+  implicit val show: Show[DatasourceMeta] = {
     implicit val exShow: Show[Exception] =
       Show.shows(_.getMessage)
 
     Show.show {
-      case DatasourceMetadata(k, s) =>
-        Cord("DatasourceMetadata(") ++ k.show ++ Cord(", ") ++ s.show ++ Cord(")")
+      case DatasourceMeta(n, k, s) =>
+        Cord("DatasourceMeta(") ++ k.show ++ Cord(", ") ++ n.show ++ Cord(", ") ++ s.show ++ Cord(")")
     }
   }
 }

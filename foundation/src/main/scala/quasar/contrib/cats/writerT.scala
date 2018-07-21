@@ -14,21 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.contrib.cats
 
-import slamdata.Predef.String
+import quasar.contrib.scalaz.MonadTell_
 
-import scalaz.{Order, Show}
-import scalaz.std.string._
+import cats.Applicative
+import cats.data.WriterT
 
-final case class ResourceName(value: String)
-
-object ResourceName extends ResourceNameInstances
-
-sealed abstract class ResourceNameInstances {
-  implicit val order: Order[ResourceName] =
-    Order.orderBy(_.value)
-
-  implicit val show: Show[ResourceName] =
-    Show.shows(_.value)
+object writerT {
+  implicit def catsWriterTMonadTell_[F[_]: Applicative, W]: MonadTell_[WriterT[F, W, ?], W] =
+    new MonadTell_[WriterT[F, W, ?], W] {
+      def writer[A](w: W, a: A) = WriterT.put(a)(w)
+    }
 }

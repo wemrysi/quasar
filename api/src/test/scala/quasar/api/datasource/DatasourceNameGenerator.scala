@@ -14,21 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.datasource
 
-import slamdata.Predef.Boolean
-import quasar.api.ResourceError.CommonError
+import slamdata.Predef.String
 
-import scalaz.\/
+import org.scalacheck.Arbitrary
 
-/** Provides for discovering the resources in a datasource. */
-trait ResourceDiscovery[F[_], G[_]] {
-
-  /** Returns the children of the specified resource path or an error if it
-    * does not exist.
-    */
-  def children(path: ResourcePath): F[CommonError \/ G[(ResourceName, ResourcePathType)]]
-
-  /** Returns whether the specified resource path refers to a resource. */
-  def isResource(path: ResourcePath): F[Boolean]
+trait DatasourceNameGenerator {
+  implicit val datasourceNameArbitrary: Arbitrary[DatasourceName] =
+    Arbitrary(Arbitrary.arbitrary[String] map (DatasourceName(_)))
 }
+
+object DatasourceNameGenerator extends DatasourceNameGenerator

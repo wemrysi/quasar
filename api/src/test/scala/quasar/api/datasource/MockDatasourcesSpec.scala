@@ -16,38 +16,44 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{String, List}
-import quasar.api.ResourceName
-
+import slamdata.Predef.{Int, List, String, Stream => SStream}
 import quasar.Condition
-import quasar.fp.numeric.Positive
+import quasar.contrib.cats.stateT._
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.IO
+import cats.data.StateT
+import cats.syntax.applicative._
 import eu.timepit.refined.auto._
-import scalaz.{IMap, ISet, Id, StateT, ~>}, Id.Id
+import scalaz.ISet
+import scalaz.std.anyVal._
+import scalaz.std.list._
 import scalaz.std.string._
 import shims._
 
-import MockDatasourcesSpec.DefaultM
+import MockDatasourcesSpec._
 
-final class MockDatasourcesSpec extends DatasourcesSpec[DefaultM, String] {
-  val s3: DatasourceType    = DatasourceType("s3", Positive(3).get)
-  val azure: DatasourceType = DatasourceType("azure", Positive(3).get)
-  val mongo: DatasourceType = DatasourceType("mongodb", Positive(3).get)
+final class MockDatasourcesSpec
+  extends DatasourcesSpec[MockM, List, Int, String] {
+
+  val s3: DatasourceType    = DatasourceType("s3", 1L)
+  val azure: DatasourceType = DatasourceType("azure", 1L)
+  val mongo: DatasourceType = DatasourceType("mongodb", 1L)
   val acceptedSet: ISet[DatasourceType] = ISet.fromList(List(s3, azure, mongo))
 
-  def datasources: Datasources[DefaultM, String] =
-    MockDatasources[DefaultM, String](acceptedSet, (_, _, _) => Condition.normal())
+  def datasources: Datasources[MockM, List, Int, String] =
+    MockDatasources[String, MockM, List](
+      acceptedSet, _ => Condition.normal(), SStream.empty)
 
-  def supportedType = DatasourceType("s3", 3L)
+  def supportedType = DatasourceType("s3", 1L)
 
-  def validConfigs = ("one", "five")
+  def validConfigs = ("bucket1", "bucket2")
 
-  def run: DefaultM ~> Id.Id =
-    λ[DefaultM ~> Id]( _.eval(IMap.empty).unsafeRunSync )
+  def gatherMultiple[A](xs: List[A]) = xs.pure[MockM]
 }
 
 object MockDatasourcesSpec {
-  type Store = IMap[ResourceName, (DatasourceMetadata, String)]
-  type DefaultM[A] = StateT[IO, Store, A]
+  import MockDatasources.MockState
+  type MockM[A] = StateT[IO, MockState[String], A]
 }

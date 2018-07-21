@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.connector.datasource
+package quasar.api.datasource
 
-import quasar.RenderTreeT
-import quasar.connector.{Datasource, QScriptEvaluator}
-import quasar.fs.Planner.PlannerErrorME
-import quasar.qscript.QScriptEducated
+import slamdata.Predef.String
 
-import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.Monad
+import scalaz.{Order, Show}
+import scalaz.std.string._
 
-/** A Datasource capable of executing QScript. */
-abstract class HeavyweightDatasource[
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: PlannerErrorME,
-    G[_],
-    R]
-    extends QScriptEvaluator[T, F, R]
-    with Datasource[F, G, T[QScriptEducated[T, ?]], R]
+final case class DatasourceName(value: String)
+
+object DatasourceName extends DatasourceNameInstances
+
+sealed abstract class DatasourceNameInstances {
+  implicit val order: Order[DatasourceName] =
+    Order.orderBy(_.value)
+
+  implicit val show: Show[DatasourceName] =
+    Show.shows(_.value)
+}

@@ -18,8 +18,12 @@ package quasar
 package repl
 
 import slamdata.Predef._
-import quasar.api._, datasource._
+import quasar.api.datasource._
+import quasar.common.resource.ResourcePath
+import quasar.run.optics.{stringUUIDP => UuidString}
 import quasar.sql.Query
+
+import java.util.UUID
 
 import eu.timepit.refined.auto._
 import scalaz._, Scalaz._
@@ -33,6 +37,7 @@ object Command {
   private val HelpPattern                  = "(?i)(?:help)|(?:commands)|\\?".r
   private val CdPattern                    = "(?i)cd(?: +(.+))?".r
   private val LsPattern                    = "(?i)ls(?: +(.+))?".r
+  private val PwdPattern                   = "(?i)pwd".r
   private val SetPhaseFormatPattern        = "(?i)(?:set +)?phaseFormat *= *(tree|code)".r
   private val SetTimingFormatPattern       = "(?i)(?:set +)?timingFormat *= *(tree|onlytotal)".r
   private val DebugPattern                 = "(?i)(?:set +)?debug *= *(0|1|2)".r
@@ -43,13 +48,14 @@ object Command {
   private val ListVarPattern               = "(?i)env".r
   private val DatasourceListPattern        = "(?i)ds(?: +)(?:list|ls)".r
   private val DatasourceTypesPattern       = "(?i)ds(?: +)types".r
-  private val DatasourceAddPattern         = s"(?i)ds(?: +)(?:add +)($NamePattern)(?: +)($NamePattern)(?: +)(replace|preserve)(?: +)(.*\\S)".r
+  private val DatasourceAddPattern         = s"(?i)ds(?: +)(?:add +)($NamePattern)(?: +)($NamePattern)(?: +)(.*\\S)".r
   private val DatasourceLookupPattern      = "(?i)ds(?: +)(?:lookup|get) +([\\S]+)".r
   private val DatasourceRemovePattern      = "(?i)ds(?: +)(?:remove|rm) +([\\S]+)".r
 
   final case object Exit extends Command
   final case object Help extends Command
   final case object ListVars extends Command
+  final case object Pwd extends Command
   final case class Cd(dir: ReplPath) extends Command
   final case class Select(query: Query) extends Command
   final case class Ls(dir: Option[ReplPath]) extends Command
@@ -63,9 +69,9 @@ object Command {
 
   final case object DatasourceList extends Command
   final case object DatasourceTypes extends Command
-  final case class DatasourceLookup(name: ResourceName) extends Command
-  final case class DatasourceAdd(name: ResourceName, tp: DatasourceType.Name, config: String, onConflict: ConflictResolution) extends Command
-  final case class DatasourceRemove(name: ResourceName) extends Command
+  final case class DatasourceLookup(id: UUID) extends Command
+  final case class DatasourceAdd(name: DatasourceName, tp: DatasourceType.Name, config: String) extends Command
+  final case class DatasourceRemove(id: UUID) extends Command
 
   implicit val equalCommand: Equal[Command] = Equal.equalA
 
@@ -85,13 +91,13 @@ object Command {
       case SetVarPattern(name, value)               => SetVar(VarName(name), VarValue(value))
       case UnsetVarPattern(name)                    => UnsetVar(VarName(name))
       case ListVarPattern()                         => ListVars
+      case PwdPattern()                             => Pwd
       case DatasourceListPattern()                  => DatasourceList
       case DatasourceTypesPattern()                 => DatasourceTypes
-      case DatasourceLookupPattern(n)               => DatasourceLookup(ResourceName(n))
-      case DatasourceAddPattern(n, DatasourceType.string(tp), onConflict, cfg) =>
-                                                       DatasourceAdd(ResourceName(n), tp, cfg,
-                                                         ConflictResolution.string.getOption(onConflict) | ConflictResolution.Preserve)
-      case DatasourceRemovePattern(n)               => DatasourceRemove(ResourceName(n))
+      case DatasourceLookupPattern(UuidString(u))   => DatasourceLookup(u)
+      case DatasourceAddPattern(n, DatasourceType.string(tp), cfg) =>
+                                                       DatasourceAdd(DatasourceName(n), tp, cfg)
+      case DatasourceRemovePattern(UuidString(u))   => DatasourceRemove(u)
       case _                                        => Select(Query(input))
     }
 }

@@ -17,48 +17,45 @@
 package quasar.run
 
 import quasar.Data
-import quasar.api.{QueryEvaluator, ResourceDiscovery, ResourceName}
-import quasar.api.datasource.Datasources
+import quasar.api.QueryEvaluator
+import quasar.api.datasource.{DatasourceRef, Datasources}
 import quasar.common.PhaseResultTell
-import quasar.contrib.fs2.stream._
-import quasar.contrib.pathy.AFile
-import quasar.contrib.scalaz.MonadError_
+import quasar.contrib.pathy.ADir
+import quasar.contrib.std.uuid._
 import quasar.evaluate.FederatingQueryEvaluator
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.local.LocalDatasourceModule
-import quasar.impl.datasources.{DatasourceConfig, DatasourceManagement, DefaultDatasources}
+import quasar.impl.datasources.{DatasourceManagement, DefaultDatasources}
 import quasar.impl.external.{ExternalConfig, ExternalDatasources}
 import quasar.mimir.Precog
-import quasar.mimir.datasources.MimirDatasourceConfigs
-import quasar.mimir.evaluate.{MimirQueryFederation, QueryAssociate}
-import quasar.run.data.{jsonToRValue, rValueToJson}
+import quasar.mimir.evaluate.MimirQueryFederation
+import quasar.mimir.storage.{MimirIndexedStore, StoreKey}
 import quasar.run.implicits._
-import quasar.yggdrasil.vfs.ResourceError
+import quasar.run.optics._
 
 import java.nio.file.Path
+import java.util.UUID
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
-import cats.~>
+import argonaut.JsonScalaz._
 import cats.effect.{ConcurrentEffect, IO, Timer}
-import cats.syntax.functor._
 import cats.syntax.flatMap._
 import fs2.{Scheduler, Stream}
 import matryoshka.data.Fix
 import pathy.Path._
 import scalaz.IMap
 import scalaz.syntax.foldable._
-import scalaz.syntax.invariantFunctor._
 import shims._
 
-final class Quasar[F[_], G[_]](
-    val datasources: Datasources[F, Json],
-    val queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]])
+final class Quasar[F[_]](
+    val datasources: Datasources[F, Stream[F, ?], UUID, Json],
+    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[IO, Data]])
 
 object Quasar {
-  // The location the datasource configs table within `mimir`.
-  val DatasourceConfigsLocation: AFile =
-    rootDir </> dir("quasar") </> file("datasource-configs")
+  // The location the datasource refs tables within `mimir`.
+  val DatasourceRefsLocation: ADir =
+    rootDir </> dir("quasar") </> dir("datasource-refs")
 
   /** What it says on the tin.
     *
@@ -69,7 +66,7 @@ object Quasar {
       mimirDir: Path,
       extConfig: ExternalConfig,
       pool: ExecutionContext)
-      : Stream[F, Quasar[F, IO]] = {
+      : Stream[F, Quasar[F]] = {
 
     implicit val ec = pool
 
@@ -78,19 +75,16 @@ object Quasar {
         d => Stream.emit(d.unsafeValue),
         _.dispose.to[F])
 
-      configs =
-        MimirDatasourceConfigs[F](precog, DatasourceConfigsLocation)
-          .xmap(rValueToJson, jsonToRValue)
+      refs =
+        MimirIndexedStore.transformValue(
+          MimirIndexedStore.transformIndex(
+            MimirIndexedStore[F](precog, DatasourceRefsLocation),
+            "UUID",
+            StoreKey.stringIso composePrism stringUUIDP),
+          "DatasourceRef",
+          rValueDatasourceRefP(rValueJsonP))
 
-      configStream <- Stream.eval(MonadError_[F, ResourceError] unattempt {
-        MimirDatasourceConfigs.allConfigs(precog, DatasourceConfigsLocation).run.to[F]
-      })
-
-      configured <-
-        configStream
-          .map { case (n, c) => (n, c.map(rValueToJson)) }
-          .fold(IMap.empty[ResourceName, DatasourceConfig[Json]])(_ + _)
-          .translate(λ[IO ~> F](_.to[F]))
+      configured <- refs.entries.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _)
 
       extMods <- ExternalDatasources[F](extConfig, pool)
 
@@ -100,26 +94,20 @@ object Quasar {
 
       scheduler <- Scheduler(corePoolSize = 1, threadPrefix = "quasar-scheduler")
 
-      mr <- Stream.bracket(DatasourceManagement[Fix, F, IO](modules, configured, pool, scheduler))(
+      mr <- Stream.bracket(DatasourceManagement[Fix, F, UUID](modules, configured, pool, scheduler))(
         Stream.emit(_),
-        { case (_, r) => r.get.flatMap(_.traverse_(_.fold(_.shutdown, _.shutdown))) })
+        { case (_, r) => r.get.flatMap(_.traverse_(_.dispose)) })
 
       (mgmt, running) = mr
 
-      datasources = DefaultDatasources(configs, mgmt, mgmt)
+      freshUUID = ConcurrentEffect[F].delay(UUID.randomUUID)
+
+      datasources = DefaultDatasources(freshUUID, refs, mgmt, mgmt)
 
       federation = MimirQueryFederation[Fix, F](precog)
 
-      sources = running.get.map(_.map(ds => (
-        ds.fold[ResourceDiscovery[F, Stream[IO, ?]]](
-          l => l,
-          h => h),
-        ds.fold[QueryAssociate[Fix, F, IO]](
-          lw => QueryAssociate.Lightweight(lw.evaluate),
-          hw => QueryAssociate.Heavyweight(hw.evaluate)))))
-
       queryEvaluator =
-        Sql2QueryEvaluator(FederatingQueryEvaluator(federation, sources))
+        Sql2QueryEvaluator(FederatingQueryEvaluator(federation, ResourceRouter(running.get)))
 
     } yield new Quasar(datasources, queryEvaluator)
   }
