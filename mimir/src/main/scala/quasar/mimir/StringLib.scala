@@ -103,69 +103,56 @@ trait StringLibModule extends ColumnarTableLibModule {
       val tpe = UnaryOperationType(JType.JPrimitiveUnfixedT, JTextT)
       def f1: F1 = CF1P {
         case c: BoolColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: LongColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: DoubleColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: NumColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: StrColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: NullColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = "null"
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: OffsetDateTimeColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: OffsetTimeColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: OffsetDateColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: LocalDateTimeColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: LocalTimeColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: LocalDateColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
         case c: IntervalColumn =>
-          new StrColumn {
+          new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
-            def isDefinedAt(row: Int) = c.isDefinedAt(row)
           }
       }
     }
