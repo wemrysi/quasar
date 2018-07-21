@@ -159,8 +159,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
       for {
         errorOrId1 <- tables.createTable(table1)
         errorOrId2 <- tables.createTable(table2)
-        resultStream <- tables.allTables
-        result <- resultStream.compile.toList
+        result <- tables.allTables.compile.toList
       } yield {
         (result.map(_._2) must_= List(table1, table2)) or
           (result.map(_._2) must_= List(table2, table1))

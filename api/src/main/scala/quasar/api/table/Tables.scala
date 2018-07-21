@@ -30,7 +30,7 @@ import scalaz.\/
 trait Tables[F[_], I, Q, D] {
   import TableError.{CreationError, ExistenceError, ModificationError, PrePreparationError}
 
-  def allTables: F[Stream[F, (I, Table[Q], PreparationStatus)]]
+  def allTables: Stream[F, (I, Table[Q], PreparationStatus)]
 
   def table(tableId: I): F[ExistenceError[I] \/ Table[Q]]
 

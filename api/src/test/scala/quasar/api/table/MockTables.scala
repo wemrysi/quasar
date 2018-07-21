@@ -40,12 +40,12 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
 
   val store = MonadState_[F, IMap[UUID, MockTable]]
 
-  def allTables: F[Stream[F, (UUID, Table[String], PreparationStatus)]] =
-    store.get.map { s =>
+  def allTables: Stream[F, (UUID, Table[String], PreparationStatus)] =
+    Stream.force(store.get.map { s =>
       Stream.emits(s.toList.map {
         case (uuid, MockTable(table, status)) => (uuid, table, status)
       }).covary[F]
-    }
+    })
 
   def table(tableId: UUID): F[ExistenceError[UUID] \/ Table[String]] =
     store.gets(_.lookup(tableId)
