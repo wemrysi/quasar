@@ -131,10 +131,6 @@ object Dependencies {
     "com.codecommit" %% "smock" % "0.4.0-specs2-4.0.2" % "test"
   )
 
-  def mimir = Seq(
-    "io.chrisdavenport" %% "scalaz-task-effect" % "0.1.0"
-  )
-
   def niflheim = Seq(
     "com.typesafe.akka"  %% "akka-actor" % akkaVersion,
     "org.typelevel"      %% "spire"      % spireVersion,

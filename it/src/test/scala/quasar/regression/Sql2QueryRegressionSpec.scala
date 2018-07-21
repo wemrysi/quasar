@@ -51,13 +51,11 @@ import cats.effect.{Effect, IO, Sync, Timer}
 import eu.timepit.refined.auto._
 import fs2.{io, text, Stream}
 import fs2.async.Promise
-import _root_.io.chrisdavenport.scalaz.task._
 import matryoshka._
 import org.specs2.execute
 import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 // import shims._ causes compilation to not terminate in any reasonable amount of time.
 import shims.{monadErrorToScalaz, monadToScalaz}
 
@@ -148,8 +146,8 @@ final class Sql2QueryRegressionSpec extends Qspec {
           test.data.nonEmpty.fold(DataDir(id) </> fileParent(loc), rootDir))
 
       verifyResults(test.expected, results(query), backendName)
-        .timed(2.minutes)
-        .unsafePerformSync
+        .unsafeRunTimed(2.minutes)
+        .getOrElse(execute.StandardResults.failure("Timed out."))
     }
 
     s"${test.name} [${posixCodec.printPath(loc)}]" >> {
@@ -164,11 +162,11 @@ final class Sql2QueryRegressionSpec extends Qspec {
   }
 
   /** Verify the given results according to the provided expectation. */
-  def verifyResults(
+  def verifyResults[F[_]: Sync](
       exp: ExpectedResult,
-      act: Stream[IO, Data],
+      act: Stream[F, Data],
       backendName: BackendName)
-      : Task[execute.Result] = {
+      : F[execute.Result] = {
 
     /** This helps us get identical results on different connectors, even though
       * they have different precisions for their floating point values.
@@ -204,15 +202,15 @@ final class Sql2QueryRegressionSpec extends Qspec {
             OrderIgnored
         } | OrderPreserved
 
-    val actProcess =
-      convert.toProcess(act)
-        // TODO{fs2}: Chunkiness
-        .map(normalizeJson <<< deleteFields <<< (_.asJson))
-        .translate(λ[IO ~> Task](_.to[Task]))
+    // TODO{fs2}: Chunkiness
+    val actNormal =
+      act.mapChunks(
+        _.map(normalizeJson <<< deleteFields <<< (_.asJson))
+          .toSegment)
 
     exp.predicate(
       exp.rows,
-      actProcess,
+      actNormal,
       fieldOrderSignificance,
       resultOrderSignificance)
   }

@@ -541,7 +541,6 @@ lazy val mimir = project
     impl % BothScopes,
     core,
     connector)
-  .settings(libraryDependencies ++= Dependencies.mimir)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
