@@ -209,7 +209,7 @@ lazy val root = project.in(file("."))
     foundation, frontend, fs,
     impl, interface, it,
     js,
-    mimir, mongodb, mongoIt,
+    mimir,
     niflheim,
     precog,
     qscript, qsu,
@@ -393,27 +393,6 @@ lazy val core = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-/** Implementation of the MongoDB connector.
-  */
-lazy val mongodb = project
-  .settings(name := "quasar-mongodb-internal")
-  .dependsOn(
-    fs        % "test->test",
-    connector % BothScopes,
-    js        % BothScopes,
-    core      % BothScopes)
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(
-    libraryDependencies ++= Dependencies.mongodb,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf,
-      Wart.Equals,
-      Wart.Overloading))
-  .settings(isolatedBackendSettings("quasar.physical.mongodb.MongoDb$"))
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Types and operations needed by applications that embed Quasar.
   */
 lazy val interface = project
@@ -520,19 +499,6 @@ lazy val it = project
 
       test in Test
     }.value)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val mongoIt = project
-  .configs(ExclusiveTests)
-  .dependsOn(it % BothScopes, mongodb)
-  .settings(commonSettings)
-  .settings(noPublishSettings)
-  .settings(targetSettings)
-  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
-  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
-  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
-  .settings(parallelExecution in Test := false)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
