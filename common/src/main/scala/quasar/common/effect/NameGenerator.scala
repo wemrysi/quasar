@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.effect
+package quasar.common.effect
 
 import slamdata.Predef._
 import quasar.fp.ski.κ
 
 import simulacrum.typeclass
 import scalaz._
-import scalaz.concurrent.Task
 import scalaz.syntax.functor._
 
 /** A source of strings unique within `F[_]`, an implementation must have the
@@ -38,21 +37,12 @@ import scalaz.syntax.functor._
     freshName map (prefix + _)
 }
 
-object NameGenerator extends NameGeneratorInstances {
-  /** A short, randomized string to use as "salt" in salted name generators. */
-  val salt: Task[String] =
-    Task.delay(scala.util.Random.nextInt().toHexString)
-}
+object NameGenerator extends NameGeneratorInstances
 
 sealed abstract class NameGeneratorInstances extends NameGeneratorInstances0 {
   implicit def sequenceNameGenerator[F[_]](implicit F: MonadState[F, Long]): NameGenerator[F] =
     new NameGenerator[F] {
       def freshName = F.bind(F.get)(n => F.put(n + 1) as n.toString)
-    }
-
-  implicit def monotonicSeqNameGenerator[S[_]](implicit S: MonotonicSeq :<: S): NameGenerator[Free[S, ?]] =
-    new NameGenerator[Free[S, ?]] {
-      def freshName = MonotonicSeq.Ops[S].next map (_.toString)
     }
 }
 

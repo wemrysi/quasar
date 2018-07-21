@@ -17,7 +17,7 @@
 package quasar.qsu
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.effect.NameGenerator
+import quasar.common.effect.NameGenerator
 import quasar.RenderTreeT
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.MonadState_

@@ -19,7 +19,7 @@ package quasar.qsu
 import slamdata.Predef.{Map => SMap, _}
 
 import quasar.RenderTreeT
-import quasar.effect.NameGenerator
+import quasar.common.effect.NameGenerator
 import quasar.contrib.iota.copkTraverse
 import quasar.fp.symbolOrder
 import quasar.frontend.logicalplan.JoinDir

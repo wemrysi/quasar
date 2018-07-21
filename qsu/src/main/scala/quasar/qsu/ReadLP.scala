@@ -27,9 +27,9 @@ import quasar.{
   UnaryFunc
 }
 import quasar.common.data.Data
+import quasar.common.effect.NameGenerator
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.scalaz.MonadState_
-import quasar.effect.NameGenerator
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.contrib.iota._

@@ -18,7 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 import quasar.RenderTreeT
-import quasar.effect.NameGenerator
+import quasar.common.effect.NameGenerator
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.qscript.MonadPlannerErr
 

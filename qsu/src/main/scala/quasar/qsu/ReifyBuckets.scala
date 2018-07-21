@@ -18,7 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.effect.NameGenerator
+import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp.symbolOrder
 import quasar.fp.ski.ι

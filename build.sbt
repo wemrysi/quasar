@@ -205,7 +205,7 @@ lazy val root = project.in(file("."))
     blueeyes,
     common, connector, core,
     datagen,
-    effect, ejson,
+    ejson,
     foundation, frontend,
     impl, it,
     mimir,
@@ -258,15 +258,6 @@ lazy val ejson = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val effect = project
-  .settings(name := "quasar-effect-internal")
-  .dependsOn(foundation % BothScopes)
-  .settings(libraryDependencies ++= Dependencies.effect)
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Quasar components shared by both frontend and connector. This includes
   * things like data models, types, etc.
   */
@@ -288,7 +279,6 @@ lazy val frontend = project
   .settings(name := "quasar-frontend-internal")
   .dependsOn(
     common % BothScopes,
-    effect,
     ejson % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
@@ -364,8 +354,7 @@ lazy val core = project
   .dependsOn(
     api     % BothScopes,
     qscript % BothScopes,
-    sql     % BothScopes,
-    effect  % "test->test")
+    sql     % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)

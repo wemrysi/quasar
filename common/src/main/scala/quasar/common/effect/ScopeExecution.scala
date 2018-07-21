@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.effect
+package quasar.common.effect
 
 import slamdata.Predef._
 import java.time.Instant
