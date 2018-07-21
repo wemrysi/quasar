@@ -22,10 +22,8 @@ import quasar.api._, datasource._
 import quasar.common.resource._
 import quasar.contrib.pathy._
 import quasar.contrib.std.uuid._
-import quasar.csv.CsvWriter
 import quasar.fp.minspace
 import quasar.fp.ski._
-import quasar.main.Prettify
 import quasar.run.{QuasarError, SqlQuery}
 import quasar.run.ResourceRouter.DatasourceResourcePrefix
 import quasar.run.optics.{stringUUIDP => UuidString}

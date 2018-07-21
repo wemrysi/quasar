@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.main
+package quasar.repl
 
 import slamdata.Predef._
 
@@ -35,7 +35,7 @@ import eu.timepit.refined.auto._
 import org.scalacheck.Arbitrary
 import scalaz._, Scalaz._
 
-class PrettifySpecs extends quasar.Qspec {
+final class PrettifySpec extends quasar.Qspec {
   import Prettify._
 
   "flatten" should {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.main
+package quasar.repl
 
 import slamdata.Predef._
 import quasar.fp._

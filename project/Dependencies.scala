@@ -115,23 +115,9 @@ object Dependencies {
     "org.spire-math" %% "jawn-argonaut" % jawnVersion
   )
 
-  def interface = Seq(
-    "com.github.scopt" %% "scopt" % scoptVersion,
-    "org.jboss.aesh"    % "aesh"  % "0.66.17",
+  def repl = Seq(
     "org.jline" % "jline" % "3.8.0"
   )
-
-  def mongodb = {
-    val nettyVersion = "4.1.21.Final"
-
-    Seq(
-      "org.mongodb" % "mongodb-driver-async" %   "3.6.3",
-      // These are optional dependencies of the mongo asynchronous driver.
-      // They are needed to connect to mongodb vis SSL which we do under certain configurations
-      "io.netty"    % "netty-buffer"         % nettyVersion,
-      "io.netty"    % "netty-handler"        % nettyVersion
-    )
-  }
 
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % slf4sVersion,

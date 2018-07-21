@@ -207,7 +207,7 @@ lazy val root = project.in(file("."))
     datagen,
     effect, ejson,
     foundation, frontend, fs,
-    impl, interface, it,
+    impl, it,
     js,
     mimir,
     niflheim,
@@ -393,21 +393,6 @@ lazy val core = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-/** Types and operations needed by applications that embed Quasar.
-  */
-lazy val interface = project
-  .settings(name := "quasar-interface-internal")
-  .dependsOn(
-    core % BothScopes,
-    mimir,
-    sst)
-  .settings(commonSettings)
-  .settings(publishTestsSettings)
-  .settings(targetSettings)
-  .settings(libraryDependencies ++= Dependencies.interface)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Implementations of the Quasar API. */
 lazy val impl = project
   .settings(name := "quasar-impl-internal")
@@ -437,10 +422,14 @@ lazy val runp = (project in file("run"))
   */
 lazy val repl = project
   .settings(name := "quasar-repl")
-  .dependsOn(api, interface, runp)
+  .dependsOn(
+    frontend % BothScopes,
+    api,
+    runp)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(backendRewrittenRunSettings)
+  .settings(libraryDependencies ++= Dependencies.repl)
   .settings(
     mainClass in Compile := Some("quasar.repl.Main"),
     fork in run := true,
@@ -456,7 +445,6 @@ lazy val it = project
   .configs(ExclusiveTests)
   .dependsOn(
     runp,
-    interface % BothScopes,
     qscript % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
