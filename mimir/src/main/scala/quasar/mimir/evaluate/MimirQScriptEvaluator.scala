@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar._
 import quasar.connector.QScriptEvaluator
-import quasar.contrib.cats.effect._
+import quasar.contrib.cats.effect.liftio._
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
@@ -37,13 +37,11 @@ import scala.Predef.implicitly
 
 import cats.effect.{IO, LiftIO}
 import fs2.Stream
-import io.chrisdavenport.scalaz.task._
 import iotaz.CopK
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._
 import scalaz.syntax.monad._
-import scalaz.concurrent.Task
 import shims._
 
 final class MimirQScriptEvaluator[
@@ -95,11 +93,10 @@ final class MimirQScriptEvaluator[
 
   def plan(cp: T[QSM]): M[Repr] = {
     def qScriptCorePlanner =
-      new mimir.QScriptCorePlanner[T, M](
-        λ[ReaderT[Task, Cake, ?] ~> M](_.run(cake).to[IO].to[F].liftM[MT]))
+      new mimir.QScriptCorePlanner[T, M](cake)
 
     def equiJoinPlanner =
-      new mimir.EquiJoinPlanner[T, M](λ[IO ~> M](_.to[F].liftM[MT]))
+      new mimir.EquiJoinPlanner[T, M]
 
     def shiftedReadPlanner =
       new FederatedShiftedReadPlanner[T, F](cake)
