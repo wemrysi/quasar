@@ -22,7 +22,6 @@ import quasar.api.datasource._
 import quasar.build.BuildInfo
 import quasar.common.PhaseResults
 import quasar.contrib.argonaut._
-import quasar.contrib.cats.effect._
 import quasar.contrib.fs2.convert
 import quasar.contrib.iota._
 import quasar.contrib.nio.{file => contribFile}
@@ -31,7 +30,6 @@ import quasar.contrib.scalaz.{MonadError_, MonadTell_}
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
 import quasar.fp._
-import quasar.fs.FileSystemType
 import quasar.impl.datasource.local.LocalType
 import quasar.impl.external.ExternalConfig
 import quasar.run.{Quasar, QuasarError, SqlQuery}
@@ -104,35 +102,30 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   } yield (q, i)
 
-  val lwcLocalConfigs =
-    TestConfig.fileSystemConfigs(FileSystemType("lwc_local")).to[IO]
-
   ////
 
   val buildSuite =
-    lwcLocalConfigs.map(_.isEmpty).ifM(
-      IO(suiteName >> skipped("to run, enable the 'lwc_local' test configuration.")),
-      for {
-        tdef <- Promise.empty[IO, (Quasar[IO], UUID)]
-        sdown <- Promise.empty[IO, Unit]
+    for {
+      tdef <- Promise.empty[IO, (Quasar[IO], UUID)]
+      sdown <- Promise.empty[IO, Unit]
 
-        tests <- regressionTests[IO](TestsRoot, TestDataRoot)
+      tests <- regressionTests[IO](TestsRoot, TestDataRoot)
 
-        _ <- Q.evalMap(t => tdef.complete(t) *> sdown.get).compile.drain.start
-        t <- tdef.get
-        (q, i) = t
+      _ <- Q.evalMap(t => tdef.complete(t) *> sdown.get).compile.drain.start
+      t <- tdef.get
+      (q, i) = t
 
-        f = (squery: UUID => SqlQuery) =>
-          Stream.force(q.queryEvaluator.evaluate(squery(i)))
-      } yield {
-        suiteName >> {
-          tests.toList foreach { case (loc, test) =>
-            regressionExample(loc, test, BackendName("lwc_local"), f)
-          }
-
-          step(sdown.complete(()).unsafeRunSync())
+      f = (squery: UUID => SqlQuery) =>
+        Stream.force(q.queryEvaluator.evaluate(squery(i)))
+    } yield {
+      suiteName >> {
+        tests.toList foreach { case (loc, test) =>
+          regressionExample(loc, test, BackendName("lwc_local"), f)
         }
-      })
+
+        step(sdown.complete(()).unsafeRunSync())
+      }
+    }
 
   buildSuite.unsafeRunSync()
 
