@@ -69,11 +69,14 @@ object Dependencies {
     "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test
   )
 
+  def common = Seq(
+    "com.slamdata" %% "qdata-core" % qdataVersion,
+    "com.slamdata" %% "qdata-core" % qdataVersion % "test->test" classifier "tests",
+    "com.slamdata" %% "qdata-time" % qdataVersion % "test->test" classifier "tests"
+  )
+
   def frontend = Seq(
     "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
-    "com.slamdata"               %% "qdata-core"    % qdataVersion,
-    "com.slamdata"               %% "qdata-core"    % qdataVersion % "test->test" classifier "tests",
-    "com.slamdata"               %% "qdata-time"    % qdataVersion % "test->test" classifier "tests",
     "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test
   )
 

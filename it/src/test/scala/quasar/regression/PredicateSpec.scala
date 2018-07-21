@@ -18,9 +18,10 @@ package quasar.regression
 
 import slamdata.Predef._
 
-import quasar.{Data, DataCodec}
-import quasar.DataGenerators.dataArbitrary
+import quasar.common.data.Data
+import quasar.common.data.DataGenerators.dataArbitrary
 import quasar.fp._
+import quasar.frontend.data.DataCodec
 
 import scala.Predef.$conforms
 

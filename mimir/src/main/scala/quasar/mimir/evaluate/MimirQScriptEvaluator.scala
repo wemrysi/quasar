@@ -19,6 +19,7 @@ package quasar.mimir.evaluate
 import slamdata.Predef._
 
 import quasar._
+import quasar.common.data.Data
 import quasar.connector.QScriptEvaluator
 import quasar.contrib.cats.effect.liftio._
 import quasar.contrib.iota._
@@ -26,7 +27,6 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
 import quasar.fp._
 import quasar.fp.numeric._
-import quasar.fs.Planner.PlannerErrorME
 import quasar.mimir
 import quasar.mimir.MimirCake._
 import quasar.precog.common.{CUndefined, RValue}
@@ -46,7 +46,7 @@ import shims._
 
 final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], List[IO[Unit]]]] private (
+    F[_]: LiftIO: Monad: MonadPlannerErr: MonadTell_[?[_], List[IO[Unit]]]] private (
     cake: Cake)
     extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] {
 
@@ -132,7 +132,7 @@ final class MimirQScriptEvaluator[
 object MimirQScriptEvaluator {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], List[IO[Unit]]]](
+      F[_]: LiftIO: Monad: MonadPlannerErr: MonadTell_[?[_], List[IO[Unit]]]](
       cake: Cake)
       : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, Data]] =
     new MimirQScriptEvaluator[T, F](cake)

@@ -206,9 +206,8 @@ lazy val root = project.in(file("."))
     common, connector, core,
     datagen,
     effect, ejson,
-    foundation, frontend, fs,
+    foundation, frontend,
     impl, it,
-    js,
     mimir,
     niflheim,
     precog,
@@ -268,22 +267,15 @@ lazy val effect = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-/** Somewhat Quasar- and MongoDB-specific JavaScript implementations.
-  */
-lazy val js = project
-  .settings(name := "quasar-js-internal")
-  .dependsOn(foundation % BothScopes)
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Quasar components shared by both frontend and connector. This includes
   * things like data models, types, etc.
   */
 lazy val common = project
   .settings(name := "quasar-common-internal")
-  .dependsOn(foundation % BothScopes)
+  .dependsOn(
+    foundation % BothScopes,
+    ejson)
+  .settings(libraryDependencies ++= Dependencies.common)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -297,8 +289,7 @@ lazy val frontend = project
   .dependsOn(
     common % BothScopes,
     effect,
-    ejson % BothScopes,
-    js)
+    ejson % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -339,20 +330,11 @@ lazy val sql = project
     libraryDependencies ++= Dependencies.sql)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val fs = project
-  .settings(name := "quasar-fs-internal")
-  .dependsOn(frontend % BothScopes)
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(publishTestsSettings)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
   .dependsOn(
-    fs,
-    frontend % "test->test")
+    foundation % BothScopes,
+    frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -383,7 +365,6 @@ lazy val core = project
     api     % BothScopes,
     qscript % BothScopes,
     sql     % BothScopes,
-    fs      % "test->test",
     effect  % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)

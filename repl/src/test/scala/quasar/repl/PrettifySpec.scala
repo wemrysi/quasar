@@ -18,8 +18,7 @@ package quasar.repl
 
 import slamdata.Predef._
 
-import quasar._
-import quasar.RepresentableDataGenerators._
+import quasar.common.data._, RepresentableDataGenerators._
 import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.time.{

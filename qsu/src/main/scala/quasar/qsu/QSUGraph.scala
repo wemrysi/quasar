@@ -388,7 +388,7 @@ object QSUGraph extends QSUGraphInstances {
    * This object contains extraction helpers in terms of QSU nodes.
    */
   object Extractors {
-    import quasar.Data
+    import quasar.common.data.Data
     import quasar.qscript.{
       FreeMap,
       Hole,

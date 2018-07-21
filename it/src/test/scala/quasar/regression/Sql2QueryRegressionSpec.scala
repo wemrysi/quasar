@@ -21,6 +21,7 @@ import quasar._
 import quasar.api.datasource._
 import quasar.build.BuildInfo
 import quasar.common.PhaseResults
+import quasar.common.data.Data
 import quasar.contrib.argonaut._
 import quasar.contrib.fs2.convert
 import quasar.contrib.iota._
@@ -30,6 +31,7 @@ import quasar.contrib.scalaz.{MonadError_, MonadTell_}
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
 import quasar.fp._
+import quasar.frontend.data.DataCodec
 import quasar.impl.datasource.local.LocalType
 import quasar.impl.external.ExternalConfig
 import quasar.run.{Quasar, QuasarError, SqlQuery}

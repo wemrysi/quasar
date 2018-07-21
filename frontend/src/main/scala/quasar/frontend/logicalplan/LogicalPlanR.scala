@@ -19,6 +19,7 @@ package quasar.frontend.logicalplan
 import slamdata.Predef._
 import quasar._
 import quasar.common.{phase, CIName, JoinType, PhaseResultTell, SortDir}
+import quasar.common.data.{Data, DataDateTimeExtractors}
 import quasar.contrib.pathy._
 import quasar.contrib.shapeless._
 import quasar.effect.NameGenerator

@@ -17,9 +17,11 @@
 package quasar.repl
 
 import slamdata.Predef._
+import quasar._
+import quasar.common.data.Data
 import quasar.fp._
 import quasar.fp.ski._
-import quasar._
+import quasar.frontend.data.DataCodec
 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
