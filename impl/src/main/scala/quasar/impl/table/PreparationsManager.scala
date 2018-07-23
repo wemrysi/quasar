@@ -145,8 +145,16 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
     } yield !successOpt.isDefined
   }
 
-  def preparationStatus(tableId: I)(implicit I: Equal[I]): F[Option[OffsetDateTime]] =
-    F.delay(Option(ongoing.get(tableId)).map(_.start))
+  def preparationStatus(tableId: I)(implicit I: Equal[I]): F[Status] = {
+    for {
+      ongoingStatus <- F.delay(Option(ongoing.get(tableId)).map(_.start))
+      pendingStatus <- F.delay(Option(pending.get(tableId)))
+    } yield {
+      ongoingStatus.map(Status.Started)
+        .orElse(pendingStatus.as(Status.Pending))
+        .getOrElse(Status.Unknown)
+    }
+  }
 
   def cancelPreparation(tableId: I)(implicit I: Equal[I]): F[Condition[NotInProgressError[I]]] = {
     val removePending = for {
@@ -225,6 +233,14 @@ object PreparationsManager {
 
   final case class InProgressError[I](tableId: I)
   final case class NotInProgressError[I](tableId: I)
+
+  sealed trait Status extends Product with Serializable
+
+  object Status {
+    final case class Started(start: OffsetDateTime) extends Status
+    case object Pending extends Status
+    case object Unknown extends Status
+  }
 
   sealed trait TableEvent[I] extends Product with Serializable
 
