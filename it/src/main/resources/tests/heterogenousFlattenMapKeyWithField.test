@@ -6,7 +6,7 @@
         "mongodb_3_6":       "pending"
     },
     "data": "heterogeneous.data",
-    "query": "select a, b{*:} as k from `heterogeneous.data`",
+    "query": "select a, b{*:} as k from `heterogeneous.data` where a < 11",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [
