@@ -78,7 +78,24 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
 
               configured = Stream.eval(F.delay(OffsetDateTime.now())) flatMap { start =>
                 val preparation = Preparation(cancel, start)
-                val halted = persist.interruptWhen(s) onComplete {
+                val halted = persist.interruptWhen(s)
+
+                val handled = halted handleErrorWith { t =>
+                  val eff = for {
+                    end <- F.delay(OffsetDateTime.now())
+                    _ <- s.set(true)    // prevent the onComplete handler
+
+                    _ <- notificationsQ.enqueue1(
+                      Some(
+                        TableEvent.PreparationErrored(
+                          tableId,
+                          start,
+                          (end.toEpochSecond - start.toEpochSecond).millis,
+                          t)))
+                  } yield ()
+
+                  Stream.eval_(eff)
+                } onComplete {
                   val eff = for {
                     canceled <- s.get
 
@@ -96,22 +113,6 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
                               (end.toEpochSecond - start.toEpochSecond).millis)))
                       } yield ()
                     }
-                  } yield ()
-
-                  Stream.eval_(eff)
-                }
-
-                val handled = halted handleErrorWith { t =>
-                  val eff = for {
-                    end <- F.delay(OffsetDateTime.now())
-
-                    _ <- notificationsQ.enqueue1(
-                      Some(
-                        TableEvent.PreparationErrored(
-                          tableId,
-                          start,
-                          (end.toEpochSecond - start.toEpochSecond).millis,
-                          t)))
                   } yield ()
 
                   Stream.eval_(eff)
