@@ -4,19 +4,6 @@ jdk: oraclejdk8
 dist: trusty
 sudo: required
 
-stages:
-  - name: clean
-    if: NOT type = pull_request
-  - name: compile
-  - name: test
-  - name: testjar
-    if: type = pull_request
-  - name: publish
-    # weirdly, we have to add the extra PR check
-    if: NOT type = pull_request
-  - name: cache cleanup
-
-# this all goes in the test stage
 env:
   global:
     - COURSIER_PROGRESS=0
@@ -36,72 +23,21 @@ before_script:
   - nproc 2>/dev/null && python -c 'import multiprocessing;print multiprocessing.cpu_count()'
   - free && cat /proc/meminfo
 
-jobs:
-  include:
-    - stage: clean
-      env:
-      script:
-        - travis_wait 30 ./scripts/s3Cache cacheCleanUp
-        - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
+script:
+  - set -e
 
-    - stage: compile
-      env:
-      script:
-        - set -e
+  - |-
+    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+      checkHeaders \
+      test:compile
+      "testOnly -- failtrace" \
+      "exclusive:testOnly -- failtrace" \
+      doc repl/assembly'
 
-        - travis_wait 30 scripts/s3Cache cleanup
+  - scripts/testJar
+  - '[ $TRAVIS_PULL_REQUEST == "false" ] && [[ "$TRAVIS_BRANCH" =~ backport/v.*|master ]] && scripts/quasarPublishAndTag'
 
-        - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-            checkHeaders \
-            test:compile
-
-        - travis_wait 30 scripts/s3Cache upload
-
-        - set +e
-
-    - stage: test
-      env:
-      script:
-        - travis_wait 30 scripts/s3Cache download
-        - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-            "testOnly -- failtrace" \
-            "exclusive:testOnly -- failtrace"
-
-    - stage: testjar
-      env:
-      script:
-        - set -e
-
-        - travis_wait 30 scripts/s3Cache download
-
-        - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc repl/assembly'
-
-        - scripts/testJar
-
-        - set +e
-
-    - stage: publish
-      env:
-      script:
-        - set -e
-
-        - travis_wait 30 scripts/s3Cache download
-
-        - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc repl/assembly'
-
-        - scripts/testJar
-
-        # release to sonatype
-        - scripts/quasarPublishAndTag
-
-        - set +e
-
-    - stage: cache cleanup
-      env:
-      script:
-        - travis_wait 30 scripts/s3Cache cleanup
+  - set +e
 
 notifications:
   irc:
@@ -118,10 +54,8 @@ after_failure:
   - scripts/discordTravisPost failure https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
 
 branches:
-  only:
-    - master
-    - next-major
-    - /^backport.*$/
+  except:
+    - /^v\d+\.\d+\.\d+$/ # don't redundantly build tags
 
 cache:
   directories:
