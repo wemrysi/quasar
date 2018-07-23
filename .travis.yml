@@ -1,8 +1,9 @@
 language: scala
 scala: 2.12.4 # this needs to be in sync with Scala version used in .appveyor.yml
 jdk: oraclejdk8
+
 dist: trusty
-sudo: required
+sudo: false
 
 env:
   global:
