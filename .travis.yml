@@ -39,14 +39,6 @@ script:
 
   - set +e
 
-notifications:
-  irc:
-    template:
-      - "%{result}: %{repository_slug}#%{build_number} (%{branch}@%{commit}: %{author})
-        %{build_url}"
-  slack:
-    secure: k7tat0w0CSokOD1K0nfPhFY9Z3xkYHXboNlW1WgNAjqtq56hQsfQWhN8z6cXRAs/CgT8ME0K//wDN/HgdG91/aVh1smv/hxMa6P/o70GclhvUkB4iTis3kv9la3Kf2w3K5pbWJ6fFLdAZqc5i9XpQ8q+d7UTgwAxj1ZcYwaCSVo=
-
 after_success:
   - scripts/discordTravisPost success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
 
