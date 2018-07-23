@@ -63,7 +63,27 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
 
       configured = Stream.eval(F.delay(OffsetDateTime.now())) flatMap { start =>
         val preparation = Preparation(s.set(true), start)
-        val halted = persist.interruptWhen(s)
+        val halted = persist.interruptWhen(s) onComplete {
+          val eff = for {
+            canceled <- s.get
+
+            _ <- if (canceled) {
+              ().point[F]
+            } else {
+              for {
+                end <- F.delay(OffsetDateTime.now())
+                _ <- notificationsQ.enqueue1(
+                  Some(
+                    TableNotification.PreparationSucceeded(
+                      tableId,
+                      start,
+                      (end.toEpochSecond - start.toEpochSecond).millis)))
+              } yield ()
+            }
+          } yield ()
+
+          Stream.eval_(eff)
+        }
 
         val handled = halted handleErrorWith { t =>
           val eff = for {
@@ -145,7 +165,9 @@ object PreparationsManager {
       emit = Stream(new PreparationsManager[F, I, Q, R](evaluator, notificationsQ, q.enqueue1(_))(runToStore))
 
       // we have to be explicit here because scalaz's MonadSyntax includes .join
-      back <- emit.concurrently(Stream.InvariantOps(q.dequeue).join(maxStreams))
+      back <- emit.concurrently(Stream.InvariantOps(q.dequeue).join(maxStreams)) onComplete {
+        Stream.eval_(notificationsQ.enqueue1(None))
+      }
     } yield back
   }
 
