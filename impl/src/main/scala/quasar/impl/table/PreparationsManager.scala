@@ -47,8 +47,8 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
 
   import PreparationsManager._
 
-  private val pending: ConcurrentHashMap[I, Unit] =
-    new ConcurrentHashMap[I, Unit]
+  private val pending: ConcurrentHashMap[I, F[Unit]] =
+    new ConcurrentHashMap[I, F[Unit]]
 
   private val ongoing: ConcurrentHashMap[I, Preparation[F]] =
     new ConcurrentHashMap[I, Preparation[F]]
@@ -59,8 +59,13 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
 
   // fake Equal for fake parametricity
   def prepareTable(tableId: I, query: Q)(implicit I: Equal[I]): F[Condition[InProgressError[I]]] = {
-    F.delay(Option(pending.putIfAbsent(tableId, ())).isDefined) flatMap { pcheck =>
-      if (pcheck) {
+    for {
+      s <- async.signalOf[F, Boolean](false)
+      cancel = s.set(true)
+
+      pcheck <- F.delay(Option(pending.putIfAbsent(tableId, cancel)).isDefined)
+
+      back <- if (pcheck) {
         Condition.abnormal(InProgressError(tableId)).point[F]
       } else {
         F.delay(ongoing.contains(tableId)) flatMap { ocheck =>
@@ -70,10 +75,9 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
             for {
               result <- evaluator.evaluate(query)
               persist <- runToStore(tableId, result)
-              s <- async.signalOf[F, Boolean](false)
 
               configured = Stream.eval(F.delay(OffsetDateTime.now())) flatMap { start =>
-                val preparation = Preparation(s.set(true), start)
+                val preparation = Preparation(cancel, start)
                 val halted = persist.interruptWhen(s) onComplete {
                   val eff = for {
                     canceled <- s.get
@@ -119,26 +123,43 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
               }
 
               _ <- background(configured.drain)
-            } yield Condition.Normal()
+            } yield Condition.normal[InProgressError[I]]()
           }
         }
       }
-    }
+    } yield back
   }
 
   private def initiateState(tableId: I, preparation: Preparation[F]): F[Boolean] = {
     for {
      // I don't think this can ever fail?
-      success <- F.delay(Option(ongoing.putIfAbsent(tableId, preparation)).isDefined)
-      _ <- F.delay(Option(pending.remove(tableId)))
-    } yield success
+      successOpt <- F.delay(Option(ongoing.putIfAbsent(tableId, preparation)))
+
+      _ <- successOpt match {
+        case Some(Preparation(cancel, _)) =>
+          F.delay(Option(pending.remove(tableId, cancel)))
+
+        case None =>
+          None.point[F]
+      }
+    } yield !successOpt.isDefined
   }
 
   def preparationStatus(tableId: I)(implicit I: Equal[I]): F[Option[OffsetDateTime]] =
     F.delay(Option(ongoing.get(tableId)).map(_.start))
 
-  def cancelPreparation(tableId: I): F[Condition[NotInProgressError[I]]] = {
-    val eff = for {
+  def cancelPreparation(tableId: I)(implicit I: Equal[I]): F[Condition[NotInProgressError[I]]] = {
+    val removePending = for {
+      cancel <- OptionT(F.delay(Option(pending.get(tableId))))
+      removed <- F.delay(pending.remove(tableId, cancel)).liftM[OptionT]
+
+      _ <- if (removed)
+        cancel.liftM[OptionT]
+      else
+        ().point[OptionT[F, ?]]
+    } yield ()
+
+    val removeOngoing = for {
       live <- OptionT(F.delay(Option(ongoing.get(tableId))))
       removed <- F.delay(ongoing.remove(tableId, live)).liftM[OptionT]
 
@@ -148,16 +169,20 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
         ().point[OptionT[F, ?]]
     } yield ()
 
-    eff.run map {
+    (removePending.orElse(removeOngoing)).run map {
       case Some(_) => Condition.Normal()
       case None => Condition.Abnormal(NotInProgressError(tableId))
     }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def cancelAll: F[Unit] = {
+  def cancelAll(implicit I: Equal[I]): F[Unit] = {
     for {
-      keys <- F.delay(ongoing.keys.asScala.toList)
+      pendingKeys <- F.delay(pending.keys.asScala.toList)
+      ongoingKeys <- F.delay(ongoing.keys.asScala.toList)
+
+      keys = (pendingKeys ++ ongoingKeys).distinct
+
       results <- keys.traverse(cancelPreparation)
 
       _ <- if (results.isEmpty)
