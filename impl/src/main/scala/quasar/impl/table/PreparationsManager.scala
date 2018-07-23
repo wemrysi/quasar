@@ -40,7 +40,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 class PreparationsManager[F[_]: Effect, I, Q, R] private (
     evaluator: QueryEvaluator[F, Q, R],
-    notificationsQ: Queue[F, Option[PreparationsManager.TableNotification[I]]],
+    notificationsQ: Queue[F, Option[PreparationsManager.TableEvent[I]]],
     background: Stream[F, Nothing] => F[Unit])(
     runToStore: (I, R) => F[Stream[F, Unit]])(
     implicit ec: ExecutionContext) {
@@ -57,6 +57,8 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
   // fake Equal for fake parametricity
   def prepareTable(tableId: I, query: Q)(implicit I: Equal[I]): F[Unit] = {
     for {
+      // TODO check for ongoing
+
       result <- evaluator.evaluate(query)
       persist <- runToStore(tableId, result)
       s <- async.signalOf[F, Boolean](false)
@@ -74,7 +76,7 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
                 end <- F.delay(OffsetDateTime.now())
                 _ <- notificationsQ.enqueue1(
                   Some(
-                    TableNotification.PreparationSucceeded(
+                    TableEvent.PreparationSucceeded(
                       tableId,
                       start,
                       (end.toEpochSecond - start.toEpochSecond).millis)))
@@ -91,7 +93,7 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
 
             _ <- notificationsQ.enqueue1(
               Some(
-                TableNotification.PreparationErrored(
+                TableEvent.PreparationErrored(
                   tableId,
                   start,
                   (end.toEpochSecond - start.toEpochSecond).millis,
@@ -160,7 +162,7 @@ object PreparationsManager {
         Stream.eval(async.boundedQueue[F, Stream[F, Nothing]](maxStreams))
 
       notificationsQ <-
-        Stream.eval(async.boundedQueue[F, Option[TableNotification[I]]](maxNotifications))
+        Stream.eval(async.boundedQueue[F, Option[TableEvent[I]]](maxNotifications))
 
       emit = Stream(new PreparationsManager[F, I, Q, R](evaluator, notificationsQ, q.enqueue1(_))(runToStore))
 
@@ -178,18 +180,18 @@ object PreparationsManager {
   final case class InProgressError[I](tableId: I)
   final case class NotInProgressError[I](tableId: I)
 
-  sealed trait TableNotification[I] extends Product with Serializable
+  sealed trait TableEvent[I] extends Product with Serializable
 
-  object TableNotification {
+  object TableEvent {
     final case class PreparationErrored[I](
         tableId: I,
         start: OffsetDateTime,
         duration: Duration,
-        t: Throwable) extends TableNotification[I]
+        t: Throwable) extends TableEvent[I]
 
     final case class PreparationSucceeded[I](
         tableId: I,
         start: OffsetDateTime,
-        duration: Duration) extends TableNotification[I]
+        duration: Duration) extends TableEvent[I]
   }
 }
