@@ -182,7 +182,7 @@ lazy val foundation = project
 /** Types and interfaces describing Quasar's functionality. */
 lazy val api = project
   .settings(name := "quasar-api-internal")
-  .dependsOn(common % BothScopes)
+  .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.api)
   .settings(commonSettings)
   .settings(publishTestsSettings)

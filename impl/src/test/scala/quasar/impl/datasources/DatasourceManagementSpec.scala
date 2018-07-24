@@ -20,9 +20,9 @@ import slamdata.Predef._
 import quasar.{ConditionMatchers, Disposable, RenderTreeT}
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
+import quasar.api.resource._
 import quasar.common.data.Data
-import quasar.common.resource._
-import quasar.connector.{Datasource, HeavyweightDatasourceModule, LightweightDatasourceModule}
+import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.DatasourceModule
 import quasar.qscript.{MonadPlannerErr, PlannerError, QScriptEducated}

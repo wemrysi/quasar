@@ -18,7 +18,8 @@ package quasar.impl.evaluate
 
 import slamdata.Predef.{None, Option, Some}
 import quasar.api.QueryEvaluator
-import quasar.common.resource.{MonadResourceErr, ResourceError, ResourcePath}
+import quasar.api.resource.ResourcePath
+import quasar.connector.{MonadResourceErr, ResourceError}
 import quasar.contrib.iota.copkTraverse
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_

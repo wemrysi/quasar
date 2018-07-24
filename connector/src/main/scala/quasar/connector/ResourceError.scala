@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.common.resource
+package quasar.connector
 
 import slamdata.Predef.{Exception, Product, Serializable, Throwable}
+
+import quasar.api.resource._
 
 import monocle.Prism
 import scalaz.{Cord, Equal, Show}

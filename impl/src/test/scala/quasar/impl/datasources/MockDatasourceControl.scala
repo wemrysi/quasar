@@ -20,7 +20,7 @@ import slamdata.Predef.{Boolean, List, None, Option, Some, Unit}
 import quasar.Condition
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError._
-import quasar.common.resource._
+import quasar.api.resource._
 import quasar.contrib.scalaz.{MonadState_, MonadTell_}
 import MockDatasourceControl.{MonadInit, MonadShutdown}
 

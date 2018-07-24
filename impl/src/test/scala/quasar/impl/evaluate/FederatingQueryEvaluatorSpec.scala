@@ -18,7 +18,8 @@ package quasar.impl.evaluate
 
 import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers}
-import quasar.common.resource._
+import quasar.api.resource._
+import quasar.connector.ResourceError
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.iota.{copkTraverse, copkEqual}
 import quasar.fp.constEqual

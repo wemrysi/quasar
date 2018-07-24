@@ -17,7 +17,7 @@
 package quasar.run
 
 import slamdata.Predef._
-import quasar.common.resource._
+import quasar.api.resource._
 import quasar.contrib.cats.effect._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.std.uuid._

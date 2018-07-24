@@ -18,9 +18,9 @@ package quasar.impl.datasource.local
 
 import slamdata.Predef.{Stream => _, Seq => _, _}
 import quasar.api.datasource.DatasourceType
-import quasar.common.resource._, ResourceError._
+import quasar.api.resource._
 import quasar.common.data.Data
-import quasar.connector.Datasource
+import quasar.connector.{Datasource, MonadResourceErr, ResourceError}, ResourceError._
 import quasar.connector.datasource.LightweightDatasource
 import quasar.contrib.fs2.convert
 import quasar.contrib.scalaz.MonadError_

@@ -14,21 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.common.resource
+package quasar.api.resource
 
-import slamdata.Predef.String
+import quasar.contrib.pathy.AFile
+import quasar.pkg.tests._
 
-import scalaz.{Order, Show}
-import scalaz.std.string._
+import pathy.scalacheck.PathyArbitrary._
 
-final case class ResourceName(value: String)
-
-object ResourceName extends ResourceNameInstances
-
-sealed abstract class ResourceNameInstances {
-  implicit val order: Order[ResourceName] =
-    Order.orderBy(_.value)
-
-  implicit val show: Show[ResourceName] =
-    Show.shows(_.value)
+trait ResourcePathGenerator {
+  implicit val resourcePathArbitrary: Arbitrary[ResourcePath] =
+    Arbitrary(for {
+      n <- choose(1, 10)
+      p <- if (n > 2) arbitrary[AFile].map(ResourcePath.leaf(_))
+           else const(ResourcePath.root())
+    } yield p)
 }
+
+object ResourcePathGenerator extends ResourcePathGenerator
