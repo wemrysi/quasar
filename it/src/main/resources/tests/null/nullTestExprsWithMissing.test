@@ -2,9 +2,7 @@
     "name": "expressions with `= null` and `is null`, with missing fields (pending #465)",
     "backends": {
         "lwc_local":         "pendingIgnoreFieldOrder",
-        "mimir":             "pendingIgnoreFieldOrder",
-        "mongodb_3_4_13":    "pendingIgnoreFieldOrder",
-        "mongodb_3_6":       "pendingIgnoreFieldOrder"
+        "mimir":             "pendingIgnoreFieldOrder"
     },
     "data": "nullsWithMissing.data",
     "query": "select name,

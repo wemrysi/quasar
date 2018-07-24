@@ -1,9 +1,7 @@
 {
     "name": "distinct *",
     "backends": {
-        "mimir":"ignoreFieldOrder",
-        "mongodb_3_4_13":    "pendingIgnoreFieldOrder",
-        "mongodb_3_6":       "pendingIgnoreFieldOrder"
+        "mimir": "ignoreFieldOrder"
     },
     "data": "cities.data",
     "query": "select distinct * from `cities.data` where city = \"BOSTON\"",

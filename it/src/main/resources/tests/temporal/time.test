@@ -2,10 +2,8 @@
     "name": "filter on time_of_day",
 
     "backends": {
-        "lwc_local":      "ignoreFieldOrder",
-        "mimir":          "pendingIgnoreFieldOrder",
-        "mongodb_3_4_13": "pendingIgnoreFieldOrder",
-        "mongodb_3_6":    "pendingIgnoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir":     "pendingIgnoreFieldOrder"
     },
     "data": "../days.data",
 

@@ -1,10 +1,8 @@
 {
     "name": "unify flattened fields with multiple shape-preserving ops.",
     "backends": {
-        "lwc_local":         "pendingIgnoreFieldOrder",
-        "mimir":             "pendingIgnoreFieldOrder",
-        "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending"
+        "lwc_local": "pendingIgnoreFieldOrder",
+        "mimir":     "pendingIgnoreFieldOrder"
     },
     "NB": "ch663 for lwc_local",
     "data": "zips.data",

@@ -1,9 +1,7 @@
 {
     "name": "field and flattened map key on heterogeneous",
     "backends": {
-        "mimir":             "ignoreFieldOrder",
-        "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending"
+        "mimir":             "ignoreFieldOrder"
     },
     "data": "heterogeneous.data",
     "query": "select a, b{*:} as k from `heterogeneous.data` where a < 11",

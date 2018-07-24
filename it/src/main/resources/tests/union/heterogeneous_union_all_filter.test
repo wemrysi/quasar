@@ -3,9 +3,7 @@
 
   "backends": {
     "lwc_local":      "ignoreFieldOrder",
-    "mimir":          "pendingIgnoreFieldOrder",
-    "mongodb_3_4_13": "pending",
-    "mongodb_3_6":    "pending"
+    "mimir":          "pendingIgnoreFieldOrder"
   },
 
   "data": ["../heterogeneous.data", "../types.data"],
