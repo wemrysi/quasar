@@ -27,12 +27,19 @@ before_script:
 script:
   - set -e
 
+  # we split the following across multiple sbt instances because it makes travis happier
   - |-
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       checkHeaders \
-      test:compile \
+      test:compile
+
+  - |-
+    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       "testOnly -- failtrace" \
-      "exclusive:testOnly -- failtrace" \
+      "exclusive:testOnly -- failtrace"
+
+  - |-
+    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       doc \
       repl/assembly
 
