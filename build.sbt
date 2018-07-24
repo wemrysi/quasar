@@ -265,9 +265,7 @@ lazy val sql = project
 
 lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
-  .dependsOn(
-    foundation % BothScopes,
-    frontend % BothScopes)
+  .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -284,8 +282,9 @@ lazy val qsu = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
-    api % BothScopes,
-    qsu)
+    api,
+    foundation % "test->test",
+    qscript)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -295,9 +294,10 @@ lazy val connector = project
 lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(
-    api     % BothScopes,
-    qscript % BothScopes,
-    sql     % BothScopes)
+    api,
+    frontend % "test->test",
+    qscript,
+    sql % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -324,7 +324,8 @@ lazy val runp = (project in file("run"))
   .dependsOn(
     core,
     impl,
-    mimir)
+    mimir,
+    qsu)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
