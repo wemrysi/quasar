@@ -27,7 +27,7 @@ import fs2.{async, Stream}
 import fs2.async.mutable.Queue
 
 // monad/traverse syntax conflict
-import scalaz.{Equal, OptionT, Scalaz}, Scalaz._
+import scalaz.{-\/, \/-, \/, Equal, OptionT, Scalaz}, Scalaz._
 
 import shims._
 
@@ -47,11 +47,8 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
 
   import PreparationsManager._
 
-  private val pending: ConcurrentHashMap[I, F[Unit]] =
-    new ConcurrentHashMap[I, F[Unit]]
-
-  private val ongoing: ConcurrentHashMap[I, Preparation[F]] =
-    new ConcurrentHashMap[I, Preparation[F]]
+  private val status: ConcurrentHashMap[I, F[Unit] \/ Preparation[F]] =
+    new ConcurrentHashMap[I, F[Unit] \/ Preparation[F]]
 
   val F = Effect[F]
 
@@ -63,116 +60,89 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
       s <- async.signalOf[F, Boolean](false)
       cancel = s.set(true)
 
-      pcheck <- F.delay(Option(pending.putIfAbsent(tableId, cancel)).isDefined)
+      check <- F.delay(Option(status.putIfAbsent(tableId, -\/(cancel))).isDefined)
 
-      back <- if (pcheck) {
+      back <- if (check) {
         Condition.abnormal(InProgressError(tableId)).point[F]
       } else {
-        F.delay(ongoing.contains(tableId)) flatMap { ocheck =>
-          if (ocheck) {
-            F.delay(pending.remove(tableId)).as(Condition.abnormal(InProgressError(tableId)))
-          } else {
-            for {
-              result <- evaluator.evaluate(query)
-              persist <- runToStore(tableId, result)
+        for {
+          result <- evaluator.evaluate(query)
+          persist <- runToStore(tableId, result)
 
-              configured = Stream.eval(F.delay(OffsetDateTime.now())) flatMap { start =>
-                val preparation = Preparation(cancel, start)
-                val halted = persist.interruptWhen(s)
+          configured = Stream.eval(F.delay(OffsetDateTime.now())) flatMap { start =>
+            val preparation = Preparation(cancel, start)
+            val halted = persist.interruptWhen(s)
 
-                val handled = halted handleErrorWith { t =>
-                  val eff = for {
+            val handled = halted handleErrorWith { t =>
+              val eff = for {
+                end <- F.delay(OffsetDateTime.now())
+                _ <- s.set(true)    // prevent the onComplete handler
+
+                _ <- notificationsQ.enqueue1(
+                  Some(
+                    TableEvent.PreparationErrored(
+                      tableId,
+                      start,
+                      (end.toEpochSecond - start.toEpochSecond).millis,
+                      t)))
+              } yield ()
+
+              Stream.eval_(eff)
+            } onComplete {
+              val eff = for {
+                canceled <- s.get
+
+                _ <- if (canceled) {
+                  ().point[F]
+                } else {
+                  for {
                     end <- F.delay(OffsetDateTime.now())
-                    _ <- s.set(true)    // prevent the onComplete handler
 
                     _ <- notificationsQ.enqueue1(
                       Some(
-                        TableEvent.PreparationErrored(
+                        TableEvent.PreparationSucceeded(
                           tableId,
                           start,
-                          (end.toEpochSecond - start.toEpochSecond).millis,
-                          t)))
+                          (end.toEpochSecond - start.toEpochSecond).millis)))
                   } yield ()
-
-                  Stream.eval_(eff)
-                } onComplete {
-                  val eff = for {
-                    canceled <- s.get
-
-                    _ <- if (canceled) {
-                      ().point[F]
-                    } else {
-                      for {
-                        end <- F.delay(OffsetDateTime.now())
-
-                        _ <- notificationsQ.enqueue1(
-                          Some(
-                            TableEvent.PreparationSucceeded(
-                              tableId,
-                              start,
-                              (end.toEpochSecond - start.toEpochSecond).millis)))
-                      } yield ()
-                    }
-                  } yield ()
-
-                  Stream.eval_(eff)
                 }
+              } yield ()
 
-                Stream.bracket(
-                  initiateState(tableId, preparation))(
-                  flag => if (flag) handled else Stream.empty,
-                  _ => F.delay(ongoing.remove(tableId, preparation)).void)
-              }
+              Stream.eval_(eff)
+            }
 
-              _ <- background(configured.drain)
-            } yield Condition.normal[InProgressError[I]]()
+            Stream.bracket(
+              F.delay(status.replace(tableId, -\/(cancel), \/-(preparation))))(
+              flag => if (flag) handled else Stream.empty,
+              _ => F.delay(status.remove(tableId, \/-(preparation))).void)
           }
-        }
+
+          _ <- background(configured.drain)
+        } yield Condition.normal[InProgressError[I]]()
       }
     } yield back
   }
 
-  private def initiateState(tableId: I, preparation: Preparation[F]): F[Boolean] = {
-    for {
-     // I don't think this can ever fail?
-      successOpt <- F.delay(Option(ongoing.putIfAbsent(tableId, preparation)))
-      _ <- successOpt.traverse(p => F.delay(Option(pending.remove(tableId, p.cancel))))
-    } yield !successOpt.isDefined
-  }
-
   def preparationStatus(tableId: I)(implicit I: Equal[I]): F[Status] = {
-    for {
-      ongoingStatus <- F.delay(Option(ongoing.get(tableId)).map(_.start))
-      pendingStatus <- F.delay(Option(pending.get(tableId)))
-    } yield {
-      ongoingStatus.map(Status.Started)
-        .orElse(pendingStatus.as(Status.Pending))
-        .getOrElse(Status.Unknown)
+    F.delay(Option(status.get(tableId))) map {
+      case Some(\/-(Preparation(_, start))) => Status.Started(start)
+      case Some(-\/(_)) => Status.Pending
+      case None => Status.Unknown
     }
   }
 
   def cancelPreparation(tableId: I)(implicit I: Equal[I]): F[Condition[NotInProgressError[I]]] = {
-    val removePending = for {
-      cancel <- OptionT(F.delay(Option(pending.get(tableId))))
-      removed <- F.delay(pending.remove(tableId, cancel)).liftM[OptionT]
+    val eff = for {
+      live <- OptionT(F.delay(Option(status.get(tableId))))
+      removed <- F.delay(status.remove(tableId, live)).liftM[OptionT]
 
       _ <- if (removed)
-        cancel.liftM[OptionT]
+        live.fold(x => x, _.cancel).liftM[OptionT]
       else
         ().point[OptionT[F, ?]]
     } yield ()
 
-    val removeOngoing = for {
-      live <- OptionT(F.delay(Option(ongoing.get(tableId))))
-      removed <- F.delay(ongoing.remove(tableId, live)).liftM[OptionT]
-
-      _ <- if (removed)
-        live.cancel.liftM[OptionT]
-      else
-        ().point[OptionT[F, ?]]
-    } yield ()
-
-    (removePending.orElse(removeOngoing)).run map {
+    eff.run map {
       case Some(_) => Condition.Normal()
       case None => Condition.Abnormal(NotInProgressError(tableId))
     }
@@ -181,11 +151,7 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def cancelAll(implicit I: Equal[I]): F[Unit] = {
     for {
-      pendingKeys <- F.delay(pending.keys.asScala.toList)
-      ongoingKeys <- F.delay(ongoing.keys.asScala.toList)
-
-      keys = (pendingKeys ++ ongoingKeys).distinct
-
+      keys <- F.delay(status.keys.asScala.toList)
       results <- keys.traverse(cancelPreparation)
 
       _ <- if (results.isEmpty)
