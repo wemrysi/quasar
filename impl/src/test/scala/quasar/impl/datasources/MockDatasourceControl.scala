@@ -18,6 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef.{Boolean, List, None, Option, Some, Unit}
 import quasar.Condition
+import quasar.api.MockSchemaConfig
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
@@ -29,13 +30,14 @@ import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.plusEmpty._
 import scalaz.syntax.std.boolean._
+import scalaz.syntax.std.option._
 
 /** Provides for control over the lifecycle of external Datasources. */
 final class MockDatasourceControl[F[_]: Monad, G[_]: PlusEmpty, I: Order, C] private (
     supportedTypes: ISet[DatasourceType],
     initErrors: C => Option[InitializationError[C]])(
     implicit initd: MonadInit[F, I], sdown: MonadShutdown[F, I])
-    extends DatasourceControl[F, G, I, C] {
+    extends DatasourceControl[F, G, I, C, MockSchemaConfig.type] {
 
   def initDatasource(
       datasourceId: I,
@@ -72,6 +74,13 @@ final class MockDatasourceControl[F[_]: Monad, G[_]: PlusEmpty, I: Order, C] pri
       else datasourceNotFound[I, DiscoveryError[I]](datasourceId).left
     }
 
+  def resourceSchema(datasourceId: I, path: ResourcePath, cfg: MockSchemaConfig.type)
+      : F[DiscoveryError[I] \/ Option[cfg.Schema]] =
+    initd.gets(_.member(datasourceId)) map { exists =>
+      if (exists) MockSchemaConfig.MockSchema.some.right
+      else datasourceNotFound[I, DiscoveryError[I]](datasourceId).left
+    }
+
   def shutdownDatasource(datasourceId: I): F[Unit] =
     sdown.tell(List(datasourceId)) >> initd.modify(_.delete(datasourceId))
 
@@ -90,6 +99,6 @@ object MockDatasourceControl {
       supportedTypes: ISet[DatasourceType],
       initErrors: C => Option[InitializationError[C]])(
       implicit MI: MonadInit[F, I], MS: MonadShutdown[F, I])
-      : DatasourceControl[F, G, I, C] =
+      : DatasourceControl[F, G, I, C, MockSchemaConfig.type] =
     new MockDatasourceControl[F, G, I, C](supportedTypes, initErrors)
 }

@@ -23,9 +23,16 @@ import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.common.data.Data
 import quasar.connector._
+import quasar.contrib.iota._
+import quasar.contrib.matryoshka.envT
 import quasar.contrib.scalaz.MonadError_
+import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.impl.DatasourceModule
+import quasar.impl.schema.{SstConfig, SstSchema}
 import quasar.qscript.{MonadPlannerErr, PlannerError, QScriptEducated}
+import quasar.sst._, StructuralType.TypeST
+import quasar.tpe._
 
 import java.lang.IllegalArgumentException
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -40,17 +47,21 @@ import eu.timepit.refined.auto._
 import fs2.{Scheduler, Stream}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz.{\/, -\/, IMap, Show}
+import scalaz.syntax.bind._
 import scalaz.syntax.either._
 import scalaz.syntax.show._
 import scalaz.std.anyVal._
 import scalaz.std.option._
-import shims._
+import shims.{orderToScalaz => _, eqToScalaz => _, _}
+import spire.std.double._
 
 final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers {
   import DatasourceManagementSpec._
 
-  type Mgmt = DatasourceControl[IO, Stream[IO, ?], Int, Json] with DatasourceErrors[IO, Int]
+  type Cfg = SstConfig[Fix[EJson], Double]
+  type Mgmt = DatasourceControl[IO, Stream[IO, ?], Int, Json, Cfg] with DatasourceErrors[IO, Int]
   type Running = DatasourceManagement.Running[Int, Fix, IO]
 
   implicit val ioPlannerErrorME: MonadError_[IO, PlannerError] =
@@ -108,7 +119,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
   def withInitialMgmt[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgmt, IO[Running]) => IO[A]): A =
     (for {
       s <- Scheduler.allocate[IO](1)
-      t <- DatasourceManagement[Fix, IO, Int](modules, configured, global, s._1)
+      t <- DatasourceManagement[Fix, IO, Int, Double](modules, configured, 10L, s._1)
       (mgmt, run) = t
       a <- f(mgmt, run.get)
       _ <- s._2
@@ -244,11 +255,37 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
         }
       }
 
-
       "datasource not found when no datasource having id" >> withMgmt { (mgmt, _) =>
         mgmt.prefixedChildPaths(-1, ResourcePath.root() / ResourceName("data")).map(_ must beLike {
           case -\/(DatasourceNotFound(-1)) => ok
         })
+      }
+    }
+
+    "resource schema" >> {
+      val defaultCfg = SstConfig.Default[Fix[EJson], Double]
+
+      val sst = envT(
+        TypeStat.bool(3.0, 2.0),
+        TypeST(TypeF.simple[Fix[EJson], SST[Fix[EJson], Double]](SimpleType.Bool))).embed
+
+      val schema =
+        SstSchema[Fix[EJson], Double](
+          Population.subst[StructuralType[Fix[EJson], ?], TypeStat[Double]](sst).right)
+
+      "computes an SST of the data" >> withMgmt { (mgmt, _) =>
+        for {
+          c <- mgmt.initDatasource(1, DatasourceRef(LightT, DatasourceName("b"), Json.jNull))
+          b <- mgmt.resourceSchema(1, ResourcePath.root() / ResourceName("data"), defaultCfg)
+        } yield {
+          c must beNormal
+          b.toOption.join must_= Some(schema)
+        }
+      }
+
+      "datasource not found when no datasource having id" >> withMgmt { (mgmt, _) =>
+        mgmt.resourceSchema(-1, ResourcePath.root() / ResourceName("data"), defaultCfg)
+          .map(_ must beLike { case -\/(DatasourceNotFound(-1)) => ok })
       }
     }
   }
@@ -319,7 +356,7 @@ object DatasourceManagementSpec {
       def kind = kind0
 
       def evaluate(query: Q): F[Stream[F, Data]] =
-        Stream.empty.covaryAll[F, Data].pure[F]
+        Stream.emits(List(true, true, false, true, false) map (Data._bool(_))).covary[F].pure[F]
 
       def pathIsResource(path: ResourcePath): F[Boolean] =
         false.pure[F]

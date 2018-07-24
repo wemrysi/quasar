@@ -16,8 +16,9 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{Boolean, Exception}
+import slamdata.Predef.{Boolean, Exception, Option}
 import quasar.Condition
+import quasar.api.SchemaConfig
 import quasar.api.resource._
 
 import scalaz.{\/, ISet}
@@ -27,7 +28,7 @@ import scalaz.{\/, ISet}
   * @tparam I identity
   * @tparam C configuration
   */
-trait Datasources[F[_], G[_], I, C] {
+trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
   import DatasourceError._
 
   /** Adds the datasource described by the given `DatasourceRef` to the
@@ -56,7 +57,7 @@ trait Datasources[F[_], G[_], I, C] {
       : F[ExistentialError[I] \/ Boolean]
 
   /** Returns the name and type of the `ResourcePath`s within the specified
-    * Datasource implied by concatenating each name to `prefixPath`.
+    * datasource implied by concatenating each name to `prefixPath`.
     */
   def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
       : F[DiscoveryError[I] \/ G[(ResourceName, ResourcePathType)]]
@@ -67,6 +68,14 @@ trait Datasources[F[_], G[_], I, C] {
   /** Replaces the reference to the specified datasource. */
   def replaceDatasource(datasourceId: I, ref: DatasourceRef[C])
       : F[Condition[DatasourceError[I, C]]]
+
+  /** Retrieves the schema of the resource at the given `path` with the
+    * specified datasource according to the provided `schemaConfig`.
+    *
+    * Returns `None` if the resource exists but a schema is not available.
+    */
+  def resourceSchema(datasourceId: I, path: ResourcePath, schemaConfig: S)
+      : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]]
 
   /** The set of supported datasource types. */
   def supportedDatasourceTypes: F[ISet[DatasourceType]]
