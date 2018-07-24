@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.evaluate
+package quasar.impl.evaluate
 
 import slamdata.Predef.{None, Option, Some}
 import quasar.api.QueryEvaluator
 import quasar.common.resource.{MonadResourceErr, ResourceError, ResourcePath}
+import quasar.contrib.iota.copkTraverse
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
 import quasar.fp.PrismNT
-import quasar.contrib.iota.copkTraverse
 import quasar.qscript.{Read => QRead, _}
 
 import matryoshka._

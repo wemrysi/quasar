@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.evaluate
+package quasar.impl.evaluate
 
 import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers}
