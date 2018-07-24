@@ -2,9 +2,7 @@
     "name": "group by flattened field",
     "backends": {
         "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder",
-        "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending"
+        "mimir":             "ignoreFieldOrder"
     },
     "data": "slamengine_commits.data",
     "query": "select substring(parents[*].sha, 0, 1), count(*) from `slamengine_commits.data` group by substring(parents[*].sha, 0, 1)",

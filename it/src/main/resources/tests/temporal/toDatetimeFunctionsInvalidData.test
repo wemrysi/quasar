@@ -2,9 +2,7 @@
     "name": "convert to datetime functions with invalid data",
 
     "backends": {
-        "mimir": "pending",
-        "mongodb_3_4_13": "pending",
-        "mongodb_3_6": "pending"
+        "mimir": "pending"
     },
 
     "data": "../types.data",

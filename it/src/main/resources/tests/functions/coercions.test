@@ -3,9 +3,7 @@
 
   "backends": {
     "lwc_local":         "skip",
-    "mimir":             "skip",
-    "mongodb_3_4_13":    "skip",
-    "mongodb_3_6":       "skip"
+    "mimir":             "skip"
   },
 
   "data": "coercions.data",

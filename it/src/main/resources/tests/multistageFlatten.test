@@ -2,9 +2,7 @@
     "name": "multi-flatten with fields at various depths",
     "backends": {
         "lwc_local":         "pending",
-        "mimir":             "pending",
-        "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending"
+        "mimir":             "pending"
   },
     "data": "nested_foo.data",
     "query": "select * from `nested_foo.data` where (
