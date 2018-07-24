@@ -2,8 +2,6 @@
   "name": "[qa_s06] select all self union all",
 
   "backends": {
-    "mongodb_3_4_13": "pending",
-    "mongodb_3_6":    "pending"
   },
 
   "data": "simple_union.data",

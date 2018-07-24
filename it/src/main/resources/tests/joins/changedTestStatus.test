@@ -3,9 +3,7 @@
     "NB": "This is currently disabled on all connectors due to #2110.",
     "backends": {
         "lwc_local":         "skip",
-        "mimir":             "skip",
-        "mongodb_3_4_13":    "pendingIgnoreFieldOrder",
-        "mongodb_3_6":       "pendingIgnoreFieldOrder"
+        "mimir":             "skip"
     },
     "NB": "Mimir runs of out memory and the JVM dies when this test runs",
     "data": ["../oldTests.data", "../newTests.data"],

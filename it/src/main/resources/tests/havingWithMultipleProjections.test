@@ -2,9 +2,7 @@
     "name": "having with multiple projections",
     "backends": {
         "lwc_local":         "pendingIgnoreFieldOrder",
-        "mimir":             "pendingIgnoreFieldOrder",
-        "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending"
+        "mimir":             "pendingIgnoreFieldOrder"
     },
     "NB": "Pending for all connectors because of qz-3686",
     "data": "extraSmallZips.data",
