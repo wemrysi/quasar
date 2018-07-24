@@ -157,7 +157,6 @@ object PreparationsManagerSpec extends Specification {
       }
     }
 
-    // TODO this is flaky
     "suppress success reports on error" in {
       case object TestException extends Exception
 
