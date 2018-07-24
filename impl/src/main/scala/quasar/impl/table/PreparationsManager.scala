@@ -55,7 +55,7 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
 
   val F = Effect[F]
 
-  val notifications = notificationsQ.dequeue.unNoneTerminate
+  val notifications: Stream[F, TableEvent[I]] = notificationsQ.dequeue.unNoneTerminate
 
   // fake Equal for fake parametricity
   def prepareTable(tableId: I, query: Q)(implicit I: Equal[I]): F[Condition[InProgressError[I]]] = {
@@ -87,6 +87,7 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
                     } else {
                       for {
                         end <- F.delay(OffsetDateTime.now())
+
                         _ <- notificationsQ.enqueue1(
                           Some(
                             TableEvent.PreparationSucceeded(
@@ -119,7 +120,7 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
                 Stream.bracket(
                   initiateState(tableId, preparation))(
                   flag => if (flag) handled else Stream.empty,
-                  _ => F.delay(ongoing.remove(tableId, preparation)).as(()))
+                  _ => F.delay(ongoing.remove(tableId, preparation)).void)
               }
 
               _ <- background(configured.drain)
@@ -134,14 +135,7 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
     for {
      // I don't think this can ever fail?
       successOpt <- F.delay(Option(ongoing.putIfAbsent(tableId, preparation)))
-
-      _ <- successOpt match {
-        case Some(Preparation(cancel, _)) =>
-          F.delay(Option(pending.remove(tableId, cancel)))
-
-        case None =>
-          None.point[F]
-      }
+      _ <- successOpt.traverse(p => F.delay(Option(pending.remove(tableId, p.cancel))))
     } yield !successOpt.isDefined
   }
 
