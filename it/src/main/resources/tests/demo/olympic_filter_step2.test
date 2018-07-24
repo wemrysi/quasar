@@ -2,8 +2,8 @@
     "name": "olympic_filter_step2",
     "data": "olympics.data",
     "backends": {
-       "lwc_local":         "pending",
-       "mimir":             "pending"
+       "lwc_local": "ignoreFieldOrder",
+       "mimir":     "pending"
     },
     "NB": "mimir is pending because the results are not properly ordered - it can only be fully ASC or DESC, you can not mix sorting orders",
     "query": "temp0 := SELECT * FROM `olympics.data`;

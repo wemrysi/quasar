@@ -1,7 +1,7 @@
 {
     "name": "merge differently-nested flattens",
     "backends": {
-        "lwc_local":         "skip",
+        "lwc_local":         "ignoreFieldOrder",
         "mimir":             "skip",
         "mongodb_3_4_13":    "pending",
         "mongodb_3_6":       "pending"

@@ -2,7 +2,7 @@
     "name": "olympic_search_step1",
     "data": "olympics.data",
     "backends": {
-       "lwc_local":         "pending",
+       "lwc_local":         "ignoreFieldOrder",
        "mimir":             "pending"
     },
     "NB": "mimir handles order incorrectly",

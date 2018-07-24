@@ -6,6 +6,7 @@
         "mongodb_3_4_13":    "pending",
         "mongodb_3_6":       "pending"
     },
+    "NB": "ch663 for lwc_local",
     "data": "zips.data",
     "query": "select `_id` as zip, loc[*] from `zips.data` where loc[*] > 68 order by loc[*]",
     "predicate": "exactly",
