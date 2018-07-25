@@ -22,10 +22,10 @@ import quasar.common.PhaseResultTell
 import quasar.common.data.Data
 import quasar.contrib.pathy.ADir
 import quasar.contrib.std.uuid._
-import quasar.evaluate.FederatingQueryEvaluator
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.local.LocalDatasourceModule
 import quasar.impl.datasources.{DatasourceManagement, DefaultDatasources}
+import quasar.impl.evaluate.FederatingQueryEvaluator
 import quasar.impl.external.{ExternalConfig, ExternalDatasources}
 import quasar.mimir.Precog
 import quasar.mimir.evaluate.MimirQueryFederation

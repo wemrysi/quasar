@@ -16,8 +16,8 @@
 
 package quasar.connector.datasource
 
-import quasar.common.resource.{MonadResourceErr, ResourcePath}
-import quasar.connector.Datasource
+import quasar.api.resource.ResourcePath
+import quasar.connector.{Datasource, MonadResourceErr}
 
 /** A Datasource capable of returning the contents of resources. */
 abstract class LightweightDatasource[F[_]: MonadResourceErr, G[_], R]

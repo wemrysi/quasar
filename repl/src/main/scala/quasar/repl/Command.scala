@@ -19,7 +19,7 @@ package repl
 
 import slamdata.Predef._
 import quasar.api.datasource._
-import quasar.common.resource.ResourcePath
+import quasar.api.resource.ResourcePath
 import quasar.run.optics.{stringUUIDP => UuidString}
 import quasar.sql.Query
 

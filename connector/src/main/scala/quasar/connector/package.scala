@@ -14,20 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.common.resource
+package quasar
 
-import quasar.contrib.pathy.AFile
-import quasar.pkg.tests._
+import quasar.contrib.scalaz.MonadError_
 
-import pathy.scalacheck.PathyArbitrary._
+package object connector {
+  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
 
-trait ResourcePathGenerator {
-  implicit val resourcePathArbitrary: Arbitrary[ResourcePath] =
-    Arbitrary(for {
-      n <- choose(1, 10)
-      p <- if (n > 2) arbitrary[AFile].map(ResourcePath.leaf(_))
-           else const(ResourcePath.root())
-    } yield p)
+  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
+      : MonadResourceErr[F] = ev
 }
-
-object ResourcePathGenerator extends ResourcePathGenerator

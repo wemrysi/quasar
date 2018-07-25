@@ -20,7 +20,7 @@ import slamdata.Predef.{Boolean, Unit}
 import quasar.Condition
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{CreateError, DiscoveryError, ExistentialError}
-import quasar.common.resource.{ResourceName, ResourcePath, ResourcePathType}
+import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 
 import scalaz.{\/, ISet}
 

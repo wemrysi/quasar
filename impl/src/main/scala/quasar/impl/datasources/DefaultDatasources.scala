@@ -20,7 +20,7 @@ import slamdata.Predef.{Boolean, Exception, Unit}
 import quasar.Condition
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
-import quasar.common.resource._
+import quasar.api.resource._
 import quasar.impl.storage.IndexedStore
 
 import cats.effect.Sync

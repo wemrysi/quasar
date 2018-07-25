@@ -182,7 +182,7 @@ lazy val foundation = project
 /** Types and interfaces describing Quasar's functionality. */
 lazy val api = project
   .settings(name := "quasar-api-internal")
-  .dependsOn(common % BothScopes)
+  .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.api)
   .settings(commonSettings)
   .settings(publishTestsSettings)
@@ -265,9 +265,7 @@ lazy val sql = project
 
 lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
-  .dependsOn(
-    foundation % BothScopes,
-    frontend % BothScopes)
+  .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -284,8 +282,9 @@ lazy val qsu = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
-    api % BothScopes,
-    qsu)
+    api,
+    foundation % "test->test",
+    qscript)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -295,9 +294,8 @@ lazy val connector = project
 lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(
-    api     % BothScopes,
-    qscript % BothScopes,
-    sql     % BothScopes)
+    frontend % BothScopes,
+    sql % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -311,8 +309,7 @@ lazy val impl = project
   .settings(name := "quasar-impl-internal")
   .dependsOn(
     api % BothScopes,
-    connector % BothScopes,
-    frontend)
+    connector % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.impl)
@@ -324,7 +321,8 @@ lazy val runp = (project in file("run"))
   .dependsOn(
     core,
     impl,
-    mimir)
+    mimir,
+    qsu)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -336,8 +334,7 @@ lazy val runp = (project in file("run"))
 lazy val repl = project
   .settings(name := "quasar-repl")
   .dependsOn(
-    frontend % BothScopes,
-    api,
+    common % "test->test",
     runp)
   .settings(commonSettings)
   .settings(targetSettings)
@@ -356,8 +353,8 @@ lazy val it = project
   .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
   .dependsOn(
-    runp,
-    qscript % "test->test")
+    qscript % "test->test",
+    runp)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -449,7 +446,6 @@ lazy val mimir = project
   .dependsOn(
     yggdrasil % BothScopes,
     impl % BothScopes,
-    core,
     connector)
   .settings(headerLicenseSettings)
   .settings(publishSettings)

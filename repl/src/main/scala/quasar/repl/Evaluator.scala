@@ -18,9 +18,8 @@ package quasar
 package repl
 
 import slamdata.Predef._
-import quasar.api._, datasource._
+import quasar.api._, datasource._, resource._
 import quasar.common.data.Data
-import quasar.common.resource._
 import quasar.contrib.pathy._
 import quasar.contrib.std.uuid._
 import quasar.fp.minspace

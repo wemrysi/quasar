@@ -14,22 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.api.resource
 
-import quasar.Disposable
-import quasar.api.datasource.DatasourceType
-import quasar.api.datasource.DatasourceError.InitializationError
-import quasar.api.resource.ResourcePath
-import quasar.common.data.Data
+import slamdata.Predef.String
 
-import argonaut.Json
-import cats.effect.{ConcurrentEffect, Timer}
-import fs2.Stream
-import scalaz.\/
+import scalaz.{Order, Show}
+import scalaz.std.string._
 
-trait LightweightDatasourceModule {
-  def kind: DatasourceType
+final case class ResourceName(value: String)
 
-  def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
-      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]]]]
+object ResourceName extends ResourceNameInstances
+
+sealed abstract class ResourceNameInstances {
+  implicit val order: Order[ResourceName] =
+    Order.orderBy(_.value)
+
+  implicit val show: Show[ResourceName] =
+    Show.shows(_.value)
 }

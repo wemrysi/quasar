@@ -19,7 +19,7 @@ package quasar.impl.datasource
 import slamdata.Predef.{Boolean, None, Option, Some, Throwable, Unit}
 import quasar.Disposable
 import quasar.api.datasource.DatasourceType
-import quasar.common.resource._
+import quasar.api.resource._
 import quasar.connector.Datasource
 
 import scala.Predef.implicitly

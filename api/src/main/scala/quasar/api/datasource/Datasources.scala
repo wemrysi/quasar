@@ -18,7 +18,7 @@ package quasar.api.datasource
 
 import slamdata.Predef.{Boolean, Exception}
 import quasar.Condition
-import quasar.common.resource._
+import quasar.api.resource._
 
 import scalaz.{\/, ISet}
 
