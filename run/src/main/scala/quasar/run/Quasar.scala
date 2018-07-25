@@ -39,6 +39,7 @@ import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import argonaut.JsonScalaz._
+import cats.~>
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.flatMap._
 import fs2.{Scheduler, Stream}
@@ -50,7 +51,7 @@ import shims._
 
 final class Quasar[F[_]](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json],
-    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[IO, Data]])
+    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
 
 object Quasar {
   // The location the datasource refs tables within `mimir`.
@@ -106,9 +107,10 @@ object Quasar {
 
       federation = MimirQueryFederation[Fix, F](precog)
 
-      queryEvaluator =
+      (queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[IO, Data]]) =
         Sql2QueryEvaluator(FederatingQueryEvaluator(federation, ResourceRouter(running.get)))
 
-    } yield new Quasar(datasources, queryEvaluator)
+    } yield new Quasar(datasources,
+        QueryEvaluator.functor[F, SqlQuery].map(queryEvaluator)(_.translate(λ[IO ~> F](_.to[F]))))
   }
 }

@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.Datasources
 import quasar.build.BuildInfo
+import quasar.common.PhaseResultListen
 import quasar.common.data.Data
 import quasar.run.SqlQuery
 
@@ -37,7 +38,7 @@ import org.jline.reader._
 import org.jline.terminal._
 import scalaz._, Scalaz._
 
-final class Repl[F[_]: ConcurrentEffect](
+final class Repl[F[_]: ConcurrentEffect: PhaseResultListen](
     prompt: String,
     reader: LineReader,
     evaluator: Command => F[Evaluator.Result]) {
@@ -63,14 +64,14 @@ final class Repl[F[_]: ConcurrentEffect](
 }
 
 object Repl {
-  def apply[F[_]: ConcurrentEffect](
+  def apply[F[_]: ConcurrentEffect: PhaseResultListen](
       prompt: String,
       reader: LineReader,
       evaluator: Command => F[Evaluator.Result])
       : Repl[F] =
     new Repl[F](prompt, reader, evaluator)
 
-  def mk[F[_]: ConcurrentEffect](
+  def mk[F[_]: ConcurrentEffect: PhaseResultListen](
       ref: Ref[F, ReplState],
       datasources: Datasources[F, Stream[F, ?], UUID, Json],
       queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])

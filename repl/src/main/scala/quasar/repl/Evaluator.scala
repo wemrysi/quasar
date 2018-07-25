@@ -19,9 +19,11 @@ package repl
 
 import slamdata.Predef._
 import quasar.api._, datasource._
+import quasar.common.{PhaseResultListen, PhaseResults}
 import quasar.common.data.Data
 import quasar.common.resource._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.MonadListen_
 import quasar.contrib.std.uuid._
 import quasar.fp.minspace
 import quasar.fp.ski._
@@ -46,7 +48,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import shims._
 
-final class Evaluator[F[_]: Effect](
+final class Evaluator[F[_]: Effect: PhaseResultListen](
     stateRef: Ref[F, ReplState],
     sources: Datasources[F, Stream[F, ?], UUID, Json],
     queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]]) {
@@ -201,9 +203,11 @@ final class Evaluator[F[_]: Effect](
 
         for {
           state <- stateRef.get
-          qres <- evaluateQuery(SqlQuery(q, state.variables, toADir(state.cwd)), state.summaryCount)
+          (qres, phaseResults) <- PhaseResultListen[F].listen(
+            evaluateQuery(SqlQuery(q, state.variables, toADir(state.cwd)), state.summaryCount))
+          log = printLog(state.debugLevel, state.phaseFormat, phaseResults).map(_ + "\n")
           res <- convert(state.format, qres)
-        } yield res
+        } yield (log |+| res)
 
       case Exit =>
         F.pure("Exiting...".some)
@@ -281,8 +285,21 @@ final class Evaluator[F[_]: Effect](
         case Condition.Abnormal(a) => s"error: ${onAbnormal(a)}"
       }
 
+    private def printLog(debugLevel: DebugLevel, phaseFormat: PhaseFormat, results: PhaseResults): Option[String] =
+      debugLevel match {
+        case DebugLevel.Silent  => none
+        case DebugLevel.Normal  => (printPhaseResults(phaseFormat, results.takeRight(1)) + "\n").some
+        case DebugLevel.Verbose => (printPhaseResults(phaseFormat, results) + "\n").some
+      }
+
     private def printPath(p: ResourcePath): String =
       posixCodec.printPath(p.toPath)
+
+    private def printPhaseResults(phaseFormat: PhaseFormat, results: PhaseResults): String =
+      phaseFormat match {
+        case PhaseFormat.Tree => results.map(_.showTree).mkString("\n\n")
+        case PhaseFormat.Code => results.map(_.showCode).mkString("\n\n")
+      }
 
     private def raiseEvalError[A](s: String): F[A] =
       F.raiseError(new EvalError(s))
@@ -322,7 +339,7 @@ object Evaluator {
 
   final class EvalError(msg: String) extends java.lang.RuntimeException(msg)
 
-  def apply[F[_]: Effect](
+  def apply[F[_]: Effect: MonadListen_[?[_], PhaseResults]](
       stateRef: Ref[F, ReplState],
       sources: Datasources[F, Stream[F, ?], UUID, Json],
       queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
