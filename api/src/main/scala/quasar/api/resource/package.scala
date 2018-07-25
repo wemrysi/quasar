@@ -14,17 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.common
+package quasar.api
 
 import slamdata.Predef.{Option, String}
-import quasar.contrib.scalaz.MonadError_
 
 package object resource {
-  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
-
-  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
-      : MonadResourceErr[F] = ev
-
   object /: {
     def unapply(p: ResourcePath): Option[(String, ResourcePath)] =
       p.uncons.map { case (ResourceName(s), p) => (s, p) }

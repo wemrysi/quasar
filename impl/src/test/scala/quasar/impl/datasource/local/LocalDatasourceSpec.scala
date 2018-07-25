@@ -16,8 +16,8 @@
 
 package quasar.impl.datasource.local
 
-import quasar.common.resource.{ResourceError, ResourceName, ResourcePath}
-import quasar.connector.DatasourceSpec
+import quasar.api.resource.{ResourceName, ResourcePath}
+import quasar.connector.{DatasourceSpec, ResourceError}
 import quasar.contrib.scalaz.MonadError_
 
 import java.nio.file.Paths

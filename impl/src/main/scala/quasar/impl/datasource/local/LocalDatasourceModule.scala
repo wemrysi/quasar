@@ -18,9 +18,9 @@ package quasar.impl.datasource.local
 
 import quasar.Disposable
 import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
+import quasar.api.resource.ResourcePath
 import quasar.common.data.Data
-import quasar.common.resource.{MonadResourceErr, ResourcePath}
-import quasar.connector.{Datasource, LightweightDatasourceModule}
+import quasar.connector.{Datasource, LightweightDatasourceModule, MonadResourceErr}
 
 import java.nio.file.Paths
 import scala.concurrent.ExecutionContext.Implicits.global

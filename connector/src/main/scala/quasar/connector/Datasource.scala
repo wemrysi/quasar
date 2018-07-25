@@ -19,7 +19,7 @@ package quasar.connector
 import slamdata.Predef.{Boolean, Option}
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
-import quasar.common.resource._
+import quasar.api.resource._
 
 /** @tparam F effects
   * @tparam G multiple results

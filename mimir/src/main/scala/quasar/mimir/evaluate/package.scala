@@ -18,7 +18,7 @@ package quasar.mimir
 
 import slamdata.Predef.Option
 import quasar.contrib.pathy.AFile
-import quasar.evaluate.Source
+import quasar.impl.evaluate.Source
 
 import scalaz.Kleisli
 

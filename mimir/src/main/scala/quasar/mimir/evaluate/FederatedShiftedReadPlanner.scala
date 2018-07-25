@@ -22,7 +22,7 @@ import quasar.common.data.Data
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
-import quasar.evaluate.{Source => EvalSource}
+import quasar.impl.evaluate.{Source => EvalSource}
 import quasar.mimir._, MimirCake._
 import quasar.precog.common.RValue
 import quasar.qscript._, PlannerError.InternalError

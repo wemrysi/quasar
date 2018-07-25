@@ -19,7 +19,7 @@ package quasar.api.datasource
 import slamdata.Predef.{tailrec, Boolean, Exception, Int, None, Option, Some, Stream => SStream}
 import quasar.Condition
 import quasar.api.datasource.DatasourceError.InitializationError
-import quasar.common.resource._
+import quasar.api.resource._
 import quasar.contrib.scalaz.MonadState_
 
 import scalaz.{\/, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags, Tree}

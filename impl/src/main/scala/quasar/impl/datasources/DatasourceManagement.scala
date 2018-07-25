@@ -25,9 +25,9 @@ import quasar.api.datasource.DatasourceError.{
   DiscoveryError,
   ExistentialError
 }
+import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.common.data.Data
-import quasar.common.resource.{MonadResourceErr, ResourceName, ResourcePath, ResourcePathType}
-import quasar.connector.Datasource
+import quasar.connector.{Datasource, MonadResourceErr}
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.{κ, κ2}
 import quasar.impl.DatasourceModule

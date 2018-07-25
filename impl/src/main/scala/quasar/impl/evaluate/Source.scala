@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package quasar.evaluate
+package quasar.impl.evaluate
 
-import quasar.common.resource.ResourcePath
+import quasar.api.resource.ResourcePath
 
 import monocle.macros.Lenses
 import scalaz.{Applicative, Cord, Equal, Order, Show, Traverse}
