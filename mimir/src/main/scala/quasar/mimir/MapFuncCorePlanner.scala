@@ -137,8 +137,6 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.TypeOf(a1) =>
         (Map1[A](a1, cake.Library.typeOf.f1): TransSpec[A]).point[F]
 
-      case MapFuncsCore.ToId(a1) => ???
-
       case MapFuncsCore.Negate(a1) =>
         Unary.Neg.spec(a1).point[F]   // NB: don't use math.Negate here; it does weird things to booleans
       case MapFuncsCore.Add(a1, a2) =>

@@ -166,7 +166,6 @@ object RenderQScriptDSL {
     case Data.OffsetDate(d) => "Data.OffsetDate(quasar.OffsetDate.parse(\"" + d.toString + "\"))"
     case Data.OffsetTime(d) => "Data.OffsetTime(java.time.OffsetTime.parse(\"" + d.toString + "\"))"
     case Data.Dec(d) => "Data.Dec(BigDecimal(\"" + d.toString + "\"))"
-    case Data.Id(id) => "Data.Id(" + id + ")"
     case Data.Int(i) => "Data.Int(BigInt(\"" + i.toString + "\"))"
     case Data.Interval(i) => "Data.Interval(java.time.Duration.parse(\"" + i.toString + "\"))"
     case Data.NA => "Data.NA"
@@ -226,7 +225,6 @@ object RenderQScriptDSL {
               case ToTimestamp(a1) => ("ToTimestamp", (fa(base, a1).right :: Nil).some)
               case ToLocal(a1) => ("ToLocal", (fa(base, a1).right :: Nil).some)
               case TypeOf(a1) => ("TypeOf", (fa(base, a1).right :: Nil).some)
-              case ToId(a1) => ("ToId", (fa(base, a1).right :: Nil).some)
               case Negate(a1) => ("Negate", (fa(base, a1).right :: Nil).some)
               case Not(a1) => ("Not", (fa(base, a1).right :: Nil).some)
               case Length(a1) => ("Length", (fa(base, a1).right :: Nil).some)

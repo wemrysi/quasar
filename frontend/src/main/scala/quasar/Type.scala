@@ -278,8 +278,6 @@ trait TypeInstances {
         jString("LocalDate")
       case Interval =>
         jString("Interval")
-      case Id =>
-        jString("Id")
       case Arr(types) =>
         Json("Array" := types)
       case FlexArr(min, max, mbrs) =>
@@ -330,7 +328,6 @@ object Type extends TypeInstances {
     case Data.LocalDate(_) => LocalDate
     case Data.Interval(_) => Interval
     case Data.Binary(_) => Binary
-    case Data.Id(_) => Id
     case Data.NA => Bottom
   }
 
@@ -454,7 +451,6 @@ object Type extends TypeInstances {
     case LocalTime => Nil
     case LocalDate => Nil
     case Interval => Nil
-    case Id => Nil
     case Arr(value) => value
     case FlexArr(_, _, value) => value :: Nil
     case Obj(map, uk) => uk.toList ++ map.values.toList
@@ -524,7 +520,6 @@ object Type extends TypeInstances {
   final case object LocalTime         extends Type
   final case object LocalDate         extends Type
   final case object Interval          extends Type
-  final case object Id                extends Type
 
   final case class Arr(value: List[Type]) extends Type
   final case class FlexArr(minSize: Int, maxSize: Option[Int], value: Type)
@@ -583,7 +578,7 @@ object Type extends TypeInstances {
   val Numeric = Int ⨿ Dec
   val Temporal = OffsetDateTime ⨿ OffsetDate ⨿ OffsetTime ⨿ LocalDateTime ⨿ LocalDate ⨿ LocalTime
   val Comparable = Numeric ⨿ Str ⨿ Temporal ⨿ Bool
-  val Syntaxed = Type.Null ⨿ Type.Comparable ⨿ Type.Interval ⨿ Type.Id
+  val Syntaxed = Type.Null ⨿ Type.Comparable ⨿ Type.Interval
   val HasDate = OffsetDateTime ⨿ OffsetDate ⨿ LocalDateTime ⨿ LocalDate
   val HasTime = OffsetDateTime ⨿ OffsetTime ⨿ LocalDateTime ⨿ LocalTime
   val HasOffset = OffsetDateTime ⨿ OffsetDate ⨿ OffsetTime
@@ -604,8 +599,7 @@ object Type extends TypeInstances {
        | (LocalDateTime,  LocalDateTime)
        | (LocalTime,      LocalTime)
        | (LocalDate,      LocalDate)
-       | (Interval,       Interval)
-       | (Id,             Id) =>
+       | (Interval,       Interval) =>
       true
     case (Const(a), Const(b)) => a ≟ b
     case (Arr(as), Arr(bs)) => as ≟ bs

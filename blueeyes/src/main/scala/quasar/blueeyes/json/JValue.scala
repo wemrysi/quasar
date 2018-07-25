@@ -95,7 +95,6 @@ object JValue {
     case Data.LocalTime(value) => JString(value.toString)
     case Data.Interval(value) => JString(value.toString)
     case Data.Binary(values) => JArray(values.map(JNumLong(_)): _*)
-    case Data.Id(value) => JString(value)
     case Data.NA => JUndefined
   }
 

@@ -75,7 +75,6 @@ class DataCodecSpecs extends quasar.Qspec {
       }
       "encode array"     in { DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beSome("[ 0, 1, 2 ]") }
       "encode binary"    in { DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must beSome("""{ "$binary": "TE1OTw==" }""") }
-      "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beSome("""{ "$oid": "abc" }""") }
       "encode NA"        in { DataCodec.render(Data.NA) must beNone }
     }
 
@@ -183,7 +182,6 @@ class DataCodecSpecs extends quasar.Qspec {
       "encode array"     in { DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beSome("[ 0, 1, 2 ]") }
       "encode binary"    in { DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must beSome("\"TE1OTw==\"") }
       "encode empty binary" in { DataCodec.render(Data.Binary.fromArray(Array[Byte]())) must beSome("\"\"") }
-      "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beSome("\"abc\"") }
       "encode NA"        in { DataCodec.render(Data.NA) must beNone }
     }
 
@@ -228,11 +226,6 @@ class DataCodecSpecs extends quasar.Qspec {
       "re-parse Binary as Str" in {
         val binary = Data.Binary.fromArray(Array[Byte](0, 1, 2, 3))
         roundTrip(binary) must beSome(Data.Str("AAECAw==").right[DataEncodingError])
-      }
-
-      "re-parse Id as Str" in {
-        val id = Data.Id("abc")
-        roundTrip(id) must beSome(Data.Str("abc").right[DataEncodingError])
       }
     }
   }

@@ -73,7 +73,6 @@ object DataCodec {
     val IntervalKey = "$interval"
     val BinaryKey = "$binary"
     val ObjKey = "$obj"
-    val IdKey = "$oid"
 
     // we really only care about decoding old precise
     def encode(data: Data): Option[Json] = None
@@ -107,7 +106,6 @@ object DataCodec {
             case (`BinaryKey`, value) :: Nil    => unpack(value.string, "string value for $binary") { str =>
               \/.fromTryCatchNonFatal(Data.Binary.fromArray(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
             }
-            case (`IdKey`, value) :: Nil        => unpack(value.string, "string value for $oid")(str => \/-(Data.Id(str)))
             case _ => obj.fields.find(_.startsWith("$")).fold(decodeObj(obj))(κ(-\/(UnescapedKeyError(json))))
           }
         })
@@ -123,7 +121,6 @@ object DataCodec {
     val IntervalKey = "$interval"
     val BinaryKey = "$binary"
     val ObjKey = "$obj"
-    val IdKey = "$oid"
   }
 
   object VerboseDateTimeFormatters {
@@ -192,26 +189,24 @@ object DataCodec {
 
         case Arr(value) => Json.array(value.map(encode).unite: _*).some
 
-        case OffsetDateTime(value)  =>
+        case OffsetDateTime(value) =>
           Json.obj(OffsetDateTimeKey -> jString(OffsetDateTimeFormatter.format(value))).some
         case Data.OffsetDate(value) =>
-          Json.obj(OffsetDateKey     -> jString(value.toString)).some
-        case OffsetTime(value)      =>
-          Json.obj(OffsetTimeKey     -> jString(OffsetTimeFormatter.format(value))).some
-        case LocalDateTime(value)   =>
-          Json.obj(LocalDateTimeKey  -> jString(LocalDateTimeFormatter.format(value))).some
-        case LocalDate(value)       =>
-          Json.obj(LocalDateKey      -> jString(value.toString)).some
-        case LocalTime(value)       =>
-          Json.obj(LocalTimeKey      -> jString(LocalTimeFormatter.format(value))).some
-        case Interval(value)        =>
-          Json.obj(IntervalKey       -> jString(value.toString)).some
+          Json.obj(OffsetDateKey -> jString(value.toString)).some
+        case OffsetTime(value) =>
+          Json.obj(OffsetTimeKey -> jString(OffsetTimeFormatter.format(value))).some
+        case LocalDateTime(value) =>
+          Json.obj(LocalDateTimeKey -> jString(LocalDateTimeFormatter.format(value))).some
+        case LocalDate(value) =>
+          Json.obj(LocalDateKey -> jString(value.toString)).some
+        case LocalTime(value) =>
+          Json.obj(LocalTimeKey -> jString(LocalTimeFormatter.format(value))).some
+        case Interval(value) =>
+          Json.obj(IntervalKey -> jString(value.toString)).some
 
-        case bin @ Binary(_)        => Json.obj(BinaryKey         -> jString(bin.base64)).some
+        case bin @ Binary(_) => Json.obj(BinaryKey -> jString(bin.base64)).some
 
-        case Id(value)              => Json.obj(IdKey             -> jString(value)).some
-
-        case NA                     => None
+        case NA => None
       }
     }
 
@@ -247,7 +242,6 @@ object DataCodec {
             case (`BinaryKey`, value) :: Nil         => unpack(value.string, "string value for $binary") { str =>
               \/.fromTryCatchNonFatal(Data.Binary.fromArray(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
             }
-            case (`IdKey`, value) :: Nil             => unpack(value.string, "string value for $oid")(str => \/-(Data.Id(str)))
             case _ => obj.fields.find(_.startsWith("$")).fold(decodeObj(obj))(κ(-\/(UnescapedKeyError(json))))
           }
         })
@@ -281,8 +275,6 @@ object DataCodec {
         case Interval(value)        => jString(value.toString).some
 
         case bin @ Binary(_)  => jString(bin.base64).some
-
-        case Id(value)        => jString(value).some
 
         case NA               => None
       }
@@ -323,12 +315,12 @@ object DataCodec {
   // other types (e.g. `Data.Str("12:34")`, which becomes `Data.Time`).
   @SuppressWarnings(Array("org.wartremover.warts.Equals","org.wartremover.warts.Recursion"))
   def representable(data: Data, codec: DataCodec): Boolean = data match {
-    case (Data.Binary(_) | Data.Id(_)) if codec == Readable => false
-    case Data.NA                                            => false
-    case Data.Int(x)                                        => x.isValidLong
-    case Data.Arr(list)                                     => list.forall(representable(_, codec))
-    case Data.Obj(map)                                      => map.values.forall(representable(_, codec))
-    case _                                                  => true
+    case Data.Binary(_) if codec == Readable => false
+    case Data.NA => false
+    case Data.Int(x) => x.isValidLong
+    case Data.Arr(list) => list.forall(representable(_, codec))
+    case Data.Obj(map) => map.values.forall(representable(_, codec))
+    case _ => true
   }
 
   // TODO enable support for fixpoint encoding as well

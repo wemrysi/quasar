@@ -1,12 +1,16 @@
 {
     "name": "[qa_s07] select tests that have changed status (interim)",
-    "NB": "This is a workaround for a QScript issue in changedTestStatus.test
-           and should be removed when some connectors start passing that test.",
+
     "backends": {
         "lwc_local": "pendingIgnoreFieldOrder",
         "mimir": "pendingIgnoreFieldOrder"
     },
+
+    "NB1": "This is a workaround for a QScript issue in changedTestStatus.test",
+    "NB2": "`$oid` will have to be removed from oldTests.data for this to pass",
+
     "data": ["../oldTests.data", "../newTests.data"],
+
     "query": "select old.name ?? new.name as name,
                      old.backend ?? new.backend as backend,
                      old.status ?? \"success\" as prevStatus,
@@ -19,8 +23,10 @@
                      old.backend = new.backend and
                      old.backend <> \"mongodb_q_3_2\" and
                      old.status <> new.status",
+
     "predicate": "atLeast",
     "ignoreResultOrder": true,
+
     "expected": [
         { "name": "basic analytic query",           "backend": "mongodb_2_6",       "prevStatus": "success", "currStatus": "pending" },
         { "name": "basic analytic query",           "backend": "mongodb_3_0",       "prevStatus": "success", "currStatus": "pending" },
