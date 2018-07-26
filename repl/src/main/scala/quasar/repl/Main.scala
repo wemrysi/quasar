@@ -19,33 +19,26 @@ package repl
 
 import slamdata.Predef._
 import quasar.impl.external.ExternalConfig
-import quasar.common.{PhaseResults, PhaseResultCatsT, PhaseResultListen, PhaseResultTell}
-import quasar.contrib.cats.{writerT => catsWT}
+import quasar.common.{PhaseResultCatsT, PhaseResultListen, PhaseResultTell}
+import quasar.contrib.cats.writerT.{catsWriterTMonadListen_, catsWriterTMonadTell_}
 import quasar.contrib.scalaz.MonadError_
 import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import cats.~>
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import fs2.{Stream, StreamApp}, StreamApp.ExitCode
 import fs2.async.Ref
 import scalaz._, Scalaz._
 import shims._
 
-object Main extends StreamApp[IO] {
+object Main extends StreamApp[PhaseResultCatsT[IO, ?]] {
 
   type IOT[A] = PhaseResultCatsT[IO, A]
 
   implicit val iotQuasarError: MonadError_[IOT, QuasarError] =
     MonadError_.facet[IOT](QuasarError.throwableP)
-
-  implicit val iotListen: PhaseResultListen[IOT] =
-    catsWT.catsWriterTMonadListen_[IO, PhaseResults]
-
-  implicit val iotTell: PhaseResultTell[IOT] =
-    catsWT.catsWriterTMonadTell_[IO, PhaseResults]
 
   implicit val iotTimer: Timer[IOT] = Timer.derive
 
@@ -71,11 +64,9 @@ object Main extends StreamApp[IO] {
       l <- repl.loop
     } yield l
 
-  override def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] = {
-    val st: Stream[IOT, ExitCode] =
-      quasarStream[IOT] >>= { q: Quasar[IOT] =>
-        Stream.eval(repl(q))
-      }
-    st.translate(λ[IOT ~> IO](_.run.map(_._2)))
+  override def stream(args: List[String], requestShutdown: IOT[Unit]): Stream[IOT, ExitCode] = {
+    quasarStream[IOT] >>= { q: Quasar[IOT] =>
+      Stream.eval(repl(q))
+    }
   }
 }
