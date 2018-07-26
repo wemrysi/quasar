@@ -2,8 +2,6 @@
   "name": "constant from ",
 
   "backends": {
-    "mongodb_3_4_13":    "pending",
-    "mongodb_3_6":       "pending"
   },
 
   "data": "../smallZips.data",

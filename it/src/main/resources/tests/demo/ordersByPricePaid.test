@@ -3,9 +3,7 @@
     "data": ["../customers.data", "../orders.data", "../ordered_items.data", "../inventory_items.data"],
     "backends": {
         "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder",
-        "mongodb_3_4_13":    "skip",
-        "mongodb_3_6":       "skip"
+        "mimir":             "ignoreFieldOrder"
     },
     "NB2": "mongo skipped due to timeout",
     "query": "

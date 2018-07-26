@@ -19,7 +19,7 @@ package quasar.mimir.evaluate
 import quasar.RenderTreeT
 import quasar.common.data.Data
 import quasar.contrib.cats.effect.liftio._
-import quasar.evaluate.{FederatedQuery, QueryFederation}
+import quasar.impl.evaluate.{FederatedQuery, QueryFederation}
 import quasar.mimir._, MimirCake._
 import quasar.qscript.MonadPlannerErr
 

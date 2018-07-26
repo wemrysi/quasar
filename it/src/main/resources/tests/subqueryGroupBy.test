@@ -1,10 +1,8 @@
 {
     "name": "use subquery when there's a group by statement",
     "backends": {
-        "mimir":          "pendingIgnoreFieldOrder",
-        "lwc_local":      "pendingIgnoreFieldOrder",
-        "mongodb_3_4_13": "pending",
-        "mongodb_3_6":    "pending"
+        "lwc_local":  "pendingIgnoreFieldOrder",
+        "mimir":      "pendingIgnoreFieldOrder"
     },
     "NB": "pending on mongo due to sorting issues",
     "data": "zips.data",

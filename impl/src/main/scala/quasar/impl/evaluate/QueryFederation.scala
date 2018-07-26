@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.evaluate
+package quasar.impl.evaluate
 
 import scalaz.{Contravariant, Functor, Profunctor}
 import scalaz.syntax.functor._

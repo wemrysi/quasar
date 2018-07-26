@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.common.resource
+package quasar.api.resource
 
 import slamdata.Predef.{Boolean, Int, Product, Serializable, Some}
 

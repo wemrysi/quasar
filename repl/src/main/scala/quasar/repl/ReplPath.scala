@@ -17,7 +17,7 @@
 package quasar.repl
 
 import slamdata.Predef._
-import quasar.common.resource.{ResourceName, ResourcePath}
+import quasar.api.resource.{ResourceName, ResourcePath}
 
 import scalaz.{IList, Scalaz}, Scalaz._
 
