@@ -19,45 +19,55 @@ package repl
 
 import slamdata.Predef._
 import quasar.impl.external.ExternalConfig
-import quasar.common.PhaseResults
-import quasar.contrib.scalaz.{MonadError_, MonadTell_}
-import quasar.run.{Quasar, QuasarError}
+import quasar.common.{PhaseResultCatsT, PhaseResultListen, PhaseResultTell}
+import quasar.contrib.cats.writerT.{catsWriterTMonadListen_, catsWriterTMonadTell_}
+import quasar.contrib.scalaz.MonadError_
+import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
 
+import java.nio.file.Path
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import cats.effect.IO
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import eu.timepit.refined.auto._
 import fs2.{Stream, StreamApp}, StreamApp.ExitCode
 import fs2.async.Ref
 import scalaz._, Scalaz._
 import shims._
 
-object Main extends StreamApp[IO] {
+object Main extends StreamApp[PhaseResultCatsT[IO, ?]] {
 
-  implicit val ignorePhaseResults: MonadTell_[IO, PhaseResults] =
-    MonadTell_.ignore[IO, PhaseResults]
+  type IOT[A] = PhaseResultCatsT[IO, A]
 
-  implicit val ioQuasarError: MonadError_[IO, QuasarError] =
-    MonadError_.facet[IO](QuasarError.throwableP)
+  implicit val iotQuasarError: MonadError_[IOT, QuasarError] =
+    MonadError_.facet[IOT](QuasarError.throwableP)
 
-  val quasarStream: Stream[IO, Quasar[IO]] =
+  implicit val iotTimer: Timer[IOT] = Timer.derive
+
+  def paths[F[_]](implicit F: cats.Applicative[F]): Stream[F, (Path, Path)] =
     for {
-      basePath <- Paths.getBasePath[Stream[IO, ?]]
+      basePath <- Paths.getBasePath[Stream[F, ?]]
       dataDir = basePath.resolve(Paths.QuasarDataDirName)
-      _ <- Paths.mkdirs[Stream[IO, ?]](dataDir)
+      _ <- Paths.mkdirs[Stream[F, ?]](dataDir)
       pluginDir = basePath.resolve(Paths.QuasarPluginsDirName)
-      _ <- Paths.mkdirs[Stream[IO, ?]](pluginDir)
-      q <- Quasar[IO](dataDir, ExternalConfig.PluginDirectory(pluginDir), 1000L)
+      _ <- Paths.mkdirs[Stream[F, ?]](pluginDir)
+    } yield (dataDir, pluginDir)
+
+  def quasarStream[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultTell: Timer]: Stream[F, Quasar[F]] =
+    for {
+      (dataPath, pluginPath) <- paths[F]
+      q <- Quasar[F](dataPath, ExternalConfig.PluginDirectory(pluginPath), 1000L)
     } yield q
 
-  def repl(q: Quasar[IO]): IO[ExitCode] =
+  def repl[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](q: Quasar[F]): F[ExitCode] =
     for {
-      ref <- Ref[IO, ReplState](ReplState.mk)
-      repl <- Repl.mk[IO](ref, q.datasources, q.queryEvaluator)
+      ref <- Ref[F, ReplState](ReplState.mk)
+      repl <- Repl.mk[F](ref, q.datasources, q.queryEvaluator)
       l <- repl.loop
     } yield l
 
-  override def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] =
-    quasarStream >>= (q => Stream.eval(repl(q)))
-
+  override def stream(args: List[String], requestShutdown: IOT[Unit]): Stream[IOT, ExitCode] = {
+    quasarStream[IOT] >>= { q: Quasar[IOT] =>
+      Stream.eval(repl(q))
+    }
+  }
 }

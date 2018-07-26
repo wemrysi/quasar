@@ -19,6 +19,7 @@ package repl
 
 import slamdata.Predef._
 import quasar.api._, datasource._, resource._
+import quasar.common.{PhaseResultListen, PhaseResultTell, PhaseResults}
 import quasar.common.data.Data
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
@@ -29,7 +30,7 @@ import quasar.fp.minspace
 import quasar.fp.ski._
 import quasar.frontend.data.DataCodec
 import quasar.impl.schema.{SstConfig, SstSchema}
-import quasar.run.{QuasarError, SqlQuery}
+import quasar.run.{QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
 import quasar.run.ResourceRouter.DatasourceResourcePrefix
 import quasar.run.optics.{stringUuidP => UuidString}
 import quasar.sst._
@@ -53,7 +54,7 @@ import scalaz._, Scalaz._
 import shims.{eqToScalaz => _, orderToScalaz => _, _}
 import spire.std.double._
 
-final class Evaluator[F[_]: Effect](
+final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
     stateRef: Ref[F, ReplState],
     sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
     queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]]) {
@@ -231,9 +232,19 @@ final class Evaluator[F[_]: Effect](
 
         for {
           state <- stateRef.get
-          qres <- evaluateQuery(SqlQuery(q, state.variables, toADir(state.cwd)), state.summaryCount)
+          (qres, phaseResults) <- PhaseResultListen[F].listen(
+            evaluateQuery(SqlQuery(q, state.variables, toADir(state.cwd)), state.summaryCount))
+          log = printLog(state.debugLevel, state.phaseFormat, phaseResults).map(_ + "\n")
           res <- convert(state.format, qres)
-        } yield res
+        } yield (log |+| res)
+
+      case Explain(q) =>
+        for {
+          state <- stateRef.get
+          (_, phaseResults) <- PhaseResultListen[F].listen(
+            Sql2QueryEvaluator.sql2ToQScript[Fix, F](SqlQuery(q, state.variables, toADir(state.cwd))))
+          log = printLog(Order[DebugLevel].max(DebugLevel.Normal, state.debugLevel), state.phaseFormat, phaseResults)
+        } yield log
 
       case Exit =>
         F.pure("Exiting...".some)
@@ -311,8 +322,21 @@ final class Evaluator[F[_]: Effect](
         case Condition.Abnormal(a) => s"error: ${onAbnormal(a)}"
       }
 
+    private def printLog(debugLevel: DebugLevel, phaseFormat: PhaseFormat, results: PhaseResults): Option[String] =
+      debugLevel match {
+        case DebugLevel.Silent  => none
+        case DebugLevel.Normal  => (printPhaseResults(phaseFormat, results.takeRight(1)) + "\n").some
+        case DebugLevel.Verbose => (printPhaseResults(phaseFormat, results) + "\n").some
+      }
+
     private def printPath(p: ResourcePath): String =
       posixCodec.printPath(p.toPath)
+
+    private def printPhaseResults(phaseFormat: PhaseFormat, results: PhaseResults): String =
+      phaseFormat match {
+        case PhaseFormat.Tree => results.map(_.showTree).mkString("\n\n")
+        case PhaseFormat.Code => results.map(_.showCode).mkString("\n\n")
+      }
 
     private def raiseEvalError[A](s: String): F[A] =
       F.raiseError(new EvalError(s))
@@ -352,7 +376,7 @@ object Evaluator {
 
   final class EvalError(msg: String) extends java.lang.RuntimeException(msg)
 
-  def apply[F[_]: Effect](
+  def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
       stateRef: Ref[F, ReplState],
       sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
       queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
@@ -375,13 +399,14 @@ object Evaluator {
       |  ls [path]
       |  schema [path]
       |  [query]
+      |  (explain | compile) [query]
+      |  set debug = 0 | 1 | 2
       |  set format = table | precise | readable | csv
       |  set summaryCount = [rows]
       |  set [var] = [value]
       |  env
       |
       |TODO:
-      |  set debug = 0 | 1 | 2
       |  set phaseFormat = tree | code
       |  set timingFormat = tree | onlytotal""".stripMargin
 }

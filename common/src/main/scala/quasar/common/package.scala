@@ -44,6 +44,7 @@ package object common {
 
   type PhaseResultW[A] = Writer[PhaseResults, A]
   type PhaseResultT[F[_], A] = WriterT[F, PhaseResults, A]
+  type PhaseResultCatsT[F[_], A] = cats.data.WriterT[F, PhaseResults, A]
 
   type PhaseResultTell[F[_]] = MonadTell_[F, PhaseResults]
 

@@ -52,6 +52,7 @@ object Command {
   private val DatasourceLookupPattern      = "(?i)ds(?: +)(?:lookup|get) +([\\S]+)".r
   private val DatasourceRemovePattern      = "(?i)ds(?: +)(?:remove|rm) +([\\S]+)".r
   private val ResourceSchemaPattern        = "(?i)schema +(.+)".r
+  private val ExplainPattern               = "(?i)(?:explain|compile)(?: +)(.*\\S)".r
 
   final case object Exit extends Command
   final case object Help extends Command
@@ -59,6 +60,7 @@ object Command {
   final case object Pwd extends Command
   final case class Cd(dir: ReplPath) extends Command
   final case class Select(query: Query) extends Command
+  final case class Explain(query: Query) extends Command
   final case class Ls(dir: Option[ReplPath]) extends Command
   final case class Debug(level: DebugLevel) extends Command
   final case class SummaryCount(rows: Int) extends Command
@@ -101,6 +103,7 @@ object Command {
                                                        DatasourceAdd(DatasourceName(n), tp, cfg)
       case DatasourceRemovePattern(UuidString(u))   => DatasourceRemove(u)
       case ResourceSchemaPattern(ReplPath(path))    => ResourceSchema(path)
+      case ExplainPattern(s)                        => Explain(Query(s))
       case _                                        => Select(Query(input))
     }
 }
