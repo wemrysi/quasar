@@ -64,7 +64,7 @@ object Main extends StreamApp[IO] {
       q <- Quasar[F](dataPath, ExternalConfig.PluginDirectory(pluginPath), global)
     } yield q
 
-  def repl[F[_]: ConcurrentEffect: PhaseResultListen](q: Quasar[F]): F[ExitCode] =
+  def repl[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](q: Quasar[F]): F[ExitCode] =
     for {
       ref <- Ref[F, ReplState](ReplState.mk)
       repl <- Repl.mk[F](ref, q.datasources, q.queryEvaluator)

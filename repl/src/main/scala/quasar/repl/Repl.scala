@@ -21,9 +21,9 @@ import slamdata.Predef._
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.Datasources
 import quasar.build.BuildInfo
-import quasar.common.PhaseResultListen
+import quasar.common.{PhaseResultListen, PhaseResultTell}
 import quasar.common.data.Data
-import quasar.run.SqlQuery
+import quasar.run.{MonadQuasarErr, SqlQuery}
 
 import java.io.File
 import java.util.UUID
@@ -71,7 +71,7 @@ object Repl {
       : Repl[F] =
     new Repl[F](prompt, reader, evaluator)
 
-  def mk[F[_]: ConcurrentEffect: PhaseResultListen](
+  def mk[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
       ref: Ref[F, ReplState],
       datasources: Datasources[F, Stream[F, ?], UUID, Json],
       queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])

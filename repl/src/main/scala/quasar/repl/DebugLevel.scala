@@ -39,6 +39,9 @@ object DebugLevel {
       case Verbose => 2
     }
 
-  implicit val equal: Equal[DebugLevel] =
-    Equal.equalBy(int(_))
+  implicit val order: Order[DebugLevel] = new Order[DebugLevel] {
+    def order(x: DebugLevel, y: DebugLevel): Ordering =
+      Order[Int].order(int(x), int(y))
+  }
+
 }
