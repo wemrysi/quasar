@@ -46,7 +46,7 @@ import fs2.{Scheduler, Stream}
 import matryoshka.data.Fix
 import pathy.Path._
 import scalaz.IMap
-import scalaz.syntax.foldable._
+import scalaz.syntax.{foldable, functor}, foldable._, functor._
 import shims._
 
 final class Quasar[F[_]](
@@ -107,10 +107,11 @@ object Quasar {
 
       federation = MimirQueryFederation[Fix, F](precog)
 
-      (queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[IO, Data]]) =
+      (queryEvaluatorIO: QueryEvaluator[F, SqlQuery, Stream[IO, Data]]) =
         Sql2QueryEvaluator(FederatingQueryEvaluator(federation, ResourceRouter(running.get)))
 
-    } yield new Quasar(datasources,
-        QueryEvaluator.functor[F, SqlQuery].map(queryEvaluator)(_.translate(λ[IO ~> F](_.to[F]))))
+      queryEvaluator = queryEvaluatorIO.map(_.translate(λ[IO ~> F](_.to[F])))
+
+    } yield new Quasar(datasources, queryEvaluator)
   }
 }
