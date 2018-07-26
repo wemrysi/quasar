@@ -56,6 +56,6 @@ object Sql2QueryEvaluator {
 
       lp  <- queryPlan[F, T, T[LP]](sql, sqlQuery.vars, sqlQuery.basePath, 0L, None)
 
-      qs  <- phaseM[F]("QScriptEducated", LPtoQS[T].apply[StateT[F, Long, ?]](lp).eval(0))
+      qs  <- phaseM[F]("QScript (Educated)", LPtoQS[T].apply[StateT[F, Long, ?]](lp).eval(0))
     } yield qs
 }
