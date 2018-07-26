@@ -18,6 +18,7 @@ package quasar.api.datasource
 
 import slamdata.Predef._
 import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
+import quasar.api.SchemaConfig
 import quasar.api.resource.ResourcePath
 
 import scala.Predef.assert
@@ -35,19 +36,22 @@ import scalaz.syntax.equal._
 import scalaz.syntax.foldable._
 import scalaz.std.list._
 
-abstract class DatasourcesSpec[F[_], G[_], I: Order: Show, C: Equal: Show](
+abstract class DatasourcesSpec[
+    F[_], G[_], I: Order: Show, C: Equal: Show, S <: SchemaConfig](
     implicit F: Effect[F], ec: ExecutionContext)
     extends EffectfulQSpec[F]
     with ConditionMatchers {
 
   import DatasourceError._
 
-  def datasources: Datasources[F, G, I, C]
+  def datasources: Datasources[F, G, I, C, S]
 
   def supportedType: DatasourceType
 
   // Must be distinct.
   def validConfigs: (C, C)
+
+  val schemaConfig: S
 
   def gatherMultiple[A](fga: G[A]): F[List[A]]
 
@@ -237,6 +241,10 @@ abstract class DatasourcesSpec[F[_], G[_], I: Order: Show, C: Equal: Show](
         metaAfter.any(_._1 ≟ i) must beFalse
       }
     }
+  }
+
+  "resource schema" >> {
+    discoveryExamples(datasources.resourceSchema(_, _, schemaConfig))
   }
 
   ////

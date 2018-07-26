@@ -26,6 +26,7 @@ import quasar.run.{Quasar, QuasarError}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.IO
+import eu.timepit.refined.auto._
 import fs2.{Stream, StreamApp}, StreamApp.ExitCode
 import fs2.async.Ref
 import scalaz._, Scalaz._
@@ -46,7 +47,7 @@ object Main extends StreamApp[IO] {
       _ <- Paths.mkdirs[Stream[IO, ?]](dataDir)
       pluginDir = basePath.resolve(Paths.QuasarPluginsDirName)
       _ <- Paths.mkdirs[Stream[IO, ?]](pluginDir)
-      q <- Quasar[IO](dataDir, ExternalConfig.PluginDirectory(pluginDir), global)
+      q <- Quasar[IO](dataDir, ExternalConfig.PluginDirectory(pluginDir), 1000L)
     } yield q
 
   def repl(q: Quasar[IO]): IO[ExitCode] =

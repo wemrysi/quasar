@@ -117,7 +117,7 @@ object optics {
     Prism(fromRValue)(toRValue)
   }
 
-  val stringUUIDP: Prism[String, UUID] =
+  val stringUuidP: Prism[String, UUID] =
     Prism[String, UUID](
       s => \/.fromTryCatchNonFatal(UUID.fromString(s)).toOption)(
       u => u.toString)

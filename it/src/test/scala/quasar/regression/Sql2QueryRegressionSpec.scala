@@ -83,7 +83,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
         Stream.emit(_),
         contribFile.deleteRecursively[IO](_))
 
-    q <- Quasar[IO](tmpPath, ExternalConfig.Empty, global)
+    q <- Quasar[IO](tmpPath, ExternalConfig.Empty, 1L)
 
     localCfg =
       ("rootDir" := posixCodec.printPath(TestDataRoot)) ->:

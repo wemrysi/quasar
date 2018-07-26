@@ -22,7 +22,6 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.Datasource
 
-import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration
 
@@ -103,8 +102,8 @@ object ByNeedDatasource {
   def apply[F[_]: Effect, G[_], Q, R](
       kind: DatasourceType,
       init: F[Disposable[F, Datasource[F, G, Q, R]]],
-      pool: ExecutionContext,
-      scheduler: Scheduler)
+      scheduler: Scheduler)(
+      implicit ec: ExecutionContext)
       : F[Disposable[F, Datasource[F, G, Q, R]]] = {
 
     def dispose(q: mutable.Queue[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]]): F[Unit] =
@@ -114,7 +113,7 @@ object ByNeedDatasource {
       }
 
     for {
-      mvar <- async.boundedQueue[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]](1)(implicitly, pool)
+      mvar <- async.boundedQueue[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]](1)
       _    <- mvar.enqueue1(NeedState.Uninitialized(init))
     } yield Disposable(new ByNeedDatasource(kind, mvar, scheduler), dispose(mvar))
   }

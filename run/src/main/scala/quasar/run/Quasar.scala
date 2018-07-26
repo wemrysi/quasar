@@ -16,17 +16,22 @@
 
 package quasar.run
 
+import slamdata.Predef.Double
+
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
 import quasar.common.PhaseResultTell
 import quasar.common.data.Data
 import quasar.contrib.pathy.ADir
 import quasar.contrib.std.uuid._
+import quasar.ejson.EJson
+import quasar.fp.numeric.Positive
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.local.LocalDatasourceModule
 import quasar.impl.datasources.{DatasourceManagement, DefaultDatasources}
 import quasar.impl.evaluate.FederatingQueryEvaluator
 import quasar.impl.external.{ExternalConfig, ExternalDatasources}
+import quasar.impl.schema.SstConfig
 import quasar.mimir.Precog
 import quasar.mimir.evaluate.MimirQueryFederation
 import quasar.mimir.storage.{MimirIndexedStore, StoreKey}
@@ -47,9 +52,10 @@ import pathy.Path._
 import scalaz.IMap
 import scalaz.syntax.foldable._
 import shims._
+import spire.std.double._
 
 final class Quasar[F[_]](
-    val datasources: Datasources[F, Stream[F, ?], UUID, Json],
+    val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[IO, Data]])
 
 object Quasar {
@@ -61,14 +67,14 @@ object Quasar {
     *
     * @param mimirDir directory where mimir should store its data
     * @param extConfig datasource plugin configuration
+    * @param sstSampleSize the number of records to sample when generating SST schemas
     */
   def apply[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultTell: Timer](
       mimirDir: Path,
       extConfig: ExternalConfig,
-      pool: ExecutionContext)
+      sstSampleSize: Positive)(
+      implicit ec: ExecutionContext)
       : Stream[F, Quasar[F]] = {
-
-    implicit val ec = pool
 
     for {
       precog <- Stream.bracket(Precog(mimirDir.toFile).to[F])(
@@ -80,13 +86,13 @@ object Quasar {
           MimirIndexedStore.transformIndex(
             MimirIndexedStore[F](precog, DatasourceRefsLocation),
             "UUID",
-            StoreKey.stringIso composePrism stringUUIDP),
+            StoreKey.stringIso composePrism stringUuidP),
           "DatasourceRef",
           rValueDatasourceRefP(rValueJsonP))
 
       configured <- refs.entries.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _)
 
-      extMods <- ExternalDatasources[F](extConfig, pool)
+      extMods <- ExternalDatasources[F](extConfig)
 
       modules = extMods.insert(
         LocalDatasourceModule.kind,
@@ -94,7 +100,8 @@ object Quasar {
 
       scheduler <- Scheduler(corePoolSize = 1, threadPrefix = "quasar-scheduler")
 
-      mr <- Stream.bracket(DatasourceManagement[Fix, F, UUID](modules, configured, pool, scheduler))(
+      mr <- Stream.bracket(
+        DatasourceManagement[Fix, F, UUID, Double](modules, configured, sstSampleSize, scheduler))(
         Stream.emit(_),
         { case (_, r) => r.get.flatMap(_.traverse_(_.dispose)) })
 

@@ -16,8 +16,9 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{tailrec, Boolean, Exception, Int, None, Option, Some, Stream => SStream}
+import slamdata.Predef.{Stream => SStream, _}
 import quasar.Condition
+import quasar.api.MockSchemaConfig
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource._
 import quasar.contrib.scalaz.MonadState_
@@ -43,7 +44,7 @@ final class MockDatasources[
     supportedTypes: ISet[DatasourceType],
     errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
     structure: SStream[Tree[ResourceName]])
-  extends Datasources[F, G, Int, C] {
+  extends Datasources[F, G, Int, C, MockSchemaConfig.type] {
 
   import DatasourceError._
 
@@ -130,6 +131,22 @@ final class MockDatasources[
         Condition.abnormal(datasourceNotFound[Int, ExistentialError[Int]](id)).point[F]
     }
 
+  def resourceSchema(
+      id: Int,
+      path: ResourcePath,
+      cfg: MockSchemaConfig.type)
+      : F[DiscoveryError[Int] \/ Option[cfg.Schema]] =
+    mockState.gets { s =>
+      if (s.dss member id)
+        forestAt(path) match {
+          case Some(forest) if forest.isEmpty => MockSchemaConfig.MockSchema.some.right
+          case Some(_) => pathNotAResource[DiscoveryError[Int]](path).left
+          case None => pathNotFound[DiscoveryError[Int]](path).left
+        }
+      else
+        datasourceNotFound[Int, ExistentialError[Int]](id).left
+    }
+
   val supportedDatasourceTypes: F[ISet[DatasourceType]] = supportedTypes.point[F]
 
   ////
@@ -201,6 +218,6 @@ object MockDatasources {
       supportedTypes: ISet[DatasourceType],
       errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
       structure: SStream[Tree[ResourceName]])
-      : Datasources[F, G, Int, C] =
+      : Datasources[F, G, Int, C, MockSchemaConfig.type] =
     new MockDatasources[C, F, G](supportedTypes, errorCondition, structure)
 }
