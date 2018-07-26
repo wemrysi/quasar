@@ -65,52 +65,6 @@ object DataCodec {
   def render(data: Data)(implicit C: DataCodec): Option[String] =
     C.encode(data).map(_.pretty(minspace))
 
-  // this is just copy-pasted from the old version; we should remove it eventually
-  def OldPrecise(recDecode: Json => DataEncodingError \/ Data) = new DataCodec {
-    val TimestampKey = "$timestamp"
-    val DateKey = "$date"
-    val TimeKey = "$time"
-    val IntervalKey = "$interval"
-    val BinaryKey = "$binary"
-    val ObjKey = "$obj"
-
-    // we really only care about decoding old precise
-    def encode(data: Data): Option[Json] = None
-
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def decode(json: Json): DataEncodingError \/ Data =
-      json.fold(
-        \/-(Data.Null),
-        bool => \/-(Data.Bool(bool)),
-        num => num match {
-          case JsonLong(x) => \/-(Data.Int(x))
-          case _           => \/-(Data.Dec(num.toBigDecimal))
-        },
-        str => \/-(Data.Str(str)),
-        arr => arr.traverse(recDecode).map(Data.Arr(_)),
-        obj => {
-          import quasar.std.DateLib._
-
-          def unpack[A](a: Option[A], expected: String)(f: A => DataEncodingError \/ Data) =
-            (a \/> UnexpectedValueError(expected, json)) flatMap f
-
-          def decodeObj(obj: JsonObject): DataEncodingError \/ Data =
-            obj.toList.traverse { case (k, v) => recDecode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*)))
-
-          obj.toList match {
-            case (`TimestampKey`, value) :: Nil => unpack(value.string, "string value for $timestamp")(parseTimestamp(_).leftMap(err => ParseError(err.message)))
-            case (`DateKey`, value) :: Nil      => unpack(value.string, "string value for $date")(parseLocalDate(_).leftMap(err => ParseError(err.message)))
-            case (`TimeKey`, value) :: Nil      => unpack(value.string, "string value for $time")(parseLocalTime(_).leftMap(err => ParseError(err.message)))
-            case (`IntervalKey`, value) :: Nil  => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
-            case (`ObjKey`, value) :: Nil       => unpack(value.obj,    "object value for $obj")(decodeObj)
-            case (`BinaryKey`, value) :: Nil    => unpack(value.string, "string value for $binary") { str =>
-              \/.fromTryCatchNonFatal(Data.Binary.fromArray(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
-            }
-            case _ => obj.fields.find(_.startsWith("$")).fold(decodeObj(obj))(κ(-\/(UnescapedKeyError(json))))
-          }
-        })
-  }
-
   object PreciseKeys {
     val LocalDateTimeKey = "$localdatetime"
     val LocalDateKey = "$localdate"
@@ -156,23 +110,7 @@ object DataCodec {
       .toFormatter()
   }
 
-  /*
-   * The purpose behind the explicit fixed-point here is to allow interleaved
-   * composition at depth.  Specifically, we want to be able to write the `orElse`
-   * combinator and have it apply not just at the top level, but also at *every*
-   * level of the recursive hierarchy.  Thus, we need to ensure that recursive
-   * calls to decode delegate to the orElse'd codec, and not the current
-   * specialized one.  This is the difference between singular backtracking and
-   * recursive backtracking.  Take note of the "decode timestamp AND localdatetimp
-   * within array" test, which is impossible to satisfy without this trick.
-   *
-   * Note that only decoding is composed in this way.  Encoding is still singular
-   * in its backtracking.  This is mostly because I'm lazy and we relaly don't
-   * need recursive backtracking on encoding... YET.  If you need to add this
-   * (i.e. because of a situation analogous to the decoding test I referenced),
-   * then you can add it using a very similar trick.
-   */
-  def NewPrecise(recDecode: Json => DataEncodingError \/ Data) = new DataCodec {
+  val Precise = new DataCodec {
     import PreciseKeys._
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -220,7 +158,7 @@ object DataCodec {
           case _           => \/-(Data.Dec(num.toBigDecimal))
         },
         str => \/-(Data.Str(str)),
-        arr => arr.traverse(recDecode).map(Data.Arr(_)),
+        arr => arr.traverse(decode).map(Data.Arr(_)),
         obj => {
           import quasar.std.DateLib._
 
@@ -228,7 +166,7 @@ object DataCodec {
             (a \/> UnexpectedValueError(expected, json)) flatMap f
 
           def decodeObj(obj: JsonObject): DataEncodingError \/ Data =
-            obj.toList.traverse { case (k, v) => recDecode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*)))
+            obj.toList.traverse { case (k, v) => decode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*)))
 
           obj.toList match {
             case (`OffsetDateTimeKey`, value) :: Nil => unpack(value.string, "string value for $offsetdatetime")(parseOffsetDateTime(_).leftMap(err => ParseError(err.message)))
@@ -246,8 +184,6 @@ object DataCodec {
           }
         })
   }
-
-  val Precise = orElse(NewPrecise _, OldPrecise _)
 
   val Readable = new DataCodec {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -321,20 +257,5 @@ object DataCodec {
     case Data.Arr(list) => list.forall(representable(_, codec))
     case Data.Obj(map) => map.values.forall(representable(_, codec))
     case _ => true
-  }
-
-  // TODO enable support for fixpoint encoding as well
-  private def orElse(
-      selfF: (Json => DataEncodingError \/ Data) => DataCodec,
-      otherF: (Json => DataEncodingError \/ Data) => DataCodec): DataCodec = new DataCodec {
-
-    private lazy val self = selfF(decode)
-    private lazy val other = otherF(decode)
-
-    def encode(data: Data): Option[Json] =
-      self.encode(data).orElse(other.encode(data))
-
-    def decode(json: Json): DataEncodingError \/ Data =
-      self.decode(json).orElse(other.decode(json))
   }
 }
