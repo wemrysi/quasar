@@ -2,7 +2,7 @@
     "name": "nested select with filter",
     "backends": {
         "lwc_local": "ignoreFieldOrder",
-        "mimir":     "pendingIgnoreFieldOrder"
+        "mimir":     "ignoreFieldOrder"
     },
     "data": "demo/olympics.data",
     "query": "select * from

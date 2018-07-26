@@ -3,7 +3,7 @@
 
     "backends": {
         "lwc_local": "ignoreFieldOrder",
-        "mimir":     "pending"
+        "mimir":     "ignoreFieldOrder"
     },
 
     "data": ["../zips.data", "../largeZips.data"],
