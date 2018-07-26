@@ -28,6 +28,7 @@ import java.nio.file.Path
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
+import eu.timepit.refined.auto._
 import fs2.{Stream, StreamApp}, StreamApp.ExitCode
 import fs2.async.Ref
 import scalaz._, Scalaz._
@@ -54,7 +55,7 @@ object Main extends StreamApp[PhaseResultCatsT[IO, ?]] {
   def quasarStream[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultTell: Timer]: Stream[F, Quasar[F]] =
     for {
       (dataPath, pluginPath) <- paths[F]
-      q <- Quasar[F](dataPath, ExternalConfig.PluginDirectory(pluginPath), global)
+      q <- Quasar[F](dataPath, ExternalConfig.PluginDirectory(pluginPath), 1000L)
     } yield q
 
   def repl[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](q: Quasar[F]): F[ExitCode] =

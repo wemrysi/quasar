@@ -55,10 +55,9 @@ object ExternalDatasources extends Logging {
   val PluginChunkSize = 8192
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def apply[F[_]: Timer](config: ExternalConfig, pool: ExecutionContext)(implicit F: Effect[F])
+  def apply[F[_]: Timer](config: ExternalConfig)(
+      implicit F: Effect[F], ec: ExecutionContext)
       : Stream[F, IMap[DatasourceType, DatasourceModule]] = {
-
-    implicit val ec: ExecutionContext = pool
 
     val moduleStream = config match {
       case PluginDirectory(directory) =>

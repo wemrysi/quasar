@@ -37,14 +37,14 @@ import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.fp.ski.κ
 import quasar.tpe._
 
+import iotaz.{CopK, TNilK}
+import iotaz.TListK.:::
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns.EnvT
 import monocle.Lens
 import scalaz._, Scalaz._
-import iotaz.{CopK, TNilK}
-import iotaz.TListK.:::
 
 /** A measure annotated Type focused on structure over semantics.
   *

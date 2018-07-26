@@ -309,7 +309,8 @@ lazy val impl = project
   .settings(name := "quasar-impl-internal")
   .dependsOn(
     api % BothScopes,
-    connector % BothScopes)
+    connector % BothScopes,
+    sst)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.impl)

@@ -18,6 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef.{Stream => _, _}
 import quasar.Condition
+import quasar.api.MockSchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.contrib.cats.stateT._
@@ -44,7 +45,7 @@ import scalaz.std.string._
 import shims._
 
 final class DefaultDatasourcesSpec
-    extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String] {
+    extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] {
 
   val monadIdx: MonadState_[DefaultM, Int] =
     MonadState_.zoom[DefaultM](DefaultState.idx)
@@ -61,12 +62,14 @@ final class DefaultDatasourcesSpec
 
   def validConfigs = ("one", "two")
 
+  val schemaConfig = MockSchemaConfig
+
   def gatherMultiple[A](as: Stream[DefaultM, A]) = as.compile.toList
 
   def mkDatasources(
       errs: IMap[Int, Exception])(
       init: String => Option[InitializationError[String]])
-      : Datasources[DefaultM, Stream[DefaultM, ?], Int, String] = {
+      : Datasources[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] = {
 
     val freshId =
       for {

@@ -21,14 +21,19 @@ import slamdata.Predef._
 import quasar.api._, datasource._, resource._
 import quasar.common.{PhaseResultListen, PhaseResultTell, PhaseResults}
 import quasar.common.data.Data
+import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.contrib.std.uuid._
+import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp.minspace
 import quasar.fp.ski._
 import quasar.frontend.data.DataCodec
+import quasar.impl.schema.{SstConfig, SstSchema}
 import quasar.run.{QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
 import quasar.run.ResourceRouter.DatasourceResourcePrefix
-import quasar.run.optics.{stringUUIDP => UuidString}
+import quasar.run.optics.{stringUuidP => UuidString}
+import quasar.sst._
 
 import java.lang.Exception
 import scala.util.control.NonFatal
@@ -43,13 +48,15 @@ import eu.timepit.refined.scalaz._
 import fs2.{Stream, StreamApp}, StreamApp.ExitCode
 import fs2.async.Ref
 import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
-import shims._
+import shims.{eqToScalaz => _, orderToScalaz => _, _}
+import spire.std.double._
 
 final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
     stateRef: Ref[F, ReplState],
-    sources: Datasources[F, Stream[F, ?], UUID, Json],
+    sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
     queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]]) {
 
   import Command._
@@ -88,6 +95,17 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
 
       case _ =>
         fromEither[DiscoveryError[UUID], Stream[F, (ResourceName, ResourcePathType)]](
+          pathNotFound[DiscoveryError[UUID]](path).left)
+    }
+
+  private def schema(path: ResourcePath): F[Option[SstSchema[Fix[EJson], Double]]] =
+    path match {
+      case DatasourceResourcePrefix /: UuidString(id) /: p =>
+        sources.resourceSchema(id, p, SstConfig.Default)
+          .flatMap(fromEither[DiscoveryError[UUID], Option[SstSchema[Fix[EJson], Double]]])
+
+      case _ =>
+        fromEither[DiscoveryError[UUID], Option[SstSchema[Fix[EJson], Double]]](
           pathNotFound[DiscoveryError[UUID]](path).left)
     }
 
@@ -166,6 +184,18 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       case DatasourceRemove(id) =>
         (sources.removeDatasource(id) >>= ensureNormal[ExistentialError[UUID]]).map(
           κ(s"Removed datasource $id".some))
+
+      case ResourceSchema(replPath) =>
+        for {
+          cwd <- stateRef.get.map(_.cwd)
+          path = newPath(cwd, replPath)
+          s <- schema(path)
+          t = s.map(_.sst.fold(_.asEJson[Fix[EJson]], _.asEJson[Fix[EJson]]))
+        } yield {
+          t.flatMap(ejs => DataCodec.Precise.encode(ejs.cata(Data.fromEJson)))
+            .fold("No schema available.")(_.spaces2)
+            .some
+        }
 
       case Cd(path: ReplPath) =>
         for {
@@ -348,7 +378,7 @@ object Evaluator {
 
   def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
       stateRef: Ref[F, ReplState],
-      sources: Datasources[F, Stream[F, ?], UUID, Json],
+      sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
       queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
       : Evaluator[F] =
     new Evaluator[F](stateRef, sources, queryEvaluator)
@@ -364,9 +394,10 @@ object Evaluator {
       |  ds add [name] [type] [cfg]
       |  ds (remove | rm) [uuid]
       |  ds (lookup | get) [uuid]
+      |  pwd
       |  cd [path]
       |  ls [path]
-      |  pwd
+      |  schema [path]
       |  [query]
       |  (explain | compile) [query]
       |  set debug = 0 | 1 | 2
