@@ -1,10 +1,9 @@
 {
     "name": "merge differently-nested flattens",
     "backends": {
-        "lwc_local":         "skip",
-        "mimir":             "skip"
+        "lwc_local":         "ignoreFieldOrder",
+        "mimir":             "ignoreFieldOrder"
     },
-    "NB": "skipped on mimir/lwc_local due to timeout on travis",
     "data": "user_comments.data",
     "query": "select profile from `user_comments.data` where (
                 userId                 LIKE \"%Dr%\" OR

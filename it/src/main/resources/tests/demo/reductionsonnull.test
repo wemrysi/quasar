@@ -1,5 +1,5 @@
 {
-  "name": "reductionsonnull",
+  "name": "reductions on null",
   "data": "patients.data",
   "backends": {
     "lwc_local":         "pendingIgnoreFieldOrder",

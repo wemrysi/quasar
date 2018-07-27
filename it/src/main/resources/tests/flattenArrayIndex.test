@@ -1,6 +1,5 @@
 {
     "name": "flatten array index",
-    "NB": "Pending on ML because ML has 1-based indices",
     "backends": {
     },
     "data": "extraSmallZips.data",

@@ -1,12 +1,11 @@
 {
-    "name": "field and flattened array value and flattened map value on heterogenous",
+    "name": "field and shifted array value and shifted map value on heterogenous",
     "backends": {
         "lwc_local":         "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder"
-
     },
     "data": "heterogeneous.data",
-    "query": "select a, b[*] as ba, b{*} as bm from `heterogeneous.data`",
+    "query": "select a, b[_] as ba, b{_} as bm from `heterogeneous.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

@@ -1,17 +1,17 @@
 {
-  "name": "nestedreductionsonnull",
+  "name": "nested reductions on null",
   "data": "patients.data",
   "backends": {
-    "lwc_local":         "pending",
-    "mimir":             "pending"
+    "lwc_local":         "ignoreFieldOrder",
+    "mimir":             "ignoreFieldOrder"
   },
   "query": "SELECT AVG(weight) AS measure, city AS category, gender AS stack, null AS parallel FROM `patients.data` AS card468278e5ec90410e8d702ed8f6967066_ WHERE true GROUP BY null, gender, city ORDER BY null ASC, gender ASC, city ASC",
-  "predicate": "exactly",
+  "predicate": "initial",
   "expected": [
     { "parallel": null, "measure": 185.0, "stack": "female", "category": "ABBOTT" },
     { "parallel": null, "measure": 168.0, "stack": "female", "category": "ABERCROMBIE" },
     { "parallel": null, "measure": 194.0, "stack": "female", "category": "ABERDEEN" },
-    { "parallel": null, "measure": 116.0, "stack": "female", "category": "ABERDEEN" },
+    { "parallel": null, "measure": 116.0, "stack": "female", "category": "ABERDEEN PROVING GROUND" },
     { "parallel": null, "measure": 274.0, "stack": "female", "category": "ACCOKEEK" },
     { "parallel": null, "measure": 220.0, "stack": "female", "category": "ACME" },
     { "parallel": null, "measure": 140.0, "stack": "female", "category": "ACTON" },

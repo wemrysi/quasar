@@ -2,10 +2,9 @@
     "name": "revenue_step2",
     "data": "revenue.data",
     "backends": {
-       "lwc_local":         "pending",
-       "mimir":             "pending"
+       "lwc_local": "ignoreFieldOrder",
+       "mimir":     "ignoreFieldOrder"
     },
-    "NB": "mimir gets results in wrong order",
     "query": "SELECT DISTINCT value AS value, quarter AS dimension, region AS series, null AS parallel FROM `revenue.data` ORDER BY value DESC, region ASC, quarter ASC LIMIT 6",
     "predicate": "exactly",
     "expected": [
