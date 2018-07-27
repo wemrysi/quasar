@@ -188,6 +188,8 @@ object PreparationsManagerSpec extends Specification {
       val Id = "table-id"
 
       val results = for {
+        a <- Stream.eval(async.signalOf[IO, Boolean](false))
+
         manager <- PreparationsManager[IO, String, PreparationsManager[IO, String, _, Unit], Unit](
           { manager =>    // is this not clever? (actually it's probably really stupid; feel free to say so)
             for {
@@ -196,7 +198,7 @@ object PreparationsManagerSpec extends Specification {
               _ <- IO(status mustEqual Status.Pending)
             } yield ()
           })(
-          (_, _) => IO.pure(Stream.empty))
+          (_, _) => IO.pure(Stream.eval(latchGet(a))))
 
         status1 <- Stream.eval(manager.prepareTable(Id, manager))   // tie the knot on the fixedpoint
         status2 <- Stream.eval(manager.prepareTable(Id, manager))
