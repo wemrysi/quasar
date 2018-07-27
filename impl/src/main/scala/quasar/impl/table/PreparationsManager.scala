@@ -132,14 +132,15 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
   }
 
   def cancelPreparation(tableId: I)(implicit I: Equal[I]): F[Condition[NotInProgressError[I]]] = {
-    val eff = for {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    lazy val eff: OptionT[F, Unit] = for {
       live <- OptionT(F.delay(Option(status.get(tableId))))
       removed <- F.delay(status.remove(tableId, live)).liftM[OptionT]
 
       _ <- if (removed)
         live.fold(x => x, _.cancel).liftM[OptionT]
       else
-        ().point[OptionT[F, ?]]
+        eff
     } yield ()
 
     eff.run map {
