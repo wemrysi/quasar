@@ -19,8 +19,10 @@ package quasar.run
 import slamdata.Predef.{Long, None}
 import quasar.RenderTreeT
 import quasar.api.QueryEvaluator
-import quasar.common.PhaseResultTell
+import quasar.common.{phaseM, PhaseResultTell}
 import quasar.compile.queryPlan
+import quasar.contrib.iota._
+import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.qscript.QScriptEducated
 import quasar.qsu.LPtoQS
@@ -54,6 +56,6 @@ object Sql2QueryEvaluator {
 
       lp  <- queryPlan[F, T, T[LP]](sql, sqlQuery.vars, sqlQuery.basePath, 0L, None)
 
-      qs  <- LPtoQS[T].apply[StateT[F, Long, ?]](lp).eval(0)
+      qs  <- phaseM[F]("QScript (Educated)", LPtoQS[T].apply[StateT[F, Long, ?]](lp).eval(0))
     } yield qs
 }

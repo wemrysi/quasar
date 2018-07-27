@@ -1,10 +1,10 @@
 {
-    "name": "field and flattened array index on heterogenous",
+    "name": "field and shifted array index on heterogenous",
     "backends": {
         "mimir":             "ignoreFieldOrder"
     },
     "data": "heterogeneous.data",
-    "query": "select a, b[*:] as i from `heterogeneous.data`",
+    "query": "select a, b[_:] as i from `heterogeneous.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

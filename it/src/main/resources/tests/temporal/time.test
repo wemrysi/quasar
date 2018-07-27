@@ -2,18 +2,18 @@
     "name": "filter on time_of_day",
 
     "backends": {
-        "lwc_local": "pendingIgnoreFieldOrder",
+        "lwc_local": "ignoreFieldOrder",
         "mimir":     "pendingIgnoreFieldOrder"
     },
     "data": "../days.data",
 
     "query": "select day, time_of_day(ts) as tod, time_of_day(day) as notadate, time_of_day(missing) as missing from `../days.data`
-    where time_of_day(ts) >= time(\"08:00\") and time_of_day(ts) < time(\"10:20:30.400\")",
+    where time_of_day(ts) >= offsettime(\"08:00Z\") and time_of_day(ts) < offsettime(\"10:20:30.400Z\")",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [
-        { "day": "Tuesday",   "tod": { "$offsettime": "08:00Z" } },
-        { "day": "Wednesday", "tod": { "$offsettime": "09:00Z" } },
-        { "day": "Thursday",  "tod": { "$offsettime": "10:00Z" } }]
+        { "day": "Tuesday",   "tod": { "$offsettime": "08:00:00.000000000Z" } },
+        { "day": "Wednesday", "tod": { "$offsettime": "09:00:00.000000000Z" } },
+        { "day": "Thursday",  "tod": { "$offsettime": "10:00:00.000000000Z" } }]
 }

@@ -4,6 +4,7 @@
         "lwc_local": "pendingIgnoreFieldOrder",
         "mimir":     "pendingIgnoreFieldOrder"
     },
+    "NB": "ch663 for lwc_local",
     "data": "zips.data",
     "query": "select `_id` as zip, loc[*] from `zips.data` where loc[*] > 68 order by loc[*]",
     "predicate": "exactly",

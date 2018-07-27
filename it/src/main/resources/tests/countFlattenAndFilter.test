@@ -1,0 +1,13 @@
+{
+    "name": "count flattened array value with filter",
+
+    "data": "extraSmallZips.data",
+
+    "query": "select count(loc[*]) as c from `extraSmallZips.data` where city like \"A%\"",
+
+    "predicate": "exactly",
+
+    "expected": [
+      { "c": 6 }
+    ]
+}

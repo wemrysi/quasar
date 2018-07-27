@@ -16,12 +16,19 @@
 
 package quasar.contrib.cats
 
-import quasar.contrib.scalaz.MonadTell_
+import quasar.contrib.scalaz.{MonadListen_, MonadTell_}
 
-import cats.Applicative
+import cats.{Applicative, Functor}
 import cats.data.WriterT
+import cats.syntax.functor._
 
 object writerT {
+  implicit def catsWriterTMonadListen_[F[_]: Functor, W]: MonadListen_[WriterT[F, W, ?], W] =
+    new MonadListen_[WriterT[F, W, ?], W] {
+      def listen[A](fa: WriterT[F, W, A]) =
+        WriterT(fa.run.map { case (w, a) => (w, (a, w)) })
+    }
+
   implicit def catsWriterTMonadTell_[F[_]: Applicative, W]: MonadTell_[WriterT[F, W, ?], W] =
     new MonadTell_[WriterT[F, W, ?], W] {
       def writer[A](w: W, a: A) = WriterT.put(a)(w)
