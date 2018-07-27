@@ -380,14 +380,14 @@ object Data {
   def toEJson[F[a] <: ACopK[a]](implicit C: Common :<<: F, E: Extension :<<: F):
       Coalgebra[CoEnv[Data, F, ?], Data] =
     ed => CoEnv(ed match {
-      case Arr(value)       => C.inj(ejson.Arr(value)).right
-      case Obj(value)       =>
+      case Arr(value) => C.inj(ejson.Arr(value)).right
+      case Obj(value) =>
         E.inj(ejson.Map(value.toList.map(_.leftMap(Str(_))))).right
-      case Null             => C.inj(ejson.Null()).right
-      case Bool(value)      => C.inj(ejson.Bool(value)).right
-      case Str(value)       => C.inj(ejson.Str(value)).right
-      case Dec(value)       => C.inj(ejson.Dec(value)).right
-      case Int(value)       => E.inj(ejson.Int(value)).right
+      case Null => C.inj(ejson.Null()).right
+      case Bool(value) => C.inj(ejson.Bool(value)).right
+      case Str(value) => C.inj(ejson.Str(value)).right
+      case Dec(value) => C.inj(ejson.Dec(value)).right
+      case Int(value) => E.inj(ejson.Int(value)).right
 
       case OffsetDateTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
@@ -429,7 +429,7 @@ object Data {
           DateTimeConstants.nanosecond -> Int(value.getNano))),
         EJsonType(TypeTag.LocalDateTime))).right
 
-      case LocalTime(value)=> E.inj(ejson.Meta(
+      case LocalTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
           DateTimeConstants.hour       -> Int(value.getHour),
           DateTimeConstants.minute     -> Int(value.getMinute),
