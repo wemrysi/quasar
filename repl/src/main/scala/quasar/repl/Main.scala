@@ -22,11 +22,13 @@ import quasar.impl.external.ExternalConfig
 import quasar.common.{PhaseResultCatsT, PhaseResultListen, PhaseResultTell}
 import quasar.contrib.cats.writerT.{catsWriterTMonadListen_, catsWriterTMonadTell_}
 import quasar.contrib.scalaz.MonadError_
+import quasar.mimir.Precog
 import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContext.Implicits.global
 
+import cats.arrow.FunctionK
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import eu.timepit.refined.auto._
 import fs2.{Stream, StreamApp}, StreamApp.ExitCode
@@ -55,7 +57,8 @@ object Main extends StreamApp[PhaseResultCatsT[IO, ?]] {
   def quasarStream[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultTell: Timer]: Stream[F, Quasar[F]] =
     for {
       (dataPath, pluginPath) <- paths[F]
-      q <- Quasar[F](dataPath, ExternalConfig.PluginDirectory(pluginPath), 1000L)
+      precog <- Precog.stream(dataPath.toFile).translate(λ[FunctionK[IO, F]](_.to[F]))
+      q <- Quasar[F](precog, ExternalConfig.PluginDirectory(pluginPath), 1000L)
     } yield q
 
   def repl[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](q: Quasar[F]): F[ExitCode] =

@@ -35,6 +35,8 @@ import akka.routing.{
 
 import cats.effect.IO
 
+import fs2.Stream
+
 import shims._
 
 import org.slf4s.Logging
@@ -101,4 +103,7 @@ object Precog extends Logging {
         case (vfs, sys) => new Precog(dataDir, sys, vfs)
       })
     } yield pcd
+
+  def stream(dataDir: File): Stream[IO, Precog] =
+    Stream.bracket(apply(dataDir))(d => Stream.emit(d.unsafeValue), _.dispose)
 }

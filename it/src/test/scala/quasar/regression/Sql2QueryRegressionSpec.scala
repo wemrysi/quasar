@@ -34,6 +34,7 @@ import quasar.fp._
 import quasar.frontend.data.DataCodec
 import quasar.impl.datasource.local.LocalType
 import quasar.impl.external.ExternalConfig
+import quasar.mimir.Precog
 import quasar.run.{Quasar, QuasarError, SqlQuery}
 import quasar.run.implicits._
 import quasar.sql.Query
@@ -83,7 +84,9 @@ final class Sql2QueryRegressionSpec extends Qspec {
         Stream.emit(_),
         contribFile.deleteRecursively[IO](_))
 
-    q <- Quasar[IO](tmpPath, ExternalConfig.Empty, 1L)
+    precog <- Precog.stream(tmpPath.toFile)
+
+    q <- Quasar[IO](precog, ExternalConfig.Empty, 1L)
 
     localCfg =
       ("rootDir" := posixCodec.printPath(TestDataRoot)) ->:
