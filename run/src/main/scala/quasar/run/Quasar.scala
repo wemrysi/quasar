@@ -38,7 +38,6 @@ import quasar.mimir.storage.{MimirIndexedStore, StoreKey}
 import quasar.run.implicits._
 import quasar.run.optics._
 
-import java.nio.file.Path
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 
@@ -60,27 +59,32 @@ final class Quasar[F[_]](
     val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
 
 object Quasar {
-  // The location the datasource refs tables within `mimir`.
+  // The location of the datasource refs tables within `mimir`.
   val DatasourceRefsLocation: ADir =
     rootDir </> dir("quasar") </> dir("datasource-refs")
 
   /** What it says on the tin.
     *
-    * @param mimirDir directory where mimir should store its data
+    * TODO: If we want to divest from `mimir` completely, we'll need to convert
+    *       all the abstractions that use it into arguments to this constructor.
+    *
+    * @param precog Precog instance to use by Quasar
     * @param extConfig datasource plugin configuration
     * @param sstSampleSize the number of records to sample when generating SST schemas
     */
   def apply[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultTell: Timer](
-      mimirDir: Path,
+      precog: Precog,
       extConfig: ExternalConfig,
       sstSampleSize: Positive)(
       implicit ec: ExecutionContext)
       : Stream[F, Quasar[F]] = {
 
     for {
-      precog <- Stream.bracket(Precog(mimirDir.toFile).to[F])(
-        d => Stream.emit(d.unsafeValue),
-        _.dispose.to[F])
+      extMods <- ExternalDatasources[F](extConfig)
+
+      modules = extMods.insert(
+        LocalDatasourceModule.kind,
+        DatasourceModule.Lightweight(LocalDatasourceModule))
 
       refs =
         MimirIndexedStore.transformValue(
@@ -92,12 +96,6 @@ object Quasar {
           rValueDatasourceRefP(rValueJsonP))
 
       configured <- refs.entries.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _)
-
-      extMods <- ExternalDatasources[F](extConfig)
-
-      modules = extMods.insert(
-        LocalDatasourceModule.kind,
-        DatasourceModule.Lightweight(LocalDatasourceModule))
 
       scheduler <- Scheduler(corePoolSize = 1, threadPrefix = "quasar-scheduler")
 
