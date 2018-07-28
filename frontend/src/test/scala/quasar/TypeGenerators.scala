@@ -84,7 +84,6 @@ trait TypeGenerators {
         case Type.OffsetDate      => Gen.oneOf(Gen.const(Type.OffsetDate), implicitly[Arbitrary[OffsetDate]].arbitrary.map(i => Type.Const(Data.OffsetDate(i))))
         case Type.OffsetTime      => Gen.oneOf(Gen.const(Type.OffsetTime), implicitly[Arbitrary[OffsetTime]].arbitrary.map(i => Type.Const(Data.OffsetTime(i))))
         case Type.Interval        => Gen.oneOf(Gen.const(Type.Interval), implicitly[Arbitrary[DateTimeInterval]].arbitrary.map(i => Type.Const(Data.Interval(i))))
-        case Type.Id              => Gen.oneOf(Gen.const(Type.Id), Arbitrary.arbString.arbitrary.map(i => Type.Const(Data.Id(i))))
         case Type.Arr(tys)        => tys.traverse(genSubtypes(_, depth)).map(Type.Arr)
         case Type.Coproduct(x, y) => Gen.oneOf(genSubtypes(x, depth - 1), genSubtypes(y, depth - 1))
         case Type.Obj(map, hk)    =>

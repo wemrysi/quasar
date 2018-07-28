@@ -233,9 +233,6 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
         case Data.Binary(_) =>
           None
 
-        case Data.Id(_) =>
-          None
-
         case Data.NA =>
           None
 

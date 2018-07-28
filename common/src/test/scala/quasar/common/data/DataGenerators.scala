@@ -63,12 +63,8 @@ object DataGenerators extends DataGenerators {
   val defaultDec: Gen[BigDecimal] =
     Gen.oneOf[Double](Gen.choose(-1000.0, 1000.0), IntAsDouble) ^^ (x => BigDecimal(x))
 
-  // NB: a (nominally) valid MongoDB id, because we use this generator to test BSON conversion, too
-  val defaultId: Gen[String] =
-    Gen.oneOf[Char]("0123456789abcdef") * 24 ^^ (_.mkString)
-
   val simpleNonNested: Gen[Data] =
-    genNonNested(Gen.alphaStr, defaultInt, defaultDec, defaultId)
+    genNonNested(Gen.alphaStr, defaultInt, defaultDec)
 
   ////
 
@@ -95,7 +91,7 @@ object DataGenerators extends DataGenerators {
       genData(max, atomic).list ^^ Data.Arr)
 
   /** Generator of atomic Data (everything but Obj and Arr). */
-  def genNonNested(strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal], idSrc: Gen[String])
+  def genNonNested(strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal])
       : Gen[Data] =
     Gen.oneOf[Data](
       Data.Null,
@@ -112,8 +108,7 @@ object DataGenerators extends DataGenerators {
       TimeGenerators.genLocalDateTime ^^ Data.LocalDateTime,
       TimeGenerators.genLocalDate ^^ Data.LocalDate,
       TimeGenerators.genLocalTime ^^ Data.LocalTime,
-      arrayOf(genByte) ^^ Data.Binary.fromArray,
-      idSrc ^^ Data.Id)
+      arrayOf(genByte) ^^ Data.Binary.fromArray)
 
   def genKey = Gen.alphaChar ^^ (_.toString)
 

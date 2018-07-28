@@ -165,11 +165,6 @@ object Data {
   val _binary =
     Prism.partial[Data, ImmutableArray[Byte]] { case Data.Binary(bs) => bs } (Data.Binary(_))
 
-  final case class Id(value: String) extends Data
-
-  val _id =
-    Prism.partial[Data, String] { case Data.Id(id) => id } (Data.Id(_))
-
   /**
    An object to represent any value that might come from a backend, but that
    we either don't know about or can't represent in this ADT. We represent it
@@ -275,7 +270,6 @@ object Data {
 
   val fromExtension: Algebra[Extension, Data] = {
     case ejson.Meta(value, meta) => (meta, value) match {
-      case (EJsonType(TypeTag("_bson.oid")), Str(oid)) => Id(oid)
 
       case (EJsonTypeSize(TypeTag.Binary, size), Str(data)) =>
         if (size.isValidInt)
@@ -386,14 +380,14 @@ object Data {
   def toEJson[F[a] <: ACopK[a]](implicit C: Common :<<: F, E: Extension :<<: F):
       Coalgebra[CoEnv[Data, F, ?], Data] =
     ed => CoEnv(ed match {
-      case Arr(value)       => C.inj(ejson.Arr(value)).right
-      case Obj(value)       =>
+      case Arr(value) => C.inj(ejson.Arr(value)).right
+      case Obj(value) =>
         E.inj(ejson.Map(value.toList.map(_.leftMap(Str(_))))).right
-      case Null             => C.inj(ejson.Null()).right
-      case Bool(value)      => C.inj(ejson.Bool(value)).right
-      case Str(value)       => C.inj(ejson.Str(value)).right
-      case Dec(value)       => C.inj(ejson.Dec(value)).right
-      case Int(value)       => E.inj(ejson.Int(value)).right
+      case Null => C.inj(ejson.Null()).right
+      case Bool(value) => C.inj(ejson.Bool(value)).right
+      case Str(value) => C.inj(ejson.Str(value)).right
+      case Dec(value) => C.inj(ejson.Dec(value)).right
+      case Int(value) => E.inj(ejson.Int(value)).right
 
       case OffsetDateTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
@@ -435,7 +429,7 @@ object Data {
           DateTimeConstants.nanosecond -> Int(value.getNano))),
         EJsonType(TypeTag.LocalDateTime))).right
 
-      case LocalTime(value)      => E.inj(ejson.Meta(
+      case LocalTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
           DateTimeConstants.hour       -> Int(value.getHour),
           DateTimeConstants.minute     -> Int(value.getMinute),
@@ -450,7 +444,7 @@ object Data {
           DateTimeConstants.day   -> Int(value.getDayOfMonth))),
         EJsonType(TypeTag.LocalDate))).right
 
-      case Interval(value)  =>
+      case Interval(value) =>
         E.inj(ejson.Meta(
           Obj(ListMap(
             DateTimeConstants.year       -> Int(value.period.getYears),
@@ -460,15 +454,11 @@ object Data {
             DateTimeConstants.nanosecond -> Int(value.duration.getNano))),
           EJsonType(TypeTag.Interval))).right
 
-      case Binary(value)    =>
+      case Binary(value) =>
         E.inj(ejson.Meta(
           Str(ejson.z85.encode(ByteVector.view(value.toArray))),
           EJsonTypeSize(TypeTag.Binary, value.size))).right
 
-      case Id(value)        =>
-        // FIXME: This evilly guesses the backend-specific OID formats
-        E.inj(ejson.Meta(Str(value), EJsonType(TypeTag("_bson.oid")))).right
-
-      case data             => data.left
+      case data => data.left
     })
 }

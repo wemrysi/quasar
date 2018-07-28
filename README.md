@@ -639,7 +639,6 @@ offsetdate | `"2015-01-31Z"`    | `{ "$offsetdate": "2015-01-31Z" }` |
 offsettime | `"10:30:00.000Z"`    | `{ "$offsettime": "10:30Z" }` |
 interval  | `"PT12H34M"`    | `{ "$interval": "P7DT12H34M" }` | 
 binary    | `"TE1OTw=="`    | `{ "$binary": "TE1OTw==" }` | BASE64-encoded.
-object id | `"abc"`         | `{ "$oid": "abc" }` |
 
 
 ### CSV

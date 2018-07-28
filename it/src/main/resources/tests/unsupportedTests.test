@@ -1,15 +1,15 @@
 {
-    "name": "show tests that likely have a bug prior to the connector",
+    "name": "select first five tests with 12 backends ",
     "backends": {
     },
     "data": "newTests.data",
     "query": "select name from `newTests.data` where count(backends{_}) = 12 order by name limit 5",
     "predicate": "exactly",
     "expected": [
-        "convert a field to ObjectId",
         "count grouped joined tables",
         "expressions with `= null` and `is null`, with missing fields (pending #465)",
         "flatten a single field as both object and array",
-        "flatten one side of a join condition"
+        "flatten one side of a join condition",
+        "flattening both sides of a join condition"
     ]
 }

@@ -734,8 +734,7 @@ class TypesSpec extends Qspec with ValidationMatchers {
       (typJson(OffsetDateTime)  must_= jString("OffsetDateTime")) and
       (typJson(Type.OffsetDate) must_= jString("OffsetDate")) and
       (typJson(OffsetTime)      must_= jString("OffsetTime")) and
-      (typJson(Interval)        must_= jString("Interval"))  and
-      (typJson(Id)              must_= jString("Id"))
+      (typJson(Interval)        must_= jString("Interval"))
     }
 
     "encode constant types as their data encoding" >> prop { data: Data =>
