@@ -22,7 +22,7 @@ import quasar.contrib.fs2.convert
 import quasar.contrib.scalaz.MonadTell_
 import quasar.precog.BitSet
 import quasar.precog.common._
-import quasar.precog.util.{BitSetUtil, RawBitSet}
+import quasar.precog.util.RawBitSet
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
@@ -1383,9 +1383,7 @@ trait ColumnarTableModule
     }
 
     def leftShift(focus: CPath, emitOnUndef: Boolean): Table = {
-
-      def lens(slice: Slice): (Map[ColumnRef, Column], BitSet, Map[ColumnRef, Column]) = {
-
+      def lens(slice: Slice): (Map[ColumnRef, Column], Map[ColumnRef, Column]) = {
         val (focused: Map[ColumnRef, Column], unfocused: Map[ColumnRef, Column]) =
           slice.columns.partition(_._1.selector.hasPrefix(focus))
 
@@ -1402,25 +1400,17 @@ trait ColumnarTableModule
             (ColumnRef(path.dropPrefix(focus).get, tpe), col)
         }
 
-        val emit =
-          if (emitOnUndef) {
-            val undefineds = focused.values.map(_.definedAt(0, slice.size)).reduceOption(_ | _).getOrElse(new BitSet)
-            undefineds.flip(0, slice.size) //mutation!
-
-            val unflattenables = unflattenable.values.map(_.definedAt(0, slice.size)).reduceOption(_ | _).getOrElse(new BitSet)
-
-            unflattenables | undefineds
-          }
-          else
-            new BitSet
-
-        (remapped, emit, unfocused)
+        (remapped, unfocused)
       }
 
-      def merge(focused: Map[ColumnRef, Column], innerIndex: Map[CPathNode, Int], expansion: CF1, highWaterMark: Int)
+      def merge(
+          focused: Map[ColumnRef, Column],
+          innerIndex: Map[CPathNode, Int],
+          expansion: CF1,
+          highWaterMark: Int)
           : Map[ColumnRef, Column] = {
 
-        val remapped: List[(ColumnRef, Column)] = focused.toList map {
+        val remapped: List[(ColumnRef, Int, Column)] = focused.toList map {
           case (ColumnRef(CPath.Identity, CArrayType(tpe)), col: HomogeneousArrayColumn[a]) =>
             ???
 
@@ -1429,22 +1419,39 @@ trait ColumnarTableModule
             val head = path.head.get
             val locus = innerIndex(head)
 
+            // we materialized so this is safe
+            val bs = col.asInstanceOf[BitsetColumn].definedAt
+            val sparsened = bs.sparsenByMod(locus, highWaterMark)
+
             // explode column and then sparsen by mod ring
             val expanded =
-              expansion.andThen(cf.util.filterBy(_ % highWaterMark == locus))(col).get
+              expansion.andThen(cf.util.filterExclusive(sparsened))(col).get
 
-            ColumnRef(path.dropPrefix(head).get, tpe) -> expanded
+            (ColumnRef(path.dropPrefix(head).get, tpe), locus, expanded)
         }
 
         // put together all the same-ref columns which now are mapped to the same path
         remapped.groupBy(_._1).map({
-          // the key here is the column ref; the value is the list of same-type pairs
+          case (ref, singleton) if singleton.lengthCompare(1) == 0 =>
+            ref -> singleton.head._3
+
+          // the key here is the column ref; the value is the list of same-type triples
           case (ref, toMerge) =>
-            ref -> toMerge.map(_._2).reduce(cf.util.UnionRight(_, _).get)
+            val cols = new Array[Column](highWaterMark)
+
+            // it's just easier to represent things this way
+            toMerge foreach {
+              case (_, idx, col) => cols(idx) = col
+            }
+
+            ref -> cf.util.ModUnion(ref.ctype, cols)
         })(collection.breakOut)
       }
 
-      def idColumns(innerHeads: Vector[CPathNode], pathNode: CPathNode, definedness: BitSet)
+      def idColumns(
+          innerHeads: Vector[CPathNode],
+          pathNode: CPathNode,
+          definedness: BitSet)
           : Map[ColumnRef, Column] = {
 
         val refinedHeads: Vector[String \/ Int] = innerHeads collect {
@@ -1507,7 +1514,10 @@ trait ColumnarTableModule
         Map(fassigned ++ iassigned: _*)
       }
 
-      def leftShiftFocused(merged: Map[ColumnRef, Column], innerHeads: Vector[CPathNode], definedness: BitSet)
+      def leftShiftFocused(
+          merged: Map[ColumnRef, Column],
+          innerHeads: Vector[CPathNode],
+          definedness: BitSet)
           : Map[ColumnRef, Column] = {
 
         // move all of our results into index 1 of an array
@@ -1527,12 +1537,11 @@ trait ColumnarTableModule
       }
 
       def leftshiftUnfocused(
-        unfocused: Map[ColumnRef, Column],
-        size: Int,
-        definedness: BitSet,
-        emit: BitSet,
-        expansion: CF1,
-        highWaterMark: Int)
+          unfocused: Map[ColumnRef, Column],
+          size: Int,
+          definedness: BitSet,
+          expansion: CF1,
+          highWaterMark: Int)
           : Map[ColumnRef, Column] = {
 
         // expand all of the unfocused columns
@@ -1540,24 +1549,20 @@ trait ColumnarTableModule
           case (ref, col) => ref -> expansion(col).get
         }
 
-        // additional definedness bitset:
-        // we need to keep every first expanded row
-        // in unfocused that's marked to be kept according to the emit bitset
-        val keep: BitSet = definedness |
-          BitSetUtil.filteredRange(0, size * highWaterMark)(i =>
-            (i % highWaterMark == 0) && emit(i / highWaterMark))
-
         // we need to go back to our original columns and filter them by results
         // if we don't do this, the data will be highly sparse (like an outer join)
-        unfocusedExpanded map {
-          case (ref, col) =>
-            ref -> cf.util.filter(0, size * highWaterMark, keep)(col).get
+        if (emitOnUndef) {
+          unfocusedExpanded
+        } else {
+          unfocusedExpanded map {
+            case (ref, col) =>
+              ref -> cf.util.filterExclusive(definedness)(col).get
+          }
         }
       }
 
-      // eagerly force the slices, since we'll be backtracking within each
-      val slices2: StreamT[IO, Slice] = slices.map(_.materialized) flatMap { slice =>
-        val (focused, emit, unfocused) = lens(slice)
+      val slices2: StreamT[IO, Slice] = slices flatMap { slice =>
+        val (focused, unfocused) = lens(slice)
 
         val innerHeads: Vector[CPathNode] = {
           val unsorted = focused.keys.toVector flatMap {
@@ -1614,10 +1619,11 @@ trait ColumnarTableModule
           Vector(slice)
         }
 
+        // eagerly force the slices, since we'll be backtracking within each
         // shadow the outer `slice`
-        StreamT.fromIterable(resplit).trans(λ[Id.Id ~> IO](IO.pure(_))) map { slice =>
+        StreamT.fromIterable(resplit).map(_.materialized).trans(λ[Id.Id ~> IO](IO.pure(_))) map { slice =>
           // ...and the outer `focused` and `unfocused`
-          val (focused, emit, unfocused) = lens(slice)
+          val (focused, unfocused) = lens(slice)
 
           // a CF1 for inflating column sizes to account for shifting
           val expansion = cf.util.Remap(_ / highWaterMark)
@@ -1627,14 +1633,20 @@ trait ColumnarTableModule
 
           // figure out the definedness of the exploded, filtered result
           // this is necessary so we can implement inner-concat semantics
-          val definedness: BitSet =
-            merged.values.map(_.definedAt(0, slice.size * highWaterMark)).reduceOption(_ | _).getOrElse(new BitSet)
+          val definedness: BitSet = {
+            val bsing = merged.values map {
+              case col: BitsetColumn => col.definedAt
+              case col => col.definedAt(0, slice.size * highWaterMark)
+            }
+
+            bsing.reduceOption(_ | _).getOrElse(new BitSet)
+          }
 
           val focusedTransformed: Map[ColumnRef, Column] =
             leftShiftFocused(merged, innerHeads, definedness)
 
           val unfocusedTransformed: Map[ColumnRef, Column] =
-            leftshiftUnfocused(unfocused, slice.size, definedness, emit, expansion, highWaterMark)
+            leftshiftUnfocused(unfocused, slice.size, definedness, expansion, highWaterMark)
 
           // glue everything back together with the unfocused and compute the new size
           Slice(focusedTransformed ++ unfocusedTransformed, slice.size * highWaterMark)
