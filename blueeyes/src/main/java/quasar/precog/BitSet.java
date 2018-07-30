@@ -312,7 +312,7 @@ public class BitSet {
 
         // we special-case this because it has a much faster implementation (and also our main impl assumes mod > 1)
         if (mod == 1) {
-            final long replacement = 0xFFFFFFFFL;
+            final long replacement = 0xFFFFFFFFFFFFFFFFL;
             for (int i = 0; i < _length; i++) {
                 bits[i] = replacement;
             }
@@ -324,7 +324,7 @@ public class BitSet {
         for (int i = 0; i < _length; i++) {
             do {
                 if ((bits[i] & mask) == 0L) {
-                    bits[i] ^= flipper;
+                    bits[i] |= flipper;
                 }
                 mask = Long.rotateLeft(mask, mod);
                 flipper = Long.rotateLeft(flipper, mod);
