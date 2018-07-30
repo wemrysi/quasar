@@ -60,6 +60,7 @@ class SliceSpec extends Specification with ScalaCheck {
   }
 
   def toCValues(slice: Slice) = sortableCValues(slice, Vector.empty) map (_._2)
+
   def fakeSort(slice: Slice, sortKey: Vector[CPath]) =
     sortableCValues(slice, sortKey).sortBy(_._1).map(_._2)
 
