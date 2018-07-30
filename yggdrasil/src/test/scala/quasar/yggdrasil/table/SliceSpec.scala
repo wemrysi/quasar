@@ -60,7 +60,6 @@ class SliceSpec extends Specification with ScalaCheck {
   }
 
   def toCValues(slice: Slice) = sortableCValues(slice, Vector.empty) map (_._2)
-
   def fakeSort(slice: Slice, sortKey: Vector[CPath]) =
     sortableCValues(slice, sortKey).sortBy(_._1).map(_._2)
 
@@ -599,6 +598,50 @@ class SliceSpec extends Specification with ScalaCheck {
         // without duplicating concat.
         toCValues(slice).map(stripUndefineds) must_== fakeConcat(slices).map(stripUndefineds)
       }
+    }
+  }
+
+  "ifUndefined" should {
+    "merge slices with holes" in {
+      val sourceArray = JParser.parseUnsafe("""[
+        { "a": 1 },
+        { "a": 2 },
+        { "b": "three" },
+        { "a": 4 }
+        ]""")
+
+      val sourceData = sourceArray match {
+        case JArray(rows) => rows.toStream
+        case _ => ???
+      }
+
+      val source = Slice.fromJValues(sourceData).deref(CPathField("a"))
+
+      val defaultArray = JParser.parseUnsafe("""[
+        { "b": "five" },
+        { "a": 3 },
+        { "a": 3 },
+        { "b": "six" }
+        ]""")
+
+      val defaultData = defaultArray match {
+        case JArray(rows) => rows.toStream
+        case _ => ???
+      }
+
+      val default = Slice.fromJValues(defaultData).deref(CPathField("a"))
+
+      val result = source.ifUndefined(default)
+      val values = result.toJsonElements
+
+      val expectedArray = JParser.parseUnsafe("""[1, 2, 3, 4]""")
+
+      val expectedData = expectedArray match {
+        case JArray(rows) => rows.toVector
+        case _ => ???
+      }
+
+      values mustEqual expectedData
     }
   }
 }

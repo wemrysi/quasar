@@ -31,95 +31,69 @@ object util {
   val UnionRight = CF2P {
     case (c1: BoolColumn, c2: BoolColumn) =>
       new UnionColumn(c1, c2) with BoolColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: LongColumn, c2: LongColumn) =>
       new UnionColumn(c1, c2) with LongColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: DoubleColumn, c2: DoubleColumn) =>
       new UnionColumn(c1, c2) with DoubleColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: NumColumn, c2: NumColumn) =>
       new UnionColumn(c1, c2) with NumColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: StrColumn, c2: StrColumn) =>
       new UnionColumn(c1, c2) with StrColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: OffsetDateTimeColumn, c2: OffsetDateTimeColumn) =>
       new UnionColumn(c1, c2) with OffsetDateTimeColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: OffsetTimeColumn, c2: OffsetTimeColumn) =>
       new UnionColumn(c1, c2) with OffsetTimeColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: OffsetDateColumn, c2: OffsetDateColumn) =>
       new UnionColumn(c1, c2) with OffsetDateColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: LocalDateTimeColumn, c2: LocalDateTimeColumn) =>
       new UnionColumn(c1, c2) with LocalDateTimeColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: LocalTimeColumn, c2: LocalTimeColumn) =>
       new UnionColumn(c1, c2) with LocalTimeColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: LocalDateColumn, c2: LocalDateColumn) =>
       new UnionColumn(c1, c2) with LocalDateColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: IntervalColumn, c2: IntervalColumn) =>
       new UnionColumn(c1, c2) with IntervalColumn {
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: HomogeneousArrayColumn[a], _c2: HomogeneousArrayColumn[_]) if c1.tpe == _c2.tpe =>
       val c2 = _c2.asInstanceOf[HomogeneousArrayColumn[a]]
       new UnionColumn(c1, c2) with HomogeneousArrayColumn[a] {
         val tpe = c1.tpe
-        def apply(row: Int) = {
-          if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        }
+        def apply(row: Int) = if (c2.isDefinedAt(row)) c2(row) else c1(row)
       }
 
     case (c1: EmptyArrayColumn, c2: EmptyArrayColumn)   => new UnionColumn(c1, c2) with EmptyArrayColumn
