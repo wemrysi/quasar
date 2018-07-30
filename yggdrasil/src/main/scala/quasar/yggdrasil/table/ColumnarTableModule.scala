@@ -1416,24 +1416,22 @@ trait ColumnarTableModule
 
           // because of how we have defined things, path is guaranteed NOT to be Identity now
           case (ColumnRef(path, tpe), col) =>
-            val head = path.head.get
-            val locus = innerIndex(head)
+            (ColumnRef(path.tail, tpe), innerIndex(path.head.get), col)
+        }
 
+        // put together all the same-ref columns which now are mapped to the same path
+        remapped.groupBy(_._1).map({
+          // we just expanded, so this should ALWAYS be hit in the singleton case
+          case (ref, List((_, locus, col: BitsetColumn))) =>
             // we materialized so this is safe
-            val bs = col.asInstanceOf[BitsetColumn].definedAt
+            val bs = col.definedAt
             val sparsened = bs.sparsenByMod(locus, highWaterMark)
 
             // explode column and then sparsen by mod ring
             val expanded =
               expansion.andThen(cf.util.filterExclusive(sparsened))(col).get
 
-            (ColumnRef(path.dropPrefix(head).get, tpe), locus, expanded)
-        }
-
-        // put together all the same-ref columns which now are mapped to the same path
-        remapped.groupBy(_._1).map({
-          case (ref, singleton) if singleton.lengthCompare(1) == 0 =>
-            ref -> singleton.head._3
+            ref -> expanded
 
           // the key here is the column ref; the value is the list of same-type triples
           case (ref, toMerge) =>
@@ -1538,7 +1536,6 @@ trait ColumnarTableModule
 
       def leftshiftUnfocused(
           unfocused: Map[ColumnRef, Column],
-          size: Int,
           definedness: BitSet,
           expansion: CF1,
           highWaterMark: Int)
@@ -1551,17 +1548,16 @@ trait ColumnarTableModule
 
         // we need to go back to our original columns and filter them by results
         // if we don't do this, the data will be highly sparse (like an outer join)
-        if (emitOnUndef) {
-          unfocusedExpanded
-        } else {
-          unfocusedExpanded map {
-            case (ref, col) =>
-              ref -> cf.util.filterExclusive(definedness)(col).get
-          }
+        unfocusedExpanded map {
+          case (ref, col) =>
+            ref -> cf.util.filterExclusive(definedness)(col).get
         }
       }
 
-      val slices2: StreamT[IO, Slice] = slices flatMap { slice =>
+      val slices2: StreamT[IO, Slice] = slices flatMap { slice0 =>
+        // we have to compact since some of our masking will "resurrect" fully-undefined rows (see below)
+        val slice = slice0.compact(slice0, AnyDefined)
+
         val (focused, unfocused) = lens(slice)
 
         val innerHeads: Vector[CPathNode] = {
@@ -1645,8 +1641,17 @@ trait ColumnarTableModule
           val focusedTransformed: Map[ColumnRef, Column] =
             leftShiftFocused(merged, innerHeads, definedness)
 
+          val unfocusedDefinedness = if (emitOnUndef) {
+            val definedness2 = definedness.copy
+            // this is where we necro the undefined rows
+            definedness2.flipByMod(highWaterMark)
+            definedness2
+          } else {
+            definedness
+          }
+
           val unfocusedTransformed: Map[ColumnRef, Column] =
-            leftshiftUnfocused(unfocused, slice.size, definedness, expansion, highWaterMark)
+            leftshiftUnfocused(unfocused, unfocusedDefinedness, expansion, highWaterMark)
 
           // glue everything back together with the unfocused and compute the new size
           Slice(focusedTransformed ++ unfocusedTransformed, slice.size * highWaterMark)

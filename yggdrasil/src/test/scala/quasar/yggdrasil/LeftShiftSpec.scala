@@ -116,7 +116,7 @@ trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
         toRecord(Array(1), JArray(JNum(0), JNum(42)).some),
         toRecord(Array(1), JArray(JNum(1), JNum(43)).some))
 
-    toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
+    toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues.toVector mustEqual expected
   }
 
   def testHeterogenousLeftShift(emit: Boolean) = {

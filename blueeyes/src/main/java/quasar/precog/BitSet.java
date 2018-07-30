@@ -299,6 +299,40 @@ public class BitSet {
     }
 
     /**
+     * Flips all bits for which index % mod == 0 such that
+     * the bits (i % mod >= 0 && i % mod < mod) are 0. The
+     * invariant here is that, for all ranges of i such
+     * that (i % mod >= 0 && i % mod < mod), there is *at least*
+     * one value of i such that get(i) == true.
+     */
+    public void flipByMod(int mod) {
+        if (mod <= 0) {
+            return;
+        }
+
+        // we special-case this because it has a much faster implementation (and also our main impl assumes mod > 1)
+        if (mod == 1) {
+            final long replacement = 0xFFFFFFFFL;
+            for (int i = 0; i < _length; i++) {
+                bits[i] = replacement;
+            }
+            return;
+        }
+
+        long flipper = 1L;
+        long mask = (1L << mod) - 1L;  // bitmask which covers everything >= 0 and < mod
+        for (int i = 0; i < _length; i++) {
+            do {
+                if ((bits[i] & mask) == 0L) {
+                    bits[i] ^= flipper;
+                }
+                mask = Long.rotateLeft(mask, mod);
+                flipper = Long.rotateLeft(flipper, mod);
+            } while (!(flipper >= 0 && flipper < mod));
+        }
+    }
+
+    /**
      * Returns {@code true}> if the specified integer is in
      * this bit set; {@code false } otherwise.
      *
