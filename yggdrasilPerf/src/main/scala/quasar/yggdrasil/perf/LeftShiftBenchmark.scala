@@ -27,7 +27,7 @@ import cats.effect.IO
 
 import java.util.concurrent.TimeUnit
 
-import org.openjdk.jmh.annotations.{Benchmark, BenchmarkMode, Mode, OutputTimeUnit, Param, Scope, State}
+import org.openjdk.jmh.annotations.{Benchmark, BenchmarkMode, Mode, OutputTimeUnit, Param, Scope, Setup, State}
 import org.openjdk.jmh.infra.Blackhole
 
 import scalaz._, Scalaz._
@@ -67,24 +67,30 @@ object LeftShiftBenchmark {
         data.iterator.map(fs2.Stream.emits(_).covary[IO])
       ).join).run.map(_._2)
 
-  abstract class BenchmarkState(chunks: Int, chunkSize: Int, v: Int => Option[RValue]) {
-    val table: IO[P.Table] = mkTable(P)(leftShiftTestData(chunks, chunkSize, v)).flatMap(_.force)
+  abstract class BenchmarkState(v: Int => Option[RValue]) {
+    @Param(Array("5"))
+    var chunks: Int = _
+
+    @Param(Array("10", "10000", "1000000"))
+    var chunkSize: Int = _
+
+    @Param(Array("true", "false"))
+    var emitOnUndef: Boolean = _
+
+    var table: IO[P.Table] = _
+
+    @Setup
+    def setup(): Unit = {
+      table = mkTable(P)(leftShiftTestData(chunks, chunkSize, v)).flatMap(_.force)
+    }
   }
 
   @State(Scope.Benchmark)
-  class BenchmarkState_1_10000_scrolling extends BenchmarkState(1, 10000, scrolling(nrKeysPerObject = 10, totalNrKeys = 14))
+  class BenchmarkState_scrolling extends BenchmarkState(scrolling(nrKeysPerObject = 10, totalNrKeys = 14))
 
   @State(Scope.Benchmark)
-  class BenchmarkState_5_10000_scrolling extends BenchmarkState(5, 10000, scrolling(nrKeysPerObject = 10, totalNrKeys = 14))
+  class BenchmarkState_scalarUndefined extends BenchmarkState(scalarUndefined)
 
-  @State(Scope.Benchmark)
-  class BenchmarkState_1_10000_scalarUndefined extends BenchmarkState(1, 10000, scalarUndefined)
-
-  @State(Scope.Benchmark)
-  class BenchmarkState_1_1000000_scalarUndefined extends BenchmarkState(1, 1000000, scalarUndefined)
-
-  @State(Scope.Benchmark)
-  class BenchmarkState_5_10000_scalarUndefined extends BenchmarkState(5, 10000, scalarUndefined)
 }
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -96,7 +102,7 @@ class LeftShiftBenchmark {
   @Param(Array("5"))
   var chunks: Int = _
 
-  @Param(Array("10000"))
+  @Param(Array("10", "10000", "1000000"))
   var chunkSize: Int = _
 
   @Param(Array("10"))
@@ -120,7 +126,7 @@ class LeftShiftBenchmark {
 
   def doTestForce(state: BenchmarkState, bh: Blackhole): Unit = {
     val table: IO[P.Table] = state.table
-    val tableAfter: IO[P.Table] = table.map(t => leftShift(t, true))
+    val tableAfter: IO[P.Table] = table.map(t => leftShift(t, state.emitOnUndef))
     tableAfter.map(t => SliceTools.consumeTable(P)(t, bh)).unsafeRunSync
   }
 
@@ -152,12 +158,7 @@ class LeftShiftBenchmark {
   }
 
   @Benchmark
-  def scrollingFieldsObjectsForced_1_10000(state: BenchmarkState_1_10000_scrolling, bh: Blackhole): Unit = {
-    doTestForce(state, bh)
-  }
-
-  @Benchmark
-  def scrollingFieldsObjectsForced_5_10000(state: BenchmarkState_5_10000_scrolling, bh: Blackhole): Unit = {
+  def scrollingFieldsObjectsForced(state: BenchmarkState_scrolling, bh: Blackhole): Unit = {
     doTestForce(state, bh)
   }
 
@@ -180,17 +181,7 @@ class LeftShiftBenchmark {
   }
 
   @Benchmark
-  def scalarOrUndefinedForced_1_10000(state: BenchmarkState_1_10000_scalarUndefined, bh: Blackhole): Unit = {
-    doTestForce(state, bh)
-  }
-
-  @Benchmark
-  def scalarOrUndefinedForced_1_1000000(state: BenchmarkState_1_1000000_scalarUndefined, bh: Blackhole): Unit = {
-    doTestForce(state, bh)
-  }
-
-  @Benchmark
-  def scalarOrUndefinedForced_5_10000(state: BenchmarkState_5_10000_scalarUndefined, bh: Blackhole): Unit = {
+  def scalarOrUndefinedForced(state: BenchmarkState_scalarUndefined, bh: Blackhole): Unit = {
     doTestForce(state, bh)
   }
 }
