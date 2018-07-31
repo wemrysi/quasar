@@ -199,6 +199,33 @@ trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
     toJson(table.leftShift(CPath.Identity \ 1, emitOnUndef = emit)).getJValues mustEqual expected
   }
 
+  def testUnevenHomogeneousArraysEmit = {
+    // closely drawn from intArrays.data
+    val table =
+      fromSample(
+        SampleData(
+          Stream(
+            toRecord(Array(0), JObject("b" -> JArray(JNum(1) :: JNum(2) :: Nil), "c" -> JArray(JNum(11) :: JNum(12) :: Nil)).some),
+            toRecord(Array(0), JObject("b" -> JArray(JNum(3) :: JNum(4) :: Nil), "c" -> JArray(JNum(13) :: JNum(14) :: Nil)).some),
+            toRecord(Array(0), JObject("b" -> JArray(JNum(5) :: JNum(6) :: JNum(7) :: Nil), "c" -> JArray(JNum(15) :: JNum(16) :: JNum(17) :: Nil)).some),
+            toRecord(Array(0), JObject("b" -> JArray(JNum(8) :: Nil), "c" -> JArray(JNum(18) :: Nil)).some),
+            toRecord(Array(0), JObject("b" -> JArray(Nil), "c" -> JArray(Nil)).some))))
+
+    val expected =
+      Vector(
+        toRecord(Array(0), JObject("b" -> JArray(JNum(0) :: JNum(1) :: Nil), "c" -> JArray(JNum(11) :: JNum(12) :: Nil)).some),
+        toRecord(Array(0), JObject("b" -> JArray(JNum(1) :: JNum(2) :: Nil), "c" -> JArray(JNum(11) :: JNum(12) :: Nil)).some),
+        toRecord(Array(0), JObject("b" -> JArray(JNum(0) :: JNum(3) :: Nil), "c" -> JArray(JNum(13) :: JNum(14) :: Nil)).some),
+        toRecord(Array(0), JObject("b" -> JArray(JNum(1) :: JNum(4) :: Nil), "c" -> JArray(JNum(13) :: JNum(14) :: Nil)).some),
+        toRecord(Array(0), JObject("b" -> JArray(JNum(0) :: JNum(5) :: Nil), "c" -> JArray(JNum(15) :: JNum(16) :: JNum(17) :: Nil)).some),
+        toRecord(Array(0), JObject("b" -> JArray(JNum(1) :: JNum(6) :: Nil), "c" -> JArray(JNum(15) :: JNum(16) :: JNum(17) :: Nil)).some),
+        toRecord(Array(0), JObject("b" -> JArray(JNum(2) :: JNum(7) :: Nil), "c" -> JArray(JNum(15) :: JNum(16) :: JNum(17) :: Nil)).some),
+        toRecord(Array(0), JObject("b" -> JArray(JNum(0) :: JNum(8) :: Nil), "c" -> JArray(JNum(18) :: Nil)).some),
+        toRecord(Array(0), JObject("c" -> JArray(Nil)).some))
+
+    toJson(table.leftShift(CPath.Identity \ 1 \ "b", emitOnUndef = true)).getJValues.toVector mustEqual expected
+  }
+
   // replaces SampleData.toRecord to avoid ordering issues
   def toRecord(indices: Array[Int], jv: Option[JValue]): JValue =
     JArray(JArray(indices.map(JNum(_)).toList) :: jv.toList)

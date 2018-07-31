@@ -1537,6 +1537,7 @@ trait ColumnarTableModule
       def leftshiftUnfocused(
           unfocused: Map[ColumnRef, Column],
           definedness: BitSet,
+          size: Int,
           expansion: CF1,
           highWaterMark: Int)
           : Map[ColumnRef, Column] = {
@@ -1550,7 +1551,7 @@ trait ColumnarTableModule
         // if we don't do this, the data will be highly sparse (like an outer join)
         unfocusedExpanded map {
           case (ref, col) =>
-            ref -> cf.util.filterExclusive(definedness)(col).get
+            ref -> cf.util.filter(0, size * highWaterMark, definedness)(col).get
         }
       }
 
@@ -1651,7 +1652,7 @@ trait ColumnarTableModule
           }
 
           val unfocusedTransformed: Map[ColumnRef, Column] =
-            leftshiftUnfocused(unfocused, unfocusedDefinedness, expansion, highWaterMark)
+            leftshiftUnfocused(unfocused, unfocusedDefinedness, slice.size, expansion, highWaterMark)
 
           // glue everything back together with the unfocused and compute the new size
           Slice(focusedTransformed ++ unfocusedTransformed, slice.size * highWaterMark)
