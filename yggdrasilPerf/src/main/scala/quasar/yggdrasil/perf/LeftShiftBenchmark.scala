@@ -71,17 +71,17 @@ object LeftShiftBenchmark {
     @Param(Array("5"))
     var chunks: Int = _
 
-    @Param(Array("10", "10000", "1000000"))
+    @Param(Array("10000"))
     var chunkSize: Int = _
 
-    @Param(Array("true", "false"))
+    @Param(Array("true"))
     var emitOnUndef: Boolean = _
 
-    var table: IO[P.Table] = _
+    var table: P.Table = _
 
     @Setup
     def setup(): Unit = {
-      table = mkTable(P)(leftShiftTestData(chunks, chunkSize, v)).flatMap(_.force)
+      table = mkTable(P)(leftShiftTestData(chunks, chunkSize, v)).flatMap(_.force).unsafeRunSync
     }
   }
 
@@ -102,7 +102,7 @@ class LeftShiftBenchmark {
   @Param(Array("5"))
   var chunks: Int = _
 
-  @Param(Array("10", "10000", "1000000"))
+  @Param(Array("10000"))
   var chunkSize: Int = _
 
   @Param(Array("10"))
@@ -125,9 +125,9 @@ class LeftShiftBenchmark {
   }
 
   def doTestForce(state: BenchmarkState, bh: Blackhole): Unit = {
-    val table: IO[P.Table] = state.table
-    val tableAfter: IO[P.Table] = table.map(t => leftShift(t, state.emitOnUndef))
-    tableAfter.map(t => SliceTools.consumeTable(P)(t, bh)).unsafeRunSync
+    val table: P.Table = state.table
+    val tableAfter: P.Table = leftShift(table, state.emitOnUndef)
+    SliceTools.consumeTable(P)(tableAfter, bh).unsafeRunSync
   }
 
   @Benchmark
