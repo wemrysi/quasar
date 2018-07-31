@@ -30,7 +30,6 @@ import quasar.fp.minspace
 import quasar.fp.ski._
 import quasar.frontend.data.DataCodec
 import quasar.impl.schema.{SstConfig, SstSchema}
-import quasar.mimir.MimirRepr
 import quasar.run.{QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
 import quasar.run.ResourceRouter.DatasourceResourcePrefix
 import quasar.run.optics.{stringUuidP => UuidString}
@@ -40,8 +39,7 @@ import java.lang.Exception
 import scala.util.control.NonFatal
 
 import argonaut.{Json, JsonParser, JsonScalaz}, JsonScalaz._
-import cats.~>
-import cats.effect.{Effect, IO}
+import cats.effect._
 import eu.timepit.refined.refineV
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -59,7 +57,7 @@ import spire.std.double._
 final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
     stateRef: Ref[F, ReplState],
     sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-    queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]]) {
+    queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]]) {
 
   import Command._
   import DatasourceError._
@@ -273,11 +271,8 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
 
     private def evaluateQuery(q: SqlQuery, summaryCount: Option[Int Refined Positive])
         : F[Stream[F, Data]] =
-      queryEvaluator.evaluate(q).map { s =>
-        val flattened: Stream[F, Data] =
-          s.map(mimir.tableToData).flatMap(_.translate(λ[IO ~> F](_.to[F])))
-
-        summaryCount.map(c => flattened.take(c.value.toLong)).getOrElse(flattened)
+      queryEvaluator.evaluate(q) map { s =>
+        summaryCount.map(c => s.take(c.value.toLong)).getOrElse(s)
       }
 
     private def findType(tps: ISet[DatasourceType], tp: DatasourceType.Name)
@@ -387,7 +382,7 @@ object Evaluator {
   def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
       stateRef: Ref[F, ReplState],
       sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])
+      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
       : Evaluator[F] =
     new Evaluator[F](stateRef, sources, queryEvaluator)
 
