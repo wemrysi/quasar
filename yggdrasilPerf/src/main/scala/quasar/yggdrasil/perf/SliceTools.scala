@@ -36,6 +36,8 @@ object SliceTools {
     slices.foldLeftRec(IO.unit)((i, o) => i.flatMap(_ => consumeSlice(o, bh))).flatMap(x => x)
 
   def consumeTable(module: TestColumnarTableModule)(table: module.Table, bh: Blackhole): IO[Unit] =
-    convert.fromStreamT(table.renderJson()).compile.drain
+    consumeSlices(table.slices, bh)
 
+  def consumeTableJson(module: TestColumnarTableModule)(table: module.Table, bh: Blackhole): IO[Unit] =
+    convert.fromStreamT(table.renderJson()).compile.drain
 }
