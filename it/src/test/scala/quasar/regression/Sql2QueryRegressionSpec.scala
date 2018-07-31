@@ -119,9 +119,9 @@ final class Sql2QueryRegressionSpec extends Qspec {
       (q, i) = t
 
       f = (squery: UUID => SqlQuery) =>
-        Stream.force {
+        (Stream.force {
           q.queryEvaluator.evaluate(squery(i)).map(_.map(mimir.tableToData))
-        }.flatMap(s => s)
+        }).flatMap(s => s)
     } yield {
       suiteName >> {
         tests.toList foreach { case (loc, test) =>
