@@ -133,38 +133,32 @@ class LeftShiftBenchmark {
     table.leftShift(CPath.Identity \ 1, emitOnUndef)
 
   def doTestForce(state: BenchmarkState, bh: Blackhole): Unit = {
-    val table: P.Table = state.table
-    val tableAfter: P.Table = leftShift(table, state.emitOnUndef)
+    val tableAfter: P.Table = leftShift(state.table, state.emitOnUndef)
     SliceTools.consumeTable(P)(tableAfter, bh).unsafeRunSync
   }
 
   @Benchmark
-  def arrays(state: BenchmarkState_arrays, bh: Blackhole): Unit = {
+  def arrays(state: BenchmarkState_arrays, bh: Blackhole): Unit =
     doTestForce(state, bh)
-  }
 
   @Benchmark
-  def objects(state: BenchmarkState_objects, bh: Blackhole): Unit = {
+  def objects(state: BenchmarkState_objects, bh: Blackhole): Unit =
     doTestForce(state, bh)
-  }
 
   @Benchmark
-  def distinctFieldsObjects(state: BenchmarkState_distinctFields, bh: Blackhole): Unit = {
+  def distinctFieldsObjects(state: BenchmarkState_distinctFields, bh: Blackhole): Unit =
     doTestForce(state, bh)
-  }
 
   @Benchmark
-  def scrollingFields(state: BenchmarkState_scrolling, bh: Blackhole): Unit = {
+  def scrollingFields(state: BenchmarkState_scrolling, bh: Blackhole): Unit =
     doTestForce(state, bh)
-  }
 
   @Benchmark
-  def heterogeneous(state: BenchmarkState_heterogeneous, bh: Blackhole): Unit = {
+  def heterogeneous(state: BenchmarkState_heterogeneous, bh: Blackhole): Unit =
     doTestForce(state, bh)
-  }
 
   @Benchmark
-  def scalarOrUndefined(state: BenchmarkState_scalarUndefined, bh: Blackhole): Unit = {
+  def scalarOrUndefined(state: BenchmarkState_scalarUndefined, bh: Blackhole): Unit =
     doTestForce(state, bh)
-  }
+
 }
