@@ -649,7 +649,7 @@ class SliceSpec extends Specification with ScalaCheck {
       val sourceArray = JParser.parseUnsafe("""[
         { "a": true },
         { "a": 2 },
-        { "b": "three" },
+        { "b": 3 },
         { "a": null }
         ]""")
 
