@@ -35,7 +35,6 @@ import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
 import scala.Predef.implicitly
 
 import cats.effect.{IO, LiftIO}
-import fs2.Stream
 import iotaz.CopK
 import matryoshka._
 import matryoshka.implicits._
@@ -47,7 +46,7 @@ final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadTell_[?[_], List[IO[Unit]]]] private (
     cake: Cake)
-    extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, MimirRepr]] {
+    extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] {
 
   type MT[X[_], A] = Kleisli[X, Associates[T, IO], A]
   type M[A] = MT[F, A]
@@ -80,8 +79,8 @@ final class MimirQScriptEvaluator[
   def UnicoalesceCap: Unicoalesce.Capture[T, QS[T]] =
     Unicoalesce.Capture[T, QS[T]]
 
-  def execute(repr: Repr): M[Stream[IO, Repr]] =
-    Stream(repr).covary[IO].point[M]
+  def execute(repr: Repr): M[Repr] =
+    repr.point[M]
 
   def optimize: QSM[T[QSM]] => QSM[T[QSM]] =
     (new Optimize[T]).optimize(reflNT[QSM])
@@ -129,6 +128,6 @@ object MimirQScriptEvaluator {
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: LiftIO: Monad: MonadPlannerErr: MonadTell_[?[_], List[IO[Unit]]]](
       cake: Cake)
-      : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], Stream[IO, MimirRepr]] =
+      : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] =
     new MimirQScriptEvaluator[T, F](cake)
 }

@@ -42,8 +42,8 @@ final class MimirQueryFederation[
     MimirQScriptEvaluator[T, WriterT[F, List[IO[Unit]], ?]](P)
 
   def evaluateFederated(q: FederatedQuery[T, QueryAssociate[T, IO]]): F[Stream[IO, MimirRepr]] = {
-    val finalize: ((List[IO[Unit]], Stream[IO, MimirRepr])) => Stream[IO, MimirRepr] = {
-      case (fs, s) => fs.foldLeft(s)(_ onFinalize _)
+    val finalize: ((List[IO[Unit]], MimirRepr)) => Stream[IO, MimirRepr] = {
+      case (fs, s) => fs.foldLeft(Stream(s).covary[IO])(_ onFinalize _)
     }
 
     qscriptEvaluator
