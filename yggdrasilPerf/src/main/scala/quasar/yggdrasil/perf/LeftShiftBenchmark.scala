@@ -36,6 +36,16 @@ import shims._
 object LeftShiftBenchmark {
   val P = new TestColumnarTableModule {}
 
+  def arrays(arraySize: Int): Int => Option[RValue] =
+    κ(RArray(List.tabulate(arraySize)(i => CLong(i + 42))).some)
+
+  def objects(nrKeysPerObject: Int): Int => Option[RValue] =
+    κ(RObject(List.tabulate(nrKeysPerObject)(i => ("k" + i) -> CLong(i + 42)).toMap).some)
+
+  def distinctFields(nrKeysPerObject: Int): Int => Option[RValue] = { r =>
+    RObject(List.tabulate(nrKeysPerObject)(i => ("k" + r + i) -> CLong(i + r + 42)).toMap).some
+  }
+
   def scrolling(nrKeysPerObject: Int, totalNrKeys: Int): Int => Option[RValue] = { r =>
     assert(totalNrKeys >= nrKeysPerObject)
     RObject(List.tabulate(nrKeysPerObject)(i => ("k" + ((r + i) % totalNrKeys)) -> CLong(i + r + 42)).toMap).some
@@ -45,6 +55,15 @@ object LeftShiftBenchmark {
     (i % 2) match {
       case 0 => none
       case _ => CLong(i + 42).some
+    }
+  }
+
+  def heterogeneous(nrKeysPerObject: Int, arraySize: Int): Int => Option[RValue] = { i =>
+    (i % 4) match {
+      case 0 => none
+      case 1 => CLong(i + 42).some
+      case 2 => RArray(List.tabulate(arraySize)(i => CLong(i + 42))).some
+      case _ => RObject(List.tabulate(nrKeysPerObject)(i => ("k" + i) -> CLong(i + 42)).toMap).some
     }
   }
 
@@ -86,11 +105,22 @@ object LeftShiftBenchmark {
   }
 
   @State(Scope.Benchmark)
+  class BenchmarkState_arrays extends BenchmarkState(arrays(arraySize = 10))
+
+  @State(Scope.Benchmark)
+  class BenchmarkState_objects extends BenchmarkState(objects(nrKeysPerObject = 10))
+
+  @State(Scope.Benchmark)
   class BenchmarkState_scrolling extends BenchmarkState(scrolling(nrKeysPerObject = 10, totalNrKeys = 14))
+
+  @State(Scope.Benchmark)
+  class BenchmarkState_distinctFields extends BenchmarkState(distinctFields(nrKeysPerObject = 10))
 
   @State(Scope.Benchmark)
   class BenchmarkState_scalarUndefined extends BenchmarkState(scalarUndefined)
 
+  @State(Scope.Benchmark)
+  class BenchmarkState_heterogeneous extends BenchmarkState(heterogeneous(nrKeysPerObject = 10, arraySize = 10))
 }
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -99,30 +129,8 @@ object LeftShiftBenchmark {
 class LeftShiftBenchmark {
   import LeftShiftBenchmark._
 
-  @Param(Array("5"))
-  var chunks: Int = _
-
-  @Param(Array("10000"))
-  var chunkSize: Int = _
-
-  @Param(Array("10"))
-  var arraySize: Int = _
-
-  @Param(Array("10"))
-  var nrKeysPerObject: Int = _
-
-  // make sure that: totalNrKeys >= nrKeysPerObject
-  @Param(Array("14"))
-  var totalNrKeys: Int = _
-
   def leftShift(table: P.Table, emitOnUndef: Boolean): P.Table =
     table.leftShift(CPath.Identity \ 1, emitOnUndef)
-
-  def doTest(v: Int => Option[RValue], bh: Blackhole): Unit = {
-    val table: IO[P.Table] = mkTable(P)(leftShiftTestData(chunks, chunkSize, v))
-    val tableAfter: IO[P.Table] = table.map(t => leftShift(t, true))
-    tableAfter.map(t => SliceTools.consumeTable(P)(t, bh)).unsafeRunSync
-  }
 
   def doTestForce(state: BenchmarkState, bh: Blackhole): Unit = {
     val table: P.Table = state.table
@@ -131,57 +139,32 @@ class LeftShiftBenchmark {
   }
 
   @Benchmark
-  def arrays(bh: Blackhole): Unit = {
-    val v: Int => Option[RValue] =
-      κ(RArray(List.tabulate(arraySize)(i => CLong(i + 42))).some)
-    doTest(v, bh)
-  }
-
-  @Benchmark
-  def objects(bh: Blackhole): Unit = {
-    val v: Int => Option[RValue] =
-      κ(RObject(List.tabulate(nrKeysPerObject)(i => ("k" + i) -> CLong(i + 42)).toMap).some)
-    doTest(v, bh)
-  }
-
-  @Benchmark
-  def distinctFieldsObjects(bh: Blackhole): Unit = {
-    val v: Int => Option[RValue] = { r =>
-      RObject(List.tabulate(nrKeysPerObject)(i => ("k" + r + i) -> CLong(i + r + 42)).toMap).some
-    }
-    doTest(v, bh)
-  }
-
-  @Benchmark
-  def scrollingFieldsObjects(bh: Blackhole): Unit = {
-    doTest(scrolling(nrKeysPerObject, totalNrKeys), bh)
-  }
-
-  @Benchmark
-  def scrollingFieldsObjectsForced(state: BenchmarkState_scrolling, bh: Blackhole): Unit = {
+  def arrays(state: BenchmarkState_arrays, bh: Blackhole): Unit = {
     doTestForce(state, bh)
   }
 
   @Benchmark
-  def heterogeneous(bh: Blackhole): Unit = {
-    val v: Int => Option[RValue] = { i =>
-      (i % 4) match {
-        case 0 => none
-        case 1 => CLong(i + 42).some
-        case 2 => RArray(List.tabulate(arraySize)(i => CLong(i + 42))).some
-        case _ => RObject(List.tabulate(nrKeysPerObject)(i => ("k" + i) -> CLong(i + 42)).toMap).some
-      }
-    }
-    doTest(v, bh)
+  def objects(state: BenchmarkState_objects, bh: Blackhole): Unit = {
+    doTestForce(state, bh)
   }
 
   @Benchmark
-  def scalarOrUndefined(bh: Blackhole): Unit = {
-    doTest(scalarUndefined, bh)
+  def distinctFieldsObjects(state: BenchmarkState_distinctFields, bh: Blackhole): Unit = {
+    doTestForce(state, bh)
   }
 
   @Benchmark
-  def scalarOrUndefinedForced(state: BenchmarkState_scalarUndefined, bh: Blackhole): Unit = {
+  def scrollingFields(state: BenchmarkState_scrolling, bh: Blackhole): Unit = {
+    doTestForce(state, bh)
+  }
+
+  @Benchmark
+  def heterogeneous(state: BenchmarkState_heterogeneous, bh: Blackhole): Unit = {
+    doTestForce(state, bh)
+  }
+
+  @Benchmark
+  def scalarOrUndefined(state: BenchmarkState_scalarUndefined, bh: Blackhole): Unit = {
     doTestForce(state, bh)
   }
 }
