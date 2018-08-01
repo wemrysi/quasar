@@ -1645,7 +1645,7 @@ trait ColumnarTableModule
           val unfocusedDefinedness = if (emitOnUndef) {
             val definedness2 = definedness.copy
             // this is where we necro the undefined rows
-            definedness2.flipByMod(highWaterMark)
+            definedness2.setByMod(highWaterMark)
             definedness2
           } else {
             definedness

@@ -50,12 +50,12 @@ object BitSetSpec extends Specification with ScalaCheck {
       }
     }
 
-    "flipByMod" in prop { (bs: BitSet, mod0: Int) =>
+    "setByMod" in prop { (bs: BitSet, mod0: Int) =>
       (mod0 > Int.MinValue) ==> {
         val mod = math.abs(mod0) % 20    // don't let scalacheck go crazy
 
         (mod > 0) ==> {
-          bs.flipByMod(mod)
+          bs.setByMod(mod)
           val bound = bs.length << 6
 
           (0 until (bound / mod) by mod) forall { i =>

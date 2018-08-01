@@ -299,13 +299,13 @@ public class BitSet {
     }
 
     /**
-     * Flips all bits for which index % mod == 0 such that
+     * Sets all bits for which index % mod == 0 such that
      * the bits (i % mod >= 0 && i % mod < mod) are 0. The
      * invariant here is that, for all ranges of i such
      * that (i % mod >= 0 && i % mod < mod), there is *at least*
      * one value of i such that get(i) == true.
      */
-    public void flipByMod(int mod) {
+    public void setByMod(int mod) {
         if (mod <= 0) {
             return;
         }
