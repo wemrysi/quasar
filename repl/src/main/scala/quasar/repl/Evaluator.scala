@@ -269,15 +269,18 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         },
         F.unit)
 
-    private def evaluateQuery(q: SqlQuery, summaryCount: Option[Int Refined Positive]): F[Stream[F, Data]] =
+    private def evaluateQuery(q: SqlQuery, summaryCount: Option[Int Refined Positive])
+        : F[Stream[F, Data]] =
       queryEvaluator.evaluate(q) map { s =>
         summaryCount.map(c => s.take(c.value.toLong)).getOrElse(s)
       }
 
-    private def findType(tps: ISet[DatasourceType], tp: DatasourceType.Name): Option[DatasourceType] =
+    private def findType(tps: ISet[DatasourceType], tp: DatasourceType.Name)
+        : Option[DatasourceType] =
       tps.toList.find(_.name === tp)
 
-    private def findTypeF(tps: ISet[DatasourceType], tp: DatasourceType.Name): F[DatasourceType] =
+    private def findTypeF(tps: ISet[DatasourceType], tp: DatasourceType.Name)
+        : F[DatasourceType] =
       findType(tps, tp) match {
         case None => raiseEvalError(s"Unsupported datasource type: $tp")
         case Some(z) => z.point[F]

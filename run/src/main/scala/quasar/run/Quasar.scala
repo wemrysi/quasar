@@ -21,7 +21,6 @@ import slamdata.Predef.Double
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
 import quasar.common.PhaseResultTell
-import quasar.common.data.Data
 import quasar.contrib.pathy.ADir
 import quasar.contrib.std.uuid._
 import quasar.ejson.EJson
@@ -32,7 +31,7 @@ import quasar.impl.datasources.{DatasourceManagement, DefaultDatasources}
 import quasar.impl.evaluate.FederatingQueryEvaluator
 import quasar.impl.external.{ExternalConfig, ExternalDatasources}
 import quasar.impl.schema.SstConfig
-import quasar.mimir.Precog
+import quasar.mimir.{MimirRepr, Precog}
 import quasar.mimir.evaluate.MimirQueryFederation
 import quasar.mimir.storage.{MimirIndexedStore, StoreKey}
 import quasar.run.implicits._
@@ -50,13 +49,14 @@ import fs2.{Scheduler, Stream}
 import matryoshka.data.Fix
 import pathy.Path._
 import scalaz.IMap
-import scalaz.syntax.{foldable, functor}, foldable._, functor._
+import scalaz.syntax.foldable._
+import scalaz.syntax.functor._
 import shims._
 import spire.std.double._
 
 final class Quasar[F[_]](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
+    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])
 
 object Quasar {
   // The location of the datasource refs tables within `mimir`.
@@ -112,7 +112,7 @@ object Quasar {
 
       federation = MimirQueryFederation[Fix, F](precog)
 
-      (queryEvaluatorIO: QueryEvaluator[F, SqlQuery, Stream[IO, Data]]) =
+      (queryEvaluatorIO: QueryEvaluator[F, SqlQuery, Stream[IO, MimirRepr]]) =
         Sql2QueryEvaluator(FederatingQueryEvaluator(federation, ResourceRouter(running.get)))
 
       queryEvaluator = queryEvaluatorIO.map(_.translate(λ[IO ~> F](_.to[F])))
