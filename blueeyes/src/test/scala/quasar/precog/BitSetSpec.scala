@@ -69,5 +69,43 @@ object BitSetSpec extends Specification with ScalaCheck {
         }
       }
     }
+
+    "setByMod avoid positive wrap-around masking issues" in {
+      val bs = new BitSet(128)    // ensure we have two longs
+
+      // 64 % 10 = 4, so we should wrap-around mid-mask
+      bs.setByMod(10)
+
+      // sanity check on first mod
+      (0 until 10) must contain { i: Int =>
+        bs(i) must beTrue
+      }
+
+      (60 until 70) must contain { i: Int =>
+        bs(i) must beTrue
+      }
+    }
+
+    // note that these negative tests assume that we're setting the mod zero bit
+    // that's an implementation detail and technically not forced by the contract
+    "setByMod avoid negative wrap-around masking issues" in {
+      val bs = new BitSet(128)    // ensure we have two longs
+
+      bs.set(64)    // first bit in the second long
+
+      // 64 % 10 = 4, so we should wrap-around mid-mask
+      bs.setByMod(10)
+
+      bs(60) must beFalse
+      bs(61) must beFalse
+      bs(62) must beFalse
+      bs(63) must beFalse
+      bs(64) must beTrue
+      bs(65) must beFalse
+      bs(66) must beFalse
+      bs(67) must beFalse
+      bs(68) must beFalse
+      bs(69) must beFalse
+    }
   }
 }

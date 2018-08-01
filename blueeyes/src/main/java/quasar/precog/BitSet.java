@@ -299,13 +299,18 @@ public class BitSet {
     }
 
     /**
-     * Sets all bits for which index % mod == 0 such that
-     * the bits (i % mod >= 0 && i % mod < mod) are 0. The
-     * invariant here is that, for all ranges of i such
-     * that (i % mod >= 0 && i % mod < mod), there is *at least*
-     * one value of i such that get(i) == true.
+     * Ensures that all disjoint index mod rings contain at least one
+     * set bit. If a disjoint index mod ring *already* contains a set
+     * bit, then its contents are guaranteed to be left unmodified.
+     * More rigorously, the first invariant is captured by:
+     *
+     * ∀ i . ∃ j >= 0 && j < mod . bits(i + j) == 1
      */
     public void setByMod(int mod) {
+        if (mod >= 64) {
+            throw new IllegalArgumentException("this algorithm doesn't work for mod > 64; got " + mod);
+        }
+
         if (mod <= 0) {
             return;
         }
@@ -319,16 +324,54 @@ public class BitSet {
             return;
         }
 
+        final long initMask = (1L << mod) - 1L;
+
         long flipper = 1L;
-        long mask = (1L << mod) - 1L;  // bitmask which covers everything >= 0 and < mod
+        long mask = initMask;
+
+        /*
+         * We need a mask which covers the mod - 1 *highest* order bits.
+         * The goal is to use this to find when flipper has landed within
+         * that range, since that would mean that mask would roll over into
+         * the low order. We flip the lowest of these high bits back to 0
+         * since we don't want to catch the case where flipper << mod == 1L.
+         *
+         * When that situation arises, it means mask is split across a long
+         * boundary. We resolve this by splitting the mask and doing two
+         * checks.
+         */
+        final long highOrderCheck = Long.rotateRight(initMask ^ 1L, mod);
+        final long lowOrderCheck = initMask >> 1;
+
         for (int i = 0; i < _length; i++) {
             do {
-                if ((bits[i] & mask) == 0L) {
-                    bits[i] |= flipper;
+                if ((flipper & highOrderCheck) == 0L) {
+                    if ((bits[i] & mask) == 0L) {
+                        bits[i] |= flipper;
+                    }
+                } else {
+                    // we've wrapped around and the mask is splitting high/low-order
+
+                    long highMask = mask & highOrderCheck;
+
+                    if (i < _length - 1) {
+                        long lowMask = mask & lowOrderCheck;
+
+                        // check both current high and next low
+                        if (((bits[i] & highMask) | (bits[i + 1] & lowMask)) == 0L) {
+                            bits[i] |= flipper;
+                        }
+                    } else {
+                        // there is no next. just check current high
+                        if ((bits[i] & highMask) == 0L) {
+                            bits[i] |= flipper;
+                        }
+                    }
                 }
+
                 mask = Long.rotateLeft(mask, mod);
                 flipper = Long.rotateLeft(flipper, mod);
-            } while (!(flipper >= 0 && flipper < mod));
+            } while ((flipper & initMask) == 0);
         }
     }
 
