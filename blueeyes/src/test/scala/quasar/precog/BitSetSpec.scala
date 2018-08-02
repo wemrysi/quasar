@@ -111,7 +111,8 @@ object BitSetSpec extends Specification with ScalaCheck {
     "setByMod avoid mask overlap on mod > 32" in {
       val bs = new BitSet(448)    // ensure we have seven longs
 
-      bs.set(416)   // uh... I don't know what's special about this value
+      bs.set(415)
+      bs.set(416)
 
       // 64 % 35 = 29, and 64 * 6 = 384, and 384 % 35 = 0
       bs.setByMod(35)

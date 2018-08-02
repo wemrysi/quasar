@@ -342,9 +342,6 @@ public class BitSet {
          */
         final long highOrderCheck = Long.rotateRight(initMask ^ 1L, mod);
 
-        final long lowOrderMask = 0xFFFFFFFFL;
-        final long highOrderMask = lowOrderMask << 32;
-
         for (int i = 0; i < _length; i++) {
             do {
                 if ((flipper & highOrderCheck) == 0L) {
@@ -352,6 +349,14 @@ public class BitSet {
                         bits[i] |= flipper;
                     }
                 } else {
+                    int leadingBits = Long.numberOfLeadingZeros(flipper);
+
+                    long highOrderMask = 0xFFFFFFFFFFFFFFFFL << leadingBits;         // mask that exactly covers flipper
+                    long lowOrderMask = (1L << (mod - leadingBits)) - 1;  // ...and the rest of the mod bits
+
+                    // NB: make sure we run in production with assertions OFF
+                    assert((Long.toBinaryString(highOrderMask) + Long.toBinaryString(lowOrderMask)).length() == mod);
+
                     // we've wrapped around and the mask is splitting high/low-order
 
                     long highBits = mask & highOrderMask;

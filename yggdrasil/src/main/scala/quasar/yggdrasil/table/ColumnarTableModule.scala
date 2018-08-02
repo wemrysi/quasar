@@ -1551,6 +1551,24 @@ trait ColumnarTableModule
         // if we don't do this, the data will be highly sparse (like an outer join)
         unfocusedExpanded map {
           case (ref, col) =>
+            if (ref.selector == CPath.Identity \ "source" \ "a") {
+              val lcol = col.asInstanceOf[LongColumn]
+              println(s"column definedness = ${col.definedAt(0, size * highWaterMark)}")
+              println(s"definedness = $definedness")
+              println(s"values = ${(0 until (size * highWaterMark)).map(lcol(_)).mkString(",")}")
+
+              for (i <- 0 until 448 if definedness(i)) {
+                println(s"bs.set($i)")
+              }
+
+              println("elevens!")
+              for (i <- 0 until (size * highWaterMark) if lcol(i) == 11L) {
+                println(s"  i = $i")
+                println(s"  definedness(i) = ${definedness(i)}")
+                println(s"  lcol.isDefinedAt(i) = ${lcol.isDefinedAt(i)}")
+              }
+            }
+
             ref -> cf.util.filter(0, size * highWaterMark, definedness)(col).get
         }
       }
@@ -1643,6 +1661,8 @@ trait ColumnarTableModule
             leftShiftFocused(merged, innerHeads, definedness)
 
           val unfocusedDefinedness = if (emitOnUndef) {
+            println(s"highWaterMark = $highWaterMark")
+
             val definedness2 = definedness.copy
             // this is where we necro the undefined rows
             definedness2.setByMod(highWaterMark)
