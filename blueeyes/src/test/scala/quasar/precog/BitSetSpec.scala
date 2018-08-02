@@ -59,7 +59,7 @@ object BitSetSpec extends Specification with ScalaCheck {
 
     "setByMod" in prop { (bs: BitSet, mod0: Int) =>
       (mod0 > Int.MinValue) ==> {
-        val mod = math.abs(mod0) % 64    // don't let scalacheck go crazy
+        val mod = math.abs(mod0) % 100    // don't let scalacheck go crazy
 
         (mod > 0) ==> {
           val modded = bs.copy

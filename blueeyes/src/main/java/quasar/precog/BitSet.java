@@ -307,11 +307,12 @@ public class BitSet {
      * ∀ i . ∃ j >= 0 && j < mod . bits(i + j) == 1
      */
     public void setByMod(int mod) {
-        if (mod >= 64) {
-            throw new IllegalArgumentException("this algorithm doesn't work for mod > 64; got " + mod);
+        if (mod <= 0) {
+            return;
         }
 
-        if (mod <= 0) {
+        if (mod >= 64) {
+            setByModSlow(mod);
             return;
         }
 
@@ -379,6 +380,23 @@ public class BitSet {
                 mask = Long.rotateLeft(mask, mod);
                 flipper = Long.rotateLeft(flipper, mod);
             } while ((flipper & initMask) == 0L);
+        }
+    }
+
+    private void setByModSlow(int mod) {
+        int bound = _length << 6;
+        for (int i = 0; i < bound / mod; i++) {
+            boolean set = false;
+            for (int j = 0; j < mod && i * mod + j < bound; j++) {
+                if (get(i * mod + j)) {
+                    set = true;
+                    break;
+                }
+            }
+
+            if (!set) {
+                set(i * mod);
+            }
         }
     }
 
