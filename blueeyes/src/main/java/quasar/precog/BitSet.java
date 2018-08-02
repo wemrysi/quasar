@@ -351,7 +351,7 @@ public class BitSet {
                 } else {
                     int leadingBits = Long.numberOfLeadingZeros(flipper);
 
-                    long highOrderMask = 0xFFFFFFFFFFFFFFFFL << leadingBits;         // mask that exactly covers flipper
+                    long highOrderMask = ((1L << (leadingBits + 1)) - 1L) << (64 - leadingBits - 1);         // mask that exactly covers flipper
                     long lowOrderMask = (1L << (mod - leadingBits)) - 1;  // ...and the rest of the mod bits
 
                     // NB: make sure we run in production with assertions OFF
@@ -378,7 +378,7 @@ public class BitSet {
 
                 mask = Long.rotateLeft(mask, mod);
                 flipper = Long.rotateLeft(flipper, mod);
-            } while ((flipper & initMask) == 0);
+            } while ((flipper & initMask) == 0L);
         }
     }
 

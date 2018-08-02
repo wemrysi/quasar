@@ -18,14 +18,21 @@ package quasar.precog
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
+import org.specs2.scalacheck.Parameters
 import org.scalacheck._
 
 object BitSetSpec extends Specification with ScalaCheck {
 
+  implicit val params = Parameters(
+    minSize = 100,
+    maxSize = 1000,
+    workers = Runtime.getRuntime.availableProcessors,
+    minTestsOk = 10000)
+
   implicit val arbBitSet: Arbitrary[BitSet] = {
-    Arbitrary(Arbitrary.arbitrary[Array[Boolean]] map { bools =>
-      val bs = new BitSet(bools.length)
-      for (i <- 0 until bools.length) {
+    Arbitrary(Arbitrary.arbitrary[scala.collection.BitSet] map { bools =>
+      val bs = new BitSet(bools.size)
+      for (i <- 0 until bools.size) {
         bs(i) = bools(i)
       }
       bs
@@ -52,20 +59,29 @@ object BitSetSpec extends Specification with ScalaCheck {
 
     "setByMod" in prop { (bs: BitSet, mod0: Int) =>
       (mod0 > Int.MinValue) ==> {
-        val mod = math.abs(mod0) % 20    // don't let scalacheck go crazy
+        val mod = math.abs(mod0) % 64    // don't let scalacheck go crazy
 
         (mod > 0) ==> {
-          bs.setByMod(mod)
+          val modded = bs.copy
+          modded.setByMod(mod)
+
           val bound = bs.length << 6
 
-          (0 until (bound / mod) by mod) forall { i =>
+          (0 until bound) must contain { i: Int =>
+            if (bs(i))
+              modded(i) must beTrue.setMessage(s"modded($i) was false while bs($i) is true")
+            else
+              ok
+          }.forall
+
+          (0 until (bound / mod) by mod) must contain { i: Int =>
             (0 until mod) must contain { j: Int =>
               if (i + j < bound)    // mod might not divide bound
-                bs(i + j) must beTrue
+                modded(i + j) must beTrue.setMessage(s"modded(${i + j}) was false")
               else
                 ko
             }
-          }
+          }.forall
         }
       }
     }
@@ -121,6 +137,17 @@ object BitSetSpec extends Specification with ScalaCheck {
 
       bs(350) must beTrue
       (351 to 384).map(bs(_)) must contain(beFalse).forall
+    }
+
+    "setByMod works with mod 3" in {
+      val bs = new BitSet(128)    // ensure we have seven longs
+
+      // 64 % 35 = 29, and 64 * 6 = 384, and 384 % 35 = 0
+      bs.setByMod(3)
+
+      bs(3) must beTrue
+
+      bs(63) must beTrue
     }
   }
 }
