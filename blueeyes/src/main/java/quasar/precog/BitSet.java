@@ -341,7 +341,9 @@ public class BitSet {
          * checks.
          */
         final long highOrderCheck = Long.rotateRight(initMask ^ 1L, mod);
-        final long lowOrderCheck = initMask >> 1;
+
+        final long lowOrderMask = 0xFFFFFFFFL;
+        final long highOrderMask = lowOrderMask << 32;
 
         for (int i = 0; i < _length; i++) {
             do {
@@ -352,18 +354,18 @@ public class BitSet {
                 } else {
                     // we've wrapped around and the mask is splitting high/low-order
 
-                    long highMask = mask & highOrderCheck;
+                    long highBits = mask & highOrderMask;
 
                     if (i < _length - 1) {
-                        long lowMask = mask & lowOrderCheck;
+                        long lowBits = mask & lowOrderMask;
 
                         // check both current high and next low
-                        if (((bits[i] & highMask) | (bits[i + 1] & lowMask)) == 0L) {
+                        if (((bits[i] & highBits) | (bits[i + 1] & lowBits)) == 0L) {
                             bits[i] |= flipper;
                         }
                     } else {
                         // there is no next. just check current high
-                        if ((bits[i] & highMask) == 0L) {
+                        if ((bits[i] & highBits) == 0L) {
                             bits[i] |= flipper;
                         }
                     }
