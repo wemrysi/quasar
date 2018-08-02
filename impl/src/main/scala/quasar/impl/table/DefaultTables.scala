@@ -24,8 +24,8 @@ import quasar.api.table.{
   PreparationResult,
   PreparationStatus,
   PreparedStatus,
-  TableRef,
   TableError,
+  TableRef,
   Tables
 }
 import quasar.impl.storage.IndexedStore
@@ -38,6 +38,7 @@ import fs2.Stream
 import scalaz.{\/, -\/, \/-, Equal}
 import scalaz.std.option
 import scalaz.syntax.either._
+import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 
 import shims._
@@ -78,7 +79,7 @@ final class DefaultTables[F[_]: Effect: FlatMap, I: Equal, Q, D](
 
   def createTable(table: TableRef[Q]): F[NameConflict \/ I] =
     tableStore.entries
-      .exists(_._2.name == table.name) // TODO Equal[TableName]
+      .exists(_._2.name === table.name)
       .compile.last
       .flatMap {
         case Some(true) => NameConflict(table.name).left.pure[F]
