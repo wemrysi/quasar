@@ -223,6 +223,10 @@ public class BitSet {
      * for all values of bs, i, o, m.
      */
     public BitSet sparsenByMod(final int offset, final int mod) {
+        if (mod <= 1) {
+            return copy();
+        }
+
         long[] _bits = new long[_length * mod];
 
         int preI = 0;

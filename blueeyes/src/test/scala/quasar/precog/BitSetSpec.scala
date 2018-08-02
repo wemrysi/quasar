@@ -44,7 +44,7 @@ object BitSetSpec extends Specification with ScalaCheck {
       (mod0 > Int.MinValue && offset0 > Int.MinValue) ==> {
         val mod = math.abs(mod0) % 20    // don't let scalacheck go crazy
 
-        mod > 2 ==> {
+        (mod > 0) ==> {
           val offset = math.abs(offset0) % mod
 
           val sparsened = bs.sparsenByMod(offset, mod)
