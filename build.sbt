@@ -374,6 +374,7 @@ lazy val precog = project
     scalacStrictMode := false)
   .dependsOn(common)
   .settings(libraryDependencies ++= Dependencies.precog)
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -390,6 +391,7 @@ lazy val blueeyes = project
     precog,
     frontend % BothScopes)
   .settings(libraryDependencies ++= Dependencies.blueeyes)
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -403,6 +405,7 @@ lazy val niflheim = project
     scalacStrictMode := false)
   .dependsOn(blueeyes % BothScopes)
   .settings(libraryDependencies ++= Dependencies.niflheim)
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -419,6 +422,7 @@ lazy val yggdrasil = project
   .settings(
     resolvers += "bintray-djspiewak-maven" at "https://dl.bintray.com/djspiewak/maven",
     libraryDependencies ++= Dependencies.yggdrasil)
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -431,6 +435,7 @@ lazy val yggdrasilPerf = project
     name := "quasar-yggdrasil-perf-internal",
     scalacStrictMode := false)
   .dependsOn(yggdrasil % "compile->compile;compile->test")
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(noPublishSettings)
   .settings(assemblySettings)
@@ -448,6 +453,7 @@ lazy val mimir = project
     yggdrasil % BothScopes,
     impl % BothScopes,
     connector)
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
