@@ -1534,7 +1534,7 @@ trait ColumnarTableModule
         }
       }
 
-      def leftshiftUnfocused(
+      def leftShiftUnfocused(
           unfocused: Map[ColumnRef, Column],
           definedness: BitSet,
           size: Int,
@@ -1652,7 +1652,7 @@ trait ColumnarTableModule
           }
 
           val unfocusedTransformed: Map[ColumnRef, Column] =
-            leftshiftUnfocused(unfocused, unfocusedDefinedness, slice.size, expansion, highWaterMark)
+            leftShiftUnfocused(unfocused, unfocusedDefinedness, slice.size, expansion, highWaterMark)
 
           // glue everything back together with the unfocused and compute the new size
           Slice(focusedTransformed ++ unfocusedTransformed, slice.size * highWaterMark)
