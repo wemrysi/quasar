@@ -139,7 +139,6 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
     "access a created table" >>* {
       for {
         errorOrId <- tables.createTable(table1)
-        _ = println(s"$errorOrId")
         id <- isSuccess(errorOrId)
         result <- tables.table(id)
       } yield {

@@ -86,7 +86,7 @@ object optics {
     Prism(fromRValue)(toRValue)
   }
 
-  val TableRefNameField = "type"
+  val TableRefNameField = "name"
   val TableRefQueryField = "query"
 
   def rValueTableRefP[A](queryP: Prism[RValue, A]): Prism[RValue, TableRef[A]] = {

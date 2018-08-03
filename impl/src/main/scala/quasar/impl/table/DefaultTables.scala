@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.table.{
   OngoingStatus,
+  PreparationEvent,
   PreparationResult,
   PreparationStatus,
   PreparedStatus,
@@ -30,7 +31,6 @@ import quasar.api.table.{
 }
 import quasar.impl.storage.IndexedStore
 
-import cats.FlatMap
 import cats.effect.Effect
 
 import fs2.Stream
@@ -43,7 +43,7 @@ import scalaz.syntax.monad._
 
 import shims._
 
-final class DefaultTables[F[_]: Effect: FlatMap, I: Equal, Q, D](
+final class DefaultTables[F[_]: Effect, I: Equal, Q, D](
     freshId: F[I],
     tableStore: IndexedStore[F, I, TableRef[Q]],
     manager: PreparationsManager[F, I, Q, D],
@@ -70,7 +70,6 @@ final class DefaultTables[F[_]: Effect: FlatMap, I: Equal, Q, D](
   def cancelAllPreparations: F[Unit] =
     manager.cancelAll
 
-  // TODO also existence error?
   def cancelPreparation(tableId: I): F[Condition[PreparationNotInProgress[I]]] =
     manager.cancelPreparation(tableId).map(_.map {
       case PreparationsManager.NotInProgressError(i) =>
@@ -112,6 +111,9 @@ final class DefaultTables[F[_]: Effect: FlatMap, I: Equal, Q, D](
     }
   }
 
+  def preparationEvents: Stream[F, PreparationEvent[I]] =
+    manager.notifications
+
   def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, D]] =
     tableStore.lookup(tableId).flatMap {
       case Some(_) =>
@@ -125,7 +127,6 @@ final class DefaultTables[F[_]: Effect: FlatMap, I: Equal, Q, D](
         (TableNotFound(tableId): ExistenceError[I]).left.pure[F]
     }
 
-  // TODO change to accept `Q` instead of `TableRef[Q]`
   def replaceTable(tableId: I, table: TableRef[Q]): F[Condition[ModificationError[I]]] =
     tableStore.lookup(tableId).flatMap {
       case Some(_) =>
@@ -168,7 +169,7 @@ final class DefaultTables[F[_]: Effect: FlatMap, I: Equal, Q, D](
 }
 
 object DefaultTables {
-  def apply[F[_]: Effect: FlatMap, I: Equal, Q, D](
+  def apply[F[_]: Effect, I: Equal, Q, D](
       freshId: F[I],
       tableStore: IndexedStore[F, I, TableRef[Q]],
       manager: PreparationsManager[F, I, Q, D],

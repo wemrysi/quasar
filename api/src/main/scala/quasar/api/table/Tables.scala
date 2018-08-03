@@ -46,6 +46,8 @@ trait Tables[F[_], I, Q, D] {
 
   def prepareTable(tableId: I): F[Condition[PrePreparationError[I]]]
 
+  def preparationEvents: Stream[F, PreparationEvent[I]]
+
   def preparationStatus(tableId: I): F[ExistenceError[I] \/ PreparationStatus]
 
   def cancelPreparation(tableId: I): F[Condition[PreparationNotInProgress[I]]]
