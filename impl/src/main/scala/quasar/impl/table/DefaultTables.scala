@@ -30,7 +30,6 @@ import quasar.api.table.{
 }
 import quasar.impl.storage.IndexedStore
 
-import cats.FlatMap
 import cats.effect.Effect
 
 import fs2.Stream
@@ -43,7 +42,7 @@ import scalaz.syntax.monad._
 
 import shims._
 
-final class DefaultTables[F[_]: Effect: FlatMap, I: Equal, Q, D](
+final class DefaultTables[F[_]: Effect, I: Equal, Q, D](
     freshId: F[I],
     tableStore: IndexedStore[F, I, TableRef[Q]],
     manager: PreparationsManager[F, I, Q, D],
@@ -168,7 +167,7 @@ final class DefaultTables[F[_]: Effect: FlatMap, I: Equal, Q, D](
 }
 
 object DefaultTables {
-  def apply[F[_]: Effect: FlatMap, I: Equal, Q, D](
+  def apply[F[_]: Effect, I: Equal, Q, D](
       freshId: F[I],
       tableStore: IndexedStore[F, I, TableRef[Q]],
       manager: PreparationsManager[F, I, Q, D],
