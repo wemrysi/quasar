@@ -246,6 +246,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           log = printLog(Order[DebugLevel].max(DebugLevel.Normal, state.debugLevel), state.phaseFormat, phaseResults)
         } yield log
 
+      case NoOp =>
+        F.pure(none)
+
       case Exit =>
         F.pure("Exiting...".some)
     }
