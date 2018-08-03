@@ -594,7 +594,6 @@ abstract class Slice { source =>
     val defined = {
       val bsing = source.columns.values map {
         case col: BitsetColumn => col.definedAt.copy
-        case col: DefinedAtIndex => col.defined.copy
         case col => col.definedAt(0, size)
       }
 
