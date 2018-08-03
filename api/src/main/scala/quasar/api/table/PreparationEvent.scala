@@ -18,27 +18,20 @@ package quasar.api.table
 
 import slamdata.Predef._
 
-import scalaz.{Cord, Equal, Show}
-import scalaz.std.tuple._
-import scalaz.syntax.show._
+import java.time.OffsetDateTime
+import scala.concurrent.duration.Duration
 
-final case class TableRef[Q](name: TableName, query: Q)
+sealed trait PreparationEvent[I] extends Product with Serializable
 
-final case class TableName(name: String)
+object PreparationEvent {
+  final case class PreparationErrored[I](
+      tableId: I,
+      start: OffsetDateTime,
+      duration: Duration,
+      t: Throwable) extends PreparationEvent[I]
 
-object TableName {
-  implicit val equalTableName: Equal[TableName] = Equal.equalA
-  implicit val showTableName: Show[TableName] = Show.showFromToString
-}
-
-object TableRef {
-  import TableName._
-
-  implicit def equalTableRef[Q: Equal]: Equal[TableRef[Q]] =
-    Equal.equalBy(t => (t.name, t.query))
-
-  implicit def showTableRef[Q: Show]: Show[TableRef[Q]] =
-    Show.show { t =>
-      Cord("TableRef(") ++ t.name.show ++ Cord(", ") ++ t.query.show ++ Cord(")")
-    }
+  final case class PreparationSucceeded[I](
+      tableId: I,
+      start: OffsetDateTime,
+      duration: Duration) extends PreparationEvent[I]
 }
