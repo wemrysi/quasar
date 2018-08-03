@@ -69,7 +69,6 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D](
   def cancelAllPreparations: F[Unit] =
     manager.cancelAll
 
-  // TODO also existence error?
   def cancelPreparation(tableId: I): F[Condition[PreparationNotInProgress[I]]] =
     manager.cancelPreparation(tableId).map(_.map {
       case PreparationsManager.NotInProgressError(i) =>
@@ -124,7 +123,6 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D](
         (TableNotFound(tableId): ExistenceError[I]).left.pure[F]
     }
 
-  // TODO change to accept `Q` instead of `TableRef[Q]`
   def replaceTable(tableId: I, table: TableRef[Q]): F[Condition[ModificationError[I]]] =
     tableStore.lookup(tableId).flatMap {
       case Some(_) =>
