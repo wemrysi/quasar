@@ -48,10 +48,14 @@ object BitSetSpec extends Specification with ScalaCheck {
           val offset = math.abs(offset0) % mod
 
           val sparsened = bs.sparsenByMod(offset, mod)
-          val bound = bs.length << 6
 
-          (0 until bound) forall { i =>
-            bs(i) mustEqual sparsened(i * mod + offset)
+          (sparsened.length << 6) must beEqualTo((bs.length << 6) * mod)
+          
+          (0 until (sparsened.length << 6)) forall { i: Int =>
+            if (i % mod == offset)
+              bs(i / mod) must beEqualTo(sparsened(i)).setMessage(s"bs(${i / mod}) != sparsened($i)")
+            else
+              sparsened(i) must beEqualTo(false).setMessage(s"sparsened($i) != false")
           }
         }
       }
