@@ -99,6 +99,9 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
           TableNotFound(tableId): PrePreparationError[UUID]).point[F]
     })
 
+  def preparationEvents: Stream[F, PreparationEvent[UUID]] =
+    Stream.empty
+
   def preparationStatus(tableId: UUID): F[ExistenceError[UUID] \/ PreparationStatus] =
     store.gets(_.lookup(tableId)
       .map(_.status)

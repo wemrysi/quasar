@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.table.{
   OngoingStatus,
+  PreparationEvent,
   PreparationResult,
   PreparationStatus,
   PreparedStatus,
@@ -109,6 +110,9 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D](
         }
     }
   }
+
+  def preparationEvents: Stream[F, PreparationEvent[I]] =
+    manager.notifications
 
   def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, D]] =
     tableStore.lookup(tableId).flatMap {
