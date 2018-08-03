@@ -152,7 +152,7 @@ object ExternalDatasources extends Logging {
       backendModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestAttributeName)
       versionModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestVersionName)
 
-      (_: Stream[F, Nothing]) <- versionModuleAttr match {
+      _ <- versionModuleAttr match {
         case None => warnStream[F](s"No '${Plugin.ManifestVersionName}' attribute found in Manifest for '$pluginFile'.", None)
         case Some(version) => infoStream[F](s"Loading $pluginFile with version $version")
       }
@@ -180,6 +180,6 @@ object ExternalDatasources extends Logging {
   private def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
     Sync[Stream[F, ?]].delay(cause.fold(log.warn(msg))(log.warn(msg, _))).drain
 
-  private def infoStream[F[_]: Sync](msg: => String): Stream[F, Nothing] =
-    Sync[Stream[F, ?]].delay(log.info(msg)).drain
+  private def infoStream[F[_]: Sync](msg: => String): Stream[F, Unit] =
+    Sync[Stream[F, ?]].delay(log.info(msg))
 }
