@@ -21,8 +21,9 @@ import quasar.blueeyes._, json._
 import quasar.common.data.{Data, DataGenerators}
 import quasar.contrib.cats.effect.liftio._
 import quasar.frontend.data.DataCodec
-import quasar.precog.common._
 import quasar.pkg.tests._, Gen._
+import quasar.precog.common._
+import quasar.yggdrasil.TestIdentities._
 import quasar.yggdrasil.bytecode.JType
 
 import org.slf4j.LoggerFactory

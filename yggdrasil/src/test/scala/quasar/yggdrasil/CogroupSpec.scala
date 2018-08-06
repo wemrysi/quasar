@@ -17,8 +17,9 @@
 package quasar.yggdrasil
 
 import quasar.blueeyes._
-import quasar.precog.common._
 import quasar.blueeyes.json._
+import quasar.precog.common._
+import quasar.yggdrasil.TestIdentities._
 
 import scalaz._
 import scalaz.Ordering._

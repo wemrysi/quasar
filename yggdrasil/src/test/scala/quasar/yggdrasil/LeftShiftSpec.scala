@@ -16,12 +16,12 @@
 
 package quasar.yggdrasil
 
-import quasar.precog.common._
 import quasar.blueeyes.json._
+import quasar.precog.common._
+import quasar.yggdrasil.TestIdentities._
 
 import org.specs2._
-
-import _root_.scalaz._, Scalaz._
+import scalaz._, Scalaz._
 
 trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
 
