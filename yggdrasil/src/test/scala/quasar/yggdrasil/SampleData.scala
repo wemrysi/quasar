@@ -16,9 +16,10 @@
 
 package quasar.yggdrasil
 
-import quasar.blueeyes._, json._
 import quasar.RCValueGenerators
+import quasar.blueeyes._, json._
 import quasar.precog.common._
+import quasar.yggdrasil.TestIdentities._
 
 import scalaz._, Scalaz._
 
@@ -28,6 +29,7 @@ import scala.util.Random
 import org.scalacheck._
 import org.scalacheck.Gen._
 import org.scalacheck.Arbitrary._
+
 import SJValueGenerators.JSchema
 
 case class SampleData(data: Stream[RValue], schema: Option[(Int, JSchema)] = None) {
