@@ -2145,7 +2145,6 @@ object Slice {
     val maxColumnsC = maxColumns.getOrElse(Config.maxSliceColumns)
     // println(s"maxRows: $maxRowsC, maxCols: $maxColumnsC")
 
-    // FIXME not tailrec
     def rec(next: ArraySliced[RValue], values: fs2.Stream[F, RValue])
         : fs2.Pull[F, Slice, Unit] =
       if (next.size == 0) {
