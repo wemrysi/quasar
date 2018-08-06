@@ -2145,7 +2145,9 @@ object Slice {
     val maxColumnsC = maxColumns.getOrElse(Config.maxSliceColumns)
     // println(s"maxRows: $maxRowsC, maxCols: $maxColumnsC")
 
-    def rec(next: ArraySliced[RValue], values: fs2.Stream[F, RValue]): fs2.Pull[F, Slice, Unit] =
+    // FIXME not tailrec
+    def rec(next: ArraySliced[RValue], values: fs2.Stream[F, RValue])
+        : fs2.Pull[F, Slice, Unit] =
       if (next.size == 0) {
         values.pull.unconsChunk flatMap {
           case Some((chunk, next)) =>
@@ -2157,7 +2159,9 @@ object Slice {
         }
       } else {
         // println(s"extracting slice from data with size ${next.size}")
-        val (nextSlice, remainingData) = Slice.fromRValuesStep(next, maxRowsC, maxColumnsC, Config.defaultMinRows)
+        val (nextSlice, remainingData) =
+          Slice.fromRValuesStep(next, maxRowsC, maxColumnsC, Config.defaultMinRows)
+
         fs2.Pull.output1(nextSlice) >> rec(remainingData, values)
       }
 
@@ -2168,13 +2172,13 @@ object Slice {
   def fromJValues(values: Stream[JValue]): Slice =
     fromRValues(values.map(RValue.fromJValueRaw))
 
-  // don't use this anymore. It doesn't limit the slice size properly,
-  // unlike allFromRValues and fromRValuesStep.
+  // This doesn't limit slice size properly.
   @deprecated("use allFromRValues", "52.0.2")
   def fromRValues(values: Stream[RValue]): Slice = {
     val sliceSize = values.size
 
-    @tailrec def buildColArrays(from: Stream[RValue], into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int): (Map[ColumnRef, ArrayColumn[_]], Int) = {
+    @tailrec def buildColArrays(from: Stream[RValue], into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int)
+        : (Map[ColumnRef, ArrayColumn[_]], Int) =
       from match {
         case jv #:: xs =>
           val refs = updateRefs(jv.flattenWithPath, into, sliceIndex, sliceSize)
@@ -2182,7 +2186,6 @@ object Slice {
         case _ =>
           (into, sliceIndex)
       }
-    }
 
     new Slice {
       val (columns, size) = buildColArrays(values, Map.empty[ColumnRef, ArrayColumn[_]], 0)
