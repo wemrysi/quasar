@@ -29,7 +29,7 @@ import matryoshka.{project => _, _}
 import matryoshka.patterns.EnvT
 import matryoshka.implicits._
 import scalaz._, Scalaz._
-import spire.algebra.Field
+import spire.algebra.{AdditiveSemigroup, Field}
 import spire.math.ConvertableTo
 
 object compression {
@@ -38,21 +38,25 @@ object compression {
   /** Compress a map having greater than `maxSize` keys by moving the largest
     * group of keys having the same `PrimaryTag` to the unknown key field
     * and their values to the unknown value field.
+    *
+    * @param maxSize threshold at which a map is considered for key compression
+    * @param retainMostFrequent the number of keys, in desc order of
+    *                           frequency, to retain from a compression set
     */
   def coalesceKeys[J: Order, A: Order: Field: ConvertableTo](
-    maxSize: Natural
-  )(implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
+      maxSize: Natural,
+      retainMostFrequent: Natural)(
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
     case EnvT((ts, TypeST(TypeF.Map(kn, unk)))) if kn.size > maxSize.value =>
-      val grouped =
-        kn.foldlWithKey(IMap.empty[PrimaryTag, J ==>> Unit])((m, j, _) =>
-          m.alter(
-            primaryTagOf(j),
-            _ map (_ insert (j, ())) orElse some(IMap.singleton(j, ()))))
+      val pruned =
+        groupByPrimaryTag(kn)
+          .maximumBy(_.size)
+          .map(withoutTopValues(_, retainMostFrequent.value.toInt))
 
-      val compressed = grouped.maximumBy(_.size) map { m =>
+      val compressed = pruned map { m =>
         val toCompress = kn intersection m
         (kn \\ toCompress, compressMap(toCompress) |+| unk)
       }
@@ -68,10 +72,10 @@ object compression {
     * also appears in the union.
     */
   def coalescePrimary[J: Order, A: Order: Field: ConvertableTo](
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
     case EnvT((ts, TypeST(TypeF.Unioned(xs)))) if willCoalesce(xs) =>
       val grouped = xs.list groupBy { sst =>
         isConst(sst).fold(none, sst.project.primaryTag)
@@ -92,13 +96,16 @@ object compression {
   /** Compress maps having unknown keys by coalescing known keys with unknown
     * when the unknown contains any values having the same `PrimaryTag` as the
     * known key.
+    *
+    * @param retainMostFrequent the number of keys to retain from a compression set
     */
   def coalesceWithUnknown[J: Order, A: Order: Field: ConvertableTo](
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
-    case EnvT((ts, TypeST(TypeF.Map(xs, Some((k, v)))))) =>
+      retainMostFrequent: Natural)(
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
+    case EnvT((ts, TypeST(TypeF.Map(kn, Some((k, v)))))) =>
       val unkPrimaries = k.project.lower match {
         case TypeST(TypeF.Unioned(ts)) =>
           ISet.fromFoldable[NelOpt, PrimaryTag](ts map (_.project.primaryTag))
@@ -107,8 +114,16 @@ object compression {
           ISet.fromFoldable(tpe.primaryTag)
       }
 
-      val (toCompress, unchanged) = xs partitionWithKey { (j, _) =>
-        unkPrimaries member primaryTagOf(j)
+      val pruned =
+        groupByPrimaryTag(kn).foldlWithKey(IMap.empty[J, A]) { (r, t, m) =>
+          if (unkPrimaries member t)
+            r union withoutTopValues(m, retainMostFrequent.value.toInt)
+          else
+            r
+        }
+
+      val (toCompress, unchanged) = kn partitionWithKey { (j, _) =>
+        pruned member j
       }
 
       compressMap(toCompress) map { compressed =>
@@ -120,10 +135,10 @@ object compression {
 
   /** Replace statically known arrays longer than the given limit with a lub array. */
   def limitArrays[J: Order, A: Order](maxLength: Natural)(
-    implicit
-    A : Field[A],
-    JR: Recursive.Aux[J, EJson]
-  ): ElgotCoalgebra[SST[J, A] \/ ?, SSTF[J, A, ?], SST[J, A]] =
+      implicit
+      A : Field[A],
+      JR: Recursive.Aux[J, EJson])
+      : ElgotCoalgebra[SST[J, A] \/ ?, SSTF[J, A, ?], SST[J, A]] =
     sst => sst.project match {
       case EnvT((_, TagST(Tagged(strings.StructuralString, _)))) =>
         sst.left
@@ -140,10 +155,10 @@ object compression {
 
   /** Replace literal string types longer than the given limit with `char[]`. */
   def limitStrings[J, A: ConvertableTo: Field: Order](maxLength: Natural)(
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] =
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] =
     _.some collect {
       case EnvT((ts, TypeST(TypeF.Const(Embed(C(Str(s))))))) if s.length > maxLength.value =>
         strings.compress[SST[J, A], J, A](ts, s)
@@ -153,11 +168,11 @@ object compression {
     * values sharing a primary type to their shared type.
     */
   def narrowUnion[J: Order, A: Order: Field: ConvertableTo](
-    maxSize: Positive
-  )(implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
+      maxSize: Positive)(
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
     case EnvT((ts, TypeST(TypeF.Unioned(xs)))) if xs.length > maxSize.value =>
       val grouped = xs.list groupBy (_.project.primaryTag)
 
@@ -178,10 +193,10 @@ object compression {
 
   /** Returns the SST of the primary tag of the given EJson value. */
   def primarySst[J: Order, A: ConvertableTo: Field: Order](cnt: A, j: J)(
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SST[J, A] = j match {
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SST[J, A] = j match {
     case Embed(C(Str(s))) =>
       strings.widen[J, A](cnt, s).embed
 
@@ -195,11 +210,11 @@ object compression {
     * the argument itself.
     */
   def widenConst[J: Order, A: ConvertableTo: Field: Order](
-    sst: SST[J, A]
-  )(implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SST[J, A] = {
+      sst: SST[J, A])(
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SST[J, A] = {
     def psst(ts: TypeStat[A], j: J): SST[J, A] =
       StructuralType.measure[J, TypeStat[A]].set(ts)(primarySst(ts.size, j))
 
@@ -216,10 +231,10 @@ object compression {
 
   /** Replace encoded binary strings with `byte[]`. */
   def z85EncodedBinary[J, A](
-    implicit
-    A : Field[A],
-    JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] =
+      implicit
+      A : Field[A],
+      JR: Recursive.Aux[J, EJson])
+      : SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] =
     _.some collect {
       case EnvT((ts, TypeST(TypeF.Const(Embed(EncodedBinarySize(n)))))) =>
         val (cnt, len) = (ts.size, some(A.fromBigInt(n)))
@@ -240,20 +255,31 @@ object compression {
     ).embed.right)
 
   private def compressMap[J: Order, A: Order: Field: ConvertableTo](
-    m: J ==>> SST[J, A]
-  )(implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): Option[(SST[J, A], SST[J, A])] =
+      m: J ==>> SST[J, A])(
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : Option[(SST[J, A], SST[J, A])] =
     m.foldlWithKey(none[(SST[J, A], SST[J, A])]) { (r, j, sst) =>
       r |+| some((SST.fromEJson(SST.size(sst), j), sst))
     }
 
+  private def groupByPrimaryTag[J: Order, A: AdditiveSemigroup](
+      kn: IMap[J, SST[J, A]])(
+      implicit
+      JR: Recursive.Aux[J, EJson])
+      : IMap[PrimaryTag, J ==>> A] =
+    kn.foldlWithKey(IMap.empty[PrimaryTag, J ==>> A]) { (m, j, s) =>
+      m.alter(
+        primaryTagOf(j),
+        _ map (_ insert (j, SST.size(s))) orElse some(IMap.singleton(j, SST.size(s))))
+    }
+
   private def willCoalesce[F[_]: Foldable, J, A](
-    fa: F[SST[J, A]]
-  )(implicit
-    J: Recursive.Aux[J, EJson]
-  ): Boolean = {
+      fa: F[SST[J, A]])(
+      implicit
+      J: Recursive.Aux[J, EJson])
+      : Boolean = {
     val (consts, nonConsts) =
       fa.foldMap(sst =>
         isConst(sst).fold(
@@ -262,4 +288,7 @@ object compression {
 
     !consts.intersection(nonConsts).isEmpty || nonConsts.any(_ > 1)
   }
+
+  private def withoutTopValues[K: Order, V: Order](m: IMap[K, V], k: Int): IMap[K, V] =
+    if (k > 0) IMap.fromList(m.toList.sortWith((x, y) => y._2 < x._2).drop(k)) else m
 }

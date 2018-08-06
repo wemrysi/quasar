@@ -35,7 +35,6 @@ import fs2.Stream
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._
-import spire.std.double._
 import spire.math.Real
 
 final class ExtractSstSpec extends quasar.Qspec {
@@ -48,7 +47,7 @@ final class ExtractSstSpec extends quasar.Qspec {
     Show.showFromToString
 
   val J = Fixed[J]
-  val config = SstConfig[J, Real](1000L, 1000L, 1000L, 1000L)
+  val config = SstConfig[J, Real](1000L, 1000L, 1000L, 1000L, 1000L)
 
   def verify(cfg: SstConfig[J, Real], input: List[Data], expected: S) =
     Stream.emits(input)
@@ -157,9 +156,6 @@ final class ExtractSstSpec extends quasar.Qspec {
       _obj(ListMap("quux" -> _int(1)))
     )
 
-    val fooSS =
-      SampleStats.fromFoldable("foo".map(_.toDouble).toList)
-
     val expected = envT(
       TypeStat.coll(Real(4), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap.empty[J, S], Some((
@@ -189,7 +185,51 @@ final class ExtractSstSpec extends quasar.Qspec {
         ).embed
       ))))).embed
 
-    verify(config.copy(mapMaxSize = 3L, unionMaxSize = 1L), input, expected)
+    verify(config.copy(mapMaxSize = 3L, retainKeysSize = 0L, unionMaxSize = 1L), input, expected)
+  }
+
+  "coalesce map keys until <= max size, retaining top 2" >> {
+    val input = List(
+      _obj(ListMap("a" -> _int(1), "b" -> _int(1), "foo" -> _int(1))),
+      _obj(ListMap("a" -> _int(1), "b" -> _int(1), "bar" -> _int(1))),
+      _obj(ListMap("a" -> _int(1), "b" -> _int(1), "baz" -> _int(1))),
+      _obj(ListMap("a" -> _int(1), "b" -> _int(1), "quux" -> _int(1)))
+    )
+
+    val fourOnes =
+      envT(
+        TypeStat.int(SampleStats.freq(Real(4), Real(1)), BigInt(1), BigInt(1)),
+        TypeST(TypeF.const[J, S](J.int(1)))).embed
+
+    val expected = envT(
+      TypeStat.coll(Real(4), Real(3).some, Real(3).some),
+      TypeST(TypeF.map[J, S](
+        IMap(
+          J.str("a") -> fourOnes,
+          J.str("b") -> fourOnes),
+        Some((envT(
+          TypeStat.coll(Real(4), Real(3).some, Real(4).some),
+          TagST[J](Tagged(
+            strings.StructuralString,
+            envT(
+              TypeStat.coll(Real(4), Real(3).some, Real(4).some),
+              TypeST(TypeF.arr[J, S](IList(
+                envT(
+                  TypeStat.char(strSS("fbbq"), 'b', 'q'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(strSS("oaau"), 'a', 'u'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(strSS("orzu"), 'o', 'z'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(strSS("x"), 'x', 'x'),
+                  TypeST(TypeF.const[J, S](J.char('x')))).embed
+              ).left))).embed))).embed,
+          fourOnes))))).embed
+
+    verify(config.copy(mapMaxSize = 3L, retainKeysSize = 2L, unionMaxSize = 1L), input, expected)
   }
 
   "coalesce new map keys when primary type in unknown key" >> {
@@ -229,7 +269,7 @@ final class ExtractSstSpec extends quasar.Qspec {
         ).embed
       ))))).embed
 
-    verify(config.copy(mapMaxSize = 2L, unionMaxSize = 1L), input, expected)
+    verify(config.copy(mapMaxSize = 2L, retainKeysSize = 0L, unionMaxSize = 1L), input, expected)
   }
 
   "narrow unions until <= max size" >> {
