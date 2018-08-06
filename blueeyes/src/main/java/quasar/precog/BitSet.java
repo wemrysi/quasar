@@ -230,26 +230,22 @@ public class BitSet {
         long[] _bits = new long[_length * mod];
 
         int preI = 0;
-        int postI = 0;
+        int fullI = 0;
 
         long preC = 1L;
         long postC = 1L << offset;
 
+
         // iterate over our words
         while (preI < _length) {
             // in the current word, check if each bit is set
-            if ((bits[preI] & preC) == preC) {
+            if ((bits[preI] & preC) != 0) {
                 // if the bit is set, flip the current sparsened image
-                _bits[postI] ^= postC;
+                _bits[(fullI * mod + offset) >> 6] |= postC;
             }
 
             // move the post-image forward
             postC = Long.rotateLeft(postC, mod);
-            if (postC >= 0L && postC < (1L << mod)) {
-                // if we've wrapped around, increment the post-index
-                // note postC may not equal 1L << offset here, since mod might not divide 64
-                postI++;
-            }
 
             // move the pre-image forward
             preC = Long.rotateLeft(preC, 1);
@@ -257,7 +253,10 @@ public class BitSet {
                 // we've wrapped around, increment the pre-index
                 preI++;
             }
+
+            fullI++;
         }
+
 
         // it's just as easy to return a new one as mutate the old
         return new BitSet(_bits, _bits.length);
