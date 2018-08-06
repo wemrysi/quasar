@@ -21,12 +21,11 @@ import slamdata.Predef.{Stream => _, _}
 import quasar.common.data.Data
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.MonadTell_
 import quasar.impl.evaluate.{Source => EvalSource}
 import quasar.mimir._, MimirCake._
 import quasar.precog.common.RValue
 import quasar.qscript._, PlannerError.InternalError
-import quasar.yggdrasil.TransSpecModule
+import quasar.yggdrasil.{MonadFinalizers, TransSpecModule}
 
 import cats.effect.{IO, LiftIO}
 import fs2.Stream
@@ -36,7 +35,7 @@ import scalaz._, Scalaz._
 
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
-    F[_]: LiftIO: Monad: MonadPlannerErr: MonadTell_[?[_], List[IO[Unit]]]](
+    F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]](
     val P: Cake) {
 
   type Assocs = Associates[T, IO]

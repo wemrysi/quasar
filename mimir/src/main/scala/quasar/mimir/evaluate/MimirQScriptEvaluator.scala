@@ -23,7 +23,6 @@ import quasar.connector.QScriptEvaluator
 import quasar.contrib.cats.effect.liftio._
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.MonadTell_
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.mimir
@@ -31,6 +30,7 @@ import quasar.mimir.{MimirQScriptCP, MimirRepr}
 import quasar.mimir.MimirCake._
 import quasar.qscript._
 import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
+import quasar.yggdrasil.MonadFinalizers
 
 import scala.Predef.implicitly
 
@@ -44,7 +44,7 @@ import shims._
 
 final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: LiftIO: Monad: MonadPlannerErr: MonadTell_[?[_], List[IO[Unit]]]] private (
+    F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]] private (
     cake: Cake)
     extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] {
 
@@ -126,7 +126,7 @@ final class MimirQScriptEvaluator[
 object MimirQScriptEvaluator {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: LiftIO: Monad: MonadPlannerErr: MonadTell_[?[_], List[IO[Unit]]]](
+      F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]](
       cake: Cake)
       : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] =
     new MimirQScriptEvaluator[T, F](cake)

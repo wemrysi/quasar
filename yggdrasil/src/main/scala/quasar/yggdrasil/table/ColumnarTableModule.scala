@@ -19,7 +19,6 @@ package table
 
 import quasar.blueeyes._
 import quasar.contrib.fs2.convert
-import quasar.contrib.scalaz.MonadTell_
 import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util.RawBitSet
@@ -516,13 +515,13 @@ trait ColumnarTableModule
       }
     }
 
-    def fromRValueStream[M[_]: Monad: MonadTell_[?[_], List[IO[Unit]]]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table] = {
+    def fromRValueStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table] = {
       val sliceStream = Slice.allFromRValues(values)
 
       for {
         d <- LiftIO[M].liftIO(convert.toStreamT(sliceStream))
 
-        _ <- MonadTell_[M, List[IO[Unit]]].tell(List(d.dispose))
+        _ <- MonadFinalizers[M, IO].tell(List(d.dispose))
 
         slices = d.unsafeValue
       } yield Table(slices, UnknownSize)
