@@ -1,8 +1,8 @@
 {
     "name": "field and flattened array index on very heterogenous arrays",
     "backends": {
-        "lwc_local": "pendingIgnoreFieldOrder",
-        "mimir":     "pendingIgnoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir":     "ignoreFieldOrder"
     },
     "data": "very_heterogeneous_array.data",
     "query": "select a, b[*:] as i from `very_heterogeneous_array.data`",
