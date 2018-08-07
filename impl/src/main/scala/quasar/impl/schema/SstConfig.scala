@@ -26,12 +26,14 @@ import eu.timepit.refined.auto._
   *
   * @param arrayMaxLength  arrays larger than this will be compressed
   * @param mapMaxSize      maps larger than this will be compressed
+  * @param retainKeysSize  the number of map keys to retain, per type, during compression
   * @param stringMaxLength all strings longer than this are compressed to char[]
   * @param unionMaxSize    unions larger than this will be compressed
   */
 final case class SstConfig[J, A](
     arrayMaxLength:  Natural,
     mapMaxSize:      Natural,
+    retainKeysSize:  Natural,
     stringMaxLength: Natural,
     unionMaxSize:    Positive)
     extends SchemaConfig {
@@ -42,6 +44,7 @@ final case class SstConfig[J, A](
 object SstConfig {
   val DefaultArrayMaxLength:  Natural  = 10L
   val DefaultMapMaxSize:      Natural  = 32L
+  val DefaultRetainKeysSize:  Natural  =  0L
   val DefaultStringMaxLength: Natural  =  0L
   val DefaultUnionMaxSize:    Positive =  1L
 
@@ -49,6 +52,7 @@ object SstConfig {
     SstConfig[J, A](
       arrayMaxLength  = DefaultArrayMaxLength,
       mapMaxSize      = DefaultMapMaxSize,
+      retainKeysSize  = DefaultRetainKeysSize,
       stringMaxLength = DefaultStringMaxLength,
       unionMaxSize    = DefaultUnionMaxSize)
 }
