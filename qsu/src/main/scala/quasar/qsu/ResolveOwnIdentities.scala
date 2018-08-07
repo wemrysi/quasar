@@ -19,7 +19,6 @@ package quasar.qsu
 import slamdata.Predef.{Boolean, Option, Symbol}
 
 import quasar.contrib.matryoshka._
-import quasar.ejson.EJson
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.qscript.{construction, Hole, IdOnly, IdStatus, IncludeId}
@@ -37,14 +36,14 @@ final class ResolveOwnIdentities[T[_[_]]: BirecursiveT: EqualT] private () exten
   val func = construction.Func[T]
 
   object ShiftId {
-    def unapply(qa: QAccess[Hole]): Option[Symbol] =
-      Access.identityHole[T[EJson]]
+    def unapply(qa: Access[Hole]): Option[Symbol] =
+      Access.id[Hole]
         .composeLens(_1)
-        .composePrism(IdAccess.identity[T[EJson]])
+        .composePrism(IdAccess.identity)
         .getOption(qa)
   }
 
-  def accessesShiftIdOf(node: Symbol): ShiftTarget[T] => Boolean = {
+  def accessesShiftIdOf(node: Symbol): ShiftTarget => Boolean = {
     case ShiftTarget.AccessLeftTarget(ShiftId(sym)) => sym === node
     case _ => false
   }
@@ -56,15 +55,15 @@ final class ResolveOwnIdentities[T[_[_]]: BirecursiveT: EqualT] private () exten
         val newRepair = repair flatMap {
           case ShiftTarget.AccessLeftTarget(ShiftId(sym)) if sym === qg.root =>
             if (idStatus === IdOnly)
-              RightTarget[T]
+              RightTarget
             else
-              func.ProjectIndexI(RightTarget[T], 0)
+              func.ProjectIndexI(RightTarget, 0)
 
-          case ShiftTarget.RightTarget() =>
+          case ShiftTarget.RightTarget =>
             if (idStatus === IdOnly)
-              RightTarget[T]
+              RightTarget
             else
-              func.ProjectIndexI(RightTarget[T], 1)
+              func.ProjectIndexI(RightTarget, 1)
 
           case other => func.Hole as other
         }

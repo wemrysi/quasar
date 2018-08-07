@@ -37,8 +37,6 @@ trait Prov[D, I, P] {
   implicit def PC: Corecursive.Aux[P, PF]
   implicit def PR: Recursive.Aux[P, PF]
 
-  def dataId: D => I
-
   import ProvF._
   private val O = ProvF.Optics[D, I]
 
@@ -99,8 +97,8 @@ trait Prov[D, I, P] {
       case (_, Nada())          => mempty[JoinKeys, I]
       case (Proj(_), Proj(_))   => mempty[JoinKeys, I]
       case (Value(l), Value(r)) => JoinKeys.singleton(l, r)
-      case (Value(l), Proj(r))  => JoinKeys.singleton(l, dataId(r))
-      case (Proj(l), Value(r))  => JoinKeys.singleton(dataId(l), r)
+      case (Value(_), Proj(_))  => mempty[JoinKeys, I]
+      case (Proj(_), Value(_))  => mempty[JoinKeys, I]
       case (Then(_, _), _)      => joinThens(left, right)
       case (_, Then(_, _))      => joinThens(left, right)
       case (Both(_, _), _)      => joinBoths(left, right)
@@ -204,15 +202,13 @@ trait Prov[D, I, P] {
 }
 
 object Prov {
-  def apply[D, I, P]
-      (dataId0: D => I)
-      (implicit
-        TC: Corecursive.Aux[P, ProvF[D, I, ?]],
-        TR: Recursive.Aux[P, ProvF[D, I, ?]])
+  def apply[D, I, P](
+      implicit
+      TC: Corecursive.Aux[P, ProvF[D, I, ?]],
+      TR: Recursive.Aux[P, ProvF[D, I, ?]])
       : Prov[D, I, P] =
     new Prov[D, I, P] {
       val PC = TC
       val PR = TR
-      val dataId = dataId0
     }
 }

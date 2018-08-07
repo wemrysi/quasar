@@ -51,8 +51,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
   val hole: Hole = SrcHole
 
-  def index(i: Int): FreeMapA[QAccess[Hole] \/ Int] =
-    i.right[QAccess[Hole]].pure[FreeMapA]
+  def index(i: Int): FreeMapA[Access[Hole] \/ Int] =
+    i.right[Access[Hole]].pure[FreeMapA]
 
   "convert singly nested LeftShift/ThetaJoin" in {
     val dataset = qsu.leftShift(
@@ -118,23 +118,23 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         )
         innerRepair must beTreeEqual(
           func.StaticMapS(
-            "original" -> AccessLeftTarget[Fix](Access.valueHole(_)),
+            "original" -> AccessLeftTarget[Fix](Access.value(_)),
             "0" -> RightTarget[Fix])
         )
         outerRepair must beTreeEqual(
           func.Cond(
             func.Or(
               func.Eq(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh0), _)),
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _))),
+                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh0), _)),
+                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _))),
               func.IfUndefined(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _)),
+                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _)),
                 func.Constant(json.bool(true)))),
             func.StaticMapS(
                 "original" ->
-                  func.ProjectKeyS(AccessLeftTarget[Fix](Access.valueHole(_)), "original"),
+                  func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "original"),
                 "0" ->
-                  func.ProjectKeyS(AccessLeftTarget[Fix](Access.valueHole(_)), "0"),
+                  func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "0"),
                 "1" -> RightTarget[Fix]),
             func.Undefined
           )
@@ -273,41 +273,41 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         )
         innermostRepair must beTreeEqual(
           func.StaticMapS(
-            "original" -> AccessLeftTarget[Fix](Access.valueHole(_)),
+            "original" -> AccessLeftTarget[Fix](Access.value(_)),
             "0" -> RightTarget[Fix])
         )
         innerRepair must beTreeEqual(
           func.Cond(
             func.Or(
               func.Eq(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh0), _)),
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _))),
+                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh0), _)),
+                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _))),
               func.IfUndefined(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _)),
+                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _)),
                 func.Constant(json.bool(true)))),
             func.StaticMapS(
               "original" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.valueHole(_)), "original"),
+                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "original"),
               "0" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.valueHole(_)), "0"),
+                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "0"),
               "1" -> RightTarget[Fix]),
             func.Undefined))
         outerRepair must beTreeEqual(
           func.Cond(
             func.Or(
               func.Eq(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _)),
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh2), _))),
+                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _)),
+                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh2), _))),
               func.IfUndefined(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh2), _)),
+                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh2), _)),
                 func.Constant(json.bool(true)))),
             func.StaticMapS(
               "original" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.valueHole(_)), "original"),
+                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "original"),
               "0" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.valueHole(_)), "0"),
+                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "0"),
               "1" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.valueHole(_)), "1"),
+                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "1"),
               "2" -> RightTarget[Fix]),
             func.Undefined
         ))

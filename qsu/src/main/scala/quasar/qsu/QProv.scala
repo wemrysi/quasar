@@ -29,18 +29,17 @@ import matryoshka.data._
 import scalaz.{Lens => _, _}, Scalaz._, Tags.MaxVal
 
 final class QProv[T[_[_]]: BirecursiveT: EqualT]
-    extends Dimension[T[EJson], IdAccess[T[EJson]], QProv.P[T]]
+    extends Dimension[T[EJson], IdAccess, QProv.P[T]]
     with QSUTTypes[T] {
 
   import QProv.BucketsState
 
   type D     = T[EJson]
-  type I     = IdAccess[D]
+  type I     = IdAccess
   type PF[A] = QProv.PF[T, A]
   type P     = QProv.P[T]
 
-  val prov: Prov[D, I, P] =
-    Prov[D, I, P](IdAccess.static(_))
+  val prov: Prov[D, I, P] = Prov[D, I, P]
 
   type BucketsM[F[_]] = MonadState_[F, BucketsState[I]]
   def BucketsM[F[_]](implicit ev: BucketsM[F]): BucketsM[F] = ev
@@ -63,7 +62,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
           )) as s.nextIdx
         }
 
-        b = IdAccess.bucket[D](src, idx)
+        b = IdAccess.bucket(src, idx)
       } yield prov.value(b)
 
     case other =>
@@ -104,13 +103,13 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     def rename0(sym: Symbol): Symbol =
       (sym === from) ? to | sym
 
-    modifyIdentities(dims)(IdAccess.symbols[D].modify(rename0))
+    modifyIdentities(dims)(IdAccess.symbols.modify(rename0))
   }
 
   ////
 
   private val pfo = ProvF.Optics[D, I]
-  private val groupKey = prov.value composePrism IdAccess.groupKey[D]
+  private val groupKey = prov.value composePrism IdAccess.groupKey
 
   private def bucketedDims(src: Symbol, dims: Dimensions[P]): (I ==>> SInt, Dimensions[P]) =
     dims.reverse
@@ -121,7 +120,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
 }
 
 object QProv {
-  type PF[T[_[_]], A] = ProvF[T[EJson], IdAccess[T[EJson]], A]
+  type PF[T[_[_]], A] = ProvF[T[EJson], IdAccess, A]
   type P[T[_[_]]]     = T[PF[T, ?]]
 
   final case class BucketsState[I](nextIdx: SInt, buckets: I ==>> SInt)

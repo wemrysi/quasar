@@ -59,7 +59,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
   // FIXME: Figure out how to get this to resolve normally.
   implicit val eqP: Equal[qprov.P] =
-    qprov.prov.provenanceEqual(Equal[qprov.D], Equal[QIdAccess])
+    qprov.prov.provenanceEqual(Equal[qprov.D], Equal[IdAccess])
 
   "provenance application" should {
 

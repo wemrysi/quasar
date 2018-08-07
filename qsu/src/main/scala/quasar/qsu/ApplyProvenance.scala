@@ -114,7 +114,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
           })
 
           val nextIdx = dims.nextGroupKeyIndex(g.root, updated)
-          val idAccess = IdAccess.groupKey[dims.D](g.root, nextIdx)
+          val idAccess = IdAccess.groupKey(g.root, nextIdx)
           val nextDims = dims.swap(0, 1, dims.lshift(idAccess, updated))
 
           QAuthS[F].modify(
@@ -132,7 +132,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       case JoinSideRef(_) => unexpectedError
 
       case LeftShift(src, _, _, _, _, rot) =>
-        val tid = IdAccess.identity[dims.D](g.root)
+        val tid = IdAccess.identity(g.root)
         compute1[F](g, src) { sdims =>
           rot match {
             case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, sdims)
@@ -141,7 +141,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         }
 
         case MultiLeftShift(src, shifts, _, _) =>
-          val tid = IdAccess.identity[dims.D](g.root)
+          val tid = IdAccess.identity(g.root)
           compute1[F](g, src) { sdims =>
             IList.fromList(shifts).sortBy(_._3).foldRight(sdims) {
               case (shift, prv) => shift._3 match {
@@ -189,7 +189,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         compute2[F](g, left, right)(dims.join(_, _))
 
       case Transpose(src, _, rot) =>
-        val tid = IdAccess.identity[dims.D](g.root)
+        val tid = IdAccess.identity(g.root)
         compute1[F](g, src) { sdims =>
           rot match {
             case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, sdims)

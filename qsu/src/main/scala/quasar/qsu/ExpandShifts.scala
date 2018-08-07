@@ -83,9 +83,9 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
       val sortedShifts = IList.fromList(shifts).sortBy(_._3).toList
       val shiftedG = sortedShifts match {
         case (struct, idStatus, rotation) :: ss =>
-          val firstRepair: FreeMapA[QScriptUniform.ShiftTarget[T]] =
+          val firstRepair: FreeMapA[QScriptUniform.ShiftTarget] =
             func.StaticMapS(
-              "original" -> AccessLeftTarget[T](Access.valueHole(_)),
+              "original" -> AccessLeftTarget(Access.value(_)),
               "0" -> RightTarget
             )
           val firstShiftPat: QScriptUniform[Symbol] =
@@ -97,7 +97,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
             shiftAndRotation <- ss.zipWithIndex.foldLeftM[G, (QSUGraph, Rotation)]((firstShift :++ mls, rotation)) {
               case ((shiftAbove, rotationAbove), ((newStruct, newIdStatus, newRotation), idx)) =>
                 val keysAbove = ("original" :: (0 to idx).map(_.toString).toList)
-                val staticAbove = func.StaticMapFS(keysAbove: _*)(func.ProjectKeyS(AccessLeftTarget[T](Access.valueHole(_)), _), s => s)
+                val staticAbove = func.StaticMapFS(keysAbove: _*)(func.ProjectKeyS(AccessLeftTarget[T](Access.value(_)), _), s => s)
 
                 val repair = func.ConcatMaps(staticAbove, func.MakeMapS((idx + 1).toString, RightTarget))
                 val struct = newStruct >> func.ProjectKeyS(func.Hole, originalKey)
@@ -111,10 +111,10 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
                     func.Cond(
                       func.Or(
                         func.Eq(
-                          AccessLeftTarget[T](Access.id(IdAccess.identity[T[EJson]](shiftAbove.root), _)),
-                          AccessLeftTarget[T](Access.id(IdAccess.identity[T[EJson]](newShift.root), _))),
+                          AccessLeftTarget[T](Access.id(IdAccess.identity(shiftAbove.root), _)),
+                          AccessLeftTarget[T](Access.id(IdAccess.identity(newShift.root), _))),
                         func.IfUndefined(
-                          AccessLeftTarget[T](Access.id(IdAccess.identity[T[EJson]](newShift.root), _)),
+                          AccessLeftTarget[T](Access.id(IdAccess.identity(newShift.root), _)),
                           func.Constant(json.bool(true)))),
                       repair,
                       func.Undefined)

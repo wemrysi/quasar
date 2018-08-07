@@ -25,7 +25,7 @@ import scalaz.std.anyVal._
 
 object ProvSpec extends Qspec {
 
-  val P = Prov[Char, Int, Fix[ProvF[Char, Int, ?]]](_.toInt)
+  val P = Prov[Char, Int, Fix[ProvF[Char, Int, ?]]]
 
   val p1 = P.proj('x')
   val p1i = 'x'.toInt
@@ -49,8 +49,7 @@ object ProvSpec extends Qspec {
       }
 
       "value θ proj" >> {
-        P.joinKeys(v1, p1) must_=
-          JoinKeys.singleton(v1i, p1i)
+        P.joinKeys(v1, p1) must_= JoinKeys.empty
       }
 
       "value θ value" >> {
