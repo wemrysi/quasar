@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.connector.{HeavyweightDatasourceModule, LightweightDatasourceModule}
 import quasar.contrib.fs2.convert
+import quasar.fp.ski.κ
 import quasar.impl.DatasourceModule
 
 import java.lang.{
@@ -91,19 +92,20 @@ object ExternalDatasources extends Logging {
   private def loadModule[F[_]: Sync](className: String, classLoader: ClassLoader)
       : Stream[F, DatasourceModule] = {
 
+    def handleFailedLoad[A](s: Stream[F, A]): Stream[F, A] =
+      s recoverWith {
+        case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
+          warnStream[F](s"Datasource module '$className' does not appear to be a singleton object", Some(e))
+
+        case e: ExceptionInInitializerError =>
+          warnStream[F](s"Datasource module '$className' failed to load with exception", Some(e))
+
+        case _: ClassCastException =>
+          warnStream[F](s"Datasource module '$className' is not actually a subtype of LightweightDatasourceModule or HeavyweightDatasourceModule", None)
+      }
+
     def loadModule0(clazz: Class[_])(f: Object => DatasourceModule): Stream[F, DatasourceModule] =
-      Sync[Stream[F, ?]]
-        .delay(f(clazz.getDeclaredField("MODULE$").get(null)))
-        .recoverWith {
-          case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
-            warnStream[F](s"Datasource module '$className' does not appear to be a singleton object", Some(e))
-
-          case e: ExceptionInInitializerError =>
-            warnStream[F](s"Datasource module '$className' failed to load with exception", Some(e))
-
-          case _: ClassCastException =>
-            warnStream[F](s"Datasource module '$className' is not actually a subtype of LightweightDatasourceModule or HeavyweightDatasourceModule", None)
-        }
+      Sync[Stream[F, ?]].delay(f(clazz.getDeclaredField("MODULE$").get(null)))
 
     def loadLightweight(clazz: Class[_]): Stream[F, DatasourceModule] =
       loadModule0(clazz) { o =>
@@ -121,7 +123,7 @@ object ExternalDatasources extends Logging {
           warnStream[F](s"Could not locate class for datasource module '$className'", Some(cnf))
       }
 
-      module <- loadLightweight(clazz) ++ loadHeavyweight(clazz)
+      module <- handleFailedLoad(loadLightweight(clazz) handleErrorWith κ(loadHeavyweight(clazz)))
     } yield module
   }
 
