@@ -18,11 +18,13 @@ package quasar.qscript.provenance
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka.birecursiveIso
+import quasar.contrib.scalaz.MonadTell_
 import quasar.fp.ski.{ι, κ}
 
 import matryoshka._
 import matryoshka.implicits._
 import monocle.Prism
+import scalaz.Tags.Disjunction
 import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 
 /**
@@ -45,8 +47,17 @@ trait Prov[D, I, P] {
   def nada: Prism[P, Unit] =
     birecursiveIso[P, PF] composePrism O.nada[P]
 
-  def proj: Prism[P, D] =
-    birecursiveIso[P, PF] composePrism O.proj[P]
+  def fresh: Prism[P, Unit] =
+    birecursiveIso[P, PF] composePrism O.fresh[P]
+
+  def prjPath: Prism[P, D] =
+    birecursiveIso[P, PF] composePrism O.prjPath[P]
+
+  def prjValue: Prism[P, D] =
+    birecursiveIso[P, PF] composePrism O.prjValue[P]
+
+  def injValue: Prism[P, D] =
+    birecursiveIso[P, PF] composePrism O.injValue[P]
 
   def value: Prism[P, I] =
     birecursiveIso[P, PF] composePrism O.value[P]
@@ -62,76 +73,81 @@ trait Prov[D, I, P] {
 
   // Operations
 
+  /** Returns whether the provenance autojoin, collecting join keys using the
+    * specified monad.
+    */
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def joinKeys(left: P, right: P)(implicit D: Equal[D]): JoinKeys[I] = {
+  def autojoined[F[_]: Monad](left: P, right: P)(
+      implicit
+      F: MonadTell_[F, JoinKeys[I]],
+      D: Equal[D])
+      : F[Boolean] = {
+
     // NB: We don't want to consider identities themselves when checking for
     //     joinability, just that both sides are Value(_).
     implicit val ignoreI: Equal[I] = Equal.equalBy(κ(()))
 
-    def joinBoths(l0: P, r0: P): JoinKeys[I] =
-      JoinKeys((for {
-        l <- flattenBoth(l0).join
-        r <- flattenBoth(r0).join
-        if l ≟ r
-        k <- joinKeys(l, r).keys
-      } yield k).foldMap1Opt(ι).toIList)
+    def joinBoths(l0: P, r0: P): F[Boolean] = {
+      val crossed =
+        flattenBoth(l0).join tuple flattenBoth(r0).join
 
-    def joinOneOfs(l0: P, r0: P): JoinKeys[I] =
-      JoinKeys((for {
-        l <- flattenOneOf(l0)
-        r <- flattenOneOf(r0)
-        if l ≟ r
-        k <- joinKeys(l, r).keys
-      } yield k).foldMap1Opt(ι).toIList)
+      val joined =
+        Disjunction.unsubst(crossed foldMapM {
+          case (l, r) => Disjunction.subst(autojoined[Writer[JoinKeys[I], ?]](l, r))
+        })
 
-    def joinThens(l0: P, r0: P): JoinKeys[I] =
-      JoinKeys(for {
-        ls <- flattenThen(l0)
-        rs <- flattenThen(r0)
-        (l, r) <- ls.reverse.fzip(rs.reverse) takeWhile { case (x, y) => x ≟ y }
-        k  <- joinKeys(l, r).keys
-      } yield k)
+      joined.run match {
+        case (jks, b) => F.writer(JoinKeys(jks.keys.foldMap1Opt(ι).toIList), b)
+      }
+    }
+
+    def joinOneOfs(l0: P, r0: P): F[Boolean] = {
+      val crossed =
+        flattenOneOf(l0) tuple flattenOneOf(r0)
+
+      val joined =
+        Disjunction.unsubst(crossed foldMapM {
+          case (l, r) => Disjunction.subst(autojoined[Writer[JoinKeys[I], ?]](l, r))
+        })
+
+      joined.run match {
+        case (jks, b) => F.writer(JoinKeys(jks.keys.foldMap1Opt(ι).toIList), b)
+      }
+    }
+
+    def joinThens(l0: P, r0: P): F[Boolean] = {
+      val crossed =
+        flattenThen(l0) tuple flattenThen(r0)
+
+      Disjunction.unsubst(crossed foldMapM {
+        case (ls, rs) =>
+          Disjunction.subst(ls.reverse.alignBoth(rs.reverse).foldLeftM(true) {
+            case (true, Some((l, r))) => autojoined[F](l, r)
+            case _ => false.point[F]
+          })
+      })
+    }
 
     (left.project, right.project) match {
-      case (Nada(), _)          => mempty[JoinKeys, I]
-      case (_, Nada())          => mempty[JoinKeys, I]
-      case (Proj(_), Proj(_))   => mempty[JoinKeys, I]
-      case (Value(l), Value(r)) => JoinKeys.singleton(l, r)
-      case (Value(_), Proj(_))  => mempty[JoinKeys, I]
-      case (Proj(_), Value(_))  => mempty[JoinKeys, I]
-      case (Then(_, _), _)      => joinThens(left, right)
-      case (_, Then(_, _))      => joinThens(left, right)
-      case (Both(_, _), _)      => joinBoths(left, right)
-      case (_, Both(_, _))      => joinBoths(left, right)
-      case (OneOf(_, _), _)     => joinOneOfs(left, right)
-      case (_, OneOf(_, _))     => joinOneOfs(left, right)
+      case (Value(l), Value(r)) => F.writer(JoinKeys.singleton(l, r), true)
+      case (Both(_, _), _) => joinBoths(left, right)
+      case (_, Both(_, _)) => joinBoths(left, right)
+      case (Then(_, _), _) => joinThens(left, right)
+      case (_, Then(_, _)) => joinThens(left, right)
+      case (OneOf(_, _), _) => joinOneOfs(left, right)
+      case (_, OneOf(_, _)) => joinOneOfs(left, right)
+      case _ => (left ≟ right).point[F]
     }
   }
 
-  // eliminate duplicates within contiguous Both/OneOf and reassociate to the right
-  def normalize(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): P = {
-    def normalize0(alternates: NEL[NEL[P]]): P =
-      alternates
-        .map(_.distinctE1.foldRight1(both(_, _)))
-        .distinctE1
-        .foldRight1(oneOf(_, _))
-
-    val normalizeƒ: Algebra[PF, NEL[NEL[P]]] = {
-      case Both(l, r)  => (l |@| r)(_ append _)
-      case OneOf(l, r) => l append r
-      case Then(l, r)  => NEL(NEL(thenn(normalize0(l), normalize0(r))))
-      case Value(i)    => NEL(NEL(value(i)))
-      case Proj(d)     => NEL(NEL(proj(d)))
-      case Nada()      => NEL(NEL(nada()))
-    }
-
-    normalize0(p.cata(normalizeƒ))
-  }
+  /** Reduce to normal form. */
+  def normalize(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): P =
+    applyProjection(removeDuplicates(p)).cata(collapseNadaƒ)
 
 
   // Instances
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion", "org.wartremover.warts.Equals"))
   implicit def provenanceEqual(implicit eqD: Equal[D], eqI: Equal[I]): Equal[P] = {
     implicit def listSetPEqual: Equal[IList[P] @@ AsSet] =
       asSetEqual[IList, P](Foldable[IList], provenanceEqual(eqD, eqI))
@@ -147,20 +163,84 @@ trait Prov[D, I, P] {
       AsSet(nubNada(flattenOneOf(l))) ≟ AsSet(nubNada(flattenOneOf(r)))
 
     Equal.equal((x, y) => (x.project, y.project) match {
-      case (Nada(), Nada())     => true
+      case (Nada(), Nada()) => true
+      case (a@Fresh(), b@Fresh()) => a eq b
       case (Value(l), Value(r)) => l ≟ r
-      case (Proj(l), Proj(r))   => l ≟ r
-      case (Both(_, _), _)      => bothEq(x, y)
-      case (_, Both(_, _))      => bothEq(x, y)
-      case (OneOf(_, _), _)     => oneOfEq(x, y)
-      case (_, OneOf(_, _))     => oneOfEq(x, y)
-      case (Then(_, _), _)      => thenEq(x, y)
-      case (_, Then(_, _))      => thenEq(x, y)
-      case _                    => false
+      case (PrjPath(l), PrjPath(r)) => l ≟ r
+      case (PrjValue(l), PrjValue(r)) => l ≟ r
+      case (InjValue(l), InjValue(r)) => l ≟ r
+      case (Both(_, _), _) => bothEq(x, y)
+      case (_, Both(_, _)) => bothEq(x, y)
+      case (Then(_, _), _) => thenEq(x, y)
+      case (_, Then(_, _)) => thenEq(x, y)
+      case (OneOf(_, _), _) => oneOfEq(x, y)
+      case (_, OneOf(_, _)) => oneOfEq(x, y)
+      case _ => false
     })
   }
 
   ////
+
+  private def removeDuplicates(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): P = {
+    def removeDuplicates0(alternates: NEL[NEL[P]]): P =
+      alternates
+        .map(_.distinctE1.foldRight1(both(_, _)))
+        .distinctE1
+        .foldRight1(oneOf(_, _))
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    val removeDuplicatesƒ: Algebra[PF, NEL[NEL[P]]] = {
+      case Both(l, r) => (l |@| r)(_ append _)
+      case OneOf(l, r) => l append r
+      case Then(l, r) => NEL(NEL(thenn(removeDuplicates0(l), removeDuplicates0(r))))
+      case Value(i) => NEL(NEL(value(i)))
+      case InjValue(d) => NEL(NEL(injValue(d)))
+      case PrjValue(d) => NEL(NEL(prjValue(d)))
+      case PrjPath(d) => NEL(NEL(prjPath(d)))
+      case p@Fresh() => NEL(NEL(p.asInstanceOf[PF[P]].embed))
+      case Nada() => NEL(NEL(nada()))
+    }
+
+    removeDuplicates0(p.cata(removeDuplicatesƒ))
+  }
+
+  private def applyProjection(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): P = {
+    def applyProjection0(thens: NEL[P]): P =
+      thens match {
+        case NEL(Embed(PrjValue(k)), ICons(Embed(InjValue(j)), ts)) =>
+          (k === j).option(ts)
+            .flatMap(_.foldRight1Opt(thenn(_, _)))
+            .getOrElse(nada())
+
+        case _ => thens.foldRight1(thenn(_, _))
+      }
+
+    // OneOf[Both[Then]]
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    val flattenƒ: Algebra[PF, NEL[NEL[NEL[P]]]] = {
+      case Then(l, r) => (l |@| r)((l1, r1) => (l1 |@| r1)(_ append _))
+      case Both(l, r) => (l |@| r)(_ append _)
+      case OneOf(l, r) => l append r
+      case Value(i) => NEL(NEL(NEL(value(i))))
+      case InjValue(d) => NEL(NEL(NEL(injValue(d))))
+      case PrjValue(d) => NEL(NEL(NEL(prjValue(d))))
+      case PrjPath(d) => NEL(NEL(NEL(prjPath(d))))
+      case p@Fresh() => NEL(NEL(NEL(p.asInstanceOf[PF[P]].embed)))
+      case Nada() => NEL(NEL(NEL(nada())))
+    }
+
+    p.cata(flattenƒ)
+      .map(_.map(applyProjection0).foldRight1(both(_, _)))
+      .foldRight1(oneOf(_, _))
+  }
+
+  private val collapseNadaƒ: Algebra[PF, P] = {
+    case Both(l, Embed(Nada())) => l
+    case Both(Embed(Nada()), r) => r
+    case Then(Embed(Nada()), _) => nada()
+    case Then(_, Embed(Nada())) => nada()
+    case pf => pf.embed
+  }
 
   /** The disjunction of sets arising from distributing `OneOf` over trees
     * of `Both`.
@@ -169,9 +249,9 @@ trait Prov[D, I, P] {
     p.elgotPara[IList[IList[P]]](flattenBothƒ)
 
   private val flattenBothƒ: ElgotAlgebra[(P, ?), PF, IList[IList[P]]] = {
-    case (_, Both(l, r))  => (l |@| r)(_ ++ _)
+    case (_, Both(l, r)) => (l |@| r)(_ ++ _)
     case (_, OneOf(l, r)) => l ++ r
-    case (other, _)       => IList(IList(other))
+    case (other, _) => IList(IList(other))
   }
 
   /** The disjunction described by a tree of `OneOf`. */
@@ -179,10 +259,8 @@ trait Prov[D, I, P] {
     p.elgotPara[IList[P]](flattenOneOfƒ)
 
   private val flattenOneOfƒ: ElgotAlgebra[(P, ?), PF, IList[P]] = {
-    case (_, Both(l, r))  => l ++ r
-    case (_, Then(l, r))  => l ++ r
     case (_, OneOf(l, r)) => l ++ r
-    case (other, _)       => IList(other)
+    case (other, _) => IList(other)
   }
 
   /** The disjunction of sequences arising from distributing `OneOf` over trees
@@ -192,9 +270,9 @@ trait Prov[D, I, P] {
     p.elgotPara[IList[IList[P]]](flattenThenƒ)
 
   private val flattenThenƒ: ElgotAlgebra[(P, ?), PF, IList[IList[P]]] = {
-    case (_, Then(l, r))  => (l |@| r)(_ ++ _)
+    case (_, Then(l, r)) => (l |@| r)(_ ++ _)
     case (_, OneOf(l, r)) => l ++ r
-    case (other, _)       => IList(IList(other))
+    case (other, _) => IList(IList(other))
   }
 
   private def nubNada(ps: IList[P]): IList[P] =

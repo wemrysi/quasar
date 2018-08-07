@@ -28,21 +28,38 @@ trait Dimension[D, I, P] {
   import prov._
 
   /** Returns the `JoinKeys` describing the autojoin of the two dimension stacks. */
-  def autojoinKeys(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D]): JoinKeys[I] =
-    ls.reverse.fzipWith(rs.reverse)(joinKeys).fold
+  def autojoinKeys(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D]): JoinKeys[I] = {
+    val joined =
+      ls.reverse.alignBoth(rs.reverse).foldLeftM(true) { (b, lr) =>
+        if (b)
+          lr anyM { case (l, r) => autojoined[Writer[JoinKeys[I], ?]](l, r) }
+        else
+          false.point[Writer[JoinKeys[I], ?]]
+      }
+
+    joined.written
+  }
 
   /** The empty dimension stack. */
   val empty: Dimensions[P] =
     IList[P]()
 
   def canonicalize(ds: Dimensions[P])(implicit eqD: Equal[D], eqI: Equal[I]): Dimensions[P] =
-    ds.map(normalize)
+    ds.map(normalize).filter(nada.isEmpty)
 
   /** Updates the dimensional stack by sequencing a new dimension from value
     * space with the current head dimension.
     */
   def flatten(id: I, ds: Dimensions[P]): Dimensions[P] =
     nest(lshift(id, ds))
+
+  /** Inject a value into a structure at an unknown field. */
+  def injectDynamic(ds: Dimensions[P]): Dimensions[P] =
+    extend[P](thenn(_, _), fresh())(ds)
+
+  /** Inject a value into a structure at the given field. */
+  def injectStatic(field: D, ds: Dimensions[P]): Dimensions[P] =
+    extend[P](thenn(_, _), injValue(field))(ds)
 
   /** Joins two dimensions into a single dimension stack, starting from the base. */
   def join(ls: Dimensions[P], rs: Dimensions[P])(implicit eqD: Equal[D], eqI: Equal[I]): Dimensions[P] =
@@ -58,9 +75,17 @@ trait Dimension[D, I, P] {
   def nest(ds: Dimensions[P]): Dimensions[P] =
     ds.toNel.fold(ds)(nel => extend[P](thenn(_, _), nel.head)(nel.tail))
 
-  /** Project a static key/index from maps and arrays. */
-  def project(field: D, ds: Dimensions[P]): Dimensions[P] =
-    extend[P](thenn(_, _), proj(field))(ds)
+  /** Project an unknown field from a value-level structure. */
+  def projectDynamic(ds: Dimensions[P]): Dimensions[P] =
+    extend[P](thenn(_, _), fresh())(ds)
+
+  /** Project a static path segment. */
+  def projectPath(segment: D, ds: Dimensions[P]): Dimensions[P] =
+    extend[P](thenn(_, _), prjPath(segment))(ds)
+
+  /** Project a static field from value-level structure. */
+  def projectStatic(field: D, ds: Dimensions[P])(implicit eqD: Equal[D], eqI: Equal[I]): Dimensions[P] =
+    canonicalize(extend[P](thenn(_, _), prjValue(field))(ds))
 
   /** Reduces the dimensional stack by peeling off the current dimension. */
   def reduce(ds: Dimensions[P]): Dimensions[P] =
