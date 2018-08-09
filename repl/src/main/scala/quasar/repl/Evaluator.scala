@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.api._, datasource._, resource._
 import quasar.common.{PhaseResultListen, PhaseResultTell, PhaseResults}
 import quasar.common.data.Data
+import quasar.contrib.fs2.convert.fromStreamT
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.contrib.std.uuid._
@@ -30,15 +31,18 @@ import quasar.fp.minspace
 import quasar.fp.ski._
 import quasar.frontend.data.DataCodec
 import quasar.impl.schema.{SstConfig, SstSchema}
+import quasar.mimir.MimirRepr
 import quasar.run.{QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
 import quasar.run.ResourceRouter.DatasourceResourcePrefix
 import quasar.run.optics.{stringUuidP => UuidString}
 import quasar.sst._
 
 import java.lang.Exception
+import java.nio.CharBuffer
 import scala.util.control.NonFatal
 
 import argonaut.{Json, JsonParser, JsonScalaz}, JsonScalaz._
+import cats.arrow.FunctionK
 import cats.effect._
 import eu.timepit.refined.refineV
 import eu.timepit.refined.api.Refined
@@ -57,7 +61,7 @@ import spire.std.double._
 final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
     stateRef: Ref[F, ReplState],
     sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-    queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]]) {
+    queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]]) {
 
   import Command._
   import DatasourceError._
@@ -227,8 +231,13 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         stateRef.get.map(s => printPath(s.cwd).some)
 
       case Select(q) =>
-        def convert(format: OutputFormat, s: Stream[F, Data]): F[Option[String]] =
-          s.compile.toList.map(ds => renderData(format, ds).some)
+        def convert(format: OutputFormat, s: Stream[F, MimirRepr]): F[Option[String]] = {
+          val rs: Stream[F, String] = s.flatMap { repr =>
+            val rendered = render(format, repr)
+            fromStreamT(rendered).map(_.toString).translate(λ[FunctionK[IO, F]](_.to[F]))
+          }
+          rs.compile.toList.map(_.mkString("\n").some)
+        }
 
         for {
           state <- stateRef.get
@@ -273,7 +282,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         F.unit)
 
     private def evaluateQuery(q: SqlQuery, summaryCount: Option[Int Refined Positive])
-        : F[Stream[F, Data]] =
+        : F[Stream[F, MimirRepr]] =
       queryEvaluator.evaluate(q) map { s =>
         summaryCount.map(c => s.take(c.value.toLong)).getOrElse(s)
       }
@@ -356,17 +365,17 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
             t.getStackTrace.mkString("\n  ", "\n  ", "")).some
       }
 
-    private def renderData(format: OutputFormat, ds: List[Data]): String =
-      (format match {
+    private def render(format: OutputFormat, repr: MimirRepr): StreamT[IO, CharBuffer] =
+      format match {
         case OutputFormat.Table =>
-          Prettify.renderTable(ds)
+          ???
         case OutputFormat.Precise =>
-          ds.map(formatJson(DataCodec.Precise)).unite
+          repr.table.renderJson(precise = true)
         case OutputFormat.Readable =>
-          ds.map(formatJson(DataCodec.Readable)).unite
+          repr.table.renderJson(precise = false)
         case OutputFormat.Csv =>
-          Prettify.renderValues(ds).map(CsvWriter(none)(_).trim)
-      }).mkString("\n")
+          repr.table.renderCsv(assumeHomogeneous = true)
+      }
 
     private def supportedTypes: F[ISet[DatasourceType]] =
       stateRef.get.map(_.supportedTypes) >>=
@@ -385,7 +394,7 @@ object Evaluator {
   def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
       stateRef: Ref[F, ReplState],
       sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
+      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])
       : Evaluator[F] =
     new Evaluator[F](stateRef, sources, queryEvaluator)
 

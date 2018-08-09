@@ -22,9 +22,9 @@ import quasar.api.QueryEvaluator
 import quasar.api.datasource.Datasources
 import quasar.build.BuildInfo
 import quasar.common.{PhaseResultListen, PhaseResultTell}
-import quasar.common.data.Data
 import quasar.ejson.EJson
 import quasar.impl.schema.SstConfig
+import quasar.mimir.MimirRepr
 import quasar.run.{MonadQuasarErr, SqlQuery}
 
 import java.io.File
@@ -77,7 +77,7 @@ object Repl {
   def mk[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
       ref: Ref[F, ReplState],
       datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
+      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])
       : F[Repl[F]] = {
     val evaluator = Evaluator[F](ref, datasources, queryEvaluator)
     historyFile[F].map(f => Repl[F](prompt, mkLineReader(f), evaluator.evaluate))

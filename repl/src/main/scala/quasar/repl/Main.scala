@@ -67,9 +67,7 @@ object Main extends StreamApp[PhaseResultCatsT[IO, ?]] {
       : F[ExitCode] =
     for {
       ref <- Ref[F, ReplState](ReplState.mk)
-      repl <- Repl.mk[F](ref,
-        q.datasources,
-        q.queryEvaluator.map(_.flatMap(mimir.tableToData(_).translate(λ[FunctionK[IO, F]](_.to[F])))))
+      repl <- Repl.mk[F](ref, q.datasources, q.queryEvaluator)
       l <- repl.loop
     } yield l
 
