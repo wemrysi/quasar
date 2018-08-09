@@ -139,6 +139,10 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         stateRef.modify(_.copy(format = fmt)) *>
           F.pure(s"Set output format: $fmt".some)
 
+      case Mode(mode) =>
+        stateRef.modify(_.copy(mode = mode)) *>
+          F.pure(s"Set output mode: $mode".some)
+
       case SetPhaseFormat(fmt) =>
         stateRef.modify(_.copy(phaseFormat = fmt)) *>
           F.pure(s"Set phase format: $fmt".some)
@@ -417,6 +421,7 @@ object Evaluator {
       |  (explain | compile) [query]
       |  set debug = 0 | 1 | 2
       |  set format = table | precise | readable | csv
+      |  set mode = console | file
       |  set summaryCount = [rows]
       |  set [var] = [value]
       |  env
