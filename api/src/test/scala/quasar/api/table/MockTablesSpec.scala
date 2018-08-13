@@ -18,6 +18,7 @@ package quasar.api.table
 
 import slamdata.Predef._
 
+import quasar.contrib.cats.stateT._
 import quasar.contrib.scalaz.MonadState_
 import quasar.contrib.std.uuid._
 
@@ -25,23 +26,17 @@ import java.util.UUID
 
 import cats.data.StateT
 import cats.effect.IO
-import scalaz.{~>, Id, IMap, Monad}, Id.Id
+import cats.syntax.applicative._
+import scalaz.{~>, Id, IMap}, Id.Id
 import scalaz.std.string._
 import shims._
 
-import MockTablesSpec.Store
+import MockTablesSpec.MockM
 
-final class MockTablesSpec extends TablesSpec[StateT[IO, Store, ?], UUID, String, String] {
+final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String] {
 
-  // TODO why doesn't this resolve if I put it anywhere but here
-  implicit def monadState[F[_]: Monad, S] =
-    new MonadState_[StateT[F, S, ?], S] {
-      def get = StateT.get
-      def put(s: S) = StateT.set(s)
-    }
-
-  val tables: Tables[StateT[IO, Store, ?], UUID, String, String] =
-    MockTables[StateT[IO, Store, ?]]
+  val tables: Tables[MockM, UUID, String, String] =
+    MockTables[MockM]
 
   val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1")
   val table2: TableRef[String] = TableRef(TableName("table2"), "select * from table2")
@@ -51,13 +46,37 @@ final class MockTablesSpec extends TablesSpec[StateT[IO, Store, ?], UUID, String
 
   val uniqueId: UUID = UUID.randomUUID
 
-  def run: StateT[IO, Store, ?] ~> Id.Id =
-    λ[StateT[IO, Store, ?] ~> Id](
+  def run: MockM ~> Id.Id =
+    λ[MockM ~> Id](
       _.runA(IMap.empty).unsafeRunSync)
 
+  def init(table: MockTables.MockTable): MockM[UUID] =
+    for {
+      tableId <- UUID.randomUUID.pure[MockM]
+      _ <- MockM.modify(_.insert(tableId, table))
+    } yield tableId
+
   def before: Unit = ()
+
+  "preparations" >> {
+    "error on request to prepare an already preparing table" >>* {
+      for {
+        id <- init(MockTables.MockTable(
+          TableRef(TableName("foo"), "bar"),
+          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
+        result <- tables.prepareTable(id)
+      } yield {
+        result must beAbnormal {
+          TableError.PreparationInProgress(id)
+        }
+      }
+    }
+  }
 }
 
 object MockTablesSpec {
   type Store = IMap[UUID, MockTables.MockTable]
+
+  type MockM[A] = StateT[IO, Store, A]
+  val MockM = MonadState_[MockM, Store]
 }

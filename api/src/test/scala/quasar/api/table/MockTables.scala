@@ -88,6 +88,9 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
   // mock tables prepare immediately
   def prepareTable(tableId: UUID): F[Condition[PrePreparationError[UUID]]] =
     store.get.flatMap(stateMap => stateMap.lookup(tableId) match {
+      case Some(MockTable(_, PreparationStatus(_, OngoingStatus.Preparing))) =>
+        Condition.abnormal(
+          PreparationInProgress(tableId): PrePreparationError[UUID]).point[F]
       case Some(state) =>
         store.put {
           stateMap.insert(tableId,
