@@ -66,9 +66,72 @@ final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String] {
           PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
         result <- tables.prepareTable(id)
       } yield {
-        result must beAbnormal {
-          TableError.PreparationInProgress(id)
-        }
+        result must beAbnormal(TableError.PreparationInProgress(id))
+      }
+    }
+
+    "cancel an ongoing preparation" >>* {
+      for {
+        id1 <- init(MockTables.MockTable(
+          TableRef(TableName("foo1"), "bar1"),
+          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
+
+        id2 <- init(MockTables.MockTable(
+          TableRef(TableName("foo2"), "bar2"),
+          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
+
+        cancel1 <- tables.cancelPreparation(id1)
+
+        res1 <- tables.preparationStatus(id1)
+        res2 <- tables.preparationStatus(id2)
+      } yield {
+        cancel1 must beNormal
+
+        res1 must be_\/-(
+          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing))
+
+        res2 must be_\/-(
+          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing))
+      }
+    }
+
+    "error a request to cancel a not ongoing preparation" >>* {
+      for {
+        id1 <- init(MockTables.MockTable(
+          TableRef(TableName("foo1"), "bar1"),
+          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing)))
+
+        cancel <- tables.cancelPreparation(id1)
+        status <- tables.preparationStatus(id1)
+      } yield {
+        cancel must beAbnormal(TableError.PreparationNotInProgress(id1))
+        status must be_\/-(PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing))
+      }
+    }
+
+    "cancel all ongoing preparations" >>* {
+      for {
+        id1 <- init(MockTables.MockTable(
+          TableRef(TableName("foo1"), "bar1"),
+          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing)))
+
+        id2 <- init(MockTables.MockTable(
+          TableRef(TableName("foo2"), "bar2"),
+          PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.Preparing)))
+
+        id3 <- init(MockTables.MockTable(
+          TableRef(TableName("foo3"), "bar3"),
+          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
+
+        _ <- tables.cancelAllPreparations
+
+        status1 <- tables.preparationStatus(id1)
+        status2 <- tables.preparationStatus(id2)
+        status3 <- tables.preparationStatus(id3)
+      } yield {
+        status1 must be_\/-(PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing))
+        status2 must be_\/-(PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.NotPreparing))
+        status3 must be_\/-(PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing))
       }
     }
   }
