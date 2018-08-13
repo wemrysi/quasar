@@ -16,6 +16,8 @@
 
 package quasar
 
+import slamdata.Predef._
+import quasar.api.datasource.DatasourceType
 import quasar.contrib.scalaz.MonadError_
 
 package object connector {
@@ -23,4 +25,8 @@ package object connector {
 
   def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
       : MonadResourceErr[F] = ev
+
+  final case class IncompatibleDatasourceException(kind: DatasourceType) extends java.lang.RuntimeException {
+    override def getMessage = s"Loaded datasource implementation with type $kind is incompatible with quasar"
+  }
 }
