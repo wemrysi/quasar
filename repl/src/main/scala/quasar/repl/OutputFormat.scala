@@ -16,7 +16,7 @@
 
 package quasar.repl
 
-import slamdata.Predef.{Option, Some, String}
+import slamdata.Predef._
 
 sealed abstract class OutputFormat
 object OutputFormat {
@@ -31,5 +31,13 @@ object OutputFormat {
       case "precise"  => Precise
       case "readable" => Readable
       case "csv"      => Csv
+    }
+
+  def headerLines(format: OutputFormat): Int =
+    format match {
+      case Table => 2
+      case Precise => 0
+      case Readable => 0
+      case Csv => 1
     }
 }

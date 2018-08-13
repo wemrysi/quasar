@@ -39,6 +39,7 @@ import quasar.sst._
 
 import java.lang.Exception
 import java.nio.CharBuffer
+import java.nio.file.{Path => JPath}
 import scala.util.control.NonFatal
 
 import argonaut.{Json, JsonParser, JsonScalaz}, JsonScalaz._
@@ -235,21 +236,24 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         stateRef.get.map(s => printPath(s.cwd).some)
 
       case Select(q) =>
-        def convert(format: OutputFormat, s: Stream[F, MimirRepr]): F[Option[String]] = {
-          val rs: Stream[F, String] = s.flatMap { repr =>
-            val rendered = render(format, repr)
-            fromStreamT(rendered).map(_.toString).translate(λ[FunctionK[IO, F]](_.to[F]))
-          }
-          rs.compile.toList.map(_.mkString("\n").some)
-        }
-
         for {
           state <- stateRef.get
           (qres, phaseResults) <- PhaseResultListen[F].listen(
             evaluateQuery(SqlQuery(q, state.variables, toADir(state.cwd)), state.summaryCount))
-          log = printLog(state.debugLevel, state.phaseFormat, phaseResults).map(_ + "\n")
-          res <- convert(state.format, qres)
-        } yield (log |+| res)
+          log = printLog(state.debugLevel, state.phaseFormat, phaseResults).map(_ + "\n").getOrElse("")
+          rendered = renderMimirReprStream(state.format, qres)
+            res <- state.mode match {
+            case OutputMode.Console =>
+              val maxLines = state.summaryCount
+                .map(_.value + OutputFormat.headerLines(state.format))
+              printQueryResults(maxLines, rendered).map(log + _)
+            case OutputMode.File =>
+              for {
+                tmpFile <- Paths.createTempFile("results", ".txt")
+                _ <- writeToPath(tmpFile, Stream(log).covary[F] ++ rendered)
+              } yield s"Results written to ${tmpFile.toFile.getAbsolutePath}"
+          }
+        } yield (res.some)
 
       case Explain(q) =>
         for {
@@ -357,6 +361,30 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         case PhaseFormat.Code => results.map(_.showCode).mkString("\n\n")
       }
 
+    private def printQueryResults(maxLines: Option[Int], stream: Stream[F, String]): F[String] = {
+
+      def cutOffAfterMaxLines(maxLines: Int, start: (Int, String), current: String): (Int, String) =
+        current.foldLeft(start) { case (acc, c) =>
+          val count = acc._1 + (if (c === '\n') 1 else 0)
+          if (count < maxLines)
+            (count, acc._2 + c.toString)
+          else
+            (count, acc._2)
+        }
+
+      maxLines match {
+        case None =>
+          stream.compile.toList.map(_.mkString)
+        case Some(max) =>
+          stream.fold((0, "")) { case (acc, s) =>
+            if (acc._1 < max)
+              cutOffAfterMaxLines(max, acc, s)
+            else
+              acc
+          }.map(_._2).compile.toList.map(_.mkString)
+      }
+    }
+
     private def raiseEvalError[A](s: String): F[A] =
       F.raiseError(new EvalError(s))
 
@@ -369,17 +397,30 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
             t.getStackTrace.mkString("\n  ", "\n  ", "")).some
       }
 
-    private def render(format: OutputFormat, repr: MimirRepr): StreamT[IO, CharBuffer] =
+    private def renderMimirRepr(format: OutputFormat, repr: MimirRepr): Stream[F, String] = {
+      def convert(s: StreamT[IO, CharBuffer]): Stream[F, String] =
+        fromStreamT(s).map(_.toString).translate(λ[FunctionK[IO, F]](_.to[F]))
+
       format match {
         case OutputFormat.Table =>
-          ???
+          val ds: Stream[IO, Data] = mimir.tableToData(repr)
+          //TODO make Prettify.renderTable streaming so that we are not memory bound here
+          val r: IO[List[String]] = ds.compile.toList.map(Prettify.renderTable)
+          Stream.eval(r).flatMap { ss =>
+            Stream.fromIterator[IO, String](ss.iterator)
+          }.intersperse("\n").translate(λ[FunctionK[IO, F]](_.to[F]))
         case OutputFormat.Precise =>
-          repr.table.renderJson(precise = true)
+          convert(repr.table.renderJson(precise = true))
         case OutputFormat.Readable =>
-          repr.table.renderJson(precise = false)
+          convert(repr.table.renderJson(precise = false))
         case OutputFormat.Csv =>
-          repr.table.renderCsv(assumeHomogeneous = true)
+          convert(repr.table.renderCsv(assumeHomogeneous = true))
       }
+    }
+
+    private def renderMimirReprStream(format: OutputFormat, s: Stream[F, MimirRepr])
+        : Stream[F, String] =
+      s.flatMap(renderMimirRepr(format, _))
 
     private def supportedTypes: F[ISet[DatasourceType]] =
       stateRef.get.map(_.supportedTypes) >>=
@@ -388,6 +429,10 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
     private def toADir(path: ResourcePath): ADir =
       path.fold(f => fileParent(f) </> dir(fileName(f).value), rootDir)
 
+    private def writeToPath(path: JPath, s: Stream[F, String]): F[Unit] =
+      s.through(fs2.text.utf8Encode)
+        .through(fs2.io.file.writeAll(path))
+        .compile.drain
 }
 
 object Evaluator {
