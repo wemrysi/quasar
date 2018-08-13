@@ -44,9 +44,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable.Set
 
 trait ColumnarTableTypes {
-  type F1         = CF1
-  type F2         = CF2
-  type FN         = CFN
   type Scanner    = CScanner
   type Mapper     = CMapper
   type Reducer[α] = CReducer[α]
@@ -237,20 +234,6 @@ trait ColumnarTableModule
 
   def newScratchDir(): File = IOUtils.createTmpDir("ctmscratch").unsafePerformIO
   def jdbmCommitInterval: Long = 200000l
-
-  implicit def liftF1(f: F1) = new F1Like {
-    def compose(f1: F1) = f compose f1
-    def andThen(f1: F1) = f andThen f1
-  }
-
-  implicit def liftF2(f: F2) = new F2Like {
-    def applyl(cv: CValue) = CF1{ f(Column.const(cv), _) }
-    def applyr(cv: CValue) = CF1{ f(_, Column.const(cv)) }
-
-    def andThen(f1: F1) = CF2 { (c1, c2) =>
-      f(c1, c2) flatMap f1.apply
-    }
-  }
 
   trait ColumnarTableCompanion extends TableCompanionLike {
     def apply(slices: StreamT[IO, Slice], size: TableSize): Table

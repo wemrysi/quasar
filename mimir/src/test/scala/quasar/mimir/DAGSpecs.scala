@@ -22,7 +22,7 @@ import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil._
 import quasar.pkg.tests._
 
-object DAGSpecs extends Specification with DAG with FNDummyModule {
+object DAGSpecs extends Specification with DAG with FNModule {
   import dag._
 
   type Lib = RandomLibrary

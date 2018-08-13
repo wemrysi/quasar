@@ -23,7 +23,7 @@ import quasar.pkg.tests._
 import quasar.yggdrasil.bytecode.JNumberT
 import quasar.yggdrasil.table.{CF1, CF2, CFN}
 
-trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with SpecificationLike with ScalazSpecs2Instances {
+trait TransSpecModuleSpec extends TransSpecModule with FNModule with SpecificationLike with ScalazSpecs2Instances {
   import trans._
   import CPath._
 

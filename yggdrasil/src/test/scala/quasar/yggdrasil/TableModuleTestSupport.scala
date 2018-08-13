@@ -19,16 +19,17 @@ package quasar.yggdrasil
 import quasar.blueeyes._, json._
 import quasar.pkg.tests._
 import quasar.precog.common.RValue
+import quasar.yggdrasil.table.{CF1, CF2}
 
 import cats.effect.IO
 
 trait TestLib extends TableModule {
-  def lookupF1(namespace: List[String], name: String): F1
-  def lookupF2(namespace: List[String], name: String): F2
+  def lookupF1(namespace: List[String], name: String): CF1
+  def lookupF2(namespace: List[String], name: String): CF2
   def lookupScanner(namespace: List[String], name: String): Scanner
 }
 
-trait TableModuleTestSupport extends TableModule with TestLib {
+trait TableModuleTestSupport extends FNModule with TestLib {
   def fromJson(data: Stream[JValue], maxBlockSize: Option[Int] = None): Table
   def toJson(dataset: Table): IO[Stream[RValue]] = dataset.toJson.map(_.toStream)
 

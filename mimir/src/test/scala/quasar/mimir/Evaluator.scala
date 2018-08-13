@@ -17,10 +17,11 @@
 package quasar.mimir
 
 import quasar.precog.common._
-import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil._
 import quasar.yggdrasil.TableModule._
+import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.execution.EvaluationContext
+import quasar.yggdrasil.table.{CF1, CF2}
 import quasar.yggdrasil.vfs._
 import quasar.precog.util._
 
@@ -36,8 +37,8 @@ import scala.collection.immutable.Queue
 trait EvaluatorModule
     extends OpFinderModule
     with ReductionFinderModule
+    with FNModule
     with TransSpecableModule
-    with TableModule // Remove this explicit dep!
     with TableLibModule {
 
   import dag._
@@ -63,8 +64,8 @@ trait EvaluatorModule
 
     def Forall: Reduction { type Result = Option[Boolean] }
     def Exists: Reduction { type Result = Option[Boolean] }
-    def concatString: F2
-    def coerceToDouble: F1
+    def concatString: CF2
+    def coerceToDouble: CF1
 
     def composeOptimizations(optimize: Boolean, funcs: List[DepGraph => DepGraph]): DepGraph => DepGraph =
       if (optimize) funcs.reverse.map(Endo[DepGraph]).suml.run else identity

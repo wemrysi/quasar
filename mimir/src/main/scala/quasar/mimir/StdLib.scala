@@ -78,7 +78,7 @@ trait TableLibModule extends TableModule with TransSpecModule {
       def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
         trans.Map1(source, f1)
 
-      def f1: F1
+      def f1: CF1
 
       override val rowLevel: Boolean = true
 
@@ -102,7 +102,7 @@ trait TableLibModule extends TableModule with TransSpecModule {
         trans.MapWith(trans.InnerArrayConcat(trans.WrapArray(trans.Map1(left, prepare)), trans.WrapArray(trans.Map1(right, prepare))), mapper)
       }
 
-      def prepare: F1
+      def prepare: CF1
 
       def mapper: Mapper
     }
@@ -111,7 +111,7 @@ trait TableLibModule extends TableModule with TransSpecModule {
       def spec[A <: SourceType](left: TransSpec[A], right: TransSpec[A]): TransSpec[A] =
         trans.Map2(left, right, f2)
 
-      def f2: F2
+      def f2: CF2
 
       override val rowLevel: Boolean = true
 
@@ -125,7 +125,7 @@ trait TableLibModule extends TableModule with TransSpecModule {
       def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
         trans.MapN(source, fn)
 
-      def fn: FN
+      def fn: CFN
     }
 
     abstract class Reduction extends ReductionLike with Morph1Apply {

@@ -73,7 +73,7 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
   def fromJson(values: Stream[JValue], maxSliceRows: Option[Int] = None): Table =
     fromJson0(values, maxSliceRows orElse Some(defaultSliceSize))
 
-  def lookupF1(namespace: List[String], name: String): F1 = {
+  def lookupF1(namespace: List[String], name: String): CF1 = {
     val lib = Map[String, CF1](
       "negate" -> cf.math.Negate,
       "coerceToDouble" -> cf.util.CoerceToDouble,
@@ -83,7 +83,7 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
     lib(name)
   }
 
-  def lookupF2(namespace: List[String], name: String): F2 = {
+  def lookupF2(namespace: List[String], name: String): CF2 = {
     val lib  = Map[String, CF2](
       "add" -> cf.math.Add,
       "mod" -> cf.math.Mod,
