@@ -48,7 +48,7 @@ object ReplState {
     DebugLevel.Normal,
     PhaseFormat.Tree,
     Some(10),
-    OutputFormat.Table,
+    OutputFormat.Precise,
     OutputMode.Console,
     Variables(Map()),
     TimingFormat.OnlyTotal,

@@ -95,7 +95,7 @@ object Command {
       case SetPhaseFormatPattern(format)            => SetPhaseFormat(PhaseFormat.fromString(format) | PhaseFormat.Tree)
       case SetTimingFormatPattern(format)           => SetTimingFormat(TimingFormat.fromString(format) | TimingFormat.OnlyTotal)
       case SummaryCountPattern(rows)                => SummaryCount(rows.toInt)
-      case FormatPattern(format)                    => Format(OutputFormat.fromString(format) | OutputFormat.Table)
+      case FormatPattern(format)                    => Format(OutputFormat.fromString(format) | OutputFormat.Precise)
       case ModePattern(mode)                        => Mode(OutputMode.fromString(mode) | OutputMode.Console)
       case HelpPattern()                            => Help
       case SetVarPattern(name, value)               => SetVar(VarName(name), VarValue(value))
