@@ -1,0 +1,33 @@
+{
+    "name": "to_string",
+    "backends": {
+      "lwc_local": "ignoreFieldOrder",
+      "mimir": "ignoreFieldOrder"
+    },
+    "data": "types.data",
+    "query": "select num, to_string(foo) as s from `types.data`",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      { "num": 1, "s": "11" },
+      { "num": 2, "s": "1.12345" },
+      { "num": 3, "s": "13" },
+      { "num": 4, "s": "zap" },
+      { "num": 5, "s": "true" },
+      { "num": 6, "s": "false" },
+      { "num": 7, "s": "null" },
+      { "num": 8, "s": "2009-02-13T23:31:30.011+12:15:18" },
+      { "num": 9, "s": "2009-02-13+12:15:18" },
+      { "num": 10, "s": "23:31:30.011+12:15:18" },
+      { "num": 11, "s": "2009-02-13T23:31:30.011" },
+      { "num": 12, "s": "2009-02-13" },
+      { "num": 13, "s": "23:31:30.011" },
+      { "num": 14, "s": "P7DT12H34M" },
+      { "num": 15 },
+      { "num": 16 },
+      { "num": 17 },
+      { "num": 18 },
+      { "num": 19 },
+      { "num": 20 }
+    ]
+}
