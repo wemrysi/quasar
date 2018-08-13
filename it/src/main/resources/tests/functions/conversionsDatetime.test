@@ -1,0 +1,32 @@
+{
+  "name": "[qa_s02] datetime conversions",
+
+  "backends": {
+    "lwc_local": "ignoreFieldOrder",
+    "mimir": "ignoreFieldOrder"
+  },
+
+  "data": "conversions.data",
+
+  "query": "select num, offsetdatetime(str) as odt, offsetdate(str) as od, offsettime(str) as ot, localdatetime(str) as ldt, localdate(str) as ld, localtime(str) as lt, interval(str) as i from `conversions.data`",
+
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+
+  "expected": [
+    { "num": 0 },
+    { "num": 1 },
+    { "num": 2 },
+    { "num": 3 },
+    { "num": 4 },
+    { "num": 5 },
+    { "num": 6 },
+    { "num": 7, "odt": { "$offsetdatetime": "2009-02-13T23:31:30.011000000+12:15:18" } },
+    { "num": 8, "od": { "$offsetdate": "2009-02-13+12:15:18" } },
+    { "num": 9, "ot": { "$offsettime": "23:31:30.011000000+12:15:18" } },
+    { "num": 10, "ldt": { "$localdatetime": "2009-02-13T23:31:30.011000000" } },
+    { "num": 11, "ld": { "$localdate": "2009-02-13" } },
+    { "num": 12, "lt": { "$localtime": "23:31:30.011000000" } },
+    { "num": 13, "i": { "$interval": "P7DT12H34M" } }
+  ]
+}
