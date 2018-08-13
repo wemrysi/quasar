@@ -2,9 +2,7 @@
     "name": "field and flattened array value and flattened map value on heterogenous",
     "backends": {
         "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder",
-        "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending"
+        "mimir":             "ignoreFieldOrder"
 
     },
     "data": "heterogeneous.data",
@@ -33,6 +31,21 @@
       { "a": 10, "ba": null },
       { "a": 10, "ba": "foo" },
       { "a": 10, "ba": {  } },
-      { "a": 10, "ba": [] }
+      { "a": 10, "ba": [] },
+      { "a": 11, "ba": { "$offsetdatetime": "2018-07-29T23:59:59.999000000+01:01:01" } },
+      { "a": 11, "ba": { "$offsetdate": "2009-02-13+02:00" } },
+      { "a": 11, "ba": { "$offsettime": "23:00:00.000000000+03:59" } },
+      { "a": 11, "ba": { "$localdatetime": "2018-07-29T23:59:59.999999000" } },
+      { "a": 11, "ba": { "$localdate": "2012-12-31" } },
+      { "a": 11, "ba": { "$localtime": "13:31:30.100000000" } },
+      { "a": 11, "ba": { "$interval": "P7DT12H34M" } },
+      { "a": 12, "bm": { "$offsetdatetime": "2018-07-29T23:59:59.999000000+01:01:01" } },
+      { "a": 12, "bm": { "$offsetdate": "2009-02-13+02:00" } },
+      { "a": 12, "bm": { "$offsettime": "23:00:00.000000000+03:59" } },
+      { "a": 12, "bm": { "$localdatetime": "2018-07-29T23:59:59.999999000" } },
+      { "a": 12, "bm": { "$localdate": "2012-12-31" } },
+      { "a": 12, "bm": { "$localtime": "13:31:30.100000000" } },
+      { "a": 12, "bm": { "$interval": "P7DT12H34M" } },
+      { "a": 13 }
     ]
 }

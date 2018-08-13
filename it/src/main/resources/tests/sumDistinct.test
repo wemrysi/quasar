@@ -1,8 +1,6 @@
 {
     "name": "grouped sum of distinct values",
     "backends": {
-        "mongodb_3_4_13":    "ignoreFieldOrder",
-        "mongodb_3_6":       "ignoreFieldOrder"
     },
     "data": "zips.data",
     "query": "select state, sum(distinct(pop)) from `zips.data` group by state",

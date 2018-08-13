@@ -21,8 +21,9 @@ import quasar.blueeyes._, json._
 import quasar.common.data.{Data, DataGenerators}
 import quasar.contrib.cats.effect.liftio._
 import quasar.frontend.data.DataCodec
-import quasar.precog.common._
 import quasar.pkg.tests._, Gen._
+import quasar.precog.common._
+import quasar.yggdrasil.TestIdentities._
 import quasar.yggdrasil.bytecode.JType
 
 import org.slf4j.LoggerFactory
@@ -230,12 +231,6 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
 
     "verify renderJson (precise) round tripping" in {
       def removal(data: Data): Option[Data] = data match {
-        case Data.Binary(_) =>
-          None
-
-        case Data.Id(_) =>
-          None
-
         case Data.NA =>
           None
 
@@ -402,6 +397,11 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
         "shift a heterogeneous array" in testHeteroArrayLeftShift(emit)
         "shift a simple array with an inner object" in testTrivialArrayLeftShiftWithInnerObject(emit)
       }
+    }
+
+    // this is separated because of how these specs are structured 🙄
+    "in leftShift (emit on undefined... still)" >> {
+      "shift a homogeneous (but uneven) array with an empty member" in testUnevenHomogeneousArraysEmit
     }
 
     "in transform" >> {

@@ -128,8 +128,6 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeGenerators {
   "IdentityLib" >> {
     testCoherence("Squash", IdentityLib.Squash)
 
-    testCoherence("ToId", IdentityLib.ToId)
-
     testCoherence("TypeOf", IdentityLib.TypeOf)
   }
 

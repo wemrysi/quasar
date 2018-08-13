@@ -2,9 +2,7 @@
     "name": "concat unknown with literal array",
     "backends": {
         "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder",
-        "mongodb_3_4_13":    "ignoreFieldOrder",
-        "mongodb_3_6":       "ignoreFieldOrder"
+        "mimir":             "ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select loc || [1, 2] as arr, city from `largeZips.data`",

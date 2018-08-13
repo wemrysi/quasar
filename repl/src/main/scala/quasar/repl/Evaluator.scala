@@ -18,17 +18,22 @@ package quasar
 package repl
 
 import slamdata.Predef._
-import quasar.api._, datasource._
+import quasar.api._, datasource._, resource._
+import quasar.common.{PhaseResultListen, PhaseResultTell, PhaseResults}
 import quasar.common.data.Data
-import quasar.common.resource._
+import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.contrib.std.uuid._
+import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp.minspace
 import quasar.fp.ski._
 import quasar.frontend.data.DataCodec
-import quasar.run.{QuasarError, SqlQuery}
+import quasar.impl.schema.{SstConfig, SstSchema}
+import quasar.run.{QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
 import quasar.run.ResourceRouter.DatasourceResourcePrefix
-import quasar.run.optics.{stringUUIDP => UuidString}
+import quasar.run.optics.{stringUuidP => UuidString}
+import quasar.sst._
 
 import java.lang.Exception
 import scala.util.control.NonFatal
@@ -42,13 +47,16 @@ import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.scalaz._
 import fs2.{Stream, StreamApp}, StreamApp.ExitCode
 import fs2.async.Ref
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
-import shims._
+import shims.{eqToScalaz => _, orderToScalaz => _, _}
+import spire.std.double._
 
-final class Evaluator[F[_]: Effect](
+final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
     stateRef: Ref[F, ReplState],
-    sources: Datasources[F, Stream[F, ?], UUID, Json],
+    sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
     queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]]) {
 
   import Command._
@@ -87,6 +95,17 @@ final class Evaluator[F[_]: Effect](
 
       case _ =>
         fromEither[DiscoveryError[UUID], Stream[F, (ResourceName, ResourcePathType)]](
+          pathNotFound[DiscoveryError[UUID]](path).left)
+    }
+
+  private def schema(path: ResourcePath): F[Option[SstSchema[Fix[EJson], Double]]] =
+    path match {
+      case DatasourceResourcePrefix /: UuidString(id) /: p =>
+        sources.resourceSchema(id, p, SstConfig.Default)
+          .flatMap(fromEither[DiscoveryError[UUID], Option[SstSchema[Fix[EJson], Double]]])
+
+      case _ =>
+        fromEither[DiscoveryError[UUID], Option[SstSchema[Fix[EJson], Double]]](
           pathNotFound[DiscoveryError[UUID]](path).left)
     }
 
@@ -166,6 +185,18 @@ final class Evaluator[F[_]: Effect](
         (sources.removeDatasource(id) >>= ensureNormal[ExistentialError[UUID]]).map(
           κ(s"Removed datasource $id".some))
 
+      case ResourceSchema(replPath) =>
+        for {
+          cwd <- stateRef.get.map(_.cwd)
+          path = newPath(cwd, replPath)
+          s <- schema(path)
+          t = s.map(_.sst.fold(_.asEJson[Fix[EJson]], _.asEJson[Fix[EJson]]))
+        } yield {
+          t.flatMap(ejs => DataCodec.Precise.encode(ejs.cata(Data.fromEJson)))
+            .fold("No schema available.")(_.spaces2)
+            .some
+        }
+
       case Cd(path: ReplPath) =>
         for {
           cwd <- stateRef.get.map(_.cwd)
@@ -201,9 +232,22 @@ final class Evaluator[F[_]: Effect](
 
         for {
           state <- stateRef.get
-          qres <- evaluateQuery(SqlQuery(q, state.variables, toADir(state.cwd)), state.summaryCount)
+          (qres, phaseResults) <- PhaseResultListen[F].listen(
+            evaluateQuery(SqlQuery(q, state.variables, toADir(state.cwd)), state.summaryCount))
+          log = printLog(state.debugLevel, state.phaseFormat, phaseResults).map(_ + "\n")
           res <- convert(state.format, qres)
-        } yield res
+        } yield (log |+| res)
+
+      case Explain(q) =>
+        for {
+          state <- stateRef.get
+          (_, phaseResults) <- PhaseResultListen[F].listen(
+            Sql2QueryEvaluator.sql2ToQScript[Fix, F](SqlQuery(q, state.variables, toADir(state.cwd))))
+          log = printLog(Order[DebugLevel].max(DebugLevel.Normal, state.debugLevel), state.phaseFormat, phaseResults)
+        } yield log
+
+      case NoOp =>
+        F.pure(none)
 
       case Exit =>
         F.pure("Exiting...".some)
@@ -228,15 +272,18 @@ final class Evaluator[F[_]: Effect](
         },
         F.unit)
 
-    private def evaluateQuery(q: SqlQuery, summaryCount: Option[Int Refined Positive]): F[Stream[F, Data]] =
+    private def evaluateQuery(q: SqlQuery, summaryCount: Option[Int Refined Positive])
+        : F[Stream[F, Data]] =
       queryEvaluator.evaluate(q) map { s =>
         summaryCount.map(c => s.take(c.value.toLong)).getOrElse(s)
       }
 
-    private def findType(tps: ISet[DatasourceType], tp: DatasourceType.Name): Option[DatasourceType] =
+    private def findType(tps: ISet[DatasourceType], tp: DatasourceType.Name)
+        : Option[DatasourceType] =
       tps.toList.find(_.name === tp)
 
-    private def findTypeF(tps: ISet[DatasourceType], tp: DatasourceType.Name): F[DatasourceType] =
+    private def findTypeF(tps: ISet[DatasourceType], tp: DatasourceType.Name)
+        : F[DatasourceType] =
       findType(tps, tp) match {
         case None => raiseEvalError(s"Unsupported datasource type: $tp")
         case Some(z) => z.point[F]
@@ -281,8 +328,21 @@ final class Evaluator[F[_]: Effect](
         case Condition.Abnormal(a) => s"error: ${onAbnormal(a)}"
       }
 
+    private def printLog(debugLevel: DebugLevel, phaseFormat: PhaseFormat, results: PhaseResults): Option[String] =
+      debugLevel match {
+        case DebugLevel.Silent  => none
+        case DebugLevel.Normal  => (printPhaseResults(phaseFormat, results.takeRight(1)) + "\n").some
+        case DebugLevel.Verbose => (printPhaseResults(phaseFormat, results) + "\n").some
+      }
+
     private def printPath(p: ResourcePath): String =
       posixCodec.printPath(p.toPath)
+
+    private def printPhaseResults(phaseFormat: PhaseFormat, results: PhaseResults): String =
+      phaseFormat match {
+        case PhaseFormat.Tree => results.map(_.showTree).mkString("\n\n")
+        case PhaseFormat.Code => results.map(_.showCode).mkString("\n\n")
+      }
 
     private def raiseEvalError[A](s: String): F[A] =
       F.raiseError(new EvalError(s))
@@ -322,9 +382,9 @@ object Evaluator {
 
   final class EvalError(msg: String) extends java.lang.RuntimeException(msg)
 
-  def apply[F[_]: Effect](
+  def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
       stateRef: Ref[F, ReplState],
-      sources: Datasources[F, Stream[F, ?], UUID, Json],
+      sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
       queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
       : Evaluator[F] =
     new Evaluator[F](stateRef, sources, queryEvaluator)
@@ -340,17 +400,19 @@ object Evaluator {
       |  ds add [name] [type] [cfg]
       |  ds (remove | rm) [uuid]
       |  ds (lookup | get) [uuid]
+      |  pwd
       |  cd [path]
       |  ls [path]
-      |  pwd
+      |  schema [path]
       |  [query]
+      |  (explain | compile) [query]
+      |  set debug = 0 | 1 | 2
       |  set format = table | precise | readable | csv
       |  set summaryCount = [rows]
       |  set [var] = [value]
       |  env
       |
       |TODO:
-      |  set debug = 0 | 1 | 2
       |  set phaseFormat = tree | code
       |  set timingFormat = tree | onlytotal""".stripMargin
 }

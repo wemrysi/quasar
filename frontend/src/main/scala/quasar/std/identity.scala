@@ -17,12 +17,11 @@
 package quasar.std
 
 import quasar._
-import quasar.common.data.Data
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
 import scalaz._, Scalaz._
-import shapeless.{Data => _, _}
+import shapeless._
 
 trait IdentityLib extends Library {
   import Type._
@@ -45,18 +44,6 @@ trait IdentityLib extends Library {
     },
     partialTyper[nat._1] { case Sized(x) => x },
     untyper[nat._1](t => success(Func.Input1(t))))
-
-  val ToId = UnaryFunc(
-    Mapping,
-    "Converts a string to a (backend-specific) object identifier.",
-    Type.Id,
-    Func.Input1(Type.Str),
-    noSimplification,
-    partialTyper[nat._1] {
-      case Sized(Type.Const(Data.Str(str))) => Type.Const(Data.Id(str))
-      case Sized(Type.Str)                  => Type.Id
-    },
-    basicUntyper)
 
   val TypeOf = UnaryFunc(
     Mapping,

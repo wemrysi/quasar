@@ -1,0 +1,37 @@
+{
+    "name": "field and shifted array index on heterogenous",
+    "backends": {
+        "mimir":             "ignoreFieldOrder"
+    },
+    "data": "heterogeneous.data",
+    "query": "select a, b[_:] as i from `heterogeneous.data`",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      { "a": 1 },
+      { "a": 2, "i": 0 },
+      { "a": 2, "i": 1 },
+      { "a": 3 },
+      { "a": 4 },
+      { "a": 5 },
+      { "a": 6, "i": 0 },
+      { "a": 7 },
+      { "a": 8 },
+      { "a": 9 },
+      { "a": 10, "i": 0 },
+      { "a": 10, "i": 1 },
+      { "a": 10, "i": 2 },
+      { "a": 10, "i": 3 },
+      { "a": 10, "i": 4 },
+      { "a": 10, "i": 5 },
+      { "a": 11, "i": 0 },
+      { "a": 11, "i": 1 },
+      { "a": 11, "i": 2 },
+      { "a": 11, "i": 3 },
+      { "a": 11, "i": 4 },
+      { "a": 11, "i": 5 },
+      { "a": 11, "i": 6 },
+      { "a": 12 },
+      { "a": 13 }
+    ]
+}

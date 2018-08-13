@@ -17,7 +17,7 @@
 package quasar.api.datasource
 
 import slamdata.Predef._
-import quasar.common.resource.ResourcePath
+import quasar.api.resource.ResourcePath
 
 import monocle.Prism
 import scalaz.{Cord, Equal, ISet, NonEmptyList, Show}
@@ -51,6 +51,9 @@ object DatasourceError extends DatasourceErrorInstances {
   sealed trait DiscoveryError[+I] extends DatasourceError[I, Nothing]
 
   final case class PathNotFound(path: ResourcePath)
+    extends DiscoveryError[Nothing]
+
+  final case class PathNotAResource(path: ResourcePath)
     extends DiscoveryError[Nothing]
 
   sealed trait ExistentialError[+I] extends DiscoveryError[I]
@@ -102,6 +105,12 @@ object DatasourceError extends DatasourceErrorInstances {
       case (t, c, r) => MalformedConfiguration(t, c, r)
     }
 
+  def pathNotAResource[E >: DiscoveryError[Nothing] <: DatasourceError[_, _]]
+      : Prism[E, ResourcePath] =
+    Prism.partial[E, ResourcePath] {
+      case PathNotAResource(p) => p
+    } (PathNotAResource(_))
+
   def pathNotFound[E >: DiscoveryError[Nothing] <: DatasourceError[_, _]]
       : Prism[E, ResourcePath] =
     Prism.partial[E, ResourcePath] {
@@ -123,6 +132,7 @@ sealed abstract class DatasourceErrorInstances {
       datasourceUnsupported[DatasourceError[I, C]].getOption(de),
       invalidConfiguration[C, DatasourceError[I, C]].getOption(de),
       malformedConfiguration[C, DatasourceError[I, C]].getOption(de),
+      pathNotAResource[DatasourceError[I, C]].getOption(de),
       pathNotFound[DatasourceError[I, C]].getOption(de)
     )}
   }
@@ -141,6 +151,9 @@ sealed abstract class DatasourceErrorInstances {
 
   implicit def showDiscoveryError[I: Show]: Show[DiscoveryError[I]] =
     Show.show {
+      case PathNotAResource(p) =>
+        Cord("PathNotAResource(") ++ p.show ++ Cord(")")
+
       case PathNotFound(p) =>
         Cord("PathNotFound(") ++ p.show ++ Cord(")")
 

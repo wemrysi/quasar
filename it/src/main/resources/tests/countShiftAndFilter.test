@@ -1,0 +1,15 @@
+{
+    "name": "count shifted array value with filter",
+
+    "data": "extraSmallZips.data",
+
+    "query": "select count(loc[_]) as c from `extraSmallZips.data` where city like \"A%\"",
+
+    "predicate": "exactly",
+
+    "expected": [
+      { "c": 2 },
+      { "c": 2 },
+      { "c": 2 }
+    ]
+}

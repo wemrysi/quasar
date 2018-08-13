@@ -25,14 +25,20 @@ import quasar.api.datasource.DatasourceError.{
   DiscoveryError,
   ExistentialError
 }
+import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.common.data.Data
-import quasar.common.resource.{MonadResourceErr, ResourceName, ResourcePath, ResourcePathType}
-import quasar.connector.Datasource
+import quasar.connector.{Datasource, MonadResourceErr}
+import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
+import quasar.ejson.EJson
+import quasar.ejson.implicits._
+import quasar.fp.numeric.Positive
 import quasar.fp.ski.{κ, κ2}
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.{ByNeedDatasource, ConditionReportingDatasource, FailedDatasource}
-import quasar.qscript.{MonadPlannerErr, QScriptEducated}
+import quasar.impl.schema._
+import quasar.qscript._
+import quasar.sst._
 
 import scala.concurrent.ExecutionContext
 
@@ -41,17 +47,22 @@ import cats.effect.{ConcurrentEffect, Timer}
 import fs2.{Scheduler, Stream}
 import fs2.async.{immutable, mutable, Ref}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
+import pathy.Path
 import scalaz.{\/, EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz}, Scalaz._
 import shims._
+import spire.algebra.Field
+import spire.math.ConvertableTo
 
 final class DatasourceManagement[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: ConcurrentEffect: MonadPlannerErr: MonadResourceErr: Timer,
-    I: Order] private (
+    I: Order,
+    N: ConvertableTo: Field: Order] private (
     modules: DatasourceManagement.Modules,
     errors: Ref[F, IMap[I, Exception]],
-    running: mutable.Signal[F, DatasourceManagement.Running[I, T, F]])
-    extends DatasourceControl[F, Stream[F, ?], I, Json]
+    running: mutable.Signal[F, DatasourceManagement.Running[I, T, F]],
+    sstSampleSize: Positive)
+    extends DatasourceControl[F, Stream[F, ?], I, Json, SstConfig[T[EJson], N]]
     with DatasourceErrors[F, I] {
 
   import DatasourceManagement.withErrorReporting
@@ -106,6 +117,45 @@ final class DatasourceManagement[
       _.prefixedChildPaths(prefixPath))
       .map(_.flatMap(_ \/> DatasourceError.pathNotFound[DiscoveryError[I]](prefixPath)))
 
+  def resourceSchema(
+      datasourceId: I,
+      path: ResourcePath,
+      sstConfig: SstConfig[T[EJson], N])
+      : F[DiscoveryError[I] \/ Option[sstConfig.Schema]] = {
+
+    type TS = TypeStat[N]
+    type P[X] = StructuralType[T[EJson], X]
+
+    def sampleQuery =
+      dsl.Subset(
+        dsl.Unreferenced,
+        freeDsl.LeftShift(
+          Path.refineType(path.toPath)
+            .fold(freeDsl.Read(_), freeDsl.Read(_)),
+          recFunc.Hole,
+          ExcludeId,
+          ShiftType.Map,
+          OnUndefined.Omit,
+          func.RightSide),
+        Take,
+        freeDsl.Map(
+          freeDsl.Unreferenced,
+          recFunc.Constant(EJson.int(sstSampleSize.value))))
+
+    withDs[DiscoveryError[I], Option[sstConfig.Schema]](datasourceId) { ds =>
+      val dataStream = ds.fold(
+        lw => lw.evaluate(path).map(_.take(sstSampleSize.value)),
+        hw => hw.evaluate(sampleQuery))
+
+      val k = ConvertableTo[N].fromLong(sstSampleSize.value)
+
+      Stream.force(dataStream)
+        .through(extractSst(sstConfig))
+        .map(s => SstSchema((SST.size(s) < k) either Population.subst[P, TS](s) or s))
+        .compile.last
+    }
+  }
+
   def shutdownDatasource(datasourceId: I): F[Unit] =
     modifyAndShutdown(_.updateLookupWithKey(datasourceId, κ2(None)) match {
       case (v, m) => (m, v strengthL datasourceId)
@@ -126,6 +176,11 @@ final class DatasourceManagement[
 
   ////
 
+  private val dsl = construction.mkGeneric[T, QScriptEducated[T, ?]]
+  private val freeDsl = construction.mkFree[T, QScriptEducated[T, ?]]
+  private val func = construction.Func[T]
+  private val recFunc = construction.RecFunc[T]
+
   private def modifyAndShutdown(f: Running => (Running, Option[(I, Disposable[F, DS])])): F[Unit] =
     for {
       t <- running.modify2(f)
@@ -139,9 +194,13 @@ final class DatasourceManagement[
       datasourceId: I)(
       f: Datasource[F, Stream[F, ?], _, _] => F[A])
       : F[E \/ A] =
+    withDs[E, A](datasourceId)(ds => f(ds.merge))
+
+  private def withDs[E >: ExistentialError[I] <: DatasourceError[I, Json], A](
+      datasourceId: I)(f: DS => F[A]): F[E \/ A] =
     running.get.flatMap(_.lookup(datasourceId) match {
       case Some(ds) =>
-        f(ds.unsafeValue.merge).map(_.right[E])
+        f(ds.unsafeValue).map(_.right[E])
 
       case None =>
         DatasourceError.datasourceNotFound[I, E](datasourceId)
@@ -156,17 +215,20 @@ object DatasourceManagement {
   type DS[T[_[_]], F[_]] = LDS[F] \/ HDS[T, F]
   type Running[I, T[_[_]], F[_]] = IMap[I, Disposable[F, DS[T, F]]]
 
+  type MgmtControl[T[_[_]], F[_], I, N] =
+      DatasourceControl[F, Stream[F, ?], I, Json, SstConfig[T[EJson], N]]
+
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: MonadPlannerErr: MonadResourceErr: MonadError_[?[_], CreateError[Json]]: Timer,
-      I: Order](
+      I: Order,
+      N: ConvertableTo: Field: Order](
       modules: Modules,
       configured: IMap[I, DatasourceRef[Json]],
-      pool: ExecutionContext,
-      scheduler: Scheduler)
-      : F[(DatasourceControl[F, Stream[F, ?], I, Json] with DatasourceErrors[F, I], immutable.Signal[F, Running[I, T, F]])] = {
-
-    implicit val ec: ExecutionContext = pool
+      sstSampleSize: Positive,
+      scheduler: Scheduler)(
+      implicit ec: ExecutionContext)
+      : F[(MgmtControl[T, F, I, N] with DatasourceErrors[F, I], immutable.Signal[F, Running[I, T, F]])] = {
 
     for {
       errors <- Ref[F, IMap[I, Exception]](IMap.empty)
@@ -182,7 +244,7 @@ object DatasourceManagement {
               (id, ds.left[HDS[T, F]].point[Disposable[F, ?]]).point[F]
 
             case Some(mod) =>
-              lazyDatasource[T, F](mod, ref, pool, scheduler).strengthL(id)
+              lazyDatasource[T, F](mod, ref, scheduler).strengthL(id)
           }
       }
 
@@ -194,7 +256,7 @@ object DatasourceManagement {
 
       runningS <- mutable.Signal[F, Running[I, T, F]](running)
 
-      mgmt = new DatasourceManagement[T, F, I](modules, errors, runningS)
+      mgmt = new DatasourceManagement[T, F, I, N](modules, errors, runningS, sstSampleSize)
     } yield (mgmt, runningS)
   }
 
@@ -213,8 +275,8 @@ object DatasourceManagement {
       F[_]: ConcurrentEffect: MonadPlannerErr: MonadResourceErr: MonadError_[?[_], CreateError[Json]]: Timer](
       module: DatasourceModule,
       ref: DatasourceRef[Json],
-      pool: ExecutionContext,
-      scheduler: Scheduler)
+      scheduler: Scheduler)(
+      implicit ec: ExecutionContext)
       : F[Disposable[F, DS[T, F]]] =
     module match {
       case DatasourceModule.Lightweight(lw) =>
@@ -223,7 +285,7 @@ object DatasourceManagement {
             .map(_.leftMap(ie => ie: CreateError[Json]))
         }
 
-        ByNeedDatasource(ref.kind, mklw, pool, scheduler)
+        ByNeedDatasource(ref.kind, mklw, scheduler)
           .map(_.map(_.left))
 
       case DatasourceModule.Heavyweight(hw) =>
@@ -232,7 +294,7 @@ object DatasourceManagement {
             .map(_.leftMap(ie => ie: CreateError[Json]))
         }
 
-        ByNeedDatasource(ref.kind, mkhw, pool, scheduler)
+        ByNeedDatasource(ref.kind, mkhw, scheduler)
           .map(_.map(_.right))
     }
 }

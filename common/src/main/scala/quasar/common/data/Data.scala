@@ -46,7 +46,6 @@ import matryoshka._
 import matryoshka.patterns._
 import monocle.{Iso, Optional, Prism}
 import scalaz.{Lens => _, Optional=>_, _}, Scalaz._
-import scodec.bits.ByteVector
 
 sealed abstract class Data extends Product with Serializable
 
@@ -142,33 +141,6 @@ object Data {
   val _interval =
     Prism.partial[Data, DateTimeInterval]
       { case Data.Interval(dti) => dti }(Data.Interval)
-
-  final case class Binary(value: ImmutableArray[Byte]) extends Data {
-    def base64: String = new sun.misc.BASE64Encoder().encode(value.toArray)
-
-    override def toString = "Binary(Array[Byte](" + value.mkString(", ") + "))"
-
-    /**
-      * scala equality needs to remain for Spark to work
-      * @see Planner.qscriptCore
-      */
-    override def equals(that: Any): Boolean = that match {
-      case Binary(value2) => value ≟ value2
-      case _ => false
-    }
-    override def hashCode = java.util.Arrays.hashCode(value.toArray[Byte])
-  }
-  object Binary {
-    def fromArray(array: Array[Byte]): Binary = Binary(ImmutableArray.fromArray(array))
-  }
-
-  val _binary =
-    Prism.partial[Data, ImmutableArray[Byte]] { case Data.Binary(bs) => bs } (Data.Binary(_))
-
-  final case class Id(value: String) extends Data
-
-  val _id =
-    Prism.partial[Data, String] { case Data.Id(id) => id } (Data.Id(_))
 
   /**
    An object to represent any value that might come from a backend, but that
@@ -275,14 +247,6 @@ object Data {
 
   val fromExtension: Algebra[Extension, Data] = {
     case ejson.Meta(value, meta) => (meta, value) match {
-      case (EJsonType(TypeTag("_bson.oid")), Str(oid)) => Id(oid)
-
-      case (EJsonTypeSize(TypeTag.Binary, size), Str(data)) =>
-        if (size.isValidInt)
-          ejson.z85.decode(data).fold[Data](
-            NA)(
-            bv => Binary(ImmutableArray.fromArray(bv.take(size.toLong).toArray)))
-        else NA
 
       case (EJsonType(TypeTag.OffsetDateTime), Obj(map)) =>
         (extract(map.get(DateTimeConstants.year), _int)(_.toInt) ⊛
@@ -359,18 +323,15 @@ object Data {
       case (_, _) => value
     }
 
-    case ejson.Map(value)       =>
+    case ejson.Map(value) =>
       value.traverse(Bitraverse[(?, ?)].leftTraverse.traverse(_) {
         case Str(key) => key.some
         case _        => None
       }).fold[Data](NA)(pairs => Obj(ListMap(pairs: _*)))
 
-    case ejson.Int(value)       => Int(value)
+    case ejson.Int(value) => Int(value)
 
-    // FIXME: cheating, but it’s what we’re already doing in the SQL parser
-    case ejson.Byte(value)      => Binary.fromArray(Array[Byte](value))
-
-    case ejson.Char(value)      => Str(value.toString)
+    case ejson.Char(value) => Str(value.toString)
   }
 
   // TODO: Data should be replaced with EJson. These just exist to bridge the
@@ -386,14 +347,14 @@ object Data {
   def toEJson[F[a] <: ACopK[a]](implicit C: Common :<<: F, E: Extension :<<: F):
       Coalgebra[CoEnv[Data, F, ?], Data] =
     ed => CoEnv(ed match {
-      case Arr(value)       => C.inj(ejson.Arr(value)).right
-      case Obj(value)       =>
+      case Arr(value) => C.inj(ejson.Arr(value)).right
+      case Obj(value) =>
         E.inj(ejson.Map(value.toList.map(_.leftMap(Str(_))))).right
-      case Null             => C.inj(ejson.Null()).right
-      case Bool(value)      => C.inj(ejson.Bool(value)).right
-      case Str(value)       => C.inj(ejson.Str(value)).right
-      case Dec(value)       => C.inj(ejson.Dec(value)).right
-      case Int(value)       => E.inj(ejson.Int(value)).right
+      case Null => C.inj(ejson.Null()).right
+      case Bool(value) => C.inj(ejson.Bool(value)).right
+      case Str(value) => C.inj(ejson.Str(value)).right
+      case Dec(value) => C.inj(ejson.Dec(value)).right
+      case Int(value) => E.inj(ejson.Int(value)).right
 
       case OffsetDateTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
@@ -435,7 +396,7 @@ object Data {
           DateTimeConstants.nanosecond -> Int(value.getNano))),
         EJsonType(TypeTag.LocalDateTime))).right
 
-      case LocalTime(value)      => E.inj(ejson.Meta(
+      case LocalTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
           DateTimeConstants.hour       -> Int(value.getHour),
           DateTimeConstants.minute     -> Int(value.getMinute),
@@ -450,7 +411,7 @@ object Data {
           DateTimeConstants.day   -> Int(value.getDayOfMonth))),
         EJsonType(TypeTag.LocalDate))).right
 
-      case Interval(value)  =>
+      case Interval(value) =>
         E.inj(ejson.Meta(
           Obj(ListMap(
             DateTimeConstants.year       -> Int(value.period.getYears),
@@ -460,15 +421,6 @@ object Data {
             DateTimeConstants.nanosecond -> Int(value.duration.getNano))),
           EJsonType(TypeTag.Interval))).right
 
-      case Binary(value)    =>
-        E.inj(ejson.Meta(
-          Str(ejson.z85.encode(ByteVector.view(value.toArray))),
-          EJsonTypeSize(TypeTag.Binary, value.size))).right
-
-      case Id(value)        =>
-        // FIXME: This evilly guesses the backend-specific OID formats
-        E.inj(ejson.Meta(Str(value), EJsonType(TypeTag("_bson.oid")))).right
-
-      case data             => data.left
+      case data => data.left
     })
 }

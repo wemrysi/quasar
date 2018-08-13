@@ -16,9 +16,10 @@
 
 package quasar.yggdrasil
 
-import quasar.precog.common._
 import quasar.blueeyes._, json._
 import quasar.pkg.tests._
+import quasar.precog.common._
+import quasar.yggdrasil.TestIdentities._
 import quasar.yggdrasil.bytecode._
 
 import scala.util.Random

@@ -49,8 +49,6 @@ object QDataData extends QData[Data] {
     case Data.LocalDate(_) => QLocalDate
     case Data.LocalTime(_) => QLocalTime
     case Data.Interval(_) => QInterval
-    case Data.Binary(_) => error(s"Unable to represent `Data.Binary`.")
-    case Data.Id(_) => QString
     case Data.NA => error(s"Unable to represent `Data.NA`.")
     case Data.Obj(_) => QObject
     case Data.Arr(_) => QArray
@@ -77,8 +75,7 @@ object QDataData extends QData[Data] {
 
   def getString(a: Data): String = a match {
     case Data.Str(value) => value
-    case Data.Id(value) => value
-    case _ => error(s"Expected `Data.Str` or `Data.Id`. Received $a")
+    case _ => error(s"Expected `Data.Str`. Received $a")
   }
   def makeString(l: String): Data = Data.Str(l)
 

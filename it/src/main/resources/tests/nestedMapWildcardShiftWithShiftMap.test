@@ -1,0 +1,25 @@
+{
+  "name": "wildcard shifted map key and shifted map value on nested map",
+
+  "backends": {
+      "lwc_local": "pendingIgnoreFieldOrder",
+      "mimir":     "pendingIgnoreFieldOrder"
+  },
+  "data": "nested_map.data",
+
+  "query": "select b{_} as b, *{_:} as k from `nested_map.data`",
+
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+
+  "expected": [
+    { "b": 100, "k": "a" },
+    { "b": 100, "k": "b" },
+    { "b": 101, "k": "a" },
+    { "b": 101, "k": "b" },
+    { "b": 200, "k": "a" },
+    { "b": 200, "k": "b" },
+    { "b": 201, "k": "a" },
+    { "b": 201, "k": "b" }
+  ]
+}

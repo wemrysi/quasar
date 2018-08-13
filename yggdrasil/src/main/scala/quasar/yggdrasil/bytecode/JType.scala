@@ -86,7 +86,7 @@ object JType {
     tpe match {
       case Type.Null => JNullT
       case Type.Str => JTextT
-      case Type.Int | Type.Dec | Type.Binary => JNumberT
+      case Type.Int | Type.Dec => JNumberT
       case Type.Bool => JBooleanT
       case Type.OffsetDateTime => JOffsetDateTimeT | JTextT
       case Type.OffsetTime => JOffsetTimeT | JTextT
@@ -95,7 +95,7 @@ object JType {
       case Type.LocalTime => JLocalTimeT | JTextT
       case Type.LocalDate => JLocalDateT | JTextT
       case Type.Interval => JIntervalT | JTextT
-      case Type.Id => JTextT
+
       case Type.Arr(tpes) =>
         val mapped: Map[Int, JType] =
           tpes.map(fromType).zipWithIndex.map(_.swap)(collection.breakOut)

@@ -21,8 +21,11 @@ import slamdata.Predef._
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.Datasources
 import quasar.build.BuildInfo
+import quasar.common.{PhaseResultListen, PhaseResultTell}
 import quasar.common.data.Data
-import quasar.run.SqlQuery
+import quasar.ejson.EJson
+import quasar.impl.schema.SstConfig
+import quasar.run.{MonadQuasarErr, SqlQuery}
 
 import java.io.File
 import java.util.UUID
@@ -32,12 +35,13 @@ import cats.effect._
 import cats.syntax.{applicative, flatMap, functor}, applicative._, flatMap._, functor._
 import fs2.{Stream, StreamApp}, StreamApp.ExitCode
 import fs2.async.Ref
+import matryoshka.data.Fix
 import org.apache.commons.io.FileUtils
 import org.jline.reader._
 import org.jline.terminal._
 import scalaz._, Scalaz._
 
-final class Repl[F[_]: ConcurrentEffect](
+final class Repl[F[_]: ConcurrentEffect: PhaseResultListen](
     prompt: String,
     reader: LineReader,
     evaluator: Command => F[Evaluator.Result]) {
@@ -63,16 +67,16 @@ final class Repl[F[_]: ConcurrentEffect](
 }
 
 object Repl {
-  def apply[F[_]: ConcurrentEffect](
+  def apply[F[_]: ConcurrentEffect: PhaseResultListen](
       prompt: String,
       reader: LineReader,
       evaluator: Command => F[Evaluator.Result])
       : Repl[F] =
     new Repl[F](prompt, reader, evaluator)
 
-  def mk[F[_]: ConcurrentEffect](
+  def mk[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
       ref: Ref[F, ReplState],
-      datasources: Datasources[F, Stream[F, ?], UUID, Json],
+      datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
       queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
       : F[Repl[F]] = {
     val evaluator = Evaluator[F](ref, datasources, queryEvaluator)

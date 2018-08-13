@@ -18,9 +18,10 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._, json._
-import quasar.yggdrasil.bytecode._
-import quasar.precog.common._
 import quasar.pkg.tests._
+import quasar.precog.common._
+import quasar.yggdrasil.TestIdentities._
+import quasar.yggdrasil.bytecode._
 
 import cats.effect.IO
 import scalaz._, Scalaz._
@@ -68,7 +69,4 @@ trait PartitionMergeSpec extends ColumnarTableModuleTestSupport with Specificati
 
     result.flatMap(_.toJson).getJValues must_== expected.toStream
   }
-
 }
-
-

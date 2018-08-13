@@ -1,11 +1,10 @@
 {
     "name": "simple filter using date literals",
     "backends": {
-        "lwc_local":      "pending",
         "mimir":          "pending"
     },
     "data":  "../days.data",
-    "query": "select ts from `../days.data` where ts > date(\"2014-08-18\")",
+    "query": "select ts from `../days.data` where ts > offsetdatetime(\"2014-08-18T00:00Z\")",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected":

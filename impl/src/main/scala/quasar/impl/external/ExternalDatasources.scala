@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.connector.{HeavyweightDatasourceModule, LightweightDatasourceModule}
 import quasar.contrib.fs2.convert
+import quasar.fp.ski.κ
 import quasar.impl.DatasourceModule
 
 import java.lang.{
@@ -55,10 +56,9 @@ object ExternalDatasources extends Logging {
   val PluginChunkSize = 8192
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def apply[F[_]: Timer](config: ExternalConfig, pool: ExecutionContext)(implicit F: Effect[F])
+  def apply[F[_]: Timer](config: ExternalConfig)(
+      implicit F: Effect[F], ec: ExecutionContext)
       : Stream[F, IMap[DatasourceType, DatasourceModule]] = {
-
-    implicit val ec: ExecutionContext = pool
 
     val moduleStream = config match {
       case PluginDirectory(directory) =>
@@ -92,19 +92,20 @@ object ExternalDatasources extends Logging {
   private def loadModule[F[_]: Sync](className: String, classLoader: ClassLoader)
       : Stream[F, DatasourceModule] = {
 
+    def handleFailedLoad[A](s: Stream[F, A]): Stream[F, A] =
+      s recoverWith {
+        case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
+          warnStream[F](s"Datasource module '$className' does not appear to be a singleton object", Some(e))
+
+        case e: ExceptionInInitializerError =>
+          warnStream[F](s"Datasource module '$className' failed to load with exception", Some(e))
+
+        case _: ClassCastException =>
+          warnStream[F](s"Datasource module '$className' is not actually a subtype of LightweightDatasourceModule or HeavyweightDatasourceModule", None)
+      }
+
     def loadModule0(clazz: Class[_])(f: Object => DatasourceModule): Stream[F, DatasourceModule] =
-      Sync[Stream[F, ?]]
-        .delay(f(clazz.getDeclaredField("MODULE$").get(null)))
-        .recoverWith {
-          case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
-            warnStream[F](s"Datasource module '$className' does not appear to be a singleton object", Some(e))
-
-          case e: ExceptionInInitializerError =>
-            warnStream[F](s"Datasource module '$className' failed to load with exception", Some(e))
-
-          case _: ClassCastException =>
-            warnStream[F](s"Datasource module '$className' is not actually a subtype of LightweightDatasourceModule or HeavyweightDatasourceModule", None)
-        }
+      Sync[Stream[F, ?]].delay(f(clazz.getDeclaredField("MODULE$").get(null)))
 
     def loadLightweight(clazz: Class[_]): Stream[F, DatasourceModule] =
       loadModule0(clazz) { o =>
@@ -122,7 +123,7 @@ object ExternalDatasources extends Logging {
           warnStream[F](s"Could not locate class for datasource module '$className'", Some(cnf))
       }
 
-      module <- loadLightweight(clazz) ++ loadHeavyweight(clazz)
+      module <- handleFailedLoad(loadLightweight(clazz) handleErrorWith κ(loadHeavyweight(clazz)))
     } yield module
   }
 
@@ -150,12 +151,13 @@ object ExternalDatasources extends Logging {
 
       mainJar = new JarFile(plugin.mainJar.toFile)
 
-      backendModuleAttr <-
-        S.delay(Option(
-          mainJar
-            .getManifest
-            .getMainAttributes
-            .getValue(Plugin.ManifestAttributeName)))
+      backendModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestAttributeName)
+      versionModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestVersionName)
+
+      _ <- versionModuleAttr match {
+        case None => warnStream[F](s"No '${Plugin.ManifestVersionName}' attribute found in Manifest for '$pluginFile'.", None)
+        case Some(version) => infoStream[F](s"Loading $pluginFile with version $version")
+      }
 
       moduleClasses <- backendModuleAttr match {
         case None =>
@@ -174,6 +176,12 @@ object ExternalDatasources extends Logging {
     } yield mod
   }
 
+  private def jarAttribute[F[_]: Sync](j: JarFile, attr: String): Stream[F, Option[String]] =
+    Sync[Stream[F, ?]].delay(Option(j.getManifest.getMainAttributes.getValue(attr)))
+
   private def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
     Sync[Stream[F, ?]].delay(cause.fold(log.warn(msg))(log.warn(msg, _))).drain
+
+  private def infoStream[F[_]: Sync](msg: => String): Stream[F, Unit] =
+    Sync[Stream[F, ?]].delay(log.info(msg))
 }

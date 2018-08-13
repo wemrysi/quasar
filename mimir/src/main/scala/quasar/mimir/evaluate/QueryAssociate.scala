@@ -16,8 +16,8 @@
 
 package quasar.mimir.evaluate
 
+import quasar.api.resource.ResourcePath
 import quasar.common.data.Data
-import quasar.common.resource.ResourcePath
 import quasar.qscript.QScriptEducated
 
 import fs2.Stream

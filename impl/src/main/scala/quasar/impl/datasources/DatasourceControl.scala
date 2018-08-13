@@ -16,11 +16,12 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{Boolean, Unit}
+import slamdata.Predef.{Boolean, Option, Unit}
 import quasar.Condition
+import quasar.api.SchemaConfig
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{CreateError, DiscoveryError, ExistentialError}
-import quasar.common.resource.{ResourceName, ResourcePath, ResourcePathType}
+import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 
 import scalaz.{\/, ISet}
 
@@ -31,7 +32,7 @@ import scalaz.{\/, ISet}
   * to be used as a dependency in another context, such as `DefaultDatasources`,
   * that decides whether doing so is appropriate.
   */
-trait DatasourceControl[F[_], G[_], I, C] {
+trait DatasourceControl[F[_], G[_], I, C, S <: SchemaConfig] {
   /** Initialize a datasource as `datasourceId` using the provided `ref`. If a
     * datasource exists at `datasourceId`, it is shut down.
     */
@@ -49,6 +50,14 @@ trait DatasourceControl[F[_], G[_], I, C] {
     */
   def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
       : F[DiscoveryError[I] \/ G[(ResourceName, ResourcePathType)]]
+
+  /** Retrieves the schema of the resource at the given `path` with the
+    * specified datasource according to the provided `schemaConfig`.
+    *
+    * Returns `None` if the resource exists but a schema is not available.
+    */
+  def resourceSchema(datasourceId: I, path: ResourcePath, schemaConfig: S)
+      : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]]
 
   /** Stop the named datasource, discarding it and freeing any resources it may
     * be using.

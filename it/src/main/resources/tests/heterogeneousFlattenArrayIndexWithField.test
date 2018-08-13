@@ -1,9 +1,7 @@
 {
     "name": "field and flattened array index on heterogenous",
     "backends": {
-        "mimir":             "ignoreFieldOrder",
-        "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending"
+        "mimir":             "ignoreFieldOrder"
     },
     "data": "heterogeneous.data",
     "query": "select a, b[*:] as i from `heterogeneous.data`",
@@ -25,6 +23,15 @@
       { "a": 10, "i": 2 },
       { "a": 10, "i": 3 },
       { "a": 10, "i": 4 },
-      { "a": 10, "i": 5 }
+      { "a": 10, "i": 5 },
+      { "a": 11, "i": 0 },
+      { "a": 11, "i": 1 },
+      { "a": 11, "i": 2 },
+      { "a": 11, "i": 3 },
+      { "a": 11, "i": 4 },
+      { "a": 11, "i": 5 },
+      { "a": 11, "i": 6 },
+      { "a": 12 },
+      { "a": 13 }
     ]
 }

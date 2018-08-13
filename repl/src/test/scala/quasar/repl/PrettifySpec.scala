@@ -256,13 +256,11 @@ final class PrettifySpec extends quasar.Qspec {
 
     // TODO: Add explanation for why these particular values are not representable here
     def representable(data: Data): Boolean = data match {
-      case Data.Str("")     => false
-      case Data.Obj(_)      => false
-      case Data.Arr(_)      => false
-      case Data.Binary(_)   => false
-      case Data.Id(_)       => false
-      case Data.NA          => false
-      case _                => true
+      case Data.Str("") => false
+      case Data.Obj(_)  => false
+      case Data.Arr(_)  => false
+      case Data.NA      => false
+      case _            => true
     }
 
     "round-trip all representable values" >> prop { (data: RepresentableData) =>
@@ -278,12 +276,6 @@ final class PrettifySpec extends quasar.Qspec {
       case _ => true
     }
 
-    "handle an integer string with a leading zero" in {
-      val data = Data.Id("012345")
-      val r = render(data).value
-      parse(r).map(render(_).value) must beSome("12345")
-    }
-
     "handle a decimal string with a leading zero" in {
       val data = Data.Str("00.12345")
       val r = render(data).value
@@ -295,7 +287,6 @@ final class PrettifySpec extends quasar.Qspec {
 
     def removeLeadingZero(data: Data): Data = data match {
       case Data.Str(str) => Data.Str(trimNumericString(str))
-      case Data.Id(str) => Data.Id(trimNumericString(str))
       case data => data
     }
 

@@ -2,10 +2,9 @@
     "name": "olympic_search_step1",
     "data": "olympics.data",
     "backends": {
-       "lwc_local":         "pending",
-       "mimir":             "pending"
+       "lwc_local":         "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
     },
-    "NB": "mimir handles order incorrectly",
     "query": "temp0 := SELECT * FROM `olympics.data`;
            SELECT DISTINCT * FROM (temp0) AS temp1 WHERE (((SEARCH(city, \"^.*NOR.*$\", true)) OR ((SEARCH(country, \"^.*NOR.*$\", true))) OR ((SEARCH(discipline, \"^.*NOR.*$\", true))) OR ((SEARCH(event, \"^.*NOR.*$\", true))) OR ((SEARCH(gender, \"^.*NOR.*$\", true))) OR ((SEARCH(sport, \"^.*NOR.*$\", true))) OR ((SEARCH(type, \"^.*NOR.*$\", true))) OR ((SEARCH(year, \"^.*NOR.*$\", true))))) ORDER BY year desc,discipline asc, city asc, country asc, type desc, event asc LIMIT 6",
     "predicate": "exactly",

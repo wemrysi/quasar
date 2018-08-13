@@ -1,11 +1,8 @@
 {
     "name": "use type_of function",
-    "NB": "Expected results not verified for any connector.",
     "backends": {
-        "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "pendingIgnoreFieldOrder",
-        "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir":     "pendingIgnoreFieldOrder"
     },
     "data": "types.data",
     "query": "select foo ?? \"nope\" as foo, type_of(foo ?? 42) as type from `types.data`",

@@ -33,7 +33,6 @@ sealed abstract class Type extends Product with Serializable { self =>
 
   final def toPrimaryType: Option[PrimaryType] =
     if      (Str.contains(this))       common.Arr.some
-    else if (Binary.contains(this))    common.Arr.some
     else if (AnyArray.contains(this))  common.Arr.some
     else if (Bool.contains(this))      common.Bool.some
     else if (Dec.contains(this))       common.Dec.some
@@ -262,8 +261,6 @@ trait TypeInstances {
         jString("Dec")
       case Bool =>
         jString("Bool")
-      case Binary =>
-        jString("Binary")
       case OffsetDateTime =>
         jString("OffsetDateTime")
       case OffsetTime =>
@@ -278,8 +275,6 @@ trait TypeInstances {
         jString("LocalDate")
       case Interval =>
         jString("Interval")
-      case Id =>
-        jString("Id")
       case Arr(types) =>
         Json("Array" := types)
       case FlexArr(min, max, mbrs) =>
@@ -306,7 +301,6 @@ object Type extends TypeInstances {
   val fromPrimaryType: PrimaryType => Type = {
     case common.Null => Null
     case common.Bool => Bool
-    case common.Byte => Top
     case common.Char => Top
     case common.Int  => Int
     case common.Dec  => Dec
@@ -329,8 +323,6 @@ object Type extends TypeInstances {
     case Data.LocalTime(_) => LocalTime
     case Data.LocalDate(_) => LocalDate
     case Data.Interval(_) => Interval
-    case Data.Binary(_) => Binary
-    case Data.Id(_) => Id
     case Data.NA => Bottom
   }
 
@@ -446,7 +438,6 @@ object Type extends TypeInstances {
     case Int => Nil
     case Dec => Nil
     case Bool => Nil
-    case Binary => Nil
     case OffsetDateTime => Nil
     case OffsetTime => Nil
     case OffsetDate => Nil
@@ -454,7 +445,6 @@ object Type extends TypeInstances {
     case LocalTime => Nil
     case LocalDate => Nil
     case Interval => Nil
-    case Id => Nil
     case Arr(value) => value
     case FlexArr(_, _, value) => value :: Nil
     case Obj(map, uk) => uk.toList ++ map.values.toList
@@ -516,7 +506,6 @@ object Type extends TypeInstances {
   final case object Int               extends Type
   final case object Dec               extends Type
   final case object Bool              extends Type
-  final case object Binary            extends Type
   final case object OffsetDateTime    extends Type
   final case object OffsetTime        extends Type
   final case object OffsetDate        extends Type
@@ -524,7 +513,6 @@ object Type extends TypeInstances {
   final case object LocalTime         extends Type
   final case object LocalDate         extends Type
   final case object Interval          extends Type
-  final case object Id                extends Type
 
   final case class Arr(value: List[Type]) extends Type
   final case class FlexArr(minSize: Int, maxSize: Option[Int], value: Type)
@@ -583,29 +571,27 @@ object Type extends TypeInstances {
   val Numeric = Int ⨿ Dec
   val Temporal = OffsetDateTime ⨿ OffsetDate ⨿ OffsetTime ⨿ LocalDateTime ⨿ LocalDate ⨿ LocalTime
   val Comparable = Numeric ⨿ Str ⨿ Temporal ⨿ Bool
-  val Syntaxed = Type.Null ⨿ Type.Comparable ⨿ Type.Interval ⨿ Type.Id
+  val Syntaxed = Type.Null ⨿ Type.Comparable ⨿ Type.Interval
   val HasDate = OffsetDateTime ⨿ OffsetDate ⨿ LocalDateTime ⨿ LocalDate
   val HasTime = OffsetDateTime ⨿ OffsetTime ⨿ LocalDateTime ⨿ LocalTime
   val HasOffset = OffsetDateTime ⨿ OffsetDate ⨿ OffsetTime
 
   @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Recursion"))
   implicit val equal: Equal[Type] = Equal.equal((a, b) => (a, b) match {
-    case (Top,       Top)
-       | (Bottom,    Bottom)
-       | (Null,      Null)
-       | (Str,       Str)
-       | (Int,       Int)
-       | (Dec,       Dec)
-       | (Bool,      Bool)
-       | (Binary,    Binary)
+    case (Top, Top)
+       | (Bottom, Bottom)
+       | (Null, Null)
+       | (Str, Str)
+       | (Int, Int)
+       | (Dec, Dec)
+       | (Bool, Bool)
        | (OffsetDateTime, OffsetDateTime)
-       | (OffsetTime,     OffsetTime)
-       | (OffsetDate,     OffsetDate)
-       | (LocalDateTime,  LocalDateTime)
-       | (LocalTime,      LocalTime)
-       | (LocalDate,      LocalDate)
-       | (Interval,       Interval)
-       | (Id,             Id) =>
+       | (OffsetTime, OffsetTime)
+       | (OffsetDate, OffsetDate)
+       | (LocalDateTime, LocalDateTime)
+       | (LocalTime, LocalTime)
+       | (LocalDate, LocalDate)
+       | (Interval, Interval) =>
       true
     case (Const(a), Const(b)) => a ≟ b
     case (Arr(as), Arr(bs)) => as ≟ bs

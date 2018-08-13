@@ -86,7 +86,10 @@ lazy val publishSettings = Seq(
       url("https://github.com/slamdata/quasar"),
       "scm:git@github.com:slamdata/quasar.git"
     )
-  ))
+  ),
+  publishArtifact in (Test, packageBin) := true
+)
+
 
 lazy val assemblySettings = Seq(
   test in assembly := {},
@@ -127,10 +130,6 @@ lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
 lazy val excludeTypelevelScalaLibrary =
   Seq(excludeDependencies += "org.typelevel" % "scala-library")
 
-// Include to also publish a project's tests
-lazy val publishTestsSettings = Seq(
-  publishArtifact in (Test, packageBin) := true)
-
 lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
 lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
@@ -167,7 +166,6 @@ lazy val root = project.in(file("."))
 lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
   .settings(commonSettings)
-  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(
     buildInfoKeys := Seq[BuildInfoKey](version, isCIBuild, isIsolatedEnv, exclusiveTestTag),
@@ -182,10 +180,9 @@ lazy val foundation = project
 /** Types and interfaces describing Quasar's functionality. */
 lazy val api = project
   .settings(name := "quasar-api-internal")
-  .dependsOn(common % BothScopes)
+  .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.api)
   .settings(commonSettings)
-  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
@@ -211,7 +208,6 @@ lazy val common = project
     ejson)
   .settings(libraryDependencies ++= Dependencies.common)
   .settings(commonSettings)
-  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
@@ -224,7 +220,6 @@ lazy val frontend = project
     common % BothScopes,
     ejson % BothScopes)
   .settings(commonSettings)
-  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(
     libraryDependencies ++= Dependencies.frontend)
@@ -256,7 +251,6 @@ lazy val sql = project
   .settings(name := "quasar-sql-internal")
   .dependsOn(common % BothScopes)
   .settings(commonSettings)
-  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .settings(
@@ -265,9 +259,7 @@ lazy val sql = project
 
 lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
-  .dependsOn(
-    foundation % BothScopes,
-    frontend % BothScopes)
+  .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -284,10 +276,10 @@ lazy val qsu = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
-    api % BothScopes,
-    qsu)
+    api,
+    foundation % "test->test",
+    qscript)
   .settings(commonSettings)
-  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
@@ -295,11 +287,9 @@ lazy val connector = project
 lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(
-    api     % BothScopes,
-    qscript % BothScopes,
-    sql     % BothScopes)
+    frontend % BothScopes,
+    sql % BothScopes)
   .settings(commonSettings)
-  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(
     libraryDependencies ++= Dependencies.core)
@@ -312,7 +302,7 @@ lazy val impl = project
   .dependsOn(
     api % BothScopes,
     connector % BothScopes,
-    frontend)
+    sst)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.impl)
@@ -324,9 +314,9 @@ lazy val runp = (project in file("run"))
   .dependsOn(
     core,
     impl,
-    mimir)
+    mimir,
+    qsu)
   .settings(commonSettings)
-  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
@@ -336,8 +326,7 @@ lazy val runp = (project in file("run"))
 lazy val repl = project
   .settings(name := "quasar-repl")
   .dependsOn(
-    frontend % BothScopes,
-    api,
+    common % "test->test",
     runp)
   .settings(commonSettings)
   .settings(targetSettings)
@@ -356,10 +345,9 @@ lazy val it = project
   .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
   .dependsOn(
-    runp,
-    qscript % "test->test")
+    qscript % "test->test",
+    runp)
   .settings(commonSettings)
-  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.it)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
@@ -376,6 +364,7 @@ lazy val precog = project
     scalacStrictMode := false)
   .dependsOn(common)
   .settings(libraryDependencies ++= Dependencies.precog)
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -392,6 +381,7 @@ lazy val blueeyes = project
     precog,
     frontend % BothScopes)
   .settings(libraryDependencies ++= Dependencies.blueeyes)
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -405,6 +395,7 @@ lazy val niflheim = project
     scalacStrictMode := false)
   .dependsOn(blueeyes % BothScopes)
   .settings(libraryDependencies ++= Dependencies.niflheim)
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -421,6 +412,7 @@ lazy val yggdrasil = project
   .settings(
     resolvers += "bintray-djspiewak-maven" at "https://dl.bintray.com/djspiewak/maven",
     libraryDependencies ++= Dependencies.yggdrasil)
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -433,6 +425,7 @@ lazy val yggdrasilPerf = project
     name := "quasar-yggdrasil-perf-internal",
     scalacStrictMode := false)
   .dependsOn(yggdrasil % "compile->compile;compile->test")
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(noPublishSettings)
   .settings(assemblySettings)
@@ -449,8 +442,8 @@ lazy val mimir = project
   .dependsOn(
     yggdrasil % BothScopes,
     impl % BothScopes,
-    core,
     connector)
+  .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)

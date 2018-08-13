@@ -3,14 +3,12 @@
 
   "backends": {
     "lwc_local":      "ignoreFieldOrder",
-    "mimir":          "pendingIgnoreFieldOrder",
-    "mongodb_3_4_13": "pending",
-    "mongodb_3_6":    "pending"
+    "mimir":          "pendingIgnoreFieldOrder"
   },
 
   "data": ["../heterogeneous.data", "../types.data"],
 
-  "query": "select a as num, b from `../heterogeneous.data` union all select num + 10 as num, foo as b from `../types.data`",
+  "query": "select a as num, b from `../heterogeneous.data` union all select num + 20 as num, foo as b from `../types.data`",
 
   "predicate": "exactly",
 
@@ -27,25 +25,28 @@
     { "num": 8, "b": null },
     { "num": 9, "b": { "e": { "n": 1 }, "f": null, "i": [], "g": "foo", "h": {  }, "d": [ 1, 2, 3 ] } },
     { "num": 10, "b": [ [ 4, 5, 6 ], { "m": 1 }, null, "foo", {  }, [] ] },
-    { "num": 11, "b": 11 },
-    { "num": 12, "b": 1.12345 },
-    { "num": 13, "b": "13" },
-    { "num": 14, "b": "zap" },
-    { "num": 15, "b": true },
-    { "num": 16, "b": false },
-    { "num": 17, "b": null },
-    { "num": 18, "b": { "$offsetdatetime": "2009-02-13T23:31:30.011000000+12:15:18" } },
-    { "num": 19, "b": { "$offsetdate": "2009-02-13+12:15:18" } },
-    { "num": 20, "b": { "$offsettime": "23:31:30.011000000+12:15:18" } },
-    { "num": 21, "b": { "$localdatetime": "2009-02-13T23:31:30.011000000" } },
-    { "num": 22, "b": { "$localdate": "2009-02-13" } },
-    { "num": 23, "b": { "$localtime": "23:31:30.011000000" } },
-    { "num": 24, "b": { "$interval": "P7DT12H34M" } },
-    { "num": 25, "b": [] },
-    { "num": 26, "b": {  } },
-    { "num": 27, "b": [ 15, [ { "baz": [ "quux" ] } ] ] },
-    { "num": 28, "b": { "baz": [ "qx" ], "bar": 15 } },
-    { "num": 29 },
-    { "num": 30 }
+    { "num": 11, "b": [{"$offsetdatetime":"2018-07-29T23:59:59.999000000+01:01:01"}, {"$offsetdate":"2009-02-13+02:00"}, {"$offsettime":"23:00:00.000000000+03:59"}, {"$localdatetime":"2018-07-29T23:59:59.999999000"}, {"$localdate":"2012-12-31"}, {"$localtime":"13:31:30.100000000"}, {"$interval":"P7DT12H34M"}] },
+    { "num": 12, "b": { "odt": {"$offsetdatetime":"2018-07-29T23:59:59.999000000+01:01:01"}, "od": {"$offsetdate":"2009-02-13+02:00"}, "ot": {"$offsettime":"23:00:00.000000000+03:59"}, "ldt":{"$localdatetime":"2018-07-29T23:59:59.999999000"}, "ld": {"$localdate":"2012-12-31"}, "lt": {"$localtime":"13:31:30.100000000"}, "i": {"$interval":"P7DT12H34M"} } },
+    { "num": 13 },
+    { "num": 21, "b": 11 },
+    { "num": 22, "b": 1.12345 },
+    { "num": 23, "b": "13" },
+    { "num": 24, "b": "zap" },
+    { "num": 25, "b": true },
+    { "num": 26, "b": false },
+    { "num": 27, "b": null },
+    { "num": 28, "b": { "$offsetdatetime": "2009-02-13T23:31:30.011000000+12:15:18" } },
+    { "num": 29, "b": { "$offsetdate": "2009-02-13+12:15:18" } },
+    { "num": 30, "b": { "$offsettime": "23:31:30.011000000+12:15:18" } },
+    { "num": 31, "b": { "$localdatetime": "2009-02-13T23:31:30.011000000" } },
+    { "num": 32, "b": { "$localdate": "2009-02-13" } },
+    { "num": 33, "b": { "$localtime": "23:31:30.011000000" } },
+    { "num": 34, "b": { "$interval": "P7DT12H34M" } },
+    { "num": 35, "b": [] },
+    { "num": 36, "b": {  } },
+    { "num": 37, "b": [ 15, [ { "baz": [ "quux" ] } ] ] },
+    { "num": 38, "b": { "baz": [ "qx" ], "bar": 15 } },
+    { "num": 39 },
+    { "num": 40 }
   ]
 }

@@ -18,6 +18,7 @@ package quasar.api.datasource
 
 import slamdata.Predef.{Int, List, String, Stream => SStream}
 import quasar.Condition
+import quasar.api.MockSchemaConfig
 import quasar.contrib.cats.stateT._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -35,20 +36,22 @@ import shims._
 import MockDatasourcesSpec._
 
 final class MockDatasourcesSpec
-  extends DatasourcesSpec[MockM, List, Int, String] {
+  extends DatasourcesSpec[MockM, List, Int, String, MockSchemaConfig.type] {
 
   val s3: DatasourceType    = DatasourceType("s3", 1L)
   val azure: DatasourceType = DatasourceType("azure", 1L)
   val mongo: DatasourceType = DatasourceType("mongodb", 1L)
   val acceptedSet: ISet[DatasourceType] = ISet.fromList(List(s3, azure, mongo))
 
-  def datasources: Datasources[MockM, List, Int, String] =
+  def datasources: Datasources[MockM, List, Int, String, MockSchemaConfig.type] =
     MockDatasources[String, MockM, List](
       acceptedSet, _ => Condition.normal(), SStream.empty)
 
   def supportedType = DatasourceType("s3", 1L)
 
   def validConfigs = ("bucket1", "bucket2")
+
+  val schemaConfig = MockSchemaConfig
 
   def gatherMultiple[A](xs: List[A]) = xs.pure[MockM]
 }

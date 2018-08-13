@@ -1,0 +1,19 @@
+{
+    "name": "field and flattened array value on heterogenous with filter on flattened array value",
+    "backends": {
+        "lwc_local": "pendingIgnoreFieldOrder",
+        "mimir":     "pendingIgnoreFieldOrder"
+    },
+    "NB": "ch663 for lwc_local",
+    "data": "heterogeneous.data",
+    "query": "select a, b[*] from `heterogeneous.data` where type_of(b[*]) = \"string\" or type_of(b[*]) = \"offsetdatetime\"",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      { "a": 2, "b": "u" },
+      { "a": 2, "b": "v" },
+      { "a": 6, "b": "w" },
+      { "a": 10, "b": "foo" },
+      { "a": 11, "b": { "$offsetdatetime": "2018-07-29T23:59:59.999000000+01:01:01" } }
+    ]
+}

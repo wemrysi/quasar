@@ -16,11 +16,12 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{Boolean, Exception, Unit}
+import slamdata.Predef.{Boolean, Exception, Option, Unit}
 import quasar.Condition
+import quasar.api.SchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
-import quasar.common.resource._
+import quasar.api.resource._
 import quasar.impl.storage.IndexedStore
 
 import cats.effect.Sync
@@ -32,12 +33,13 @@ import scalaz.syntax.monad._
 import scalaz.syntax.std.boolean._
 import shims._
 
-final class DefaultDatasources[F[_]: Sync, I: Equal, C: Equal] private (
+final class DefaultDatasources[
+    F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig] private (
     freshId: F[I],
     refs: IndexedStore[F, I, DatasourceRef[C]],
     errors: DatasourceErrors[F, I],
-    control: DatasourceControl[F, Stream[F, ?], I, C])
-    extends Datasources[F, Stream[F, ?], I, C] {
+    control: DatasourceControl[F, Stream[F, ?], I, C, S])
+    extends Datasources[F, Stream[F, ?], I, C, S] {
 
   def addDatasource(ref: DatasourceRef[C]): F[CreateError[C] \/ I] =
     for {
@@ -83,6 +85,10 @@ final class DefaultDatasources[F[_]: Sync, I: Equal, C: Equal] private (
 
       case -\/(err) => Condition.abnormal(err).point[F]
     }
+
+  def resourceSchema(datasourceId: I, path: ResourcePath, schemaConfig: S)
+      : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]] =
+    control.resourceSchema(datasourceId, path, schemaConfig)
 
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     control.supportedDatasourceTypes
@@ -152,11 +158,11 @@ final class DefaultDatasources[F[_]: Sync, I: Equal, C: Equal] private (
 }
 
 object DefaultDatasources {
-  def apply[F[_]: Sync, I: Equal, C: Equal](
+  def apply[F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig](
       freshId: F[I],
       refs: IndexedStore[F, I, DatasourceRef[C]],
       errors: DatasourceErrors[F, I],
-      control: DatasourceControl[F, Stream[F, ?], I, C])
-      : Datasources[F, Stream[F, ?], I, C] =
+      control: DatasourceControl[F, Stream[F, ?], I, C, S])
+      : Datasources[F, Stream[F, ?], I, C, S] =
     new DefaultDatasources(freshId, refs, errors, control)
 }

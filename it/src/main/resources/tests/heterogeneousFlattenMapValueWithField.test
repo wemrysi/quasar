@@ -2,9 +2,7 @@
     "name": "field and flattened map value on heterogeneous",
     "backends": {
         "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder",
-        "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending"
+        "mimir":             "ignoreFieldOrder"
     },
     "data": "heterogeneous.data",
     "query": "select a, b{*} from `heterogeneous.data`",
@@ -26,6 +24,15 @@
       { "a": 9, "b": "foo" },
       { "a": 9, "b": {  } },
       { "a": 9, "b": [] },
-      { "a": 10 }
+      { "a": 10 },
+      { "a": 11 },
+      { "a": 12, "b": { "$offsetdatetime": "2018-07-29T23:59:59.999000000+01:01:01" } },
+      { "a": 12, "b": { "$offsetdate": "2009-02-13+02:00" } },
+      { "a": 12, "b": { "$offsettime": "23:00:00.000000000+03:59" } },
+      { "a": 12, "b": { "$localdatetime": "2018-07-29T23:59:59.999999000" } },
+      { "a": 12, "b": { "$localdate": "2012-12-31" } },
+      { "a": 12, "b": { "$localtime": "13:31:30.100000000" } },
+      { "a": 12, "b": { "$interval": "P7DT12H34M" } },
+      { "a": 13 }
     ]
 }

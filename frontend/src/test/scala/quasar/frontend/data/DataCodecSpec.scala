@@ -28,6 +28,7 @@ import scalaz._, Scalaz._
 
 class DataCodecSpecs extends quasar.Qspec {
   import DataGenerators._, RepresentableDataGenerators._
+  import DataCodec.PreciseKeys._
 
   implicit val DataShow = new Show[Data] { override def show(v: Data) = v.toString }
   implicit val ShowStr = new Show[String] { override def show(v: String) = v }
@@ -42,44 +43,85 @@ class DataCodecSpecs extends quasar.Qspec {
     "render" should {
       // NB: these tests verify that all the formatting matches our documentation
 
-      "encode null"      in { DataCodec.render(Data.Null)     must beSome("null") }
-      "encode true"      in { DataCodec.render(Data.True)     must beSome("true") }
-      "encode false"     in { DataCodec.render(Data.False)    must beSome("false") }
-      "encode int"       in { DataCodec.render(Data.Int(0))   must beSome("0") }
-      "encode dec"       in { DataCodec.render(Data.Dec(1.1)) must beSome("1.1") }
+      "encode null" in { DataCodec.render(Data.Null) must beSome("null") }
+      "encode true" in { DataCodec.render(Data.True) must beSome("true") }
+      "encode false" in { DataCodec.render(Data.False) must beSome("false") }
+      "encode int" in { DataCodec.render(Data.Int(0)) must beSome("0") }
+      "encode dec" in { DataCodec.render(Data.Dec(1.1)) must beSome("1.1") }
       "encode dec with no fractional part" in { DataCodec.render(Data.Dec(2.0)) must beSome("2.0") }
-      "encode localdatetime" in { DataCodec.render(Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30:00"))) must beSome("""{ "$localdatetime": "2015-01-31T10:30:00.000000000" }""") }
-      "encode localdate" in { DataCodec.render(Data.LocalDate(LocalDate.parse("2015-01-31")))              must beSome("""{ "$localdate": "2015-01-31" }""") }
-      "encode localtime" in { DataCodec.render(Data.LocalTime(LocalTime.parse("10:30:00")))            must beSome("""{ "$localtime": "10:30:00.000000000" }""") }
-      "encode offsetdatetime" in { DataCodec.render(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))) must beSome("""{ "$offsetdatetime": "2015-01-31T10:30:00.000000000Z" }""") }
-      "encode offsetdate" in { DataCodec.render(Data.OffsetDate(OffsetDate.parse("2015-01-31Z")))              must beSome("""{ "$offsetdate": "2015-01-31Z" }""") }
-      "encode offsettime" in { DataCodec.render(Data.OffsetTime(OffsetTime.parse("10:30:00.000Z")))            must beSome("""{ "$offsettime": "10:30:00.000000000Z" }""") }
+
+      "encode localdatetime" in {
+        DataCodec.render(Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30:00"))) must
+          beSome(s"""{ "$LocalDateTimeKey": "2015-01-31T10:30:00.000000000" }""")
+      }
+
+      "encode localdate" in {
+        DataCodec.render(Data.LocalDate(LocalDate.parse("2015-01-31"))) must
+          beSome(s"""{ "$LocalDateKey": "2015-01-31" }""")
+      }
+
+      "encode localtime" in {
+        DataCodec.render(Data.LocalTime(LocalTime.parse("10:30:00"))) must
+          beSome(s"""{ "$LocalTimeKey": "10:30:00.000000000" }""")
+      }
+
+      "encode offsetdatetime" in {
+        DataCodec.render(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))) must
+          beSome(s"""{ "$OffsetDateTimeKey": "2015-01-31T10:30:00.000000000Z" }""")
+      }
+
+      "encode offsetdate" in {
+        DataCodec.render(Data.OffsetDate(OffsetDate.parse("2015-01-31Z"))) must
+          beSome(s"""{ "$OffsetDateKey": "2015-01-31Z" }""")
+      }
+
+      "encode offsettime" in {
+        DataCodec.render(Data.OffsetTime(OffsetTime.parse("10:30:00.000Z"))) must
+          beSome(s"""{ "$OffsetTimeKey": "10:30:00.000000000Z" }""")
+      }
+
       "encode interval"  in {
         (for {
           interval <- DateTimeInterval.parse("PT12H34M")
           rendered <- DataCodec.render(Data.Interval(interval))
-        } yield rendered) must beSome("""{ "$interval": "PT12H34M" }""")
+        } yield rendered) must beSome(s"""{ "$IntervalKey": "PT12H34M" }""")
       }
+
       "encode obj" in {
         // NB: more than 4, to verify order is preserved
-        DataCodec.render(Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2), "c" -> Data.Int(3), "d" -> Data.Int(4), "e" -> Data.Int(5)))) must
-          beSome("""{ "a": 1, "b": 2, "c": 3, "d": 4, "e": 5 }""")
+        DataCodec.render(Data.Obj(ListMap(
+          "a" -> Data.Int(1),
+          "b" -> Data.Int(2),
+          "c" -> Data.Int(3),
+          "d" -> Data.Int(4),
+          "e" -> Data.Int(5)))) must beSome(
+          """{ "a": 1, "b": 2, "c": 3, "d": 4, "e": 5 }""")
       }
+
       "encode obj with leading '$'s" in {
-        DataCodec.render(Data.Obj(ListMap("$a" -> Data.Int(1), "$date" -> Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30"))))) must
-          beSome("""{ "$obj": { "$a": 1, "$date": { "$localdatetime": "2015-01-31T10:30:00.000000000" } } }""")
+        DataCodec.render(Data.Obj(ListMap(
+          "$a" -> Data.Int(1),
+          LocalDateKey -> Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30"))))) must beSome(
+
+            s"""{ "$ObjKey": { "$$a": 1, "$LocalDateKey": { "$LocalDateTimeKey": "2015-01-31T10:30:00.000000000" } } }""")
       }
+
       "encode obj with $obj" in {
-        DataCodec.render(Data.Obj(ListMap("$obj" -> Data.Obj(ListMap("$obj" -> Data.Int(1)))))) must
-          beSome("""{ "$obj": { "$obj": { "$obj": { "$obj": 1 } } } }""")
+        DataCodec.render(Data.Obj(ListMap(ObjKey -> Data.Obj(ListMap(ObjKey -> Data.Int(1)))))) must
+          beSome(s"""{ "$ObjKey": { "$ObjKey": { "$ObjKey": { "$ObjKey": 1 } } } }""")
       }
-      "encode array"     in { DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beSome("[ 0, 1, 2 ]") }
-      "encode binary"    in { DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must beSome("""{ "$binary": "TE1OTw==" }""") }
-      "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beSome("""{ "$oid": "abc" }""") }
-      "encode NA"        in { DataCodec.render(Data.NA) must beNone }
+
+      "encode array" in {
+        DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must
+          beSome("[ 0, 1, 2 ]")
+      }
+
+      "encode NA" in {
+        DataCodec.render(Data.NA) must beNone
+      }
     }
 
-    // NB. We don't use `RepresentableData` because it does not generate ID and Binary which
+    // NB. We don't use `RepresentableData` because it does not generate ID which
     // we want to test here
     "round-trip" >> prop { data: Data =>
       DataCodec.representable(data, codec) ==> {
@@ -90,22 +132,42 @@ class DataCodecSpecs extends quasar.Qspec {
     "parse" should {
       // These types get lost on the way through rendering and re-parsing:
       "re-parse very large Int value as Dec" in {
-        roundTrip(Data.Int(LargeInt)) must beSome(Data.Dec(new java.math.BigDecimal(LargeInt.underlying)).right[DataEncodingError])
+        roundTrip(Data.Int(LargeInt)) must
+          beSome(Data.Dec(new java.math.BigDecimal(LargeInt.underlying)).right[DataEncodingError])
       }
 
-      "decode timestamp" in { DataCodec.parse("""{ "$timestamp": "2015-01-31T10:30:00.000Z" }""").toOption must beSome(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))) }
-      "decode date"      in { DataCodec.parse("""{ "$date": "2015-01-31" }""").toOption must beSome(Data.LocalDate(LocalDate.parse("2015-01-31"))) }
-      "decode time"      in { DataCodec.parse("""{ "$time": "10:30:00.000" }""").toOption must beSome(Data.LocalTime(LocalTime.parse("10:30:00.000"))) }
+      "decode localdatetime" in {
+        DataCodec.parse(s"""{ "$LocalDateTimeKey": "2015-01-31T10:30" }""").toOption must
+          beSome(Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30:00")))
+      }
 
-      "decode localdatetime" in { DataCodec.parse("""{ "$localdatetime": "2015-01-31T10:30" }""").toOption must beSome(Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30:00"))) }
-      "decode localdate" in { DataCodec.parse("""{ "$localdate": "2015-01-31" }""").toOption must beSome(Data.LocalDate(LocalDate.parse("2015-01-31"))) }
-      "decode localtime" in { DataCodec.parse("""{ "$localtime": "10:30" }""").toOption must beSome(Data.LocalTime(LocalTime.parse("10:30:00.000"))) }
-      "decode offsetdatetime" in { DataCodec.parse("""{ "$offsetdatetime": "2015-01-31T10:30Z" }""").toOption must beSome(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))) }
-      "decode offsetdate" in { DataCodec.parse("""{ "$offsetdate": "2015-01-31Z" }""").toOption must beSome(Data.OffsetDate(OffsetDate.parse("2015-01-31Z"))) }
-      "decode offsettime" in { DataCodec.parse("""{ "$offsettime": "10:30Z" }""").toOption must beSome(Data.OffsetTime(OffsetTime.parse("10:30:00.000Z"))) }
+      "decode localdate" in {
+        DataCodec.parse(s"""{ "$LocalDateKey": "2015-01-31" }""").toOption must
+          beSome(Data.LocalDate(LocalDate.parse("2015-01-31")))
+      }
 
-      "decode timestamp within array" in {
-        val input = """[{ "$timestamp": "2015-01-31T10:30:00.000Z" }]"""
+      "decode localtime" in {
+        DataCodec.parse(s"""{ "$LocalTimeKey": "10:30" }""").toOption must
+          beSome(Data.LocalTime(LocalTime.parse("10:30:00.000")))
+      }
+
+      "decode offsetdatetime" in {
+        DataCodec.parse(s"""{ "$OffsetDateTimeKey": "2015-01-31T10:30Z" }""").toOption must
+          beSome(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z")))
+      }
+
+      "decode offsetdate" in {
+        DataCodec.parse(s"""{ "$OffsetDateKey": "2015-01-31Z" }""").toOption must
+          beSome(Data.OffsetDate(OffsetDate.parse("2015-01-31Z")))
+      }
+
+      "decode offsettime" in {
+        DataCodec.parse(s"""{ "$OffsetTimeKey": "10:30Z" }""").toOption must
+          beSome(Data.OffsetTime(OffsetTime.parse("10:30:00.000Z")))
+      }
+
+      "decode offsetdatetime within array" in {
+        val input = s"""[{ "$OffsetDateTimeKey": "2015-01-31T10:30:00.000Z" }]"""
 
         val results = DataCodec.parse(input).toOption
         val expected = Data.Arr(List(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))))
@@ -113,8 +175,10 @@ class DataCodecSpecs extends quasar.Qspec {
         results must beSome(expected)
       }
 
-      "decode timestamp AND localdatetime within array" in {
-        val input = """[{ "$timestamp": "2015-01-31T10:30:00.000Z" }, { "$localdatetime": "2015-01-31T10:30" }]"""
+      "decode offsetdatetime AND localdatetime within array" in {
+        val input = s"""[
+          { "$OffsetDateTimeKey": "2015-01-31T10:30:00.000Z" },
+          { "$LocalDateTimeKey": "2015-01-31T10:30" }]"""
 
         val results = DataCodec.parse(input).toOption
 
@@ -130,15 +194,16 @@ class DataCodecSpecs extends quasar.Qspec {
       // Some invalid inputs:
 
       "fail with unescaped leading '$'" in {
-        DataCodec.parse("""{ "$a": 1 }""") must be_-\/(UnescapedKeyError(jSingleObject("$a", jNumber(1))))
+        DataCodec.parse("""{ "$a": 1 }""") must
+          be_-\/(UnescapedKeyError(jSingleObject("$a", jNumber(1))))
       }
 
       "fail with invalid offset date time value" in {
-        DataCodec.parse("""{ "$offsetdatetime": 123456 }""") must be_-\/
+        DataCodec.parse(s"""{ "$OffsetDateTimeKey": 123456 }""") must be_-\/
       }
 
       "fail with invalid offset date time string" in {
-        DataCodec.parse("""{ "$offsetdatetime": "10 o'clock this morning" }""") must be_-\/
+        DataCodec.parse(s"""{ "$OffsetDateTimeKey": "10 o'clock this morning" }""") must be_-\/
       }
     }
   }
@@ -149,42 +214,75 @@ class DataCodecSpecs extends quasar.Qspec {
     "render" should {
       // NB: these tests verify that all the formatting matches our documentation
 
-      "encode null"      in { DataCodec.render(Data.Null)     must beSome("null") }
-      "encode true"      in { DataCodec.render(Data.True)     must beSome("true") }
-      "encode false"     in { DataCodec.render(Data.False)    must beSome("false") }
-      "encode int"       in { DataCodec.render(Data.Int(0))   must beSome("0") }
-      "encode dec"       in { DataCodec.render(Data.Dec(1.1)) must beSome("1.1") }
+      "encode null" in { DataCodec.render(Data.Null) must beSome("null") }
+      "encode true" in { DataCodec.render(Data.True) must beSome("true") }
+      "encode false" in { DataCodec.render(Data.False) must beSome("false") }
+      "encode int" in { DataCodec.render(Data.Int(0)) must beSome("0") }
+      "encode dec" in { DataCodec.render(Data.Dec(1.1)) must beSome("1.1") }
       "encode dec with no fractional part" in { DataCodec.render(Data.Dec(2.0)) must beSome("2.0") }
+
       "encode localdatetime" in {
-        DataCodec.render(Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30:00"))) must beSome("\"2015-01-31T10:30\"")
+        DataCodec.render(Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30:00"))) must
+          beSome("\"2015-01-31T10:30\"")
       }
-      "encode localdate"      in { DataCodec.render(Data.LocalDate(LocalDate.parse("2015-01-31")))     must beSome("\"2015-01-31\"") }
-      "encode localtime"      in { DataCodec.render(Data.LocalTime(LocalTime.parse("10:30:00.000")))   must beSome("\"10:30\"") }
+
+      "encode localdate" in {
+        DataCodec.render(Data.LocalDate(LocalDate.parse("2015-01-31"))) must
+          beSome("\"2015-01-31\"")
+      }
+
+      "encode localtime" in {
+        DataCodec.render(Data.LocalTime(LocalTime.parse("10:30:00.000"))) must
+          beSome("\"10:30\"")
+      }
+
       "encode offsetdatetime" in {
-        DataCodec.render(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))) must beSome("\"2015-01-31T10:30Z\"")
+        DataCodec.render(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))) must
+          beSome("\"2015-01-31T10:30Z\"")
       }
-      "encode offsetdate"      in { DataCodec.render(Data.OffsetDate(OffsetDate.parse("2015-01-31Z")))     must beSome("\"2015-01-31Z\"") }
-      "encode offsettime"      in { DataCodec.render(Data.OffsetTime(OffsetTime.parse("10:30:00.000Z")))   must beSome("\"10:30Z\"") }
-      "encode interval"       in {
+
+      "encode offsetdate" in {
+        DataCodec.render(Data.OffsetDate(OffsetDate.parse("2015-01-31Z"))) must
+          beSome("\"2015-01-31Z\"")
+      }
+
+      "encode offsettime" in {
+        DataCodec.render(Data.OffsetTime(OffsetTime.parse("10:30:00.000Z"))) must
+          beSome("\"10:30Z\"")
+      }
+
+      "encode interval" in {
         (for {
           interval <- DateTimeInterval.parse("PT12H34M")
           rendered <- DataCodec.render(Data.Interval(interval))
         } yield rendered) must beSome("\"PT12H34M\"")
       }
+
       "encode obj" in {
         // NB: more than 4, to verify order is preserved
-        DataCodec.render(Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2), "c" -> Data.Int(3), "d" -> Data.Int(4), "e" -> Data.Int(5)))) must
+        DataCodec.render(Data.Obj(ListMap(
+          "a" -> Data.Int(1),
+          "b" -> Data.Int(2),
+          "c" -> Data.Int(3),
+          "d" -> Data.Int(4),
+          "e" -> Data.Int(5)))) must
           beSome("""{ "a": 1, "b": 2, "c": 3, "d": 4, "e": 5 }""")
       }
+
       "encode obj with leading '$'s" in {
-        DataCodec.render(Data.Obj(ListMap("$a" -> Data.Int(1), "$date" -> Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30"))))) must
-          beSome("""{ "$a": 1, "$date": "2015-01-31T10:30" }""")
-        }
-      "encode array"     in { DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beSome("[ 0, 1, 2 ]") }
-      "encode binary"    in { DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must beSome("\"TE1OTw==\"") }
-      "encode empty binary" in { DataCodec.render(Data.Binary.fromArray(Array[Byte]())) must beSome("\"\"") }
-      "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beSome("\"abc\"") }
-      "encode NA"        in { DataCodec.render(Data.NA) must beNone }
+        DataCodec.render(Data.Obj(ListMap(
+          "$a" -> Data.Int(1),
+          LocalDateTimeKey -> Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30"))))) must
+          beSome(s"""{ "$$a": 1, "$LocalDateTimeKey": "2015-01-31T10:30" }""")
+      }
+
+      "encode array" in {
+        DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beSome("[ 0, 1, 2 ]")
+      }
+
+      "encode NA" in {
+        DataCodec.render(Data.NA) must beNone
+      }
     }
 
     "round-trip" >> prop { data: RepresentableData =>
@@ -223,16 +321,6 @@ class DataCodecSpecs extends quasar.Qspec {
 
       "re-parse very large Int value as Dec" in {
         roundTrip(Data.Int(LargeInt)) must beSome(Data.Dec(new java.math.BigDecimal(LargeInt.underlying)).right[DataEncodingError])
-      }
-
-      "re-parse Binary as Str" in {
-        val binary = Data.Binary.fromArray(Array[Byte](0, 1, 2, 3))
-        roundTrip(binary) must beSome(Data.Str("AAECAw==").right[DataEncodingError])
-      }
-
-      "re-parse Id as Str" in {
-        val id = Data.Id("abc")
-        roundTrip(id) must beSome(Data.Str("abc").right[DataEncodingError])
       }
     }
   }

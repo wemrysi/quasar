@@ -136,7 +136,6 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       recFunc.TimeOfDay(h),
       recFunc.ToTimestamp(h),
       recFunc.TypeOf(h),
-      recFunc.ToId(h),
       recFunc.Negate(h),
       recFunc.MakeArray(h),
       recFunc.Lower(h),
@@ -235,7 +234,6 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       func.TimeOfDay(h),
       func.ToTimestamp(h),
       func.TypeOf(h),
-      func.ToId(h),
       func.Negate(h),
       func.MakeArray(h),
       func.Lower(h),
@@ -354,7 +352,6 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       json.arr(List(json.nul(), json.nul())),
       json.map(List((json.nul(), json.nul()))),
       json.bool(true),
-      json.byte(1.toByte),
       json.char('c'),
       json.dec(1.1),
       json.int(1),
@@ -380,4 +377,3 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
   }
 
 }
-

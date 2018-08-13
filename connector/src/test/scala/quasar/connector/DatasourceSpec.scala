@@ -18,7 +18,7 @@ package quasar.connector
 
 import slamdata.Predef.List
 import quasar.EffectfulQSpec
-import quasar.common.resource._
+import quasar.api.resource._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
