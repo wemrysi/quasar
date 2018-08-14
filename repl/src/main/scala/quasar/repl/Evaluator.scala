@@ -254,7 +254,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
               doSelect(sql, state).map { case (log, rendered) =>
                 val maxLines = state.summaryCount
                   .map(_.value + OutputFormat.headerLines(state.format))
-                printQueryResults(maxLines, rendered).map(log + _)
+                Stream.emit(log) ++ printQueryResults(maxLines, rendered)
               }
             case OutputMode.File =>
               Paths.createTempFile("results", ".txt").map { tmpFile =>
