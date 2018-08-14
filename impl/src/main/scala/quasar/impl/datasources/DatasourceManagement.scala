@@ -16,7 +16,7 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{Boolean, Exception, None, Option, Some, Unit}
+import slamdata.Predef.{Boolean, Exception, None, Option, Some, StringContext, Unit}
 import quasar.{Condition, Disposable, RenderTreeT}
 import quasar.api.datasource.{DatasourceError, DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{
@@ -27,7 +27,7 @@ import quasar.api.datasource.DatasourceError.{
 }
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.common.data.Data
-import quasar.connector.{Datasource, IncompatibleDatasourceException, MonadResourceErr}
+import quasar.connector.{Datasource, MonadResourceErr}
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.EJson
@@ -222,6 +222,10 @@ object DatasourceManagement {
 
   type MgmtControl[T[_[_]], F[_], I, N] =
       DatasourceControl[F, Stream[F, ?], I, Json, SstConfig[T[EJson], N]]
+
+  final case class IncompatibleDatasourceException(kind: DatasourceType) extends java.lang.RuntimeException {
+    override def getMessage = s"Loaded datasource implementation with type $kind is incompatible with quasar"
+  }
 
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
