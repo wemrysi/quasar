@@ -44,8 +44,6 @@ trait EvaluatorModule
   import dag._
   import instructions._
 
-  type GroupId = Int
-
   type Evaluator <: EvaluatorLike
 
   abstract class EvaluatorLike

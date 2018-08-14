@@ -26,9 +26,6 @@ import scala.collection.immutable.Set
 import cats.effect.{IO, LiftIO}
 
 import scalaz._
-import scalaz.syntax.monad._
-
-import shims._
 
 import java.nio.CharBuffer
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
@@ -156,7 +153,6 @@ trait TableModule extends TransSpecModule {
     def fromRValues(values: Stream[RValue], maxSliceRows: Option[Int] = None): Table
     def fromRValueStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table]
 
-    def merge(grouping: GroupingSpec)(body: (RValue, GroupId => IO[Table]) => IO[Table]): IO[Table]
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): IO[(Table, Table)]
 
     /**
@@ -309,48 +305,5 @@ trait TableModule extends TransSpecModule {
     def printer(prelude: String = "", flag: String = ""): Table
 
     def metrics: TableMetrics
-  }
-
-  sealed trait GroupingSpec {
-    def sources: Vector[GroupingSource]
-    def sorted: IO[GroupingSpec]
-  }
-
-  object GroupingSpec {
-    sealed trait Alignment
-    case object Union        extends Alignment
-    case object Intersection extends Alignment
-  }
-
-  /**
-    * Definition for a single group set and its associated composite key part.
-    *
-    * @param table The target set for the grouping
-    * @param targetTrans The key which will be used by `merge` to access a particular subset of the target
-    * @param groupKeySpec A composite union/intersect overlay on top of transspec indicating the composite key for this target set
-    */
-  final case class GroupingSource(table: Table,
-                                  idTrans: trans.TransSpec1,
-                                  targetTrans: Option[trans.TransSpec1],
-                                  groupId: GroupId,
-                                  groupKeySpec: trans.GroupKeySpec) extends GroupingSpec {
-    def sources: Vector[GroupingSource] = Vector(this)
-    def sorted: IO[GroupingSpec] =
-      for {
-        t <- table.sort(trans.DerefObjectStatic(trans.Leaf(trans.Source), CPathField("key")))
-      } yield {
-        GroupingSource(t, idTrans, targetTrans, groupId, groupKeySpec)
-      }
-  }
-
-  final case class GroupingAlignment(groupKeyLeftTrans: trans.TransSpec1,
-                                     groupKeyRightTrans: trans.TransSpec1,
-                                     left: GroupingSpec,
-                                     right: GroupingSpec,
-                                     alignment: GroupingSpec.Alignment) extends GroupingSpec {
-    def sources: Vector[GroupingSource] = left.sources ++ right.sources
-    def sorted: IO[GroupingSpec] = (left.sorted |@| right.sorted) { (t1, t2) =>
-      GroupingAlignment(groupKeyLeftTrans, groupKeyRightTrans, t1, t2, alignment)
-    }
   }
 }

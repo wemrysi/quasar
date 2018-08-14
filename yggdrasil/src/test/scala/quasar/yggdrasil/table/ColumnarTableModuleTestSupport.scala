@@ -30,7 +30,6 @@ import shims._
 import scala.annotation.tailrec
 
 trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModuleTestSupport {
-  def newGroupId: GroupId
 
   def defaultSliceSize = 10
 

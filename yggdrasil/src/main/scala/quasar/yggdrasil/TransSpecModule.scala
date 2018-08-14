@@ -36,7 +36,6 @@ object TransSpecModule {
 trait TransSpecModule {
   import TransSpecModule._
 
-  type GroupId
   type Scanner
   type Mapper
 
