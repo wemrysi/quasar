@@ -25,8 +25,7 @@ import quasar.contrib.std.uuid._
 import java.util.UUID
 
 import cats.data.StateT
-import cats.effect.IO
-import cats.syntax.applicative._
+import cats.effect.{IO, Sync}
 import scalaz.{~>, Id, IMap}, Id.Id
 import scalaz.std.string._
 import shims._
@@ -52,7 +51,7 @@ final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String] {
 
   def init(table: MockTables.MockTable): MockM[UUID] =
     for {
-      tableId <- UUID.randomUUID.pure[MockM]
+      tableId <- Sync[MockM].delay(UUID.randomUUID)
       _ <- MockM.modify(_.insert(tableId, table))
     } yield tableId
 
