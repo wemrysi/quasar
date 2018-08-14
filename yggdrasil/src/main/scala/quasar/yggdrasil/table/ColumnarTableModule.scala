@@ -44,8 +44,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable.Set
 
 trait ColumnarTableTypes {
-  type Scanner    = CScanner
-  type Mapper     = CMapper
   type Reducer[α] = CReducer[α]
   type RowId      = Int
 }

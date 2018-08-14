@@ -17,13 +17,14 @@
 package quasar.mimir
 
 import quasar.precog.common._
-import qdata.time.OffsetDate
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
 
 import cats.effect.IO
+import qdata.time.OffsetDate
 import scalaz._
+
 import java.time._
 
 trait TableLibModule extends TableModule with TransSpecModule {
@@ -104,7 +105,7 @@ trait TableLibModule extends TableModule with TransSpecModule {
 
       def prepare: CF1
 
-      def mapper: Mapper
+      def mapper: CMapper
     }
 
     abstract class Op2F2 extends Op2 {

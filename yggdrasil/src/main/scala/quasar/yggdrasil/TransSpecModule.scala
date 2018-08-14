@@ -18,7 +18,7 @@ package quasar.yggdrasil
 
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JType
-import quasar.yggdrasil.table.{CF1, CF2, CFN}
+import quasar.yggdrasil.table.{CF1, CF2, CFN, CMapper, CScanner}
 
 object TransSpecModule {
   object paths {
@@ -35,9 +35,6 @@ object TransSpecModule {
 
 trait TransSpecModule {
   import TransSpecModule._
-
-  type Scanner
-  type Mapper
 
   object trans {
     sealed trait TransSpec[+A <: SourceType]
@@ -58,9 +55,9 @@ trait TransSpecModule {
     case class Filter[+A <: SourceType](source: TransSpec[A], predicate: TransSpec[A]) extends TransSpec[A]
 
     // Adds a column to the output in the manner of scanLeft
-    case class Scan[+A <: SourceType](source: TransSpec[A], scanner: Scanner) extends TransSpec[A]
+    case class Scan[+A <: SourceType](source: TransSpec[A], scanner: CScanner) extends TransSpec[A]
 
-    case class MapWith[+A <: SourceType](source: TransSpec[A], mapper: Mapper) extends TransSpec[A]
+    case class MapWith[+A <: SourceType](source: TransSpec[A], mapper: CMapper) extends TransSpec[A]
 
     case class Map1[+A <: SourceType](source: TransSpec[A], f: CF1) extends TransSpec[A]
 

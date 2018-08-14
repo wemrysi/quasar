@@ -19,14 +19,14 @@ package quasar.yggdrasil
 import quasar.blueeyes._, json._
 import quasar.pkg.tests._
 import quasar.precog.common.RValue
-import quasar.yggdrasil.table.{CF1, CF2}
+import quasar.yggdrasil.table.{CF1, CF2, CScanner}
 
 import cats.effect.IO
 
 trait TestLib extends TableModule {
   def lookupF1(namespace: List[String], name: String): CF1
   def lookupF2(namespace: List[String], name: String): CF2
-  def lookupScanner(namespace: List[String], name: String): Scanner
+  def lookupScanner(namespace: List[String], name: String): CScanner
 }
 
 trait TableModuleTestSupport extends FNModule with TestLib {
