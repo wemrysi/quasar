@@ -3,7 +3,7 @@ scala: 2.12.4 # this needs to be in sync with Scala version used in .appveyor.ym
 jdk: oraclejdk8
 
 dist: trusty
-sudo: false
+sudo: required
 
 env:
   global:
