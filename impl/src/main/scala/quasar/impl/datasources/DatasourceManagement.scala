@@ -16,7 +16,7 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{Boolean, Exception, None, Option, Some, Unit}
+import slamdata.Predef.{Boolean, Exception, None, Option, Some, StringContext, Unit}
 import quasar.{Condition, Disposable, RenderTreeT}
 import quasar.api.datasource.{DatasourceError, DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{
@@ -43,6 +43,7 @@ import quasar.sst._
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
+import cats.ApplicativeError
 import cats.effect.{ConcurrentEffect, Timer}
 import fs2.{Scheduler, Stream}
 import fs2.async.{immutable, mutable, Ref}
@@ -65,7 +66,7 @@ final class DatasourceManagement[
     extends DatasourceControl[F, Stream[F, ?], I, Json, SstConfig[T[EJson], N]]
     with DatasourceErrors[F, I] {
 
-  import DatasourceManagement.withErrorReporting
+  import DatasourceManagement._
 
   type DS = DatasourceManagement.DS[T, F]
   type Running = DatasourceManagement.Running[I, T, F]
@@ -77,12 +78,16 @@ final class DatasourceManagement[
 
     val init0: DatasourceModule => EitherT[F, CreateError[Json], Disposable[F, DS]] = {
       case DatasourceModule.Lightweight(lw) =>
-        EitherT(lw.lightweightDatasource[F](ref.config))
-          .bimap(ie => ie: CreateError[Json], _.map(_.left))
+        EitherT(handleLinkageError(
+          ref.kind,
+          lw.lightweightDatasource[F](ref.config)))
+            .bimap(ie => ie: CreateError[Json], _.map(_.left))
 
       case DatasourceModule.Heavyweight(hw) =>
-        EitherT(hw.heavyweightDatasource[T, F](ref.config))
-          .bimap(ie => ie: CreateError[Json], _.map(_.right))
+        EitherT(handleLinkageError(
+          ref.kind,
+          hw.heavyweightDatasource[T, F](ref.config)))
+            .bimap(ie => ie: CreateError[Json], _.map(_.right))
     }
 
     val inited = for {
@@ -218,6 +223,10 @@ object DatasourceManagement {
   type MgmtControl[T[_[_]], F[_], I, N] =
       DatasourceControl[F, Stream[F, ?], I, Json, SstConfig[T[EJson], N]]
 
+  final case class IncompatibleDatasourceException(kind: DatasourceType) extends java.lang.RuntimeException {
+    override def getMessage = s"Loaded datasource implementation with type $kind is incompatible with quasar"
+  }
+
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: MonadPlannerErr: MonadResourceErr: MonadError_[?[_], CreateError[Json]]: Timer,
@@ -281,7 +290,7 @@ object DatasourceManagement {
     module match {
       case DatasourceModule.Lightweight(lw) =>
         val mklw = MonadError_[F, CreateError[Json]] unattempt {
-          lw.lightweightDatasource[F](ref.config)
+          handleLinkageError(ref.kind, lw.lightweightDatasource[F](ref.config))
             .map(_.leftMap(ie => ie: CreateError[Json]))
         }
 
@@ -290,11 +299,19 @@ object DatasourceManagement {
 
       case DatasourceModule.Heavyweight(hw) =>
         val mkhw = MonadError_[F, CreateError[Json]] unattempt {
-          hw.heavyweightDatasource[T, F](ref.config)
+          handleLinkageError(ref.kind, hw.heavyweightDatasource[T, F](ref.config))
             .map(_.leftMap(ie => ie: CreateError[Json]))
         }
 
         ByNeedDatasource(ref.kind, mkhw, scheduler)
           .map(_.map(_.right))
+    }
+
+  private def handleLinkageError[F[_], A](kind: DatasourceType, fa: => F[A])(implicit F: ApplicativeError[F, java.lang.Throwable])
+      : F[A] =
+    try {
+      fa
+    } catch {
+      case _: java.lang.LinkageError => F.raiseError(IncompatibleDatasourceException(kind))
     }
 }
