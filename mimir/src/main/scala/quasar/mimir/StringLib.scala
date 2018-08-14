@@ -43,7 +43,7 @@ trait StringLibModule extends ColumnarTableLibModule {
     class Op1SS(f: String => String) extends Op1F1 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(JTextT, JNumberT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn => new StrFrom.S(c, _ != null, f)
       }
     }
@@ -52,7 +52,7 @@ trait StringLibModule extends ColumnarTableLibModule {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(JTextT, JNumberT)
       private def build(c: StrColumn) = new BoolFrom.S(c, _ != null, f)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn => build(c)
       }
     }
@@ -67,7 +67,7 @@ trait StringLibModule extends ColumnarTableLibModule {
 
     object readBoolean extends Op1F1 {
       val tpe = UnaryOperationType(JTextT, JBooleanT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn =>
           new BoolFrom.S(c, s => s == "true" || s == "false", _.toBoolean)
       }
@@ -75,7 +75,7 @@ trait StringLibModule extends ColumnarTableLibModule {
 
     object readInteger extends Op1F1 {
       val tpe = UnaryOperationType(JTextT, JNumberT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn =>
           new LongFrom.S(c, s => try { s.toLong; true } catch { case _: Exception => false }, _.toLong)
       }
@@ -83,7 +83,7 @@ trait StringLibModule extends ColumnarTableLibModule {
 
     object readDecimal extends Op1F1 {
       val tpe = UnaryOperationType(JTextT, JNumberT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn =>
           new NumFrom.S(c, s => try { BigDecimal(s); true } catch { case _: Exception => false }, BigDecimal(_))
       }
@@ -91,7 +91,7 @@ trait StringLibModule extends ColumnarTableLibModule {
 
     object readNull extends Op1F1 {
       val tpe = UnaryOperationType(JTextT, JNullT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn =>
           new NullColumn {
             def isDefinedAt(row: Int) = c.isDefinedAt(row) && c(row) == "null"
@@ -101,7 +101,7 @@ trait StringLibModule extends ColumnarTableLibModule {
 
     object convertToString extends Op1F1 {
       val tpe = UnaryOperationType(JType.JPrimitiveUnfixedT, JTextT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: BoolColumn =>
           new Map1Column(c) with StrColumn {
             def apply(row: Int) = c(row).toString
@@ -160,7 +160,7 @@ trait StringLibModule extends ColumnarTableLibModule {
     object isEmpty extends Op1F1 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(JTextT, JBooleanT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn  => new BoolFrom.S(c, _ != null, _.isEmpty)
       }
     }
@@ -171,7 +171,7 @@ trait StringLibModule extends ColumnarTableLibModule {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(JTextT, JNumberT)
       private def build(c: StrColumn) = new LongFrom.S(c, _ != null, _.length)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn => build(c)
       }
     }
@@ -180,7 +180,7 @@ trait StringLibModule extends ColumnarTableLibModule {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JTextT, JBooleanT)
       private def build(c1: StrColumn, c2: StrColumn) = new BoolFrom.SS(c1, c2, neitherNull, f)
-      def f2: F2 = CF2P {
+      def f2: CF2 = CF2P {
         case (c1: StrColumn, c2: StrColumn) => build(c1, c2)
       }
     }
@@ -333,7 +333,7 @@ trait StringLibModule extends ColumnarTableLibModule {
     object concat extends Op2F2 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JTextT, JTextT)
-      def f2: F2 = CF2P {
+      def f2: CF2 = CF2P {
         case (c1: StrColumn, c2: StrColumn) =>
           new StrFrom.SS(c1, c2, neitherNull, _ concat _)
       }
@@ -342,7 +342,7 @@ trait StringLibModule extends ColumnarTableLibModule {
     class Op2SLL(defined: (String, Long) => Boolean, f: (String, Long) => Long) extends Op2F2 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JNumberT, JNumberT)
-      def f2: F2 = CF2P {
+      def f2: CF2 = CF2P {
         case (c1: StrColumn, c2: DoubleColumn) =>
           new LongFrom.SD(c1, c2, (s, n) => (n % 1 == 0) && defined(s, n.toLong), (s, n) => f(s, n.toLong))
 
@@ -361,7 +361,7 @@ trait StringLibModule extends ColumnarTableLibModule {
     class Substring(f: (String, Int) => String) extends Op2F2 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JNumberT, JTextT)
-      def f2: F2 = CF2P {
+      def f2: CF2 = CF2P {
         case (c1: StrColumn, c2: LongColumn) =>
           new StrFrom.SL(c1, c2, (s, n) => n >= 0, { (s, n) =>
             f(s, n.toInt)
@@ -400,7 +400,7 @@ trait StringLibModule extends ColumnarTableLibModule {
     class Op2SSL(f: (String, String) => Long) extends Op2F2 {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(JTextT, JTextT, JNumberT)
-      def f2: F2 = CF2P {
+      def f2: CF2 = CF2P {
         case (c1: StrColumn, c2: StrColumn) =>
           new LongFrom.SS(c1, c2, neitherNull, f)
       }
@@ -433,14 +433,14 @@ trait StringLibModule extends ColumnarTableLibModule {
         def apply(row: Int) = BigDecimal(c(row))
       }
 
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn => build(c)
       }
     }
 
     object numToString extends Op1F1 {
       val tpe = UnaryOperationType(JNumberT, JTextT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: LongColumn => new StrFrom.L(c, _ => true, _.toString)
         case c: DoubleColumn => {
           new StrFrom.D(c, _ => true, { d =>

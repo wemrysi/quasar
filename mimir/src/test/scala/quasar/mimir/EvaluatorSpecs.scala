@@ -45,10 +45,6 @@ trait EvaluatorTestSupport extends StdLibEvaluatorStack
       val report = new LoggingQueryLogger[Unit] with ExceptionQueryLogger[Unit] with TimingQueryLogger[Unit]
     }
 
-  private val groupId = new java.util.concurrent.atomic.AtomicInteger
-
-  def newGroupId = groupId.getAndIncrement
-
   val defaultEvaluationContext = EvaluationContext(Path.Root, Path.Root, dateTime.now)
 
   val projections = Map.empty[Path, Projection]

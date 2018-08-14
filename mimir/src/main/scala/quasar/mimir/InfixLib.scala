@@ -36,7 +36,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
 
       val Add = new Op2F2 {
         val tpe = BinaryOperationType(JType.JRelativeT, JType.JRelativeT, JType.JRelativeT)
-        def f2: F2 = CF2P {
+        def f2: CF2 = CF2P {
           case (c1: LongColumn, c2: LongColumn) =>
             new LongFrom.LL(c1, c2, longOk, _ + _)
 
@@ -146,7 +146,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
 
       val Sub = new Op2F2 {
         val tpe = BinaryOperationType(JType.JAbsoluteT, JType.JRelativeT, JType.JAbsoluteT)
-        def f2: F2 = CF2P {
+        def f2: CF2 = CF2P {
           case (c1: LongColumn, c2: LongColumn) =>
             new LongFrom.LL(c1, c2, longOk, _ - _)
 
@@ -260,7 +260,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
 
       val Mul = new Op2F2 {
         val tpe = BinaryOperationType(JType.JRelativeT, JType.JRelativeT, JType.JRelativeT)
-        def f2: F2 = CF2P {
+        def f2: CF2 = CF2P {
           case (c1: LongColumn, c2: LongColumn) =>
             new LongFrom.LL(c1, c2, longOk, _ * _)
 
@@ -310,7 +310,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
         def numf(x: BigDecimal, y: BigDecimal) = x(context) / y(context)
 
         val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
-        def f2: F2 = CF2P {
+        def f2: CF2 = CF2P {
           case (c1: LongColumn, c2: LongColumn) =>
             new DoubleFrom.LL(c1, c2, doubleNeZero, doublef)
 
@@ -347,7 +347,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
         def doubleMod(x: Double, y: Double) = x % y
         def numMod(x: BigDecimal, y: BigDecimal) = x % y
 
-        def f2: F2 = CF2P {
+        def f2: CF2 = CF2P {
           case (c1: LongColumn, c2: LongColumn) =>
             new LongFrom.LL(c1, c2, longNeZero, longMod)
 
@@ -381,7 +381,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
       trait Power {
         val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
         def defined(x: Double, y: Double) = doubleIsDefined(x) && doubleIsDefined(y)
-        def f2: F2 = CF2P {
+        def f2: CF2 = CF2P {
           case (c1: DoubleColumn, c2: DoubleColumn) =>
             new DoubleFrom.DD(c1, c2, defined, scala.math.pow)
 
@@ -416,7 +416,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
       class CompareOp2(f: Int => Boolean) extends Op2F2 {
         val tpe = BinaryOperationType(JNumberT, JNumberT, JBooleanT)
         import NumericComparisons.compare
-        def f2: F2 = CF2P {
+        def f2: CF2 = CF2P {
           case (c1: LongColumn, c2: LongColumn) =>
             new BoolFrom.LL(c1, c2, (x, y) => true, (x, y) => f(compare(x, y)))
 
@@ -474,7 +474,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
 
       // TODO find the commonalities and abstract these two
       val And = new OpNFN {
-        val fn: FN = CFNP {
+        val fn: CFN = CFNP {
           case List(c: BoolColumn) =>
             new BoolColumn {
               def isDefinedAt(row: Int): Boolean = c.isDefinedAt(row) && !c(row)
@@ -509,7 +509,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
       }
 
       val Or = new OpNFN {
-        val fn: FN = CFNP {
+        val fn: CFN = CFNP {
           case List(c: BoolColumn) =>
             new BoolColumn {
               def isDefinedAt(row: Int): Boolean = c.isDefinedAt(row) && c(row)
@@ -550,7 +550,7 @@ trait InfixLibModule extends ColumnarTableLibModule {
         private def build(c1: StrColumn, c2: StrColumn) =
           new StrFrom.SS(c1, c2, _ != null && _ != null, _ + _)
 
-        def f2: F2 = CF2P {
+        def f2: CF2 = CF2P {
           case (c1: StrColumn, c2: StrColumn) => build(c1, c2)
         }
       }

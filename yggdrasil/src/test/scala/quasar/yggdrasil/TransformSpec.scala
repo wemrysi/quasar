@@ -21,20 +21,19 @@ import quasar.pkg.tests._
 import quasar.precog.common._
 import quasar.yggdrasil.TestIdentities._
 import quasar.yggdrasil.bytecode._
+import quasar.yggdrasil.table.CFN
 
 import scala.util.Random
 
 import cats.effect.IO
 import org.scalacheck.{ Gen, Arbitrary }
-import scalaz._, Scalaz._
-import shims._
 
 trait TransformSpec extends TableModuleTestSupport with SpecificationLike with ScalaCheck {
   import SJValueGenerators._
   import SampleData._
   import trans._
 
-  def addThree: FN
+  def addThree: CFN
 
   def checkTransformLeaf = {
     implicit val gen = sample(schema)

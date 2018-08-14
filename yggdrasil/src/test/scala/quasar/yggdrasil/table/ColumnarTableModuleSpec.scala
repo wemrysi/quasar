@@ -38,11 +38,7 @@ import SampleData._
 import java.nio.CharBuffer
 
 trait TestColumnarTableModule extends ColumnarTableModuleTestSupport { self =>
-  type GroupId = Int
   import trans._
-
-  private val groupId = new java.util.concurrent.atomic.AtomicInteger
-  def newGroupId = groupId.getAndIncrement
 
   def addThree: CFN = CFNP {
     case List(x: LongColumn, y: LongColumn, z: LongColumn) =>

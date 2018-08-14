@@ -44,11 +44,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable.Set
 
 trait ColumnarTableTypes {
-  type F1         = CF1
-  type F2         = CF2
-  type FN         = CFN
-  type Scanner    = CScanner
-  type Mapper     = CMapper
   type Reducer[α] = CReducer[α]
   type RowId      = Int
 }
@@ -233,31 +228,14 @@ trait ColumnarTableModule
 
   type Table <: ColumnarTable
   type TableCompanion <: ColumnarTableCompanion
-  case class TableMetrics(startCount: Int, sliceTraversedCount: Int)
 
   def newScratchDir(): File = IOUtils.createTmpDir("ctmscratch").unsafePerformIO
   def jdbmCommitInterval: Long = 200000l
-
-  implicit def liftF1(f: F1) = new F1Like {
-    def compose(f1: F1) = f compose f1
-    def andThen(f1: F1) = f andThen f1
-  }
-
-  implicit def liftF2(f: F2) = new F2Like {
-    def applyl(cv: CValue) = CF1{ f(Column.const(cv), _) }
-    def applyr(cv: CValue) = CF1{ f(_, Column.const(cv)) }
-
-    def andThen(f1: F1) = CF2 { (c1, c2) =>
-      f(c1, c2) flatMap f1.apply
-    }
-  }
 
   trait ColumnarTableCompanion extends TableCompanionLike {
     def apply(slices: StreamT[IO, Slice], size: TableSize): Table
 
     def singleton(slice: Slice): Table
-
-    implicit def groupIdShow: Show[GroupId] = Show.showFromToString[GroupId]
 
     def empty: Table = Table(StreamT.empty[IO, Slice], ExactSize(0))
 
@@ -360,140 +338,6 @@ trait ColumnarTableModule
       )
 
       stream(sliceTransform.initial, slices)
-    }
-
-    /**
-      * Merge controls the iteration over the table of group key values.
-      */
-    def merge(grouping: GroupingSpec)(body: (RValue, GroupId => IO[Table]) => IO[Table]): IO[Table] = {
-      import GroupKeySpec.{ dnf, toVector }
-
-      type Key       = Seq[RValue]
-      type KeySchema = Seq[CPathField]
-
-      def sources(spec: GroupKeySpec): Seq[GroupKeySpecSource] = (spec: @unchecked) match {
-        case GroupKeySpecAnd(left, right) => sources(left) ++ sources(right)
-        case src: GroupKeySpecSource      => Vector(src)
-      }
-
-      def mkProjections(spec: GroupKeySpec) =
-        toVector(dnf(spec)).map(sources(_).map { s =>
-          (s.key, s.spec)
-        })
-
-      case class IndexedSource(groupId: GroupId, index: TableIndex, keySchema: KeySchema)
-
-      (for {
-        source <- grouping.sources
-        groupKeyProjections <- mkProjections(source.groupKeySpec)
-        disjunctGroupKeyTransSpecs = groupKeyProjections.map { case (key, spec) => spec }
-      } yield {
-        TableIndex.createFromTable(source.table, disjunctGroupKeyTransSpecs, source.targetTrans.getOrElse(TransSpec1.Id)).map { index =>
-          IndexedSource(source.groupId, index, groupKeyProjections.map(_._1))
-        }
-      }).sequence.flatMap { sourceKeys =>
-        val fullSchema = sourceKeys.flatMap(_.keySchema).distinct
-
-        val indicesGroupedBySource = sourceKeys.groupBy(_.groupId).mapValues(_.map(y => (y.index, y.keySchema)).toSeq).values.toSeq
-
-        def unionOfIntersections(indicesGroupedBySource: Seq[Seq[(TableIndex, KeySchema)]]): Set[Key] = {
-          def allSourceDNF[T](l: Seq[Seq[T]]): Seq[Seq[T]] = {
-            l match {
-              case Seq(hd) => hd.map(Seq(_))
-              case Seq(hd, tl @ _ *) => {
-                for {
-                  disjunctHd <- hd
-                  disjunctTl <- allSourceDNF(tl)
-                } yield disjunctHd +: disjunctTl
-              }
-              case empty => empty
-            }
-          }
-
-          def normalizedKeys(index: TableIndex, keySchema: KeySchema): Set[Key] = {
-            val schemaMap = for (k <- fullSchema) yield keySchema.indexOf(k)
-            for (key <- index.getUniqueKeys)
-              yield for (k <- schemaMap) yield if (k == -1) CUndefined else key(k)
-          }
-
-          def intersect(keys0: Set[Key], keys1: Set[Key]): Set[Key] = {
-            def consistent(key0: Key, key1: Key): Boolean =
-              (key0 zip key1).forall {
-                case (k0, k1) => k0 == k1 || k0 == CUndefined || k1 == CUndefined
-              }
-
-            def merge(key0: Key, key1: Key): Key =
-              (key0 zip key1).map {
-                case (k0, CUndefined) => k0
-                case (_, k1)          => k1
-              }
-
-            // TODO: This "mini-cross" is much better than the
-            // previous mega-cross. However in many situations we
-            // could do even less work. Consider further optimization
-            // (e.g. when one key schema is a subset of the other).
-
-            // Relatedly it might make sense to topologically sort the
-            // Indices by their keyschemas so that we end up intersecting
-            // key with their subset.
-            keys0.flatMap { key0 =>
-              keys1.flatMap(key1 => if (consistent(key0, key1)) Some(merge(key0, key1)) else None)
-            }
-          }
-
-          allSourceDNF(indicesGroupedBySource).foldLeft(Set.empty[Key]) {
-            case (acc, intersection) =>
-              val hd = normalizedKeys(intersection.head._1, intersection.head._2)
-              acc | intersection.tail.foldLeft(hd) {
-                case (keys0, (index1, schema1)) =>
-                  val keys1 = normalizedKeys(index1, schema1)
-                  intersect(keys0, keys1)
-              }
-          }
-        }
-
-        def jValueFromGroupKey(key: Seq[RValue], cpaths: Seq[CPathField]): RValue = {
-          val items = (cpaths zip key).map(t => (t._1.name, t._2))
-          RObject(items.toMap)
-        }
-
-        val groupKeys: Set[Key] = unionOfIntersections(indicesGroupedBySource)
-
-        // given a groupKey, return an IO[Table] which represents running
-        // the evaluator on that subgroup.
-        def evaluateGroupKey(groupKey: Key): IO[Table] = {
-          val groupKeyTable = jValueFromGroupKey(groupKey, fullSchema)
-
-          def map(gid: GroupId): IO[Table] = {
-            val subTableProjections = (sourceKeys
-              .filter(_.groupId == gid)
-              .map { indexedSource =>
-                val keySchema           = indexedSource.keySchema
-                val projectedKeyIndices = for (k <- fullSchema) yield keySchema.indexOf(k)
-                (indexedSource.index, projectedKeyIndices, groupKey)
-              })
-              .toList
-
-            // TODO: normalize necessary?
-            IO(TableIndex.joinSubTables(subTableProjections).normalize)
-          }
-
-          body(groupKeyTable, map)
-        }
-
-        // TODO: this can probably be done as one step, but for now
-        // it's probably fine.
-        val tables: StreamT[IO, Table] = StreamT.unfoldM(groupKeys.toList) {
-          case k :: ks =>
-            evaluateGroupKey(k).map(t => Some((t, ks)))
-          case Nil =>
-            IO.pure(None)
-        }
-
-        val slices: StreamT[IO, Slice] = tables.flatMap(_.slices)
-
-        IO.pure(Table(slices, UnknownSize))
-      }
     }
 
     /// Utility Methods ///

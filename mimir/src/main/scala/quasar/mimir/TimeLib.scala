@@ -38,7 +38,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
 
     val ExtractEpoch = new Op1F1 {
       val tpe = UnaryOperationType(JOffsetDateTimeT, JNumberT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: OffsetDateTimeColumn =>
           new Map1Column(c) with DoubleColumn {
             def apply(row: Int) = time.extractEpoch(c(row))
@@ -48,7 +48,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
 
     final class DateLongExtractor(extract: JLocalDate => Long) extends Op1F1 {
       val tpe = UnaryOperationType(JType.JDateT, JNumberT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case AsDateColumn(c) =>
           new Map1Column(c) with LongColumn {
             def apply(row: Int) = extract(c(row))
@@ -58,7 +58,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
 
     final class TimeLongExtractor(extract: JLocalTime => Long) extends Op1F1 {
       val tpe = UnaryOperationType(JType.JTimeT, JNumberT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case AsTimeColumn(c) =>
           new Map1Column(c) with LongColumn {
             def apply(row: Int) = extract(c(row))
@@ -68,7 +68,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
 
     final class OffsetIntExtractor(extract: ZoneOffset => Int) extends Op1F1 {
       val tpe = UnaryOperationType(JType.JOffsetT, JNumberT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: OffsetDateTimeColumn =>
           new Map1Column(c) with LongColumn {
             def apply(row: Int) = extract(c(row).getOffset).toLong
@@ -86,7 +86,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
 
     final class OffsetIntSetter(create: Int => ZoneOffset, set: (Int, ZoneOffset) => ZoneOffset) extends Op2F2 {
       val tpe = BinaryOperationType(JNumberT, JType.JOffsetT, JType.JOffsetT)
-      def f2: F2 = CF2P {
+      def f2: CF2 = CF2P {
         case (n: LongColumn, c: OffsetDateTimeColumn) =>
           new Map1Column(c) with OffsetDateTimeColumn {
             def apply(row: Int) = {
@@ -143,7 +143,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
 
     val ExtractSecond = new Op1F1 {
       val tpe = UnaryOperationType(JType.JOffsetT, JNumberT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case AsTimeColumn(c) =>
           new Map1Column(c) with NumColumn {
             def apply(row: Int) = time.extractSecond(c(row))
@@ -168,7 +168,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
       (i, zo) => time.setTimeZoneHour(zo, i))
 
     val LocalDate = new Op1F1 {
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn => new LocalDateColumn {
           def apply(row: Int) = JLocalDate.parse(c(row))
           def isDefinedAt(row: Int) = {
@@ -187,7 +187,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
     }
 
     val LocalDateTime = new Op1F1 {
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn => new LocalDateTimeColumn {
           def apply(row: Int) = JLocalDateTime.parse(c(row))
           def isDefinedAt(row: Int) = {
@@ -206,7 +206,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
     }
 
     val LocalTime = new Op1F1 {
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn => new LocalTimeColumn {
           def apply(row: Int) = JLocalTime.parse(c(row))
           def isDefinedAt(row: Int) = {
@@ -225,7 +225,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
     }
 
     val OffsetDate = new Op1F1 {
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn =>
           new OffsetDateColumn {
             def apply(row: Int) = QOffsetDate.parse(c(row))
@@ -245,7 +245,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
     }
 
     val OffsetDateTime = new Op1F1 {
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn => new OffsetDateTimeColumn {
           def apply(row: Int) = JOffsetDateTime.parse(c(row))
           def isDefinedAt(row: Int) = {
@@ -264,7 +264,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
     }
 
     val OffsetTime = new Op1F1 {
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn => new OffsetTimeColumn {
           def apply(row: Int) = JOffsetTime.parse(c(row))
           def isDefinedAt(row: Int) = {
@@ -283,7 +283,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
     }
 
     val Interval = new Op1F1 {
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: StrColumn => new IntervalColumn {
           def apply(row: Int) = DateTimeInterval.parse(c(row)).get
           def isDefinedAt(row: Int) = {
@@ -297,7 +297,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
     }
 
     final case class Trunc(truncPart: TemporalPart) extends Op1F1 {
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: OffsetDateTimeColumn => new Map1Column(c) with OffsetDateTimeColumn {
           def apply(row: Int) = {
             val r = c(row)
@@ -360,7 +360,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
     val TruncYear = Trunc(TemporalPart.Year)
 
     val ToTimestamp = new Op1F1 {
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: DoubleColumn =>
           new Map1Column(c) with OffsetDateTimeColumn {
             override def isDefinedAt(row: Int) = {
@@ -397,7 +397,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
     }
 
     val TimeOfDay = new Op1F1 {
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: LocalDateTimeColumn =>
           new Map1Column(c) with LocalTimeColumn {
             def apply(row: Int) = c(row).toLocalTime
@@ -411,7 +411,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
     }
 
     val StartOfDay = new Op1F1 {
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: LocalDateTimeColumn =>
           new Map1Column(c) with LocalDateTimeColumn {
             def apply(row: Int) = time.truncDateTime(TemporalPart.Day, c(row))

@@ -18,6 +18,7 @@ package quasar.yggdrasil
 
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JType
+import quasar.yggdrasil.table.{CF1, CF2, CFN, CMapper, CScanner}
 
 object TransSpecModule {
   object paths {
@@ -32,12 +33,8 @@ object TransSpecModule {
   case object AllDefined extends Definedness
 }
 
-trait TransSpecModule extends FNModule {
+trait TransSpecModule {
   import TransSpecModule._
-
-  type GroupId
-  type Scanner
-  type Mapper
 
   object trans {
     sealed trait TransSpec[+A <: SourceType]
@@ -58,19 +55,19 @@ trait TransSpecModule extends FNModule {
     case class Filter[+A <: SourceType](source: TransSpec[A], predicate: TransSpec[A]) extends TransSpec[A]
 
     // Adds a column to the output in the manner of scanLeft
-    case class Scan[+A <: SourceType](source: TransSpec[A], scanner: Scanner) extends TransSpec[A]
+    case class Scan[+A <: SourceType](source: TransSpec[A], scanner: CScanner) extends TransSpec[A]
 
-    case class MapWith[+A <: SourceType](source: TransSpec[A], mapper: Mapper) extends TransSpec[A]
+    case class MapWith[+A <: SourceType](source: TransSpec[A], mapper: CMapper) extends TransSpec[A]
 
-    case class Map1[+A <: SourceType](source: TransSpec[A], f: F1) extends TransSpec[A]
+    case class Map1[+A <: SourceType](source: TransSpec[A], f: CF1) extends TransSpec[A]
 
-    case class DeepMap1[+A <: SourceType](source: TransSpec[A], f: F1) extends TransSpec[A]
+    case class DeepMap1[+A <: SourceType](source: TransSpec[A], f: CF1) extends TransSpec[A]
 
     // apply a function to the cartesian product of the transformed left and right subsets of columns
-    case class Map2[+A <: SourceType](left: TransSpec[A], right: TransSpec[A], f: F2) extends TransSpec[A]
+    case class Map2[+A <: SourceType](left: TransSpec[A], right: TransSpec[A], f: CF2) extends TransSpec[A]
 
     // apply a function to an array
-    case class MapN[+A <: SourceType](contents: TransSpec[A], f: FN) extends TransSpec[A]
+    case class MapN[+A <: SourceType](contents: TransSpec[A], f: CFN) extends TransSpec[A]
 
     // Perform the specified transformation on the all sources, and then create a new set of columns
     // containing all the resulting columns.

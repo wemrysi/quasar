@@ -26,7 +26,7 @@ trait TypeLibModule extends ColumnarTableLibModule {
 
     object typeOf extends Op1F1 {
       val tpe = UnaryOperationType(JType.JUniverseT, JTextT)
-      def f1: F1 = CF1P {
+      def f1: CF1 = CF1P {
         case c: LongColumn => new ConstantStrColumn(c, "number")
         case c: DoubleColumn => new ConstantStrColumn(c, "number")
         case c: NumColumn => new ConstantStrColumn(c, "number")

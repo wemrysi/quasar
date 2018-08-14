@@ -23,7 +23,11 @@ import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz._, Scalaz._
 
-trait TransSpecableModule extends TransSpecModule with TableModule with EvaluatorMethodsModule {
+trait TransSpecableModule
+    extends TransSpecModule
+    with FNModule
+    with EvaluatorMethodsModule {
+
   import dag._
   import library._
   import instructions._

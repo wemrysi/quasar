@@ -28,13 +28,8 @@ import shims._
 // TODO: mix in a trait rather than defining Table directly
 
 trait IndicesSpec extends ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule { self =>
-  type GroupId = Int
-
   import TableModule._
   import trans._
-
-  private val groupId = new java.util.concurrent.atomic.AtomicInteger
-  def newGroupId = groupId.getAndIncrement
 
   class Table(slices: StreamT[IO, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._

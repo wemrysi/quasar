@@ -26,12 +26,7 @@ import shims._
 import scala.annotation.tailrec
 
 trait BlockStoreTestModule extends BaseBlockStoreTestModule { self =>
-  type GroupId = String
-  private val groupId = new java.util.concurrent.atomic.AtomicInteger
-  def newGroupId = "groupId(" + groupId.getAndIncrement + ")"
-
   trait TableCompanion extends BaseBlockStoreTestTableCompanion
-
   object Table extends TableCompanion
 }
 
