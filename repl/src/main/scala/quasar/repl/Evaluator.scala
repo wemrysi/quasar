@@ -75,10 +75,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
 
   def evaluate(cmd: Command): F[Result[Stream[F, String]]] = {
     val exitCode = if (cmd === Exit) Some(ExitCode.Success) else None
-    recoverErrors(doEvaluate(cmd)).map { _ match {
-      case None => Stream.empty.covary[F]
-      case Some(r) => Stream.eval(r.pure[F])
-    }}.map(Result(exitCode, _))
+    recoverErrors(doEvaluate(cmd)).map(Result(exitCode, _))
   }
 
   ////
@@ -120,72 +117,73 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           pathNotFound[DiscoveryError[UUID]](path).left)
     }
 
-  private def doEvaluate(cmd: Command): F[Option[String]] =
+  private def doEvaluate(cmd: Command): F[Stream[F, String]] =
     cmd match {
       case Help =>
-        F.pure(helpMsg.some)
+        liftS1(helpMsg)
 
       case Debug(level) =>
         stateRef.modify(_.copy(debugLevel = level)) *>
-          F.pure(s"Set debug level: $level".some)
+          liftS1(s"Set debug level: $level")
 
       case SummaryCount(rows) =>
         val count: Option[Option[Int Refined Positive]] =
           if (rows === 0) Some(None)
           else refineV[Positive](rows).fold(κ(None), p => Some(Some(p)))
         count match {
-          case None => F.pure("Rows must be a positive integer or 0 to indicate no limit".some)
+          case None => liftS1("Rows must be a positive integer or 0 to indicate no limit")
           case Some(c) => stateRef.modify(_.copy(summaryCount = c)) *>
-            F.pure {
+            liftS1 {
               val r = c.map(_.toString).getOrElse("unlimited")
-              s"Set rows to show in result: $r".some
+              s"Set rows to show in result: $r"
             }
         }
 
       case Format(fmt) =>
         stateRef.modify(_.copy(format = fmt)) *>
-          F.pure(s"Set output format: $fmt".some)
+          liftS1(s"Set output format: $fmt")
 
       case Mode(mode) =>
         stateRef.modify(_.copy(mode = mode)) *>
-          F.pure(s"Set output mode: $mode".some)
+          liftS1(s"Set output mode: $mode")
 
       case SetPhaseFormat(fmt) =>
         stateRef.modify(_.copy(phaseFormat = fmt)) *>
-          F.pure(s"Set phase format: $fmt".some)
+          liftS1(s"Set phase format: $fmt")
 
       case SetTimingFormat(fmt) =>
         stateRef.modify(_.copy(timingFormat = fmt)) *>
-          F.pure(s"Set timing format: $fmt".some)
+          liftS1(s"Set timing format: $fmt")
 
       case SetVar(n, v) =>
         stateRef.modify(state => state.copy(variables = state.variables + (n -> v))) *>
-          F.pure(s"Set variable ${n.value} = ${v.value}".some)
+          liftS1(s"Set variable ${n.value} = ${v.value}")
 
       case UnsetVar(n) =>
         stateRef.modify(state => state.copy(variables = state.variables - n)) *>
-          F.pure(s"Unset variable ${n.value}".some)
+          liftS1(s"Unset variable ${n.value}")
 
       case ListVars =>
         stateRef.get.map(_.variables.value).map(
           _.toList.map { case (VarName(name), VarValue(value)) => s"$name = $value" }
-            .mkString("Variables:\n", "\n", "").some)
+            .mkString("Variables:\n", "\n", "")).map(Stream.emit(_))
 
       case DatasourceList =>
         sources.allDatasourceMetadata
           .flatMap(_.map({ case (k, v) => s"$k ${printMetadata(v)}" }).compile.toList)
-          .map(_.mkString("Datasources:\n", "\n", "").some)
+          .map(_.mkString("Datasources:\n", "\n", "")).map(Stream.emit(_))
 
       case DatasourceTypes =>
         doSupportedTypes.map(
           _.toList.map(printType)
-            .mkString("Supported datasource types:\n", "\n", "").some)
+            .mkString("Supported datasource types:\n", "\n", "")).map(Stream.emit(_))
 
       case DatasourceLookup(id) =>
         sources.datasourceRef(id)
           .flatMap(fromEither[ExistentialError[UUID], DatasourceRef[Json]])
           .map(ref =>
-            List(s"Datasource[$id](name = ${ref.name.shows}, type = ${printType(ref.kind)})", ref.config.spaces2).mkString("\n").some)
+            List(s"Datasource[$id](name = ${ref.name.shows}, type = ${printType(ref.kind)})", ref.config.spaces2).mkString("\n"))
+          .map(Stream.emit(_))
 
       case DatasourceAdd(name, tp, cfg) =>
         for {
@@ -194,11 +192,11 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           cfgJson <- JsonParser.parse(cfg).fold(raiseEvalError, _.point[F])
           r <- sources.addDatasource(DatasourceRef(dsType, name, cfgJson))
           i <- r.fold(e => raiseEvalError(e.shows), _.point[F])
-        } yield s"Added datasource $i (${name.value})".some
+        } yield Stream.emit(s"Added datasource $i (${name.value})")
 
       case DatasourceRemove(id) =>
         (sources.removeDatasource(id) >>= ensureNormal[ExistentialError[UUID]]).map(
-          κ(s"Removed datasource $id".some))
+          κ(Stream.emit(s"Removed datasource $id")))
 
       case ResourceSchema(replPath) =>
         for {
@@ -207,9 +205,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           s <- schema(path)
           t = s.map(_.sst.fold(_.asEJson[Fix[EJson]], _.asEJson[Fix[EJson]]))
         } yield {
-          t.flatMap(ejs => DataCodec.Precise.encode(ejs.cata(Data.fromEJson)))
-            .fold("No schema available.")(_.spaces2)
-            .some
+          Stream.emit(
+            t.flatMap(ejs => DataCodec.Precise.encode(ejs.cata(Data.fromEJson)))
+              .fold("No schema available.")(_.spaces2))
         }
 
       case Cd(path: ReplPath) =>
@@ -218,7 +216,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           dir = newPath(cwd, path)
           _ <- ensureValidDir(dir)
           _ <- stateRef.modify(_.copy(cwd = dir))
-        } yield s"cwd is now ${printPath(dir)}".some
+        } yield Stream.emit(s"cwd is now ${printPath(dir)}")
 
       case Ls(path: Option[ReplPath]) =>
         def postfix(tpe: ResourcePathType): String = tpe match {
@@ -227,39 +225,49 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         }
 
         def convert(s: Stream[F, (ResourceName, ResourcePathType)])
-            : F[Option[String]] =
+            : Stream[F, String] =
           s.map { case (name, tpe) => s"${name.value}${postfix(tpe)}" }
-            .compile.toVector.map(_.mkString("\n").some)
 
         for {
           cwd <- stateRef.get.map(_.cwd)
           p = path.map(newPath(cwd, _)).getOrElse(cwd)
           cs <- children(p)
-          res <- convert(cs)
-        } yield res
+        } yield convert(cs)
 
       case Pwd =>
-        stateRef.get.map(s => printPath(s.cwd).some)
+        stateRef.get.map(s => Stream.emit(printPath(s.cwd)))
 
       case Select(q) =>
+        def doSelect(sql: SqlQuery, state: ReplState): F[(String, Stream[F, String])] =
+          for {
+            (qres, phaseResults) <- PhaseResultListen[F].listen(
+              evaluateQuery(sql, state.summaryCount))
+            log = printLog(state.debugLevel, state.phaseFormat, phaseResults).map(_ + "\n").getOrElse("")
+            rendered = renderMimirReprStream(state.format, qres)
+          } yield ((log, rendered))
+
         for {
           state <- stateRef.get
-          (qres, phaseResults) <- PhaseResultListen[F].listen(
-            evaluateQuery(SqlQuery(q, state.variables, toADir(state.cwd)), state.summaryCount))
-          log = printLog(state.debugLevel, state.phaseFormat, phaseResults).map(_ + "\n").getOrElse("")
-          rendered = renderMimirReprStream(state.format, qres)
-            res <- state.mode match {
+          sql = SqlQuery(q, state.variables, toADir(state.cwd))
+          res <- state.mode match {
             case OutputMode.Console =>
-              val maxLines = state.summaryCount
-                .map(_.value + OutputFormat.headerLines(state.format))
-              printQueryResults(maxLines, rendered).map(log + _)
+              doSelect(sql, state).map { case (log, rendered) =>
+                val maxLines = state.summaryCount
+                  .map(_.value + OutputFormat.headerLines(state.format))
+                printQueryResults(maxLines, rendered).map(log + _)
+              }
             case OutputMode.File =>
-              for {
-                tmpFile <- Paths.createTempFile("results", ".txt")
-                _ <- writeToPath(tmpFile, Stream(log).covary[F] ++ rendered)
-              } yield s"Results written to ${tmpFile.toFile.getAbsolutePath}"
+              Paths.createTempFile("results", ".txt").map { tmpFile =>
+                Stream.emit(s"Writing results to ${tmpFile.toFile.getAbsolutePath}") ++
+                  Stream.eval {
+                    for {
+                      (log, rendered) <- doSelect(sql, state)
+                      _ <- writeToPath(tmpFile, Stream(log).covary[F] ++ rendered)
+                    } yield "Done"
+                  }
+              }
           }
-        } yield (res.some)
+        } yield res
 
       case Explain(q) =>
         for {
@@ -267,13 +275,13 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           (_, phaseResults) <- PhaseResultListen[F].listen(
             Sql2QueryEvaluator.sql2ToQScript[Fix, F](SqlQuery(q, state.variables, toADir(state.cwd))))
           log = printLog(Order[DebugLevel].max(DebugLevel.Normal, state.debugLevel), state.phaseFormat, phaseResults)
-        } yield log
+        } yield Stream.emits(log.toList)
 
       case NoOp =>
-        F.pure(none)
+        liftS(List.empty)
 
       case Exit =>
-        F.pure("Exiting...".some)
+        liftS1("Exiting...")
     }
 
     private def doSupportedTypes: F[ISet[DatasourceType]] =
@@ -333,6 +341,11 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       ResourcePath.resourceNamesIso(interpreted)
     }
 
+    private def liftS(ss: List[String]): F[Stream[F, String]] =
+      F.pure(Stream.emits(ss))
+
+    private def liftS1(s: String): F[Stream[F, String]] = liftS(List(s))
+
     private def newPath(cwd: ResourcePath, change: ReplPath): ResourcePath =
       change match {
         case ReplPath.Absolute(p) => interpretDotsAsParent(p)
@@ -367,7 +380,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         case PhaseFormat.Code => results.map(_.showCode).mkString("\n\n")
       }
 
-    private def printQueryResults(maxLines: Option[Int], stream: Stream[F, String]): F[String] = {
+    private def printQueryResults(maxLines: Option[Int], stream: Stream[F, String]): Stream[F, String] = {
 
       def cutOffAfterMaxLines(maxLines: Int, start: (Int, String), current: String): (Int, String) =
         current.foldLeft(start) { case (acc, c) =>
@@ -380,27 +393,27 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
 
       maxLines match {
         case None =>
-          stream.compile.toList.map(_.mkString)
+          stream
         case Some(max) =>
           stream.fold((0, "")) { case (acc, s) =>
             if (acc._1 < max)
               cutOffAfterMaxLines(max, acc, s)
             else
               acc
-          }.map(_._2).compile.toList.map(_.mkString)
+          }.map(_._2)
       }
     }
 
     private def raiseEvalError[A](s: String): F[A] =
       F.raiseError(new EvalError(s))
 
-    private def recoverErrors(fa: F[Option[String]]): F[Option[String]] =
+    private def recoverErrors(fa: F[Stream[F, String]]): F[Stream[F, String]] =
       F.recover(fa) {
-        case ee: EvalError => s"Evaluation error: ${ee.getMessage}".some
-        case QuasarError.throwableP(qe) => s"Quasar error: $qe".some
+        case ee: EvalError => Stream.emit(s"Evaluation error: ${ee.getMessage}")
+        case QuasarError.throwableP(qe) => Stream.emit(s"Quasar error: $qe")
         case NonFatal(t) =>
-          (s"Unexpected error: ${t.getClass.getCanonicalName}: ${t.getMessage}" +
-            t.getStackTrace.mkString("\n  ", "\n  ", "")).some
+          Stream.emit(s"Unexpected error: ${t.getClass.getCanonicalName}: ${t.getMessage}" +
+            t.getStackTrace.mkString("\n  ", "\n  ", ""))
       }
 
     private def renderMimirRepr(format: OutputFormat, repr: MimirRepr): Stream[F, String] = {
