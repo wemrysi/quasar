@@ -404,6 +404,12 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       def convert(s: StreamT[IO, CharBuffer]): Stream[F, String] =
         fromStreamT(s).map(_.toString).translate(λ[FunctionK[IO, F]](_.to[F]))
 
+      def renderCsv(assumeHomogeneous: Boolean): Stream[F, String] = {
+        import repr.P.trans._
+        val table2 = repr.table.transform(Scan(TransSpec1.Id, NullRemover): TransSpec[Source1])
+        convert(table2.renderCsv(assumeHomogeneous))
+      }
+
       format match {
         case OutputFormat.Table =>
           val ds: Stream[IO, Data] = mimir.tableToData(repr)
@@ -417,9 +423,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         case OutputFormat.Readable =>
           convert(repr.table.renderJson(precise = false))
         case OutputFormat.Csv =>
-            import repr.P.trans._
-            val table2 = repr.table.transform(Scan(TransSpec1.Id, NullRemover): TransSpec[Source1])
-            convert(table2.renderCsv(assumeHomogeneous = true))
+          renderCsv(assumeHomogeneous = false)
+        case OutputFormat.HomogeneousCsv =>
+          renderCsv(assumeHomogeneous = true)
       }
     }
 
