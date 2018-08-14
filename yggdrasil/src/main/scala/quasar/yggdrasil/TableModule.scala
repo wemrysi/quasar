@@ -126,7 +126,6 @@ trait TableModule extends TransSpecModule {
   import TableModule._
 
   type Reducer[α]
-  type TableMetrics
 
   type Table <: TableLike
   type TableCompanion <: TableCompanionLike

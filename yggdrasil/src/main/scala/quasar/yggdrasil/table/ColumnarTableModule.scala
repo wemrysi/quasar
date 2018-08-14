@@ -230,7 +230,6 @@ trait ColumnarTableModule
 
   type Table <: ColumnarTable
   type TableCompanion <: ColumnarTableCompanion
-  case class TableMetrics(startCount: Int, sliceTraversedCount: Int)
 
   def newScratchDir(): File = IOUtils.createTmpDir("ctmscratch").unsafePerformIO
   def jdbmCommitInterval: Long = 200000l
