@@ -27,26 +27,19 @@ before_script:
 script:
   - set -e
 
-  # we split the following across multiple sbt instances because it makes travis happier
   - |-
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       checkHeaders \
-      test:compile
-
-  - |-
-    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+      test:compile \
       "testOnly -- failtrace" \
-      "exclusive:testOnly -- failtrace"
-
-  - |-
-    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+      "exclusive:testOnly -- failtrace" \
       doc \
       repl/assembly
 
   - scripts/testJar
-  - '[ $TRAVIS_PULL_REQUEST == "false" ] && [[ "$TRAVIS_BRANCH" =~ backport/v.*|master ]] && scripts/quasarPublishAndTag'
 
   - set +e
+  - '[ $TRAVIS_PULL_REQUEST == "false" ] && [[ "$TRAVIS_BRANCH" =~ backport/v.*|master ]] && scripts/quasarPublishAndTag'
 
 after_success:
   - scripts/discordTravisPost success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
