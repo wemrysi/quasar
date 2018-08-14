@@ -44,24 +44,23 @@ import scalaz._, Scalaz._
 final class Repl[F[_]: ConcurrentEffect: PhaseResultListen](
     prompt: String,
     reader: LineReader,
-    evaluator: Command => F[Evaluator.Result]) {
+    evaluator: Command => F[Evaluator.Result[Stream[F, String]]]) {
 
   val F = ConcurrentEffect[F]
 
   private val read: F[Command] = F.delay(Command.parse(reader.readLine(prompt)))
 
-  private def eval(cmd: Command): F[Evaluator.Result] =
+  private def eval(cmd: Command): F[Evaluator.Result[Stream[F, String]]] =
     F.start(evaluator(cmd)) >>= (_.join)
 
-  private def print(string: Option[String]): F[Unit] =
-    string.fold(F.unit)(s => F.delay(println(s)))
+  private def print(strings: Stream[F, String]): F[Unit] =
+    strings.observe1(s => F.delay(println(s))).compile.drain
 
   val loop: F[ExitCode] =
     for {
       cmd <- read
-      res <- eval(cmd)
-      Evaluator.Result(exitCode, string) = res
-      _ <- print(string)
+      Evaluator.Result(exitCode, strings) <- eval(cmd)
+      _ <- print(strings)
       next <- exitCode.fold(loop)(_.pure[F])
     } yield next
 }
@@ -70,7 +69,7 @@ object Repl {
   def apply[F[_]: ConcurrentEffect: PhaseResultListen](
       prompt: String,
       reader: LineReader,
-      evaluator: Command => F[Evaluator.Result])
+      evaluator: Command => F[Evaluator.Result[Stream[F, String]]])
       : Repl[F] =
     new Repl[F](prompt, reader, evaluator)
 

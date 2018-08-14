@@ -73,9 +73,12 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
 
   val F = Effect[F]
 
-  def evaluate(cmd: Command): F[Result] = {
+  def evaluate(cmd: Command): F[Result[Stream[F, String]]] = {
     val exitCode = if (cmd === Exit) Some(ExitCode.Success) else None
-    recoverErrors(doEvaluate(cmd)).map(Result(exitCode, _))
+    recoverErrors(doEvaluate(cmd)).map { _ match {
+      case None => Stream.empty.covary[F]
+      case Some(r) => Stream.eval(r.pure[F])
+    }}.map(Result(exitCode, _))
   }
 
   ////
@@ -464,7 +467,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
 }
 
 object Evaluator {
-  final case class Result(exitCode: Option[ExitCode], string: Option[String])
+  final case class Result[A](exitCode: Option[ExitCode], result: A)
 
   final class EvalError(msg: String) extends java.lang.RuntimeException(msg)
 
