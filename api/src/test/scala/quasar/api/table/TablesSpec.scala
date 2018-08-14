@@ -54,8 +54,8 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
     table1.name must_!= table2.name
   }
 
-  "failures" >> {
-    "fail to access a nonexistent table" >>* {
+  "tables" >> {
+    "error when accessing a nonexistent table" >>* {
       for {
         id <- uniqueId.point[F]
         result <- tables.table(id)
@@ -66,7 +66,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
       }
     }
 
-    "fail to create a table with a name conflict" >>* {
+    "error when creating a table with a name conflict" >>* {
       for {
         errorOrId <- tables.createTable(table1)
         _ <- isSuccess(errorOrId)
@@ -78,7 +78,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
       }
     }
 
-    "fail to replace a nonexistent table" >>* {
+    "error when replacing a nonexistent table" >>* {
       for {
         id <- uniqueId.point[F]
         result <- tables.replaceTable(id, table1)
@@ -89,7 +89,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
       }
     }
 
-    "fail to prepare a nonexistent table" >>* {
+    "error when preparing a nonexistent table" >>* {
       for {
         id <- uniqueId.point[F]
         result <- tables.prepareTable(id)
@@ -100,7 +100,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
       }
     }
 
-    "fail to get preparation status for a nonexistent table" >>* {
+    "error when requesting preparation status for a nonexistent table" >>* {
       for {
         id <- uniqueId.point[F]
         result <- tables.preparationStatus(id)
@@ -111,7 +111,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
       }
     }
 
-    "fail to get prepared data for a nonexistent table" >>* {
+    "error when requesting prepared data for a nonexistent table" >>* {
       for {
         id <- uniqueId.point[F]
         result <- tables.preparedData(id)
@@ -122,7 +122,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
       }
     }
 
-    "fail to get prepared data for an unprepared table" >>* {
+    "error when requesting prepared data for an unprepared table" >>* {
       for {
         errorOrId <- tables.createTable(table1)
         id <- isSuccess(errorOrId)
@@ -133,10 +133,8 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
         }
       }
     }
-  }
 
-  "successes" >> {
-    "access a created table" >>* {
+    "succesfully access a created table" >>* {
       for {
         errorOrId <- tables.createTable(table1)
         id <- isSuccess(errorOrId)
@@ -148,7 +146,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
       }
     }
 
-    "return all tables" >>* {
+    "succesfully return all tables" >>* {
       for {
         errorOrId1 <- tables.createTable(table1)
         errorOrId2 <- tables.createTable(table2)
@@ -159,7 +157,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
       }
     }
 
-    "replace table" >>* {
+    "succesfully replace a table" >>* {
       for {
         errorOrId <- tables.createTable(table1)
         id <- isSuccess(errorOrId)

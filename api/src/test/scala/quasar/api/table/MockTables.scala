@@ -88,6 +88,9 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
   // mock tables prepare immediately
   def prepareTable(tableId: UUID): F[Condition[PrePreparationError[UUID]]] =
     store.get.flatMap(stateMap => stateMap.lookup(tableId) match {
+      case Some(MockTable(_, PreparationStatus(_, OngoingStatus.Preparing))) =>
+        Condition.abnormal(
+          PreparationInProgress(tableId): PrePreparationError[UUID]).point[F]
       case Some(state) =>
         store.put {
           stateMap.insert(tableId,
@@ -107,12 +110,30 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
       .map(_.status)
       .toRightDisjunction(TableNotFound(tableId)))
 
-  // mock cannot cancel preparations
   def cancelPreparation(tableId: UUID): F[Condition[PreparationNotInProgress[UUID]]] =
-    Condition.normal().point[F]
+    store.get.flatMap(stateMap => stateMap.lookup(tableId) match {
+      case Some(MockTable(table, PreparationStatus(prep, OngoingStatus.Preparing))) =>
+        store.put {
+          stateMap.insert(tableId,
+            MockTable(table, PreparationStatus(prep, OngoingStatus.NotPreparing)))
+        }.as(Condition.normal())
 
-  // mock cannot cancel preparations
-  def cancelAllPreparations: F[Unit] = ().point[F]
+      case Some(MockTable(_, PreparationStatus(_, OngoingStatus.NotPreparing))) =>
+        Condition.abnormal[PreparationNotInProgress[UUID]](
+          PreparationNotInProgress(tableId)).point[F]
+
+      case None =>
+        Condition.normal().point[F]
+    })
+
+  def cancelAllPreparations: F[Unit] =
+    store.get.flatMap { stateMap =>
+      val updatedMap = stateMap.map {
+        case MockTable(ref, PreparationStatus(prep, _)) =>
+          MockTable(ref, PreparationStatus(prep, OngoingStatus.NotPreparing))
+      }
+      store.put(updatedMap)
+    } >> ().point[F]
 
   // the prepared data is the table id
   def preparedData(tableId: UUID): F[ExistenceError[UUID] \/ PreparationResult[UUID, String]] =
