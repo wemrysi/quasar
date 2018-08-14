@@ -62,7 +62,7 @@ object Main extends StreamApp[PhaseResultCatsT[IO, ?]] {
       q <- Quasar[F](precog, ExternalConfig.PluginDirectory(pluginPath), 1000L)
     } yield q
 
-  def repl[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
+  def repl[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       q: Quasar[F])
       : F[ExitCode] =
     for {

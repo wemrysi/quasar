@@ -29,6 +29,7 @@ import quasar.run.{MonadQuasarErr, SqlQuery}
 
 import java.io.File
 import java.util.UUID
+import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import cats.effect._
@@ -73,10 +74,11 @@ object Repl {
       : Repl[F] =
     new Repl[F](prompt, reader, evaluator)
 
-  def mk[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
+  def mk[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       ref: Ref[F, ReplState],
       datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])
+      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])(
+      implicit ec: ExecutionContext)
       : F[Repl[F]] = {
     val evaluator = Evaluator[F](ref, datasources, queryEvaluator)
     historyFile[F].map(f => Repl[F](prompt, mkLineReader(f), evaluator.evaluate))

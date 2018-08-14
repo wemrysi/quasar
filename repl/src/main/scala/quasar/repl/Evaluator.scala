@@ -22,6 +22,7 @@ import quasar.api._, datasource._, resource._
 import quasar.common.{PhaseResultListen, PhaseResultTell, PhaseResults}
 import quasar.common.data.Data
 import quasar.contrib.fs2.convert.fromStreamT
+import quasar.contrib.fs2.pipe
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.contrib.std.uuid._
@@ -42,7 +43,9 @@ import quasar.yggdrasil.table.{Column, CScanner}
 
 import java.lang.Exception
 import java.nio.CharBuffer
+import java.nio.charset.StandardCharsets
 import java.nio.file.{Path => JPath}
+import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 import argonaut.{Json, JsonParser, JsonScalaz}, JsonScalaz._
@@ -62,10 +65,11 @@ import scalaz._, Scalaz._
 import shims.{eqToScalaz => _, orderToScalaz => _, _}
 import spire.std.double._
 
-final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
+final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
     stateRef: Ref[F, ReplState],
     sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-    queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]]) {
+    queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])(
+    implicit ec: ExecutionContext) {
 
   import Command._
   import DatasourceError._
@@ -238,7 +242,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         stateRef.get.map(s => Stream.emit(printPath(s.cwd)))
 
       case Select(q) =>
-        def doSelect(sql: SqlQuery, state: ReplState): F[(String, Stream[F, String])] =
+        def doSelect(sql: SqlQuery, state: ReplState): F[(String, Stream[F, CharBuffer])] =
           for {
             (qres, phaseResults) <- PhaseResultListen[F].listen(
               evaluateQuery(sql, state.summaryCount))
@@ -254,7 +258,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
               doSelect(sql, state).map { case (log, rendered) =>
                 val maxLines = state.summaryCount
                   .map(_.value + OutputFormat.headerLines(state.format))
-                Stream.emit(log) ++ printQueryResults(maxLines, rendered)
+                Stream.emit(log) ++ printQueryResults(maxLines, rendered.map(_.toString))
               }
             case OutputMode.File =>
               Paths.createTempFile("results", ".txt").map { tmpFile =>
@@ -262,7 +266,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
                   Stream.eval {
                     for {
                       (log, rendered) <- doSelect(sql, state)
-                      _ <- writeToPath(tmpFile, Stream(log).covary[F] ++ rendered)
+                      _ <- writeToPath(tmpFile, Stream(CharBuffer.wrap(log)).covary[F] ++ rendered)
                     } yield "Done"
                   }
               }
@@ -416,11 +420,11 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
             t.getStackTrace.mkString("\n  ", "\n  ", ""))
       }
 
-    private def renderMimirRepr(format: OutputFormat, repr: MimirRepr): Stream[F, String] = {
-      def convert(s: StreamT[IO, CharBuffer]): Stream[F, String] =
-        fromStreamT(s).map(_.toString).translate(λ[FunctionK[IO, F]](_.to[F]))
+    private def renderMimirRepr(format: OutputFormat, repr: MimirRepr): Stream[F, CharBuffer] = {
+      def convert(s: StreamT[IO, CharBuffer]): Stream[F, CharBuffer] =
+        fromStreamT(s).translate(λ[FunctionK[IO, F]](_.to[F]))
 
-      def renderCsv(assumeHomogeneous: Boolean): Stream[F, String] = {
+      def renderCsv(assumeHomogeneous: Boolean): Stream[F, CharBuffer] = {
         import repr.P.trans._
         val table2 = repr.table.transform(Scan(TransSpec1.Id, NullRemover): TransSpec[Source1])
         convert(table2.renderCsv(assumeHomogeneous))
@@ -433,7 +437,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           val r: IO[List[String]] = ds.compile.toList.map(Prettify.renderTable)
           Stream.eval(r).flatMap { ss =>
             Stream.fromIterator[IO, String](ss.iterator)
-          }.intersperse("\n").translate(λ[FunctionK[IO, F]](_.to[F]))
+          }.intersperse("\n").map(CharBuffer.wrap(_)).translate(λ[FunctionK[IO, F]](_.to[F]))
         case OutputFormat.Precise =>
           convert(repr.table.renderJson(precise = true))
         case OutputFormat.Readable =>
@@ -446,7 +450,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
     }
 
     private def renderMimirReprStream(format: OutputFormat, s: Stream[F, MimirRepr])
-        : Stream[F, String] =
+        : Stream[F, CharBuffer] =
       s.flatMap(renderMimirRepr(format, _))
 
     private def supportedTypes: F[ISet[DatasourceType]] =
@@ -456,9 +460,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
     private def toADir(path: ResourcePath): ADir =
       path.fold(f => fileParent(f) </> dir(fileName(f).value), rootDir)
 
-    private def writeToPath(path: JPath, s: Stream[F, String]): F[Unit] =
-      s.through(fs2.text.utf8Encode)
-        .through(fs2.io.file.writeAll(path))
+    private def writeToPath(path: JPath, s: Stream[F, CharBuffer]): F[Unit] =
+      s.through(pipe.charBufferToByte(StandardCharsets.UTF_8))
+        .through(fs2.io.file.writeAllAsync(path))
         .compile.drain
 
     // duplicated from slamdata-backend
@@ -484,10 +488,11 @@ object Evaluator {
 
   final class EvalError(msg: String) extends java.lang.RuntimeException(msg)
 
-  def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
+  def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       stateRef: Ref[F, ReplState],
       sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])
+      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])(
+      implicit ec: ExecutionContext)
       : Evaluator[F] =
     new Evaluator[F](stateRef, sources, queryEvaluator)
 
