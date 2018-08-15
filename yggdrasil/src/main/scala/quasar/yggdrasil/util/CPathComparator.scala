@@ -17,7 +17,6 @@
 package quasar.yggdrasil
 package util
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import qdata.time.OffsetDate
 import quasar.yggdrasil.table._
