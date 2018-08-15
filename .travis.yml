@@ -40,8 +40,10 @@ script:
 
   - scripts/testJar
 
-  - set +e
-  - '[ $TRAVIS_PULL_REQUEST == "false" ] && [[ "$TRAVIS_BRANCH" =~ backport/v.*|master ]] && scripts/quasarPublishAndTag'
+  - |-
+    if [ $TRAVIS_PULL_REQUEST == "false" ] && [[ "$TRAVIS_BRANCH" =~ backport/v.*|master ]]; then
+      scripts/quasarPublishAndTag
+    fi
 
 after_success: scripts/discordTravisPost success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
 
