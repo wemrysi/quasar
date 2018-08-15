@@ -514,7 +514,7 @@ object Evaluator {
       |  [query]
       |  (explain | compile) [query]
       |  set debug = 0 | 1 | 2
-      |  set format = table | precise | readable | csv
+      |  set format = table | precise | readable | csv | homogeneouscsv
       |  set mode = console | file
       |  set summaryCount = [rows]
       |  set [var] = [value]
