@@ -1,29 +1,19 @@
 language: scala
 scala: 2.12.4 # this needs to be in sync with Scala version used in .appveyor.yml
 jdk: oraclejdk8
+
 dist: trusty
 sudo: required
 
-stages:
-  - name: clean
-    if: NOT type = pull_request
-  - name: compile
-  - name: test
-  - name: testjar
-    if: type = pull_request
-  - name: publish
-    # weirdly, we have to add the extra PR check
-    if: NOT type = pull_request
-  - name: cache cleanup
-
-# this all goes in the test stage
 env:
   global:
     - COURSIER_PROGRESS=0
     - SBT=./sbt
     - BUILD_HACK_TIMEOUT=60
-    # DISCORD_WEBHOOK_TOKENS
-    - secure: "copZbrzCXeRfTx2ZRM6nsM07A4rfQAZ0mqk4R+z6USJhjLHv+KXAN30QN2nIAi9FmLoEX8BZRRpbX36nkc81jverhbS6POaci5UcQLpo8HOX4yR3b/pWqIBlno55K5hC6UCEXAneI/ZThFKwotpME9dw7ww+S+gIyaoDvZc4OUI="
+
+    # base64 encoded just for obfuscation
+    - DISCORD_WEBHOOK_TOKENS="$(echo 'NDMxMTk3MzQwNDE0NTA5MDY2L3o1TlVmbWtibXFua250Q0FMcEhNbWo4c1ZJaDZwa2UwN3d4QVZic0ZfbzJuYmEyU08zN082UC04bnpFckNHWVpWNlZuCg==' | base64 --decode)"
+
     # ENCRYPTION_PASSWORD
     - secure: "YIfY4y2fR4jMOim40r7m4zIHDXI6sXIk+J8qaPJyfPx/cmDRKs5DfbHddb0Rp7Ny0tnRiwRZDt+pEZvfSiuxCIeQQ6/2vi76Jg1iK2ZMO7ZP2wFg5m2t3T+vRIx9WVBr3JVmI4lPuP9FCNTUmxHIzYgozgZM+KdhticW5k3BABY="
     # GITHUB_ACCESS_TOKEN
@@ -36,92 +26,32 @@ before_script:
   - nproc 2>/dev/null && python -c 'import multiprocessing;print multiprocessing.cpu_count()'
   - free && cat /proc/meminfo
 
-jobs:
-  include:
-    - stage: clean
-      env:
-      script:
-        - travis_wait 30 ./scripts/s3Cache cacheCleanUp
-        - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
+script:
+  - set -e
 
-    - stage: compile
-      env:
-      script:
-        - set -e
+  - |-
+    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+      checkHeaders \
+      test:compile \
+      "testOnly -- failtrace" \
+      "exclusive:testOnly -- failtrace" \
+      doc \
+      repl/assembly
 
-        - travis_wait 30 scripts/s3Cache cleanup
+  - scripts/testJar
 
-        - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-            checkHeaders \
-            test:compile
+  - |-
+    if [ $TRAVIS_PULL_REQUEST == "false" ] && [[ "$TRAVIS_BRANCH" =~ backport/v.*|master ]]; then
+      scripts/quasarPublishAndTag
+    fi
 
-        - travis_wait 30 scripts/s3Cache upload
+after_success: scripts/discordTravisPost success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
 
-        - set +e
-
-    - stage: test
-      env:
-      script:
-        - travis_wait 30 scripts/s3Cache download
-        - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-            "testOnly -- failtrace" \
-            "exclusive:testOnly -- failtrace"
-
-    - stage: testjar
-      env:
-      script:
-        - set -e
-
-        - travis_wait 30 scripts/s3Cache download
-
-        - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc repl/assembly'
-
-        - scripts/testJar
-
-        - set +e
-
-    - stage: publish
-      env:
-      script:
-        - set -e
-
-        - travis_wait 30 scripts/s3Cache download
-
-        - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc repl/assembly'
-
-        - scripts/testJar
-
-        # release to sonatype
-        - scripts/quasarPublishAndTag
-
-        - set +e
-
-    - stage: cache cleanup
-      env:
-      script:
-        - travis_wait 30 scripts/s3Cache cleanup
-
-notifications:
-  irc:
-    template:
-      - "%{result}: %{repository_slug}#%{build_number} (%{branch}@%{commit}: %{author})
-        %{build_url}"
-  slack:
-    secure: k7tat0w0CSokOD1K0nfPhFY9Z3xkYHXboNlW1WgNAjqtq56hQsfQWhN8z6cXRAs/CgT8ME0K//wDN/HgdG91/aVh1smv/hxMa6P/o70GclhvUkB4iTis3kv9la3Kf2w3K5pbWJ6fFLdAZqc5i9XpQ8q+d7UTgwAxj1ZcYwaCSVo=
-
-after_success:
-  - scripts/discordTravisPost success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
-
-after_failure:
-  - scripts/discordTravisPost failure https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
+after_failure: scripts/discordTravisPost failure https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
 
 branches:
-  only:
-    - master
-    - next-major
-    - /^backport.*$/
+  except:
+    - /^v\d+\.\d+\.\d+$/ # don't redundantly build tags
 
 cache:
   directories:
