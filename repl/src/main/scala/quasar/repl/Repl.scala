@@ -22,13 +22,14 @@ import quasar.api.QueryEvaluator
 import quasar.api.datasource.Datasources
 import quasar.build.BuildInfo
 import quasar.common.{PhaseResultListen, PhaseResultTell}
-import quasar.common.data.Data
 import quasar.ejson.EJson
 import quasar.impl.schema.SstConfig
+import quasar.mimir.MimirRepr
 import quasar.run.{MonadQuasarErr, SqlQuery}
 
 import java.io.File
 import java.util.UUID
+import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import cats.effect._
@@ -44,24 +45,23 @@ import scalaz._, Scalaz._
 final class Repl[F[_]: ConcurrentEffect: PhaseResultListen](
     prompt: String,
     reader: LineReader,
-    evaluator: Command => F[Evaluator.Result]) {
+    evaluator: Command => F[Evaluator.Result[Stream[F, String]]]) {
 
   val F = ConcurrentEffect[F]
 
   private val read: F[Command] = F.delay(Command.parse(reader.readLine(prompt)))
 
-  private def eval(cmd: Command): F[Evaluator.Result] =
+  private def eval(cmd: Command): F[Evaluator.Result[Stream[F, String]]] =
     F.start(evaluator(cmd)) >>= (_.join)
 
-  private def print(string: Option[String]): F[Unit] =
-    string.fold(F.unit)(s => F.delay(println(s)))
+  private def print(strings: Stream[F, String]): F[Unit] =
+    strings.observe1(s => F.delay(println(s))).compile.drain
 
   val loop: F[ExitCode] =
     for {
       cmd <- read
-      res <- eval(cmd)
-      Evaluator.Result(exitCode, string) = res
-      _ <- print(string)
+      Evaluator.Result(exitCode, strings) <- eval(cmd)
+      _ <- print(strings)
       next <- exitCode.fold(loop)(_.pure[F])
     } yield next
 }
@@ -70,14 +70,15 @@ object Repl {
   def apply[F[_]: ConcurrentEffect: PhaseResultListen](
       prompt: String,
       reader: LineReader,
-      evaluator: Command => F[Evaluator.Result])
+      evaluator: Command => F[Evaluator.Result[Stream[F, String]]])
       : Repl[F] =
     new Repl[F](prompt, reader, evaluator)
 
-  def mk[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
+  def mk[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       ref: Ref[F, ReplState],
       datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
+      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])(
+      implicit ec: ExecutionContext)
       : F[Repl[F]] = {
     val evaluator = Evaluator[F](ref, datasources, queryEvaluator)
     historyFile[F].map(f => Repl[F](prompt, mkLineReader(f), evaluator.evaluate))

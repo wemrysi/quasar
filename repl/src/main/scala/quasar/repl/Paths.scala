@@ -20,7 +20,7 @@ package repl
 import slamdata.Predef._
 
 import java.lang.System
-import java.nio.file.{Path => JPath, Paths => JPaths}
+import java.nio.file.{Files => JFiles, Path => JPath, Paths => JPaths}
 
 import cats.effect.Sync
 import scalaz._, Scalaz._
@@ -33,6 +33,10 @@ object Paths {
   val QuasarDirNames = NonEmptyList(".config", "quasar")
   val QuasarDataDirName = "data"
   val QuasarPluginsDirName = "plugins"
+
+  def createTempFile[F[_]](prefix: String, suffix: String)(implicit F: Sync[F])
+      : F[JPath] =
+    F.delay(JFiles.createTempFile(prefix, suffix))
 
   def getBasePath[F[_]](implicit F: Sync[F]): F[JPath] =
     getUserHome.map(h => h.map(_.resolve(getPath(QuasarDirNames)))

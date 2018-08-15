@@ -62,14 +62,12 @@ object Main extends StreamApp[PhaseResultCatsT[IO, ?]] {
       q <- Quasar[F](precog, ExternalConfig.PluginDirectory(pluginPath), 1000L)
     } yield q
 
-  def repl[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
+  def repl[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       q: Quasar[F])
       : F[ExitCode] =
     for {
       ref <- Ref[F, ReplState](ReplState.mk)
-      repl <- Repl.mk[F](ref,
-        q.datasources,
-        q.queryEvaluator.map(_.flatMap(mimir.tableToData(_).translate(λ[FunctionK[IO, F]](_.to[F])))))
+      repl <- Repl.mk[F](ref, q.datasources, q.queryEvaluator)
       l <- repl.loop
     } yield l
 

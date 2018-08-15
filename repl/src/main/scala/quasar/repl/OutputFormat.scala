@@ -16,7 +16,7 @@
 
 package quasar.repl
 
-import slamdata.Predef.{Option, Some, String}
+import slamdata.Predef._
 
 sealed abstract class OutputFormat
 object OutputFormat {
@@ -24,12 +24,23 @@ object OutputFormat {
   case object Precise extends OutputFormat
   case object Readable extends OutputFormat
   case object Csv extends OutputFormat
+  case object HomogeneousCsv extends OutputFormat
 
   def fromString(str: String): Option[OutputFormat] =
     Some(str.toLowerCase) collect {
-      case "table"    => Table
-      case "precise"  => Precise
+      case "table" => Table
+      case "precise" => Precise
       case "readable" => Readable
-      case "csv"      => Csv
+      case "csv" => Csv
+      case "homogeneouscsv" => HomogeneousCsv
+    }
+
+  def headerLines(format: OutputFormat): Int =
+    format match {
+      case Table => 2
+      case Precise => 0
+      case Readable => 0
+      case Csv => 1
+      case HomogeneousCsv => 1
     }
 }

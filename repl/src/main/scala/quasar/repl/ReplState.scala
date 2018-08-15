@@ -34,6 +34,7 @@ import scalaz._, Scalaz._
     phaseFormat:        PhaseFormat,
     summaryCount:       Option[Int Refined Positive],
     format:             OutputFormat,
+    mode:               OutputMode,
     variables:          Variables,
     timingFormat:       TimingFormat,
     supportedTypes:     Option[ISet[DatasourceType]]
@@ -47,7 +48,8 @@ object ReplState {
     DebugLevel.Normal,
     PhaseFormat.Tree,
     Some(10),
-    OutputFormat.Table,
+    OutputFormat.Precise,
+    OutputMode.Console,
     Variables(Map()),
     TimingFormat.OnlyTotal,
     none
