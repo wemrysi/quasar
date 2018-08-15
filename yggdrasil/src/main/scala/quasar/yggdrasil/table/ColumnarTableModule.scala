@@ -42,6 +42,7 @@ import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTim
 
 import scala.annotation.tailrec
 import scala.collection.immutable.Set
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait ColumnarTableTypes {
   type Reducer[α] = CReducer[α]

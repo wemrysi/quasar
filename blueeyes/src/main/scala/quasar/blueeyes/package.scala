@@ -21,7 +21,6 @@ import quasar.precog.util._
 
 import scalaz._
 
-import scala.concurrent.ExecutionContext
 import scala.math.BigDecimal
 
 import java.nio.ByteBuffer
@@ -38,8 +37,6 @@ package object blueeyes extends precog.PackageTime {
   def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = ByteBuffer.wrap(xs, offset, len)
   def abort(msg: String): Nothing                                        = throw new RuntimeException(msg)
   def decimal(d: String): BigDecimal                                     = BigDecimal(d, java.math.MathContext.UNLIMITED)
-
-  implicit val GlobalEC: ExecutionContext = scala.concurrent.ExecutionContext.global
 
   implicit def comparableOrder[A <: Comparable[A]] : scalaz.Order[A] =
     scalaz.Order.order[A]((x, y) => scalaz.Ordering.fromInt(x compareTo y))
