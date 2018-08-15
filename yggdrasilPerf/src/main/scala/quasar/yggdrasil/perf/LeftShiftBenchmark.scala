@@ -26,6 +26,7 @@ import quasar.yggdrasil.table.TestColumnarTableModule
 import cats.effect.IO
 
 import java.util.concurrent.TimeUnit
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import org.openjdk.jmh.annotations.{Benchmark, BenchmarkMode, Mode, OutputTimeUnit, Param, Scope, Setup, State}
 import org.openjdk.jmh.infra.Blackhole

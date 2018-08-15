@@ -36,6 +36,7 @@ import TableModule._
 import SampleData._
 
 import java.nio.CharBuffer
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait TestColumnarTableModule extends ColumnarTableModuleTestSupport { self =>
   import trans._

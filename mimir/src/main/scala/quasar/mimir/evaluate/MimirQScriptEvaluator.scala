@@ -33,6 +33,7 @@ import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
 import quasar.yggdrasil.MonadFinalizers
 
 import scala.Predef.implicitly
+import scala.concurrent.ExecutionContext
 
 import cats.effect.{IO, LiftIO}
 import iotaz.CopK
@@ -45,7 +46,8 @@ import shims._
 final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]] private (
-    cake: Cake)
+    cake: Cake)(
+    implicit ec: ExecutionContext)
     extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] {
 
   type MT[X[_], A] = Kleisli[X, Associates[T, IO], A]
@@ -102,7 +104,7 @@ final class MimirQScriptEvaluator[
       _ match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value)
         case _ => ???
       }
     }
@@ -115,7 +117,7 @@ final class MimirQScriptEvaluator[
       in match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value)
       }
     }
 
@@ -127,7 +129,8 @@ object MimirQScriptEvaluator {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]](
-      cake: Cake)
+      cake: Cake)(
+      implicit ec: ExecutionContext)
       : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] =
     new MimirQScriptEvaluator[T, F](cake)
 }

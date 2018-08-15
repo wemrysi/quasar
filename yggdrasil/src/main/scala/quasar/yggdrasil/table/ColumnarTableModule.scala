@@ -42,7 +42,7 @@ import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTim
 
 import scala.annotation.tailrec
 import scala.collection.immutable.Set
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 
 trait ColumnarTableTypes {
   type Reducer[α] = CReducer[α]
@@ -360,7 +360,10 @@ trait ColumnarTableModule
       }
     }
 
-    def fromRValueStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table] = {
+    def fromRValueStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](
+        values: fs2.Stream[IO, RValue])(
+        implicit ec: ExecutionContext)
+        : M[Table] = {
       val sliceStream = Slice.allFromRValues(values)
 
       for {
