@@ -43,7 +43,8 @@ object Command {
   private val SetTimingFormatPattern       = "(?i)(?:set +)?timingFormat *= *(tree|onlytotal)".r
   private val DebugPattern                 = "(?i)(?:set +)?debug *= *(0|1|2)".r
   private val SummaryCountPattern          = """(?i)(?:set +)?summaryCount *= *(\d+)""".r
-  private val FormatPattern                = "(?i)(?:set +)?format *= *((?:table)|(?:precise)|(?:readable)|(?:csv))".r
+  private val FormatPattern                = "(?i)(?:set +)?format *= *((?:table)|(?:precise)|(?:readable)|(?:csv)|(?:homogeneouscsv))".r
+  private val ModePattern                  = "(?i)(?:set +)?mode *= *((?:console)|(?:file))".r
   private val SetVarPattern                = """(?i)(?:set +)?(\w+) *= *(.*\S)""".r
   private val UnsetVarPattern              = """(?i)unset +(\w+)""".r
   private val ListVarPattern               = "(?i)env".r
@@ -67,6 +68,7 @@ object Command {
   final case class Debug(level: DebugLevel) extends Command
   final case class SummaryCount(rows: Int) extends Command
   final case class Format(format: OutputFormat) extends Command
+  final case class Mode(mode: OutputMode) extends Command
   final case class SetPhaseFormat(format: PhaseFormat) extends Command
   final case class SetTimingFormat(format: TimingFormat) extends Command
   final case class SetVar(name: VarName, value: VarValue) extends Command
@@ -93,7 +95,8 @@ object Command {
       case SetPhaseFormatPattern(format)            => SetPhaseFormat(PhaseFormat.fromString(format) | PhaseFormat.Tree)
       case SetTimingFormatPattern(format)           => SetTimingFormat(TimingFormat.fromString(format) | TimingFormat.OnlyTotal)
       case SummaryCountPattern(rows)                => SummaryCount(rows.toInt)
-      case FormatPattern(format)                    => Format(OutputFormat.fromString(format) | OutputFormat.Table)
+      case FormatPattern(format)                    => Format(OutputFormat.fromString(format) | OutputFormat.Precise)
+      case ModePattern(mode)                        => Mode(OutputMode.fromString(mode) | OutputMode.Console)
       case HelpPattern()                            => Help
       case SetVarPattern(name, value)               => SetVar(VarName(name), VarValue(value))
       case UnsetVarPattern(name)                    => UnsetVar(VarName(name))

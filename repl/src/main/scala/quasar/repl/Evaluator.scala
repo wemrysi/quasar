@@ -21,6 +21,8 @@ import slamdata.Predef._
 import quasar.api._, datasource._, resource._
 import quasar.common.{PhaseResultListen, PhaseResultTell, PhaseResults}
 import quasar.common.data.Data
+import quasar.contrib.fs2.convert.fromStreamT
+import quasar.contrib.fs2.pipe
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.contrib.std.uuid._
@@ -30,15 +32,24 @@ import quasar.fp.minspace
 import quasar.fp.ski._
 import quasar.frontend.data.DataCodec
 import quasar.impl.schema.{SstConfig, SstSchema}
+import quasar.mimir.MimirRepr
+import quasar.precog.common.{ColumnRef, CNull}
 import quasar.run.{QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
 import quasar.run.ResourceRouter.DatasourceResourcePrefix
 import quasar.run.optics.{stringUuidP => UuidString}
 import quasar.sst._
+import quasar.yggdrasil.table.{Column, CScanner}
+
 
 import java.lang.Exception
+import java.nio.CharBuffer
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Path => JPath}
+import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 import argonaut.{Json, JsonParser, JsonScalaz}, JsonScalaz._
+import cats.arrow.FunctionK
 import cats.effect._
 import eu.timepit.refined.refineV
 import eu.timepit.refined.api.Refined
@@ -54,10 +65,11 @@ import scalaz._, Scalaz._
 import shims.{eqToScalaz => _, orderToScalaz => _, _}
 import spire.std.double._
 
-final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
+final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
     stateRef: Ref[F, ReplState],
     sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-    queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]]) {
+    queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])(
+    implicit ec: ExecutionContext) {
 
   import Command._
   import DatasourceError._
@@ -65,7 +77,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
 
   val F = Effect[F]
 
-  def evaluate(cmd: Command): F[Result] = {
+  def evaluate(cmd: Command): F[Result[Stream[F, String]]] = {
     val exitCode = if (cmd === Exit) Some(ExitCode.Success) else None
     recoverErrors(doEvaluate(cmd)).map(Result(exitCode, _))
   }
@@ -109,68 +121,73 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           pathNotFound[DiscoveryError[UUID]](path).left)
     }
 
-  private def doEvaluate(cmd: Command): F[Option[String]] =
+  private def doEvaluate(cmd: Command): F[Stream[F, String]] =
     cmd match {
       case Help =>
-        F.pure(helpMsg.some)
+        liftS1(helpMsg)
 
       case Debug(level) =>
         stateRef.modify(_.copy(debugLevel = level)) *>
-          F.pure(s"Set debug level: $level".some)
+          liftS1(s"Set debug level: $level")
 
       case SummaryCount(rows) =>
         val count: Option[Option[Int Refined Positive]] =
           if (rows === 0) Some(None)
           else refineV[Positive](rows).fold(κ(None), p => Some(Some(p)))
         count match {
-          case None => F.pure("Rows must be a positive integer or 0 to indicate no limit".some)
+          case None => liftS1("Rows must be a positive integer or 0 to indicate no limit")
           case Some(c) => stateRef.modify(_.copy(summaryCount = c)) *>
-            F.pure {
+            liftS1 {
               val r = c.map(_.toString).getOrElse("unlimited")
-              s"Set rows to show in result: $r".some
+              s"Set rows to show in result: $r"
             }
         }
 
       case Format(fmt) =>
         stateRef.modify(_.copy(format = fmt)) *>
-          F.pure(s"Set output format: $fmt".some)
+          liftS1(s"Set output format: $fmt")
+
+      case Mode(mode) =>
+        stateRef.modify(_.copy(mode = mode)) *>
+          liftS1(s"Set output mode: $mode")
 
       case SetPhaseFormat(fmt) =>
         stateRef.modify(_.copy(phaseFormat = fmt)) *>
-          F.pure(s"Set phase format: $fmt".some)
+          liftS1(s"Set phase format: $fmt")
 
       case SetTimingFormat(fmt) =>
         stateRef.modify(_.copy(timingFormat = fmt)) *>
-          F.pure(s"Set timing format: $fmt".some)
+          liftS1(s"Set timing format: $fmt")
 
       case SetVar(n, v) =>
         stateRef.modify(state => state.copy(variables = state.variables + (n -> v))) *>
-          F.pure(s"Set variable ${n.value} = ${v.value}".some)
+          liftS1(s"Set variable ${n.value} = ${v.value}")
 
       case UnsetVar(n) =>
         stateRef.modify(state => state.copy(variables = state.variables - n)) *>
-          F.pure(s"Unset variable ${n.value}".some)
+          liftS1(s"Unset variable ${n.value}")
 
       case ListVars =>
         stateRef.get.map(_.variables.value).map(
           _.toList.map { case (VarName(name), VarValue(value)) => s"$name = $value" }
-            .mkString("Variables:\n", "\n", "").some)
+            .mkString("Variables:\n", "\n", "")).map(Stream.emit(_))
 
       case DatasourceList =>
         sources.allDatasourceMetadata
           .flatMap(_.map({ case (k, v) => s"$k ${printMetadata(v)}" }).compile.toList)
-          .map(_.mkString("Datasources:\n", "\n", "").some)
+          .map(_.mkString("Datasources:\n", "\n", "")).map(Stream.emit(_))
 
       case DatasourceTypes =>
         doSupportedTypes.map(
           _.toList.map(printType)
-            .mkString("Supported datasource types:\n", "\n", "").some)
+            .mkString("Supported datasource types:\n", "\n", "")).map(Stream.emit(_))
 
       case DatasourceLookup(id) =>
         sources.datasourceRef(id)
           .flatMap(fromEither[ExistentialError[UUID], DatasourceRef[Json]])
           .map(ref =>
-            List(s"Datasource[$id](name = ${ref.name.shows}, type = ${printType(ref.kind)})", ref.config.spaces2).mkString("\n").some)
+            List(s"Datasource[$id](name = ${ref.name.shows}, type = ${printType(ref.kind)})", ref.config.spaces2).mkString("\n"))
+          .map(Stream.emit(_))
 
       case DatasourceAdd(name, tp, cfg) =>
         for {
@@ -179,11 +196,11 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           cfgJson <- JsonParser.parse(cfg).fold(raiseEvalError, _.point[F])
           r <- sources.addDatasource(DatasourceRef(dsType, name, cfgJson))
           i <- r.fold(e => raiseEvalError(e.shows), _.point[F])
-        } yield s"Added datasource $i (${name.value})".some
+        } yield Stream.emit(s"Added datasource $i (${name.value})")
 
       case DatasourceRemove(id) =>
         (sources.removeDatasource(id) >>= ensureNormal[ExistentialError[UUID]]).map(
-          κ(s"Removed datasource $id".some))
+          κ(Stream.emit(s"Removed datasource $id")))
 
       case ResourceSchema(replPath) =>
         for {
@@ -192,9 +209,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           s <- schema(path)
           t = s.map(_.sst.fold(_.asEJson[Fix[EJson]], _.asEJson[Fix[EJson]]))
         } yield {
-          t.flatMap(ejs => DataCodec.Precise.encode(ejs.cata(Data.fromEJson)))
-            .fold("No schema available.")(_.spaces2)
-            .some
+          Stream.emit(
+            t.flatMap(ejs => DataCodec.Precise.encode(ejs.cata(Data.fromEJson)))
+              .fold("No schema available.")(_.spaces2))
         }
 
       case Cd(path: ReplPath) =>
@@ -203,7 +220,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           dir = newPath(cwd, path)
           _ <- ensureValidDir(dir)
           _ <- stateRef.modify(_.copy(cwd = dir))
-        } yield s"cwd is now ${printPath(dir)}".some
+        } yield Stream.emit(s"cwd is now ${printPath(dir)}")
 
       case Ls(path: Option[ReplPath]) =>
         def postfix(tpe: ResourcePathType): String = tpe match {
@@ -212,31 +229,49 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         }
 
         def convert(s: Stream[F, (ResourceName, ResourcePathType)])
-            : F[Option[String]] =
+            : Stream[F, String] =
           s.map { case (name, tpe) => s"${name.value}${postfix(tpe)}" }
-            .compile.toVector.map(_.mkString("\n").some)
 
         for {
           cwd <- stateRef.get.map(_.cwd)
           p = path.map(newPath(cwd, _)).getOrElse(cwd)
           cs <- children(p)
-          res <- convert(cs)
-        } yield res
+        } yield convert(cs)
 
       case Pwd =>
-        stateRef.get.map(s => printPath(s.cwd).some)
+        stateRef.get.map(s => Stream.emit(printPath(s.cwd)))
 
       case Select(q) =>
-        def convert(format: OutputFormat, s: Stream[F, Data]): F[Option[String]] =
-          s.compile.toList.map(ds => renderData(format, ds).some)
+        def doSelect(sql: SqlQuery, state: ReplState): F[(String, Stream[F, CharBuffer])] =
+          for {
+            (qres, phaseResults) <- PhaseResultListen[F].listen(
+              evaluateQuery(sql, state.summaryCount))
+            log = printLog(state.debugLevel, state.phaseFormat, phaseResults).map(_ + "\n").getOrElse("")
+            rendered = renderMimirReprStream(state.format, qres)
+          } yield ((log, rendered))
 
         for {
           state <- stateRef.get
-          (qres, phaseResults) <- PhaseResultListen[F].listen(
-            evaluateQuery(SqlQuery(q, state.variables, toADir(state.cwd)), state.summaryCount))
-          log = printLog(state.debugLevel, state.phaseFormat, phaseResults).map(_ + "\n")
-          res <- convert(state.format, qres)
-        } yield (log |+| res)
+          sql = SqlQuery(q, state.variables, toADir(state.cwd))
+          res <- state.mode match {
+            case OutputMode.Console =>
+              doSelect(sql, state).map { case (log, rendered) =>
+                val maxLines = state.summaryCount
+                  .map(_.value + OutputFormat.headerLines(state.format))
+                Stream.emit(log) ++ printQueryResults(maxLines, rendered.map(_.toString))
+              }
+            case OutputMode.File =>
+              Paths.createTempFile("results", ".txt").map { tmpFile =>
+                Stream.emit(s"Writing results to ${tmpFile.toFile.getAbsolutePath}") ++
+                  Stream.eval {
+                    for {
+                      (log, rendered) <- doSelect(sql, state)
+                      _ <- writeToPath(tmpFile, Stream(CharBuffer.wrap(log)).covary[F] ++ rendered)
+                    } yield "Done"
+                  }
+              }
+          }
+        } yield res
 
       case Explain(q) =>
         for {
@@ -244,13 +279,13 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           (_, phaseResults) <- PhaseResultListen[F].listen(
             Sql2QueryEvaluator.sql2ToQScript[Fix, F](SqlQuery(q, state.variables, toADir(state.cwd))))
           log = printLog(Order[DebugLevel].max(DebugLevel.Normal, state.debugLevel), state.phaseFormat, phaseResults)
-        } yield log
+        } yield Stream.emits(log.toList)
 
       case NoOp =>
-        F.pure(none)
+        liftS(List.empty)
 
       case Exit =>
-        F.pure("Exiting...".some)
+        liftS1("Exiting...")
     }
 
     private def doSupportedTypes: F[ISet[DatasourceType]] =
@@ -273,7 +308,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         F.unit)
 
     private def evaluateQuery(q: SqlQuery, summaryCount: Option[Int Refined Positive])
-        : F[Stream[F, Data]] =
+        : F[Stream[F, MimirRepr]] =
       queryEvaluator.evaluate(q) map { s =>
         summaryCount.map(c => s.take(c.value.toLong)).getOrElse(s)
       }
@@ -310,6 +345,11 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       ResourcePath.resourceNamesIso(interpreted)
     }
 
+    private def liftS(ss: List[String]): F[Stream[F, String]] =
+      F.pure(Stream.emits(ss))
+
+    private def liftS1(s: String): F[Stream[F, String]] = liftS(List(s))
+
     private def newPath(cwd: ResourcePath, change: ReplPath): ResourcePath =
       change match {
         case ReplPath.Absolute(p) => interpretDotsAsParent(p)
@@ -344,29 +384,74 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         case PhaseFormat.Code => results.map(_.showCode).mkString("\n\n")
       }
 
+    private def printQueryResults(maxLines: Option[Int], stream: Stream[F, String]): Stream[F, String] = {
+
+      def cutOffAfterMaxLines(maxLines: Int, start: (Int, String), current: String): (Int, String) =
+        current.foldLeft(start) { case (acc, c) =>
+          val count = acc._1 + (if (c === '\n') 1 else 0)
+          if (count < maxLines)
+            (count, acc._2 + c.toString)
+          else
+            (count, acc._2)
+        }
+
+      maxLines match {
+        case None =>
+          stream
+        case Some(max) =>
+          stream.fold((0, "")) { case (acc, s) =>
+            if (acc._1 < max)
+              cutOffAfterMaxLines(max, acc, s)
+            else
+              acc
+          }.map(_._2)
+      }
+    }
+
     private def raiseEvalError[A](s: String): F[A] =
       F.raiseError(new EvalError(s))
 
-    private def recoverErrors(fa: F[Option[String]]): F[Option[String]] =
+    private def recoverErrors(fa: F[Stream[F, String]]): F[Stream[F, String]] =
       F.recover(fa) {
-        case ee: EvalError => s"Evaluation error: ${ee.getMessage}".some
-        case QuasarError.throwableP(qe) => s"Quasar error: $qe".some
+        case ee: EvalError => Stream.emit(s"Evaluation error: ${ee.getMessage}")
+        case QuasarError.throwableP(qe) => Stream.emit(s"Quasar error: $qe")
         case NonFatal(t) =>
-          (s"Unexpected error: ${t.getClass.getCanonicalName}: ${t.getMessage}" +
-            t.getStackTrace.mkString("\n  ", "\n  ", "")).some
+          Stream.emit(s"Unexpected error: ${t.getClass.getCanonicalName}: ${t.getMessage}" +
+            t.getStackTrace.mkString("\n  ", "\n  ", ""))
       }
 
-    private def renderData(format: OutputFormat, ds: List[Data]): String =
-      (format match {
+    private def renderMimirRepr(format: OutputFormat, repr: MimirRepr): Stream[F, CharBuffer] = {
+      def convert(s: StreamT[IO, CharBuffer]): Stream[F, CharBuffer] =
+        fromStreamT(s).translate(λ[FunctionK[IO, F]](_.to[F]))
+
+      def renderCsv(assumeHomogeneous: Boolean): Stream[F, CharBuffer] = {
+        import repr.P.trans._
+        val table2 = repr.table.transform(Scan(TransSpec1.Id, NullRemover): TransSpec[Source1])
+        convert(table2.renderCsv(assumeHomogeneous))
+      }
+
+      format match {
         case OutputFormat.Table =>
-          Prettify.renderTable(ds)
+          val ds: Stream[IO, Data] = mimir.tableToData(repr)
+          //TODO make Prettify.renderTable streaming so that we are not memory bound here
+          val r: IO[List[String]] = ds.compile.toList.map(Prettify.renderTable)
+          Stream.eval(r).flatMap { ss =>
+            Stream.fromIterator[IO, String](ss.iterator)
+          }.intersperse("\n").map(CharBuffer.wrap(_)).translate(λ[FunctionK[IO, F]](_.to[F]))
         case OutputFormat.Precise =>
-          ds.map(formatJson(DataCodec.Precise)).unite
+          convert(repr.table.renderJson(precise = true))
         case OutputFormat.Readable =>
-          ds.map(formatJson(DataCodec.Readable)).unite
+          convert(repr.table.renderJson(precise = false))
         case OutputFormat.Csv =>
-          Prettify.renderValues(ds).map(CsvWriter(none)(_).trim)
-      }).mkString("\n")
+          renderCsv(assumeHomogeneous = false)
+        case OutputFormat.HomogeneousCsv =>
+          renderCsv(assumeHomogeneous = true)
+      }
+    }
+
+    private def renderMimirReprStream(format: OutputFormat, s: Stream[F, MimirRepr])
+        : Stream[F, CharBuffer] =
+      s.flatMap(renderMimirRepr(format, _))
 
     private def supportedTypes: F[ISet[DatasourceType]] =
       stateRef.get.map(_.supportedTypes) >>=
@@ -375,17 +460,39 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
     private def toADir(path: ResourcePath): ADir =
       path.fold(f => fileParent(f) </> dir(fileName(f).value), rootDir)
 
+    private def writeToPath(path: JPath, s: Stream[F, CharBuffer]): F[Unit] =
+      s.through(pipe.charBufferToByte(StandardCharsets.UTF_8))
+        .through(fs2.io.file.writeAllAsync(path))
+        .compile.drain
+
+    // duplicated from slamdata-backend
+    // someday, this should probably move into mimir...
+    private object NullRemover extends CScanner {
+      type A = Unit
+      val init = ()
+
+      def scan(u: Unit, cols: Map[ColumnRef, Column], range: Range): (Unit, Map[ColumnRef, Column]) = {
+        val cols2 = cols flatMap {
+          case (ColumnRef(_, CNull), _) => Nil
+          case pair => List(pair)
+        }
+
+        ((), cols2)
+      }
+    }
+
 }
 
 object Evaluator {
-  final case class Result(exitCode: Option[ExitCode], string: Option[String])
+  final case class Result[A](exitCode: Option[ExitCode], result: A)
 
   final class EvalError(msg: String) extends java.lang.RuntimeException(msg)
 
-  def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell](
+  def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       stateRef: Ref[F, ReplState],
       sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, Data]])
+      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])(
+      implicit ec: ExecutionContext)
       : Evaluator[F] =
     new Evaluator[F](stateRef, sources, queryEvaluator)
 
@@ -407,7 +514,8 @@ object Evaluator {
       |  [query]
       |  (explain | compile) [query]
       |  set debug = 0 | 1 | 2
-      |  set format = table | precise | readable | csv
+      |  set format = table | precise | readable | csv | homogeneouscsv
+      |  set mode = console | file
       |  set summaryCount = [rows]
       |  set [var] = [value]
       |  env
