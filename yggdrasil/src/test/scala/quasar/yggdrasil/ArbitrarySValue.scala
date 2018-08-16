@@ -17,7 +17,6 @@
 package quasar.yggdrasil
 
 import quasar.RCValueGenerators
-import quasar.blueeyes._
 import quasar.blueeyes.json._
 import quasar.pkg.tests._
 import quasar.precog.common._
