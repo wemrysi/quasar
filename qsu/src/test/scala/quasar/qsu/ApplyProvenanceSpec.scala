@@ -72,8 +72,8 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           (qsu.read('name1, afile), fm))
 
       val dims: SMap[Symbol, QDims] = SMap(
-        'name0 -> IList(qprov.prov.proj(J.str("foobar"))),
-        'name1 -> IList(qprov.prov.proj(J.str("foobar"))))
+        'name0 -> IList(qprov.prov.prjPath(J.str("foobar"))),
+        'name1 -> IList(qprov.prov.prjPath(J.str("foobar"))))
 
       tree must haveDimensions(dims)
     }
@@ -95,11 +95,11 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           qprov.prov.value(IdAccess.bucket('n4, 1))
         , qprov.prov.value(IdAccess.bucket('n4, 0)))
       , 'n3 -> IList(
-          qprov.prov.proj(J.str("foobar"))
+          qprov.prov.prjPath(J.str("foobar"))
         , qprov.prov.value(IdAccess.groupKey('n2, 1))
         , qprov.prov.value(IdAccess.groupKey('n2, 0)))
       , 'n2 -> IList(
-          qprov.prov.proj(J.str("foobar"))
+          qprov.prov.prjPath(J.str("foobar"))
         , qprov.prov.value(IdAccess.groupKey('n2, 1))
         , qprov.prov.value(IdAccess.groupKey('n2, 0)))
       ))
@@ -122,12 +122,12 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         'n0 -> IList(
           qprov.prov.thenn(
             qprov.prov.value(IdAccess.identity('n2))
-          , qprov.prov.proj(J.str("foobar"))))
+          , qprov.prov.prjPath(J.str("foobar"))))
       , 'n2 -> IList(
           qprov.prov.value(IdAccess.identity('n2))
-        , qprov.prov.proj(J.str("foobar")))
+        , qprov.prov.prjPath(J.str("foobar")))
       , 'n3 -> IList(
-          qprov.prov.proj(J.str("foobar")))
+          qprov.prov.prjPath(J.str("foobar")))
       ))
     }
   }
