@@ -1840,8 +1840,28 @@ trait ColumnarTableModule
     def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = "", precise: Boolean = false): StreamT[IO, CharBuffer] =
       ColumnarTableModule.renderJson(slices, prefix, delimiter, suffix, precise)
 
-    def renderCsv(assumeHomogeneous: Boolean): StreamT[IO, CharBuffer] =
-      ColumnarTableModule.renderCsv(slices, assumeHomogeneous)
+    def renderCsv(assumeHomogeneous: Boolean): StreamT[IO, CharBuffer] = {
+      def numToString: CF1 = CF1P {
+        case c: LongColumn => new Map1Column(c) with StrColumn with NoCsvEscape {
+          def apply(row: Int) = c(row).toString
+        }
+        case c: DoubleColumn => new Map1Column(c) with StrColumn with NoCsvEscape {
+          def apply(row: Int) = c(row).toString
+        }
+        case c: NumColumn => new Map1Column(c) with StrColumn with NoCsvEscape {
+          def apply(row: Int) = c(row).toString
+        }
+        case c => c
+      }
+
+      val transformedSlices: StreamT[IO, Slice] =
+        if (assumeHomogeneous)
+          this.transform(trans.DeepMap1(trans.TransSpec1.Id, numToString)).slices
+        else
+          slices
+
+      ColumnarTableModule.renderCsv(transformedSlices, assumeHomogeneous)
+    }
 
     def slicePrinter(prelude: String)(f: Slice => String): Table = {
       Table(
