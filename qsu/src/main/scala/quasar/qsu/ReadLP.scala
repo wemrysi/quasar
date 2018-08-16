@@ -18,7 +18,6 @@ package quasar.qsu
 
 import slamdata.Predef.{Map => SMap, _}
 import quasar.{
-  ejson,
   BinaryFunc,
   Mapping,
   NullaryFunc,
@@ -254,17 +253,6 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       source <- withName[G](QSU.Unreferenced[T, Symbol]())
       back <- extend1[G](source)(QSU.Unary[T, Symbol](_, func))
     } yield back
-
-  private def projectConstIdx[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
-      idx: Int)(
-      parent: QSUGraph): G[QSUGraph] = {
-    val const: T[EJson] = ejson.ExtEJson(ejson.Int[T[EJson]](idx)).embed
-
-    for {
-      idxG <- nullary[G](IC(MapFuncsCore.Constant(const)))
-      back <- autoJoin2[G](parent, idxG)((p, i) => IC(MapFuncsCore.ProjectIndex[T, JoinSide](p, i)))
-    } yield back
-  }
 
   private def autoJoin2[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
       e1: QSUGraph, e2: QSUGraph)(

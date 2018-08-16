@@ -425,6 +425,7 @@ object QScriptUniform {
   // horizontal composition of LeftShifts
   final case class MultiLeftShift[T[_[_]], A](
       source: A,
+      // TODO: NEL
       shifts: List[(FreeMap[T], IdStatus, Rotation)],
       onUndefined: OnUndefined,
       repair: FreeMapA[T, Access[Hole] \/ Int]) extends QScriptUniform[T, A]
@@ -438,6 +439,7 @@ object QScriptUniform {
   final case class QSReduce[T[_[_]], A](
       source: A,
       buckets: List[FreeMapA[T, Access[Hole]]],
+      // TODO: NEL
       reducers: List[ReduceFunc[FreeMap[T]]],
       repair: FreeMapA[T, ReduceIndex]) extends QScriptUniform[T, A]
 
