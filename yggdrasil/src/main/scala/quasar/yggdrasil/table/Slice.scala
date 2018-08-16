@@ -1127,6 +1127,11 @@ abstract class Slice { source =>
 
         def renderColumn(column: Column, tpe: CType): Unit = {
           tpe match {
+            // short-circuit csv string escaping
+            case CString if column.isInstanceOf[NoCsvEscape] =>
+              val c = column.asInstanceOf[StrColumn]
+              ctx.pushStr(c(row))
+
             case CString =>
               val c = column.asInstanceOf[StrColumn]
               ctx.renderString(c(row))
