@@ -159,7 +159,7 @@ class StructuralSpecs extends Qspec with ValidationMatchers {
 
     "untype to a map type from some value type" in {
       ShiftMap.untpe(Str).map(_.unsized) must beSuccess(List(Obj(Map(), Str.some)))
-    }
+    }.pendingUntilFixed("Typing the contents of the map causes more problems than it solves")
   }
 
   "ShiftMapKeys" should {
@@ -187,7 +187,7 @@ class StructuralSpecs extends Qspec with ValidationMatchers {
 
     "untype to an array type from some value type" in {
       ShiftArray.untpe(Str).map(_.unsized) must beSuccess(List(FlexArr(0, None, Str)))
-    }
+    }.pendingUntilFixed("Typing the contents of the array causes more problems than it solves")
   }
 
   "ShiftArrayIndices" should {

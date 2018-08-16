@@ -28,9 +28,12 @@ import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,
+  ExcludeId,
   Hole,
   HoleF,
+  IdOnly,
   IdStatus,
+  IncludeId,
   JoinSide,
   LeftSide,
   MonadPlannerErr,
@@ -51,6 +54,7 @@ import scalaz.{
   Free,
   Monad,
   NonEmptyList => NEL,
+  Semigroup,
   Scalaz
 }, Scalaz._
 
@@ -436,11 +440,56 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         }
       }
 
+      def fixCompatible(repair: FreeMapA[ShiftTarget[T]], idStatus: IdStatus, resultIdStatus: IdStatus): FreeMapA[ShiftTarget[T]] =
+        (idStatus, resultIdStatus) match {
+          case (IdOnly, IncludeId) => repair flatMap {
+            case ShiftTarget.LeftTarget() => scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
+            case ShiftTarget.RightTarget() => {
+              val hole = Free.pure[MapFunc, ShiftTarget[T]](ShiftTarget.RightTarget())
+
+              func.ProjectIndexI(hole, 0)
+            }
+            case access @ ShiftTarget.AccessLeftTarget(_) => Free.pure(access)
+          }
+
+          case (ExcludeId, IncludeId) => repair flatMap {
+            case ShiftTarget.LeftTarget() => scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
+            case ShiftTarget.RightTarget() => {
+              val hole = Free.pure[MapFunc, ShiftTarget[T]](ShiftTarget.RightTarget())
+
+              func.ProjectIndexI(hole, 1)
+            }
+            case access @ ShiftTarget.AccessLeftTarget(_) => Free.pure(access)
+          }
+          case _ => repair
+        }
+
+
       (left, right) match {
         case
-          (
-            -\/(QSU.LeftShift(fakeParent, structL, idStatusL, _, repairL, rotL)) :: tailL,
-            -\/(QSU.LeftShift(_, structR, idStatusR, _, repairR, rotR)) :: tailR) =>
+            (
+              (lshift @ -\/(QSU.LeftShift(fakeParent, structL, idStatusL, onUndefinedL, repairL, rotL))) :: tailL,
+              (rshift @ -\/(QSU.LeftShift(_, _, idStatusR, onUndefinedR, repairR, _))) :: tailR)
+          if compatibleShifts(lshift, rshift) =>
+
+          val idStatusAdj = Semigroup[IdStatus].append(idStatusL, idStatusR)
+          val repairLAdj = fixCompatible(repairL, idStatusL, idStatusAdj)
+          val repairRAdj = fixCompatible(repairR, idStatusR, idStatusAdj)
+
+          val repair =
+            func.StaticMapS(
+              LeftField -> repairLAdj,
+              RightField -> repairRAdj)
+
+          continue(fakeParent, tailL, tailR) { sym =>
+            QSU.LeftShift[T, Symbol](
+              sym, structL, idStatusAdj, onUndefinedL, repair, rotL)
+          }
+
+        case
+            (
+              -\/(QSU.LeftShift(fakeParent, structL, idStatusL, _, repairL, rotL)) :: tailL,
+              -\/(QSU.LeftShift(_, structR, idStatusR, _, repairR, rotR)) :: tailR) =>
 
           val structLAdj = fixSingleStruct(structL.linearize, LeftSide)
           val repairLAdj = fixSingleRepairForMulti(repairL, 0, LeftSide)
@@ -696,9 +745,17 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         g.overwriteAtRoot(QSU.LeftShift(src.root, struct, idStatus, onUndefined, N.freeMF(repair2), rot)).some
       case Map(MultiLeftShift(src, shifts, onUndefined, repair), fm) =>
         val repair2 = fm.linearize >> repair
-        g.overwriteAtRoot(QSU.MultiLeftShift(src.root, shifts, onUndefined, repair2)).some
+        g.overwriteAtRoot(QSU.MultiLeftShift(src.root, shifts, onUndefined, N.freeMF0(repair2))).some
       case _ => none
     }
+
+    def compatibleShifts(l: ShiftGraph, r: ShiftGraph): Boolean =
+      (l, r) match {
+        // FIXME: compare the struct symbols, not the FreeMaps
+        case (-\/(QSU.LeftShift(srcL, structL, _, _, _, rotL)), -\/(QSU.LeftShift(srcR, structR, _, _, _, rotR)))
+            if srcL.root === srcR.root && structL === structR && rotL === rotR => true
+        case _ => false
+      }
 
     for {
       // converts all candidates to produce final results wrapped in their relevant indices
