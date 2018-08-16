@@ -271,6 +271,8 @@ lazy val qsu = project
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
+  .settings(
+    libraryDependencies ++= Dependencies.qsu)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val connector = project

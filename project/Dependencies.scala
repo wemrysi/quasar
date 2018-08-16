@@ -80,10 +80,6 @@ object Dependencies {
     "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test
   )
 
-  def effect = Seq(
-    "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
-  )
-
   def datagen = Seq(
     "com.github.scopt" %% "scopt"          % scoptVersion,
     "eu.timepit"       %% "refined-scalaz" % refinedVersion
@@ -92,6 +88,10 @@ object Dependencies {
   def sql = Seq(
     "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
     "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6"
+  )
+
+  def qsu = Seq(
+    "org.slf4s" %% "slf4s-api" % slf4sVersion
   )
 
   def core = Seq(
