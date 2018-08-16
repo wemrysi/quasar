@@ -21,7 +21,7 @@ import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.qscript.{construction, Hole, ExcludeId, OnUndefined, PlannerError, SrcHole}
+import quasar.qscript.{construction, Hole, ExcludeId, IdOnly, OnUndefined, PlannerError, SrcHole}
 import quasar.qsu.{QScriptUniform => QSU}
 import slamdata.Predef.{Map => _, _}
 import quasar.contrib.iota.{copkEqual, copkTraverse}
@@ -107,45 +107,31 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         projectBar.linearize must beTreeEqual(
           func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "bar")
         )
+
         projectFoo.linearize must beTreeEqual(
           func.ProjectKeyS(func.Hole, "foo")
         )
+
         shiftedReadStruct.linearize must beTreeEqual(
           func.Hole
         )
+
         shiftedReadRepair must beTreeEqual(
           RightTarget[Fix]
         )
+
         innerRepair must beTreeEqual(
           func.StaticMapS(
             "original" -> AccessLeftTarget[Fix](Access.value(_)),
             "0" -> RightTarget[Fix])
         )
+
         outerRepair must beTreeEqual(
-          func.Cond(
-            func.Or(
-              func.Eq(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh0), _)),
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _))),
-              func.IfUndefined(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _)),
-                func.Constant(json.bool(true)))),
-            func.StaticMapS(
-                "original" ->
-                  func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "original"),
-                "0" ->
-                  func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "0"),
-                "1" -> RightTarget[Fix]),
-            func.Undefined
-          )
-        )
-        ok
+          func.ConcatMaps(
+            AccessLeftTarget[Fix](Access.value(_)),
+            func.MakeMapS("1", RightTarget[Fix])))
     }
-
-    ok
   }
-
-
 
   "convert singly nested LeftShift/ThetaJoin with onUndefined = OnUndefined.Emit" in {
     val dataset = qsu.leftShift(
@@ -193,8 +179,6 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         fm
       ) => ok
     }
-
-    ok
   }
 
   "convert doubly nested LeftShift/ThetaJoin" in {
@@ -256,65 +240,117 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               func.ProjectKeyS(func.Hole, "0"),
               func.ProjectKeyS(func.Hole, "1")),
             func.ProjectKeyS(func.Hole, "2")))
+
         projectBaz.linearize must beTreeEqual(
           func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "baz")
         )
+
         projectBar.linearize must beTreeEqual(
           func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "bar")
         )
+
         projectFoo.linearize must beTreeEqual(
           func.ProjectKeyS(func.Hole, "foo")
         )
+
         shiftedReadStruct.linearize must beTreeEqual(
           func.Hole
         )
+
         shiftedReadRepair must beTreeEqual(
           RightTarget[Fix]
         )
+
         innermostRepair must beTreeEqual(
           func.StaticMapS(
             "original" -> AccessLeftTarget[Fix](Access.value(_)),
             "0" -> RightTarget[Fix])
         )
-        innerRepair must beTreeEqual(
-          func.Cond(
-            func.Or(
-              func.Eq(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh0), _)),
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _))),
-              func.IfUndefined(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _)),
-                func.Constant(json.bool(true)))),
-            func.StaticMapS(
-              "original" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "original"),
-              "0" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "0"),
-              "1" -> RightTarget[Fix]),
-            func.Undefined))
-        outerRepair must beTreeEqual(
-          func.Cond(
-            func.Or(
-              func.Eq(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _)),
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh2), _))),
-              func.IfUndefined(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh2), _)),
-                func.Constant(json.bool(true)))),
-            func.StaticMapS(
-              "original" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "original"),
-              "0" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "0"),
-              "1" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "1"),
-              "2" -> RightTarget[Fix]),
-            func.Undefined
-        ))
-        ok
-    }
 
-    ok
+        innerRepair must beTreeEqual(
+          func.ConcatMaps(
+            AccessLeftTarget[Fix](Access.value(_)),
+            func.MakeMapS("1", RightTarget[Fix])))
+
+        outerRepair must beTreeEqual(
+          func.ConcatMaps(
+            AccessLeftTarget[Fix](Access.value(_)),
+            func.MakeMapS("2", RightTarget[Fix])))
+    }
+  }
+
+  "join shifts of the same focus" >> {
+    val dataset = qsu.leftShift(
+      qsu.read(rootDir </> file("dataset")),
+      recFunc.Hole,
+      ExcludeId,
+      OnUndefined.Omit,
+      RightTarget[Fix],
+      Rotation.ShiftArray)
+
+    val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
+      dataset,
+      List(
+        (func.ProjectKeyS(func.Hole, "foo"), IdOnly, Rotation.ShiftArray),
+        (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray)
+      ),
+      OnUndefined.Emit,
+      func.StaticMapS(
+        "id" -> index(0),
+        "val" -> index(1))
+    ))
+
+    multiShift must expandTo {
+      case qg@Map(
+        LeftShift(
+          LeftShift(
+            LeftShift(
+              Read(afile),
+              shiftedReadStruct,
+              ExcludeId,
+              OnUndefined.Omit,
+              shiftedReadRepair,
+              Rotation.ShiftArray
+            ),
+            projectFoo1,
+            IdOnly,
+            OnUndefined.Emit,
+            innerRepair,
+            Rotation.ShiftArray
+          ),
+          projectFoo2,
+          ExcludeId,
+          OnUndefined.Emit,
+          outerRepair,
+          Rotation.ShiftArray
+        ),
+        fm
+      ) =>
+        projectFoo1.linearize must beTreeEqual(
+          func.ProjectKeyS(func.Hole, "foo"))
+
+        projectFoo2.linearize must beTreeEqual(
+          func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "foo"))
+
+        innerRepair must beTreeEqual(
+          func.StaticMapS(
+            "original" -> AccessLeftTarget[Fix](Access.value(_)),
+            "0" -> RightTarget[Fix]))
+
+        outerRepair must beTreeEqual(
+           func.Cond(
+             func.Or(
+               func.Eq(
+                 AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh0), _)),
+                 AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _))),
+               func.IfUndefined(
+                 AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _)),
+                 func.Constant(json.bool(true)))),
+             func.ConcatMaps(
+               AccessLeftTarget[Fix](Access.value(_)),
+               func.MakeMapS("1", RightTarget[Fix])),
+             func.Undefined))
+    }
   }
 
   def expandTo(pf: PartialFunction[QSUGraph, MatchResult[_]]): Matcher[QSUGraph] =

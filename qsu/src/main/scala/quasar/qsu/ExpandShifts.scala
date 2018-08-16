@@ -21,117 +21,166 @@ import slamdata.Predef._
 import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz._
 import quasar.ejson.{EJson, Fixed}
+import quasar.ejson.implicits._
+import quasar.fp.ski.κ
 import quasar.qscript.{
-  Hole,
+  IdStatus,
   MonadPlannerErr,
   OnUndefined,
-  RecFreeS,
-  SrcHole,
   construction
 }
 import quasar.qscript.RecFreeS._
-import quasar.qsu.{QScriptUniform => QSU}
-import QSU.Rotation
+import quasar.qsu.{QScriptUniform => QSU}, QSU.Rotation
 import quasar.qsu.QSUGraph.Extractors._
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
 import quasar.contrib.scalaz._
 
 import matryoshka.{Hole => _, _}
+import monocle.syntax.fields._
 import scalaz._
 import scalaz.Scalaz._
 import StateT.stateTMonadState
 
 final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
-  val func = construction.Func[T]
-  val json = Fixed[T[EJson]]
-  val hole: Hole = SrcHole
 
   private val prov = new QProv[T]
+  private val func = construction.Func[T]
+  private val json = Fixed[T[EJson]]
   private type P = prov.P
-  private type AuthT[F[_], A] = StateT[F, QAuth, A]
+  private type QAuthS[F[_]] = MonadState_[F, QAuth]
+  private type MonadCI[F[_]] = MonadState_[F, CompatInfo]
+  private type CompatInfo = IList[(Symbol, Rotation, QDims)]
+  private type S = (QAuth, RevIdx, CompatInfo)
+
+  private implicit def qauthState[F[_]: Monad]: MonadState_[StateT[F, S, ?], QAuth] =
+    MonadState_.zoom[StateT[F, S, ?]](_1[S, QAuth])
+
+  private implicit def revIdxState[F[_]: Monad]: MonadState_[StateT[F, S, ?], RevIdx] =
+    MonadState_.zoom[StateT[F, S, ?]](_2[S, RevIdx])
+
+  private implicit def ciState[F[_]: Monad]: MonadState_[StateT[F, S, ?], CompatInfo] =
+    MonadState_.zoom[StateT[F, S, ?]](_3[S, CompatInfo])
+
+  import prov.prov.implicits._
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
-    type G[A] = AuthT[StateT[F, RevIdx, ?], A]
-
-    for {
-      pair <- aqsu.graph.rewriteM[G](expandShifts[G]).run(aqsu.auth).eval(aqsu.graph.generateRevIndex)
-      (auth, graph) = pair
-    } yield AuthenticatedQSU(graph, auth)
-  }
-
-  val originalKey = "original"
-  val namePrefix = "esh"
-
-  def rotationsCompatible(rotation1: Rotation, rotation2: Rotation): Boolean = rotation1 match {
-    case Rotation.FlattenArray | Rotation.ShiftArray =>
-      rotation2 === Rotation.FlattenArray || rotation2 === Rotation.ShiftArray
-    case Rotation.FlattenMap | Rotation.ShiftMap =>
-      rotation2 === Rotation.FlattenMap || rotation2 === Rotation.ShiftMap
-  }
+  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] =
+    aqsu.graph.rewriteM[StateT[F, S, ?]](expandShifts[StateT[F, S, ?]])
+      .run((aqsu.auth, aqsu.graph.generateRevIndex, IList()))
+      .map { case ((auth, _, _), graph) => AuthenticatedQSU(graph, auth) }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def expandShifts[
-    G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadPlannerErr: MonadState_[?[_], QAuth]
-    ]
+  def expandShifts[G[_]: Monad: NameGenerator: RevIdxM: MonadPlannerErr: QAuthS: MonadCI]
       : PartialFunction[QSUGraph, G[QSUGraph]] = {
     case mls @ MultiLeftShift(source, shifts, _, repair) =>
-      val mapper = repair.flatMap {
-        case -\/(_) => func.ProjectKeyS(func.Hole, originalKey)
-        case \/-(i) => func.ProjectKeyS(func.Hole, i.toString)
-      }
-      val sortedShifts = IList.fromList(shifts).sortBy(_._3).toList
-      val shiftedG = sortedShifts match {
-        case (struct, idStatus, rotation) :: ss =>
-          val firstRepair: FreeMapA[QScriptUniform.ShiftTarget] =
-            func.StaticMapS(
-              "original" -> AccessLeftTarget(Access.value(_)),
-              "0" -> RightTarget
-            )
-          val firstShiftPat: QScriptUniform[Symbol] =
-            QSU.LeftShift[T, Symbol](source.root, RecFreeS.fromFree(struct), idStatus, OnUndefined.Emit, firstRepair, rotation)
-          for {
-            firstShift <- QSUGraph.withName[T, G](namePrefix)(firstShiftPat)
-            _ <- ApplyProvenance.computeProvenance[T, G](firstShift)
+      shifts.toNel.fold(source.pure[G]) { shifts1 =>
+        val indexed = shifts.zipWithIndex
 
-            shiftAndRotation <- ss.zipWithIndex.foldLeftM[G, (QSUGraph, Rotation)]((firstShift :++ mls, rotation)) {
-              case ((shiftAbove, rotationAbove), ((newStruct, newIdStatus, newRotation), idx)) =>
-                val keysAbove = ("original" :: (0 to idx).map(_.toString).toList)
-                val staticAbove = func.StaticMapFS(keysAbove: _*)(func.ProjectKeyS(AccessLeftTarget[T](Access.value(_)), _), s => s)
+        val shiftedG = for {
+          _ <- MonadState_[G, CompatInfo].put(IList())
+          headShift <- buildShift[G](source.root, source, indexed.head)
+          expandedShifts <- indexed.tail.foldLeftM(headShift)(buildShift[G](source.root, _, _))
+        } yield expandedShifts
 
-                val repair = func.ConcatMaps(staticAbove, func.MakeMapS((idx + 1).toString, RightTarget))
-                val struct = newStruct >> func.ProjectKeyS(func.Hole, originalKey)
-                val newShiftPat =
-                  QSU.LeftShift[T, Symbol](shiftAbove.root, RecFreeS.fromFree(struct), newIdStatus, OnUndefined.Emit, repair, newRotation)
-                for {
-                  newShift <- QSUGraph.withName[T, G](namePrefix)(newShiftPat)
-                  _ <- ApplyProvenance.computeProvenance[T, G](newShift)
-                  identityCondition =
-                  if (rotationsCompatible(rotationAbove, newRotation))
-                    func.Cond(
-                      func.Or(
-                        func.Eq(
-                          AccessLeftTarget[T](Access.id(IdAccess.identity(shiftAbove.root), _)),
-                          AccessLeftTarget[T](Access.id(IdAccess.identity(newShift.root), _))),
-                        func.IfUndefined(
-                          AccessLeftTarget[T](Access.id(IdAccess.identity(newShift.root), _)),
-                          func.Constant(json.bool(true)))),
-                      repair,
-                      func.Undefined)
-                  else repair
-                  newShiftNewRepairPat =
-                    newShiftPat.copy(repair = identityCondition)
-                  newShiftNewRepair = newShift.overwriteAtRoot(newShiftNewRepairPat)
-                } yield (newShiftNewRepair :++ shiftAbove, newRotation)
-            }
-            (nestedShifts, _) = shiftAndRotation
-          } yield nestedShifts
-        case Nil => source.pure[G]
+        val mapper = repair.flatMap {
+          case -\/(_) => PrjOriginal
+          case \/-(i) => func.ProjectKeyS(func.Hole, i.toString)
+        }
+
+        shiftedG map { shifted =>
+          mls.overwriteAtRoot(QSU.Map[T, Symbol](shifted.root, mapper.asRec)) :++ shifted
+        }
       }
-      for {
-        shifted <- shiftedG
-        map = QSU.Map[T, Symbol](shifted.root, mapper.asRec)
-      } yield mls.overwriteAtRoot(map) :++ shifted
+  }
+
+  ////
+
+  private val OriginalKey = "original"
+  private val NamePrefix = "esh"
+  private val SrcVal = AccessLeftTarget[T](Access.value(_))
+  private val PrjOriginal = func.ProjectKeyS(func.Hole, OriginalKey)
+
+  private def buildShift[G[_]: Monad: NameGenerator: RevIdxM: MonadPlannerErr: QAuthS: MonadCI](
+      commonRoot: Symbol,
+      src: QSUGraph,
+      shift: ((FreeMap, IdStatus, Rotation), Int))
+      : G[QSUGraph] = {
+
+    val ((struct, status, rotation), idx) = shift
+
+    val repair =
+      func.ConcatMaps(
+        if (idx === 0) func.MakeMapS(OriginalKey, SrcVal) else SrcVal,
+        func.MakeMapS(idx.toString, RightTarget))
+
+    val adjustedStruct =
+      if (idx === 0) struct else struct >> PrjOriginal
+
+    // Use `src.root` to ensure we get a fresh name, if we use `commonRoot` it will
+    // find the original shift in the reverse index.
+    //
+    // Eventually, we'll probably want the original shift as, if its provenance was
+    // correct we'd just use it. As-is, it contains existentials due to uncollapsed
+    // mappable regions prior to provenance computation.
+    val tempShiftPat =
+      QSU.LeftShift[T, Symbol](
+        src.root, struct.asRec, status, OnUndefined.Emit, RightTarget, rotation)
+
+    def dimsOf(sym: Symbol): G[QDims] =
+      MonadState_[G, QAuth].get >>= (_.lookupDimsE[G](sym))
+
+    for {
+      commonSrcDims <- dimsOf(commonRoot)
+
+      structDim =
+        ApplyProvenance.computeFuncProvenance(struct)(κ(commonSrcDims))
+          .getOrElse(commonSrcDims)
+
+      compatInfo <- MonadState_[G, CompatInfo].get
+
+      sameFocus = compatInfo findLeft {
+        case (_, rot, qds) => (rotation ≟ rot) && (structDim ≟ qds)
+      }
+
+      tempShift <- QSUGraph.withName[T, G](NamePrefix)(tempShiftPat)
+      commonShift = tempShift.overwriteAtRoot(tempShiftPat.copy(source = commonRoot))
+
+      joinRepair = sameFocus map {
+        case (sym, _, _) =>
+          func.Cond(
+            func.Or(
+              func.Eq(
+                AccessLeftTarget[T](Access.id(IdAccess.identity(sym), _)),
+                AccessLeftTarget[T](Access.id(IdAccess.identity(commonShift.root), _))),
+              func.IfUndefined(
+                AccessLeftTarget[T](Access.id(IdAccess.identity(commonShift.root), _)),
+                func.Constant(json.bool(true)))),
+            repair,
+            func.Undefined)
+      }
+
+      srcDims <- dimsOf(src.root)
+
+      // If another shift matched, use its dimensions, otherwise compute
+      // provenance for this shift on the common source.
+      newDims <- sameFocus match {
+        case Some((sym, _, _)) => dimsOf(sym)
+        case None => ApplyProvenance.computeProvenance[T, G](commonShift)
+      }
+
+      joinDims =
+        if (idx === 0) newDims else prov.join(newDims, srcDims)
+
+      _ <- MonadState_[G, QAuth].modify(_.addDims(commonShift.root, joinDims))
+
+      newShift = commonShift overwriteAtRoot {
+        tempShiftPat.copy(
+          struct = adjustedStruct.asRec,
+          repair = joinRepair getOrElse repair)
+      }
+
+      _ <- MonadState_[G, CompatInfo].put((newShift.root, rotation, structDim) :: compatInfo)
+    } yield newShift :++ src
   }
 }
 

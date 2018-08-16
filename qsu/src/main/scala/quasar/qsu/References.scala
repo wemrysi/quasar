@@ -25,7 +25,6 @@ import quasar.qscript.{FreeMap, FreeMapA}
 
 import matryoshka.{delayShow, delayEqual, equalTEqual, showTShow, BirecursiveT, ShowT, EqualT}
 import matryoshka.data._
-// import matryoshka.data.free._
 import scalaz.{\/, Cord, Equal, IMap, ISet, Monoid, Show}
 import scalaz.std.list._
 import scalaz.std.option._
