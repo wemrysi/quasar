@@ -16,7 +16,6 @@
 
 package quasar.yggdrasil
 
-import quasar.blueeyes._
 import quasar.blueeyes.json.JValue
 import quasar.precog.common._
 

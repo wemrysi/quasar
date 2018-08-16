@@ -17,7 +17,6 @@
 package quasar.precog
 package common
 
-import quasar.blueeyes._
 import scalaz.syntax.semigroup._
 import scalaz.syntax.order._
 
