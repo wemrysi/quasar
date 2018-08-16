@@ -21,28 +21,19 @@ import quasar.precog.util._
 
 import scalaz._
 
-import scala.concurrent.ExecutionContext
 import scala.math.BigDecimal
 
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
-import java.util.UUID
 
 package object blueeyes extends precog.PackageTime {
   type ByteBufferPoolS[A] = State[(ByteBufferPool, List[ByteBuffer]), A]
 
   def Utf8Charset: Charset                                               = Charset forName "UTF-8"
-  def uuid(s: String): UUID                                              = UUID fromString s
-  def randomUuid(): UUID                                                 = UUID.randomUUID
   def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                        = ByteBuffer.wrap(xs)
   def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = ByteBuffer.wrap(xs, offset, len)
   def abort(msg: String): Nothing                                        = throw new RuntimeException(msg)
   def decimal(d: String): BigDecimal                                     = BigDecimal(d, java.math.MathContext.UNLIMITED)
-
-  implicit val GlobalEC: ExecutionContext = scala.concurrent.ExecutionContext.global
-
-  implicit def comparableOrder[A <: Comparable[A]] : scalaz.Order[A] =
-    scalaz.Order.order[A]((x, y) => scalaz.Ordering.fromInt(x compareTo y))
 
   @inline implicit def ValidationFlatMapRequested[E, A](d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
     scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)

@@ -29,6 +29,7 @@ import scalaz._
 
 import java.nio.CharBuffer
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
+import scala.concurrent.ExecutionContext
 
 // TODO: define better upper/lower bound methods, better comparisons,
 // better names, better everything!
@@ -151,7 +152,7 @@ trait TableModule extends TransSpecModule {
     def constEmptyArray: Table
 
     def fromRValues(values: Stream[RValue], maxSliceRows: Option[Int] = None): Table
-    def fromRValueStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table]
+    def fromRValueStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](values: fs2.Stream[IO, RValue])(implicit ec: ExecutionContext): M[Table]
 
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): IO[(Table, Table)]
 

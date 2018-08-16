@@ -33,6 +33,8 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
+import scala.concurrent.ExecutionContext
+
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]](
@@ -41,7 +43,8 @@ final class FederatedShiftedReadPlanner[
   type Assocs = Associates[T, IO]
   type M[A] = AssociatesT[T, F, IO, A]
 
-  val plan: AlgebraM[M, Const[ShiftedRead[AFile], ?], MimirRepr] = {
+  def plan(implicit ec: ExecutionContext)
+      : AlgebraM[M, Const[ShiftedRead[AFile], ?], MimirRepr] = {
     case Const(ShiftedRead(file, status)) =>
       Kleisli.ask[F, Assocs].map(_(file)) andThenK { maybeSource =>
         for {
@@ -78,7 +81,8 @@ final class FederatedShiftedReadPlanner[
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
 
-  private def sourceTable(source: EvalSource[QueryAssociate[T, IO]]): F[P.Table] = {
+  private def sourceTable(source: EvalSource[QueryAssociate[T, IO]])(implicit ec: ExecutionContext)
+      : F[P.Table] = {
     val queryResult =
       source.src match {
         case QueryAssociate.Lightweight(f) =>
@@ -101,9 +105,9 @@ final class FederatedShiftedReadPlanner[
     queryResult.to[F].flatMap(tableFromStream)
   }
 
-  private def tableFromStream(s: Stream[IO, Data]): F[P.Table] = {
+  private def tableFromStream(s: Stream[IO, Data])(implicit ec: ExecutionContext): F[P.Table] = {
     val dataToRValue: Data => RValue =
-      d => RValue.fromData(d).getOrElse(sys.error("There is no representation of CUndefined in SlamDB as a value"))
+      d => RValue.fromData(d).getOrElse(sys.error(s"Cannot represent $d as a value"))
 
     // TODO{fs2}: Chunkiness
     P.Table.fromRValueStream[F](s.mapChunks(_.map(dataToRValue).toSegment)) map { table =>

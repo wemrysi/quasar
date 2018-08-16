@@ -14,15 +14,28 @@
  * limitations under the License.
  */
 
-package quasar.precog
+package quasar.blueeyes
 
-package object common {
-  type JobId = String
-  implicit def stringExtensions(s: String): StringExtensions = new StringExtensions(s)
-}
+import scala.annotation.tailrec
 
-package common {
-  final class StringExtensions(s: String) {
-    def cpath = CPath(s)
+/**
+  * This object contains some methods to do faster iteration over primitives.
+  *
+  * In particular it doesn't box, allocate intermediate objects, or use a (slow)
+  * shared interface with scala collections.
+  */
+object Loop {
+  @tailrec
+  def range(i: Int, limit: Int)(f: Int => Unit) {
+    if (i < limit) {
+      f(i)
+      range(i + 1, limit)(f)
+    }
+  }
+
+  final def forall[@specialized A](as: Array[A])(f: A => Boolean): Boolean = {
+    @tailrec def loop(i: Int): Boolean = i == as.length || f(as(i)) && loop(i + 1)
+
+    loop(0)
   }
 }

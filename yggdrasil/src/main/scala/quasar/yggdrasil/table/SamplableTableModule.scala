@@ -16,7 +16,6 @@
 
 package quasar.yggdrasil.table
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil._
 
