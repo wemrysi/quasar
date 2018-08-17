@@ -748,9 +748,58 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         case _ => false
       }
 
+    type ShiftDefinition = (Symbol, FreeMap, QSU.Rotation)
+
+    def reorderCandidates(cs: List[QSUGraph]): List[QSUGraph] = {
+      val (toReorder, noReorder) =
+        cs.partition(firstShiftDefinition(_).isDefined)
+
+      // Candidates zipped with their first ShiftDefinition
+      val cs0: List[(QSUGraph, ShiftDefinition)] =
+        toReorder.map(c => firstShiftDefinition(c) match {
+          case Some(definition) => (c, definition).some
+          case None => none
+        }).unite
+
+
+      // FIXME: horrible performance
+      val cs1 = cs0.map {
+        case (cand, (sym, struct, rot)) => {
+          val freqCount = cs0.filter {
+            case (_, (sym0, struct0, rot0)) =>
+              sym === sym0 && struct === struct0 && rot === rot0
+          }.length
+
+          (cand, freqCount)
+        }
+      }
+
+      cs1.sortBy(_._2).reverse.firsts ++ noReorder
+    }
+
+    def firstShiftDefinition(g: QSUGraph): Option[ShiftDefinition] = g match {
+      case ConsecutiveBounded(_, shifts) =>
+        shiftDefinition(shifts.head)
+      case _ =>
+        none
+    }
+
+    def shiftDefinition(s: ShiftGraph): Option[ShiftDefinition] = s match {
+      case -\/(QSU.LeftShift(src, struct, _, _, _, rot)) =>
+        (src.root, struct.linearize, rot).some
+      case _ => none
+    }
+
+    def reorderWithIndex(cs: List[(QSUGraph, Int)]): List[(QSUGraph, Int)] = {
+      val matching = SMap(cs.map(_.leftMap(_.root)): _*)
+      val sorted = reorderCandidates(cs.firsts)
+
+      sorted.map(c => (c, matching(c.root)))
+    }
+
     for {
       // converts all candidates to produce final results wrapped in their relevant indices
-      wrapped <- candidates.zipWithIndex traverse { case (g, i) => wrapCandidate(g, i) }
+      wrapped <- reorderWithIndex(candidates.zipWithIndex) traverse { case (g, i) => wrapCandidate(g, i) }
 
       coalescedPair <- wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
         case ((ConsecutiveBounded(_, shifts1), leftIndices), (ConsecutiveBounded(_, shifts2), rightIndices)) =>
