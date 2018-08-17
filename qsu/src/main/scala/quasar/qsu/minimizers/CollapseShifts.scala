@@ -17,7 +17,7 @@
 package quasar.qsu
 package minimizers
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => SMap, _}
 import quasar.RenderTreeT
 import quasar.common.effect.NameGenerator
 import quasar.contrib.matryoshka._
@@ -54,7 +54,6 @@ import scalaz.{
   Free,
   Monad,
   NonEmptyList => NEL,
-  Semigroup,
   Scalaz
 }, Scalaz._
 
@@ -444,21 +443,13 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         (idStatus, resultIdStatus) match {
           case (IdOnly, IncludeId) => repair flatMap {
             case ShiftTarget.LeftTarget() => scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
-            case ShiftTarget.RightTarget() => {
-              val hole = Free.pure[MapFunc, ShiftTarget[T]](ShiftTarget.RightTarget())
-
-              func.ProjectIndexI(hole, 0)
-            }
+            case ShiftTarget.RightTarget() => func.ProjectIndexI(RightTarget, 0)
             case access @ ShiftTarget.AccessLeftTarget(_) => Free.pure(access)
           }
 
           case (ExcludeId, IncludeId) => repair flatMap {
             case ShiftTarget.LeftTarget() => scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
-            case ShiftTarget.RightTarget() => {
-              val hole = Free.pure[MapFunc, ShiftTarget[T]](ShiftTarget.RightTarget())
-
-              func.ProjectIndexI(hole, 1)
-            }
+            case ShiftTarget.RightTarget() => func.ProjectIndexI(RightTarget, 1)
             case access @ ShiftTarget.AccessLeftTarget(_) => Free.pure(access)
           }
           case _ => repair
@@ -472,7 +463,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               (rshift @ -\/(QSU.LeftShift(_, _, idStatusR, onUndefinedR, repairR, _))) :: tailR)
           if compatibleShifts(lshift, rshift) =>
 
-          val idStatusAdj = Semigroup[IdStatus].append(idStatusL, idStatusR)
+          val idStatusAdj = idStatusL |+| idStatusR
           val repairLAdj = fixCompatible(repairL, idStatusL, idStatusAdj)
           val repairRAdj = fixCompatible(repairR, idStatusR, idStatusAdj)
 
