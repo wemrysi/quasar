@@ -45,6 +45,7 @@ import Path.Sandboxed
 
 import scalaz.{\/, \/-, EitherT, Equal, Free, IList, Need, StateT}
 import scalaz.std.anyVal._
+import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 import scalaz.syntax.tag._
 import scalaz.syntax.std.boolean._
@@ -1539,6 +1540,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       }
     }
 
+    // a{:_}, a{_:}
     "shifts keys and values with a single left-shift" in {
       val shifts = QSUGraph.fromTree[Fix](
         qsu._autojoin2((
@@ -1581,6 +1583,61 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             recFunc.StaticMapS(
               "0" -> recFunc.ProjectKeyS(recFunc.Hole, "0"),
               "1" -> recFunc.ProjectKeyS(recFunc.Hole, "1")))
+      }
+    }
+
+    // a{:_}, b[*], a{_:}
+    "reorders candidates to coalesce compatible shifts" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu._autojoin3((
+          qsu.leftShift(
+            shiftedRead,
+            recFunc.ProjectKeyS(recFunc.Hole, "a"),
+            IdOnly,
+            OnUndefined.Emit,
+            RightTarget[Fix],
+            Rotation.ShiftMap),
+          qsu.leftShift(
+            shiftedRead,
+            recFunc.ProjectKeyS(recFunc.Hole, "b"),
+            IdOnly,
+            OnUndefined.Emit,
+            RightTarget[Fix],
+            Rotation.ShiftArray),
+          qsu.leftShift(
+            shiftedRead,
+            recFunc.ProjectKeyS(recFunc.Hole, "a"),
+            ExcludeId,
+            OnUndefined.Emit,
+            RightTarget[Fix],
+            Rotation.ShiftMap),
+          func.StaticMapS(
+            "0" -> func.LeftSide3,
+            "1" -> func.Center,
+            "2" -> func.RightSide3))))
+
+      runOn(qgraph) must beLike {
+        case Map(
+          MultiLeftShift(
+            LeftShift(Read(_), _, _, _, _, _),
+            List((structA, IncludeId, Rotation.ShiftMap), (structB, ExcludeId, Rotation.ShiftArray)),
+            OnUndefined.Emit,
+            repair), outerMap) =>
+
+          structA must beTreeEqual(func.ProjectKeyS(func.Hole, "a"))
+          structB must beTreeEqual(func.ProjectKeyS(func.Hole, "b"))
+
+          repair must beTreeEqual(
+            func.StaticMapS(
+              "0" -> func.ProjectIndexI(0.right[QAccess[Hole]].pure[FreeMapA], 0),
+              "1" -> 1.right[QAccess[Hole]].pure[FreeMapA],
+              "2" -> func.ProjectIndexI(0.right[QAccess[Hole]].pure[FreeMapA], 1)))
+
+          outerMap must beTreeEqual(
+            recFunc.StaticMapS(
+              "0" -> recFunc.ProjectKeyS(recFunc.Hole, "0"),
+              "1" -> recFunc.ProjectKeyS(recFunc.Hole, "1"),
+              "2" -> recFunc.ProjectKeyS(recFunc.Hole, "2")))
       }
     }
   }
