@@ -142,7 +142,13 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
         recordAccesses(g.root, bucketIdAccess(source, buckets))
 
       case QSU.QSAutoJoin(left, right, joinKeys, combiner) =>
-        val keysAccess = joinKeys.keys >>= (_.list) >>= (joinKeyAccess(g.root, _))
+        val keysAccess = for {
+          conj <- joinKeys.keys
+          isect <- conj.list
+          key <- isect.list
+          keyAccess <- joinKeyAccess(g.root, key)
+        } yield keyAccess
+
         recordAccesses(g.root, keysAccess)
 
       case other => References.noRefs

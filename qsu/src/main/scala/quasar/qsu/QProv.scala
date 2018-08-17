@@ -25,7 +25,6 @@ import quasar.qscript.provenance._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
-import matryoshka.data._
 import scalaz.{Lens => _, _}, Scalaz._, Tags.MaxVal
 
 final class QProv[T[_[_]]: BirecursiveT: EqualT]
@@ -40,6 +39,8 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
   type P     = QProv.P[T]
 
   val prov: Prov[D, I, P] = Prov[D, I, P]
+
+  import prov.implicits._
 
   type BucketsM[F[_]] = MonadState_[F, BucketsState[I]]
   def BucketsM[F[_]](implicit ev: BucketsM[F]): BucketsM[F] = ev
@@ -92,7 +93,8 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
 
   /** Returns new dimensions where all identities have been modified by `f`. */
   def modifyIdentities(dims: Dimensions[P])(f: I => I): Dimensions[P] =
-    canonicalize(dims map (_.transCata[P](pfo.value modify f)))
+    Dimensions.normalize(dims.map(d =>
+      prov.distinctConjunctions(d.transCata[P](pfo.value modify f))))
 
   /** The index of the next group key for `of`. */
   def nextGroupKeyIndex(of: Symbol, dims: Dimensions[P]): SInt =

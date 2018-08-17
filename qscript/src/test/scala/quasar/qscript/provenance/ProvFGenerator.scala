@@ -32,7 +32,6 @@ trait ProvFGenerator {
 
       def leafGenerators[A] =
         NonEmptyList(
-          1 -> Gen.const(O.nada[A]()),
           2 -> Gen.delay(Gen.const(O.fresh[A]())),
           10 -> (arbitrary[D] ^^ (O.prjPath[A](_))),
           10 -> (arbitrary[D] ^^ (O.prjValue[A](_))),
@@ -42,7 +41,6 @@ trait ProvFGenerator {
       def branchGenerators[A: Arbitrary] =
         uniformly(
           arbitrary[(A, A)] ^^ (O.both[A](_)),
-          arbitrary[(A, A)] ^^ (O.oneOf[A](_)),
           arbitrary[(A, A)] ^^ (O.thenn[A](_)))
     }
 }

@@ -26,12 +26,13 @@ import quasar.fp._
 import quasar.contrib.iota._
 import quasar.qscript.{construction, PlannerError, ReduceFuncs}
 import quasar.qscript.MapFuncsCore.RecIntLit
+import quasar.qscript.provenance.Dimensions
 
 import matryoshka._
 import matryoshka.data.Fix
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
 import pathy.Path, Path.{file, Sandboxed}
-import scalaz.{\/, Cofree, Equal, IList}
+import scalaz.{\/, Cofree}
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
 import scalaz.std.list._
@@ -53,18 +54,16 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
   val app = ApplyProvenance[Fix, F] _
   val qprov = QProv[Fix]
+  val P = qprov.prov
 
   val root = Path.rootDir[Sandboxed]
   val afile: AFile = root </> file("foobar")
 
-  // FIXME: Figure out how to get this to resolve normally.
-  implicit val eqP: Equal[qprov.P] =
-    qprov.prov.provenanceEqual(Equal[qprov.D], Equal[IdAccess])
+  import P.implicits._
 
   "provenance application" should {
 
     "produce provenance for map" in {
-
       val fm: RecFreeMap = recFunc.Add(recFunc.Hole, RecIntLit(17))
 
       val tree: Cofree[QSU, Symbol] =
@@ -72,8 +71,8 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           (qsu.read('name1, afile), fm))
 
       val dims: SMap[Symbol, QDims] = SMap(
-        'name0 -> IList(qprov.prov.prjPath(J.str("foobar"))),
-        'name1 -> IList(qprov.prov.prjPath(J.str("foobar"))))
+        'name0 -> Dimensions.origin(P.prjPath(J.str("foobar"))),
+        'name1 -> Dimensions.origin(P.prjPath(J.str("foobar"))))
 
       tree must haveDimensions(dims)
     }
@@ -91,17 +90,17 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           ReduceFuncs.Sum(())))
 
       tree must haveDimensions(SMap(
-        'n4 -> IList(
-          qprov.prov.value(IdAccess.bucket('n4, 1))
-        , qprov.prov.value(IdAccess.bucket('n4, 0)))
-      , 'n3 -> IList(
-          qprov.prov.prjPath(J.str("foobar"))
-        , qprov.prov.value(IdAccess.groupKey('n2, 1))
-        , qprov.prov.value(IdAccess.groupKey('n2, 0)))
-      , 'n2 -> IList(
-          qprov.prov.prjPath(J.str("foobar"))
-        , qprov.prov.value(IdAccess.groupKey('n2, 1))
-        , qprov.prov.value(IdAccess.groupKey('n2, 0)))
+        'n4 -> Dimensions.origin(
+          P.value(IdAccess.bucket('n4, 1))
+        , P.value(IdAccess.bucket('n4, 0)))
+      , 'n3 -> Dimensions.origin(
+          P.prjValue(J.str("pop")) ≺: P.prjPath(J.str("foobar"))
+        , P.value(IdAccess.groupKey('n2, 1))
+        , P.value(IdAccess.groupKey('n2, 0)))
+      , 'n2 -> Dimensions.origin(
+          P.prjPath(J.str("foobar"))
+        , P.value(IdAccess.groupKey('n2, 1))
+        , P.value(IdAccess.groupKey('n2, 0)))
       ))
     }
 
@@ -119,17 +118,59 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           DTrans.Squash[Fix]()))
 
       tree must haveDimensions(SMap(
-        'n0 -> IList(
-          qprov.prov.thenn(
-            qprov.prov.value(IdAccess.identity('n2))
-          , qprov.prov.prjPath(J.str("foobar"))))
-      , 'n2 -> IList(
-          qprov.prov.value(IdAccess.identity('n2))
-        , qprov.prov.prjPath(J.str("foobar")))
-      , 'n3 -> IList(
-          qprov.prov.prjPath(J.str("foobar")))
+        'n0 -> Dimensions.origin(
+          P.thenn(
+            P.value(IdAccess.identity('n2))
+          , P.prjPath(J.str("foobar"))))
+      , 'n2 -> Dimensions.origin(
+          P.value(IdAccess.identity('n2))
+        , P.prjPath(J.str("foobar")))
+      , 'n3 -> Dimensions.origin(
+          P.prjPath(J.str("foobar")))
       ))
     }
+  }
+
+  "left shift provenance" >> {
+    "flatten with trivial struct and repair is dimensional flatten" >> todo
+
+    "shift with trivial struct and repair is dimensional shift" >> todo
+
+    "include id affects provenance" >> todo
+
+    "struct affects provenance prior to shift" >> todo
+
+    "repair affects provenance after shift" >> todo
+
+    "non-structure preserving result in repair results in shift provenance" >> todo
+  }
+
+  "MapFunc provenance" >> {
+    "make map injects" >> todo
+
+    "make array injects" >> todo
+
+    "project key projects" >> todo
+
+    "project index projects" >> todo
+
+    "concat map joins" >> todo
+
+    "concat array joins, updating rhs injects" >> todo
+
+    "delete key is identity" >> todo
+
+    "if undefined is identity" >> todo
+
+    "filtering cond is identity" >> todo
+
+    "two-branch cond is union" >> todo
+
+    "filtering guard is identity" >> todo
+
+    "two branch guard is union" >> todo
+
+    "typecheck is identity" >> todo
   }
 
   // checks the expected dimensions

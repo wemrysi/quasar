@@ -36,13 +36,14 @@ import quasar.qscript.{
   RightSide,
   SrcHole
 }
+import quasar.qscript.provenance.Dimensions
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.data.free._
 import pathy.Path
 import Path.Sandboxed
 
-import scalaz.{\/, \/-, EitherT, Equal, Free, IList, Need, StateT}
+import scalaz.{\/, \/-, EitherT, Free, Need, StateT}
 import scalaz.std.anyVal._
 import scalaz.syntax.either._
 import scalaz.syntax.tag._
@@ -69,8 +70,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
   val shiftedRead =
     qsu.leftShift(qsu.read(afile), recFunc.Hole, ExcludeId, OnUndefined.Omit, RightTarget[Fix], Rotation.ShiftMap)
 
-  implicit val eqP: Equal[qprov.P] =
-    qprov.prov.provenanceEqual(Equal[qprov.D], Equal[IdAccess])
+  import qprov.prov.implicits._
 
   "autojoin minimization" should {
     "linearize .foo + .bar" in {
@@ -411,7 +411,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       agraph must beLike {
         case m @ Map(r @ QSReduce(_, _, _, _), _) =>
           val expDims =
-            IList(qprov.prov.value(IdAccess.bucket(r.root, 0)))
+            Dimensions.origin(
+              qprov.prov.both(
+                qprov.prov.thenn(
+                  qprov.prov.injValue(J.str("0")),
+                  qprov.prov.value(IdAccess.bucket(r.root, 0))),
+                qprov.prov.thenn(
+                  qprov.prov.injValue(J.str("1")),
+                  qprov.prov.value(IdAccess.bucket(r.root, 0)))))
 
           auth.dims(m.root) must_= expDims
       }

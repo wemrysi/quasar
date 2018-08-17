@@ -21,31 +21,34 @@ import quasar.fp.ski.ι
 
 import matryoshka._
 import scalaz._, Scalaz._
+import scalaz.Tags.Conjunction
 
 trait Dimension[D, I, P] {
   val prov: Prov[D, I, P]
 
   import prov._
+  import prov.implicits._
 
-  /** Returns the `JoinKeys` describing the autojoin of the two dimension stacks. */
-  def autojoinKeys(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D]): JoinKeys[I] = {
-    val joined =
-      ls.reverse.alignBoth(rs.reverse).foldLeftM(true) { (b, lr) =>
-        if (b)
-          lr anyM { case (l, r) => autojoined[Writer[JoinKeys[I], ?]](l, r) }
-        else
-          false.point[Writer[JoinKeys[I], ?]]
-      }
+  /** Returns the `JoinKeys` describing the autojoin of the two dimensions. */
+  def autojoinKeys(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D]): JoinKeys[I] =
+    ls.union.tuple(rs.union) foldMap {
+      case (l, r) =>
+        val joined =
+          l.reverse.alignBoth(r.reverse).foldLeftM(true) { (b, lr) =>
+            if (b)
+              lr anyM { case (a, b) => autojoined[Writer[JoinKeys[I], ?]](a, b) }
+            else
+              false.point[Writer[JoinKeys[I], ?]]
+          }
 
-    joined.written
-  }
+        joined.written
+          .keys.foldMap1Opt(ι)
+          .fold(JoinKeys.empty[I])(single => JoinKeys(IList(single)))
+    }
 
   /** The empty dimension stack. */
   val empty: Dimensions[P] =
-    IList[P]()
-
-  def canonicalize(ds: Dimensions[P])(implicit eqD: Equal[D], eqI: Equal[I]): Dimensions[P] =
-    ds.map(normalize).filter(nada.isEmpty)
+    Dimensions.empty[P]
 
   /** Updates the dimensional stack by sequencing a new dimension from value
     * space with the current head dimension.
@@ -54,80 +57,91 @@ trait Dimension[D, I, P] {
     nest(lshift(id, ds))
 
   /** Inject a value into a structure at an unknown field. */
-  def injectDynamic(ds: Dimensions[P]): Dimensions[P] =
-    extend[P](thenn(_, _), fresh())(ds)
+  val injectDynamic: Dimensions[P] => Dimensions[P] =
+    Dimensions.join[P].modify(extend(fresh(), _ ≺: _))
 
   /** Inject a value into a structure at the given field. */
   def injectStatic(field: D, ds: Dimensions[P]): Dimensions[P] =
-    extend[P](thenn(_, _), injValue(field))(ds)
+    ds.mapJoin(extend(injValue(field), _ ≺: _))
 
   /** Joins two dimensions into a single dimension stack, starting from the base. */
-  def join(ls: Dimensions[P], rs: Dimensions[P])(implicit eqD: Equal[D], eqI: Equal[I]): Dimensions[P] =
-    canonicalize(alignRtoL(ls, rs)(ι, ι, both(_, _)))
+  def join(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): Dimensions[P] =
+    Conjunction.unsubst(Conjunction.subst(ls) ∧ Conjunction.subst(rs))
 
   /** Shifts the dimensional stack by pushing a new dimension from value space
     * onto the stack.
     */
   def lshift(id: I, ds: Dimensions[P]): Dimensions[P] =
-    value(id) :: ds
+    ds.mapJoin(value(id) <:: _)
 
   /** Sequences the first and second dimensions. */
-  def nest(ds: Dimensions[P]): Dimensions[P] =
-    ds.toNel.fold(ds)(nel => extend[P](thenn(_, _), nel.head)(nel.tail))
+  val nest: Dimensions[P] => Dimensions[P] =
+    Dimensions.join[P] modify {
+      case NonEmptyList(a, ICons(b, cs)) => NonEmptyList.nel(a ≺: b, cs)
+      case other => other
+    }
 
   /** Project an unknown field from a value-level structure. */
-  def projectDynamic(ds: Dimensions[P]): Dimensions[P] =
-    extend[P](thenn(_, _), fresh())(ds)
+  val projectDynamic: Dimensions[P] => Dimensions[P] =
+    Dimensions.join[P].modify(extend(fresh(), _ ≺: _))
 
   /** Project a static path segment. */
   def projectPath(segment: D, ds: Dimensions[P]): Dimensions[P] =
-    extend[P](thenn(_, _), prjPath(segment))(ds)
+    if (ds.isEmpty)
+      Dimensions.origin(prjPath(segment))
+    else
+      ds.mapJoin(extend(prjPath(segment), _ ≺: _))
 
   /** Project a static field from value-level structure. */
-  def projectStatic(field: D, ds: Dimensions[P])(implicit eqD: Equal[D], eqI: Equal[I]): Dimensions[P] =
-    canonicalize(extend[P](thenn(_, _), prjValue(field))(ds))
+  def projectStatic(field: D, ds: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): Dimensions[P] =
+    Dimensions.union[P].modify(_ flatMap { jn =>
+      val projected = extend[P](prjValue(field), _ ≺: _)(jn)
+
+      applyProjection(projected.head) match {
+        case Success(Some(p)) => IList(NonEmptyList.nel(p, projected.tail))
+        case Success(None) => projected.tail.toNel.toIList
+        case Failure(_) => IList()
+      }
+    })(ds)
 
   /** Reduces the dimensional stack by peeling off the current dimension. */
-  def reduce(ds: Dimensions[P]): Dimensions[P] =
-    ds drop 1
+  val reduce: Dimensions[P] => Dimensions[P] =
+    Dimensions.union[P].modify(_.flatMap(_.tail.toNel.toIList))
 
   /** Collapses all dimensions into a single one. */
-  def squash(ds: Dimensions[P]): Dimensions[P] =
-    ds.toNel.fold(ds)(nel => IList(nel.foldRight1(thenn(_, _))))
+  val squash: Dimensions[P] => Dimensions[P] =
+    Dimensions.join[P].modify(_.foldMap1(ι).wrapNel)
 
   /** Swaps the dimensions at the nth and mth indices. */
   def swap(idxN: Int, idxM: Int, ds: Dimensions[P]): Dimensions[P] = {
     val n = if (idxN < idxM) idxN else idxM
     val m = if (idxM > idxN) idxM else idxN
 
-    val swapped = for {
-      z0  <- ds.toZipper
-      z0n <- z0.move(n)
-      vn  =  z0n.focus
-      z0m <- z0n.move(m - n)
-      vm  =  z0m.focus
-      z1  =  z0m.update(vn)
-      z1n <- z1.move(n - m)
-      z2  =  z1n.update(vm)
-    } yield z2.toIList
+    ds mapJoin { jn =>
+      val swapped = for {
+        z0  <- some(jn.toZipper)
+        z0n <- z0.move(n)
+        vn  =  z0n.focus
+        z0m <- z0n.move(m - n)
+        vm  =  z0m.focus
+        z1  =  z0m.update(vn)
+        z1n <- z1.move(n - m)
+        z2  =  z1n.update(vm)
+      } yield z2.toNel
 
-    swapped getOrElse ds
+      swapped getOrElse jn
+    }
   }
 
-  /** Unions the two dimensions into a single dimensional stack, starting from the base. */
-  def union(ls: Dimensions[P], rs: Dimensions[P])(implicit eqD: Equal[D], eqI: Equal[I]): Dimensions[P] =
-    canonicalize(alignRtoL(ls, rs)(oneOf(_, nada()), oneOf(nada(), _), oneOf(_, _)))
+  /** Disjoin two dimension stacks. */
+  def union(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): Dimensions[P] =
+    ls ∨ rs
 
   ////
 
-  private def alignRtoL[A]
-      (ls: Dimensions[P], rs: Dimensions[P])
-      (ths: P => A, tht: P => A, bth: (P, P) => A)
-      : Dimensions[A] =
-    ls.reverse.alignWith(rs.reverse)(_.fold(ths, tht, bth)).reverse
-
-  private def extend[A](f: (A, A) => A, a: A): IList[A] => IList[A] =
-    _.toNel.fold(IList(a))(nel => f(a, nel.head) :: nel.tail)
+  private def extend[A](a: => A, f: (A, A) => A): NonEmptyList[A] => NonEmptyList[A] = {
+    case NonEmptyList(h, t) => NonEmptyList.nel(f(a, h), t)
+  }
 }
 
 object Dimension {

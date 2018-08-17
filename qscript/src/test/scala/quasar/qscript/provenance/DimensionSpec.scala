@@ -19,6 +19,7 @@ package quasar.qscript.provenance
 import slamdata.Predef.{Char, Int}
 import quasar.Qspec
 
+import matryoshka._
 import matryoshka.data.Fix
 import scalaz.{IList, NonEmptyList}
 import scalaz.std.anyVal._
@@ -27,12 +28,33 @@ object DimensionSpec extends Qspec {
   val P = Prov[Char, Int, Fix[ProvF[Char, Int, ?]]]
   val D = Dimension(P)
 
+  import P.implicits._
+
+  "project path on empty dims creates new" >> {
+    D.projectPath('q', D.empty) must_= Dimensions.origin(P.prjPath('q'))
+  }
+
+  "project static on empty dims is empty" >> {
+    D.projectStatic('x', D.empty) must_= D.empty
+  }
+
+  "project static key known not to exist is empty" >> {
+    val d = D.injectStatic('y', D.lshift(1, D.projectStatic('c', D.projectPath('f', D.empty))))
+    D.projectStatic('z', d) must_= D.empty
+  }
+
+  "inject static on empty dims is empty" >> {
+    D.injectStatic('x', D.empty) must_= D.empty
+  }
+
   "autojoin keys" >> {
     "builds join keys from zipped dimensions" >> {
       val x = D.lshift(1, D.lshift(2, D.projectPath('a', D.empty)))
       val y = D.lshift(3, D.lshift(4, D.projectPath('a', D.empty)))
 
-      val jks = JoinKeys(IList(NonEmptyList(JoinKey(1, 3)), NonEmptyList(JoinKey(2, 4))))
+      val jks = JoinKeys(IList(NonEmptyList(
+        NonEmptyList(JoinKey(1, 3)),
+        NonEmptyList(JoinKey(2, 4)))))
 
       D.autojoinKeys(x, y) must_= jks
     }
@@ -41,7 +63,7 @@ object DimensionSpec extends Qspec {
       val x = D.lshift(3, D.flatten(2, D.lshift(1, D.projectPath('a', D.empty))))
       val y = D.lshift(9, D.lshift(8, D.lshift(7, D.projectPath('a', D.empty))))
 
-      val jks = JoinKeys(IList(NonEmptyList(JoinKey(1, 7))))
+      val jks = JoinKeys(IList(NonEmptyList(NonEmptyList(JoinKey(1, 7)))))
 
       D.autojoinKeys(x, y) must_= jks
     }
@@ -50,7 +72,7 @@ object DimensionSpec extends Qspec {
       val x = D.lshift(3, D.projectStatic('k', D.lshift(1, D.projectPath('a', D.empty))))
       val y = D.lshift(9, D.lshift(7, D.projectPath('a', D.empty)))
 
-      val jks = JoinKeys(IList(NonEmptyList(JoinKey(1, 7))))
+      val jks = JoinKeys(IList(NonEmptyList(NonEmptyList(JoinKey(1, 7)))))
 
       D.autojoinKeys(x, y) must_= jks
     }
@@ -61,5 +83,18 @@ object DimensionSpec extends Qspec {
 
       D.autojoinKeys(x, y) must_= JoinKeys.empty
     }
+
+    "join with union disjoins keys for each side" >> {
+      val x = D.lshift(2, D.projectPath('a', D.empty))
+      val y = D.lshift(3, D.projectPath('a', D.empty))
+      val z = D.lshift(4, D.projectPath('a', D.empty))
+
+      val jks = JoinKeys(IList(
+        NonEmptyList(NonEmptyList(JoinKey(2, 4))),
+        NonEmptyList(NonEmptyList(JoinKey(3, 4)))))
+
+      D.autojoinKeys(D.union(x, y), z) must_= jks
+    }
+
   }
 }

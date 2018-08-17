@@ -39,13 +39,13 @@ import quasar.qscript.{
   SrcHole
 }
 import quasar.qscript.RecFreeS._
+import quasar.qscript.provenance.Dimensions
 import quasar.qscript.rewrites.NormalizableT
 import quasar.qsu.{QScriptUniform => QSU}
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import monocle.Traversal
-import monocle.function.Each
 import monocle.std.option.{some => someP}
 import monocle.syntax.fields._1
 import scalaz.{Bind, Monad, OptionT, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
@@ -104,10 +104,10 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       combiner: FreeMapA[Int]): G[Option[QSUGraph]] = {
 
     val groupKeyOf: Traversal[Option[QDims], Symbol] =
-      someP[QDims]           composeTraversal
-      Each.each[QDims, QP.P] composePrism
-      QP.prov.value          composePrism
-      IdAccess.groupKey      composeLens
+      someP[QDims] composeTraversal
+      Dimensions.dimension[QP.P] composePrism
+      QP.prov.value composePrism
+      IdAccess.groupKey composeLens
       _1
 
     for {

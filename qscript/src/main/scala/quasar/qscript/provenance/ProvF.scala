@@ -31,22 +31,15 @@ import scalaz._, Scalaz._
 sealed abstract class ProvF[D, I, A]
 
 object ProvF extends ProvFInstances {
-  final case class Nada[D, I, A]() extends ProvF[D, I, A]
   final case class Fresh[D, I, A]() extends ProvF[D, I, A]
   final case class PrjPath[D, I, A](segment: D) extends ProvF[D, I, A]
   final case class PrjValue[D, I, A](field: D) extends ProvF[D, I, A]
   final case class InjValue[D, I, A](field: D) extends ProvF[D, I, A]
   final case class Value[D, I, A](id: I) extends ProvF[D, I, A]
   final case class Both[D, I, A](left: A, right: A) extends ProvF[D, I, A]
-  final case class OneOf[D, I, A](left: A, right: A) extends ProvF[D, I, A]
-  final case class Then[D, I, A](left: A, right: A) extends ProvF[D, I, A]
+  final case class Then[D, I, A](fst: A, snd: A) extends ProvF[D, I, A]
 
   final class Optics[D, I] {
-    def nada[A]: Prism[ProvF[D, I, A], Unit] =
-      Prism.partial[ProvF[D, I, A], Unit] {
-        case Nada() => ()
-      } (κ(Nada()))
-
     def fresh[A]: Prism[ProvF[D, I, A], Unit] =
       Prism.partial[ProvF[D, I, A], Unit] {
         case Fresh() => ()
@@ -79,19 +72,12 @@ object ProvF extends ProvFInstances {
         case (l, r) => Both(l, r)
       }
 
-    def oneOf[A]: Prism[ProvF[D, I, A], (A, A)] =
-      Prism.partial[ProvF[D, I, A], (A, A)] {
-        case OneOf(l, r) => (l, r)
-      } {
-        case (l, r) => OneOf(l, r)
-      }
-
     // NB: 'then' is now a reserved identifier in Scala
     def thenn[A]: Prism[ProvF[D, I, A], (A, A)] =
       Prism.partial[ProvF[D, I, A], (A, A)] {
-        case Then(l, r) => (l, r)
+        case Then(f, s) => (f, s)
       } {
-        case (l, r) => Then(l, r)
+        case (f, s) => Then(f, s)
       }
   }
 
@@ -107,17 +93,15 @@ sealed abstract class ProvFInstances {
     new Traverse[ProvF[D, I, ?]] {
       val O = Optics[D, I]
 
-      def traverseImpl[F[_]: Applicative, A, B](p: ProvF[D, I, A])(f: A => F[B]) =
+      def traverseImpl[F[_]: Applicative, A, B](p: ProvF[D, I, A])(g: A => F[B]) =
         p match {
-          case Nada() => O.nada[B]().point[F]
           case Fresh() => O.fresh[B]().point[F]
           case PrjPath(d) => O.prjPath[B](d).point[F]
           case PrjValue(d) => O.prjValue[B](d).point[F]
           case InjValue(d) => O.injValue[B](d).point[F]
           case Value(i) => O.value[B](i).point[F]
-          case Both(l, r) => f(l).tuple(f(r)).map(O.both(_))
-          case OneOf(l, r) => f(l).tuple(f(r)).map(O.oneOf(_))
-          case Then(l, r) => f(l).tuple(f(r)).map(O.thenn(_))
+          case Both(l, r) => g(l).tuple(g(r)).map(O.both(_))
+          case Then(f, s) => g(f).tuple(g(s)).map(O.thenn(_))
         }
     }
 
@@ -126,15 +110,13 @@ sealed abstract class ProvFInstances {
       def apply[A](show: Show[A]) = {
         implicit val showA = show
         Show.show {
-          case Nada() => Cord("∅")
           case Fresh() => Cord("∃")
-          case PrjPath(d) => d.show ++ Cord("/")
-          case PrjValue(d) => Cord("prj[") ++ d.show ++ Cord("]")
-          case InjValue(d) => Cord("inj[") ++ d.show ++ Cord("]")
+          case PrjPath(d) => Cord("\\") ++ d.show
+          case PrjValue(d) => Cord("prj{") ++ d.show ++ Cord("}")
+          case InjValue(d) => Cord("inj{") ++ d.show ++ Cord("}")
           case Value(i) => i.show
-          case Both(l, r) => Cord("(") ++ l.show ++ Cord(") /\\\\ (") ++ r.show ++ Cord(")")
-          case OneOf(l, r) => Cord("(") ++ l.show ++ Cord(") \\// (") ++ r.show ++ Cord(")")
-          case Then(l, r) => Cord("(") ++ l.show ++ Cord(") << (") ++ r.show ++ Cord(")")
+          case Both(l, r) => Cord("(") ++ l.show ++ Cord(" ∧ ") ++ r.show ++ Cord(")")
+          case Then(f, s) => f.show ++ Cord(" ≺ ") ++ s.show
         }
       }
     }

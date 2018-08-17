@@ -246,11 +246,15 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
           val condition = joinKeys.keys.toNel.fold(func.Constant[JoinSide](EJson.bool(true)).point[F]) { jks =>
             val mkEq = eqCond(left.root, right.root)
 
-            val mkDisj = (_: NonEmptyList[JoinKey[IdAccess]]).foldMapLeft1(mkEq) { (disj, k) =>
-              (mkEq(k) |@| disj)(func.Or(_, _))
-            }
+            val mkIsect =
+              (_: NonEmptyList[JoinKey[IdAccess]])
+                .foldMapRight1(mkEq)((l, r) => (mkEq(l) |@| r)(func.Or(_, _)))
 
-            jks.foldMapLeft1(mkDisj)((conj, ks) => (mkDisj(ks) |@| conj)(func.And(_, _)))
+            val mkConj =
+              (_: NonEmptyList[NonEmptyList[JoinKey[IdAccess]]])
+                .foldMapRight1(mkIsect)((l, r) => (mkIsect(l) |@| r)(func.And(_, _)))
+
+            jks.foldMapRight1(mkConj)((l, r) => (mkConj(l) |@| r)(func.Or(_, _)))
           }
 
           (mergeSources[F](left, right) |@| condition) {

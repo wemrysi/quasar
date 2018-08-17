@@ -46,6 +46,7 @@ import quasar.qscript.{
   OnUndefined,
   PlannerError
 }
+import quasar.qscript.provenance.Dimensions
 
 import matryoshka._
 import matryoshka.data.free._
@@ -237,7 +238,9 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         }
 
       case Read(file) =>
-        val rdims = dims.squash(segments(file).map(projPathSegment).reverse)
+        val rdims = segments(file).toNel.fold(Dimensions.empty[dims.P]) { ss =>
+          dims.squash(Dimensions.origin1(ss.map(projPathSegment).reverse))
+        }
         QAuthS[F].modify(_.addDims(g.root, rdims)) as rdims
 
       case Subset(from, _, count) =>
@@ -272,7 +275,8 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   }
 
   def computeFuncProvenance[A](fm: FreeMapA[A])(f: A => QDims): Option[QDims] =
-    some(fm.para(ginterpret(f, computeFuncProvenanceƒ[A]))).filter(_.nonEmpty)
+    some(fm.para(ginterpret(f, computeFuncProvenanceƒ[A])))
+      .filter(Dimensions.union.exist(_.nonEmpty))
 
   def computeFuncProvenanceƒ[A]: GAlgebra[(FreeMapA[A], ?), MapFunc, QDims] = {
     case MFC(MapFuncsCore.ConcatArrays((_, l), (_, r))) =>
@@ -334,6 +338,16 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   }
 
   ////
+
+  private def applyIdStatus(status: IdStatus, qdims: QDims): QDims =
+    status match {
+      case IncludeId =>
+        dims.join(
+          dims.injectStatic(EJson.int[T[EJson]](0), qdims),
+          dims.injectStatic(EJson.int[T[EJson]](1), qdims))
+
+      case _ => qdims
+    }
 
   private def compute1[F[_]: Monad: MonadPlannerErr: QAuthS]
       (g: QSUGraph, src: QSUGraph)

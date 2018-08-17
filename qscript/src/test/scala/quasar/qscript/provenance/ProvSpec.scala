@@ -16,33 +16,42 @@
 
 package quasar.qscript.provenance
 
-import slamdata.Predef.{Boolean, Char, Int}
+import slamdata.Predef.{Boolean, Char, Int, Option}
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.Qspec
 
+import scala.Predef.implicitly
+
 import matryoshka.data.Fix
+import org.scalacheck.{Arbitrary, Properties}
 import org.specs2.scalacheck._
-import scalaz.{IList, NonEmptyList, Writer}
+import scalaz.{@@, Equal, IList, NonEmptyList, Writer, Validation => V, Show}
+import scalaz.Tags.Conjunction
+import scalaz.scalacheck.ScalazProperties.{equal => eql, semigroup, semilattice}
 import scalaz.std.anyVal._
+import scalaz.std.option._
 import scalaz.std.tuple._
 import scalaz.syntax.equal._
+import scalaz.syntax.show._
 
-object ProvSpec extends Qspec with ProvFGenerator {
+final class ProvSpec extends Qspec with ProvFGenerator {
 
   implicit val params = Parameters(maxSize = 10)
 
-  val P = Prov[Char, Int, Fix[ProvF[Char, Int, ?]]]
+  import ProvSpec.P.implicits._
 
-  import P.provenanceEqual
+  val P = ProvSpec.P
 
   val p1 = P.prjPath('x')
   val p2 = P.prjPath('y')
+  val p3 = P.prjPath('z')
 
   val pk1 = P.prjValue('a')
   val pk2 = P.prjValue('b')
 
   val ik1 = P.injValue('a')
   val ik2 = P.injValue('b')
+  val ik3 = P.injValue('c')
 
   val v1i = 1
   val v1 = P.value(v1i)
@@ -56,57 +65,74 @@ object ProvSpec extends Qspec with ProvFGenerator {
   def autojoined(a: Fix[P.PF], b: Fix[P.PF]): (JoinKeys[Int], Boolean) =
     P.autojoined[Writer[JoinKeys[Int], ?]](a, b).run
 
-  "normalization" >> {
-    "right assoc boths" >> {
-      val tree = P.both(P.both(p1, pk1), P.both(p2, pk2))
-      val exp = P.both(p1, P.both(pk1, P.both(p2, pk2)))
-
-      P.normalize(tree) must_= exp
-    }
-
-    "distinct both" >> {
-      val dupes = P.both(P.both(p1, pk2), P.both(P.both(pk2, p2), p1))
-      val exp = P.both(p1, P.both(pk2, p2))
-
-      P.normalize(dupes) must_= exp
-    }
-
-    "right assoc oneofs" >> {
-      val tree = P.oneOf(P.oneOf(p1, pk1), P.oneOf(p2, pk2))
-      val exp = P.oneOf(p1, P.oneOf(pk1, P.oneOf(p2, pk2)))
-
-      P.normalize(tree) must_= exp
-    }
-
-    "distinct oneOf" >> {
-      val dupes = P.oneOf(P.oneOf(p1, pk2), P.oneOf(P.oneOf(pk2, p2), p1))
-      val exp = P.oneOf(p1, P.oneOf(pk2, p2))
-
-      P.normalize(dupes) must_= exp
-    }
-
+  "apply projection" >> {
     "prj(k) << inj(k) << p == p" >> {
-      P.normalize(P.thenn(pk1, P.thenn(ik1, p1))) must_= p1
+      P.applyProjection(P.thenn(pk1, P.thenn(ik1, p1))) must_= V.success(Option(p1))
     }
 
-    "prj(k) << inj(k) /\\\\ p << q == (q /\\\\ (prj(k) << p << q))" >> {
-      val tree = P.thenn(pk1, P.thenn(P.both(ik1, p2), p1))
-      val exp = P.both(p1, P.thenn(pk1, P.thenn(p2, p1)))
-
-      P.normalize(tree) must_= exp
+    "prj(k) << (inj(k) ∧ p) << q == q" >> {
+      P.applyProjection(P.thenn(pk1, P.thenn(P.both(ik1, p2), p1))) must_= V.success(Option(p1))
     }
 
-    "prj(k) << inj(k) \\// p << q == (q \\// (prj(k) << p << q))" >> {
-      val tree = P.thenn(pk1, P.thenn(P.oneOf(ik1, p2), p1))
-      val exp = P.oneOf(p1, P.thenn(pk1, P.thenn(p2, p1)))
-
-      P.normalize(tree) must_= exp
+    "prj(k) << (inj(k) ∧ (∃ << q)) << r == q << r" >> {
+      val fp = P.fresh()
+      val tree = P.thenn(pk1, P.thenn(P.both(ik1, P.thenn(fp, p2)), p1))
+      P.applyProjection(tree) must_= V.success(Option(P.thenn(p2, p1)))
     }
 
-    "prj(k) << inj(j) << q == ∅" >> prop { (k: Char, j: Char, p: Fix[P.PF]) => (k =/= j) ==> {
+    "prj(k) << (inj(j) ∧ (inj(k) << q)) << r == q << r" >> {
+      val tree = P.thenn(pk1, P.thenn(P.both(ik2, P.thenn(ik1, p2)), p1))
+      P.applyProjection(tree) must_= V.success(Option(P.thenn(p2, p1)))
+    }
+
+    "prj(k) << (inj(k) ∧ (inj(j) << q)) << r == r" >> {
+      val tree = P.thenn(pk1, P.thenn(P.both(ik1, P.thenn(ik2, p2)), p1))
+      P.applyProjection(tree) must_= V.success(Option(p1))
+    }
+
+    "prj(k) << inj(j) << q == Failure" >> prop { (k: Char, j: Char, p: Fix[P.PF]) => (k =/= j) ==> {
       val tree = P.thenn(P.prjValue(k), P.thenn(P.injValue(j), p))
-      P.normalize(tree) must_= P.nada()
+      P.applyProjection(tree) must beFailure
     }}
+
+    "prj(k) << (p ∧ q) << r == id" >> {
+      val tree = P.thenn(pk1, P.thenn(P.both(p3, p2), p1))
+      P.applyProjection(tree).map(_.shows) must beSuccess(Option(tree).shows)
+    }
+
+    "prj(k) << (inj(j) ∧ inj(k)) << r == r" >> {
+      val tree = P.thenn(pk1, P.thenn(P.both(ik2, ik1), p1))
+      P.applyProjection(tree) must_= V.success(Option(p1))
+    }
+
+    "prj(k) << (inj(j) ∧ inj(l) << q) << r == Failure" >> {
+      val tree = P.thenn(pk1, P.thenn(P.both(ik2, P.thenn(ik3, p2)), p1))
+      P.applyProjection(tree) must beFailure
+    }
+
+    "prj(k) << (inj(j) ∧ p << q) << r == prj(k) << p << q << r" >> {
+      val tree = P.thenn(pk1, P.thenn(P.both(ik2, P.thenn(v1, p2)), p1))
+      P.applyProjection(tree) must_= V.success(Option(P.thenn(pk1, P.thenn(v1, P.thenn(p2, p1)))))
+    }
+
+    "multiple projects on nested conjunctions" >> {
+      //inj{l} ≺ inj{0} ≺ 1 ∧ inj{r} ≺ 1)
+      val x = P.thenn(P.injValue('r'), v1)
+      val y = P.both(P.thenn(P.injValue('l'), P.thenn(P.injValue('0'), v1)), x)
+
+      val lhs = P.thenn(P.injValue('l'), y)
+      val rhs = P.thenn(P.injValue('r'), v1)
+
+      // inj{l} ≺ (inj{l} ≺ inj{0} ≺ 1 ∧ inj{r} ≺ 1) ∧ inj{r} ≺ 1
+      val tree = P.both(lhs, rhs)
+
+      val prjL = P.applyProjection(P.thenn(P.prjValue('l'), tree))
+      val prjLR = prjL.map(_.map(l => P.applyProjection(P.thenn(P.prjValue('r'), l))))
+
+      prjL must_= V.success(Option(y))
+
+      prjLR must_= V.success(Option(V.success(Option(v1))))
+    }
   }
 
   "autojoined" >> {
@@ -142,42 +168,31 @@ object ProvSpec extends Qspec with ProvFGenerator {
       autojoined(v1, v2) must_= ((JoinKeys.singleton(v1i, v2i), true))
     }
 
-    "(v1 /\\\\ v2) θ v3" >> {
+    "(v1 ∧ v2) θ v3" >> {
       val keys =
-        JoinKeys(IList(NonEmptyList(
+        JoinKeys(IList(NonEmptyList(NonEmptyList(
           JoinKey(v1i, v3i),
-          JoinKey(v2i, v3i))))
+          JoinKey(v2i, v3i)))))
 
       autojoined(P.both(v1, v2), v3) must_= ((keys, true))
     }
 
-    "(v1 /\\\\ v2) θ (v3 /\\\\ v4)" >> {
+    "(v1 ∧ v2) θ (v3 ∧ v4)" >> {
       val keys =
-        JoinKeys(IList(NonEmptyList(
+        JoinKeys(IList(NonEmptyList(NonEmptyList(
           JoinKey(v1i, v3i),
           JoinKey(v1i, v4i),
           JoinKey(v2i, v3i),
-          JoinKey(v2i, v4i))))
+          JoinKey(v2i, v4i)))))
 
       autojoined(P.both(v1, v2), P.both(v3, v4)) must_= ((keys, true))
     }
 
-    "(v1 /\\\\ v2) θ (v3 \\// v4)" >> {
+    "(v1 ∧ v2) θ (v3 << v4)" >> {
       val keys =
-        JoinKeys(IList(NonEmptyList(
-          JoinKey(v1i, v3i),
+        JoinKeys(IList(NonEmptyList(NonEmptyList(
           JoinKey(v1i, v4i),
-          JoinKey(v2i, v3i),
-          JoinKey(v2i, v4i))))
-
-      autojoined(P.both(v1, v2), P.oneOf(v3, v4)) must_= ((keys, true))
-    }
-
-    "(v1 /\\\\ v2) θ (v3 << v4)" >> {
-      val keys =
-        JoinKeys(IList(NonEmptyList(
-          JoinKey(v1i, v4i),
-          JoinKey(v2i, v4i))))
+          JoinKey(v2i, v4i)))))
 
       autojoined(P.both(v1, v2), P.thenn(v3, v4)) must_= ((keys, false))
     }
@@ -188,9 +203,9 @@ object ProvSpec extends Qspec with ProvFGenerator {
 
     "(v2 << v1) θ (v4 << v3)" >> {
       val keys =
-        JoinKeys(IList(
+        JoinKeys(IList(NonEmptyList(
           NonEmptyList(JoinKey(v1i, v3i)),
-          NonEmptyList(JoinKey(v2i, v4i))))
+         NonEmptyList(JoinKey(v2i, v4i)))))
 
       autojoined(P.thenn(v2, v1), P.thenn(v4, v3)) must_= ((keys, true))
     }
@@ -203,46 +218,40 @@ object ProvSpec extends Qspec with ProvFGenerator {
       autojoined(P.thenn(pk1, v1), P.thenn(pk2, v3)) must_= ((JoinKeys.singleton(v1i, v3i), false))
     }
 
-    "(∅ \\// v2) θ v3" >> {
-      autojoined(P.oneOf(P.nada(), v2), v3) must_= ((JoinKeys.singleton(v2i, v3i), true))
-    }
-
-    "(∅ \\// v2) θ (v3 \\// ∅)" >> {
-      autojoined(P.oneOf(P.nada(), v2), P.oneOf(v3, P.nada())) must_= ((JoinKeys.singleton(v2i, v3i), true))
-    }
-
-    "(v1 \\// v2) θ (v3 \\// v4)" >> {
+    "((v1 ∧ v2) << p) θ (v3 << p)" >> {
       val keys =
-        JoinKeys(IList(NonEmptyList(
+        JoinKeys(IList(NonEmptyList(NonEmptyList(
           JoinKey(v1i, v3i),
-          JoinKey(v1i, v4i),
-          JoinKey(v2i, v3i),
-          JoinKey(v2i, v4i))))
+          JoinKey(v2i, v3i)))))
 
-      autojoined(P.oneOf(v1, v2), P.oneOf(v3, v4)) must_= ((keys, true))
+      autojoined(P.thenn(P.both(v1, v2), p1), P.thenn(v3, p1)) must_= ((keys, true))
     }
 
-    "(v1 \\// ∅) θ (v4 << v3)" >> {
-      autojoined(P.oneOf(v1, P.nada()), P.thenn(v4, v3)) must_= ((JoinKeys.singleton(v1i, v3i), false))
-    }
-
-    "((v1 /\\\\ v2) \\// v3) θ v4" >> {
+    "(v1 ∧ (v2 << p)) θ (v3 << p)" >> {
       val keys =
-        JoinKeys(IList(NonEmptyList(
-          JoinKey(v1i, v4i),
-          JoinKey(v2i, v4i),
-          JoinKey(v3i, v4i))))
+        JoinKeys(IList(NonEmptyList(NonEmptyList(
+          JoinKey(v2i, v3i)))))
 
-      autojoined(P.oneOf(P.both(v1, v2), v3), v4) must_= ((keys, true))
-    }
-
-    "((∅ \\// v2) /\\\\ v3) θ v4" >> {
-      val keys =
-        JoinKeys(IList(NonEmptyList(
-          JoinKey(v2i, v4i),
-          JoinKey(v3i, v4i))))
-
-      autojoined(P.both(P.oneOf(P.nada(), v2), v3), v4) must_= ((keys, true))
+      autojoined(P.both(v1, P.thenn(v2, p1)), P.thenn(v3, p1)) must_= ((keys, true))
     }
   }
+
+  implicit def conjProvEqual: Equal[Fix[P.PF] @@ Conjunction] =
+    Conjunction.subst(Equal[Fix[P.PF]])
+
+  implicit def conjProvArbitrary: Arbitrary[Fix[P.PF] @@ Conjunction] =
+    Conjunction.subst(implicitly[Arbitrary[Fix[P.PF]]])
+
+  implicit def conjProvShow: Show[Fix[P.PF] @@ Conjunction] =
+    Conjunction.subst(Show[Fix[P.PF]])
+
+  "laws" >> addFragments(properties(IList(
+    eql.laws[Fix[P.PF]],
+    semigroup.laws[Fix[P.PF]],
+    semilattice.laws[Fix[P.PF] @@ Conjunction]
+  ).foldLeft(new Properties("scalaz")) { (p, l) => p.include(l); p }))
+}
+
+object ProvSpec {
+  val P = Prov[Char, Int, Fix[ProvF[Char, Int, ?]]]
 }

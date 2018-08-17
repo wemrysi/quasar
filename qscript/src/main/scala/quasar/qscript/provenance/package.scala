@@ -18,11 +18,9 @@ package quasar.qscript
 
 import quasar.contrib.scalaz.foldable._
 
-import scalaz.{Equal, Foldable, IList, Tag, @@}
+import scalaz.{Equal, Foldable, Tag, @@}
 
 package object provenance {
-  type Dimensions[P] = IList[P]
-
   sealed trait AsSet
   val AsSet = Tag.of[AsSet]
 
