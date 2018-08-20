@@ -774,7 +774,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         }
       }
 
-      cs1.sortBy(_._2).reverse.firsts ++ noReorder
+      cs1.sortBy(_._2).firsts ++ noReorder
     }
 
     def firstShiftDefinition(g: QSUGraph): Option[ShiftDefinition] = g match {
