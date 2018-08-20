@@ -123,7 +123,7 @@ trait SamplableColumnarTableModule extends SamplableTableModule { self: Columnar
   private case class RowInserter(size: Int, slice: Slice, cols: mutable.Map[ColumnRef, ArrayColumn[_]] = mutable.Map.empty) {
     import RowInserter._
 
-    def toSlice(maxSize: Int): Slice = Slice(cols.toMap, size min maxSize)
+    def toSlice(maxSize: Int): Slice = Slice(size min maxSize, cols.toMap)
 
     val ops: Array[ColumnOps] = slice.columns.map(colOpsFor)(collection.breakOut)
 

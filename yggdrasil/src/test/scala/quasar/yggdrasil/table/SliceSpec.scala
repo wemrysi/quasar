@@ -725,6 +725,6 @@ object ArbitrarySlice extends RCValueGenerators {
     val gs      = refs map (cr => genColumn(cr, sz) ^^ (cr -> _))
     val genData = gs.foldLeft(zero)((res, g) => res >> (r => g ^^ (_ :: r)))
 
-    genData ^^ (data => Slice(data.toMap, sz))
+    genData ^^ (data => Slice(sz, data.toMap))
   }
 }
