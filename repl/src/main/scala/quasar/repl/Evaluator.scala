@@ -33,13 +33,11 @@ import quasar.fp.ski._
 import quasar.frontend.data.DataCodec
 import quasar.impl.schema.{SstConfig, SstSchema}
 import quasar.mimir.MimirRepr
-import quasar.precog.common.{ColumnRef, CNull}
 import quasar.run.{QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
 import quasar.run.ResourceRouter.DatasourceResourcePrefix
 import quasar.run.optics.{stringUuidP => UuidString}
 import quasar.sst._
-import quasar.yggdrasil.table.{Column, CScanner}
-
+import quasar.yggdrasil.util.NullRemover
 
 import java.lang.Exception
 import java.nio.CharBuffer
@@ -464,23 +462,6 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       s.through(pipe.charBufferToByte(StandardCharsets.UTF_8))
         .through(fs2.io.file.writeAllAsync(path))
         .compile.drain
-
-    // duplicated from slamdata-backend
-    // someday, this should probably move into mimir...
-    private object NullRemover extends CScanner {
-      type A = Unit
-      val init = ()
-
-      def scan(u: Unit, cols: Map[ColumnRef, Column], range: Range): (Unit, Map[ColumnRef, Column]) = {
-        val cols2 = cols flatMap {
-          case (ColumnRef(_, CNull), _) => Nil
-          case pair => List(pair)
-        }
-
-        ((), cols2)
-      }
-    }
-
 }
 
 object Evaluator {
