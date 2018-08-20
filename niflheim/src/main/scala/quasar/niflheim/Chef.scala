@@ -29,6 +29,7 @@ import scalaz.syntax.traverse._
 import scalaz.std.list._
 
 final case class Prepare(blockid: Long, seqId: Long, root: File, source: StorageReader, onComplete: () => Unit)
+final case class PrepareSegments(blockid: Long, seqId: Long, root: File, offset: Long, length: Int, segments: List[Segment], onComplete: () => Unit)
 final case class Spoilt(blockid: Long, seqId: Long, onComplete: () => Unit)
 final case class Cooked(blockid: Long, seqId: Long, root: File, metadata: File, onComplete: () => Unit)
 
@@ -77,6 +78,14 @@ final case class Chef(blockFormat: CookedBlockFormat, format: SegmentFormat) ext
   def receive = {
     case Prepare(blockid, seqId, root, source, onComplete) =>
       cook(root, source) match {
+        case Success(file) =>
+          sender ! Cooked(blockid, seqId, root, file, onComplete)
+        case Failure(_) =>
+          sender ! Spoilt(blockid, seqId, onComplete)
+      }
+
+    case PrepareSegments(blockid, seqId, root, offset, length, segments, onComplete) =>
+      cookSegments(root, offset, length, segments) match {
         case Success(file) =>
           sender ! Cooked(blockid, seqId, root, file, onComplete)
         case Failure(_) =>
