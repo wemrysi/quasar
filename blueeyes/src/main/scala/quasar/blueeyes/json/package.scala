@@ -23,10 +23,6 @@ package object json {
 
   type JFieldTuple = (String, JValue)
 
-  implicit def liftJPathField(name: String): JPathNode = JPathField(name)
-  implicit def liftJPathIndex(index: Int): JPathNode   = JPathIndex(index)
-  implicit def liftJPath(path: String): JPath          = JPath(path)
-
   implicit val JPathNodeOrder: Order[JPathNode] = Order orderBy (x => x.optName -> x.optIndex)
   implicit val JPathNodeOrdering                = JPathNodeOrder.toScalaOrdering
   implicit val JPathOrder: Order[JPath]         = Order orderBy (_.nodes)

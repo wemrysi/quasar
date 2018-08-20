@@ -84,11 +84,11 @@ object JPathSpec extends Specification with ScalaCheck {
 
   "dropPrefix" should {
     "return just the remainder" in {
-      JPath(".foo.bar[1].baz").dropPrefix(".foo.bar") must beSome(JPath("[1].baz"))
+      JPath(".foo.bar[1].baz").dropPrefix(JPath(".foo.bar")) must beSome(JPath("[1].baz"))
     }
 
     "return none on path mismatch" in {
-      JPath(".foo.bar[1].baz").dropPrefix(".foo.bar[2]") must beNone
+      JPath(".foo.bar[1].baz").dropPrefix(JPath(".foo.bar[2]")) must beNone
     }
   }
 
