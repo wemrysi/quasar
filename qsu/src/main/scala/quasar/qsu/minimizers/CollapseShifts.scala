@@ -309,7 +309,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
                 func.ProjectKeyS(accessHoleLeftF, OriginalField),
               ResultsField -> repair2)
 
-            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, OnUndefined.Emit, repair3)) map { rewritten =>
+            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, OnUndefined.Emit, N.freeMF0(repair3))) map { rewritten =>
               rewritten :++ src
             }
         }
@@ -327,7 +327,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted.linearize)
 
             reconstructed.overwriteAtRoot(
-              QSU.MultiLeftShift(src.root, shifts, onUndefined, repair2))
+              QSU.MultiLeftShift(src.root, shifts, onUndefined, N.freeMF0(repair2)))
 
           case reconstructed => reconstructed
         }
@@ -498,7 +498,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               (structLAdj, idStatusL, rotL) :: (structRAdj, idStatusR, rotR) :: Nil,
               OnUndefined.Emit,
-              repair)
+              N.freeMF0(repair))
           }
 
         case
@@ -524,7 +524,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj ::: (structRAdj, idStatusR, rotR) :: Nil,
               OnUndefined.Emit,
-              repair)
+              N.freeMF0(repair))
           }
 
         case
@@ -548,7 +548,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               (structL.linearize, idStatusL, rotL) :: shiftsRAdj,
               OnUndefined.Emit,
-              repair)
+              N.freeMF0(repair))
           }
 
         case
@@ -574,7 +574,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj ::: shiftsRAdj,
               OnUndefined.Emit,
-              repair)
+              N.freeMF0(repair))
           }
 
         case
@@ -599,7 +599,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               structLAdj.asRec,
               idStatusL,
               OnUndefined.Emit,
-              repair,
+              N.freeMF0(repair),
               rotL)
           }
 
@@ -624,7 +624,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj,
               OnUndefined.Emit,
-              repair)
+              N.freeMF0(repair))
           }
 
         case
@@ -649,7 +649,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               structRAdj.asRec,
               idStatusR,
               OnUndefined.Emit,
-              repair,
+              N.freeMF0(repair),
               rotR)
           }
 
@@ -674,7 +674,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsRAdj,
               OnUndefined.Emit,
-              repair)
+              N.freeMF0(repair))
           }
 
         case (Nil, Nil) =>
