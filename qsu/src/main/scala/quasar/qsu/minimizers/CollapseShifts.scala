@@ -474,7 +474,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.LeftShift[T, Symbol](
-              sym, structL, idStatusAdj, onUndefinedL, repair, rotL)
+              sym, structL, idStatusAdj, onUndefinedL, N.freeMF0(repair), rotL)
           }
 
         case
@@ -748,9 +748,23 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         case _ => false
       }
 
-    type ShiftDefinition = (Symbol, FreeMap, QSU.Rotation)
 
     def reorderCandidates(cs: List[QSUGraph]): List[QSUGraph] = {
+      type ShiftDefinition = (Symbol, FreeMap, QSU.Rotation)
+
+      def firstShiftDefinition(g: QSUGraph): Option[ShiftDefinition] = g match {
+        case ConsecutiveBounded(_, shifts) =>
+          shiftDefinition(shifts.head)
+        case _ =>
+          none
+      }
+
+      def shiftDefinition(s: ShiftGraph): Option[ShiftDefinition] = s match {
+        case -\/(QSU.LeftShift(src, struct, _, _, _, rot)) =>
+          (src.root, struct.linearize, rot).some
+        case _ => none
+      }
+
       val (toReorder, noReorder) =
         cs.partition(firstShiftDefinition(_).isDefined)
 
@@ -762,7 +776,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         }).unite
 
 
-      // FIXME: horrible performance
+      // FIXME: quadratic complexity.
       val cs1 = cs0.map {
         case (cand, (sym, struct, rot)) => {
           val freqCount = cs0.filter {
@@ -770,31 +784,32 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym === sym0 && struct === struct0 && rot === rot0
           }.length
 
-          (cand, freqCount)
+          // compatible shifts should come first
+          // so we can coalesce them before the rest
+          (cand, -freqCount)
         }
       }
 
-      cs1.sortBy(_._2).firsts ++ noReorder
+      // Avoid unnecessary reordering if there are no compatible shifts
+      // to put next to each other.
+      if (cs1.all(_._2 === -1))
+        cs
+      else
+        cs1.sortBy(_._2).firsts ++ noReorder
     }
 
-    def firstShiftDefinition(g: QSUGraph): Option[ShiftDefinition] = g match {
-      case ConsecutiveBounded(_, shifts) =>
-        shiftDefinition(shifts.head)
-      case _ =>
-        none
-    }
-
-    def shiftDefinition(s: ShiftGraph): Option[ShiftDefinition] = s match {
-      case -\/(QSU.LeftShift(src, struct, _, _, _, rot)) =>
-        (src.root, struct.linearize, rot).some
-      case _ => none
-    }
-
+    // the order of the incoming candidates is important and we need to
+    // preserve it since the Map wrapping the final coalesce refers to
+    // them. Hence, the reordering performed by reorderCandidates is only
+    // visible inside the final coalesce.
+    //
+    // Unlike reorderCandidates, the left-side of the tuple are list
+    // positions rather than frequency counts
     def reorderWithIndex(cs: List[(QSUGraph, Int)]): List[(QSUGraph, Int)] = {
       val matching = SMap(cs.map(_.leftMap(_.root)): _*)
-      val sorted = reorderCandidates(cs.firsts)
+      val reordered = reorderCandidates(cs.firsts)
 
-      sorted.map(c => (c, matching(c.root)))
+      reordered.map(g => (g, matching(g.root)))
     }
 
     for {

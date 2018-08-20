@@ -1620,7 +1620,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case Map(
           MultiLeftShift(
             LeftShift(Read(_), _, _, _, _, _),
-            List((structA, IncludeId, Rotation.ShiftMap), (structB, ExcludeId, Rotation.ShiftArray)),
+            List((structA, IncludeId, Rotation.ShiftMap), (structB, IdOnly, Rotation.ShiftArray)),
             OnUndefined.Emit,
             repair), outerMap) =>
 
@@ -1630,8 +1630,8 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           repair must beTreeEqual(
             func.StaticMapS(
               "0" -> func.ProjectIndexI(0.right[QAccess[Hole]].pure[FreeMapA], 0),
-              "1" -> 1.right[QAccess[Hole]].pure[FreeMapA],
-              "2" -> func.ProjectIndexI(0.right[QAccess[Hole]].pure[FreeMapA], 1)))
+              "2" -> func.ProjectIndexI(0.right[QAccess[Hole]].pure[FreeMapA], 1),
+              "1" -> 1.right[QAccess[Hole]].pure[FreeMapA]))
 
           outerMap must beTreeEqual(
             recFunc.StaticMapS(
