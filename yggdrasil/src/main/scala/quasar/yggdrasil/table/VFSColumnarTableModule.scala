@@ -23,7 +23,7 @@ import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, APath, PathSegment}
 import quasar.niflheim.NIHDB
 import quasar.precog.common.{Path => PrecogPath}
 import quasar.precog.util.IOUtils
-import quasar.yggdrasil.{Config, ExactSize, Schema}
+import quasar.yggdrasil.{Config, ExactSize, Schema, TransSpecModule}
 import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.nihdb.{NIHDBProjection, SegmentsWrapper}
 import quasar.yggdrasil.vfs._
@@ -239,7 +239,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
    *
    * TODO configurable early force
    */
-  def cacheTable(table: Table): IO[Disposable[IO, Table]] = {
+  def cacheTable(table: Table, earlyForce: Boolean): IO[Disposable[IO, Table]] = {
     def zipWithIndex[F[_]: Monad, A](st: StreamT[F, A]): StreamT[F, (A, Int)] = {
       StreamT.unfoldM((st, 0)) {
         case (st, index) =>
@@ -311,6 +311,13 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
         } yield StreamT.wrapEffect[IO, Slice](streamM)
 
         cachedSlices = StreamT.wrapEffect[IO, Slice](cachedSlicesM)
+
+        // if we need to force early, then run the stream once for effect and discard the slices
+        // this will force subsequent runs to use the cache
+        _ <- if (earlyForce)
+          cachedSlices.foreach(_ => IO.pure(()))
+        else
+          IO.pure(())
 
         dispose = for {
           running <- started.get

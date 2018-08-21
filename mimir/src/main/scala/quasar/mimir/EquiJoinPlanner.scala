@@ -62,9 +62,10 @@ final class EquiJoinPlanner[
       }
 
       val (lkeys, rkeys) = keys.unfzip
+      val cartesian = keys.isEmpty
 
       for {
-        cachedD <- LiftIO[F].liftIO(src.P.cacheTable(src.table))
+        cachedD <- LiftIO[F].liftIO(src.P.cacheTable(src.table, cartesian))
         cachedTable = cachedD.unsafeValue
         _ <- MonadFinalizers[F, IO].tell(cachedD.dispose :: Nil)
 
@@ -99,7 +100,7 @@ final class EquiJoinPlanner[
 
         // identify full-cross and avoid cogroup
         resultAndSort <- {
-          if (keys.isEmpty) {
+          if (cartesian) {
             log.trace("EQUIJOIN: full-cross detected!")
 
             (ltable.cross(rtable)(transMiddle), src.unsafeMerge(leftRepr).lastSort).point[F]
