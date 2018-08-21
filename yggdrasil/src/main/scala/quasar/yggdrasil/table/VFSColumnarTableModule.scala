@@ -253,73 +253,78 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
 
     val target = table.compact(trans.TransSpec1.Id).canonicalize(Config.maxSliceRows)
 
-    for {
-      started <- Ref[IO, Boolean](false)
-      cacheTarget <- Promise.empty[IO, (NIHDB, File)]
+    // hey! we fit in memory for sure
+    if (target.size.maxSize < Config.maxSliceRows) {
+      target.force.map(Disposable(_, IO.pure(())))
+    } else {
+      for {
+        started <- Ref[IO, Boolean](false)
+        cacheTarget <- Promise.empty[IO, (NIHDB, File)]
 
-      slices = target.slices
-      size = target.size
+        slices = target.slices
+        size = target.size
 
-      cachedSlices <- for {
-        change <- started.tryModify(_ => true)
+        cachedSlices <- for {
+          change <- started.tryModify(_ => true)
 
-        winner = change match {
-          case Some(Ref.Change(false, _)) => true
-          case Some(Ref.Change(true, _)) | None => false   // either we lost a race, or we won but it was already true
-        }
-        streamM = if (winner) {
-          // persist the stream incrementally into a temporary directory
-          for {
-            dir <- IO(Files.createTempDirectory("BlockStoreColumnarTable-" + hashCode).toFile)
-            dbV <- IO {
-              NIHDB.create(
-                masterChef,
-                dir,
-                CookThreshold,
-                StorageTimeout,
-                TxLogScheduler).unsafePerformIO
-            }
-
-            // I don't really care. If we fail to store, the stream kinda has to die
-            db <- dbV.toEither.fold(
-              _ => IO.raiseError(new RuntimeException("unable to create nihdb for dir: " + dir)),
-              IO.pure(_))
-          } yield {
-            val persisting = zipWithIndex(slices) mapM {
-              case (slice, offset) =>
-                val segments = SegmentsWrapper.sliceToSegments(offset.toLong, slice)
-
-                IO.fromFutureShift(
-                  IO(db.insertSegmentsVerified(offset.toLong, slice.size, segments))).as(slice)
-            }
-
-            persisting ++ StreamT.wrapEffect(cacheTarget.complete((db, dir)).as(StreamT.empty[IO, Slice]))
+          winner = change match {
+            case Some(Ref.Change(false, _)) => true
+            case Some(Ref.Change(true, _)) | None => false   // either we lost a race, or we won but it was already true
           }
-        } else {
-          for {
-            pair <- cacheTarget.get    // wait for the other thread to finish the persistence
-            (db, _) = pair
-            proj <- NIHDBProjection.wrap(db)
-          } yield proj.getBlockStream(None)
-        }
-      } yield StreamT.wrapEffect[IO, Slice](streamM)
+          streamM = if (winner) {
+            // persist the stream incrementally into a temporary directory
+            for {
+              dir <- IO(Files.createTempDirectory("BlockStoreColumnarTable-" + hashCode).toFile)
+              dbV <- IO {
+                NIHDB.create(
+                  masterChef,
+                  dir,
+                  CookThreshold,
+                  StorageTimeout,
+                  TxLogScheduler).unsafePerformIO
+              }
 
-      dispose = for {
-        running <- started.get
+              // I don't really care. If we fail to store, the stream kinda has to die
+              db <- dbV.toEither.fold(
+                _ => IO.raiseError(new RuntimeException("unable to create nihdb for dir: " + dir)),
+                IO.pure(_))
+            } yield {
+              val persisting = zipWithIndex(slices) mapM {
+                case (slice, offset) =>
+                  val segments = SegmentsWrapper.sliceToSegments(offset.toLong, slice)
 
-        // cheater bypass (both bonus race condition!) for when we haven't run the stream at all
-        _ <- if (running) {
-          for {
-            pair <- cacheTarget.get
-            (db, dir) = pair
-            _ <- IO.fromFutureShift(IO(db.close))
-            _ <- IO(IOUtils.recursiveDelete(dir).unsafePerformIO)
-          } yield ()
-        } else {
-          IO.pure(())
-        }
-      } yield ()
-    } yield Disposable(Table(cachedSlices, size), dispose)
+                  IO.fromFutureShift(
+                    IO(db.insertSegmentsVerified(offset.toLong, slice.size, segments))).as(slice)
+              }
+
+              persisting ++ StreamT.wrapEffect(cacheTarget.complete((db, dir)).as(StreamT.empty[IO, Slice]))
+            }
+          } else {
+            for {
+              pair <- cacheTarget.get    // wait for the other thread to finish the persistence
+              (db, _) = pair
+              proj <- NIHDBProjection.wrap(db)
+            } yield proj.getBlockStream(None)
+          }
+        } yield StreamT.wrapEffect[IO, Slice](streamM)
+
+        dispose = for {
+          running <- started.get
+
+          // cheater bypass (both bonus race condition!) for when we haven't run the stream at all
+          _ <- if (running) {
+            for {
+              pair <- cacheTarget.get
+              (db, dir) = pair
+              _ <- IO.fromFutureShift(IO(db.close))
+              _ <- IO(IOUtils.recursiveDelete(dir).unsafePerformIO)
+            } yield ()
+          } else {
+            IO.pure(())
+          }
+        } yield ()
+      } yield Disposable(Table(cachedSlices, size), dispose)
+    }
   }
 
   object fs {
