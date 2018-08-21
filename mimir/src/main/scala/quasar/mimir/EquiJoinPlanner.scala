@@ -25,9 +25,10 @@ import quasar.contrib.iota.copkTraverse
 import quasar.mimir.MimirCake._
 import quasar.qscript._
 
+import quasar.yggdrasil.MonadFinalizers
 import quasar.yggdrasil.TableModule.SortAscending
 
-import cats.effect.LiftIO
+import cats.effect.{IO, LiftIO}
 
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
@@ -40,7 +41,7 @@ import scalaz._, Scalaz._
 
 final class EquiJoinPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
-    F[_]: LiftIO: Monad] extends Logging {
+    F[_]: LiftIO: Monad: MonadFinalizers[?[_], IO]] extends Logging {
 
   def mapFuncPlanner[G[_]: Monad] = MapFuncPlanner[T, G, MapFunc[T, ?]]
 
@@ -63,11 +64,17 @@ final class EquiJoinPlanner[
       val (lkeys, rkeys) = keys.unfzip
 
       for {
+        cachedD <- LiftIO[F].liftIO(src.P.cacheTable(src.table))
+        cachedTable = cachedD.unsafeValue
+        _ <- MonadFinalizers[F, IO].tell(cachedD.dispose :: Nil)
+
+        cachedSrc = src.map(_ => cachedTable): MimirRepr
+
         leftRepr <- lbranch.cataM[F, MimirRepr](
-          interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(src.point[F]), planQST))
+          interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(cachedSrc.point[F]), planQST))
 
         rightRepr <- rbranch.cataM[F, MimirRepr](
-          interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(src.point[F]), planQST))
+          interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(cachedSrc.point[F]), planQST))
 
         lmerged = src.unsafeMerge(leftRepr)
         ltable = lmerged.table
