@@ -306,7 +306,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
               pair <- cacheTarget.get    // wait for the other thread to finish the persistence
               (db, _) = pair
               proj <- NIHDBProjection.wrap(db)
-            } yield proj.getBlockStream(None)
+            } yield proj.getBlockStream(None).map(_.deref(TransSpecModule.paths.Value))
           }
         } yield StreamT.wrapEffect[IO, Slice](streamM)
 
