@@ -60,10 +60,9 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
   def write(key: StoreKey, table: PTable): Stream[F, Unit] = {
     val ios = Stream.bracket(cake.createDB(keyToFile(key)).map(_.toOption))({
       case Some((_, _, db)) =>
-        val can = table.canonicalize(Config.maxSliceRows)
-        val com = can.compact(cake.trans.TransSpec1.Id)
+        val can = table.compact(cake.trans.TransSpec1.Id).canonicalize(Config.maxSliceRows)
 
-        fromStreamT(com.slices).zipWithIndex evalMap {
+        fromStreamT(can.slices).zipWithIndex evalMap {
           case (slice, offset) =>
             val segments = SegmentsWrapper.sliceToSegments(offset.toLong, slice)
             IO.fromFutureShift(
