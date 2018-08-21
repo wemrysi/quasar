@@ -261,8 +261,12 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
       size = target.size
 
       cachedSlices <- for {
-        winner <- started.tryModify(_ => true).map(_.isDefined)
+        change <- started.tryModify(_ => true)
 
+        winner = change match {
+          case Some(Ref.Change(false, _)) => true
+          case Some(Ref.Change(true, _)) | None => false   // either we lost a race, or we won but it was already true
+        }
         streamM = if (winner) {
           // persist the stream incrementally into a temporary directory
           for {
