@@ -229,7 +229,6 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
     ot.getOrElseF(IO.unit)
   }
 
-
   /**
    * Produces a Table which will, when run the first time, write itself out to
    * NIHDB storage in a temporary directory, which in turn the subsequent reads
@@ -237,6 +236,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
    * before subsequent reads may proceed. Once the first read is completed, all
    * subsequent reads may happen in parallel. The disposal action produced will
    * shut down the temporary database and remove the directory.
+   *
+   * TODO configurable early force
    */
   def cacheTable(table: Table): IO[Disposable[IO, Table]] = {
     def zipWithIndex[F[_]: Monad, A](st: StreamT[F, A]): StreamT[F, (A, Int)] = {
@@ -264,13 +265,14 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
         slices = target.slices
         size = target.size
 
-        cachedSlices <- for {
+        cachedSlicesM = for {
           change <- started.tryModify(_ => true)
 
           winner = change match {
             case Some(Ref.Change(false, _)) => true
             case Some(Ref.Change(true, _)) | None => false   // either we lost a race, or we won but it was already true
           }
+
           streamM = if (winner) {
             // persist the stream incrementally into a temporary directory
             for {
@@ -307,6 +309,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
             } yield proj.getBlockStream(None)
           }
         } yield StreamT.wrapEffect[IO, Slice](streamM)
+
+        cachedSlices = StreamT.wrapEffect[IO, Slice](cachedSlicesM)
 
         dispose = for {
           running <- started.get
