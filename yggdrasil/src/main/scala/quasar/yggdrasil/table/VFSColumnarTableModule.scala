@@ -16,14 +16,16 @@
 
 package quasar.yggdrasil.table
 
+import quasar.Disposable
 import quasar.blueeyes.json.JValue
 import quasar.contrib.cats.effect._
 import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, APath, PathSegment}
 import quasar.niflheim.NIHDB
 import quasar.precog.common.{Path => PrecogPath}
-import quasar.yggdrasil.{ExactSize, Schema}
+import quasar.precog.util.IOUtils
+import quasar.yggdrasil.{Config, ExactSize, Schema}
 import quasar.yggdrasil.bytecode.JType
-import quasar.yggdrasil.nihdb.NIHDBProjection
+import quasar.yggdrasil.nihdb.{NIHDBProjection, SegmentsWrapper}
 import quasar.yggdrasil.vfs._
 
 import scala.concurrent.duration._
@@ -31,23 +33,23 @@ import scala.concurrent.duration._
 import java.util.concurrent.{ConcurrentHashMap, ScheduledThreadPoolExecutor, ThreadFactory}
 import java.util.concurrent.atomic.AtomicInteger
 
+import java.io.File
+import java.nio.file.Files
+
 import akka.actor.{ActorRef, ActorSystem}
 
 import cats.effect._
 
 import fs2.Stream
+import fs2.async.{Promise, Ref}
 
-import shims.{monadToCats => _, _}
+import shims._
 
 import org.slf4s.Logging
 
 import pathy.Path
 
-import scalaz.{-\/, \/, EitherT, Monad, OptionT, StreamT}
-import scalaz.std.list._
-import scalaz.syntax.either._
-import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
+import scalaz.{-\/, \/, EitherT, Monad, OptionT, Scalaz, StreamT}, Scalaz._
 
 import scala.concurrent.ExecutionContext
 
@@ -225,6 +227,95 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
     } yield ()
 
     ot.getOrElseF(IO.unit)
+  }
+
+
+  /**
+   * Produces a Table which will, when run the first time, write itself out to
+   * NIHDB storage in a temporary directory, which in turn the subsequent reads
+   * will consume. The very first running of the table must be completed entirely
+   * before subsequent reads may proceed. Once the first read is completed, all
+   * subsequent reads may happen in parallel. The disposal action produced will
+   * shut down the temporary database and remove the directory.
+   */
+  def cacheTable(table: Table): IO[Disposable[IO, Table]] = {
+    def zipWithIndex[F[_]: Monad, A](st: StreamT[F, A]): StreamT[F, (A, Int)] = {
+      StreamT.unfoldM((st, 0)) {
+        case (st, index) =>
+          st.uncons map {
+            case Some((head, tail)) =>
+              Some(((head, index), (tail, index + 1)))
+
+            case None => None
+          }
+      }
+    }
+
+    val target = table.compact(trans.TransSpec1.Id).canonicalize(Config.maxSliceRows)
+
+    for {
+      started <- Ref[IO, Boolean](false)
+      cacheTarget <- Promise.empty[IO, (NIHDB, File)]
+
+      slices = target.slices
+      size = target.size
+
+      cachedSlices <- for {
+        winner <- started.tryModify(_ => true).map(_.isDefined)
+
+        streamM = if (winner) {
+          // persist the stream incrementally into a temporary directory
+          for {
+            dir <- IO(Files.createTempDirectory("BlockStoreColumnarTable-" + hashCode).toFile)
+            dbV <- IO {
+              NIHDB.create(
+                masterChef,
+                dir,
+                CookThreshold,
+                StorageTimeout,
+                TxLogScheduler).unsafePerformIO
+            }
+
+            // I don't really care. If we fail to store, the stream kinda has to die
+            db <- dbV.toEither.fold(
+              _ => IO.raiseError(new RuntimeException("unable to create nihdb for dir: " + dir)),
+              IO.pure(_))
+          } yield {
+            val persisting = zipWithIndex(slices) mapM {
+              case (slice, offset) =>
+                val segments = SegmentsWrapper.sliceToSegments(offset.toLong, slice)
+
+                IO.fromFutureShift(
+                  IO(db.insertSegmentsVerified(offset.toLong, slice.size, segments))).as(slice)
+            }
+
+            persisting ++ StreamT.wrapEffect(cacheTarget.complete((db, dir)).as(StreamT.empty[IO, Slice]))
+          }
+        } else {
+          for {
+            pair <- cacheTarget.get    // wait for the other thread to finish the persistence
+            (db, _) = pair
+            proj <- NIHDBProjection.wrap(db)
+          } yield proj.getBlockStream(None)
+        }
+      } yield StreamT.wrapEffect[IO, Slice](streamM)
+
+      dispose = for {
+        running <- started.get
+
+        // cheater bypass (both bonus race condition!) for when we haven't run the stream at all
+        _ <- if (running) {
+          for {
+            pair <- cacheTarget.get
+            (db, dir) = pair
+            _ <- IO.fromFutureShift(IO(db.close))
+            _ <- IO(IOUtils.recursiveDelete(dir).unsafePerformIO)
+          } yield ()
+        } else {
+          IO.pure(())
+        }
+      } yield ()
+    } yield Disposable(Table(cachedSlices, size), dispose)
   }
 
   object fs {
