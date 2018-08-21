@@ -420,20 +420,27 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
       if (length == 0) {
         log.warn("Skipping insert with an empty batch on %s".format(baseDir.getCanonicalPath))
         if (responseRequested) sender ! Skipped
-      } else if (offset > currentState.maxOffset) {
+      } else if (offset < currentState.maxOffset) {
         log.warn("Skipping insert with already-inserted offset on %s".format(baseDir.getCanonicalPath))
         if (responseRequested) sender ! Skipped
       } else {
         log.debug("Inserting from segments %d rows at offset %d for %s".format(length, offset, baseDir.getCanonicalPath))
 
+        {
+          state.blockState.rawLog.close()
+          state.blockState = state.blockState.copy(rawLog = RawHandler.empty(offset + 1, rawFileFor(offset + 1)))
+        }
+
         currentState = currentState.copy(maxOffset = offset)
+        state.txLog.startCook(offset)
 
         val target = sender
         val onComplete = if (responseRequested)
-          () => target ! (())
+          () => target ! Inserted(offset, length)
         else
           () => ()
 
+        cookedDir.mkdir()   // I don't get why we need this, but we do
         chef ! PrepareSegments(offset, cookSequence.getAndIncrement, cookedDir, offset, length, segments, onComplete)
       }
 
