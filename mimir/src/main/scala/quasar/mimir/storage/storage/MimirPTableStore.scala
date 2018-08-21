@@ -23,7 +23,7 @@ import quasar.contrib.fs2.convert._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz.MonadError_
 import quasar.mimir.MimirCake.Cake
-import quasar.yggdrasil.ExactSize
+import quasar.yggdrasil.{Config, ExactSize}
 import quasar.yggdrasil.nihdb.SegmentsWrapper
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.niflheim.NIHDB
@@ -60,7 +60,10 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
   def write(key: StoreKey, table: PTable): Stream[F, Unit] = {
     val ios = Stream.bracket(cake.createDB(keyToFile(key)).map(_.toOption))({
       case Some((_, _, db)) =>
-        fromStreamT(table.slices).zipWithIndex evalMap {
+        val can = table.canonicalize(Config.maxSliceRows)
+        val com = can.compact(cake.trans.TransSpec1.Id)
+
+        fromStreamT(com.slices).zipWithIndex evalMap {
           case (slice, offset) =>
             val segments = SegmentsWrapper.sliceToSegments(offset.toLong, slice)
             IO.fromFutureShift(
