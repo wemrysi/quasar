@@ -778,24 +778,24 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
       // FIXME: quadratic complexity.
       val cs1 = cs0.map {
-        case (cand, (sym, struct, rot)) => {
+        case (cand, (shifting, struct, rot)) => {
           val freqCount = cs0.filter {
-            case (_, (sym0, struct0, rot0)) =>
-              sym === sym0 && struct === struct0 && rot === rot0
+            case (_, (shifting0, struct0, rot0)) =>
+              shifting === shifting0 && struct === struct0 && rot === rot0
           }.length
 
-          // compatible shifts should come first
-          // so we can coalesce them before the rest
-          (cand, -freqCount)
+          (cand, freqCount)
         }
       }
 
       // Avoid unnecessary reordering if there are no compatible shifts
       // to put next to each other.
-      if (cs1.all(_._2 === -1))
+      if (cs1.all(_._2 === 1))
         cs
       else
-        cs1.sortBy(_._2).firsts ++ noReorder
+        cs1.sortBy {
+          case (_, freqCount) => -freqCount
+        }.firsts ++ noReorder
     }
 
     // the order of the incoming candidates is important and we need to
