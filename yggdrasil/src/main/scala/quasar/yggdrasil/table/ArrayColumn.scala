@@ -40,6 +40,10 @@ object ArrayColumn {
   }
 }
 
+trait AccessibleArrayColumn[@specialized(Boolean, Long, Double) A] extends ArrayColumn[A] {
+  def values: Array[A]
+}
+
 class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val defined: BitSet, val values: Array[Array[A]])(implicit val tpe: CArrayType[A])
     extends BitsetColumn(defined)
     with HomogeneousArrayColumn[A]
@@ -111,7 +115,7 @@ object ArrayBoolColumn {
     new ArrayBoolColumn(new BitSet(size), new BitSet(size))
 }
 
-class ArrayLongColumn(val defined: BitSet, val values: Array[Long]) extends BitsetColumn(defined) with ArrayColumn[Long] with LongColumn {
+class ArrayLongColumn(val defined: BitSet, val values: Array[Long]) extends BitsetColumn(defined) with AccessibleArrayColumn[Long] with LongColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: Long) = {
@@ -138,7 +142,7 @@ object ArrayLongColumn {
     new ArrayLongColumn(new BitSet, new Array[Long](size))
 }
 
-class ArrayDoubleColumn(val defined: BitSet, val values: Array[Double]) extends BitsetColumn(defined) with ArrayColumn[Double] with DoubleColumn {
+class ArrayDoubleColumn(val defined: BitSet, val values: Array[Double]) extends BitsetColumn(defined) with AccessibleArrayColumn[Double] with DoubleColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: Double) = {
@@ -165,7 +169,7 @@ object ArrayDoubleColumn {
     new ArrayDoubleColumn(new BitSet, new Array[Double](size))
 }
 
-class ArrayNumColumn(val defined: BitSet, val values: Array[BigDecimal]) extends BitsetColumn(defined) with ArrayColumn[BigDecimal] with NumColumn {
+class ArrayNumColumn(val defined: BitSet, val values: Array[BigDecimal]) extends BitsetColumn(defined) with AccessibleArrayColumn[BigDecimal] with NumColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: BigDecimal) = {
@@ -192,7 +196,7 @@ object ArrayNumColumn {
     new ArrayNumColumn(new BitSet, new Array[BigDecimal](size))
 }
 
-class ArrayStrColumn(val defined: BitSet, val values: Array[String]) extends BitsetColumn(defined) with ArrayColumn[String] with StrColumn {
+class ArrayStrColumn(val defined: BitSet, val values: Array[String]) extends BitsetColumn(defined) with AccessibleArrayColumn[String] with StrColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: String) = {
@@ -219,7 +223,7 @@ object ArrayStrColumn {
     new ArrayStrColumn(new BitSet, new Array[String](size))
 }
 
-class ArrayOffsetDateTimeColumn(val defined: BitSet, val values: Array[OffsetDateTime]) extends BitsetColumn(defined) with ArrayColumn[OffsetDateTime] with OffsetDateTimeColumn {
+class ArrayOffsetDateTimeColumn(val defined: BitSet, val values: Array[OffsetDateTime]) extends BitsetColumn(defined) with AccessibleArrayColumn[OffsetDateTime] with OffsetDateTimeColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: OffsetDateTime) = {
@@ -246,7 +250,7 @@ object ArrayOffsetDateTimeColumn {
     new ArrayOffsetDateTimeColumn(new BitSet, new Array[OffsetDateTime](size))
 }
 
-class ArrayOffsetTimeColumn(val defined: BitSet, val values: Array[OffsetTime]) extends BitsetColumn(defined) with ArrayColumn[OffsetTime] with OffsetTimeColumn {
+class ArrayOffsetTimeColumn(val defined: BitSet, val values: Array[OffsetTime]) extends BitsetColumn(defined) with AccessibleArrayColumn[OffsetTime] with OffsetTimeColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: OffsetTime) = {
@@ -273,7 +277,7 @@ object ArrayOffsetTimeColumn {
     new ArrayOffsetTimeColumn(new BitSet, new Array[OffsetTime](size))
 }
 
-class ArrayOffsetDateColumn(val defined: BitSet, val values: Array[OffsetDate]) extends BitsetColumn(defined) with ArrayColumn[OffsetDate] with OffsetDateColumn {
+class ArrayOffsetDateColumn(val defined: BitSet, val values: Array[OffsetDate]) extends BitsetColumn(defined) with AccessibleArrayColumn[OffsetDate] with OffsetDateColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: OffsetDate) = {
@@ -300,7 +304,7 @@ object ArrayOffsetDateColumn {
     new ArrayOffsetDateColumn(new BitSet, new Array[OffsetDate](size))
 }
 
-class ArrayLocalDateTimeColumn(val defined: BitSet, val values: Array[LocalDateTime]) extends BitsetColumn(defined) with ArrayColumn[LocalDateTime] with LocalDateTimeColumn {
+class ArrayLocalDateTimeColumn(val defined: BitSet, val values: Array[LocalDateTime]) extends BitsetColumn(defined) with AccessibleArrayColumn[LocalDateTime] with LocalDateTimeColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: LocalDateTime) = {
@@ -327,7 +331,7 @@ object ArrayLocalDateTimeColumn {
     new ArrayLocalDateTimeColumn(new BitSet, new Array[LocalDateTime](size))
 }
 
-class ArrayLocalTimeColumn(val defined: BitSet, val values: Array[LocalTime]) extends BitsetColumn(defined) with ArrayColumn[LocalTime] with LocalTimeColumn {
+class ArrayLocalTimeColumn(val defined: BitSet, val values: Array[LocalTime]) extends BitsetColumn(defined) with AccessibleArrayColumn[LocalTime] with LocalTimeColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: LocalTime) = {
@@ -354,7 +358,7 @@ object ArrayLocalTimeColumn {
     new ArrayLocalTimeColumn(new BitSet, new Array[LocalTime](size))
 }
 
-class ArrayLocalDateColumn(val defined: BitSet, val values: Array[LocalDate]) extends BitsetColumn(defined) with ArrayColumn[LocalDate] with LocalDateColumn {
+class ArrayLocalDateColumn(val defined: BitSet, val values: Array[LocalDate]) extends BitsetColumn(defined) with AccessibleArrayColumn[LocalDate] with LocalDateColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: LocalDate) = {
@@ -381,7 +385,7 @@ object ArrayLocalDateColumn {
     new ArrayLocalDateColumn(new BitSet, new Array[LocalDate](size))
 }
 
-class ArrayIntervalColumn(val defined: BitSet, val values: Array[DateTimeInterval]) extends BitsetColumn(defined) with ArrayColumn[DateTimeInterval] with IntervalColumn {
+class ArrayIntervalColumn(val defined: BitSet, val values: Array[DateTimeInterval]) extends BitsetColumn(defined) with AccessibleArrayColumn[DateTimeInterval] with IntervalColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: DateTimeInterval) = {
