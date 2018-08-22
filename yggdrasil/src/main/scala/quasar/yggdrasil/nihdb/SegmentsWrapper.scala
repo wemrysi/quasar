@@ -99,3 +99,26 @@ case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: L
 
   def columns: Map[ColumnRef, Column] = cols
 }
+
+object SegmentsWrapper extends ((Seq[Segment], Int, Long) => SegmentsWrapper) {
+
+  def sliceToSegments(id: Long, slice0: Slice): List[Segment] = {
+    val slice = slice0.materialized
+    val length = slice.size
+
+    slice.columns.toList map {
+      case (ColumnRef(path, CBoolean), col: ArrayBoolColumn) =>
+        BooleanSegment(id, path, col.definedAt, col.values, length)
+
+      case (ColumnRef(path, tpe: CNullType), col: BitsetColumn) =>
+        NullSegment(id, path, tpe, col.definedAt, length)
+
+      // a =:= e
+      case (ColumnRef(path, tpe: CValueType[e]), col: AccessibleArrayColumn[a]) =>
+        ArraySegment(id, path, tpe.asInstanceOf[CValueType[a]], col.definedAt, col.values)
+
+      case (_, col) =>
+        sys.error(s"Slice#materialized produced a non-array column: $col")
+    }
+  }
+}

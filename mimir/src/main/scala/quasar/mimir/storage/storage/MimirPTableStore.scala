@@ -23,7 +23,8 @@ import quasar.contrib.fs2.convert._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz.MonadError_
 import quasar.mimir.MimirCake.Cake
-import quasar.yggdrasil.ExactSize
+import quasar.yggdrasil.{Config, ExactSize}
+import quasar.yggdrasil.nihdb.SegmentsWrapper
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.niflheim.NIHDB
 import quasar.yggdrasil.nihdb.NIHDBProjection
@@ -59,17 +60,20 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
   def write(key: StoreKey, table: PTable): Stream[F, Unit] = {
     val ios = Stream.bracket(cake.createDB(keyToFile(key)).map(_.toOption))({
       case Some((_, _, db)) =>
-        fromStreamT(table.slices).zipWithIndex evalMap {
+        val can = table.compact(cake.trans.TransSpec1.Id).canonicalize(Config.maxSliceRows)
+
+        fromStreamT(can.slices).zipWithIndex evalMap {
           case (slice, offset) =>
-            val jvs = slice.toJsonElements
-            IO.fromFutureShift(IO(db.insertVerified(NIHDB.Batch(offset, jvs.toList) :: Nil)))
+            val segments = SegmentsWrapper.sliceToSegments(offset.toLong, slice)
+            IO.fromFutureShift(
+              IO(db.insertSegmentsVerified(offset.toLong, slice.size, segments)))
         }
 
       case None =>
         Stream.empty
     }, {
       case Some((blob, version, db)) =>
-        IO.fromFutureShift(IO(db.cook)) *> cake.commitDB(blob, version, db)
+        cake.commitDB(blob, version, db)
 
       case None =>
         IO.pure(())

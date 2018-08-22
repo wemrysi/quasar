@@ -17,20 +17,11 @@
 package quasar.blueeyes
 
 import scalaz._, Scalaz._
-import quasar.blueeyes.json.serialization.Decomposer
 
 package object json {
   import JValue._
 
   type JFieldTuple = (String, JValue)
-
-  def jarray(elements: JValue*): JValue                                    = JArray(elements.toList)
-  def jobject(fields: JField*): JValue                                     = JObject(fields.toList)
-  def jfield[A](name: String, value: A)(implicit d: Decomposer[A]): JField = JField(name, d(value))
-
-  implicit def liftJPathField(name: String): JPathNode = JPathField(name)
-  implicit def liftJPathIndex(index: Int): JPathNode   = JPathIndex(index)
-  implicit def liftJPath(path: String): JPath          = JPath(path)
 
   implicit val JPathNodeOrder: Order[JPathNode] = Order orderBy (x => x.optName -> x.optIndex)
   implicit val JPathNodeOrdering                = JPathNodeOrder.toScalaOrdering
