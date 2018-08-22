@@ -103,7 +103,12 @@ final class EquiJoinPlanner[
           if (cartesian) {
             log.trace("EQUIJOIN: full-cross detected!")
 
-            (ltable.cross(rtable)(transMiddle), src.unsafeMerge(leftRepr).lastSort).point[F]
+            for {
+              // cache the right side since we're going to restart it
+              cachedRightD <- LiftIO[F].liftIO(rmerged.P.cacheTable(rtable, cartesian))
+              cachedRight = cachedRightD.unsafeValue
+              _ <- MonadFinalizers[F, IO].tell(cachedRightD.dispose :: Nil)
+            } yield (ltable.cross(cachedRight)(transMiddle), src.unsafeMerge(leftRepr).lastSort)
           } else {
             log.trace("EQUIJOIN: not a full-cross; sorting and cogrouping")
 
