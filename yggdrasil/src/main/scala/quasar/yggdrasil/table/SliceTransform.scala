@@ -18,6 +18,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
+import quasar.contrib.std.errorImpossible
 import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util._
@@ -362,8 +363,8 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
 
             val testDefined: List[BitSet] = tests.map {
               case c: ArrayBoolColumn => c.defined
-              case _ => ???
               case c: SingletonBoolColumn => SingletonColumn.Defined
+              case _ => errorImpossible
             }
 
             val definedM = testDefined.headOption map { bits =>
@@ -374,8 +375,8 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
 
             val testValues: List[BitSet] = tests.map {
               case c: ArrayBoolColumn => c.values
-              case _ => ???
               case c: SingletonBoolColumn => SingletonBoolColumn.bitset(c.value)
+              case _ => errorImpossible
             }
 
             val valuesM = testValues.headOption map { bits =>
@@ -408,7 +409,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
               numCol match {
                 case c: ArrayNumColumn => new ArrayLongColumn(c.defined, c.values.map(_.toLong))
                 case c: SingletonNumColumn => SingletonLongColumn(c.value.toLong)
-                case _ => ???
+                case _ => errorImpossible
               }
             }).asInstanceOf[LongColumn]
             val upperC: LongColumn = upperColumns.getOrElse(ColumnRef(CPath.Identity, CLong), {
@@ -416,19 +417,19 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
               numCol match {
                 case c: ArrayNumColumn => new ArrayLongColumn(c.defined, c.values.map(_.toLong))
                 case c: SingletonNumColumn => SingletonLongColumn(c.value.toLong)
-                case _ => ???
+                case _ => errorImpossible
               }
             }).asInstanceOf[LongColumn]
 
             val lowerA: Array[Long] = lowerC match {
               case c: ArrayLongColumn => c.values
-              case _ => ???
               case c: SingletonLongColumn => Array(c.value)
+              case _ => errorImpossible
             }
             val upperA: Array[Long] = upperC match {
               case c: ArrayLongColumn => c.values
-              case _ => ???
               case c: SingletonLongColumn => Array(c.value)
+              case _ => errorImpossible
             }
 
             val minNumRows =

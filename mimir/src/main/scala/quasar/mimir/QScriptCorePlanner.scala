@@ -22,6 +22,7 @@ import quasar._
 import quasar.common._
 import quasar.contrib.iota._
 import quasar.contrib.scalaz._
+import quasar.contrib.std.{errorImpossible, errorNotImplemented}
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.ski.κ
@@ -107,7 +108,7 @@ final class QScriptCorePlanner[
         case ReduceFuncs.First(f) => (Library.First, f)
         case ReduceFuncs.Last(f) => (Library.Last, f)
         case ReduceFuncs.UnshiftArray(f) => (Library.UnshiftArray, f)
-        case ReduceFuncs.UnshiftMap(f1, f2) => ???
+        case ReduceFuncs.UnshiftMap(f1, f2) => errorNotImplemented
       }
 
       val pairs: List[(Library.Reduction, FreeMap[T])] =
@@ -182,7 +183,7 @@ final class QScriptCorePlanner[
                             Leaf(Source),
                             CPathIndex(i)): TransSpec1).point[IO]
 
-                        case None => ???
+                        case None => errorImpossible
                       }
 
                     case ReduceIndex(-\/(idx)) =>

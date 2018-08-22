@@ -19,6 +19,7 @@ package table
 
 import quasar.blueeyes._
 import quasar.contrib.fs2.convert
+import quasar.contrib.std.errorImpossible
 import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util.RawBitSet
@@ -170,7 +171,7 @@ object ColumnarTableModule extends Logging {
                   case CPathField(name) => name
                   case CPathMeta(name) => name
                   case CPathIndex(index) => index
-                  case CPathArray => ???
+                  case CPathArray => errorImpossible
                 }
 
                 val candidateTail = path.nodes.tail.map(_.toString).mkString
@@ -1255,7 +1256,7 @@ trait ColumnarTableModule
 
         val remapped: List[(ColumnRef, Int, Column)] = focused.toList map {
           case (ColumnRef(CPath.Identity, CArrayType(tpe)), col: HomogeneousArrayColumn[a]) =>
-            ???
+            errorImpossible
 
           // because of how we have defined things, path is guaranteed NOT to be Identity now
           case (ColumnRef(path, tpe), col) =>

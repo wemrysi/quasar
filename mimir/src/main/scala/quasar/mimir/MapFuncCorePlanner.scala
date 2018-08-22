@@ -18,6 +18,7 @@ package quasar.mimir
 
 import quasar.common.data.Data
 import quasar.contrib.iota.copkTraverse
+import quasar.contrib.std.{errorImpossible, errorNotImplemented}
 import quasar.precog.common._
 import quasar.qscript.{MapFuncCore, MapFuncsCore}
 import quasar.yggdrasil.bytecode._
@@ -53,7 +54,7 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         val rvalue = RValue.fromData(data)
         rvalue.map(transRValue(_, id)).getOrElse(undefined(id)).point[F]
 
-      case MapFuncsCore.JoinSideName(_) => ??? // should never be received
+      case MapFuncsCore.JoinSideName(_) => errorImpossible // should never be received
 
       case MapFuncsCore.Length(a1) => length.spec(a1).point[F]
 
@@ -122,10 +123,10 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.ToTimestamp(a1) =>
         (Map1[A](a1, cake.Library.ToTimestamp.f1): TransSpec[A]).point[F]
 
-      case MapFuncsCore.Now() => ???
-      case MapFuncsCore.NowTime() => ???
-      case MapFuncsCore.NowDate() => ???
-      case MapFuncsCore.CurrentTimeZone() => ???
+      case MapFuncsCore.Now() => errorNotImplemented
+      case MapFuncsCore.NowTime() => errorNotImplemented
+      case MapFuncsCore.NowDate() => errorNotImplemented
+      case MapFuncsCore.CurrentTimeZone() => errorNotImplemented
 
       case MapFuncsCore.SetTimeZone(v, a1) =>
         (Map2[A](a1, v, cake.Library.SetTimeZone.f2): TransSpec[A]).point[F]
@@ -258,9 +259,9 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         (ObjectDelete[A](src, Set(CPathField(key))): TransSpec[A]).point[F]
 
       // mimir doesn't have a way to implement this
-      case MapFuncsCore.DeleteKey(src, field) => ???
+      case MapFuncsCore.DeleteKey(src, field) => errorNotImplemented
 
-      case MapFuncsCore.Meta(a1) => ???
+      case MapFuncsCore.Meta(a1) => errorNotImplemented
 
       case MapFuncsCore.Range(from, to) =>
         (Range(from, to): TransSpec[A]).point[F]

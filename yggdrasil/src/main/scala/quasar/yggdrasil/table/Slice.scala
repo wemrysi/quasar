@@ -17,6 +17,7 @@
 package quasar.yggdrasil.table
 
 import quasar.blueeyes._, json._
+import quasar.contrib.std.errorImpossible
 import quasar.frontend.data.DataCodec
 import quasar.precog._
 import quasar.precog.common._
@@ -1188,7 +1189,7 @@ abstract class Slice { source =>
               val c = column.asInstanceOf[IntervalColumn]
               ctx.renderInterval(c(row))
 
-            case CArrayType(_) => ???
+            case CArrayType(_) => errorImpossible
 
             case CUndefined =>
           }
@@ -1596,7 +1597,7 @@ abstract class Slice { source =>
                 }
 
               // NB: I removed this implementation because it was horrible and broken
-              case CArrayType(_) => ???
+              case CArrayType(_) => errorImpossible
 
               case CUndefined => false
             }

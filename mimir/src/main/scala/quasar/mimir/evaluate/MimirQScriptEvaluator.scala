@@ -16,13 +16,12 @@
 
 package quasar.mimir.evaluate
 
-import slamdata.Predef._
-
 import quasar._
 import quasar.connector.QScriptEvaluator
 import quasar.contrib.cats.effect.liftio._
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
+import quasar.contrib.std.errorImpossible
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.mimir
@@ -105,7 +104,7 @@ final class MimirQScriptEvaluator[
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
         case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value)
-        case _ => ???
+        case _ => errorImpossible
       }
     }
 
