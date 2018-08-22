@@ -21,7 +21,7 @@ import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
-abstract class SingletonColumn[A](value: A) extends ExtensibleColumn {
+abstract class SingletonColumn[A] extends ExtensibleColumn {
 
   override def isDefinedAt(row: Int) = row == 0
 
@@ -30,7 +30,7 @@ abstract class SingletonColumn[A](value: A) extends ExtensibleColumn {
 }
 
 final class SingletonBoolColumn(val value: Boolean)
-    extends SingletonColumn[Boolean](value) with BoolColumn {
+    extends SingletonColumn[Boolean] with BoolColumn {
   def apply(row: Int): Boolean = value
 }
 
@@ -47,57 +47,57 @@ object SingletonBoolColumn {
 }
 
 final case class SingletonLongColumn(value: Long)
-    extends SingletonColumn[Long](value) with LongColumn {
+    extends SingletonColumn[Long] with LongColumn {
   def apply(row: Int): Long = value
 }
 
 final case class SingletonDoubleColumn(value: Double)
-    extends SingletonColumn[Double](value) with DoubleColumn {
+    extends SingletonColumn[Double] with DoubleColumn {
   def apply(row: Int): Double = value
 }
 
 final case class SingletonNumColumn(value: BigDecimal)
-    extends SingletonColumn[BigDecimal](value) with NumColumn {
+    extends SingletonColumn[BigDecimal] with NumColumn {
   def apply(row: Int): BigDecimal = value
 }
 
 final case class SingletonStrColumn(value: String)
-    extends SingletonColumn[String](value) with StrColumn {
+    extends SingletonColumn[String] with StrColumn {
   def apply(row: Int): String = value
 }
 
 final case class SingletonOffsetDateTimeColumn(value: OffsetDateTime)
-    extends SingletonColumn[OffsetDateTime](value) with OffsetDateTimeColumn {
+    extends SingletonColumn[OffsetDateTime]with OffsetDateTimeColumn {
   def apply(row: Int): OffsetDateTime = value
 }
 
 final case class SingletonOffsetTimeColumn(value: OffsetTime)
-    extends SingletonColumn[OffsetTime](value) with OffsetTimeColumn {
+    extends SingletonColumn[OffsetTime] with OffsetTimeColumn {
   def apply(row: Int): OffsetTime = value
 }
 
 final case class SingletonOffsetDateColumn(value: OffsetDate)
-    extends SingletonColumn[OffsetDate](value) with OffsetDateColumn {
+    extends SingletonColumn[OffsetDate] with OffsetDateColumn {
   def apply(row: Int): OffsetDate = value
 }
 
 final case class SingletonLocalDateTimeColumn(value: LocalDateTime)
-    extends SingletonColumn[LocalDateTime](value) with LocalDateTimeColumn {
+    extends SingletonColumn[LocalDateTime] with LocalDateTimeColumn {
   def apply(row: Int): LocalDateTime = value
 }
 
 final case class SingletonLocalTimeColumn(value: LocalTime)
-    extends SingletonColumn[LocalTime](value) with LocalTimeColumn {
+    extends SingletonColumn[LocalTime] with LocalTimeColumn {
   def apply(row: Int): LocalTime = value
 }
 
 final case class SingletonLocalDateColumn(value: LocalDate)
-    extends SingletonColumn[LocalDate](value) with LocalDateColumn {
+    extends SingletonColumn[LocalDate] with LocalDateColumn {
   def apply(row: Int): LocalDate = value
 }
 
 final case class SingletonIntervalColumn(value: DateTimeInterval)
-    extends SingletonColumn[DateTimeInterval](value) with IntervalColumn {
+    extends SingletonColumn[DateTimeInterval] with IntervalColumn {
   def apply(row: Int): DateTimeInterval = value
 }
 
