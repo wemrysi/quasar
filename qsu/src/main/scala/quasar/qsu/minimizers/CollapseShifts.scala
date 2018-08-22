@@ -798,13 +798,14 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         }.firsts ++ noReorder
     }
 
-    // the order of the incoming candidates is important and we need to
+    // The order of the incoming candidates is important and we need to
     // preserve it since the Map wrapping the final coalesce refers to
-    // them. Hence, the reordering performed by reorderCandidates is only
-    // visible inside the final coalesce.
-    //
-    // Unlike reorderCandidates, the left-side of the tuple are list
-    // positions rather than frequency counts
+    // the candidates by their original index.  Hence, the reordering
+    // performed by reorderCandidates is only visible inside the final
+    // coalesce.
+
+    // Unlike reorderCandidates, the left-side int of the tuple are
+    // list positions rather than frequency counts
     def reorderWithIndex(cs: List[(QSUGraph, Int)]): List[(QSUGraph, Int)] = {
       val matching = SMap(cs.map(_.leftMap(_.root)): _*)
       val reordered = reorderCandidates(cs.firsts)

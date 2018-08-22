@@ -51,6 +51,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QS
       debug("ApplyProv: ")                   >==>
       ReifyBuckets[T, F]                     >==>
       debug("ReifyBuckets: ")                >==>
+      ElideStructGuards[T, F]                >==>
+      debug("ElideStructGuards: ")           >==>
       MinimizeAutoJoins[T, F]                >==>
       debug("MinimizeAutoJoins: ")           >==>
       ReifyAutoJoins[T, F]                   >==>

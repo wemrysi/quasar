@@ -290,7 +290,7 @@ trait StructuralLib extends Library {
           failureNel(invalidArgumentError("internal error: objectLike, but no objectType")))(
           success)
     },
-    untyper[nat._1](_ => success(Func.Input1(Obj(Map(), Some(Top))))))
+    untyper[nat._1](tpe => success(Func.Input1(Obj(Map(), Some(tpe))))))
 
   val ShiftArray = UnaryFunc(
     Expansion,
@@ -312,7 +312,7 @@ trait StructuralLib extends Library {
           failureNel(invalidArgumentError("internal error: arrayLike, but no arrayType")))(
           success)
     },
-    untyper[nat._1](tpe => success(Func.Input1(FlexArr(0, None, Top)))))
+    untyper[nat._1](tpe => success(Func.Input1(FlexArr(0, None, tpe)))))
 
   val ShiftMapKeys = UnaryFunc(
     Expansion,
