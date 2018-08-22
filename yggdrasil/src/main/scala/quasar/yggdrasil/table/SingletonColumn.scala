@@ -21,82 +21,94 @@ import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
-import scala.specialized
-
-abstract class SingletonColumn[@specialized A](value: A) extends ExtensibleColumn {
+abstract class SingletonColumn[A](value: A) extends ExtensibleColumn {
 
   override def isDefinedAt(row: Int) = row == 0
 
-  def apply(row: Int): A = value
+  override def definedAt(from: Int, to: Int): BitSet = SingletonColumn.Defined
 
-  lazy val defined: BitSet = {
-    val b = new BitSet(1)
-    b.set(0)
-    b
-  }
 }
 
-final case class SingletonBoolColumn(value: Boolean)
+final class SingletonBoolColumn(val value: Boolean)
     extends SingletonColumn[Boolean](value) with BoolColumn {
+  def apply(row: Int): Boolean = value
+}
 
-  lazy val values: BitSet = {
-    val bs = new BitSet(1)
-    if (value) bs.set(0)
-    bs
-  }
+object SingletonBoolColumn {
+  lazy val SingleTrue = new SingletonBoolColumn(true)
+  lazy val SingleFalse = new SingletonBoolColumn(false)
+
+  def bitset(b: Boolean) =
+    if (b) SingletonColumn.BitSet_1
+    else SingletonColumn.BitSet_0
+
+  def apply(value: Boolean): SingletonBoolColumn =
+    if (value) SingleTrue else SingleFalse
 }
 
 final case class SingletonLongColumn(value: Long)
     extends SingletonColumn[Long](value) with LongColumn {
-  lazy val values: Array[Long] = Array(value)
+  def apply(row: Int): Long = value
 }
 
 final case class SingletonDoubleColumn(value: Double)
     extends SingletonColumn[Double](value) with DoubleColumn {
-  lazy val values: Array[Double] = Array(value)
+  def apply(row: Int): Double = value
 }
 
 final case class SingletonNumColumn(value: BigDecimal)
     extends SingletonColumn[BigDecimal](value) with NumColumn {
-  lazy val values: Array[BigDecimal] = Array(value)
+  def apply(row: Int): BigDecimal = value
 }
 
 final case class SingletonStrColumn(value: String)
     extends SingletonColumn[String](value) with StrColumn {
-  lazy val values: Array[String] = Array(value)
+  def apply(row: Int): String = value
 }
 
 final case class SingletonOffsetDateTimeColumn(value: OffsetDateTime)
     extends SingletonColumn[OffsetDateTime](value) with OffsetDateTimeColumn {
-  lazy val values: Array[OffsetDateTime] = Array(value)
+  def apply(row: Int): OffsetDateTime = value
 }
 
 final case class SingletonOffsetTimeColumn(value: OffsetTime)
     extends SingletonColumn[OffsetTime](value) with OffsetTimeColumn {
-  lazy val values: Array[OffsetTime] = Array(value)
+  def apply(row: Int): OffsetTime = value
 }
 
 final case class SingletonOffsetDateColumn(value: OffsetDate)
     extends SingletonColumn[OffsetDate](value) with OffsetDateColumn {
-  lazy val values: Array[OffsetDate] = Array(value)
+  def apply(row: Int): OffsetDate = value
 }
 
 final case class SingletonLocalDateTimeColumn(value: LocalDateTime)
     extends SingletonColumn[LocalDateTime](value) with LocalDateTimeColumn {
-  lazy val values: Array[LocalDateTime] = Array(value)
+  def apply(row: Int): LocalDateTime = value
 }
 
 final case class SingletonLocalTimeColumn(value: LocalTime)
     extends SingletonColumn[LocalTime](value) with LocalTimeColumn {
-  lazy val values: Array[LocalTime] = Array(value)
+  def apply(row: Int): LocalTime = value
 }
 
 final case class SingletonLocalDateColumn(value: LocalDate)
     extends SingletonColumn[LocalDate](value) with LocalDateColumn {
-  lazy val values: Array[LocalDate] = Array(value)
+  def apply(row: Int): LocalDate = value
 }
 
 final case class SingletonIntervalColumn(value: DateTimeInterval)
     extends SingletonColumn[DateTimeInterval](value) with IntervalColumn {
-  lazy val values: Array[DateTimeInterval] = Array(value)
+  def apply(row: Int): DateTimeInterval = value
+}
+
+object SingletonColumn {
+  val BitSet_0: BitSet = new BitSet
+
+  val BitSet_1: BitSet = {
+    val bs = new BitSet
+    bs.set(0)
+    bs
+  }
+
+  val Defined: BitSet = BitSet_1
 }

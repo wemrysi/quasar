@@ -362,8 +362,8 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
 
             val testDefined: List[BitSet] = tests.map {
               case c: ArrayBoolColumn => c.defined
-              case c: SingletonBoolColumn => c.defined
               case _ => ???
+              case c: SingletonBoolColumn => SingletonColumn.Defined
             }
 
             val definedM = testDefined.headOption map { bits =>
@@ -374,8 +374,8 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
 
             val testValues: List[BitSet] = tests.map {
               case c: ArrayBoolColumn => c.values
-              case c: SingletonBoolColumn => c.values
               case _ => ???
+              case c: SingletonBoolColumn => SingletonBoolColumn.bitset(c.value)
             }
 
             val valuesM = testValues.headOption map { bits =>
@@ -422,13 +422,13 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
 
             val lowerA: Array[Long] = lowerC match {
               case c: ArrayLongColumn => c.values
-              case c: SingletonLongColumn => c.values
               case _ => ???
+              case c: SingletonLongColumn => Array(c.value)
             }
             val upperA: Array[Long] = upperC match {
               case c: ArrayLongColumn => c.values
-              case c: SingletonLongColumn => c.values
               case _ => ???
+              case c: SingletonLongColumn => Array(c.value)
             }
 
             val minNumRows =
