@@ -237,7 +237,10 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
    * subsequent reads may happen in parallel. The disposal action produced will
    * shut down the temporary database and remove the directory.
    *
-   * TODO configurable early force
+   * If `earlyForce` is `true`, then the effect of running the *entire* input
+   * table stream and writing it out to disk will be sequenced into the outer
+   * `IO`. This flag is important in the event that the output `Table` will be
+   * sequenced multiple times *interleaved*, which is of course a deadlock.
    */
   def cacheTable(table: Table, earlyForce: Boolean): IO[Disposable[IO, Table]] = {
     def zipWithIndex[F[_]: Monad, A](st: StreamT[F, A]): StreamT[F, (A, Int)] = {
