@@ -105,7 +105,7 @@ final class EquiJoinPlanner[
 
             for {
               // cache the right side since we're going to restart it
-              cachedRightD <- LiftIO[F].liftIO(rmerged.P.cacheTable(rtable, cartesian))
+              cachedRightD <- LiftIO[F].liftIO(rmerged.P.cacheTable(rtable, false))
               cachedRight = cachedRightD.unsafeValue
               _ <- MonadFinalizers[F, IO].tell(cachedRightD.dispose :: Nil)
             } yield (ltable.cross(cachedRight)(transMiddle), src.unsafeMerge(leftRepr).lastSort)
