@@ -276,7 +276,7 @@ object ApplyProvenance {
         Cord("AuthenticatedQSU {\n") ++
         g.show ++
         Cord("\n\n") ++
-        d.show ++
+        d.filterVertices(g.foldMapDown(sg => Set(sg.root))).show ++
         Cord("\n}")
       }
   }

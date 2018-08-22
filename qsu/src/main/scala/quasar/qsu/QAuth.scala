@@ -53,6 +53,9 @@ final case class QAuth[T[_[_]]](
     copy(groupKeys = groupKeys ++ tgtKeys)
   }
 
+  def filterVertices(p: Symbol => Boolean): QAuth[T] =
+    QAuth(dims.filterKeys(p), groupKeys.filterKeys { case (s, _) => p(s) })
+
   def lookupDims(vertex: Symbol): Option[QDims[T]] =
     dims get vertex
 
