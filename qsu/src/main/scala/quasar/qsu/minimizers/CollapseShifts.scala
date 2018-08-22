@@ -36,6 +36,10 @@ import quasar.qscript.{
   IncludeId,
   JoinSide,
   LeftSide,
+  MFC,
+  MFD,
+  MapFuncsCore,
+  MapFuncsDerived,
   MonadPlannerErr,
   OnUndefined,
   RightSide,
@@ -45,8 +49,10 @@ import quasar.qscript.RecFreeS._
 import quasar.qscript.rewrites.NormalizableT
 import quasar.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 
+import matryoshka.{Recursive, Corecursive}
 import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._
+import matryoshka.patterns.CoEnv
 import scalaz.{
   -\/,
   \/-,
@@ -455,7 +461,6 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           case _ => repair
         }
 
-
       (left, right) match {
         case
             (
@@ -740,14 +745,28 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       case _ => none
     }
 
-    def compatibleShifts(l: ShiftGraph, r: ShiftGraph): Boolean =
-      (l, r) match {
-        // FIXME: compare the struct symbols, not the FreeMaps
-        case (-\/(QSU.LeftShift(srcL, structL, _, _, _, rotL)), -\/(QSU.LeftShift(srcR, structR, _, _, _, rotR)))
-            if srcL.root === srcR.root && structL === structR && rotL === rotR => true
-        case _ => false
+    def elideGuards(fm: FreeMap)(
+      implicit R: Recursive.Aux[FreeMap, CoEnv[Hole, MapFunc, ?]],
+      C: Corecursive.Aux[FreeMap, CoEnv[Hole, MapFunc, ?]]): FreeMap =
+      R.cata[FreeMap](fm) {
+        case CoEnv(\/-(MFD(MapFuncsDerived.Typecheck(result, _)))) => result
+        case CoEnv(\/-(MFC(MapFuncsCore.Guard(_, _, result, _)))) => result
+        case otherwise => C.embed(otherwise)
       }
 
+    def compatibleShifts(l: ShiftGraph, r: ShiftGraph): Boolean = {
+      (l, r) match {
+        // FIXME: compare the struct symbols, not the FreeMaps
+        case (-\/(QSU.LeftShift(srcL, structL0, _, _, _, rotL)), -\/(QSU.LeftShift(srcR, structR0, _, _, _, rotR))) => {
+          val structL = elideGuards(structL0.linearize)
+          val structR = elideGuards(structR0.linearize)
+
+          srcL.root === srcR.root && structL === structR && rotL === rotR
+        }
+
+        case _ => false
+      }
+    }
 
     def reorderCandidates(cs: List[QSUGraph]): List[QSUGraph] = {
       type ShiftDefinition = (Symbol, FreeMap, QSU.Rotation)
@@ -771,8 +790,10 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       // Candidates zipped with their first ShiftDefinition
       val cs0: List[(QSUGraph, ShiftDefinition)] =
         toReorder.map(c => firstShiftDefinition(c) match {
-          case Some(definition) => (c, definition).some
-          case None => none
+          case Some((shifting, struct, rot)) =>
+            (c, (shifting, elideGuards(struct), rot)).some
+          case None =>
+            none
         }).unite
 
 
@@ -780,8 +801,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       val cs1 = cs0.map {
         case (cand, (shifting, struct, rot)) => {
           val freqCount = cs0.filter {
-            case (_, (shifting0, struct0, rot0)) =>
+            case (_, (shifting0, struct0, rot0)) => {
               shifting === shifting0 && struct === struct0 && rot === rot0
+            }
           }.length
 
           (cand, freqCount)
