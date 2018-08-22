@@ -25,7 +25,7 @@ abstract class SingletonColumn[A] extends ExtensibleColumn {
 
   override def isDefinedAt(row: Int) = row == 0
 
-  override def definedAt(from: Int, to: Int): BitSet = SingletonColumn.Defined
+  override def definedAt(from: Int, to: Int): BitSet = SingletonColumn.Defined.copy
 
 }
 
