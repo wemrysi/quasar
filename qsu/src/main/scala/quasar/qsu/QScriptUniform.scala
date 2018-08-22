@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.{RenderTree, RenderTreeT, RenderedTree}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
+import quasar.contrib.std.errorNotImplemented
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.contrib.matryoshka._
@@ -213,11 +214,11 @@ object QScriptUniform {
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]
-      : Delay[RenderTree, QScriptUniform[T, ?]] = ???
+      : Delay[RenderTree, QScriptUniform[T, ?]] = errorNotImplemented
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   implicit def equal[T[_[_]]: BirecursiveT: EqualT]
-      : Delay[Equal, QScriptUniform[T, ?]] = ???
+      : Delay[Equal, QScriptUniform[T, ?]] = errorNotImplemented
 
   final case class AutoJoin2[T[_[_]], A](
       left: A,

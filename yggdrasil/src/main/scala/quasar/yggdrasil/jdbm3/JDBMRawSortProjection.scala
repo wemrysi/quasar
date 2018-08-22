@@ -119,10 +119,7 @@ class JDBMRawSortProjection private[yggdrasil] (dbFile: File,
 
         val (firstKey, lastKey, rows) = JDBMSlice.load(sliceSize, iteratorSetup, keyColumnDecoder, valColumnDecoder)
 
-        val slice = new Slice {
-          val size    = rows
-          val columns = keyColumns.toMap ++ valColumns
-        }
+        val slice = Slice(rows, keyColumns.toMap ++ valColumns)
 
         Some(BlockProjectionData(firstKey, lastKey, slice))
       })

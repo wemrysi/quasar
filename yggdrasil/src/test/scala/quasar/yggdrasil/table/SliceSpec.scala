@@ -59,19 +59,20 @@ class SliceSpec extends Specification with ScalaCheck {
     })(collection.breakOut)
   }
 
-  def toCValues(slice: Slice) = sortableCValues(slice, Vector.empty) map (_._2)
+  def toCValues(slice: Slice): List[List[CValue]] =
+    sortableCValues(slice, Vector.empty) map (_._2) map stripUndefineds
 
-  def fakeSort(slice: Slice, sortKey: Vector[CPath]) =
+  def fakeSort(slice: Slice, sortKey: Vector[CPath]): List[List[CValue]] =
     sortableCValues(slice, sortKey).sortBy(_._1).map(_._2)
 
-  def fakeConcat(slices: List[Slice]) = {
+  def fakeConcat(slices: List[Slice]): List[List[CValue]] = {
     slices.foldLeft(List.empty[List[CValue]]) { (acc, slice) =>
       acc ++ toCValues(slice)
     }
   }
 
-  def stripUndefineds(cvals: List[CValue]): Set[CValue] =
-    (cvals filter (_ != CUndefined)).toSet
+  def stripUndefineds(cvals: List[CValue]): List[CValue] =
+    cvals.filter(_ != CUndefined)
 
   def assertSlices(values: List[RValue], slices: List[Slice], expectedSliceSize: Matcher[Int]) = {
     if (values.isEmpty) slices.size must_===(0)
@@ -597,7 +598,7 @@ class SliceSpec extends Specification with ScalaCheck {
         val slice = Slice.concat(slices)
         // This is terrible, but there isn't an immediately easy way to test
         // without duplicating concat.
-        toCValues(slice).map(stripUndefineds) must_== fakeConcat(slices).map(stripUndefineds)
+        toCValues(slice).map(_.toSet) must_== fakeConcat(slices).map(_.toSet)
       }
     }
   }
@@ -725,6 +726,6 @@ object ArbitrarySlice extends RCValueGenerators {
     val gs      = refs map (cr => genColumn(cr, sz) ^^ (cr -> _))
     val genData = gs.foldLeft(zero)((res, g) => res >> (r => g ^^ (_ :: r)))
 
-    genData ^^ (data => Slice(data.toMap, sz))
+    genData ^^ (data => Slice(sz, data.toMap))
   }
 }

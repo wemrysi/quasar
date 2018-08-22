@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef.{Map => SMap, _}
 import quasar.common.effect.NameGenerator
 import quasar.RenderTreeT
+import quasar.contrib.std.errorImpossible
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.{EJson, Fixed}
@@ -231,7 +232,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                       back :++ left
                     }
 
-                  case _ => ???
+                  case _ => errorImpossible
                 }
 
                 fakeAutoJoin <- fakeAutoJoinM.liftM[OptionT]

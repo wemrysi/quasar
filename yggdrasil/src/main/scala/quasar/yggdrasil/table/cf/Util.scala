@@ -17,6 +17,7 @@
 package quasar.yggdrasil.table.cf
 
 import quasar.blueeyes._
+import quasar.contrib.std.errorImpossible
 import quasar.precog._
 import quasar.precog.common._
 import quasar.yggdrasil._
@@ -297,8 +298,8 @@ object util {
       }
 
 
-    case CUndefined => ???
-    case CArrayType(_) => ???
+    case CUndefined => errorImpossible
+    case CArrayType(_) => errorImpossible
   }
 
   case object NConcat {

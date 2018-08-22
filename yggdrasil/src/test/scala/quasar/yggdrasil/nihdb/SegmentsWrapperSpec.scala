@@ -81,7 +81,14 @@ object SegmentsWrapperSpec extends Specification with ScalaCheck {
       CPath("4") -> CNum,
       CPath("5") -> CEmptyObject,
       CPath("6") -> CEmptyArray,
-      CPath("7") -> CNum)
+      CPath("7") -> CNum,
+      CPath("8") -> COffsetDateTime,
+      CPath("9") -> COffsetDate,
+      CPath("10") -> COffsetTime,
+      CPath("11") -> CLocalDateTime,
+      CPath("12") -> CLocalDate,
+      CPath("13") -> CLocalTime,
+      CPath("14") -> CInterval)
 
     val pd = paths.toList map {
       case (cpath, ctype) =>
