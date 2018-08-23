@@ -26,6 +26,7 @@ import java.nio.file.Paths
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import argonaut.Json
+import argonaut.Argonaut.jString
 import cats.effect.{ConcurrentEffect, Timer}
 import fs2.Stream
 import scalaz.{\/, EitherT}
@@ -35,6 +36,10 @@ import shims._
 object LocalDatasourceModule extends LightweightDatasourceModule {
 
   val kind: DatasourceType = LocalType
+
+  def sanitizeConfig(config: Json): Json = {
+    config.hcursor.downField("credentials").downField("secretKey").set(jString("***********")).undo.getOrElse(config)
+  }
 
   def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
       : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]]]] = {

@@ -43,6 +43,7 @@ import quasar.sst._
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
+import argonaut.Argonaut.jString
 import cats.ApplicativeError
 import cats.effect.{ConcurrentEffect, Timer}
 import fs2.{Scheduler, Stream}
@@ -72,6 +73,11 @@ final class DatasourceManagement[
   type Running = DatasourceManagement.Running[I, T, F]
 
   // DatasourceControl
+
+  def sanitizeRef(ref: DatasourceRef[Json]): DatasourceRef[Json] = {
+    DatasourceRef(ref.kind, ref.name,
+      ref.config.hcursor.downField("credentials").downField("secretKey").set(jString("***********")).undo.getOrElse(ref.config))
+  }
 
   def initDatasource(datasourceId: I, ref: DatasourceRef[Json])
       : F[Condition[CreateError[Json]]] = {

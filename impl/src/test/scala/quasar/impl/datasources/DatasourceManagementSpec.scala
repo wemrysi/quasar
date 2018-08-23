@@ -39,6 +39,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import argonaut.Json
 import argonaut.JsonScalaz._
+import argonaut.Argonaut.jString
 import cats.{Applicative, ApplicativeError, MonadError}
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.applicative._
@@ -95,6 +96,10 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
   val lightMod = new LightweightDatasourceModule {
     val kind = LightT
 
+    def sanitizeConfig(config: Json): Json = {
+      config.hcursor.downField("credentials").downField("secretKey").set(jString("***********")).undo.getOrElse(config))
+    }
+
     def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
         : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]]]] =
       mkDatasource[ResourcePath, F](kind).right.pure[F]
@@ -102,6 +107,10 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
   val heavyMod = new HeavyweightDatasourceModule {
     val kind = HeavyT
+
+    def sanitizeConfig(config: Json): Json = {
+      config.hcursor.downField("credentials").downField("secretKey").set(jString("***********")).undo.getOrElse(config))
+    }
 
     def heavyweightDatasource[
         T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,

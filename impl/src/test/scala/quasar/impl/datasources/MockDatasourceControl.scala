@@ -26,6 +26,8 @@ import quasar.contrib.scalaz.{MonadState_, MonadTell_}
 import MockDatasourceControl.{MonadInit, MonadShutdown}
 
 import scalaz.{\/, ISet, Monad, Order, PlusEmpty}
+import argonaut.Argonaut.jString
+import argonaut.Json
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.plusEmpty._
@@ -38,6 +40,8 @@ final class MockDatasourceControl[F[_]: Monad, G[_]: PlusEmpty, I: Order, C] pri
     initErrors: C => Option[InitializationError[C]])(
     implicit initd: MonadInit[F, I], sdown: MonadShutdown[F, I])
     extends DatasourceControl[F, G, I, C, MockSchemaConfig.type] {
+
+  def sanitizeRef(ref: DatasourceRef[C]): DatasourceRef[C] = ref
 
   def initDatasource(
       datasourceId: I,

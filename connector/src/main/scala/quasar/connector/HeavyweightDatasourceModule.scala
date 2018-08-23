@@ -30,7 +30,7 @@ import scalaz.\/
 
 trait HeavyweightDatasourceModule {
   def kind: DatasourceType
-
+  def sanitizeConfig(config: Json): Json
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: MonadPlannerErr: Timer](
