@@ -105,7 +105,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSReduce" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
-        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value[Fix[EJson], Hole](_)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value[Hole](_)))
         val reducers: List[ReduceFunc[FreeMap]] = List(ReduceFuncs.Count(HoleF))
         val repair: FreeMapA[ReduceIndex] = ReduceIndexF(\/-(0))
 
@@ -118,8 +118,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
       "convert LeftShift" in {
         val struct: RecFreeMap = recFunc.Add(recFunc.Hole, recFunc.Constant(Fixed[Fix[EJson]].int(17)))
 
-        val arepair: FreeMapA[QScriptUniform.ShiftTarget[Fix]] = func.ConcatArrays(
-          func.MakeArray(AccessLeftTarget[Fix](Access.valueHole(_))),
+        val arepair: FreeMapA[QScriptUniform.ShiftTarget] = func.ConcatArrays(
+          func.MakeArray(AccessLeftTarget[Fix](Access.value(_))),
           func.ConcatArrays(
             LeftTarget[Fix],
             func.MakeArray(RightTarget[Fix])))
@@ -137,7 +137,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSSort" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
-        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value[Fix[EJson], Hole](_)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value[Hole](_)))
         val order: NEL[(FreeMap, SortDir)] = NEL(HoleF -> SortDir.Descending)
 
         val qgraph: Fix[QSU] = qsu.qsSort(qsu.read(afile), abuckets, order)
@@ -178,7 +178,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
     "graduate naive `select * from zips`" in {
       val aconcatArr =
         func.ConcatArrays(
-          func.MakeArray(AccessLeftTarget[Fix](Access.valueHole(_))),
+          func.MakeArray(AccessLeftTarget[Fix](Access.value(_))),
           func.MakeArray(RightTarget[Fix]))
       val concatArr =
         func.ConcatArrays(

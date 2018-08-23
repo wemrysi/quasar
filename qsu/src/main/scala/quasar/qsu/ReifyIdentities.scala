@@ -88,34 +88,33 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
   private def lookupIdentity(src: Symbol): FreeMap =
     func.ProjectKeyS(lookupIdentities, src.name)
 
-  private val defaultAccess: QAccess[Symbol] => FreeMap = {
+  private val defaultAccess: Access[Symbol] => FreeMap = {
     case Access.Id(idAccess, _) => idAccess match {
       case IdAccess.Bucket(src, idx) => lookupIdentity(bucketSymbol(src, idx))
       case IdAccess.GroupKey(src, idx) => lookupIdentity(groupKeySymbol(src, idx))
       case IdAccess.Identity(src) => lookupIdentity(src)
-      case IdAccess.Static(ejs) => func.Constant(ejs)
     }
     case Access.Value(_) => func.Hole
   }
 
-  private def bucketIdAccess(src: Symbol, buckets: List[FreeAccess[Hole]]): ISet[QAccess[Symbol]] =
+  private def bucketIdAccess(src: Symbol, buckets: List[FreeAccess[Hole]]): ISet[Access[Symbol]] =
     Foldable[List].compose[FreeMapA].foldMap(buckets) { access =>
       ISet.singleton(access.symbolic(κ(src)))
     }
 
-  private def shiftTargetAccess(src: Symbol, bucket: FreeMapA[ShiftTarget[T]]): ISet[QAccess[Symbol]] =
+  private def shiftTargetAccess(src: Symbol, bucket: FreeMapA[ShiftTarget]): ISet[Access[Symbol]] =
     Foldable[FreeMapA].foldMap(bucket) {
       case ShiftTarget.AccessLeftTarget(access) => ISet.singleton(access.symbolic(κ(src)))
       case _ => ISet.empty
     }
 
-  private def joinKeyAccess(src: Symbol, jk: JoinKey[QIdAccess]): IList[QAccess[Symbol]] =
+  private def joinKeyAccess(src: Symbol, jk: JoinKey[IdAccess]): IList[Access[Symbol]] =
     IList(jk.left, jk.right) map { idA =>
       Access.id(idA, IdAccess.symbols.headOption(idA) getOrElse src)
     }
 
-  private def recordAccesses[F[_]: Foldable](by: Symbol, fa: F[QAccess[Symbol]]): References =
-    fa.foldLeft(References.noRefs[T, T[EJson]])((r, a) => r.recordAccess(by, a, defaultAccess(a)))
+  private def recordAccesses[F[_]: Foldable](by: Symbol, fa: F[Access[Symbol]]): References =
+    fa.foldLeft(References.noRefs[T])((r, a) => r.recordAccess(by, a, defaultAccess(a)))
 
   // We can't use final here due to SI-4440 - it results in warning
   private case class ReifyState(status: ReifiedStatus, refs: References) {
@@ -143,7 +142,13 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
         recordAccesses(g.root, bucketIdAccess(source, buckets))
 
       case QSU.QSAutoJoin(left, right, joinKeys, combiner) =>
-        val keysAccess = joinKeys.keys >>= (_.list) >>= (joinKeyAccess(g.root, _))
+        val keysAccess = for {
+          conj <- joinKeys.keys
+          isect <- conj.list
+          key <- isect.list
+          keyAccess <- joinKeyAccess(g.root, key)
+        } yield keyAccess
+
         recordAccesses(g.root, keysAccess)
 
       case other => References.noRefs
@@ -166,13 +171,13 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
     def freshName: F[Symbol] =
       freshSymbol("rid")
 
-    def isReferenced(access: QAccess[Symbol]): G[Boolean] =
+    def isReferenced(access: Access[Symbol]): G[Boolean] =
       G.gets(_.refs.accessed.member(access))
 
-    def includeIdRepair(oldRepair: FreeMapA[ShiftTarget[T]], oldIdStatus: IdStatus): FreeMapA[ShiftTarget[T]] =
+    def includeIdRepair(oldRepair: FreeMapA[ShiftTarget], oldIdStatus: IdStatus): FreeMapA[ShiftTarget] =
       if (oldIdStatus === ExcludeId)
         oldRepair >>= {
-          case ShiftTarget.RightTarget() => func.ProjectIndexI(RightTarget[T], 1)
+          case ShiftTarget.RightTarget => func.ProjectIndexI(RightTarget, 1)
           case tgt => tgt.pure[FreeMapA]
         }
       else oldRepair
@@ -188,7 +193,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
         IdentitiesK -> initialI,
         ValueK -> initialV)
 
-    def modifyAccess(of: QAccess[Symbol])(f: FreeMap => FreeMap): G[Unit] =
+    def modifyAccess(of: Access[Symbol])(f: FreeMap => FreeMap): G[Unit] =
       G.modify(reifyRefs.modify(_.modifyAccess(of)(f)))
 
     /** Returns a new graph that applies `func` to the result of `g`. */
@@ -205,7 +210,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
         newBranch = QSUGraph(origRoot, nestedVerts.updated(origRoot, newVert))
 
         replaceOldAccess = reifyRefs.modify(_.replaceAccess(origRoot, nestedRoot))
-        nestedAccess = Access.value[T[EJson], Symbol](nestedRoot)
+        nestedAccess = Access.value(nestedRoot)
         recordNewAccess = reifyRefs.modify(_.recordAccess(origRoot, nestedAccess, defaultAccess(nestedAccess)))
 
         _ <- G.modify(replaceOldAccess >>> recordNewAccess)
@@ -232,7 +237,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
     /** Handle bookkeeping required when a vertex transitions to emitting IV. */
     def onNeedsIV(g: QSUGraph): G[Unit] =
-      setStatus(g.root, true) >> modifyAccess(Access.valueSymbol(g.root))(rebaseV)
+      setStatus(g.root, true) >> modifyAccess(Access.value(g.root))(rebaseV)
 
     /** Preserves any IV emitted by `src` in the output of `through`, returning
       * whether IV was emitted.
@@ -241,7 +246,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       for {
         srcStatus <- emitsIVMap(src)
         _         <- setStatus(through.root, srcStatus)
-        _         <- srcStatus.whenM(modifyAccess(Access.valueSymbol(through.root))(rebaseV))
+        _         <- srcStatus.whenM(modifyAccess(Access.value(through.root))(rebaseV))
       } yield srcStatus
 
     /** Rebase the given `FreeMap` to access the value side of an IV map. */
@@ -265,7 +270,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
         preserveIV(source, g) as g
 
       case g @ E.LeftShift(source, struct, idStatus, onUndefined, repair, rot) =>
-        val idA = Access.id(IdAccess.identity[T[EJson]](g.root), g.root)
+        val idA = Access.id(IdAccess.identity(g.root), g.root)
 
         (emitsIVMap(source) |@| isReferenced(idA)).tupled flatMap {
           case (true, true) =>
@@ -379,7 +384,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
       case g @ E.QSReduce(source, buckets, reducers, repair) =>
         val referencedBuckets = buckets.indices.toList.traverse { i =>
-          val baccess = IdAccess.Bucket[T[EJson]](g.root, i)
+          val baccess = IdAccess.Bucket(g.root, i)
           isReferenced(Access.id(baccess, g.root)) map (_ option baccess)
         } map (_.unite.toNel)
 
@@ -504,8 +509,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
         setStatus(g.root, false) as g
     }
 
-    val groupKeyA: Optional[QAccess[Symbol], (Symbol, Int)] =
-      Access.id[T[EJson], Symbol] composePrism IdAccess.groupKey.first composeLens _1
+    val groupKeyA: Optional[Access[Symbol], (Symbol, Int)] =
+      Access.id[Symbol] composePrism IdAccess.groupKey.first composeLens _1
 
     // Reifies group key access.
     def reifyGroupKeys(auth: QAuth, g: QSUGraph): G[QSUGraph] = {
@@ -583,7 +588,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 }
 
 object ReifyIdentities {
-  final case class ResearchedQSU[T[_[_]]](refs: References[T, T[EJson]], graph: QSUGraph[T])
+  final case class ResearchedQSU[T[_[_]]](refs: References[T], graph: QSUGraph[T])
 
   object ResearchedQSU {
     implicit def show[T[_[_]]: ShowT]: Show[ResearchedQSU[T]] =

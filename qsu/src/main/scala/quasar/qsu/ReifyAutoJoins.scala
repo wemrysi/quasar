@@ -65,7 +65,7 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
     case g @ AutoJoin2(left, right, combiner) =>
       val (l, r) = (left.root, right.root)
 
-      val keys: F[JoinKeys[QIdAccess]] =
+      val keys: F[JoinKeys[IdAccess]] =
         (auth.lookupDimsE[F](l) |@| auth.lookupDimsE[F](r))(prov.autojoinKeys(_, _))
 
       keys.map(ks =>
@@ -86,7 +86,7 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
 
         case (joinName, lName, cName, ldims, cdims, rdims) =>
 
-          val lcKeys: JoinKeys[QIdAccess] =
+          val lcKeys: JoinKeys[IdAccess] =
             prov.autojoinKeys(ldims, cdims)
 
           def lcCombiner: JoinFunc =
@@ -112,7 +112,7 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
           val lcDims: QDims =
             prov.join(ldims, cdims)
 
-          val keys: JoinKeys[QIdAccess] =
+          val keys: JoinKeys[IdAccess] =
             prov.autojoinKeys(lcDims, rdims)
 
           val lcName = Symbol(joinName)

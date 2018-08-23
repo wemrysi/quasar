@@ -17,17 +17,20 @@
 package quasar.qsu
 
 import slamdata.Predef._
-import quasar.RenderTreeT
+import quasar.{RenderTreeT, RenderTree}, RenderTree.ops._
 import quasar.common.effect.NameGenerator
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.qscript.MonadPlannerErr
 
 import matryoshka.{delayShow, showTShow, BirecursiveT, EqualT, ShowT}
-import scalaz.{Applicative, Cord, Functor, Kleisli => K, Monad, Show}
-import scalaz.syntax.applicative._
+import org.slf4s.Logging
+import scalaz.{Cord, Functor, Kleisli => K, Monad, Show}
 import scalaz.syntax.show._
 
-final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QSUTTypes[T] {
+final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
+    extends QSUTTypes[T]
+    with Logging {
+
   import LPtoQS.MapSyntax
 
   def apply[F[_]: Monad: MonadPlannerErr: NameGenerator](lp: T[LogicalPlan])
@@ -37,47 +40,39 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QS
       ApplyProvenance.AuthenticatedQSU.graph[T]
 
     val lpToQs =
-      K(ReadLP[T, F])                        >==>
-      debug("ReadLP: ")                      >==>
-      RewriteGroupByArrays[T, F]             >==>
-      debug("RewriteGroupByArrays: ")        >-
-      EliminateUnary[T]                      >==>
-      debug("EliminateUnary: ")              >-
-      RecognizeDistinct[T]                   >==>
-      debug("RecognizeDistinct: ")           >==>
-      ExtractFreeMap[T, F]                   >==>
-      debug("ExtractFreeMap: ")              >==>
-      ApplyProvenance[T, F]                  >==>
-      debug("ApplyProv: ")                   >==>
-      ReifyBuckets[T, F]                     >==>
-      debug("ReifyBuckets: ")                >==>
-      MinimizeAutoJoins[T, F]                >==>
-      debug("MinimizeAutoJoins: ")           >==>
-      ReifyAutoJoins[T, F]                   >==>
-      debug("ReifyAutoJoins: ")              >==>
-      ExpandShifts[T, F]                     >==>
-      debug("ExpandShifts: ")                >-
-      agraph.modify(ResolveOwnIdentities[T]) >==>
-      debug("ResolveOwnIdentities: ")        >==>
-      ReifyIdentities[T, F]                  >==>
-      debug("ReifyIdentities: ")             >==>
+      K(ReadLP[T, F])                        >-
+      debug("ReadLP")                        >==>
+      RewriteGroupByArrays[T, F]             >-
+      debug("RewriteGroupByArrays")          >-
+      EliminateUnary[T]                      >-
+      debug("EliminateUnary")                >-
+      RecognizeDistinct[T]                   >-
+      debug("RecognizeDistinct")             >==>
+      ExtractFreeMap[T, F]                   >-
+      debug("ExtractFreeMap")                >==>
+      ApplyProvenance[T, F]                  >-
+      debug("ApplyProv")                     >==>
+      ReifyBuckets[T, F]                     >-
+      debug("ReifyBuckets")                  >==>
+      MinimizeAutoJoins[T, F]                >-
+      debug("MinimizeAutoJoins")             >==>
+      ReifyAutoJoins[T, F]                   >-
+      debug("ReifyAutoJoins")                >==>
+      ExpandShifts[T, F]                     >-
+      debug("ExpandShifts")                  >-
+      agraph.modify(ResolveOwnIdentities[T]) >-
+      debug("ResolveOwnIdentities")          >==>
+      ReifyIdentities[T, F]                  >-
+      debug("ReifyIdentities")               >==>
       Graduate[T, F]
+
+    log.debug("LogicalPlan\n" + lp.render.shows)
 
     lpToQs(lp)
   }
 
-  private def debug[F[_]: Applicative, A: Show](prefix: String): A => F[A] =
-    // uh... yeah do better
-    a => a.point[F].map { i =>
-      maybePrint((Cord("\n\n") ++ Cord(prefix) ++ a.show).shows)
-      i
-    }
-
-  private def maybePrint(str: => String): Unit = {
-    // println(str)
-
-    ()
-  }
+  private def debug[A: Show](name: String): A => A =
+    a => { log.debug((Cord(name + "\n") ++ a.show).shows); a }
 }
 
 object LPtoQS {

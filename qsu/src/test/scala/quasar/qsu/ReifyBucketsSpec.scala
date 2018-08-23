@@ -21,7 +21,7 @@ import slamdata.Predef.{List, Long, Nil}
 import quasar.{Qspec, TreeMatchers}
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
-import quasar.contrib.iota.{copkEqual, copkTraverse, copkShow}
+import quasar.contrib.iota.{copkEqual, copkTraverse}
 import quasar.qscript.{construction, ExcludeId, Hole, MapFuncsCore, PlannerError, ReduceFuncs, SrcHole}
 
 import matryoshka.{delayEqual, delayShow, showTShow, Embed}
@@ -59,7 +59,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           ReduceFuncs.Sum(()))
 
       val expBucket =
-        func.ProjectKeyS(func.Hole, "state") map (Access.value[Fix[EJson], Hole](_))
+        func.ProjectKeyS(func.Hole, "state") map (Access.value[Hole](_))
 
       val expReducer =
         func.ProjectKeyS(func.Hole, "pop")
@@ -88,7 +88,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           ReduceFuncs.Sum(()))
 
       val expB =
-        func.Constant[Access[Fix[EJson], Hole]](J.int(7))
+        func.Constant[Access[Hole]](J.int(7))
 
       val expReducer =
         func.ProjectKeyS(func.Hole, "pop")
@@ -164,13 +164,13 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           _(MapFuncsCore.ConcatMaps(_, _))))
 
       val expArbBucket =
-        func.ProjectKeyS(func.Hole, "city") map (Access.value[Fix[EJson], Hole](_))
+        func.ProjectKeyS(func.Hole, "city") map (Access.value[Hole](_))
 
       val expArbExpr =
         func.ProjectKeyS(func.Hole, "city")
 
       val expSumBucket =
-        func.ProjectKeyS(func.ProjectKeyS(func.Hole, "grouped"), "city") map (Access.value[Fix[EJson], Hole](_))
+        func.ProjectKeyS(func.ProjectKeyS(func.Hole, "grouped"), "city") map (Access.value[Hole](_))
 
       val expSumExpr =
         func.ProjectKeyS(func.Hole, "reduce_expr_0")
@@ -268,13 +268,13 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           _(MapFuncsCore.ConcatMaps(_, _))))
 
       val expArbBucket =
-        func.ProjectKeyS(func.Hole, "city") map (Access.value[Fix[EJson], Hole](_))
+        func.ProjectKeyS(func.Hole, "city") map (Access.value[Hole](_))
 
       val expArbExpr =
         func.ProjectKeyS(func.Hole, "city")
 
       val expSumBucket =
-        func.ProjectKeyS(func.ProjectKeyS(func.Hole, "grouped"), "city") map (Access.value[Fix[EJson], Hole](_))
+        func.ProjectKeyS(func.ProjectKeyS(func.Hole, "grouped"), "city") map (Access.value[Hole](_))
 
       val expSumExpr =
         func.ProjectKeyS(func.ProjectKeyS(func.Hole, "reduce_expr_0"), "quux")

@@ -39,13 +39,13 @@ import quasar.qscript.{
   SrcHole
 }
 import quasar.qscript.RecFreeS._
+import quasar.qscript.provenance.Dimensions
 import quasar.qscript.rewrites.NormalizableT
 import quasar.qsu.{QScriptUniform => QSU}
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import monocle.Traversal
-import monocle.function.Each
 import monocle.std.option.{some => someP}
 import monocle.syntax.fields._1
 import scalaz.{Bind, Monad, OptionT, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
@@ -104,10 +104,10 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       combiner: FreeMapA[Int]): G[Option[QSUGraph]] = {
 
     val groupKeyOf: Traversal[Option[QDims], Symbol] =
-      someP[QDims]           composeTraversal
-      Each.each[QDims, QP.P] composePrism
-      QP.prov.value          composePrism
-      IdAccess.groupKey      composeLens
+      someP[QDims] composeTraversal
+      Dimensions.dimension[QP.P] composePrism
+      QP.prov.value composePrism
+      IdAccess.groupKey composeLens
       _1
 
     for {
@@ -172,7 +172,9 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       // if this is false, it's an assertion error
       // lazy val sanityCheck = fm.toList.forall(0 ==)
 
-      some(qgraph.overwriteAtRoot(QSU.Map[T, Symbol](single.root, fm.as(srcHole).asRec))).point[G]
+      val singleG = qgraph.overwriteAtRoot(QSU.Map[T, Symbol](single.root, fm.as(srcHole).asRec))
+
+      updateProvenance[T, G](singleG) as some(singleG)
 
     case multiple if Minimizers.all(m => !m.couldApplyTo(multiple)) =>
       expandSecondOrder(fm, multiple) match {
@@ -188,8 +190,11 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                 case 1 => RightSide
               }
 
-              qgraph.overwriteAtRoot(QSU.AutoJoin2[T, Symbol](left.root, right.root, fm2)).some.point[G]
+              val aj2 = qgraph.overwriteAtRoot(QSU.AutoJoin2[T, Symbol](left.root, right.root, fm2))
+
+              updateProvenance[T, G](aj2) as some(aj2)
             }
+
             case left :: center :: right :: Nil => {
               val fm2: FreeMapA[JoinSide3] = fm map {
                 case 0 => LeftSide3
@@ -197,8 +202,11 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                 case 2 => RightSide3
               }
 
-              qgraph.overwriteAtRoot(QSU.AutoJoin3[T, Symbol](left.root, center.root, right.root, fm2)).some.point[G]
+              val aj3 = qgraph.overwriteAtRoot(QSU.AutoJoin3[T, Symbol](left.root, center.root, right.root, fm2))
+
+              updateProvenance[T, G](aj3) as some(aj3)
             }
+
             case _ => none[QSUGraph].point[G]
           }
       }
@@ -351,7 +359,7 @@ object MinimizeAutoJoins {
       state <- MinStateM[T, G].get
 
       computed <-
-        ApplyProvenance.computeProvenance[T, StateT[G, QAuth[T], ?]](qgraph).exec(state.auth)
+        ApplyProvenance.computeDims[T, StateT[G, QAuth[T], ?]](qgraph).exec(state.auth)
 
       _ <- MinStateM[T, G].put(state.copy(auth = computed))
     } yield ()

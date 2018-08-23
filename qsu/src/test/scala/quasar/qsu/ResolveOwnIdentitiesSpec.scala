@@ -26,6 +26,7 @@ import quasar.contrib.iota.{copkEqual, copkTraverse}
 import quasar.fp.ski.κ
 import quasar.qscript.{construction, ExcludeId, Hole, IdOnly, IncludeId, OnUndefined, SrcHole}
 
+import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.data.free._
 import monocle.syntax.fields._1
@@ -51,12 +52,12 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
         val renamedRep = rep map {
           case ShiftTarget.AccessLeftTarget(access) =>
             val renamedAccess =
-              Access.identityHole[J]
+              Access.id[Hole]
                 .composeLens(_1)
-                .composePrism(IdAccess.identity[J])
+                .composePrism(IdAccess.identity)
                 .modify(rns)
 
-            ShiftTarget.AccessLeftTarget[Fix](renamedAccess(access))
+            ShiftTarget.AccessLeftTarget(renamedAccess(access))
 
           case other => other
         }
@@ -65,8 +66,8 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
     }
 
   "resolving own left shift identity" should {
-    val ownAccess: QAccess[Hole] =
-      Access.identityHole[J](IdAccess.identity[J]('ls), SrcHole)
+    val ownAccess: Access[Hole] =
+      Access.id[Hole](IdAccess.identity('ls), SrcHole)
 
     val initialRepair =
       func.ConcatArrays(
