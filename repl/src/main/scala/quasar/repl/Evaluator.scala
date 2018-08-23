@@ -409,14 +409,16 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
     private def raiseEvalError[A](s: String): F[A] =
       F.raiseError(new EvalError(s))
 
-    private def recoverErrors(fa: F[Stream[F, String]]): F[Stream[F, String]] =
-      F.recover(fa) {
+    private def recoverErrors(fa: F[Stream[F, String]]): F[Stream[F, String]] = {
+      val errorHandler: PartialFunction[Throwable, Stream[F, String]] = {
         case ee: EvalError => Stream.emit(s"Evaluation error: ${ee.getMessage}")
         case QuasarError.throwableP(qe) => Stream.emit(s"Quasar error: $qe")
         case NonFatal(t) =>
           Stream.emit(s"Unexpected error: ${t.getClass.getCanonicalName}: ${t.getMessage}" +
             t.getStackTrace.mkString("\n  ", "\n  ", ""))
       }
+      F.recover(fa.map(_.handleErrorWith(errorHandler)))(errorHandler)
+    }
 
     private def renderMimirRepr(format: OutputFormat, repr: MimirRepr): Stream[F, CharBuffer] = {
       def convert(s: StreamT[IO, CharBuffer]): Stream[F, CharBuffer] =
