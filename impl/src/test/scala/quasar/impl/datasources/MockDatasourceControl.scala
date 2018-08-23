@@ -26,8 +26,6 @@ import quasar.contrib.scalaz.{MonadState_, MonadTell_}
 import MockDatasourceControl.{MonadInit, MonadShutdown}
 
 import scalaz.{\/, ISet, Monad, Order, PlusEmpty}
-import argonaut.Argonaut.jString
-import argonaut.Json
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.plusEmpty._

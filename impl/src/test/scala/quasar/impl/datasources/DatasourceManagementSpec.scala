@@ -97,7 +97,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
     val kind = LightT
 
     def sanitizeConfig(config: Json): Json = {
-      config.hcursor.downField("credentials").downField("secretKey").set(jString("***********")).undo.getOrElse(config))
+      config.hcursor.downField("credentials").downField("secretKey").set(jString("***********")).undo.getOrElse(config)
     }
 
     def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
@@ -109,7 +109,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
     val kind = HeavyT
 
     def sanitizeConfig(config: Json): Json = {
-      config.hcursor.downField("credentials").downField("secretKey").set(jString("***********")).undo.getOrElse(config))
+      config.hcursor.downField("credentials").downField("secretKey").set(jString("***********")).undo.getOrElse(config)
     }
 
     def heavyweightDatasource[
