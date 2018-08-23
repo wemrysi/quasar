@@ -36,6 +36,7 @@ import TableModule._
 import SampleData._
 
 import java.nio.CharBuffer
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait TestColumnarTableModule extends ColumnarTableModuleTestSupport { self =>
   import trans._
@@ -119,9 +120,17 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     loop(stream, new StringBuilder).unsafeRunSync
   }
 
-  def testRenderCsv(json: String, assumeHomogeneity: Boolean = false, maxSliceRows: Option[Int] = None): String = {
-    val es    = JParser.parseManyFromString(json).valueOr(throw _)
+  def testRenderCsv(
+      json: String,
+      assumeHomogeneity: Boolean = false,
+      maxSliceRows: Option[Int] = None)
+      : String = {
+    // we coerce numerics so we create DoubleColumn and LongColumn and not just NumColumn
+    val es: Seq[JValue] =
+      JParser.parseManyFromString(json).valueOr(throw _).map(JValue.coerceNumerics)
+
     val table = fromJson(es.toStream, maxSliceRows)
+
     streamToString(table.renderCsv(assumeHomogeneity))
   }
 
@@ -180,10 +189,10 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
   }
 
   def renderLotsToCsv(lots: Int, assumeHomogeneity: Boolean, maxSliceRows: Option[Int] = None) = {
-    val event    = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.0}}"
+    val event    = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.3}}"
     val events   = event * lots
     val csv      = testRenderCsv(events, assumeHomogeneity, maxSliceRows)
-    val expected = "x,y,z.xx,z.yy\r\n" + ("123,foobar,1.0,2.0\r\n" * lots)
+    val expected = "x,y,z.xx,z.yy\r\n" + ("123,foobar,1,2.3\r\n" * lots) // `JValue.coerceNumerics` coerces 1.0 to 1L
     csv must_== expected
   }
 
@@ -716,6 +725,38 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
         "1,true\r\n" +
         "2,\r\n" +
         "3,false\r\n"
+
+      testRenderCsv(events, assumeHomogeneity = true, maxSliceRows = Some(1)) must_== expected
+    }
+
+    "render homogeneous (but with holes and different numeric types) assuming homogeneity" in {
+      val events = """
+        {"a": 1, "b": true}
+        {"a": 2}
+        {"a": 3.33, "b": false}
+        """.trim
+
+      val expected =
+        "a,b\r\n" +
+        "1,true\r\n" +
+        "2,\r\n" +
+        "3.33,false\r\n"
+
+      testRenderCsv(events, assumeHomogeneity = true) must_== expected
+    }
+
+    "render homogeneous (but with holes and different numeric types) assuming homogeneity crossing slice boundaries" in {
+      val events = """
+        {"a": 1, "b": true}
+        {"a": 2}
+        {"a": 3.33, "b": false}
+        """.trim
+
+      val expected =
+        "a,b\r\n" +
+        "1,true\r\n" +
+        "2,\r\n" +
+        "3.33,false\r\n"
 
       testRenderCsv(events, assumeHomogeneity = true, maxSliceRows = Some(1)) must_== expected
     }

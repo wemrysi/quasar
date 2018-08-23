@@ -215,9 +215,9 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
           val (prefixes, suffixes) = queue.dequeueAll.map(_.split).unzip
 
-          val emission = new Slice {
-            val size = finishedSize
-            val columns: Map[ColumnRef, Column] = {
+          val emission = Slice(
+            finishedSize,
+            {
               (completeSlices.flatMap(_.columns) ++ prefixes.flatMap(_.columns)).groupBy(_._1).map {
                 case (ref, columns) => {
                   val cp: (ColumnRef, Column) = if (columns.size == 1) {
@@ -228,8 +228,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                   cp
                 }
               }
-            }
-          }
+            })
 
           blockModuleLogger.trace("Emitting a new slice of size " + emission.size)
 
@@ -879,10 +878,9 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       // Map the distinct indices into SortProjections/Cells, then merge them
       def cellsMs: Stream[IO[Option[CellState]]] = indices.values.toStream.zipWithIndex map {
         case (SortedSlice(name, kslice, vslice, _, _, _, _), index) =>
-          val slice = new Slice {
-            val size    = kslice.size
-            val columns = kslice.wrap(CPathIndex(0)).columns ++ vslice.wrap(CPathIndex(1)).columns
-          }
+          val slice = Slice(
+            kslice.size,
+            kslice.wrap(CPathIndex(0)).columns ++ vslice.wrap(CPathIndex(1)).columns)
 
           // We can actually get the last key, but is that necessary?
           IO.pure(CellState(index, new Array[Byte](0), slice, (k: SortingKey) => IO.pure(none)).some)

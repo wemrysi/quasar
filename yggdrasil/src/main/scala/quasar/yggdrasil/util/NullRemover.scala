@@ -14,22 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.precog
-package common
+package quasar.yggdrasil.util
 
-import scalaz.syntax.semigroup._
-import scalaz.syntax.order._
+import quasar.precog.common.{ColumnRef, CNull}
+import quasar.yggdrasil.table.{Column, CScanner}
 
-case class ColumnRef(selector: CPath, ctype: CType)
+object NullRemover extends CScanner {
+  type A = Unit
+  val init = ()
 
-object ColumnRef {
-  def identity(ctype: CType) = ColumnRef(CPath.Identity, ctype)
-
-  implicit object order extends scalaz.Order[ColumnRef] {
-    def order(r1: ColumnRef, r2: ColumnRef): scalaz.Ordering = {
-      (r1.selector ?|? r2.selector) |+| (r1.ctype ?|? r2.ctype)
+  def scan(u: Unit, cols: Map[ColumnRef, Column], range: Range): (Unit, Map[ColumnRef, Column]) = {
+    val cols2 = cols flatMap {
+      case (ColumnRef(_, CNull), _) => Nil
+      case pair => List(pair)
     }
-  }
 
-  implicit val ordering: scala.math.Ordering[ColumnRef] = order.toScalaOrdering
+    ((), cols2)
+  }
 }

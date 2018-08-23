@@ -19,6 +19,7 @@ package table
 
 import quasar.blueeyes._
 import quasar.contrib.fs2.convert
+import quasar.contrib.std.errorImpossible
 import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util.RawBitSet
@@ -42,6 +43,7 @@ import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTim
 
 import scala.annotation.tailrec
 import scala.collection.immutable.Set
+import scala.concurrent.ExecutionContext
 
 trait ColumnarTableTypes {
   type Reducer[α] = CReducer[α]
@@ -169,7 +171,7 @@ object ColumnarTableModule extends Logging {
                   case CPathField(name) => name
                   case CPathMeta(name) => name
                   case CPathIndex(index) => index
-                  case CPathArray => ???
+                  case CPathArray => errorImpossible
                 }
 
                 val candidateTail = path.nodes.tail.map(_.toString).mkString
@@ -242,7 +244,7 @@ trait ColumnarTableModule
     def uniformDistribution(init: MmixPrng): Table = {
       val gen: StreamT[IO, Slice] = StreamT.unfoldM[IO, Slice, MmixPrng](init) { prng =>
         val (column, nextGen) = Column.uniformDistribution(prng)
-        (Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), Config.maxSliceRows), nextGen).some.point[IO]
+        (Slice(Config.maxSliceRows, Map(ColumnRef(CPath.Identity, CDouble) -> column)), nextGen).some.point[IO]
       }
 
       Table(gen, InfiniteSize)
@@ -250,72 +252,72 @@ trait ColumnarTableModule
 
     def constBoolean(v: Set[Boolean]): Table = {
       val column = ArrayBoolColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CBoolean) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, CBoolean) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constLong(v: Set[Long]): Table = {
       val column = ArrayLongColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CLong) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, CLong) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constDouble(v: Set[Double]): Table = {
       val column = ArrayDoubleColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, CDouble) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constDecimal(v: Set[BigDecimal]): Table = {
       val column = ArrayNumColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CNum) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, CNum) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constString(v: Set[String]): Table = {
       val column = ArrayStrColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CString) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, CString) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constOffsetDateTime(v: Set[OffsetDateTime]): Table = {
       val column = ArrayOffsetDateTimeColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, COffsetDateTime) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, COffsetDateTime) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constOffsetTime(v: Set[OffsetTime]): Table = {
       val column = ArrayOffsetTimeColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, COffsetTime) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, COffsetTime) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constOffsetDate(v: Set[OffsetDate]): Table = {
       val column = ArrayOffsetDateColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, COffsetDate) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, COffsetDate) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constLocalDateTime(v: Set[LocalDateTime]): Table = {
       val column = ArrayLocalDateTimeColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CLocalDateTime) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, CLocalDateTime) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constLocalTime(v: Set[LocalTime]): Table = {
       val column = ArrayLocalTimeColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CLocalTime) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, CLocalTime) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constLocalDate(v: Set[LocalDate]): Table = {
       val column = ArrayLocalDateColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CLocalDate) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, CLocalDate) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constInterval(v: Set[DateTimeInterval]): Table = {
       val column = ArrayIntervalColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CInterval) -> column), v.size) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, CInterval) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constNull: Table =
-      Table(Slice(Map(ColumnRef(CPath.Identity, CNull) -> new InfiniteColumn with NullColumn), 1) :: StreamT.empty[IO, Slice], ExactSize(1))
+      Table(Slice(1, Map(ColumnRef(CPath.Identity, CNull) -> new InfiniteColumn with NullColumn)) :: StreamT.empty[IO, Slice], ExactSize(1))
 
     def constEmptyObject: Table =
-      Table(Slice(Map(ColumnRef(CPath.Identity, CEmptyObject) -> new InfiniteColumn with EmptyObjectColumn), 1) :: StreamT.empty[IO, Slice], ExactSize(1))
+      Table(Slice(1, Map(ColumnRef(CPath.Identity, CEmptyObject) -> new InfiniteColumn with EmptyObjectColumn)) :: StreamT.empty[IO, Slice], ExactSize(1))
 
     def constEmptyArray: Table =
-      Table(Slice(Map(ColumnRef(CPath.Identity, CEmptyArray) -> new InfiniteColumn with EmptyArrayColumn), 1) :: StreamT.empty[IO, Slice], ExactSize(1))
+      Table(Slice(1, Map(ColumnRef(CPath.Identity, CEmptyArray) -> new InfiniteColumn with EmptyArrayColumn)) :: StreamT.empty[IO, Slice], ExactSize(1))
 
     def transformStream[A](sliceTransform: SliceTransform1[A], slices: StreamT[IO, Slice]): StreamT[IO, Slice] = {
       def stream(state: A, slices: StreamT[IO, Slice]): StreamT[IO, Slice] = StreamT(
@@ -359,7 +361,10 @@ trait ColumnarTableModule
       }
     }
 
-    def fromRValueStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](values: fs2.Stream[IO, RValue]): M[Table] = {
+    def fromRValueStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](
+        values: fs2.Stream[IO, RValue])(
+        implicit ec: ExecutionContext)
+        : M[Table] = {
       val sliceStream = Slice.allFromRValues(values)
 
       for {
@@ -566,7 +571,7 @@ trait ColumnarTableModule
       require(maxLength > 0 && minLength >= 0 && maxLength >= minLength, "length bounds must be positive and ordered")
 
       def concat(rslices: List[Slice]): Slice = rslices.reverse match {
-        case Nil          => Slice(Map.empty, 0)
+        case Nil          => Slice.empty
         case slice :: Nil => slice
         case slices =>
           val slice = Slice.concat(slices)
@@ -1110,21 +1115,18 @@ trait ColumnarTableModule
                 case (a, acc) =>
                   val rows = math.min(sliceSize, (lhead.size - offset) * rhead.size)
 
-                  val lslice = new Slice {
-                    val size = rows
-                    val columns = lhead.columns.lazyMapValues(Remap({ i =>
+                  val lslice = Slice(
+                    rows,
+                    lhead.columns.lazyMapValues(Remap({ i =>
                       offset + (i / rhead.size)
-                    })(_).get)
-                  }
+                    })(_).get))
 
-                  val rslice = new Slice {
-                    val size = rows
-                    val columns =
-                      if (rhead.size == 0)
-                        rhead.columns.lazyMapValues(Empty(_).get)
-                      else
-                        rhead.columns.lazyMapValues(Remap(_ % rhead.size)(_).get)
-                  }
+                  val rslice = Slice(
+                    rows,
+                    if (rhead.size == 0)
+                      rhead.columns.lazyMapValues(Empty(_).get)
+                    else
+                      rhead.columns.lazyMapValues(Remap(_ % rhead.size)(_).get))
 
                   transform.f(a, lslice, rslice) map {
                     case (b, resultSlice) =>
@@ -1145,10 +1147,9 @@ trait ColumnarTableModule
             if (state.position < lhead.size) {
               state.tail.uncons flatMap {
                 case Some((rhead, rtail0)) =>
-                  val lslice = new Slice {
-                    val size    = rhead.size
-                    val columns = lhead.columns.lazyMapValues(Remap(i => state.position)(_).get)
-                  }
+                  val lslice = Slice(
+                    rhead.size,
+                    lhead.columns.lazyMapValues(Remap(i => state.position)(_).get))
 
                   transform.f(state.a, lslice, rhead) map {
                     case (a0, resultSlice) =>
@@ -1255,7 +1256,7 @@ trait ColumnarTableModule
 
         val remapped: List[(ColumnRef, Int, Column)] = focused.toList map {
           case (ColumnRef(CPath.Identity, CArrayType(tpe)), col: HomogeneousArrayColumn[a]) =>
-            ???
+            errorImpossible
 
           // because of how we have defined things, path is guaranteed NOT to be Identity now
           case (ColumnRef(path, tpe), col) =>
@@ -1498,7 +1499,7 @@ trait ColumnarTableModule
             leftShiftUnfocused(unfocused, unfocusedDefinedness, slice.size, expansion, highWaterMark)
 
           // glue everything back together with the unfocused and compute the new size
-          Slice(focusedTransformed ++ unfocusedTransformed, slice.size * highWaterMark)
+          Slice(slice.size * highWaterMark, focusedTransformed ++ unfocusedTransformed)
         }
       }
 
@@ -1836,8 +1837,28 @@ trait ColumnarTableModule
     def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = "", precise: Boolean = false): StreamT[IO, CharBuffer] =
       ColumnarTableModule.renderJson(slices, prefix, delimiter, suffix, precise)
 
-    def renderCsv(assumeHomogeneous: Boolean): StreamT[IO, CharBuffer] =
-      ColumnarTableModule.renderCsv(slices, assumeHomogeneous)
+    def renderCsv(assumeHomogeneous: Boolean): StreamT[IO, CharBuffer] = {
+      def numToString: CF1 = CF1P {
+        case c: LongColumn => new Map1Column(c) with StrColumn with NoCsvEscape {
+          def apply(row: Int) = c(row).toString
+        }
+        case c: DoubleColumn => new Map1Column(c) with StrColumn with NoCsvEscape {
+          def apply(row: Int) = c(row).toString
+        }
+        case c: NumColumn => new Map1Column(c) with StrColumn with NoCsvEscape {
+          def apply(row: Int) = c(row).toString
+        }
+        case c => c
+      }
+
+      val transformedSlices: StreamT[IO, Slice] =
+        if (assumeHomogeneous)
+          this.transform(trans.DeepMap1(trans.TransSpec1.Id, numToString)).slices
+        else
+          slices
+
+      ColumnarTableModule.renderCsv(transformedSlices, assumeHomogeneous)
+    }
 
     def slicePrinter(prelude: String)(f: Slice => String): Table = {
       Table(

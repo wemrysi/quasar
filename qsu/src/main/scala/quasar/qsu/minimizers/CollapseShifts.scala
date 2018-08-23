@@ -20,6 +20,7 @@ package minimizers
 import slamdata.Predef.{Map => SMap, _}
 import quasar.RenderTreeT
 import quasar.common.effect.NameGenerator
+import quasar.contrib.std.errorImpossible
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
@@ -685,7 +686,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         case (Nil, Nil) =>
           // if parent is None here, it means we invoked on empty lists
           mergeIndexMaps(
-            parent.getOrElse(???),
+            parent.getOrElse(errorImpossible),
             func.ProjectKeyS(func.Hole, "left"),
             leftIndices,
             func.ProjectKeyS(func.Hole, "right"),

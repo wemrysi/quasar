@@ -23,6 +23,9 @@ import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 import quasar.niflheim._
+import qdata.time.{DateTimeInterval, OffsetDate}
+
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: Long) extends Slice {
   import TransSpecModule.paths
@@ -98,4 +101,63 @@ case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: L
   }
 
   def columns: Map[ColumnRef, Column] = cols
+}
+
+object SegmentsWrapper extends ((Seq[Segment], Int, Long) => SegmentsWrapper) {
+
+  def sliceToSegments(id: Long, slice0: Slice): List[Segment] = {
+    val slice = slice0.materialized
+    val length = slice.size
+
+    slice.columns.toList map {
+      case (ColumnRef(path, CBoolean), col: ArrayBoolColumn) =>
+        BooleanSegment(id, path, col.definedAt, col.values, length)
+
+      case (ColumnRef(path, tpe: CNullType), col: BitsetColumn) =>
+        NullSegment(id, path, tpe, col.definedAt, length)
+
+      // a =:= e
+      case (ColumnRef(path, tpe: CValueType[e]), col: AccessibleArrayColumn[a]) =>
+        ArraySegment(id, path, tpe.asInstanceOf[CValueType[a]], col.definedAt, col.values)
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonBoolColumn) =>
+        BooleanSegment(id, path, SingletonColumn.Defined, SingletonBoolColumn.bitset(col.value), 1)
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonLongColumn) =>
+        ArraySegment[Long](id, path, tpe.asInstanceOf[CValueType[Long]], SingletonColumn.Defined, Array[Long](col.value))
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonDoubleColumn) =>
+        ArraySegment[Double](id, path, tpe.asInstanceOf[CValueType[Double]], SingletonColumn.Defined, Array[Double](col.value))
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonNumColumn) =>
+        ArraySegment[BigDecimal](id, path, tpe.asInstanceOf[CValueType[BigDecimal]], SingletonColumn.Defined, Array[BigDecimal](col.value))
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonStrColumn) =>
+        ArraySegment[String](id, path, tpe.asInstanceOf[CValueType[String]], SingletonColumn.Defined, Array[String](col.value))
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonOffsetDateTimeColumn) =>
+        ArraySegment(id, path, tpe.asInstanceOf[CValueType[OffsetDateTime]], SingletonColumn.Defined, Array(col.value))
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonOffsetDateColumn) =>
+        ArraySegment(id, path, tpe.asInstanceOf[CValueType[OffsetDate]], SingletonColumn.Defined, Array(col.value))
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonOffsetTimeColumn) =>
+        ArraySegment(id, path, tpe.asInstanceOf[CValueType[OffsetTime]], SingletonColumn.Defined, Array(col.value))
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonLocalDateTimeColumn) =>
+        ArraySegment(id, path, tpe.asInstanceOf[CValueType[LocalDateTime]], SingletonColumn.Defined, Array(col.value))
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonLocalDateColumn) =>
+        ArraySegment(id, path, tpe.asInstanceOf[CValueType[LocalDate]], SingletonColumn.Defined, Array(col.value))
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonLocalTimeColumn) =>
+        ArraySegment(id, path, tpe.asInstanceOf[CValueType[LocalTime]], SingletonColumn.Defined, Array(col.value))
+
+      case (ColumnRef(path, tpe: CValueType[e]), col: SingletonIntervalColumn) =>
+        ArraySegment(id, path, tpe.asInstanceOf[CValueType[DateTimeInterval]], SingletonColumn.Defined, Array(col.value))
+
+      case (_, col) =>
+        sys.error(s"Slice#materialized produced an unexpected column: $col")
+    }
+  }
 }

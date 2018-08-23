@@ -26,6 +26,7 @@ import cats.effect.IO
 
 // Must not be in default package
 import java.util.concurrent.TimeUnit
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import org.openjdk.jmh.annotations.{Benchmark, BenchmarkMode, Mode, OutputTimeUnit, Param, Scope, State}
 import org.openjdk.jmh.infra.Blackhole

@@ -48,6 +48,7 @@ import scala.collection.immutable.SortedMap
 import shapeless._
 
 case class Insert(batch: Seq[NIHDB.Batch], responseRequested: Boolean)
+case class InsertSegments(offset: Long, length: Int, segments: List[Segment], responseRequested: Boolean)
 
 case object GetSnapshot
 
@@ -84,6 +85,14 @@ trait NIHDB {
   def insert(batch: Seq[NIHDB.Batch]): IO[Unit]
 
   def insertVerified(batch: Seq[NIHDB.Batch]): Future[InsertResult]
+
+  /**
+   * Please don't mix segment insertion with value insertion on the same dataset. The results may be
+   * somewhat odd and *definitely* out of order. Also note that segment insertion doesn't obey the
+   * same atomicity guarantees as value insertion (naturally, since it bypasses the append log).
+   * External atomicity guarantees should be used to avoid corruption in all cases.
+   */
+  def insertSegmentsVerified(offset: Long, length: Int, segments: List[Segment]): Future[InsertResult]
 
   def getSnapshot(): Future[NIHDBSnapshot]
 
@@ -131,6 +140,9 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
 
   def insertVerified(batch: Seq[NIHDB.Batch]): Future[InsertResult] =
     (actor ? Insert(batch, true)).mapTo[InsertResult]
+
+  def insertSegmentsVerified(offset: Long, length: Int, segments: List[Segment]): Future[InsertResult] =
+    (actor ? InsertSegments(offset, length, segments, true)).mapTo[InsertResult]
 
   def getSnapshot(): Future[NIHDBSnapshot] =
     (actor ? GetSnapshot).mapTo[NIHDBSnapshot]
@@ -402,6 +414,34 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
           log.debug("Insert complete on %d rows at offset %d for %s".format(values.length, offset, baseDir.getCanonicalPath))
           if (responseRequested) sender ! Inserted(offset, values.length)
         }
+      }
+
+    case InsertSegments(offset, length, segments, responseRequested) =>
+      if (length == 0) {
+        log.warn("Skipping insert with an empty batch on %s".format(baseDir.getCanonicalPath))
+        if (responseRequested) sender ! Skipped
+      } else if (offset < currentState.maxOffset) {
+        log.warn("Skipping insert with already-inserted offset on %s".format(baseDir.getCanonicalPath))
+        if (responseRequested) sender ! Skipped
+      } else {
+        log.debug("Inserting from segments %d rows at offset %d for %s".format(length, offset, baseDir.getCanonicalPath))
+
+        {
+          state.blockState.rawLog.close()
+          state.blockState = state.blockState.copy(rawLog = RawHandler.empty(offset + 1, rawFileFor(offset + 1)))
+        }
+
+        currentState = currentState.copy(maxOffset = offset)
+        state.txLog.startCook(offset)
+
+        val target = sender
+        val onComplete = if (responseRequested)
+          () => target ! Inserted(offset, length)
+        else
+          () => ()
+
+        cookedDir.mkdir()   // I don't get why we need this, but we do
+        chef ! PrepareSegments(offset, cookSequence.getAndIncrement, cookedDir, offset, length, segments, onComplete)
       }
 
     case Cook =>

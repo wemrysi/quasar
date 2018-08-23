@@ -128,7 +128,7 @@ trait CanonicalizeSpec extends ColumnarTableModuleTestSupport with Specification
     def tableTakeRange(table: Table, start: Int, numToTake: Long) =
       table.takeRange(start, numToTake).slices.toStream.unsafeRunSync
 
-    val emptySlice = Slice(Map(), 0)
+    val emptySlice = Slice(0,Map())
     val slices =
       Stream(emptySlice) ++ tableTakeRange(table, 0, 5) ++
       Stream(emptySlice) ++ tableTakeRange(table, 5, 4) ++

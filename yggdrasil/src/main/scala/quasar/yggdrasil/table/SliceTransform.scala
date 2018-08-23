@@ -18,6 +18,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
+import quasar.contrib.std.errorImpossible
 import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util._
@@ -62,7 +63,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
     // No transform defined herein may reduce the size of a slice. Be it known!
     def composeSliceTransform2(spec: TransSpec[SourceType]): SliceTransform2[_] = {
 
-      def equalsImpl(sl: Slice, sr: Slice): Slice = {
+      def equalsImpl(sl: Slice, sr: Slice): Slice =
 
         /*
          * 1. split each side into numeric and non-numeric columns
@@ -96,9 +97,9 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
          * undefined (for all columns) at a particular row.
          */
 
-        new Slice {
-          val size = sl.size
-          val columns: Map[ColumnRef, Column] = {
+        Slice(
+          sl.size,
+          {
             val (leftNonNum, leftNum) = sl.columns partition {
               case (ColumnRef(_, CLong | CDouble | CNum), _) => false
               case _                                         => true
@@ -192,9 +193,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
             }
 
             Map(ColumnRef(CPath.Identity, CBoolean) -> column)
-          }
-        }
-      }
+          })
 
       //todo missing case WrapObjectDynamic
       val result = spec match {
@@ -219,9 +218,9 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
           val r0 = composeSliceTransform2(right)
 
           l0.zip(r0) { (sl, sr) =>
-            new Slice {
-              val size = sl.size
-              val columns: Map[ColumnRef, Column] = {
+            Slice(
+              sl.size,
+              {
                 val resultColumns = for {
                   cl <- sl.columns collect { case (ref, col) if ref.selector == CPath.Identity => col }
                   cr <- sr.columns collect { case (ref, col) if ref.selector == CPath.Identity => col }
@@ -235,17 +234,14 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
                     }
                     (ColumnRef(CPath.Identity, tpe), col)
                 }
-              }
+              })
             }
-          }
 
         case MapN(contents, f) =>
           composeSliceTransform2(contents) map { slice =>
-            new Slice {
-
-              val size = slice.size
-
-              val columns: Map[ColumnRef, Column] = {
+            Slice(
+              slice.size,
+              {
                 // find all of the scalar array values at root
                 val cols = slice.columns.toList collect {
                   case (ref @ ColumnRef(CPath(CPathIndex(_)), _), col) => ref -> col
@@ -280,8 +276,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
                 }
 
                 processed.getOrElse(Map())
-              }
-            }
+              })
           }
 
         case Filter(source, predicate) =>
@@ -318,9 +313,9 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
           }
 
           sourceSlice map { ss =>
-            new Slice {
-              val size = ss.size
-              val columns = {
+            Slice(
+              ss.size,
+              {
                 val (comparable0, other0) = ss.columns.toList.partition {
                   case (ref @ ColumnRef(CPath.Identity, tpe), col) if CType.canCompare(CType.of(value), tpe) => true
                   case _                                                                                     => false
@@ -342,8 +337,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
                 }
 
                 Map(ColumnRef(CPath.Identity, CBoolean) -> (if (invert) complement(aggregate) else aggregate))
-              }
-            }
+              })
           }
         }
 
@@ -360,14 +354,18 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
             // we force the slice, because we're going to re-use it many times
             val materializedItem = itemS.materialized
 
-            val tests: List[ArrayBoolColumn] = indices.toList map { i =>
+            val tests: List[BoolColumn] = indices.toList map { i =>
               val s = equalsImpl(materializedItem, inS.deref(CPathIndex(i))).materialized
 
               // we know this is defined, because of equality
-              s.columns(ColumnRef(CPath.Identity, CBoolean)).asInstanceOf[ArrayBoolColumn]
+              s.columns(ColumnRef(CPath.Identity, CBoolean)).asInstanceOf[BoolColumn]
             }
 
-            val testDefined = tests.map(_.defined)
+            val testDefined: List[BitSet] = tests.map {
+              case c: ArrayBoolColumn => c.defined
+              case c: SingletonBoolColumn => SingletonColumn.Defined
+              case _ => errorImpossible
+            }
 
             val definedM = testDefined.headOption map { bits =>
               val target = bits.copy    // it's important to copy, since or is in-place
@@ -375,7 +373,11 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
               target
             }
 
-            val testValues = tests.map(_.values)
+            val testValues: List[BitSet] = tests.map {
+              case c: ArrayBoolColumn => c.values
+              case c: SingletonBoolColumn => SingletonBoolColumn.bitset(c.value)
+              case _ => errorImpossible
+            }
 
             val valuesM = testValues.headOption map { bits =>
               val target = bits.copy    // it's important to copy, since or is in-place
@@ -392,26 +394,44 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
 
             val results = new ArrayBoolColumn(defined, values)
 
-            new Slice {
-              val size = materializedItem.size
-              val columns = Map(ColumnRef(CPath.Identity, CBoolean) -> results)
-            }
+            Slice(
+              materializedItem.size,
+              Map(ColumnRef(CPath.Identity, CBoolean) -> results))
           }
 
         case Range(lower, upper) =>
           composeSliceTransform2(upper).zip(composeSliceTransform2(lower)) { (upperS, lowerS) =>
-            val upperColumns = upperS.materialized.columns
-            val lowerColumns = lowerS.materialized.columns
-            val lowerC = lowerColumns.getOrElse(ColumnRef(CPath.Identity, CLong), {
-              val numCol = lowerColumns(ColumnRef(CPath.Identity, CNum)).asInstanceOf[ArrayNumColumn]
-              new ArrayLongColumn(numCol.defined, numCol.values.map(_.toLong))
-            }).asInstanceOf[ArrayLongColumn]
-            val upperC = upperColumns.getOrElse(ColumnRef(CPath.Identity, CLong), {
-              val numCol = upperColumns(ColumnRef(CPath.Identity, CNum)).asInstanceOf[ArrayNumColumn]
-              new ArrayLongColumn(numCol.defined, numCol.values.map(_.toLong))
-            }).asInstanceOf[ArrayLongColumn]
-            val lowerA = lowerC.values
-            val upperA = upperC.values
+            val upperColumns: Map[ColumnRef, Column] = upperS.materialized.columns
+            val lowerColumns: Map[ColumnRef, Column] = lowerS.materialized.columns
+
+            val lowerC: LongColumn = lowerColumns.getOrElse(ColumnRef(CPath.Identity, CLong), {
+              val numCol: NumColumn = lowerColumns(ColumnRef(CPath.Identity, CNum)).asInstanceOf[NumColumn]
+              numCol match {
+                case c: ArrayNumColumn => new ArrayLongColumn(c.defined, c.values.map(_.toLong))
+                case c: SingletonNumColumn => SingletonLongColumn(c.value.toLong)
+                case _ => errorImpossible
+              }
+            }).asInstanceOf[LongColumn]
+            val upperC: LongColumn = upperColumns.getOrElse(ColumnRef(CPath.Identity, CLong), {
+              val numCol: NumColumn = upperColumns(ColumnRef(CPath.Identity, CNum)).asInstanceOf[NumColumn]
+              numCol match {
+                case c: ArrayNumColumn => new ArrayLongColumn(c.defined, c.values.map(_.toLong))
+                case c: SingletonNumColumn => SingletonLongColumn(c.value.toLong)
+                case _ => errorImpossible
+              }
+            }).asInstanceOf[LongColumn]
+
+            val lowerA: Array[Long] = lowerC match {
+              case c: ArrayLongColumn => c.values
+              case c: SingletonLongColumn => Array(c.value)
+              case _ => errorImpossible
+            }
+            val upperA: Array[Long] = upperC match {
+              case c: ArrayLongColumn => c.values
+              case c: SingletonLongColumn => Array(c.value)
+              case _ => errorImpossible
+            }
+
             val minNumRows =
               if (lowerA.length > upperA.length) upperA.length
               else lowerA.length
@@ -481,12 +501,9 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
             }
             val arrays = arraysBuildr.result()
             val bitsets = bitsetsBuildr.result()
-            new Slice {
-              val size =
-                bitsets.length * maxNumRows
-              val columns =
-                allColumns(arrays, bitsets)
-            }
+            Slice(
+              bitsets.length * maxNumRows,
+              allColumns(arrays, bitsets))
           }
 
         case ConstLiteral(value, target) =>
@@ -509,10 +526,9 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
           } else {
             objects.map(composeSliceTransform2).reduceLeft { (l0, r0) =>
               l0.zip(r0) { (sl, sr) =>
-                new Slice {
-                  val size = sl.size
-
-                  val columns: Map[ColumnRef, Column] = {
+                Slice(
+                  sl.size,
+                  {
                     val (leftObjectBits, leftEmptyBits)   = buildFilters(sl.columns, sl.size, filterObjects, filterEmptyObjects)
                     val (rightObjectBits, rightEmptyBits) = buildFilters(sr.columns, sr.size, filterObjects, filterEmptyObjects)
 
@@ -524,8 +540,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
                     val nonemptyObjects = buildNonemptyObjects(leftFields, rightFields, sr.size)
 
                     emptyObjects ++ nonemptyObjects
-                  }
-                }
+                  })
               }
             }
           }
@@ -563,10 +578,9 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
                 val sl = sl0.typed(JObjectUnfixedT) // Help out the special cases.
                 val sr = sr0.typed(JObjectUnfixedT)
 
-                new Slice {
-                  val size = sl.size
-
-                  val columns: Map[ColumnRef, Column] = {
+                Slice(
+                  sl.size,
+                  {
                     if (sl.columns.isEmpty || sr.columns.isEmpty) {
                       Map.empty[ColumnRef, Column]
                     } else if (isDisjoint(sl, sr)) {
@@ -591,8 +605,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
                         cf.util.filter(0, sl.size max sr.size, nonemptyBits)(col).get
                       }
                     }
-                  }
-                }
+                  })
               }
             }
           }
@@ -604,10 +617,9 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
           } else {
             elements.map(composeSliceTransform2).reduceLeft { (l0, r0) =>
               l0.zip(r0) { (sl, sr) =>
-                new Slice {
-                  val size = sl.size
-
-                  val columns: Map[ColumnRef, Column] = {
+                Slice(
+                  sl.size,
+                  {
                     val (leftArrayBits, leftEmptyBits)   = buildFilters(sl.columns, sl.size, filterArrays, filterEmptyArrays)
                     val (rightArrayBits, rightEmptyBits) = buildFilters(sr.columns, sr.size, filterArrays, filterEmptyArrays)
 
@@ -617,8 +629,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
                     val nonemptyArrays = buildNonemptyArrays(sl.columns, sr.columns)
 
                     emptyArrays ++ nonemptyArrays
-                  }
-                }
+                  })
               }
             }
           }
@@ -630,10 +641,9 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
           } else {
             elements.map(composeSliceTransform2).reduceLeft { (l0, r0) =>
               l0.zip(r0) { (sl, sr) =>
-                new Slice {
-                  val size = sl.size
-
-                  val columns: Map[ColumnRef, Column] = {
+                Slice(
+                  sl.size,
+                  {
                     if (sl.columns.isEmpty || sr.columns.isEmpty) {
                       Map.empty[ColumnRef, Column]
                     } else {
@@ -651,8 +661,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
                         cf.util.filter(0, sl.size max sr.size, nonemptyBits)(col).get
                       }
                     }
-                  }
-                }
+                  })
               }
             }
           }
@@ -683,10 +692,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
               scanner.init, { (state: scanner.A, slice: Slice) =>
                 val (newState, newCols) = scanner.scan(state, slice.columns, 0 until slice.size)
 
-                val newSlice = new Slice {
-                  val size    = slice.size
-                  val columns = newCols
-                }
+                val newSlice = Slice(slice.size, newCols)
 
                 (newState, newSlice)
               }
@@ -698,12 +704,12 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
             mapper0.fold({ mapper =>
               SliceTransform1.liftM[Unit]((), { (_: Unit, slice: Slice) =>
                 val cols = mapper.map(slice.columns, 0 until slice.size)
-                ((), Slice(cols, slice.size))
+                ((), Slice(slice.size, cols))
               })
             }, { mapper =>
               SliceTransform1[Unit]((), { (_: Unit, slice: Slice) =>
                 mapper.map(slice.columns, 0 until slice.size) map { cols =>
-                  ((), Slice(cols, slice.size))
+                  ((), Slice(slice.size, cols))
                 }
               })
             })
@@ -783,10 +789,11 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
           val rightTransform = composeSliceTransform2(right)
 
           predTransform.zip2(leftTransform, rightTransform) { (predS, leftS, rightS) =>
-            new Slice {
-              val size = predS.size
+            Slice(
+              predS.size,
+              {
+                val size = predS.size
 
-              val columns: Map[ColumnRef, Column] = {
                 predS.columns get ColumnRef(CPath.Identity, CBoolean) map { predC =>
                   val leftMask = predC.asInstanceOf[BoolColumn].asBitSet(false, size)
 
@@ -809,8 +816,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
 
                   joined
                 } getOrElse Map[ColumnRef, Column]()
-              }
-            }
+              })
           }
         }
       }
