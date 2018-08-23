@@ -110,7 +110,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
       : F[QSUGraph] =
     for {
       newGraph <- QSUGraph.withName[T, F]("rbu")(node)
-      _        <- ApplyProvenance.computeProvenance[T, F](newGraph)
+      _        <- ApplyProvenance.computeDims[T, F](newGraph)
     } yield newGraph
 
   private def mkReduce[A](

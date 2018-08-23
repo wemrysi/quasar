@@ -133,7 +133,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
       commonSrcDims <- dimsOf(commonRoot)
 
       structDim =
-        ApplyProvenance.computeFuncProvenance(struct)(κ(commonSrcDims))
+        ApplyProvenance.computeFuncDims(struct)(κ(commonSrcDims))
           .getOrElse(commonSrcDims)
 
       compatInfo <- MonadState_[G, CompatInfo].get
@@ -165,7 +165,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
       // provenance for this shift on the common source.
       newDims <- sameFocus match {
         case Some((sym, _, _)) => dimsOf(sym)
-        case None => ApplyProvenance.computeProvenance[T, G](commonShift)
+        case None => ApplyProvenance.computeDims[T, G](commonShift)
       }
 
       joinDims =
