@@ -50,8 +50,6 @@ sealed trait Column {
   def rowCompare(row1: Int, row2: Int): Int
 }
 
-private[yggdrasil] trait ExtensibleColumn extends Column // TODO: or should we just unseal Column?
-
 trait HomogeneousArrayColumn[@specialized(Boolean, Long, Double) A] extends Column with (Int => Array[A]) { self =>
   val tpe: CArrayType[A]
   def apply(row: Int): Array[A]
@@ -602,7 +600,7 @@ object Column {
     cols.length > 0 && cols.forall(_ isDefinedAt row)
 }
 
-trait ArrayColumn[@specialized(Boolean, Long, Double) A] extends BitsetColumn with ExtensibleColumn {
+trait ArrayColumn[@specialized(Boolean, Long, Double) A] extends BitsetColumn with Column {
   def update(row: Int, value: A): Unit
   def clear(row: Int): Unit
   def resize(size: Int): ArrayColumn[A]
@@ -1043,7 +1041,7 @@ object MutableNullColumn {
 /* help for ctags
 type ArrayColumn */
 
-abstract class SingletonColumn[A] extends ExtensibleColumn {
+abstract class SingletonColumn[A] extends Column {
 
   override def isDefinedAt(row: Int) = row == 0
 
