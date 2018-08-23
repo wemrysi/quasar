@@ -51,18 +51,18 @@ trait Dimension[D, I, P] {
     Dimensions.empty[P]
 
   /** Updates the dimensional stack by sequencing a new dimension from value
-    * space with the current head dimension.
+    * space with the top dimension.
     */
   def flatten(id: I, ds: Dimensions[P]): Dimensions[P] =
     nest(lshift(id, ds))
 
   /** Inject a value into a structure at an unknown field. */
   val injectDynamic: Dimensions[P] => Dimensions[P] =
-    Dimensions.join[P].modify(extend(fresh(), _ ≺: _))
+    Dimensions.topDimension.modify(fresh() ≺: _)
 
   /** Inject a value into a structure at the given field. */
   def injectStatic(field: D, ds: Dimensions[P]): Dimensions[P] =
-    ds.mapJoin(extend(injValue(field), _ ≺: _))
+    Dimensions.topDimension[P].modify(injValue(field) ≺: _)(ds)
 
   /** Joins two dimensions into a single dimension stack, starting from the base. */
   def join(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): Dimensions[P] =
@@ -74,7 +74,7 @@ trait Dimension[D, I, P] {
   def lshift(id: I, ds: Dimensions[P]): Dimensions[P] =
     ds.mapJoin(value(id) <:: _)
 
-  /** Sequences the first and second dimensions. */
+  /** Sequences the top and preceding dimensions. */
   val nest: Dimensions[P] => Dimensions[P] =
     Dimensions.join[P] modify {
       case NonEmptyList(a, ICons(b, cs)) => NonEmptyList.nel(a ≺: b, cs)
@@ -83,28 +83,26 @@ trait Dimension[D, I, P] {
 
   /** Project an unknown field from a value-level structure. */
   val projectDynamic: Dimensions[P] => Dimensions[P] =
-    Dimensions.join[P].modify(extend(fresh(), _ ≺: _))
+    Dimensions.topDimension.modify(fresh() ≺: _)
 
   /** Project a static path segment. */
   def projectPath(segment: D, ds: Dimensions[P]): Dimensions[P] =
     if (ds.isEmpty)
       Dimensions.origin(prjPath(segment))
     else
-      ds.mapJoin(extend(prjPath(segment), _ ≺: _))
+      Dimensions.topDimension[P].modify(prjPath(segment) ≺: _)(ds)
 
   /** Project a static field from value-level structure. */
   def projectStatic(field: D, ds: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): Dimensions[P] =
     Dimensions.union[P].modify(_ flatMap { jn =>
-      val projected = extend[P](prjValue(field), _ ≺: _)(jn)
-
-      applyProjection(projected.head) match {
-        case Success(Some(p)) => IList(NonEmptyList.nel(p, projected.tail))
-        case Success(None) => projected.tail.toNel.toIList
+      applyProjection(prjValue(field) ≺: jn.head) match {
+        case Success(Some(p)) => IList(NonEmptyList.nel(p, jn.tail))
+        case Success(None) => jn.tail.toNel.toIList
         case Failure(_) => IList()
       }
     })(ds)
 
-  /** Reduces the dimensional stack by peeling off the current dimension. */
+  /** Remove the top dimension from the stack. */
   val reduce: Dimensions[P] => Dimensions[P] =
     Dimensions.union[P].modify(_.flatMap(_.tail.toNel.toIList))
 
@@ -136,12 +134,6 @@ trait Dimension[D, I, P] {
   /** Disjoin two dimension stacks. */
   def union(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): Dimensions[P] =
     ls ∨ rs
-
-  ////
-
-  private def extend[A](a: => A, f: (A, A) => A): NonEmptyList[A] => NonEmptyList[A] = {
-    case NonEmptyList(h, t) => NonEmptyList.nel(f(a, h), t)
-  }
 }
 
 object Dimension {

@@ -20,6 +20,7 @@ import slamdata.Predef.Boolean
 import quasar.fp.ski.ι
 
 import monocle.{Iso, PIso, PTraversal, Traversal}
+import monocle.function.Cons1
 import scalaz.{@@, Applicative, Cord, Equal, IList, Monoid, NonEmptyList, SemiLattice, Show, Traverse}
 import scalaz.Scalaz._
 import scalaz.Tags.{Disjunction, Conjunction}
@@ -79,6 +80,9 @@ object Dimensions extends DimensionsInstances {
 
   def join[A]: Traversal[Dimensions[A], NonEmptyList[A]] =
     pjoin[A, A]
+
+  def topDimension[A]: Traversal[Dimensions[A], A] =
+    join[A] composeLens Cons1.head
 
   def punion[A, B]: PIso[Dimensions[A], Dimensions[B], IList[NonEmptyList[A]], IList[NonEmptyList[B]]] =
     PIso((_: Dimensions[A]).union)(apply(_))
