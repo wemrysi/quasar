@@ -278,7 +278,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
   def computeFuncProvenanceƒ[A]: GAlgebra[(FreeMapA[A], ?), MapFunc, QDims] = {
     case MFC(MapFuncsCore.ConcatArrays((_, l), (_, r))) =>
-      // FIXME: Shift rhs indices by max on lhs
+      // FIXME{ch1487}: Adjust rhs based on knowledge of lhs.
       dims.join(l, r)
 
     case MFC(MapFuncsCore.ConcatMaps((_, l), (_, r))) =>

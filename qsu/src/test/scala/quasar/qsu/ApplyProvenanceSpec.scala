@@ -24,7 +24,7 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.qscript.{construction, PlannerError, ReduceFuncs}
+import quasar.qscript.{construction, LeftSide, PlannerError, ReduceFuncs, RightSide}
 import quasar.qscript.MapFuncsCore.RecIntLit
 import quasar.qscript.provenance.Dimensions
 
@@ -36,6 +36,7 @@ import scalaz.{\/, Cofree}
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
 import scalaz.std.list._
+import scalaz.std.option._
 import scalaz.std.map._
 
 object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
@@ -54,6 +55,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
   val app = ApplyProvenance[Fix, F] _
   val qprov = QProv[Fix]
+  type P = qprov.P
   val P = qprov.prov
 
   val root = Path.rootDir[Sandboxed]
@@ -146,6 +148,11 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
   }
 
   "MapFunc provenance" >> {
+    val rdims =
+      qprov.lshift(IdAccess.identity('a), qprov.projectPath(J.str("data"), qprov.empty))
+
+    val topDim = Dimensions.topDimension[P]
+
     "make map injects" >> todo
 
     "make array injects" >> todo
@@ -156,7 +163,56 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
     "concat map joins" >> todo
 
-    "concat array joins, updating rhs injects" >> todo
+    "concat array joins, updating rhs injects" >> {
+      val l = qprov.injectStatic(J.int(0), rdims)
+      val r = qprov.injectStatic(J.int(0), rdims)
+
+      val mf = func.ConcatArrays(func.LeftSide, func.RightSide)
+
+      val res = ApplyProvenance.computeFuncProvenance(mf) {
+        case LeftSide => l
+        case RightSide => r
+      }
+
+      val exp = topDim.modify(d =>
+        (P.injValue(J.int(0)) ≺: d) ∧ (P.injValue(J.int(1)) ≺: d))(rdims)
+
+      res must_= Some(exp)
+    }.pendingUntilFixed("ch1487")
+
+    "concat array where lhs is not static makes rhs existential" >> {
+      val l = qprov.injectDynamic(rdims)
+      val r = qprov.injectStatic(J.int(0), rdims)
+
+      val mf = func.ConcatArrays(func.LeftSide, func.RightSide)
+
+      val res = ApplyProvenance.computeFuncProvenance(mf) {
+        case LeftSide => l
+        case RightSide => r
+      }
+
+      res.exists(topDim all {
+        case P.both(P.thenn(P.fresh(_), _), P.thenn(P.fresh(_), _)) => true
+        case _ => false
+      }) must beTrue
+    }.pendingUntilFixed("ch1487")
+
+    "concat array where lhs is static and rhs isn't joins" >> {
+      val l = qprov.injectStatic(J.int(0), rdims)
+      val r = qprov.injectDynamic(rdims)
+
+      val mf = func.ConcatArrays(func.LeftSide, func.RightSide)
+
+      val res = ApplyProvenance.computeFuncProvenance(mf) {
+        case LeftSide => l
+        case RightSide => r
+      }
+
+      res.exists(topDim all {
+        case P.both(P.thenn(P.injValue(J.int(i)), _), P.thenn(P.fresh(_), _)) if i == 0 => true
+        case _ => false
+      }) must beTrue
+    }
 
     "delete key is identity" >> todo
 
