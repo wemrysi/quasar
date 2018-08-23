@@ -23,7 +23,6 @@ import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.MonadReader_
 import quasar.ejson.EJson
-import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski.κ
@@ -165,10 +164,10 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
       def holeAs(sym: Symbol): Hole => Symbol =
         κ(sym)
 
-      def resolveAccess[A, B](fa: FreeMapA[A])(ex: A => QAccess[B] \/ B)(f: B => Symbol): F[FreeMapA[B]] =
+      def resolveAccess[A, B](fa: FreeMapA[A])(ex: A => Access[B] \/ B)(f: B => Symbol): F[FreeMapA[B]] =
         MR.asks(_.resolveAccess[A, B](name, fa)(f)(ex))
 
-      def eqCond(lroot: Symbol, rroot: Symbol): JoinKey[QIdAccess] => F[JoinFunc] = {
+      def eqCond(lroot: Symbol, rroot: Symbol): JoinKey[IdAccess] => F[JoinFunc] = {
         case JoinKey(l, r) =>
           for {
             lside <- resolveAccess(func.Hole as Access.id(l, lroot))(_.left)(κ(lroot))
@@ -198,8 +197,8 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
             resolvedRepair <-
               resolveAccess(repair) {
                 case QSU.ShiftTarget.AccessLeftTarget(access) => access.map[JoinSide](_ => LeftSide).left
-                case QSU.ShiftTarget.LeftTarget() => (LeftSide: JoinSide).right
-                case QSU.ShiftTarget.RightTarget() => (RightSide: JoinSide).right
+                case QSU.ShiftTarget.LeftTarget => (LeftSide: JoinSide).right
+                case QSU.ShiftTarget.RightTarget => (RightSide: JoinSide).right
               }(κ(source.root))
 
             shiftType = rot match {
@@ -230,7 +229,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
 
         // TODO distinct should be its own node in qscript proper
         case QSU.Distinct(source) =>
-          resolveAccess(HoleF map (Access.value[T[EJson], Hole](_)))(_.left)(holeAs(source.root)) map { fm =>
+          resolveAccess(HoleF map (Access.value(_)))(_.left)(holeAs(source.root)) map { fm =>
             QCE(Reduce[T, QSUGraph](
               source,
               // Bucket by the value
@@ -247,11 +246,15 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
           val condition = joinKeys.keys.toNel.fold(func.Constant[JoinSide](EJson.bool(true)).point[F]) { jks =>
             val mkEq = eqCond(left.root, right.root)
 
-            val mkDisj = (_: NonEmptyList[JoinKey[QIdAccess]]).foldMapLeft1(mkEq) { (disj, k) =>
-              (mkEq(k) |@| disj)(func.Or(_, _))
-            }
+            val mkIsect =
+              (_: NonEmptyList[JoinKey[IdAccess]])
+                .foldMapRight1(mkEq)((l, r) => (mkEq(l) |@| r)(func.Or(_, _)))
 
-            jks.foldMapLeft1(mkDisj)((conj, ks) => (mkDisj(ks) |@| conj)(func.And(_, _)))
+            val mkConj =
+              (_: NonEmptyList[NonEmptyList[JoinKey[IdAccess]]])
+                .foldMapRight1(mkIsect)((l, r) => (mkIsect(l) |@| r)(func.And(_, _)))
+
+            jks.foldMapRight1(mkConj)((l, r) => (mkConj(l) |@| r)(func.Or(_, _)))
           }
 
           (mergeSources[F](left, right) |@| condition) {

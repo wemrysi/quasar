@@ -24,13 +24,12 @@ import scalaz.{Apply, Equal, Order, Show, Traverse1}
 import scalaz.syntax.show._
 import scalaz.std.option._
 import scalaz.std.tuple._
-import quasar.qscript.{Hole, JoinSide}
 
-sealed abstract class Access[D, A] {
-  def symbolic(value: A => Symbol): Access[D, Symbol] =
+sealed abstract class Access[A] {
+  def symbolic(value: A => Symbol): Access[Symbol] =
     this match {
       case Access.Id(i, a) =>
-        IdAccess.symbols[D]
+        IdAccess.symbols
           .headOption(i)
           .fold(Access.id(i, value(a)))(Access.id(i, _))
 
@@ -40,31 +39,25 @@ sealed abstract class Access[D, A] {
 }
 
 object Access extends AccessInstances {
-  def identityHole[D]: Prism[Access[D, Hole], (IdAccess[D], Hole)] = id[D, Hole]
-  def identitySymbol[D]: Prism[Access[D, Symbol], (IdAccess[D], Symbol)] = id[D, Symbol]
-  def identityJoinSide[D]: Prism[Access[D, JoinSide], (IdAccess[D], JoinSide)] = id[D, JoinSide]
-  def valueHole[D]: Prism[Access[D, Hole], Hole] = value[D, Hole]
-  def valueSymbol[D]: Prism[Access[D, Symbol], Symbol] = value[D, Symbol]
-  def valueJoinSide[D]: Prism[Access[D, JoinSide], JoinSide] = value[D, JoinSide]
 
-  final case class Id[D, A](idAccess: IdAccess[D], src: A) extends Access[D, A]
-  final case class Value[D, A](src: A) extends Access[D, A]
+  final case class Id[A](idAccess: IdAccess, src: A) extends Access[A]
+  final case class Value[A](src: A) extends Access[A]
 
-  def id[D, A]: Prism[Access[D, A], (IdAccess[D], A)] =
-    Prism.partial[Access[D, A], (IdAccess[D], A)] {
+  def id[A]: Prism[Access[A], (IdAccess, A)] =
+    Prism.partial[Access[A], (IdAccess, A)] {
       case Id(i, a) => (i, a)
     } { case (i, a) => Id(i, a) }
 
-  def value[D, A]: Prism[Access[D, A], A] =
-    Prism.partial[Access[D, A], A] {
+  def value[A]: Prism[Access[A], A] =
+    Prism.partial[Access[A], A] {
       case Value(a) => a
     } (Value(_))
 
-  def src[D, A]: Lens[Access[D, A], A] =
-    srcP[D, A, A]
+  def src[A]: Lens[Access[A], A] =
+    srcP[A, A]
 
-  def srcP[D, A, B]: PLens[Access[D, A], Access[D, B], A, B] =
-    PLens[Access[D, A], Access[D, B], A, B] {
+  def srcP[A, B]: PLens[Access[A], Access[B], A, B] =
+    PLens[Access[A], Access[B], A, B] {
       case Id(_, a) => a
       case Value(a) => a
     } { b => {
@@ -74,22 +67,22 @@ object Access extends AccessInstances {
 }
 
 sealed abstract class AccessInstances extends AccessInstances0 {
-  implicit def traverse1[D]: Traverse1[Access[D, ?]] =
-    new Traverse1[Access[D, ?]] {
-      def traverse1Impl[G[_]: Apply, A, B](fa: Access[D, A])(f: A => G[B]) =
-        Access.srcP[D, A, B].modifyF(f)(fa)
+  implicit val traverse1: Traverse1[Access] =
+    new Traverse1[Access] {
+      def traverse1Impl[G[_]: Apply, A, B](fa: Access[A])(f: A => G[B]) =
+        Access.srcP[A, B].modifyF(f)(fa)
 
-      def foldMapRight1[A, B](fa: Access[D, A])(z: A => B)(f: (A, => B) => B) =
-        z(Access.src[D, A] get fa)
+      def foldMapRight1[A, B](fa: Access[A])(z: A => B)(f: (A, => B) => B) =
+        z(Access.src[A] get fa)
     }
 
-  implicit def order[D: Order, A: Order]: Order[Access[D, A]] =
+  implicit def order[A: Order]: Order[Access[A]] =
     Order.orderBy(generic)
 
-  implicit def renderTree[D: Show, A: Show]: RenderTree[Access[D, A]] =
+  implicit def renderTree[A: Show]: RenderTree[Access[A]] =
     RenderTree.fromShowAsType("Access")
 
-  implicit def show[D: Show, A: Show]: Show[Access[D, A]] =
+  implicit def show[A: Show]: Show[Access[A]] =
     Show.shows {
       case Access.Id(i, a) => s"Id(${i.shows}, ${a.shows})"
       case Access.Value(a) => s"Value(${a.shows})"
@@ -97,9 +90,9 @@ sealed abstract class AccessInstances extends AccessInstances0 {
 }
 
 sealed abstract class AccessInstances0 {
-  implicit def equal[D: Equal, A: Equal]: Equal[Access[D, A]] =
+  implicit def equal[A: Equal]: Equal[Access[A]] =
     Equal.equalBy(generic)
 
-  protected def generic[D, A](a: Access[D, A]) =
+  protected def generic[A](a: Access[A]) =
     (Access.id.getOption(a), Access.value.getOption(a))
 }

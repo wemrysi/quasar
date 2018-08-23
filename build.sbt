@@ -271,6 +271,13 @@ lazy val qsu = project
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
+  .settings(libraryDependencies ++= Dependencies.qsu)
+  .settings(scalacOptions ++= {
+    CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((2, 12)) => Seq("-Ypatmat-exhaust-depth", "40")
+      case _ => Seq()
+    }
+  })
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val connector = project

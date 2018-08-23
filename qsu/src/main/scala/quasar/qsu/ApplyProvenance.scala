@@ -18,28 +18,38 @@ package quasar.qsu
 
 import slamdata.Predef._
 
+import quasar.contrib.matryoshka.ginterpret
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.fp.ski.ι
+import quasar.fp.ski.{ι, κ}
 import quasar.qscript.{
   construction,
   ExcludeId,
+  ExtractFunc,
+  FreeMapA,
   IdOnly,
   IdStatus,
-  OnUndefined,
+  IncludeId,
+  MapFuncsCore,
+  MapFuncsDerived,
+  MFC,
+  MFD,
   MonadPlannerErr,
+  OnUndefined,
   PlannerError
 }
+import quasar.qscript.provenance.Dimensions
 
 import matryoshka._
+import matryoshka.data.free._
 import matryoshka.implicits._
 import monocle.macros.Lenses
 import pathy.Path
-import scalaz.{Applicative, Cord, Functor, IList, Monad, Show, StateT, ValidationNel}
+import scalaz.{-\/, \/-, Applicative, Cord, Functor, IList, Monad, Show, StateT, ValidationNel}
 import scalaz.Scalaz._
 
 final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends QSUTTypes[T] {
@@ -65,17 +75,17 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
     val authGraph = graph.rewriteM[X] {
       case g @ Extractors.DimEdit(src, _) =>
         for {
-          _ <- computeProvenance[X](g)
+          _ <- computeDims[X](g)
           _ <- QAuthS[X].modify(_.supplant(src.root, g.root))
         } yield g.overwriteAtRoot(src.unfold map (_.root))
 
       case g @ Extractors.Transpose(src, retain, rot) =>
-        computeProvenance[X](g) as g.overwriteAtRoot {
+        computeDims[X](g) as g.overwriteAtRoot {
           LeftShift(src.root, recFunc.Hole, retain.fold[IdStatus](IdOnly, ExcludeId), OnUndefined.Omit, RightTarget[T], rot)
         }
 
       case other =>
-        computeProvenance[X](other) as other
+        computeDims[X](other) as other
     }
 
     authGraph.run(QAuth.empty[T]) map {
@@ -83,7 +93,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
     }
   }
 
-  def computeProvenance[F[_]: Monad: MonadPlannerErr: QAuthS](g: QSUGraph): F[QDims] = {
+  def computeDims[F[_]: Monad: MonadPlannerErr: QAuthS](g: QSUGraph): F[QDims] = {
     def flattened =
       s"${g.root} @ ${g.unfold.map(_.root).shows}"
 
@@ -92,16 +102,23 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         PlannerError.InternalError(s"Encountered unexpected $flattened.", None))
 
     g.unfold match {
-      case AutoJoin2(left, right, _) =>
-        compute2[F](g, left, right)(dims.join(_, _))
-
-      case AutoJoin3(left, center, right, _) =>
-        compute3[F](g, left, center, right) { (l, c, r) =>
-          dims.join(dims.join(l, c), r)
+      case AutoJoin2(left, right, combine) =>
+        compute2[F](g, left, right) { (l, r) =>
+          val joined = dims.join(l, r)
+          computeFuncDims(combine)(κ(joined)).getOrElse(joined)
         }
 
-      case QSAutoJoin(left, right, _, _) =>
-        compute2[F](g, left, right)(dims.join(_, _))
+      case AutoJoin3(left, center, right, combine) =>
+        compute3[F](g, left, center, right) { (l, c, r) =>
+          val joined = dims.join(l, dims.join(c, r))
+          computeFuncDims(combine)(κ(joined)).getOrElse(joined)
+        }
+
+      case QSAutoJoin(left, right, _, combine) =>
+        compute2[F](g, left, right) { (l, r) =>
+          val joined = dims.join(l, r)
+          computeFuncDims(combine)(κ(joined)).getOrElse(joined)
+        }
 
       case DimEdit(src, DTrans.Squash()) =>
         compute1[F](g, src)(dims.squash)
@@ -114,7 +131,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
           })
 
           val nextIdx = dims.nextGroupKeyIndex(g.root, updated)
-          val idAccess = IdAccess.groupKey[dims.D](g.root, nextIdx)
+          val idAccess = IdAccess.groupKey(g.root, nextIdx)
           val nextDims = dims.swap(0, 1, dims.lshift(idAccess, updated))
 
           QAuthS[F].modify(
@@ -131,25 +148,65 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       case JoinSideRef(_) => unexpectedError
 
-      case LeftShift(src, _, _, _, _, rot) =>
-        val tid = IdAccess.identity[dims.D](g.root)
+      case LeftShift(src, struct, idStatus, _, repair, rot) =>
+        val tid = IdAccess.identity(g.root)
         compute1[F](g, src) { sdims =>
-          rot match {
-            case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, sdims)
-            case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, sdims)
+          val structDims =
+            computeFuncDims(struct.linearize)(κ(sdims)) getOrElse sdims
+
+          val shiftedDims = rot match {
+            case Rotation.ShiftMap | Rotation.ShiftArray =>
+              dims.lshift(tid, structDims)
+
+            case Rotation.FlattenMap | Rotation.FlattenArray =>
+              dims.flatten(tid, structDims)
           }
+
+          val repairDims = computeFuncDims(repair) {
+            case ShiftTarget.LeftTarget =>
+              shiftedDims
+
+            case ShiftTarget.RightTarget =>
+              applyIdStatus(idStatus, shiftedDims)
+
+            case ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
+              shiftedDims
+
+            case ShiftTarget.AccessLeftTarget(_) =>
+              dims.empty
+          }
+
+          repairDims getOrElse shiftedDims
         }
 
-        case MultiLeftShift(src, shifts, _, _) =>
-          val tid = IdAccess.identity[dims.D](g.root)
-          compute1[F](g, src) { sdims =>
-            IList.fromList(shifts).sortBy(_._3).foldRight(sdims) {
-              case (shift, prv) => shift._3 match {
-                case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, prv)
-                case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, prv)
+      case MultiLeftShift(src, shifts, _, repair) =>
+        val tid = IdAccess.identity(g.root)
+        compute1[F](g, src) { sdims =>
+          val shiftsDims = shifts map {
+            case (struct, idStatus, rot) =>
+              val structDims =
+                computeFuncDims(struct)(κ(sdims)) getOrElse sdims
+
+              rot match {
+                case Rotation.ShiftMap | Rotation.ShiftArray =>
+                  dims.lshift(tid, structDims)
+
+                case Rotation.FlattenMap | Rotation.FlattenArray =>
+                  dims.flatten(tid, structDims)
               }
-            }
           }
+
+          val shiftedSrcDims =
+            shiftsDims.foldMapRight1Opt(ι)(dims.join(_, _)).getOrElse(sdims)
+
+          val repairDims = computeFuncDims(repair) {
+            case \/-(i) => applyIdStatus(shifts(i)._2, shiftedSrcDims)
+            case -\/(Access.Value(_)) => shiftedSrcDims
+            case -\/(_) => dims.empty
+          }
+
+          repairDims getOrElse shiftedSrcDims
+        }
 
       case LPFilter(_, _) => unexpectedError
 
@@ -165,9 +222,10 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       case QSFilter(src, _) =>
         compute1[F](g, src)(ι)
 
-      case QSReduce(src, _, _, _) =>
+      case QSReduce(src, _, _, repair) =>
         compute1[F](g, src) { sdims =>
-          dims.bucketAccess(g.root, dims.reduce(sdims))
+          val rdims = dims.bucketAccess(g.root, dims.reduce(sdims))
+          computeFuncDims(repair)(κ(rdims)) getOrElse rdims
         }
 
       case QSSort(src, _, _) =>
@@ -175,25 +233,35 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       case Unary(_, _) => unexpectedError
 
-      case Map(src, _) =>
-        compute1[F](g, src)(ι)
+      case Map(src, fm) =>
+        compute1[F](g, src) { sdims =>
+          computeFuncDims(fm.linearize)(κ(sdims)) getOrElse sdims
+        }
 
       case Read(file) =>
-        val rdims = dims.squash(segments(file).map(projStr).reverse)
+        val rdims = segments(file).toNel.fold(Dimensions.empty[dims.P]) { ss =>
+          dims.squash(Dimensions.origin1(ss.map(projPathSegment).reverse))
+        }
         QAuthS[F].modify(_.addDims(g.root, rdims)) as rdims
 
       case Subset(from, _, count) =>
         compute2[F](g, from, count)(dims.join(_, _))
 
-      case ThetaJoin(left, right, _, _, _) =>
-        compute2[F](g, left, right)(dims.join(_, _))
+      case ThetaJoin(left, right, _, _, combine) =>
+        compute2[F](g, left, right) { (l, r) =>
+          val joined = dims.join(l, r)
+          computeFuncDims(combine)(κ(joined)).getOrElse(joined)
+        }
 
       case Transpose(src, _, rot) =>
-        val tid = IdAccess.identity[dims.D](g.root)
+        val tid = IdAccess.identity(g.root)
         compute1[F](g, src) { sdims =>
           rot match {
-            case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, sdims)
-            case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, sdims)
+            case Rotation.ShiftMap | Rotation.ShiftArray =>
+              dims.lshift(tid, sdims)
+
+            case Rotation.FlattenMap | Rotation.FlattenArray =>
+              dims.flatten(tid, sdims)
           }
         }
 
@@ -203,6 +271,56 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       case Unreferenced() =>
         QAuthS[F].modify(_.addDims(g.root, dims.empty)) as dims.empty
     }
+  }
+
+  def computeFuncDims[A](fm: FreeMapA[A])(f: A => QDims): Option[QDims] =
+    some(fm.para(ginterpret(f, computeFuncProvenanceƒ[A]))).filter(_.nonEmpty)
+
+  def computeFuncProvenanceƒ[A]: GAlgebra[(FreeMapA[A], ?), MapFunc, QDims] = {
+    case MFC(MapFuncsCore.ConcatArrays((_, l), (_, r))) =>
+      // FIXME{ch1487}: Adjust rhs based on knowledge of lhs.
+      dims.join(l, r)
+
+    case MFC(MapFuncsCore.ConcatMaps((_, l), (_, r))) =>
+      dims.join(l, r)
+
+    case MFC(MapFuncsCore.Cond(_, (_, t), (_, f))) =>
+      dims.union(t, f)
+
+    case MFC(MapFuncsCore.DeleteKey((_, d), _)) =>
+      d
+
+    case MFC(MapFuncsCore.Guard(_, _, (_, a), (_, b))) =>
+      dims.union(a, b)
+
+    case MFC(MapFuncsCore.IfUndefined((_, a), (_, b))) =>
+      dims.union(a, b)
+
+    case MFC(MapFuncsCore.MakeArray((_, d))) =>
+      dims.injectStatic(EJson.int[T[EJson]](0), d)
+
+    case MFC(MapFuncsCore.MakeMap((ExtractFunc(MapFuncsCore.Constant(k)), _), (_, v))) =>
+      dims.injectStatic(k, v)
+
+    case MFC(MapFuncsCore.MakeMap(_, (_, v))) =>
+      dims.injectDynamic(v)
+
+    case MFC(MapFuncsCore.ProjectIndex((_, a), (ExtractFunc(MapFuncsCore.Constant(i)), _))) =>
+      dims.projectStatic(i, a)
+
+    case MFC(MapFuncsCore.ProjectIndex((_, a), _)) =>
+      dims.projectDynamic(a)
+
+    case MFC(MapFuncsCore.ProjectKey((_, m), (ExtractFunc(MapFuncsCore.Constant(k)), _))) =>
+      dims.projectStatic(k, m)
+
+    case MFC(MapFuncsCore.ProjectKey((_, m), _)) =>
+      dims.projectDynamic(m)
+
+    case MFD(MapFuncsDerived.Typecheck((_, d), _)) =>
+      d
+
+    case _ => dims.empty
   }
 
   ////
@@ -243,8 +361,8 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       }
     }
 
-  private def projStr(s: String): QProv.P[T] =
-    dims.prov.proj(ejson.CommonEJson(ejson.Str[T[EJson]](s)).embed)
+  private def projPathSegment(s: String): QProv.P[T] =
+    dims.prov.prjPath(ejson.CommonEJson(ejson.Str[T[EJson]](s)).embed)
 
   private def segments(p: Path[_, _, _]): IList[String] = {
     val segs = Path.flatten[IList[String]](IList(), IList(), IList(), IList(_), IList(_), p)
@@ -260,12 +378,32 @@ object ApplyProvenance {
       : F[AuthenticatedQSU[T]] =
     taggedInternalError("ApplyProvenance", new ApplyProvenance[T].apply[F](graph))
 
-  def computeProvenance[
+  def computeDims[
       T[_[_]]: BirecursiveT: EqualT: ShowT,
       F[_]: Monad: MonadPlannerErr: MonadState_[?[_], QAuth[T]]]
       (graph: QSUGraph[T])
       : F[QDims[T]] =
-    new ApplyProvenance[T].computeProvenance[F](graph)
+    new ApplyProvenance[T].computeDims[F](graph)
+
+  def computeFuncDims[
+      T[_[_]]: BirecursiveT: EqualT: ShowT, A](
+      fm: FreeMapA[T, A])(
+      f: A => QDims[T])
+      : Option[QDims[T]] =
+    new ApplyProvenance[T].computeFuncDims(fm)(f)
+
+  def applyIdStatus[T[_[_]]: BirecursiveT: EqualT](
+      status: IdStatus, qdims: QDims[T])
+      : QDims[T] =
+    status match {
+      case IncludeId =>
+        val dims = QProv[T]
+        dims.join(
+          dims.injectStatic(EJson.int[T[EJson]](0), qdims),
+          dims.injectStatic(EJson.int[T[EJson]](1), qdims))
+
+      case _ => qdims
+    }
 
   @Lenses
   final case class AuthenticatedQSU[T[_[_]]](graph: QSUGraph[T], auth: QAuth[T])
@@ -276,7 +414,7 @@ object ApplyProvenance {
         Cord("AuthenticatedQSU {\n") ++
         g.show ++
         Cord("\n\n") ++
-        d.show ++
+        d.filterVertices(g.foldMapDown(sg => Set(sg.root))).show ++
         Cord("\n}")
       }
   }

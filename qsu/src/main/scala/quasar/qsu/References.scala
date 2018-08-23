@@ -25,8 +25,7 @@ import quasar.qscript.{FreeMap, FreeMapA}
 
 import matryoshka.{delayShow, delayEqual, equalTEqual, showTShow, BirecursiveT, ShowT, EqualT}
 import matryoshka.data._
-// import matryoshka.data.free._
-import scalaz.{\/, Cord, Equal, IMap, ISet, Monoid, Order, Show}
+import scalaz.{\/, Cord, Equal, IMap, ISet, Monoid, Show}
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.tuple._
@@ -36,19 +35,19 @@ import scalaz.syntax.std.option._
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
 
-final case class References[T[_[_]], D](
-    accessing: References.Accessing[T, D],
-    accessed: References.Accessed[D]) {
+final case class References[T[_[_]]](
+    accessing: References.Accessing[T],
+    accessed: References.Accessed) {
 
-  def modifyAccess(of: Access[D, Symbol])(f: FreeMap[T] => FreeMap[T])(implicit D: Order[D]): References[T, D] =
+  def modifyAccess(of: Access[Symbol])(f: FreeMap[T] => FreeMap[T]): References[T] =
     modifySomeAccess(of, ISet.empty)(f)
 
-  def modifySomeAccess(of: Access[D, Symbol], except: ISet[Symbol])(f: FreeMap[T] => FreeMap[T])(implicit D: Order[D]): References[T, D] =
+  def modifySomeAccess(of: Access[Symbol], except: ISet[Symbol])(f: FreeMap[T] => FreeMap[T]): References[T] =
     accessed.lookup(of).fold(this) { syms =>
       copy(accessing = (syms \\ except).foldLeft(accessing)(_.adjust(_, _.adjust(of, f))))
     }
 
-  def recordAccess(by: Symbol, of: Access[D, Symbol], as: FreeMap[T])(implicit D: Order[D]): References[T, D] = {
+  def recordAccess(by: Symbol, of: Access[Symbol], as: FreeMap[T]): References[T] = {
     val accesses = IMap.singleton(of, as)
     val accessing1 = accessing.alter(by, _ map (_ union accesses) orElse some(accesses))
     val accessed1 = accessed |+| IMap.singleton(of, ISet singleton by)
@@ -56,7 +55,7 @@ final case class References[T[_[_]], D](
   }
 
   // Replace all accesses by `prev` with `next`.
-  def replaceAccess(prev: Symbol, next: Symbol)(implicit D: Order[D]): References[T, D] =
+  def replaceAccess(prev: Symbol, next: Symbol): References[T] =
     accessing.lookup(prev).fold(this) { accesses =>
       val nextAccessed = accesses.keySet.foldLeft(accessed) { (m, a) =>
         m.adjust(a, _.delete(prev).insert(next))
@@ -70,8 +69,7 @@ final case class References[T[_[_]], D](
   def resolveAccess[A, B]
     (by: Symbol, in: FreeMapA[T, A])
     (f: B => Symbol)
-    (ex: A => Access[D, B] \/ B)
-    (implicit D: Order[D])
+    (ex: A => Access[B] \/ B)
     : FreeMapA[T, B] =
       accessing.lookup(by).fold(in.map(a => ex(a).fold(Access.src.get(_), b => b))) { accesses =>
         in flatMap { a =>
@@ -87,27 +85,27 @@ final case class References[T[_[_]], D](
 
 object References {
   // How to access a given identity or value.
-  type Accesses[T[_[_]], D] = IMap[Access[D, Symbol], FreeMap[T]]
+  type Accesses[T[_[_]]] = IMap[Access[Symbol], FreeMap[T]]
   // Accesses by vertex.
-  type Accessing[T[_[_]], D] = IMap[Symbol, Accesses[T, D]]
+  type Accessing[T[_[_]]] = IMap[Symbol, Accesses[T]]
   // Vertices by access.
-  type Accessed[D] = IMap[Access[D, Symbol], ISet[Symbol]]
+  type Accessed = IMap[Access[Symbol], ISet[Symbol]]
 
-  def noRefs[T[_[_]], D]: References[T, D] =
+  def noRefs[T[_[_]]]: References[T] =
     References(IMap.empty, IMap.empty)
 
-  implicit def monoid[T[_[_]], D: Order]: Monoid[References[T, D]] =
+  implicit def monoid[T[_[_]]]: Monoid[References[T]] =
     Monoid.instance(
       (x, y) => References(
         x.accessing.unionWith(y.accessing)(_ union _),
         x.accessed |+| y.accessed),
       noRefs)
 
-  implicit def equal[T[_[_]]: BirecursiveT: EqualT, D: Equal]: Equal[References[T, D]] = {
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT]: Equal[References[T]] = {
     Equal.equalBy(r => (r.accessing, r.accessed))
   }
 
-  implicit def show[T[_[_]]: ShowT, D: Show]: Show[References[T, D]] =
+  implicit def show[T[_[_]]: ShowT]: Show[References[T]] =
     Show.show {
       case References(accessing, accessed) =>
         Cord("References {\n\n") ++

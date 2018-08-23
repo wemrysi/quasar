@@ -53,7 +53,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
                 case (newSrc, original, reduceExpr) =>
                   val buckets =
                     buckets0.map(_ flatMap { access =>
-                      if (Access.valueHole.isEmpty(access))
+                      if (Access.value[Hole].isEmpty(access))
                         func.Hole as access
                       else
                         original as access
@@ -98,10 +98,10 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
       res <- ids traverse {
         case id @ IdAccess.GroupKey(s, i) =>
           qauth.lookupGroupKeyE[F](s, i)
-            .map(fm => (ISet.singleton(s), fm as Access.value[prov.D, Hole](SrcHole)))
+            .map(fm => (ISet.singleton(s), fm as Access.value[Hole](SrcHole)))
 
         case other =>
-          (ISet.empty[Symbol], HoleF[T] as Access.id[prov.D, Hole](other, SrcHole)).point[F]
+          (ISet.empty[Symbol], HoleF[T] as Access.id[Hole](other, SrcHole)).point[F]
       }
     } yield res.unfzip leftMap (_.foldMap(ι))
 
@@ -110,7 +110,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
       : F[QSUGraph] =
     for {
       newGraph <- QSUGraph.withName[T, F]("rbu")(node)
-      _        <- ApplyProvenance.computeProvenance[T, F](newGraph)
+      _        <- ApplyProvenance.computeDims[T, F](newGraph)
     } yield newGraph
 
   private def mkReduce[A](

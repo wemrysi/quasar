@@ -21,58 +21,43 @@ import quasar.RenderTree
 import quasar.fp.symbolOrder
 
 import matryoshka._
-import monocle.{Prism, PPrism, Traversal}
-import scalaz.{Applicative, Equal, Order, Show, Traverse}
+import monocle.{Prism, Traversal}
+import scalaz.{Applicative, Equal, Order, Show}
 import scalaz.std.anyVal._
 import scalaz.std.option._
 import scalaz.std.tuple._
 import scalaz.syntax.applicative._
-import scalaz.syntax.either._
-import scalaz.syntax.show._
 
 /** Describes access to the various forms of ids. */
-sealed abstract class IdAccess[D]
+sealed abstract class IdAccess
 
 object IdAccess extends IdAccessInstances {
-  final case class Bucket[D](of: Symbol, idx: Int) extends IdAccess[D]
-  final case class GroupKey[D](of: Symbol, idx: Int) extends IdAccess[D]
-  final case class Identity[D](of: Symbol) extends IdAccess[D]
-  final case class Static[D](data: D) extends IdAccess[D]
+  final case class Bucket(of: Symbol, idx: Int) extends IdAccess
+  final case class GroupKey(of: Symbol, idx: Int) extends IdAccess
+  final case class Identity(of: Symbol) extends IdAccess
 
-  def bucket[D]: Prism[IdAccess[D], (Symbol, Int)] =
-    Prism.partial[IdAccess[D], (Symbol, Int)] {
+  val bucket: Prism[IdAccess, (Symbol, Int)] =
+    Prism.partial[IdAccess, (Symbol, Int)] {
       case Bucket(s, i) => (s, i)
     } { case (s, i) => Bucket(s, i) }
 
-  def groupKey[D]: Prism[IdAccess[D], (Symbol, Int)] =
-    Prism.partial[IdAccess[D], (Symbol, Int)] {
+  val groupKey: Prism[IdAccess, (Symbol, Int)] =
+    Prism.partial[IdAccess, (Symbol, Int)] {
       case GroupKey(s, i) => (s, i)
     } { case (s, i) => GroupKey(s, i) }
 
-  def identity[D]: Prism[IdAccess[D], Symbol] =
-    Prism.partial[IdAccess[D], Symbol] {
+  val identity: Prism[IdAccess, Symbol] =
+    Prism.partial[IdAccess, Symbol] {
       case Identity(s) => s
     } (Identity(_))
 
-  def static[D]: Prism[IdAccess[D], D] =
-    staticP[D, D]
-
-  def staticP[D, E]: PPrism[IdAccess[D], IdAccess[E], D, E] =
-    PPrism[IdAccess[D], IdAccess[E], D, E] {
-      case Bucket(s, i)   => bucket[E](s, i).left
-      case GroupKey(s, i) => groupKey[E](s, i).left
-      case Identity(s)    => identity[E](s).left
-      case Static(d)      => d.right
-    } (Static(_))
-
-  def symbols[D]: Traversal[IdAccess[D], Symbol] =
-    new Traversal[IdAccess[D], Symbol] {
-      def modifyF[F[_]: Applicative](f: Symbol => F[Symbol])(s: IdAccess[D]) =
+  val symbols: Traversal[IdAccess, Symbol] =
+    new Traversal[IdAccess, Symbol] {
+      def modifyF[F[_]: Applicative](f: Symbol => F[Symbol])(s: IdAccess) =
         s match {
           case Bucket(s, i)   => f(s) map (bucket(_, i))
           case GroupKey(s, i) => f(s) map (groupKey(_, i))
           case Identity(s)    => f(s) map (identity(_))
-          case Static(d)      => static(d).point[F]
         }
     }
 }
@@ -80,33 +65,26 @@ object IdAccess extends IdAccessInstances {
 sealed abstract class IdAccessInstances extends IdAccessInstances0 {
   import IdAccess._
 
-  implicit def traverse: Traverse[IdAccess] =
-    new Traverse[IdAccess] {
-      def traverseImpl[F[_]: Applicative, A, B](a: IdAccess[A])(f: A => F[B]) =
-        staticP[A, B].modifyF(f)(a)
-    }
-
-  implicit def order[D: Order]: Order[IdAccess[D]] =
+  implicit val order: Order[IdAccess] =
     Order.orderBy(generic(_))
 
-  implicit def renderTree[D: Show]: RenderTree[IdAccess[D]] =
-    RenderTree.fromShowAsType("IdAccess")
-
-  implicit def show[D: Show]: Show[IdAccess[D]] =
+  implicit val show: Show[IdAccess] =
     Show.shows {
       case Bucket(s, i)   => s"Bucket($s[$i])"
       case GroupKey(s, i) => s"GroupKey($s[$i])"
       case Identity(s)    => s"Identity($s)"
-      case Static(d)      => s"Static(${d.shows})"
     }
+
+  implicit val renderTree: RenderTree[IdAccess] =
+    RenderTree.fromShowAsType("IdAccess")
 }
 
 sealed abstract class IdAccessInstances0 {
-  import IdAccess.{bucket, groupKey, identity, static}
+  import IdAccess.{bucket, groupKey, identity}
 
-  implicit def equal[D: Equal]: Equal[IdAccess[D]] =
+  implicit val equal: Equal[IdAccess] =
     Equal.equalBy(generic(_))
 
-  protected def generic[D](a: IdAccess[D]) =
-    (bucket.getOption(a), groupKey.getOption(a), identity.getOption(a), static.getOption(a))
+  protected def generic(a: IdAccess) =
+    (bucket.getOption(a), groupKey.getOption(a), identity.getOption(a))
 }

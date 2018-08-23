@@ -37,15 +37,18 @@ sealed abstract class JoinKeyInstances {
 }
 
 
+/** A disjunction of a conjunction of the intersection between two sets of
+  * identities (itself represented as a disjunction of `JoinKey`s).
+  */
 @Lenses
-final case class JoinKeys[I](keys: IList[NonEmptyList[JoinKey[I]]])
+final case class JoinKeys[I](keys: IList[NonEmptyList[NonEmptyList[JoinKey[I]]]])
 
 object JoinKeys extends JoinKeysInstances {
   def empty[I]: JoinKeys[I] =
     JoinKeys(IList())
 
   def singleton[I](l: I, r: I): JoinKeys[I] =
-    JoinKeys(IList(NonEmptyList(JoinKey(l, r))))
+    JoinKeys(IList(NonEmptyList(NonEmptyList(JoinKey(l, r)))))
 }
 
 sealed abstract class JoinKeysInstances {
@@ -62,7 +65,7 @@ sealed abstract class JoinKeysInstances {
     plusEmpty.monoid[I]
 
   implicit def equal[I: Equal]: Equal[JoinKeys[I]] =
-    Equal.equalBy(jks => AsSet(jks.keys map (AsSet(_))))
+    Equal.equalBy(jks => AsSet(jks.keys.map(conjs => AsSet(conjs.map(AsSet(_))))))
 
   implicit def show[I: Show]: Show[JoinKeys[I]] =
     Show.shows(jks => "JoinKeys" + jks.keys.shows)

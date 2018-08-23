@@ -57,9 +57,9 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
     case qgraph @ QSReduce(src, buckets, reducers, repair) =>
       def rebuild(src: QSUGraph, fm: FreeMap): G[QSUGraph] = {
-        def rewriteBucket(bucket: QAccess[Hole]): FreeMapA[QAccess[Hole]] = bucket match {
+        def rewriteBucket(bucket: Access[Hole]): FreeMapA[Access[Hole]] = bucket match {
           case v @ Access.Value(_) => fm.map(κ(v))
-          case other => Free.pure[MapFunc, QAccess[Hole]](other)
+          case other => Free.pure[MapFunc, Access[Hole]](other)
         }
 
         val buckets2 = buckets.map(_.flatMap(rewriteBucket))

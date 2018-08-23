@@ -2,8 +2,8 @@
   "name": "wildcard shifted map key and shifted map value on nested map",
 
   "backends": {
-      "lwc_local": "pendingIgnoreFieldOrder",
-      "mimir":     "pendingIgnoreFieldOrder"
+      "lwc_local": "ignoreFieldOrder",
+      "mimir":     "ignoreFieldOrder"
   },
   "data": "nested_map.data",
 

@@ -53,6 +53,9 @@ final case class QAuth[T[_[_]]](
     copy(groupKeys = groupKeys ++ tgtKeys)
   }
 
+  def filterVertices(p: Symbol => Boolean): QAuth[T] =
+    QAuth(dims.filterKeys(p), groupKeys.filterKeys { case (s, _) => p(s) })
+
   def lookupDims(vertex: Symbol): Option[QDims[T]] =
     dims get vertex
 
@@ -106,7 +109,7 @@ sealed abstract class QAuthInstances {
     Monoid.instance(_ ++ _, QAuth.empty[T])
 
   implicit def equal[T[_[_]]: BirecursiveT: EqualT]: Equal[QAuth[T]] = {
-    implicit val eqP: Equal[QProv.P[T]] = QProv[T].prov.provenanceEqual
+    implicit val eqP: Equal[QProv.P[T]] = QProv[T].prov.implicits.provEqual
     Equal.equalBy(qa => (qa.dims, qa.groupKeys))
   }
 
