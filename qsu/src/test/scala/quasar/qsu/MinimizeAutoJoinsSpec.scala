@@ -1505,7 +1505,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
       // TODO: Should really be 3, but another bug is duplicating the inner
       //       shift common to both sides of the `Or`
-      leftShiftCount must_= 4
+      leftShiftCount must_= 3
     }
 
     "create a single AutoJoin2 when there are exactly two sources" in {
