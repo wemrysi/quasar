@@ -827,7 +827,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
     // performed by reorderCandidates is only visible inside the final
     // coalesce.
 
-    // Unlike reorderCandidates, the left-side int of the tuple are
+    // Unlike reorderCandidates, the right int of the tuple are
     // list positions rather than frequency counts
     def reorderWithIndex(cs: List[(QSUGraph, Int)]): List[(QSUGraph, Int)] = {
       val matching = SMap(cs.map(_.leftMap(_.root)): _*)
