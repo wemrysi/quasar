@@ -17,27 +17,26 @@
 package quasar.impl.datasource.local
 
 import slamdata.Predef.{Stream => _, Seq => _, _}
+import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.common.data.Data
 import quasar.connector.{Datasource, MonadResourceErr, ResourceError}, ResourceError._
 import quasar.connector.datasource.LightweightDatasource
 import quasar.contrib.fs2.convert
 import quasar.contrib.scalaz.MonadError_
-import quasar.frontend.data.DataCodec.Precise
 import quasar.fp.ski.ι
+import quasar.impl.parse.QDataPreciseFacade
 
 import java.nio.file.{Files, Path => JPath}
-import java.text.ParseException
 
 import scala.concurrent.ExecutionContext
 
-import argonaut.Json
 import cats.effect.{Effect, Timer}
-import fs2.{io, Chunk, Stream}
-import jawn.support.argonaut.Parser.facade
+import fs2.{io, Stream}
+import jawn.Facade
 import jawnfs2._
 import pathy.Path
+import qdata.QDataEncode
 import scalaz.{\/, Scalaz}, Scalaz._
 import shims._
 
@@ -55,29 +54,32 @@ final class LocalDatasource[F[_]: Timer] private (
     readChunkSizeBytes: Int,
     pool: ExecutionContext)(
     implicit F: Effect[F], RE: MonadResourceErr[F])
-    extends LightweightDatasource[F, Stream[F, ?], Stream[F, Data]] {
+    extends LightweightDatasource[F, Stream[F, ?]] {
 
   implicit val ec: ExecutionContext = pool
 
-  val kind: DatasourceType = LocalType
+  def evaluator[R: QDataEncode]: QueryEvaluator[F, ResourcePath, Stream[F, R]] =
+    new QueryEvaluator[F, ResourcePath, Stream[F, R]] {
+      implicit val facade: Facade[R] = QDataPreciseFacade.qdataPrecise
 
-  def evaluate(path: ResourcePath): F[Stream[F, Data]] =
-    for {
-      jp <- toNio(path)
+      def evaluate(path: ResourcePath): F[Stream[F, R]] =
+        for {
+          jp <- toNio(path)
 
-      exists <- F.delay(Files.exists(jp))
-      _ <- exists.unlessM(RE.raiseError(pathNotFound(path)))
+          exists <- F.delay(Files.exists(jp))
+          _ <- exists.unlessM(RE.raiseError(pathNotFound(path)))
 
-      isFile <- F.delay(Files.isRegularFile(jp))
-      _ <- isFile.unlessM(RE.raiseError(notAResource(path)))
-    } yield {
-      io.file.readAllAsync[F](jp, readChunkSizeBytes)
-        .chunks
-        .map(_.toByteBuffer)
-        .parseJsonStream[Json]
-        .chunks
-        .flatMap(decodeChunk)
+          isFile <- F.delay(Files.isRegularFile(jp))
+          _ <- isFile.unlessM(RE.raiseError(notAResource(path)))
+        } yield {
+          io.file.readAllAsync[F](jp, readChunkSizeBytes)
+            .chunks
+            .map(_.toByteBuffer)
+            .parseJsonStream[R]
+        }
     }
+
+  val kind: DatasourceType = LocalType
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     toNio(path) >>= (jp => F.delay(Files.isRegularFile(jp)))
@@ -104,12 +106,6 @@ final class LocalDatasource[F[_]: Timer] private (
 
   private val ME = MonadError_[F, Throwable]
 
-  private def decodeChunk(c: Chunk[Json]): Stream[F, Data] =
-    c.traverse(Precise.decode)
-      .leftMap(e => new ParseException(e.message, -1))
-      .fold(Stream.raiseError, Stream.chunk)
-      .covary[F]
-
   private def toNio(rp: ResourcePath): F[JPath] =
     Path.flatten("", "", "", ι, ι, rp.toPath).foldLeftM(root) { (p, n) =>
       if (n.isEmpty) p.point[F]
@@ -126,6 +122,6 @@ object LocalDatasource {
       root: JPath,
       readChunkSizeBytes: Int,
       pool: ExecutionContext)
-      : Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]] =
+      : Datasource[F, Stream[F, ?], ResourcePath] =
     new LocalDatasource[F](root, readChunkSizeBytes, pool)
 }

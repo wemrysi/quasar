@@ -18,7 +18,7 @@ package quasar.time
 
 import slamdata.Predef._
 
-import qdata.time.OffsetDate
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.lang.IllegalArgumentException
 import java.time._
@@ -46,6 +46,12 @@ object DateTimeUtil {
   def parseLocalTime(value: String): LocalTime = LocalTime.parse(value)
 
   def parseLocalDate(value: String): LocalDate = LocalDate.parse(value)
+
+  def parseInterval(value: String): DateTimeInterval =
+    DateTimeInterval.parse(value) match {
+      case Some(i) => i
+      case None => scala.sys.error(s"Failed to parse interval $value.")
+    }
 
   def isValidTimestamp(str: String): Boolean = try {
     parseInstant(str); true

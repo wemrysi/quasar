@@ -1,5 +1,5 @@
 {
-    "name": "simple filter using date literals",
+    "name": "foo simple filter using date literals",
     "backends": {
         "mimir":          "pending"
     },

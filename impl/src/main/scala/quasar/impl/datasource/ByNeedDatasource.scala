@@ -18,6 +18,7 @@ package quasar.impl.datasource
 
 import slamdata.Predef.{Boolean, None, Option, Some, Throwable, Unit}
 import quasar.Disposable
+import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.Datasource
@@ -31,23 +32,27 @@ import cats.syntax.applicative._
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import fs2.Scheduler
+import fs2.{Scheduler, Stream}
 import fs2.async
 import fs2.async.mutable
+import qdata.QDataEncode
 
 import ByNeedDatasource.NeedState
 
-final class ByNeedDatasource[F[_], G[_], Q, R] private (
+final class ByNeedDatasource[F[_], G[_], Q] private (
     datasourceType: DatasourceType,
-    mvar: mutable.Queue[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]],
+    mvar: mutable.Queue[F, NeedState[F, Disposable[F, Datasource[F, G, Q]]]],
     scheduler: Scheduler)(
     implicit F: MonadError[F, Throwable])
-    extends Datasource[F, G, Q, R] {
+    extends Datasource[F, G, Q] {
+
+  def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, Stream[F, R]] =
+    new QueryEvaluator[F, Q, Stream[F, R]] {
+      def evaluate(query: Q): F[Stream[F, R]] =
+        getDatasource.flatMap(_.evaluator.evaluate(query))
+    }
 
   val kind: DatasourceType = datasourceType
-
-  def evaluate(query: Q): F[R] =
-    getDatasource.flatMap(_.evaluate(query))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     getDatasource.flatMap(_.pathIsResource(path))
@@ -58,7 +63,7 @@ final class ByNeedDatasource[F[_], G[_], Q, R] private (
 
   ////
 
-  private def getDatasource: F[Datasource[F, G, Q, R]] =
+  private def getDatasource: F[Datasource[F, G, Q]] =
     for {
       needState <- mvar.peek1
 
@@ -71,7 +76,7 @@ final class ByNeedDatasource[F[_], G[_], Q, R] private (
       }
     } yield ds
 
-  private def initAndGet: F[Datasource[F, G, Q, R]] =
+  private def initAndGet: F[Datasource[F, G, Q]] =
     mvar.timedDequeue1(Duration.Zero, scheduler) flatMap {
       case Some(s @ NeedState.Uninitialized(init)) =>
         val doInit = for {
@@ -99,21 +104,21 @@ object ByNeedDatasource {
     final case class Initialized[F[_], A](a: A) extends NeedState[F, A]
   }
 
-  def apply[F[_]: Effect, G[_], Q, R](
+  def apply[F[_]: Effect, G[_], Q](
       kind: DatasourceType,
-      init: F[Disposable[F, Datasource[F, G, Q, R]]],
+      init: F[Disposable[F, Datasource[F, G, Q]]],
       scheduler: Scheduler)(
       implicit ec: ExecutionContext)
-      : F[Disposable[F, Datasource[F, G, Q, R]]] = {
+      : F[Disposable[F, Datasource[F, G, Q]]] = {
 
-    def dispose(q: mutable.Queue[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]]): F[Unit] =
+    def dispose(q: mutable.Queue[F, NeedState[F, Disposable[F, Datasource[F, G, Q]]]]): F[Unit] =
       q.dequeue1 flatMap {
         case NeedState.Initialized(ds) => ds.dispose
         case _ => ().pure[F]
       }
 
     for {
-      mvar <- async.boundedQueue[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]](1)
+      mvar <- async.boundedQueue[F, NeedState[F, Disposable[F, Datasource[F, G, Q]]]](1)
       _    <- mvar.enqueue1(NeedState.Uninitialized(init))
     } yield Disposable(new ByNeedDatasource(kind, mvar, scheduler), dispose(mvar))
   }

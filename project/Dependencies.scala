@@ -102,7 +102,8 @@ object Dependencies {
   def impl = Seq(
     "org.http4s"     %% "jawn-fs2"      % "0.12.2",
     "org.slf4s"      %% "slf4s-api"     % slf4sVersion,
-    "org.spire-math" %% "jawn-argonaut" % jawnVersion
+    "org.spire-math" %% "jawn-argonaut" % jawnVersion,
+    "org.spire-math" %% "jawn-util"     % jawnVersion
   )
 
   def repl = Seq(

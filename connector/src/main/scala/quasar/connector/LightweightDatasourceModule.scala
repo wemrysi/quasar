@@ -20,7 +20,6 @@ import quasar.Disposable
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource.ResourcePath
-import quasar.common.data.Data
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, Timer}
@@ -31,5 +30,5 @@ trait LightweightDatasourceModule {
   def kind: DatasourceType
   def sanitizeConfig(config: Json): Json
   def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
-      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]]]]
+      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath]]]
 }

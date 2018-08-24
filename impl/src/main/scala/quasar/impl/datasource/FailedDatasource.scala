@@ -17,25 +17,31 @@
 package quasar.impl.datasource
 
 import slamdata.Predef.{Boolean, Option}
+import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.Datasource
 import quasar.contrib.scalaz.MonadError_
 
+import fs2.Stream
+import qdata.QDataEncode
 import scalaz.Applicative
 
 final class FailedDatasource[
     E,
     F[_]: Applicative: MonadError_[?[_], E],
-    G[_], Q, R] private (
+    G[_], Q] private (
     datasourceType: DatasourceType,
     error: E)
-    extends Datasource[F, G, Q, R] {
+    extends Datasource[F, G, Q] {
+
+  def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, Stream[F, R]] =
+    new QueryEvaluator[F, Q, Stream[F, R]] {
+      def evaluate(query: Q): F[Stream[F, R]] =
+        MonadError_[F, E].raiseError(error)
+    }
 
   val kind: DatasourceType = datasourceType
-
-  def evaluate(query: Q): F[R] =
-    MonadError_[F, E].raiseError(error)
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     MonadError_[F, E].raiseError(error)
@@ -49,9 +55,9 @@ object FailedDatasource {
   def apply[
       E,
       F[_]: Applicative: MonadError_[?[_], E],
-      G[_], Q, R](
+      G[_], Q](
       kind: DatasourceType,
       error: E)
-      : Datasource[F, G, Q, R] =
-    new FailedDatasource[E, F, G, Q, R](kind, error)
+      : Datasource[F, G, Q] =
+    new FailedDatasource[E, F, G, Q](kind, error)
 }

@@ -34,6 +34,7 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp.ski.{κ, κ2}
 import quasar.impl.DatasourceModule
+import quasar.impl.DatasourceModule.{Heavyweight, Lightweight}
 import quasar.impl.datasource.{ByNeedDatasource, ConditionReportingDatasource, FailedDatasource}
 import quasar.impl.schema._
 import quasar.qscript._
@@ -50,7 +51,6 @@ import fs2.async.{Ref, immutable, mutable}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import pathy.Path
 import scalaz.{\/, EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz}, Scalaz._
-import quasar.impl.DatasourceModule.{Heavyweight, Lightweight}
 import shims._
 import spire.algebra.Field
 import spire.math.ConvertableTo
@@ -160,11 +160,12 @@ final class DatasourceManagement[
           recFunc.Constant(EJson.int(sstEvalConfig.sampleSize.value))))
 
     withDs[DiscoveryError[I], Option[sstConfig.Schema]](datasourceId) { ds =>
-      val dataStream = ds.fold(
-        lw => lw.evaluate(path).map(_.take(sstEvalConfig.sampleSize.value)),
-        hw => hw.evaluate(sampleQuery))
 
-      val k = ConvertableTo[N].fromLong(sstEvalConfig.sampleSize.value)
+      val dataStream: F[Stream[F, Data]] = ds.fold(
+        lw => lw.evaluator[Data].evaluate(path).map(_.take(sstEvalConfig.sampleSize.value)),
+        hw => hw.evaluator[Data].evaluate(sampleQuery))
+
+      val k: N = ConvertableTo[N].fromLong(sstEvalConfig.sampleSize.value)
 
       Stream.force(dataStream)
         .chunkLimit(sstEvalConfig.chunkSize.value.toInt)
@@ -210,7 +211,7 @@ final class DatasourceManagement[
 
   private def withDatasource[E >: ExistentialError[I] <: DatasourceError[I, Json], A](
       datasourceId: I)(
-      f: Datasource[F, Stream[F, ?], _, _] => F[A])
+      f: Datasource[F, Stream[F, ?], _] => F[A])
       : F[E \/ A] =
     withDs[E, A](datasourceId)(ds => f(ds.merge))
 
@@ -228,8 +229,8 @@ final class DatasourceManagement[
 
 object DatasourceManagement {
   type Modules = IMap[DatasourceType, DatasourceModule]
-  type LDS[F[_]] = Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]]
-  type HDS[T[_[_]], F[_]] = Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], Stream[F, Data]]
+  type LDS[F[_]] = Datasource[F, Stream[F, ?], ResourcePath]
+  type HDS[T[_[_]], F[_]] = Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]]]
   type DS[T[_[_]], F[_]] = LDS[F] \/ HDS[T, F]
   type Running[I, T[_[_]], F[_]] = IMap[I, Disposable[F, DS[T, F]]]
 
@@ -259,7 +260,7 @@ object DatasourceManagement {
         case (id, ref @ DatasourceRef(kind, _, _)) =>
           modules.lookup(kind) match {
             case None =>
-              val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], ResourcePath, Stream[F, Data]](
+              val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], ResourcePath](
                 kind,
                 DatasourceUnsupported(kind, modules.keySet))
 
@@ -282,12 +283,12 @@ object DatasourceManagement {
     } yield (mgmt, runningS)
   }
 
-  def withErrorReporting[F[_]: Monad: MonadError_[?[_], Exception], I: Order, G[_], Q, R](
+  def withErrorReporting[F[_]: Monad: MonadError_[?[_], Exception], I: Order, G[_], Q](
       errors: Ref[F, IMap[I, Exception]],
       datasourceId: I,
-      ds: Datasource[F, G, Q, R])
-      : Datasource[F, G, Q, R] =
-    ConditionReportingDatasource[Exception, F, G, Q, R](
+      ds: Datasource[F, G, Q])
+      : Datasource[F, G, Q] =
+    ConditionReportingDatasource[Exception, F, G, Q](
       c => errors.modify(_.alter(datasourceId, κ(Condition.optionIso.get(c)))).void, ds)
 
   ////
