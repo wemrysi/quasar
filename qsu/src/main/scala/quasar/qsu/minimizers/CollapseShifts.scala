@@ -288,7 +288,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               accessHoleLeftF,
               func.MakeMapS(ResultsField, repair2))
 
-            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, OnUndefined.Emit, N.freeMF0(repair3))) map { rewritten =>
+            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, OnUndefined.Emit, N.freeMF(repair3))) map { rewritten =>
               rewritten :++ src
             }
         }
@@ -306,7 +306,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted.linearize)
 
             reconstructed.overwriteAtRoot(
-              QSU.MultiLeftShift(src.root, shifts, onUndefined, N.freeMF0(repair2)))
+              QSU.MultiLeftShift(src.root, shifts, onUndefined, N.freeMF(repair2)))
 
           case reconstructed => reconstructed
         }
@@ -452,7 +452,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.LeftShift[T, Symbol](
-              sym, structL, idStatusAdj, onUndefinedL, N.freeMF0(repair), rotL)
+              sym, structL, idStatusAdj, onUndefinedL, N.freeMF(repair), rotL)
           }
 
         case
@@ -476,7 +476,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               (structLAdj, idStatusL, rotL) :: (structRAdj, idStatusR, rotR) :: Nil,
               OnUndefined.Emit,
-              N.freeMF0(repair))
+              N.freeMF(repair))
           }
 
         case
@@ -502,7 +502,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj ::: (structRAdj, idStatusR, rotR) :: Nil,
               OnUndefined.Emit,
-              N.freeMF0(repair))
+              N.freeMF(repair))
           }
 
         case
@@ -526,7 +526,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               (structL.linearize, idStatusL, rotL) :: shiftsRAdj,
               OnUndefined.Emit,
-              N.freeMF0(repair))
+              N.freeMF(repair))
           }
 
         case
@@ -552,7 +552,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj ::: shiftsRAdj,
               OnUndefined.Emit,
-              N.freeMF0(repair))
+              N.freeMF(repair))
           }
 
         case
@@ -577,7 +577,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               structLAdj.asRec,
               idStatusL,
               OnUndefined.Emit,
-              N.freeMF0(repair),
+              N.freeMF(repair),
               rotL)
           }
 
@@ -602,7 +602,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj,
               OnUndefined.Emit,
-              N.freeMF0(repair))
+              N.freeMF(repair))
           }
 
         case
@@ -627,7 +627,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               structRAdj.asRec,
               idStatusR,
               OnUndefined.Emit,
-              N.freeMF0(repair),
+              N.freeMF(repair),
               rotR)
           }
 
@@ -652,7 +652,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsRAdj,
               OnUndefined.Emit,
-              N.freeMF0(repair))
+              N.freeMF(repair))
           }
 
         case (Nil, Nil) =>
@@ -713,7 +713,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
       case Map(MultiLeftShift(src, shifts, onUndefined, repair), fm) =>
         val repair2 = fm.linearize >> repair
-        g.overwriteAtRoot(QSU.MultiLeftShift(src.root, shifts, onUndefined, N.freeMF0(repair2))).some
+        g.overwriteAtRoot(QSU.MultiLeftShift(src.root, shifts, onUndefined, N.freeMF(repair2))).some
       case _ => none
     }
 
