@@ -728,7 +728,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
     def compatibleShifts(l: ShiftGraph, r: ShiftGraph): Boolean = {
       (l, r) match {
-        // FIXME: compare the struct symbols, not the FreeMaps
+        // FIXME: compare the struct symbols, not the FreeMaps. ch1555
         case (-\/(QSU.LeftShift(srcL, structL0, _, _, _, rotL)), -\/(QSU.LeftShift(srcR, structR0, _, _, _, rotR))) => {
           val structL = elideGuards(structL0.linearize)
           val structR = elideGuards(structR0.linearize)
@@ -769,7 +769,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         }).unite
 
 
-      // FIXME: quadratic complexity.
+      // FIXME: quadratic complexity. ch1555
       val cs1 = cs0.map {
         case (cand, (shifting, struct, rot)) => {
           val freqCount = cs0.filter {
