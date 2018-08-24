@@ -778,7 +778,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             }
           }.length
 
-          (cand, freqCount)
+          (cand, freqCount, shifting)
         }
       }
 
@@ -788,8 +788,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         cs
       else
         cs1.sortBy {
-          case (_, freqCount) => -freqCount
-        }.firsts ++ noReorder
+          case (_, freqCount, shifting) => (-freqCount, shifting.name)
+        }.map(_._1) ++ noReorder
     }
 
     // The order of the incoming candidates is important and we need to
