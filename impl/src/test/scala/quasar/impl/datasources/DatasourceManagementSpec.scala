@@ -39,7 +39,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import argonaut.Json
 import argonaut.JsonScalaz._
-import argonaut.Argonaut.jString
+import argonaut.Argonaut.{jString, jEmptyObject}
 import cats.{Applicative, ApplicativeError, MonadError}
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.applicative._
@@ -96,9 +96,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
   val lightMod = new LightweightDatasourceModule {
     val kind = LightT
 
-    def sanitizeConfig(config: Json): Json = {
-      config.hcursor.downField("credentials").downField("secretKey").set(jString("***********")).undo.getOrElse(config)
-    }
+    def sanitizeConfig(config: Json): Json = jString("sanitized")
 
     def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
         : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]]]] =
@@ -108,9 +106,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
   val heavyMod = new HeavyweightDatasourceModule {
     val kind = HeavyT
 
-    def sanitizeConfig(config: Json): Json = {
-      config.hcursor.downField("credentials").downField("secretKey").set(jString("***********")).undo.getOrElse(config)
-    }
+    def sanitizeConfig(config: Json): Json = jString("sanitized")
 
     def heavyweightDatasource[
         T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
@@ -348,6 +344,30 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
         _  <- mgmt.pathIsResource(-1, ResourcePath.root() / ResourceName("foo")).attempt
         e1 <- mgmt.datasourceError(-1)
       } yield e1.exists(_.getMessage.contains("Unsupported")) must beTrue
+    }
+  }
+
+  "config sanitization" >> {
+
+    val cleansed = jString("sanitized")
+
+    "invoke sanitizeConfig on lightweight module" >> withMgmt { (mgmt, _) =>
+      for {
+        l <- mgmt.sanitizeRef(DatasourceRef(LightT, DatasourceName("b"), jString("config"))).pure[IO]
+        h <- mgmt.sanitizeRef(DatasourceRef(HeavyT, DatasourceName("b"), jString("config"))).pure[IO]
+      } yield {
+        l.config must_= cleansed
+        h.config must_= cleansed
+      }
+    }
+
+    "invoke sanitizeConfig on nonexistant module" >> withMgmt { (mgmt, _) =>
+      val unkT = DatasourceType("unknown", 1L)
+      for {
+        u <- mgmt.sanitizeRef(DatasourceRef(unkT, DatasourceName("b"), jString("config"))).pure[IO]
+      } yield {
+        u.config must_= jEmptyObject
+      }
     }
   }
 }
