@@ -43,13 +43,15 @@ import quasar.sst._
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
+import argonaut.Argonaut.jEmptyObject
 import cats.ApplicativeError
 import cats.effect.{ConcurrentEffect, Timer}
 import fs2.{Scheduler, Stream}
-import fs2.async.{immutable, mutable, Ref}
+import fs2.async.{Ref, immutable, mutable}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import pathy.Path
 import scalaz.{\/, EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz}, Scalaz._
+import quasar.impl.DatasourceModule.{Heavyweight, Lightweight}
 import shims._
 import spire.algebra.Field
 import spire.math.ConvertableTo
@@ -72,6 +74,16 @@ final class DatasourceManagement[
   type Running = DatasourceManagement.Running[I, T, F]
 
   // DatasourceControl
+
+  def sanitizeRef(ref: DatasourceRef[Json]): DatasourceRef[Json] = {
+    modules.lookup(ref.kind) match {
+      case Some(n) => n match {
+        case Lightweight(lw) => ref.copy(config = lw.sanitizeConfig(ref.config))
+        case Heavyweight(hw) => ref.copy(config = hw.sanitizeConfig(ref.config))
+      }
+      case _ => ref.copy(config = jEmptyObject)
+    }
+  }
 
   def initDatasource(datasourceId: I, ref: DatasourceRef[Json])
       : F[Condition[CreateError[Json]]] = {

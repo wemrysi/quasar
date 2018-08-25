@@ -18,17 +18,21 @@ package quasar.impl
 
 import quasar.api.datasource.DatasourceType
 import quasar.connector.{HeavyweightDatasourceModule, LightweightDatasourceModule}
+import argonaut.Json
 
 sealed trait DatasourceModule {
   def kind: DatasourceType
+  def sanitizeConfig(config: Json): Json
 }
 
 object DatasourceModule {
   final case class Lightweight(lw: LightweightDatasourceModule) extends DatasourceModule {
     def kind = lw.kind
+    def sanitizeConfig(config: Json): Json = lw.sanitizeConfig(config)
   }
 
   final case class Heavyweight(hw: HeavyweightDatasourceModule) extends DatasourceModule {
     def kind = hw.kind
+    def sanitizeConfig(config: Json): Json = hw.sanitizeConfig(config)
   }
 }

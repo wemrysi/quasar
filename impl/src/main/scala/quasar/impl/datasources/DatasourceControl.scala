@@ -66,4 +66,6 @@ trait DatasourceControl[F[_], G[_], I, C, S <: SchemaConfig] {
 
   /** The types of datasources supported. */
   def supportedDatasourceTypes: F[ISet[DatasourceType]]
+
+  def sanitizeRef(ref: DatasourceRef[C]): DatasourceRef[C]
 }

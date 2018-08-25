@@ -261,6 +261,9 @@ abstract class DatasourcesSpec[
   def refB: F[DatasourceRef[C]] =
     randomName map (DatasourceRef(supportedType, _, validConfigs._2))
 
+  def sanitizedRefB: F[DatasourceRef[C]] =
+    randomName map (DatasourceRef(supportedType, _, validConfigs._2))
+
   def createRef(r: DatasourceRef[C]): F[I] =
     datasources.addDatasource(r) >>= expectSuccess
 
