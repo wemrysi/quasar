@@ -17,7 +17,7 @@
 package quasar.qsu
 package minimizers
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => SMap, _}
 import quasar.RenderTreeT
 import quasar.common.effect.NameGenerator
 import quasar.contrib.std.errorImpossible
@@ -28,11 +28,18 @@ import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,
+  ExcludeId,
   Hole,
   HoleF,
+  IdOnly,
   IdStatus,
+  IncludeId,
   JoinSide,
   LeftSide,
+  MFC,
+  MFD,
+  MapFuncsCore,
+  MapFuncsDerived,
   MonadPlannerErr,
   OnUndefined,
   RightSide,
@@ -42,8 +49,10 @@ import quasar.qscript.RecFreeS._
 import quasar.qscript.rewrites.NormalizableT
 import quasar.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 
+import matryoshka.{Recursive, Corecursive}
 import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._
+import matryoshka.patterns.CoEnv
 import scalaz.{
   -\/,
   \/-,
@@ -279,7 +288,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               accessHoleLeftF,
               func.MakeMapS(ResultsField, repair2))
 
-            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, OnUndefined.Emit, repair3)) map { rewritten =>
+            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, OnUndefined.Emit, N.freeMF(repair3))) map { rewritten =>
               rewritten :++ src
             }
         }
@@ -297,7 +306,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted.linearize)
 
             reconstructed.overwriteAtRoot(
-              QSU.MultiLeftShift(src.root, shifts, onUndefined, repair2))
+              QSU.MultiLeftShift(src.root, shifts, onUndefined, N.freeMF(repair2)))
 
           case reconstructed => reconstructed
         }
@@ -409,11 +418,47 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         }
       }
 
+      def fixCompatible(repair: FreeMapA[ShiftTarget], idStatus: IdStatus, resultIdStatus: IdStatus): FreeMapA[ShiftTarget] =
+        (idStatus, resultIdStatus) match {
+          case (IdOnly, IncludeId) => repair flatMap {
+            case ShiftTarget.LeftTarget => scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
+            case ShiftTarget.RightTarget => func.ProjectIndexI(RightTarget, 0)
+            case access @ ShiftTarget.AccessLeftTarget(_) => Free.pure(access)
+          }
+
+          case (ExcludeId, IncludeId) => repair flatMap {
+            case ShiftTarget.LeftTarget => scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
+            case ShiftTarget.RightTarget => func.ProjectIndexI(RightTarget, 1)
+            case access @ ShiftTarget.AccessLeftTarget(_) => Free.pure(access)
+          }
+          case _ => repair
+        }
+
       (left, right) match {
         case
-          (
-            -\/(QSU.LeftShift(fakeParent, structL, idStatusL, _, repairL, rotL)) :: tailL,
-            -\/(QSU.LeftShift(_, structR, idStatusR, _, repairR, rotR)) :: tailR) =>
+            (
+              (lshift @ -\/(QSU.LeftShift(fakeParent, structL, idStatusL, onUndefinedL, repairL, rotL))) :: tailL,
+              (rshift @ -\/(QSU.LeftShift(_, _, idStatusR, onUndefinedR, repairR, _))) :: tailR)
+          if compatibleShifts(lshift, rshift) =>
+
+          val idStatusAdj = idStatusL |+| idStatusR
+          val repairLAdj = fixCompatible(repairL, idStatusL, idStatusAdj)
+          val repairRAdj = fixCompatible(repairR, idStatusR, idStatusAdj)
+
+          val repair =
+            func.StaticMapS(
+              LeftField -> repairLAdj,
+              RightField -> repairRAdj)
+
+          continue(fakeParent, tailL, tailR) { sym =>
+            QSU.LeftShift[T, Symbol](
+              sym, structL, idStatusAdj, onUndefinedL, N.freeMF(repair), rotL)
+          }
+
+        case
+            (
+              -\/(QSU.LeftShift(fakeParent, structL, idStatusL, _, repairL, rotL)) :: tailL,
+              -\/(QSU.LeftShift(_, structR, idStatusR, _, repairR, rotR)) :: tailR) =>
 
           val structLAdj = fixSingleStruct(structL.linearize, LeftSide)
           val repairLAdj = fixSingleRepairForMulti(repairL, 0, LeftSide)
@@ -431,7 +476,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               (structLAdj, idStatusL, rotL) :: (structRAdj, idStatusR, rotR) :: Nil,
               OnUndefined.Emit,
-              repair)
+              N.freeMF(repair))
           }
 
         case
@@ -457,7 +502,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj ::: (structRAdj, idStatusR, rotR) :: Nil,
               OnUndefined.Emit,
-              repair)
+              N.freeMF(repair))
           }
 
         case
@@ -481,7 +526,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               (structL.linearize, idStatusL, rotL) :: shiftsRAdj,
               OnUndefined.Emit,
-              repair)
+              N.freeMF(repair))
           }
 
         case
@@ -507,7 +552,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj ::: shiftsRAdj,
               OnUndefined.Emit,
-              repair)
+              N.freeMF(repair))
           }
 
         case
@@ -532,7 +577,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               structLAdj.asRec,
               idStatusL,
               OnUndefined.Emit,
-              repair,
+              N.freeMF(repair),
               rotL)
           }
 
@@ -557,7 +602,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj,
               OnUndefined.Emit,
-              repair)
+              N.freeMF(repair))
           }
 
         case
@@ -582,7 +627,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               structRAdj.asRec,
               idStatusR,
               OnUndefined.Emit,
-              repair,
+              N.freeMF(repair),
               rotR)
           }
 
@@ -607,7 +652,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsRAdj,
               OnUndefined.Emit,
-              repair)
+              N.freeMF(repair))
           }
 
         case (Nil, Nil) =>
@@ -668,14 +713,103 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
       case Map(MultiLeftShift(src, shifts, onUndefined, repair), fm) =>
         val repair2 = fm.linearize >> repair
-        g.overwriteAtRoot(QSU.MultiLeftShift(src.root, shifts, onUndefined, repair2)).some
-
+        g.overwriteAtRoot(QSU.MultiLeftShift(src.root, shifts, onUndefined, N.freeMF(repair2))).some
       case _ => none
+    }
+
+    def elideGuards(fm: FreeMap)(
+      implicit R: Recursive.Aux[FreeMap, CoEnv[Hole, MapFunc, ?]],
+      C: Corecursive.Aux[FreeMap, CoEnv[Hole, MapFunc, ?]]): FreeMap =
+      R.cata[FreeMap](fm) {
+        case CoEnv(\/-(MFD(MapFuncsDerived.Typecheck(result, _)))) => result
+        case CoEnv(\/-(MFC(MapFuncsCore.Guard(_, _, result, _)))) => result
+        case otherwise => C.embed(otherwise)
+      }
+
+    def compatibleShifts(l: ShiftGraph, r: ShiftGraph): Boolean = {
+      (l, r) match {
+        // FIXME: compare the struct symbols, not the FreeMaps. ch1555
+        case (-\/(QSU.LeftShift(srcL, structL0, _, _, _, rotL)), -\/(QSU.LeftShift(srcR, structR0, _, _, _, rotR))) => {
+          val structL = elideGuards(structL0.linearize)
+          val structR = elideGuards(structR0.linearize)
+
+          srcL.root === srcR.root && structL === structR && rotL === rotR
+        }
+
+        case _ => false
+      }
+    }
+
+    def reorderCandidates(cs: List[QSUGraph]): List[QSUGraph] = {
+      type ShiftDefinition = (Symbol, FreeMap, QSU.Rotation)
+
+      def firstShiftDefinition(g: QSUGraph): Option[ShiftDefinition] = g match {
+        case ConsecutiveBounded(_, shifts) =>
+          shiftDefinition(shifts.head)
+        case _ =>
+          none
+      }
+
+      def shiftDefinition(s: ShiftGraph): Option[ShiftDefinition] = s match {
+        case -\/(QSU.LeftShift(src, struct, _, _, _, rot)) =>
+          (src.root, struct.linearize, rot).some
+        case _ => none
+      }
+
+      val (toReorder, noReorder) =
+        cs.partition(firstShiftDefinition(_).isDefined)
+
+      // Candidates zipped with their first ShiftDefinition
+      val cs0: List[(QSUGraph, ShiftDefinition)] =
+        toReorder.map(c => firstShiftDefinition(c) match {
+          case Some((shifting, struct, rot)) =>
+            (c, (shifting, elideGuards(struct), rot)).some
+          case None =>
+            none
+        }).unite
+
+
+      // FIXME: quadratic complexity. ch1555
+      val cs1 = cs0.map {
+        case (cand, (shifting, struct, rot)) => {
+          val freqCount = cs0.filter {
+            case (_, (shifting0, struct0, rot0)) => {
+              shifting === shifting0 && struct === struct0 && rot === rot0
+            }
+          }.length
+
+          (cand, freqCount, shifting)
+        }
+      }
+
+      // Avoid unnecessary reordering if there are no compatible shifts
+      // to put next to each other.
+      if (cs1.all(_._2 === 1))
+        cs
+      else
+        cs1.sortBy {
+          case (_, freqCount, shifting) => (-freqCount, shifting.name)
+        }.map(_._1) ++ noReorder
+    }
+
+    // The order of the incoming candidates is important and we need to
+    // preserve it since the Map wrapping the final coalesce refers to
+    // the candidates by their original index.  Hence, the reordering
+    // performed by reorderCandidates is only visible inside the final
+    // coalesce.
+
+    // Unlike reorderCandidates, the right int of the tuple are
+    // list positions rather than frequency counts
+    def reorderWithIndex(cs: List[(QSUGraph, Int)]): List[(QSUGraph, Int)] = {
+      val matching = SMap(cs.map(_.leftMap(_.root)): _*)
+      val reordered = reorderCandidates(cs.firsts)
+
+      reordered.map(g => (g, matching(g.root)))
     }
 
     for {
       // converts all candidates to produce final results wrapped in their relevant indices
-      wrapped <- candidates.zipWithIndex traverse { case (g, i) => wrapCandidate(g, i) }
+      wrapped <- reorderWithIndex(candidates.zipWithIndex) traverse { case (g, i) => wrapCandidate(g, i) }
 
       coalescedPair <- wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
         case ((ConsecutiveBounded(_, shifts1), leftIndices), (ConsecutiveBounded(_, shifts2), rightIndices)) =>
