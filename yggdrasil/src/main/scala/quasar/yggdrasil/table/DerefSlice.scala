@@ -45,7 +45,7 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
 
   val size = source.size
 
-  val columns = source.columns.keySet.foldLeft(Map.empty[ColumnRef, Column]) {
+  val cols = source.columns.keySet.foldLeft(Map.empty[ColumnRef, Column]) {
     case (acc, ColumnRef(CPath(_, xs @ _ *), ctype)) =>
       val resultRef = ColumnRef(CPath(xs: _*), ctype)
 
@@ -299,6 +299,8 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
     // deref at the root is eliminationd
     case (acc, ColumnRef(CPath(), _)) => acc
   }
+
+  val columns: Map[ColumnRef, Column] = Slice.replaceColumnImpl(size, cols)
 }
 
 /* A strict version

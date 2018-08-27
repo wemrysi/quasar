@@ -654,10 +654,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
 
       def reducer: Reducer[Result] = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range) = {
-          val slice = new Slice {
-            val size = range.end
-            val columns = schema.columnMap(JType.JUniverseT)
-          }
+          val slice = Slice(range.end, schema.columnMap(JType.JUniverseT))
           var result: Option[RValue] = None
           breakable {
             RangeUtil.loop(range) { i =>
@@ -691,10 +688,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
 
       def reducer: Reducer[Result] = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range) = {
-          val slice = new Slice {
-            val size = range.end
-            val columns = schema.columnMap(JType.JUniverseT)
-          }
+          val slice = Slice(range.end, schema.columnMap(JType.JUniverseT))
           var result = -1
           RangeUtil.loop(range) { i =>
             if (slice.isDefinedAt(i)) {
@@ -727,10 +721,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
 
       def reducer: Reducer[Result] = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range) = {
-          val slice = new Slice {
-            val size = range.end
-            val columns = schema.columnMap(JType.JUniverseT)
-          }
+          val slice = Slice(range.end, schema.columnMap(JType.JUniverseT))          
 
           val buffer = mutable.ListBuffer[RValue]()
           RangeUtil.loop(range) { i =>

@@ -386,12 +386,10 @@ class SliceSpec extends Specification with ScalaCheck {
         RArray(List(CLong(1), CLong(2), CLong(3)))), 0, 3)
       val expectedDefined = new BitSet(1)
       expectedDefined.set(0, 2)
-      val expectedSlice = new Slice {
-        def size = 2
-        def columns = Map(
+      val expectedSlice = Slice(2,
+        Map(
           ColumnRef(CPath.Identity, CLong) ->
-            new ArrayLongColumn(expectedDefined, Array(1L, 2L)))
-      }
+            new ArrayLongColumn(expectedDefined, Array(1L, 2L))))
       val expectedRemaining = ArraySliced(data.arr, 2, 1)
       val (actualSlice, actualRemaining) =
         Slice.fromRValuesStep(data, 3, 2, 32)
@@ -403,13 +401,14 @@ class SliceSpec extends Specification with ScalaCheck {
       val data = ArraySliced(Array[RValue](RArray(List(CLong(1), CLong(2), CLong(3)))), 0, 1)
       val expectedDefined = new BitSet(1)
       expectedDefined.set(0)
-      val expectedSlice = new Slice {
+      val expectedSlice = {
         def size = 1
         def columns = Map(
           ColumnRef(CPath.Identity \ 0, CLong) -> new ArrayLongColumn(expectedDefined, Array(1)),
           ColumnRef(CPath.Identity \ 1, CLong) -> new ArrayLongColumn(expectedDefined, Array(2)),
           ColumnRef(CPath.Identity \ 2, CLong) -> new ArrayLongColumn(expectedDefined, Array(3))
         )
+        Slice(size, columns)
       }
       val expectedRemaining = ArraySliced.noRValues
       val (actualSlice, actualRemaining) =
@@ -423,11 +422,12 @@ class SliceSpec extends Specification with ScalaCheck {
       val arraySliced = ArraySliced(data.map[RValue, Array[RValue]](CLong(_)), start = 0, size = 10)
       val expectedDefined = new BitSet(8)
       expectedDefined.set(0, 8)
-      val expectedSlice = new Slice {
+      val expectedSlice = {
         def size = 8
         val columns = Map(
           ColumnRef(CPath.Identity, CLong) ->
             new ArrayLongColumn(expectedDefined, data))
+        Slice(size, columns)
       }
       val expectedRemaining = ArraySliced(arraySliced.arr, 8, 2)
       val (actualSlice, actualRemaining) =
@@ -570,10 +570,7 @@ class SliceSpec extends Specification with ScalaCheck {
       }
     }
 
-    val emptySlice = new Slice {
-      val size = 0
-      val columns: Map[ColumnRef, Column] = Map.empty
-    }
+    val emptySlice = Slice.empty
 
     "concat empty slices correctly" in {
       implicit def arbSlice = Arbitrary(genSlice(concatProjDesc, 23))

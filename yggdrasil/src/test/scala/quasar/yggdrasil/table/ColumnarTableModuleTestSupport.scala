@@ -45,8 +45,9 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
     }
 
     val (prefix, suffix) = sampleData.splitAt(sliceSize)
-    val slice = new Slice {
+    val slice = {
       val (columns, size) = buildColArrays(prefix.toStream, Map.empty[ColumnRef, ArrayColumn[_]], 0)
+      Slice(size, columns)
     }
 
     (slice, suffix)

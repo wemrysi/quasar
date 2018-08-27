@@ -1910,10 +1910,8 @@ abstract class Slice { source =>
 }
 
 object Slice {
-  def empty: Slice = Slice(0, Map.empty)
 
-  def apply(dataSize: Int, columns0: Map[ColumnRef, Column]): Slice = {
-
+  def replaceColumnImpl(size: Int, cols: Map[ColumnRef, Column]): Map[ColumnRef, Column] = {
     def step(acc: Map[ColumnRef, Column], cref: ColumnRef, col: Column): Map[ColumnRef, Column] =
       if (col.isDefinedAt(0)) {
         val c = cref.ctype match {
@@ -1939,19 +1937,21 @@ object Slice {
       } else
         acc
 
-    if (dataSize == 1)
-      new Slice {
-        val size = 1
-        val columns = columns0.foldLeft[Map[ColumnRef, Column]](Map.empty) {
-          case (acc, (cref, col)) => step(acc, cref, col)
-        }
+    if (size == 1)
+      cols.foldLeft[Map[ColumnRef, Column]](Map.empty) {
+        case (acc, (cref, col)) => step(acc, cref, col)
       }
     else
-      new Slice {
-        val size    = dataSize
-        val columns = columns0
-      }
+      cols
   }
+
+  def empty: Slice = Slice(0, Map.empty)
+
+  def apply(dataSize: Int, columns0: Map[ColumnRef, Column]): Slice =
+    new Slice {
+      val size = dataSize
+      val columns = replaceColumnImpl(dataSize, columns0)
+    }
 
   def updateRefs(rv: List[(CPath, CValue)], into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int, sliceSize: Int): Map[ColumnRef, ArrayColumn[_]] = {
     var acc = into

@@ -100,7 +100,7 @@ case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: L
     sz
   }
 
-  def columns: Map[ColumnRef, Column] = cols
+  def columns: Map[ColumnRef, Column] = Slice.replaceColumnImpl(size, cols)
 }
 
 object SegmentsWrapper extends ((Seq[Segment], Int, Long) => SegmentsWrapper) {
