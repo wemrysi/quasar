@@ -27,7 +27,6 @@ import quasar.qscript.rewrites._
 
 import iotaz.{CopK, TListK}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import matryoshka.implicits._
 import scalaz.{Functor, Monad}
 import scalaz.syntax.monad._
 
@@ -48,13 +47,9 @@ abstract class QScriptEvaluator[
   def QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM
   def QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]]
   def UnirewriteT: Unirewrite[T, QS[T]]
-  def UnicoalesceCap: Unicoalesce.Capture[T, QS[T]]
 
   /** Returns the result of executing the `Repr`. */
   def execute(repr: Repr): F[R]
-
-  /** Returns a function that optimizes QScript for this evaluator. */
-  def optimize: QSM[T[QSM]] => QSM[T[QSM]]
 
   /** Returns the executable representation of the given optimized QScript. */
   def plan(cp: T[QSM]): F[Repr]
@@ -64,11 +59,7 @@ abstract class QScriptEvaluator[
   def evaluate(qsr: T[QScriptEducated[T, ?]]): F[R] =
     for {
       shifted <- Unirewrite[T, QS[T], F](new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
-
-      optimized = shifted.transHylo(optimize, Unicoalesce.Capture[T, QS[T]].run)
-
-      repr <- plan(optimized)
-
+      repr <- plan(shifted)
       result <- execute(repr)
     } yield result
 
@@ -76,5 +67,4 @@ abstract class QScriptEvaluator[
   private final implicit def _QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM = QSMFromQScriptCore
   private final implicit def _QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]] = QSMToQScriptTotal
   private final implicit def _UnirewriteT: Unirewrite[T, QS[T]] = UnirewriteT
-  private final implicit def _UnicoalesceCap: Unicoalesce.Capture[T, QS[T]] = UnicoalesceCap
 }

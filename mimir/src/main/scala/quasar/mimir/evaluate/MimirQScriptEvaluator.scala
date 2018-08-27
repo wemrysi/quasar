@@ -28,7 +28,7 @@ import quasar.mimir
 import quasar.mimir.{MimirQScriptCP, MimirRepr}
 import quasar.mimir.MimirCake._
 import quasar.qscript._
-import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
+import quasar.qscript.rewrites.Unirewrite
 import quasar.yggdrasil.MonadFinalizers
 
 import scala.Predef.implicitly
@@ -77,14 +77,8 @@ final class MimirQScriptEvaluator[
   def UnirewriteT: Unirewrite[T, QS[T]] =
     implicitly[Unirewrite[T, QS[T]]]
 
-  def UnicoalesceCap: Unicoalesce.Capture[T, QS[T]] =
-    Unicoalesce.Capture[T, QS[T]]
-
   def execute(repr: Repr): M[Repr] =
     repr.point[M]
-
-  def optimize: QSM[T[QSM]] => QSM[T[QSM]] =
-    (new Optimize[T]).optimize(reflNT[QSM])
 
   def plan(cp: T[QSM]): M[Repr] = {
     def qScriptCorePlanner =
