@@ -20,12 +20,15 @@ import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedCoo
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 
+import org.specs2.specification.AfterAll
+
 import scala.concurrent.duration._
 
 import java.util.concurrent.{ScheduledThreadPoolExecutor, ThreadFactory}
 import java.util.concurrent.atomic.AtomicInteger
 
-trait NIHDBAkkaSetup {
+trait NIHDBAkkaSetup extends AfterAll {
+
   // cargo-culted all this setup, mostly from Precog
   val CookThreshold = 1
   val Timeout = 300.seconds
@@ -51,4 +54,8 @@ trait NIHDBAkkaSetup {
     VersionedSegmentFormat(Map(1 -> V1SegmentFormat))))
 
   val masterChef: ActorRef = actorSystem.actorOf(props)
+
+  override def afterAll(): Unit = {
+    actorSystem.terminate
+  }
 }

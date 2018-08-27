@@ -98,8 +98,4 @@ object SegmentsWrapperSpec extends Specification with ScalaCheck with NIHDBAkkaS
       minTestsOk = Runtime.getRuntime.availableProcessors * 2,
       workers = Runtime.getRuntime.availableProcessors)    // these take a long time
   }
-
-  protected def afterAll() = {
-    actorSystem.terminate
-  }
 }
