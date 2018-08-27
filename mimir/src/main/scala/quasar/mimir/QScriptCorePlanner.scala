@@ -29,7 +29,7 @@ import quasar.fp.ski.κ
 import quasar.precog.common.{CNumericValue, ColumnRef, CPath, CPathField, CPathIndex}
 import quasar.mimir.MimirCake._
 import quasar.qscript._, MapFuncCore._
-import quasar.yggdrasil.TableModule
+import quasar.yggdrasil.{MonadFinalizers, TableModule}
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
 import scala.collection.immutable.{Map => ScalaMap}
@@ -44,7 +44,7 @@ import shims.monadToScalaz
 
 final class QScriptCorePlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
-    F[_]: LiftIO: Monad](
+    F[_]: LiftIO: Monad: MonadFinalizers[?[_], IO]](
     val P: Cake) {
 
   def mapFuncPlanner[G[_]: Monad] = MapFuncPlanner[T, G, MapFunc[T, ?]]
@@ -335,12 +335,19 @@ final class QScriptCorePlanner[
 
     case qscript.Union(src, lBranch, rBranch) =>
       for {
-       leftRepr <- interpretBranch(planQST)(src, lBranch)
-       rightRepr <- interpretBranch(planQST)(src, rBranch)
+        cachedD <- LiftIO[F].liftIO(src.P.cacheTable(src.table, false))
+        cachedTable = cachedD.unsafeValue
+        _ <- MonadFinalizers[F, IO].tell(cachedD.dispose :: Nil)
 
-       rightCoerced = leftRepr.unsafeMerge(rightRepr)
+        cachedSrc = src.map(_ => cachedTable): MimirRepr
+
+        leftRepr <- interpretBranch(planQST)(cachedSrc, lBranch)
+        rightRepr <- interpretBranch(planQST)(cachedSrc, rBranch)
+
+        rightCoerced = leftRepr.unsafeMerge(rightRepr)
       } yield MimirRepr(leftRepr.P)(leftRepr.table.concat(rightCoerced.table))
 
+    // we won't engage in hole caching here because the `count` really needs to be a constant anyway
     case qscript.Subset(src, from, op, count) =>
       for {
         fromRepr <- interpretBranch(planQST)(src, from)
