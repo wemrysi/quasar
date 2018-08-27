@@ -1,6 +1,11 @@
 {
     "name": "count and sum grouped by single field",
 
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
+    },
+
     "data": "zips.data",
 
     "query": "select count(*) as cnt, sum(pop) as sm from `zips.data` group by state",

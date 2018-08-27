@@ -1,7 +1,8 @@
 {
     "name": "long city names in Colorado",
     "backends": {
-        "mimir":"ignoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select distinct city, length(city) as len from `largeZips.data` where state=\"CO\" and length(city) >= 10",

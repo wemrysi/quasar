@@ -3,6 +3,11 @@
 
     "backends": {},
 
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
+    },
+
     "data": "zips.data",
 
     "query": "min_pop := 10000;

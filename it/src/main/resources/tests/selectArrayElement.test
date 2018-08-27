@@ -1,6 +1,9 @@
 {
     "name": "select array element",
-    "backends": {},
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
+    },
     "data": "largeZips.data",
     "query": "select city, loc[0] as lat from `largeZips.data`",
     "predicate": "atLeast",

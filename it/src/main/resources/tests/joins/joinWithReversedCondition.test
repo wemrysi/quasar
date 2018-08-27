@@ -2,9 +2,9 @@
     "name": "[qa_s07] join with reversed condition and complex condition expression",
 
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
-
 
     "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
 

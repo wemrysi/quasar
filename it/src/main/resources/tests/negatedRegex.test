@@ -1,7 +1,8 @@
 {
     "name": "negate matches in filter and projection",
     "backends": {
-        "mimir":"ignoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select city, city !~ \"A\" as noA from `largeZips.data` where city !~ \"CHI\"",

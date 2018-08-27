@@ -1,6 +1,7 @@
 {
     "name": "select count and another field",
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
     "data": "slamengine_commits.data",

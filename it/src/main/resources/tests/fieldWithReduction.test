@@ -2,6 +2,8 @@
     "name": "select field with reduction",
 
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "extraSmallZips.data",
 

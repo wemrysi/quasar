@@ -1,7 +1,8 @@
 {
     "name": "convert values from strings",
     "backends": {
-        "mimir":             "ignoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "smallZips.data",
     "query": "select integer(`_id`) as intId, decimal(`_id`) as decId from `smallZips.data`",

@@ -1,9 +1,10 @@
 {
   "name": "sort by JS expression with filter",
 
-  "backends": {
-        "mimir":"ignoreFieldOrder"
-  },
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
+    },
 
   "data": "zips.data",
 

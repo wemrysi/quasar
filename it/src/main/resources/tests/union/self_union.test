@@ -9,6 +9,7 @@
   "query": "select * from (select * from `simple_union.data` union select * from `simple_union.data`) order by a",
 
   "predicate": "exactly",
+  "ignoreFieldOrder": true,
 
   "expected": [{"a": "1", "b": 1},
                {"a": "2", "b": 2}]
