@@ -1,6 +1,8 @@
 {
     "name": "bigdecimal",
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "bigdecimal.data",
     "query": "select nr, val1 from `bigdecimal.data`",

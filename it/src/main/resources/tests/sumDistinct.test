@@ -1,6 +1,8 @@
 {
     "name": "grouped sum of distinct values",
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",
     "query": "select state, sum(distinct(pop)) from `zips.data` group by state",

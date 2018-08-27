@@ -1,6 +1,7 @@
 {
     "name": "unify flattened fields with unflattened field",
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",

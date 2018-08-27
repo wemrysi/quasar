@@ -1,6 +1,8 @@
 {
     "name": "derived function floor",
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "divide.data",
     "query": "select nr, floor(val3) as floor1 from `divide.data`",

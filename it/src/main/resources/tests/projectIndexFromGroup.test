@@ -1,7 +1,8 @@
 {
     "name": "project index from group",
     "backends": {
-        "mimir":"ignoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "slamengine_commits.data",
     "query": "select parents[0].sha, count(*) as count from `slamengine_commits.data` group by parents[0].sha",

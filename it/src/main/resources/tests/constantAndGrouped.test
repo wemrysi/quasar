@@ -2,7 +2,8 @@
     "name": "constant and a grouped value",
 
     "backends": {
-        "mimir":          "ignoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",
 

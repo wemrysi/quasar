@@ -1,6 +1,8 @@
 {
     "name": "select unreduced grouped values from nested select with reduction",
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "patients.data",
     "query": "select city, cnt as c from (select city, count(*) as cnt from `patients.data` where state = \"NY\"
