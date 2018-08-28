@@ -115,7 +115,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   // TODO: These optimizations should give rise to various property tests:
   //       • elideNopMap ⇒ no `Map(???, HoleF)`
   //       • normalize ⇒ a whole bunch, based on MapFuncsCore
-  //       • elideNopJoin ⇒ no `ThetaJoin(???, HoleF, HoleF, LeftSide === RightSide, ???, ???)`
   //       • coalesceMaps ⇒ no `Map(Map(???, ???), ???)`
   //       • coalesceMapJoin ⇒ no `Map(ThetaJoin(???, …), ???)`
 
@@ -378,16 +377,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       branchSide.remap(func).flatMap(branchSide.combine)
   }
 
-  // FIXME: This really needs to ensure that the condition is that of an
-  //        autojoin, otherwise it’ll elide things that are truly meaningful.
-  def elideNopJoin[F[a] <: ACopK[a], A]
-    (rebase: FreeQS => A => Option[A])
-    (implicit QC: QScriptCore :<<: F, FI: Injectable[F, QScriptTotal])
-      : ThetaJoin[A] => Option[F[A]] = {
-    case ThetaJoin(s, l, r, _, _, combine) => unifySimpleBranches[F, A](s, l, r, combine)(rebase)(QC, FI)
-    case _                                 => None
-  }
-
   def compactLeftShift[F[_]: Functor]
       (QCToF: PrismNT[F, QScriptCore])
       : QScriptCore[T[F]] => Option[F[T[F]]] = {
@@ -555,9 +544,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       F[A] => G[A] = {
 
     val normTJ = applyTransforms(
-      liftFFTrans[F, G, T[G]](prism)(C.coalesceTJ[G](prism.get)),
-      liftFFTrans[F, G, T[G]](prism)((fa: F[T[G]]) =>
-        TJ.prj(fa).flatMap(elideNopJoin[F, T[G]](rebase))))
+      liftFFTrans[F, G, T[G]](prism)(C.coalesceTJ[G](prism.get)))
 
     normalizeWithBijection[F, G, A](bij)(prism, normTJ compose (prism apply _))
   }
