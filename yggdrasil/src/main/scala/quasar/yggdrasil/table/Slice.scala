@@ -1911,7 +1911,7 @@ abstract class Slice { source =>
 
 object Slice {
 
-  def replaceColumnImpl(size: Int, cols: Map[ColumnRef, Column]): Map[ColumnRef, Column] = {
+  private def replaceColumnImpl(size: Int, cols: Map[ColumnRef, Column]): Map[ColumnRef, Column] = {
     def step(acc: Map[ColumnRef, Column], cref: ColumnRef, col: Column): Map[ColumnRef, Column] =
       if (col.isDefinedAt(0)) {
         val c = cref.ctype match {
