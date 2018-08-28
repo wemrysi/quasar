@@ -733,7 +733,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
             assert(derefBy.columns.size <= 1)
             derefBy.columns.headOption collect {
               case (ColumnRef(CPath.Identity, CString), c: StrColumn)       =>
-                new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathField(c(row)) })
+                DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathField(c(row)) })
             } getOrElse {
               slice
             }
@@ -752,13 +752,13 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
             assert(derefBy.columns.size <= 1)
             derefBy.columns.headOption collect {
               case (ColumnRef(CPath.Identity, CLong), c: LongColumn)        =>
-                new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
+                DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
 
               case (ColumnRef(CPath.Identity, CDouble), c: DoubleColumn)    =>
-                new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
+                DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
 
               case (ColumnRef(CPath.Identity, CNum), c: NumColumn)          =>
-                new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
+                DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
             } getOrElse {
               slice
             }
