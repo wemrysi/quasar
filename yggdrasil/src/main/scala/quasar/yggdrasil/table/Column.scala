@@ -601,7 +601,7 @@ object Column {
 }
 
 trait ArrayColumn[@specialized(Boolean, Long, Double) A] extends BitsetColumn with Column {
-  def update(row: Int, value: A): Unit
+  def update(row: Int, value: A): this.type
   def clear(row: Int): Unit
   def resize(size: Int): ArrayColumn[A]
 }
@@ -625,9 +625,10 @@ class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val def
 
   def apply(row: Int) = values(row)
 
-  def update(row: Int, value: Array[A]) {
+  def update(row: Int, value: Array[A]) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -662,6 +663,7 @@ class ArrayBoolColumn(val defined: BitSet, val values: BitSet) extends BitsetCol
   def update(row: Int, value: Boolean) = {
     defined.set(row)
     if (value) values.set(row) else values.clear(row)
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -695,6 +697,7 @@ class ArrayLongColumn(val defined: BitSet, val values: Array[Long]) extends Bits
   def update(row: Int, value: Long) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -722,6 +725,7 @@ class ArrayDoubleColumn(val defined: BitSet, val values: Array[Double]) extends 
   def update(row: Int, value: Double) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -749,6 +753,7 @@ class ArrayNumColumn(val defined: BitSet, val values: Array[BigDecimal]) extends
   def update(row: Int, value: BigDecimal) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -776,6 +781,7 @@ class ArrayStrColumn(val defined: BitSet, val values: Array[String]) extends Bit
   def update(row: Int, value: String) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -803,6 +809,7 @@ class ArrayOffsetDateTimeColumn(val defined: BitSet, val values: Array[OffsetDat
   def update(row: Int, value: OffsetDateTime) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -830,6 +837,7 @@ class ArrayOffsetTimeColumn(val defined: BitSet, val values: Array[OffsetTime]) 
   def update(row: Int, value: OffsetTime) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -857,6 +865,7 @@ class ArrayOffsetDateColumn(val defined: BitSet, val values: Array[OffsetDate]) 
   def update(row: Int, value: OffsetDate) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -884,6 +893,7 @@ class ArrayLocalDateTimeColumn(val defined: BitSet, val values: Array[LocalDateT
   def update(row: Int, value: LocalDateTime) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -911,6 +921,7 @@ class ArrayLocalTimeColumn(val defined: BitSet, val values: Array[LocalTime]) ex
   def update(row: Int, value: LocalTime) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -938,6 +949,7 @@ class ArrayLocalDateColumn(val defined: BitSet, val values: Array[LocalDate]) ex
   def update(row: Int, value: LocalDate) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -965,6 +977,7 @@ class ArrayIntervalColumn(val defined: BitSet, val values: Array[DateTimeInterva
   def update(row: Int, value: DateTimeInterval) = {
     defined.set(row)
     values(row) = value
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -989,6 +1002,7 @@ object ArrayIntervalColumn {
 class MutableEmptyArrayColumn(val defined: BitSet) extends BitsetColumn(defined) with ArrayColumn[Boolean] with EmptyArrayColumn {
   def update(row: Int, value: Boolean) = {
     if (value) defined.set(row) else defined.clear(row)
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -1006,6 +1020,7 @@ object MutableEmptyArrayColumn {
 class MutableEmptyObjectColumn(val defined: BitSet) extends BitsetColumn(defined) with ArrayColumn[Boolean] with EmptyObjectColumn {
   def update(row: Int, value: Boolean) = {
     if (value) defined.set(row) else defined.clear(row)
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
@@ -1023,6 +1038,7 @@ object MutableEmptyObjectColumn {
 class MutableNullColumn(val defined: BitSet) extends BitsetColumn(defined) with ArrayColumn[Boolean] with NullColumn {
   def update(row: Int, value: Boolean) = {
     if (value) defined.set(row) else defined.clear(row)
+    this
   }
 
   def clear(row: Int): Unit = defined.clear(row)
