@@ -31,9 +31,6 @@ import scalaz._, Scalaz._
 trait CompilerHelpers extends LogicalPlanHelpers {
   import SemanticAnalysis._
 
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-  import WriterT.writerTMonad
-
   private type ECT[A] = PhaseResultT[ArgumentErrors \/ ?, A]
 
   // TODO use `quasar.precompile`
@@ -61,19 +58,11 @@ trait CompilerHelpers extends LogicalPlanHelpers {
     parseAndAnnotate(query).valueOr(err => throw new RuntimeException(s"False assumption in test, could not annotate due to underlying issue: $err"))
   }
 
-  // Compile -> Optimize -> Typecheck -> Rewrite Joins
+  // Compile -> Optimize -> Rewrite Joins
   val fullCompile: Fix[Sql] => SemanticErrors \/ Fix[LP] =
     q => compile(q).flatMap { lp =>
       // TODO we should just call `quasar.preparePlan` here
-      // but we need to remove core's dependency on sql first
-      val optimized = optimizer.optimize(lp)
-
-      val planned = for {
-        typechecked <- lpr.ensureCorrectTypes[ECT](optimized).value
-        rewritten <- optimizer.rewriteJoins(typechecked).right
-      } yield rewritten
-
-      planned.leftMap(_.map(SemanticError.argError(_)))
+      optimizer.rewriteJoins(optimizer.optimize(lp)).right
     }
 
   // NB: this plan is simplified and normalized, but not optimized. That allows
@@ -92,9 +81,6 @@ trait CompilerHelpers extends LogicalPlanHelpers {
 
   def testLogicalPlanCompile(query: Fix[Sql], expected: Fix[LP]) =
     compile(query).map(optimizer.optimize).toEither must beRight(equalToPlan(expected))
-
-  def testLogicalPlanDoesNotTypeCheck(query: Fix[Sql]) =
-    compile(query).map(lpr.ensureCorrectTypes[ECT](_).value.toEither must beLeft).toEither must beRight
 
   def testTypedLogicalPlanCompile(query: Fix[Sql], expected: Fix[LP]) =
     fullCompile(query).toEither must beRight(equalToPlan(expected))

@@ -393,10 +393,6 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.constant(Data.Int(3)))))
     }
 
-    "not compile select substring with input from div (Q#2755)" in {
-      testLogicalPlanDoesNotTypeCheck(sqlE"""select substring("abcdefg", 0, pop / 10000) from zips""")
-    }
-
     "compile select length" in {
       testLogicalPlanCompile(
         sqlE"select length(bar) from foo",

@@ -18,7 +18,7 @@ package quasar.frontend
 
 import slamdata.Predef._
 import quasar._
-import quasar.common.{phase, phaseM, JoinType, PhaseResultTell, SortDir}
+import quasar.common.{phase, JoinType, PhaseResultTell, SortDir}
 import quasar.common.data.Data
 import quasar.common.effect.NameGenerator
 import quasar.contrib.pathy.FPath
@@ -101,9 +101,8 @@ package object logicalplan {
     val lpr = optimizer.lpr
 
     for {
-      optimized   <- phase[F]("Optimized", optimizer.optimize(t))
-      typechecked <- phaseM[F]("Typechecked", lpr.ensureCorrectTypes[F](optimized))
-      rewritten   <- phase[F]("Rewritten Joins", optimizer.rewriteJoins(typechecked))
+      optimized <- phase[F]("Optimized", optimizer.optimize(t))
+      rewritten <- phase[F]("Rewritten Joins", optimizer.rewriteJoins(optimized))
     } yield rewritten
   }
 }
