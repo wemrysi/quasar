@@ -132,6 +132,7 @@ object MapFunc {
     case relations.Between => (a1, a2, a3) => MFC(C.Between(a1, a2, a3))
     case relations.Cond    => (a1, a2, a3) => MFC(C.Cond(a1, a2, a3))
     case string.Search     => (a1, a2, a3) => MFC(C.Search(a1, a2, a3))
+    case string.Like       => (a1, a2, a3) => MFC(C.Like(a1, a2, a3))
     case string.Substring  => (a1, a2, a3) => MFC(C.Substring(a1, a2, a3))
   }
 }

@@ -20,8 +20,11 @@ import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.std.StringLib
 import quasar.yggdrasil.bytecode._
-
 import quasar.yggdrasil.table._
+
+import scalaz.syntax.semigroup._
+import scalaz.std.list._
+
 import java.util.regex.{ Pattern, PatternSyntaxException }
 
 /* DEPRECATED
@@ -216,7 +219,7 @@ trait StringLibModule extends ColumnarTableLibModule {
     }
 
     // please use this one as much as possible. it is orders of magnitude faster than searchDynamic
-    def search(pattern: String, flag: Boolean) = {
+    def search(pattern: String, flag: Boolean): Op1SB = {
       val compiled = if (flag)
         Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
       else
@@ -226,6 +229,60 @@ trait StringLibModule extends ColumnarTableLibModule {
         compiled.matcher(target).find()
       })
     }
+
+    lazy val likeDynamic: CFN = CFNP {
+      case List(target: StrColumn, pattern: StrColumn, escape: StrColumn) =>
+        new BoolColumn {
+          def apply(row: Int) = {
+            // we're literally recompiling this on a row-by-row basis
+            val likePattern: String =
+              regexForLikePattern(pattern(row), escape(row).headOption)
+
+            val compiled = Pattern.compile(likePattern)
+
+            compiled.matcher(target(row)).find()
+          }
+
+          def isDefinedAt(row: Int) =
+            target.isDefinedAt(row) && pattern.isDefinedAt(row) && escape.isDefinedAt(row)
+        }
+    }
+
+    // please use this one as much as possible. it is orders of magnitude faster than likeDynamic
+    def like(pattern: String, escape: String): Op1SB =
+      search(regexForLikePattern(pattern, escape.headOption), false)
+
+    private def regexForLikePattern(pattern: String, escapeChar: Option[Char]): String = {
+      def sansEscape(pat: List[Char]): List[Char] = pat match {
+        case '_' :: t => '.' +: escape(t)
+
+        case '%' :: t => ".*".toList |+| escape(t)
+
+        case c   :: t =>
+          if ("\\^$.|?*+()[{".contains(c))
+            '\\' +: c +: escape(t)
+          else c +: escape(t)
+
+        case Nil => Nil
+      }
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def escape(pat: List[Char]): List[Char] =
+      escapeChar match {
+        case None => sansEscape(pat)
+        case Some(esc) =>
+          pat match {
+            // NB: We only handle the escape char when it’s before a special
+            //     char, otherwise you run into weird behavior when the escape
+            //     char _is_ a special char. Will change if someone can find
+            //     an actual definition of SQL’s semantics.
+            case `esc` :: '%' :: t => '%' +: escape(t)
+            case `esc` :: '_' :: t => '_' +: escape(t)
+            case l => sansEscape(l)
+          }
+      }
+    "^" + escape(pattern.toList).mkString + "$"
+  }
 
     // starting to follow a different pattern  since we don't do evaluator lookups anymore
     // note that this different pattern means we can't test in StringLibSpecs

@@ -264,6 +264,7 @@ object RenderQScriptDSL {
               case Between(a1, a2, a3) => ("Between", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
               case Cond(a1, a2, a3) => ("Cond", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
               case Search(a1, a2, a3) => ("Search", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
+              case Like(a1, a2, a3) => ("Like", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
               case Substring(a1, a2, a3) => ("Substring", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
               case Guard(a1, tpe, a2, a3) =>
                 ("Guard", (fa(base, a1).right :: showType(tpe).left :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)

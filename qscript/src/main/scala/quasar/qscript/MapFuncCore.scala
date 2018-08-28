@@ -560,6 +560,7 @@ object MapFuncCore {
         case Between(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Between(_, _, _))
         case Cond(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Cond(_, _, _))
         case Search(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Search(_, _, _))
+        case Like(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Like(_, _, _))
         case Substring(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Substring(_, _, _))
         case Guard(a1, tpe, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Guard(_, tpe, _, _))
       }
@@ -660,6 +661,7 @@ object MapFuncCore {
         case (Between(a1, a2, a3), Between(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Cond(a1, a2, a3), Cond(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Search(a1, a2, a3), Search(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
+        case (Like(a1, a2, a3), Like(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Substring(a1, a2, a3), Substring(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Guard(a1, atpe, a2, a3), Guard(b1, btpe, b2, b3)) => atpe ≟ btpe && in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
 
@@ -764,6 +766,7 @@ object MapFuncCore {
           case Between(a1, a2, a3) => shz("Between", a1, a2, a3)
           case Cond(a1, a2, a3) => shz("Cond", a1, a2, a3)
           case Search(a1, a2, a3) => shz("Search", a1, a2, a3)
+          case Like(a1, a2, a3) => shz("Like", a1, a2, a3)
           case Substring(a1, a2, a3) => shz("Substring", a1, a2, a3)
           case Guard(a1, tpe, a2, a3) =>
             Cord("Guard(") ++
@@ -877,6 +880,7 @@ object MapFuncCore {
           case Between(a1, a2, a3) => nAry("Between", a1, a2, a3)
           case Cond(a1, a2, a3) => nAry("Cond", a1, a2, a3)
           case Search(a1, a2, a3) => nAry("Search", a1, a2, a3)
+          case Like(a1, a2, a3) => nAry("Like", a1, a2, a3)
           case Substring(a1, a2, a3) => nAry("Substring", a1, a2, a3)
           case Guard(a1, tpe, a2, a3) => NonTerminal("Guard" :: nt, None,
             List(r.render(a1), tpe.render, r.render(a2), r.render(a3)))
@@ -1002,6 +1006,7 @@ object MapFuncsCore {
   @Lenses final case class ToString[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Split[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Search[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
+  @Lenses final case class Like[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
   @Lenses final case class Substring[T[_[_]], A](string: A, from: A, count: A) extends Ternary[T, A] {
     def a1 = string
     def a2 = from
