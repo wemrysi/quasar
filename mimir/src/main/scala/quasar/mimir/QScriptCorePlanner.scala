@@ -29,8 +29,8 @@ import quasar.fp.ski.κ
 import quasar.precog.common.{CNumericValue, ColumnRef, CPath, CPathField, CPathIndex}
 import quasar.mimir.MimirCake._
 import quasar.qscript._, MapFuncCore._
-import quasar.yggdrasil.TableModule
-import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
+import quasar.yggdrasil.{MonadFinalizers, TableModule}
+import quasar.yggdrasil.bytecode.{JArrayFixedT, JArrayUnfixedT, JObjectUnfixedT, JType}
 
 import scala.collection.immutable.{Map => ScalaMap}
 
@@ -44,7 +44,7 @@ import shims.monadToScalaz
 
 final class QScriptCorePlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
-    F[_]: LiftIO: Monad](
+    F[_]: LiftIO: Monad: MonadFinalizers[?[_], IO]](
     val P: Cake) {
 
   def mapFuncPlanner[G[_]: Monad] = MapFuncPlanner[T, G, MapFunc[T, ?]]
@@ -221,11 +221,17 @@ final class QScriptCorePlanner[
       val source = "source"
       val focus = "focus"
 
-      for {
+      val jType: JType = shiftType match {
+        case ShiftType.Array => JArrayUnfixedT
+        case ShiftType.Map => JObjectUnfixedT
+      }
 
+      for {
         structTrans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(struct.linearize)
-        wrappedStructTrans =
-          OuterObjectConcat(WrapObject(TransSpec1.Id, source), WrapObject(structTrans, focus))
+
+        wrappedStructTrans = OuterObjectConcat(
+          WrapObject(TransSpec1.Id, source), // preserve the source
+          WrapObject(Typed(structTrans, jType), focus)) // type filter the struct
 
         repairTrans <- repair.cataM[F, TransSpec1](
           interpretM[F, MapFunc[T, ?], JoinSide, TransSpec1](
@@ -247,9 +253,13 @@ final class QScriptCorePlanner[
             mapFuncPlanner[F].plan(src.P)[Source1](TransSpec1.Id)))
 
         emit = onUndef === OnUndefined.Emit
-        shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ focus, emit)
-        repaired = shifted.transform(repairTrans)
-      } yield MimirRepr(src.P)(repaired)
+
+        shifted = src.table
+          .transform(wrappedStructTrans) // wrap the struct
+          .leftShift(CPath.Identity \ focus, emit) // shift the focus
+          .transform(repairTrans) // emit the repair
+
+      } yield MimirRepr(src.P)(shifted)
 
     case qscript.Sort(src, buckets, orders) =>
       import src.P.trans._
@@ -335,12 +345,19 @@ final class QScriptCorePlanner[
 
     case qscript.Union(src, lBranch, rBranch) =>
       for {
-       leftRepr <- interpretBranch(planQST)(src, lBranch)
-       rightRepr <- interpretBranch(planQST)(src, rBranch)
+        cachedD <- LiftIO[F].liftIO(src.P.cacheTable(src.table, false))
+        cachedTable = cachedD.unsafeValue
+        _ <- MonadFinalizers[F, IO].tell(cachedD.dispose :: Nil)
 
-       rightCoerced = leftRepr.unsafeMerge(rightRepr)
+        cachedSrc = src.map(_ => cachedTable): MimirRepr
+
+        leftRepr <- interpretBranch(planQST)(cachedSrc, lBranch)
+        rightRepr <- interpretBranch(planQST)(cachedSrc, rBranch)
+
+        rightCoerced = leftRepr.unsafeMerge(rightRepr)
       } yield MimirRepr(leftRepr.P)(leftRepr.table.concat(rightCoerced.table))
 
+    // we won't engage in hole caching here because the `count` really needs to be a constant anyway
     case qscript.Subset(src, from, op, count) =>
       for {
         fromRepr <- interpretBranch(planQST)(src, from)

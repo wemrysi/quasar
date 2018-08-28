@@ -1,6 +1,8 @@
 {
     "name": "useful group by",
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "extraSmallZips.data",
     "query": "select city || \", \" || state, sum(pop) from `extraSmallZips.data` group by city, state",

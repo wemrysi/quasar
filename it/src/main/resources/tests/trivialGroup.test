@@ -1,7 +1,8 @@
 {
     "name": "trivial group by",
     "backends": {
-        "mimir":"ignoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select city, sum(pop) as totalPop from `largeZips.data` group by city",

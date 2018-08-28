@@ -2,6 +2,8 @@
   "name": "[qa_s02] simple check if a field is undefined",
 
   "backends": {
+    "lwc_local": "ignoreFieldOrder",
+    "mimir": "ignoreFieldOrder"
   },
 
   "data": "functions.data",

@@ -1,6 +1,8 @@
 {
     "name": "select all backend failure statuses",
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "newTests.data",
     "query": "select backends{_:} as backend, backends{:_} as status, name from `newTests.data`",

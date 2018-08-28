@@ -74,7 +74,14 @@ object NIHDB {
 
   final val projectionIdGen = new AtomicInteger()
 
-  final def create(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Validation[Error, NIHDB]] =
+  final def create(
+      chef: ActorRef,
+      baseDir: File,
+      cookThreshold: Int,
+      timeout: FiniteDuration,
+      txLogScheduler: ScheduledExecutorService)(
+      implicit actorSystem: ActorSystem)
+      : IO[Validation[Error, NIHDB]] =
     NIHDBActor.create(chef, baseDir, cookThreshold, timeout, txLogScheduler) map { _ map { actor => new NIHDBImpl(actor, timeout) } }
 
   final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Option[Validation[Error, NIHDB]]] =

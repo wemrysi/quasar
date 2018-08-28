@@ -2,6 +2,7 @@
     "name": "reduced expressions which trigger bad field ordering in MongoDB (#598)",
 
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",

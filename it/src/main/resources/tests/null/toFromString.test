@@ -1,6 +1,7 @@
 {
     "name": "convert null to/from strings",
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
     "data": "nulls.data",

@@ -56,7 +56,8 @@ final class DefaultDatasourcesSpec
   implicit val monadRefs: MonadState_[DefaultM, Refs] =
     MonadState_.zoom[DefaultM](DefaultState.refs)
 
-  def datasources = mkDatasources(IMap.empty)(_ => None)
+  def datasources = mkDatasources(IMap.empty, c => c)(_ => None)
+  def sanitizedDatasources = mkDatasources(IMap.empty, _ => "sanitized")(_ => None)
 
   def supportedType = DatasourceType("test-type", 3L)
 
@@ -67,7 +68,7 @@ final class DefaultDatasourcesSpec
   def gatherMultiple[A](as: Stream[DefaultM, A]) = as.compile.toList
 
   def mkDatasources(
-      errs: IMap[Int, Exception])(
+      errs: IMap[Int, Exception], sanitize: String => String)(
       init: String => Option[InitializationError[String]])
       : Datasources[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] = {
 
@@ -86,7 +87,7 @@ final class DefaultDatasourcesSpec
     val control =
       MockDatasourceControl[DefaultM, Stream[DefaultM, ?], Int, String](
         ISet.singleton(supportedType),
-        init)
+        init, sanitize)
 
     DefaultDatasources(freshId, refs, errors, control)
   }
@@ -106,7 +107,7 @@ final class DefaultDatasourcesSpec
         val err3 =
           MalformedConfiguration(supportedType, "three", "3 isn't a config!")
 
-        val ds = mkDatasources(IMap.empty) {
+        val ds = mkDatasources(IMap.empty, _ => "") {
           case "three" => Some(err3)
           case _ => None
         }
@@ -130,7 +131,7 @@ final class DefaultDatasourcesSpec
         val errs =
           IMap[Int, Exception](1 -> new IOException())
 
-        val ds = mkDatasources(errs)(_ => None)
+        val ds = mkDatasources(errs, _ => "")(_ => None)
 
         val lbar = for {
           a <- refA
@@ -153,7 +154,7 @@ final class DefaultDatasourcesSpec
         val errs =
           IMap[Int, Exception](0 -> new IOException())
 
-        val ds = mkDatasources(errs)(_ => None)
+        val ds = mkDatasources(errs, _ => "")(_ => None)
 
         val lbar = for {
           a <- refA
@@ -229,6 +230,23 @@ final class DefaultDatasourcesSpec
         }).unsafeRunSync()
       }
     }
+
+    "sanitize config" >> {
+      "ref is sanitized" >> {
+        val ds = for {
+          a <- refA
+          _ <- sanitizedDatasources.addDatasource(a)
+          l <- sanitizedDatasources.datasourceRef(0)
+        } yield l
+
+        ds.runEmpty.run.map(x => x must beLike {
+          case (_, (_, \/-(ref))) => {
+            ref.config must_= "sanitized"
+          }
+        }).unsafeRunSync()
+      }
+    }
+
   }
 }
 

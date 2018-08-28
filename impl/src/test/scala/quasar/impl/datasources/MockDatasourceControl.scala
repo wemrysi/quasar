@@ -35,9 +35,13 @@ import scalaz.syntax.std.option._
 /** Provides for control over the lifecycle of external Datasources. */
 final class MockDatasourceControl[F[_]: Monad, G[_]: PlusEmpty, I: Order, C] private (
     supportedTypes: ISet[DatasourceType],
-    initErrors: C => Option[InitializationError[C]])(
+    initErrors: C => Option[InitializationError[C]],
+    sanitize: C => C)(
     implicit initd: MonadInit[F, I], sdown: MonadShutdown[F, I])
     extends DatasourceControl[F, G, I, C, MockSchemaConfig.type] {
+
+  def sanitizeRef(ref: DatasourceRef[C]): DatasourceRef[C] =
+    ref.copy(config = sanitize(ref.config))
 
   def initDatasource(
       datasourceId: I,
@@ -97,8 +101,9 @@ object MockDatasourceControl {
 
   def apply[F[_]: Monad, G[_]: PlusEmpty, I: Order, C](
       supportedTypes: ISet[DatasourceType],
-      initErrors: C => Option[InitializationError[C]])(
+      initErrors: C => Option[InitializationError[C]],
+      sanitize: C => C)(
       implicit MI: MonadInit[F, I], MS: MonadShutdown[F, I])
       : DatasourceControl[F, G, I, C, MockSchemaConfig.type] =
-    new MockDatasourceControl[F, G, I, C](supportedTypes, initErrors)
+    new MockDatasourceControl[F, G, I, C](supportedTypes, initErrors, sanitize)
 }

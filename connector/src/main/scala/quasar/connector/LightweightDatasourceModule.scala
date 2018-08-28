@@ -29,7 +29,7 @@ import scalaz.\/
 
 trait LightweightDatasourceModule {
   def kind: DatasourceType
-
+  def sanitizeConfig(config: Json): Json
   def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
       : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]]]]
 }

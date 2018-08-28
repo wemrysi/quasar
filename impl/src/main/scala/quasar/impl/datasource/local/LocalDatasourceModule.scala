@@ -36,6 +36,8 @@ object LocalDatasourceModule extends LightweightDatasourceModule {
 
   val kind: DatasourceType = LocalType
 
+  def sanitizeConfig(config: Json): Json = config
+
   def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
       : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]]]] = {
 

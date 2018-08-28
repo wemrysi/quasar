@@ -1,7 +1,8 @@
 {
     "name": "group by simple expression",
     "backends": {
-        "mimir":             "ignoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "extraSmallZips.data",
     "query": "select city, sum(pop) from `extraSmallZips.data` group by lower(city)",

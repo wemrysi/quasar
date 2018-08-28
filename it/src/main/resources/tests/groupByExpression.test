@@ -2,7 +2,8 @@
     "name": "group by a computed value",
 
     "backends": {
-        "mimir":"ignoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",
 

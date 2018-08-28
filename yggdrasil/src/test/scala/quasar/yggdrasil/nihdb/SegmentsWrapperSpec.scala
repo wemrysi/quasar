@@ -18,12 +18,10 @@ package quasar.yggdrasil
 package nihdb
 
 import quasar.contrib.cats.effect._
-import quasar.niflheim.{Chef, NIHDB, V1CookedBlockFormat, V1SegmentFormat, VersionedCookedBlockFormat, VersionedSegmentFormat}
+import quasar.niflheim.NIHDB
 import quasar.precog.common._
 import quasar.precog.util.IOUtils
 import quasar.yggdrasil.table._
-
-import akka.actor.{ActorRef, ActorSystem, Props}
 
 import cats.effect.IO
 
@@ -36,41 +34,12 @@ import scalaz.syntax.traverse._
 
 import shims._
 
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import java.nio.file.Files
-import java.util.concurrent.{ScheduledThreadPoolExecutor, ThreadFactory}
-import java.util.concurrent.atomic.AtomicInteger
 
-object SegmentsWrapperSpec extends Specification with ScalaCheck {
+object SegmentsWrapperSpec extends Specification with ScalaCheck with NIHDBAkkaSetup {
   import ArbitrarySlice._
-
-  // cargo-culted all this setup, mostly from Precog
-  val CookThreshold = 1
-  val Timeout = 300.seconds
-
-  private val TxLogScheduler = new ScheduledThreadPoolExecutor(20,
-    new ThreadFactory {
-      private val counter = new AtomicInteger(0)
-
-      def newThread(r: Runnable): Thread = {
-        val t = new Thread(r)
-        t.setName("HOWL-sched-%03d".format(counter.getAndIncrement()))
-
-        t
-      }
-    })
-
-  implicit val actorSystem = ActorSystem(
-    "nihdbExecutorActorSystem",
-    classLoader = Some(getClass.getClassLoader))
-
-  private val props: Props = Props(Chef(
-    VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
-    VersionedSegmentFormat(Map(1 -> V1SegmentFormat))))
-
-  val masterChef: ActorRef = actorSystem.actorOf(props)
 
   "direct columnmar table persistence" should {
     val paths = Vector(
@@ -135,9 +104,5 @@ object SegmentsWrapperSpec extends Specification with ScalaCheck {
     }.set(
       minTestsOk = Runtime.getRuntime.availableProcessors * 2,
       workers = Runtime.getRuntime.availableProcessors)    // these take a long time
-  }
-
-  protected def afterAll() = {
-    actorSystem.terminate
   }
 }

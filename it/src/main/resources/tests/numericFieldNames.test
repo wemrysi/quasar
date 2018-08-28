@@ -2,6 +2,8 @@
   "name": "numeric field names",
 
   "backends": {
+    "lwc_local": "ignoreFieldOrder",
+    "mimir": "ignoreFieldOrder"
   },
 
   "data": "smallZips.data",
