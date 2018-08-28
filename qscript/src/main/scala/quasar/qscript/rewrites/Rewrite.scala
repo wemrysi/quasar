@@ -17,7 +17,7 @@
 package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
-import quasar.{RenderTree, RenderTreeT}
+import quasar.RenderTreeT
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz.bitraverse._
@@ -42,13 +42,6 @@ import scalaz.{:+: => _, Divide => _, _},
   Scalaz._
 
 class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T] {
-  def rebuildArray[A: Show: RenderTree](funcs: List[FreeMapA[A]]): FreeMapA[A] = funcs match {
-    case Nil    => Free.roll(MFC(EmptyArray[T, FreeMapA[A]]))
-    case h :: t =>
-      t.foldLeft(
-        Free.roll(MFC(MakeArray[T, FreeMapA[A]](h))))(
-        (acc, e) => Free.roll(MFC(ConcatArrays(acc, Free.roll(MFC(MakeArray(e)))))))
-  }
 
   def rewriteShift(idStatus: IdStatus, repair: JoinFunc)
       : Option[(IdStatus, JoinFunc)] =
@@ -584,24 +577,4 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
              FI: Injectable[F, QScriptTotal]):
       F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
     normalizeTJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism, rebaseTCo)
-
-  /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
-    * [[Root]] (and projections, etc.) into [[Read]], so then we can handle
-    * exposing only “true” joins and converting intra-data joins to map
-    * operations.
-    *
-    * `f` takes QScript representing a _potential_ path to a file, converts
-    * [[Root]] and its children to path, with the operations post-file remaining.
-    */
-  def pathify[M[_]: Monad: MonadPlannerErr, IN[_]: Traverse, OUT[a] <: ACopK[a]: Traverse]
-    (g: DiscoverPath.ListContents[M])
-    (implicit
-      FS: DiscoverPath.Aux[T, IN, OUT],
-      RD:  Const[Read[ADir], ?] :<<: OUT,
-      RF: Const[Read[AFile], ?] :<<: OUT,
-      QC:           QScriptCore :<<: OUT,
-      FI: Injectable[OUT, QScriptTotal])
-      : T[IN] => M[T[OUT]] =
-    _.cataM[M, List[ADir] \&/ FS.IT[FS.OUT]](FS.discoverPath[M](g)) >>=
-      DiscoverPath.unionAll[T, M, OUT](g)
 }
