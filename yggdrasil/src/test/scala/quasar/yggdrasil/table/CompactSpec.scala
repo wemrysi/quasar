@@ -78,20 +78,18 @@ trait CompactSpec extends ColumnarTableModuleTestSupport with SpecificationLike 
 
       val maskedSlices = slices.map { slice =>
         if(numSlices > 1 && Random.nextDouble < 0.25) {
-          new Slice {
-            val size = slice.size
-            val columns = slice.columns.mapValues { col => (col |> cf.util.filter(0, slice.size, new BitSet)).get }
-          }
+          val size = slice.size
+          val columns = slice.columns.mapValues { col => (col |> cf.util.filter(0, slice.size, new BitSet)).get }
+          Slice(size, columns)
         } else {
           val retained = (0 until slice.size).flatMap {
             x => if (scala.util.Random.nextDouble < 0.75) Some(x) else None
           }
-          new Slice {
-            val size = slice.size
-            val columns = slice.columns.mapValues {
+          Slice(
+            slice.size,
+            slice.columns.mapValues {
               col => (col |> cf.util.filter(0, slice.size, BitSetUtil.create(retained))).get
-            }
-          }
+            })
         }
       }
 
@@ -114,10 +112,7 @@ trait CompactSpec extends ColumnarTableModuleTestSupport with SpecificationLike 
               val retained = (0 until slice.size).map { (x : Int) => if(scala.util.Random.nextDouble < 0.75) Some(x) else None }.flatten
               (col |> cf.util.filter(0, slice.size, BitSetUtil.create(retained))).get
             }
-          new Slice {
-            val size = slice.size
-            val columns = slice.columns.updated(colRef, maskedCol)
-          }
+          Slice(slice.size, slice.columns.updated(colRef, maskedCol))
         }
         maskedSlice.getOrElse(slice)
       }

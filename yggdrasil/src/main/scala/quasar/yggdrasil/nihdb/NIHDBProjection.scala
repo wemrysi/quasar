@@ -46,7 +46,7 @@ final class NIHDBProjection(snapshot: NIHDBSnapshot, projectionId: Int) extends 
     val index = id getOrElse 0L
     getSnapshotBlock(id, columns.map(_.map(_.selector))) map {
       case Block(_, segments, _) =>
-        val slice = SegmentsWrapper(segments, projectionId, index)
+        val slice = SegmentsWrapper.mkSlice(segments, projectionId, index)
         BlockProjectionData(index, index, slice)
     }
   }

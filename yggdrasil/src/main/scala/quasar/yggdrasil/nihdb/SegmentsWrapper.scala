@@ -27,83 +27,83 @@ import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
-case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: Long) extends Slice {
-  import TransSpecModule.paths
+object SegmentsWrapper {
 
-  val logger = LoggerFactory.getLogger("com.precog.yggdrasil.table.SegmentsWrapper")
+  def mkSlice(segments: Seq[Segment], projectionId: Int, blockId: Long): Slice = {
+    import TransSpecModule.paths
 
-  // FIXME: This should use an identity of Array[Long](projectionId,
-  // blockId), but the evaluator will cry if we do that right now
-  private def keyFor(row: Int): Long = {
-    (projectionId.toLong << 44) ^ (blockId << 16) ^ row.toLong
-  }
+    val logger = LoggerFactory.getLogger("com.precog.yggdrasil.table.SegmentsWrapper")
 
-  private def buildKeyColumn(length: Int): (ColumnRef, Column) = {
-    val keys = new Array[Long](length)
-    var i = 0
-    while (i < length) {
-      keys(i) = keyFor(i)
-      i += 1
+    // FIXME: This should use an identity of Array[Long](projectionId,
+    // blockId), but the evaluator will cry if we do that right now
+    def keyFor(row: Int): Long = {
+      (projectionId.toLong << 44) ^ (blockId << 16) ^ row.toLong
     }
-    (ColumnRef(CPath(paths.Key) \ 0, CLong), ArrayLongColumn(keys))
-  }
 
-  private def buildColumnRef(seg: Segment) = ColumnRef(CPath(paths.Value) \ seg.cpath, seg.ctype)
-
-  private def buildColumn(seg: Segment): Column = seg match {
-    case segment: ArraySegment[a] =>
-      val ctype: CValueType[a] = segment.ctype
-      val defined: BitSet = segment.defined
-      val values: Array[a] = segment.values
-      ctype match {
-        case CString            => new ArrayStrColumn(defined, values)
-        case COffsetDateTime    => new ArrayOffsetDateTimeColumn(defined, values)
-        case COffsetTime        => new ArrayOffsetTimeColumn(defined, values)
-        case COffsetDate        => new ArrayOffsetDateColumn(defined, values)
-        case CLocalDateTime     => new ArrayLocalDateTimeColumn(defined, values)
-        case CLocalTime         => new ArrayLocalTimeColumn(defined, values)
-        case CLocalDate         => new ArrayLocalDateColumn(defined, values)
-        case CInterval          => new ArrayIntervalColumn(defined, values)
-        case CNum               => new ArrayNumColumn(defined, values)
-        case CDouble            => new ArrayDoubleColumn(defined, values)
-        case CLong              => new ArrayLongColumn(defined, values)
-        case cat: CArrayType[_] => new ArrayHomogeneousArrayColumn(defined, values)(cat)
-        case CBoolean           => sys.error("impossible")
+    def buildKeyColumn(length: Int): (ColumnRef, Column) = {
+      val keys = new Array[Long](length)
+      var i = 0
+      while (i < length) {
+        keys(i) = keyFor(i)
+        i += 1
       }
-
-    case BooleanSegment(_, _, defined, values, _) =>
-      new ArrayBoolColumn(defined, values)
-
-    case NullSegment(_, _, ctype, defined, _) => ctype match {
-      case CNull =>
-        NullColumn(defined)
-      case CEmptyObject =>
-        new MutableEmptyObjectColumn(defined)
-      case CEmptyArray =>
-        new MutableEmptyArrayColumn(defined)
-      case CUndefined =>
-        sys.error("also impossible")
+      (ColumnRef(CPath(paths.Key) \ 0, CLong), ArrayLongColumn(keys))
     }
-  }
 
-  private def buildMap(segments: Seq[Segment]): Map[ColumnRef, Column] =
-    segments.map(seg => (buildColumnRef(seg), buildColumn(seg))).toMap
+    def buildColumnRef(seg: Segment) = ColumnRef(CPath(paths.Value) \ seg.cpath, seg.ctype)
 
-  private val cols: Map[ColumnRef, Column] =
-    buildMap(segments) + buildKeyColumn(segments.headOption map (_.length) getOrElse 0)
+    def buildColumn(seg: Segment): Column = seg match {
+      case segment: ArraySegment[a] =>
+        val ctype: CValueType[a] = segment.ctype
+        val defined: BitSet = segment.defined
+        val values: Array[a] = segment.values
+        ctype match {
+          case CString            => new ArrayStrColumn(defined, values)
+          case COffsetDateTime    => new ArrayOffsetDateTimeColumn(defined, values)
+          case COffsetTime        => new ArrayOffsetTimeColumn(defined, values)
+          case COffsetDate        => new ArrayOffsetDateColumn(defined, values)
+          case CLocalDateTime     => new ArrayLocalDateTimeColumn(defined, values)
+          case CLocalTime         => new ArrayLocalTimeColumn(defined, values)
+          case CLocalDate         => new ArrayLocalDateColumn(defined, values)
+          case CInterval          => new ArrayIntervalColumn(defined, values)
+          case CNum               => new ArrayNumColumn(defined, values)
+          case CDouble            => new ArrayDoubleColumn(defined, values)
+          case CLong              => new ArrayLongColumn(defined, values)
+          case cat: CArrayType[_] => new ArrayHomogeneousArrayColumn(defined, values)(cat)
+          case CBoolean           => sys.error("impossible")
+        }
 
-  val size: Int = {
-    val sz = segments.foldLeft(0)(_ max _.length)
-    if (logger.isTraceEnabled) {
-      logger.trace("Computed size %d from:\n  %s".format(sz, segments.mkString("\n  ")))
+      case BooleanSegment(_, _, defined, values, _) =>
+        new ArrayBoolColumn(defined, values)
+
+      case NullSegment(_, _, ctype, defined, _) => ctype match {
+        case CNull =>
+          NullColumn(defined)
+        case CEmptyObject =>
+          new MutableEmptyObjectColumn(defined)
+        case CEmptyArray =>
+          new MutableEmptyArrayColumn(defined)
+        case CUndefined =>
+          sys.error("also impossible")
+      }
     }
-    sz
+
+    def buildMap(segments: Seq[Segment]): Map[ColumnRef, Column] =
+      segments.map(seg => (buildColumnRef(seg), buildColumn(seg))).toMap
+
+    val cols: Map[ColumnRef, Column] =
+      buildMap(segments) + buildKeyColumn(segments.headOption map (_.length) getOrElse 0)
+
+    val size: Int = {
+      val sz = segments.foldLeft(0)(_ max _.length)
+      if (logger.isTraceEnabled) {
+        logger.trace("Computed size %d from:\n  %s".format(sz, segments.mkString("\n  ")))
+      }
+      sz
+    }
+
+    Slice(size, cols)
   }
-
-  def columns: Map[ColumnRef, Column] = cols
-}
-
-object SegmentsWrapper extends ((Seq[Segment], Int, Long) => SegmentsWrapper) {
 
   def sliceToSegments(id: Long, slice0: Slice): List[Segment] = {
     val slice = slice0.materialized
