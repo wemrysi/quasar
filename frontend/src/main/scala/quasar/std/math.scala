@@ -17,7 +17,7 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Func, UnaryFunc, BinaryFunc, Type, Mapping}
+import quasar.{Func, UnaryFunc, BinaryFunc, Mapping}
 import quasar.common.data.Data
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
@@ -60,21 +60,6 @@ trait MathLib extends Library {
     def unapply[A](obj: LP[A]): Boolean = obj match {
       case Constant(One()) => true
       case _                => false
-    }
-  }
-
-  object TZero {
-    def apply() = Type.Const(Zero())
-    def unapply(obj: Type): Boolean = obj match {
-      case Type.Const(Zero()) => true
-      case _                  => false
-    }
-  }
-  object TOne {
-    def apply() = Type.Const(One())
-    def unapply(obj: Type): Boolean = obj match {
-      case Type.Const(One()) => true
-      case _                 => false
     }
   }
 
