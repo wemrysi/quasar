@@ -79,19 +79,19 @@ trait MapFuncStdLibTestRunner extends StdLibTestRunner {
   /** Translate to MapFunc (common to all QScript backends). */
   def translate[A](prg: Fix[LP], args: Symbol => A): Free[MapFunc[Fix, ?], A] =
     prg.cata[Free[MapFunc[Fix, ?], A]] {
-      case lp.InvokeUnapply(func @ NullaryFunc(_, _, _, _), Sized())
+      case lp.InvokeUnapply(func @ NullaryFunc(_, _, _), Sized())
           if func.effect ≟ Mapping =>
         Free.roll((MapFunc.translateNullaryMapping[Fix, MapFunc[Fix, ?], Free[MapFunc[Fix, ?], A]].apply _)(func))
 
-      case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
+      case lp.InvokeUnapply(func @ UnaryFunc(_, _, _), Sized(a1))
           if func.effect ≟ Mapping =>
         Free.roll((MapFunc.translateUnaryMapping[Fix, MapFunc[Fix, ?], Free[MapFunc[Fix, ?], A]].apply _)(func)(a1))
 
-      case lp.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
+      case lp.InvokeUnapply(func @ BinaryFunc(_, _, _), Sized(a1, a2))
           if func.effect ≟ Mapping =>
         Free.roll((MapFunc.translateBinaryMapping[Fix, MapFunc[Fix, ?], Free[MapFunc[Fix, ?], A]].apply _)(func)(a1, a2))
 
-      case lp.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
+      case lp.InvokeUnapply(func @ TernaryFunc(_, _, _), Sized(a1, a2, a3))
           if func.effect ≟ Mapping =>
         Free.roll((MapFunc.translateTernaryMapping[Fix, MapFunc[Fix, ?], Free[MapFunc[Fix, ?], A]] _)(func)(a1, a2, a3))
 

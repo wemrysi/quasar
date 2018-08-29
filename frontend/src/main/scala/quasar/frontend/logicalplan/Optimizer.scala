@@ -216,12 +216,6 @@ final class Optimizer[T: Equal]
   def preferProjections(t: T): T =
     boundPara(t)(preferProjectionsƒ)._1.transCata[T](repeatedly(simplifyƒ))
 
-  // FIXME: Make this a transformation instead of an algebra.
-  val elideTypeCheckƒ: Algebra[LP, T] = {
-    case Typecheck(_, _, cont, _) => cont
-    case x => x.embed
-  }
-
   /** Rewrite joins and subsequent filtering so that:
     * 1) Filtering that is equivalent to an equi-join is rewritten into the join condition.
     * 2) Filtering that refers to only side of the join is hoisted prior to the join.
@@ -242,22 +236,6 @@ final class Optimizer[T: Equal]
     @SuppressWarnings(Array("org.wartremover.warts.Equals"))
     def toComp(left: T, right: T)(c: T): (List[Component[T, T]], Component[T, T]) = {
 
-      def typecheckCond(cond: T => T, tpe: Type, cont: Component[T, T], f: (T => T) => Component[T, T])
-          : (List[Component[T, T]], Component[T, T]) = {
-        val check: T => T = { t =>
-          Typecheck(cond(t), tpe, Constant[T](Data.Bool(true)).embed, Constant[T](Data.Bool(false)).embed).embed
-        }
-        (List(f(check)), cont)
-      }
-
-      def typecheckLeft(cond: T => T, tpe: Type, cont: Component[T, T])
-          : (List[Component[T, T]], Component[T, T]) =
-        typecheckCond(cond, tpe, cont, LeftCond(_))
-
-      def typecheckRight(cond: T => T, tpe: Type, cont: Component[T, T])
-          : (List[Component[T, T]], Component[T, T]) =
-        typecheckCond(cond, tpe, cont, RightCond(_))
-
       boundParaM[T, (List[Component[T, T]], ?), LP, Component[T, T]](c) {
         case t if t.map(_._1) ≟ left.project  => (Nil, LeftCond(ι))
         case t if t.map(_._1) ≟ right.project => (Nil, RightCond(ι))
@@ -268,37 +246,18 @@ final class Optimizer[T: Equal]
         case InvokeUnapply(relations.Eq, Sized((_, RightCond(rc)), (_, LeftCond(lc)))) =>
           (Nil, EquiCond((l, r) => relations.Eq(rc(r), lc(l)).embed))
 
-        // FIXME: in new mongo, we should only have to match on `Data.NA`
-        case Typecheck((_, LeftCond(lc)), tpe, (_, cont), (Embed(Constant(Data.NA)), _)) =>
-          typecheckLeft(lc, tpe, cont)
-        case Typecheck((_, LeftCond(lc)), tpe, (_, cont), (Embed(Constant(Data.Arr(List(Data.NA)))), _)) =>
-          typecheckLeft(lc, tpe, cont)
-        case Typecheck((_, LeftCond(lc)), tpe, (_, cont), (Embed(Constant(Data.Obj(obj))), _)) if obj === ListMap("" -> Data.NA) =>
-          typecheckLeft(lc, tpe, cont)
-
-        // FIXME: in new mongo, we should only have to match on `Data.NA`
-        case Typecheck((_, RightCond(rc)), tpe, (_, cont), (Embed(Constant(Data.NA)), _)) =>
-          typecheckRight(rc, tpe, cont)
-        case Typecheck((_, RightCond(rc)), tpe, (_, cont), (Embed(Constant(Data.Arr(List(Data.NA)))), _)) =>
-          typecheckRight(rc, tpe, cont)
-        case Typecheck((_, RightCond(rc)), tpe, (_, cont), (Embed(Constant(Data.Obj(obj))), _)) if obj === ListMap("" -> Data.NA) =>
-          typecheckRight(rc, tpe, cont)
-
-        case Typecheck((_, cond), tpe, (_, cont), (_, fallback)) =>
-          (Nil, (cond |@| cont |@| fallback)(lpr.typecheck(_, tpe, _, _)))
-
-        case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(t1)) =>
+        case InvokeUnapply(func @ UnaryFunc(_, _, _), Sized(t1)) =>
           (Nil, Func.Input1(t1).traverse(_._2).map(lpr.invoke(func, _)))
 
         // Preserve the previously-computed components in the `And`.
         // Return a constant `true` which is included as a no-op filter post-join.
-        case t @ InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(t1, t2)) if func == relations.And =>
+        case t @ InvokeUnapply(func @ BinaryFunc(_, _, _), Sized(t1, t2)) if func == relations.And =>
           (List(t1._2, t2._2), NeitherCond(lpr.constant(Data.Bool(true))))
 
-        case InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(t1, t2)) =>
+        case InvokeUnapply(func @ BinaryFunc(_, _, _), Sized(t1, t2)) =>
           (Nil, Func.Input2(t1, t2).traverse(_._2).map(lpr.invoke(func, _)))
 
-        case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(t1, t2, t3)) =>
+        case InvokeUnapply(func @ TernaryFunc(_, _, _), Sized(t1, t2, t3)) =>
           (Nil, Func.Input3(t1, t2, t3).traverse(_._2).map(lpr.invoke(func, _)))
 
         case Let(ident, form, body) =>

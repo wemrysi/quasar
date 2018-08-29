@@ -832,7 +832,7 @@ object Compiler {
       def strip(v: Cofree[LP, Boolean]) = Cofree(false, v.tail)
 
       t => t.tail match {
-        case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(arg)) if func.effect ≟ Reduction =>
+        case InvokeUnapply(func @ UnaryFunc(_, _, _), Sized(arg)) if func.effect ≟ Reduction =>
           Invoke[nat._1, Cofree[LP, Boolean]](func, Func.Input1(strip(arg)))
 
         case _ =>

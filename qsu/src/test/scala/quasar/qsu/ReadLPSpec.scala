@@ -18,7 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.{Type, Qspec}
+import quasar.Qspec
 import quasar.common.data.{Data, DataGenerators}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.scalaz.{NonEmptyListE => NELE}
@@ -29,7 +29,6 @@ import quasar.qscript.{
   LeftSide,
   LeftSide3,
   MapFuncsCore,
-  MapFuncsDerived,
   PlannerError,
   ReduceFuncs,
   RightSide,
@@ -225,16 +224,6 @@ object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with
       }
     }
 
-    "convert Typecheck" in {
-      lpf.typecheck(read("foo"), Type.AnyObject, read("bar"), read("baz")) must readQsuAs {
-        case AutoJoin3C(
-          TRead("foo"),
-          TRead("bar"),
-          TRead("baz"),
-          MapFuncsCore.Guard(LeftSide3, Type.AnyObject, Center, RightSide3)) => ok
-      }
-    }
-
     "convert join side" in {
       lpf.joinSideName('heythere) must readQsuAs {
         case JoinSideRef('heythere) => ok
@@ -321,14 +310,7 @@ object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with
       val input =
         lpf.let(
           '__tmp0,
-          lpf.let(
-            '__tmp1,
-            read("zips"),
-            lpf.typecheck(
-              lpf.free('__tmp1),
-              Type.AnyObject,
-              lpf.free('__tmp1),
-              lpf.constant(Data.NA))),
+          read("zips"),
           lpf.invoke2(
             SetLib.Take,
             lpf.invoke1(
@@ -344,15 +326,11 @@ object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with
                       StructuralLib.MapProject,
                       lpf.free('__tmp0),
                       lpf.constant(Data.Str("city"))),
-                    lpf.typecheck(
+                    lpf.invoke3(
+                      StringLib.Search,
                       lpf.free('__tmp2),
-                      Type.Str,
-                      lpf.invoke3(
-                        StringLib.Search,
-                        lpf.free('__tmp2),
-                        lpf.constant(Data.Str("OULD.{0,2} CIT")),
-                        lpf.constant(Data.Bool(false))),
-                      lpf.constant(Data.NA)))),
+                      lpf.constant(Data.Str("OULD.{0,2} CIT")),
+                      lpf.constant(Data.Bool(false))))),
                 lpf.constant(Data.Str("city")))),
             lpf.constant(Data.Int(11))))
 
@@ -360,40 +338,24 @@ object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with
         case Subset(
           DimEdit(
             AutoJoin2C(
-              LPFilter(
-                Unary(   // '__tmp0
-                  Transpose(    // '__tmp1
-                    Read(_),
-                    QSU.Retain.Values,
-                    QSU.Rotation.ShiftMap),
-                  ID(MapFuncsDerived.Typecheck(SrcHole, Type.AnyObject))),
-                AutoJoin3C(
+              LPFilter( // 8
+                Transpose(    // '__tmp1
+                  Read(_),
+                  QSU.Retain.Values,
+                  QSU.Rotation.ShiftMap),
+                AutoJoin3C( // 7
                   AutoJoin2C(   // '__tmp2
-                    Unary(   // '__tmp0
-                      Transpose(    // '__tmp1
-                        Read(_),
-                        QSU.Retain.Values,
-                        QSU.Rotation.ShiftMap),
-                      ID(MapFuncsDerived.Typecheck(SrcHole, Type.AnyObject))),
+                    Transpose(    // '__tmp1
+                      Read(_),
+                      QSU.Retain.Values,
+                      QSU.Rotation.ShiftMap),
                     DataConstant(Data.Str("city")),
                     MapFuncsCore.ProjectKey(LeftSide, RightSide)),
-                  AutoJoin3C(
-                    AutoJoin2C(   // '__tmp2
-                      Unary(   // '__tmp0
-                        Transpose(    // '__tmp1
-                          Read(_),
-                          QSU.Retain.Values,
-                          QSU.Rotation.ShiftMap),
-                        ID(MapFuncsDerived.Typecheck(SrcHole, Type.AnyObject))),
-                      DataConstant(Data.Str("city")),
-                      MapFuncsCore.ProjectKey(LeftSide, RightSide)),
-                    DataConstant(Data.Str("OULD.{0,2} CIT")),
-                    DataConstant(Data.Bool(false)),
-                    MapFuncsCore.Search(LeftSide3, Center, RightSide3)),
-                  _,
-                  MapFuncsCore.Guard(LeftSide3, Type.Str, Center, RightSide3))),
-              DataConstant(Data.Str("city")),
-              MapFuncsCore.ProjectKey(LeftSide, RightSide)),
+                  DataConstant(Data.Str("OULD.{0,2} CIT")),
+                  DataConstant(Data.Bool(false)),
+                  MapFuncsCore.Search(LeftSide3, Center, RightSide3))),
+                DataConstant(Data.Str("city")),
+                MapFuncsCore.ProjectKey(LeftSide, RightSide)),
             QSU.DTrans.Squash()),
           Take,
           DataConstant(Data.Int(subsetTakeI))) =>

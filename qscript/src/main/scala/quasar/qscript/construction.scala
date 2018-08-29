@@ -223,6 +223,8 @@ object construction {
       rollCore(MapFuncsCore.Cond(a1, a2, a3))
     def Search[A](a1: RecFreeMapA[T, A], a2: RecFreeMapA[T, A], a3: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
       rollCore(MapFuncsCore.Search(a1, a2, a3))
+    def Like[A](a1: RecFreeMapA[T, A], a2: RecFreeMapA[T, A], a3: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
+      rollCore(MapFuncsCore.Like(a1, a2, a3))
     def Substring[A](a1: RecFreeMapA[T, A], a2: RecFreeMapA[T, A], a3: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
       rollCore(MapFuncsCore.Substring(a1, a2, a3))
     def Guard[A](a1: RecFreeMapA[T, A], tpe: quasar.Type, a2: RecFreeMapA[T, A], a3: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
@@ -441,6 +443,8 @@ object construction {
       rollCore(MapFuncsCore.Cond(a1, a2, a3))
     def Search[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A], a3: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.Search(a1, a2, a3))
+    def Like[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A], a3: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.Like(a1, a2, a3))
     def Substring[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A], a3: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.Substring(a1, a2, a3))
     def Guard[A](a1: FreeMapA[T, A], tpe: quasar.Type, a2: FreeMapA[T, A], a3: FreeMapA[T, A]): FreeMapA[T, A] =

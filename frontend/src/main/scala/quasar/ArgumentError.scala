@@ -18,10 +18,7 @@ package quasar
 
 import slamdata.Predef._
 
-import monocle.Prism
-import scalaz.NonEmptyList
 import scalaz.std.string._
-import scalaz.syntax.foldable._
 import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 import shapeless._
@@ -34,46 +31,11 @@ object ArgumentError {
   final case class InvalidArgumentError(message: String)
       extends ArgumentError
 
-  final case class InvalidStringCoercionError(str: String, expected: NonEmptyList[String])
-      extends ArgumentError {
-    def message = {
-      val expectedString =
-        if (expected.tail.isEmpty)
-          s"“${expected.head}”"
-        else
-          s"one of " + expected.toList.mkString("“", ", ", "”")
-
-      s"Expected $expectedString but found “$str”."
-    }
-  }
-
   final case class TemporalFormatError[N <: Nat](func: GenericFunc[N], str: String, hint: Option[String])
       extends ArgumentError {
     def message = s"Unable to parse '$str' as ${func.shows}." + ~hint.map(" (" + _ + ")")
   }
 
-  final case class TypeError(error: UnificationError)
-      extends ArgumentError {
-    def message = error.message
-  }
-
-  val invalidArgumentError: Prism[ArgumentError, String] =
-    Prism.partial[ArgumentError, String] {
-      case InvalidArgumentError(s) => s
-    } (InvalidArgumentError)
-
-  val invalidStringCoercionError: Prism[ArgumentError, (String, NonEmptyList[String])] =
-    Prism.partial[ArgumentError, (String, NonEmptyList[String])] {
-      case InvalidStringCoercionError(s, ss) => (s, ss)
-    } {
-      case (s, ss) => InvalidStringCoercionError(s, ss)
-    }
-
   def temporalFormatError[N <: Nat](func: GenericFunc[N], str: String, hint: Option[String]): ArgumentError =
     TemporalFormatError(func, str, hint)
-
-  val typeError: Prism[ArgumentError, UnificationError] =
-    Prism.partial[ArgumentError, UnificationError] {
-      case TypeError(e) => e
-    } (TypeError)
 }

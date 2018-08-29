@@ -24,14 +24,10 @@ import scalaz._, Scalaz._
 import shapeless._
 
 trait IdentityLib extends Library {
-  import Type._
-  import Validation.success
 
   val Squash: UnaryFunc = UnaryFunc(
     Squashing,
     "Squashes all dimensional information",
-    Top,
-    Func.Input1(Top),
     new Func.Simplifier {
       def apply[T]
         (orig: LP[T])
@@ -41,18 +37,12 @@ trait IdentityLib extends Library {
             Squash(x).some
           case _ => none
         }
-    },
-    partialTyper[nat._1] { case Sized(x) => x },
-    untyper[nat._1](t => success(Func.Input1(t))))
+    })
 
   val TypeOf = UnaryFunc(
     Mapping,
     "Returns the simple type of a value.",
-    Type.Str,
-    Func.Input1(Type.Top),
-    noSimplification,
-    basicTyper,
-    basicUntyper)
+    noSimplification)
 }
 
 object IdentityLib extends IdentityLib

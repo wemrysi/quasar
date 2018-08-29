@@ -195,45 +195,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
       normalizeFExpr(exp) must equal(expected)
     }
 
-    "elide a join with a constant on one side" in {
-      import qsdsl._
-      val exp: Fix[QS] =
-        fix.ThetaJoin(
-          fix.Root,
-          free.LeftShift(
-            free.Map(
-              free.Root,
-              recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("city")))),
-            recFunc.Hole,
-            IncludeId,
-            ShiftType.Array,
-            OnUndefined.Omit,
-            func.ConcatArrays(
-              func.MakeArray(func.LeftSide),
-              func.MakeArray(func.RightSide))),
-          free.Map(
-            free.Unreferenced,
-            recFunc.Constant(json.str("name"))),
-          func.Constant(json.bool(true)),
-          JoinType.Inner,
-          func.ProjectKey(
-            func.ProjectIndexI(
-              func.ProjectIndexI(func.LeftSide, 1),
-              1),
-            func.RightSide))
-
-      // TODO: only require a single pass
-      normalizeExpr(normalizeExpr(exp)) must equal(
-        chainQS(
-          fix.Root,
-          fix.LeftShift(_,
-            recFunc.ProjectKeyS(recFunc.Hole, "city"),
-            ExcludeId,
-            ShiftType.Array,
-            OnUndefined.Omit,
-            func.ProjectKeyS(func.RightSide, "name"))))
-    }
-
     "fold a constant doubly-nested array value" in {
       import qsdsl._
       val value: Fix[EJson] =
@@ -250,59 +211,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
           recFunc.Constant(json.arr(List(json.arr(List(value))))))
 
       normalizeFExpr(exp) must equal(expected)
-    }
-
-    "elide a join in the branch of a join" in {
-      import qsdsl._
-      val exp: Fix[QS] =
-        fix.ThetaJoin(
-          fix.Root,
-          free.Map(
-            free.Unreferenced,
-            recFunc.Constant(json.str("name"))),
-          free.ThetaJoin(
-            free.Root,
-            free.LeftShift(
-              free.Hole,
-              recFunc.Hole,
-              IncludeId,
-              ShiftType.Array,
-              OnUndefined.Omit,
-              func.ConcatArrays(
-                func.MakeArray(func.LeftSide),
-                func.MakeArray(func.RightSide))),
-            free.Map(
-              free.Unreferenced,
-              recFunc.Constant(json.str("name"))),
-            func.Constant(json.bool(true)),
-            JoinType.Inner,
-            func.ConcatArrays(
-              func.MakeArray(func.LeftSide),
-              func.MakeArray(func.RightSide))),
-          func.Constant(json.bool(true)),
-          JoinType.Inner,
-          func.ConcatArrays(
-            func.MakeArray(func.LeftSide),
-            func.MakeArray(func.RightSide)))
-
-      // TODO: only require a single pass
-      normalizeExpr(normalizeExpr(exp)) must
-        equal(
-          fix.LeftShift(
-            fix.Root,
-            recFunc.Hole,
-            IncludeId,
-            ShiftType.Array,
-            OnUndefined.Omit,
-            func.ConcatArrays(
-              func.Constant(json.arr(List(json.str("name")))),
-              func.MakeArray(
-                func.ConcatArrays(
-                  func.MakeArray(
-                    func.ConcatArrays(
-                      func.MakeArray(func.LeftSide),
-                      func.MakeArray(func.RightSide))),
-                  func.Constant(json.arr(List(json.str("name")))))))))
     }
 
     "fold nested boolean values" in {
