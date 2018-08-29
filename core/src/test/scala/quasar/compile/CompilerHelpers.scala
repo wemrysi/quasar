@@ -74,7 +74,7 @@ trait CompilerHelpers extends LogicalPlanHelpers {
       e => throw new RuntimeException("could not compile query for expected value: " + pprint(query) + "; " + e),
       optimizer.optimize)
 
-  // Compile the given query, including optimization and typechecking
+  // Compile the given query, including optimization
   def fullCompileExp(query: Fix[Sql]): Fix[LP] =
     fullCompile(query).valueOr(e =>
       throw new RuntimeException(s"could not full-compile query for expected value '$query': $e"))
@@ -82,7 +82,7 @@ trait CompilerHelpers extends LogicalPlanHelpers {
   def testLogicalPlanCompile(query: Fix[Sql], expected: Fix[LP]) =
     compile(query).map(optimizer.optimize).toEither must beRight(equalToPlan(expected))
 
-  def testTypedLogicalPlanCompile(query: Fix[Sql], expected: Fix[LP]) =
+  def testFullLogicalPlanCompile(query: Fix[Sql], expected: Fix[LP]) =
     fullCompile(query).toEither must beRight(equalToPlan(expected))
 
   def renameJoinSides
