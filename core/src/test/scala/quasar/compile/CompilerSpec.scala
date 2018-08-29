@@ -625,10 +625,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke2(MapProject,
               lpf.invoke2(Filter,
                 lpf.free('__tmp0),
-                lpf.invoke3(Search,
+                lpf.invoke3(Like,
                   lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
-                  lpf.constant(Data.Str("^a.*$")),
-                  lpf.constant(Data.Bool(false)))),
+                  lpf.constant(Data.Str("a%")),
+                  lpf.constant(Data.Str("\\")))),
               lpf.constant(Data.Str("bar"))))))
     }
 
@@ -640,10 +640,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke2(MapProject,
               lpf.invoke2(Filter,
                 lpf.free('__tmp0),
-                lpf.invoke3(Search,
+                lpf.invoke3(Like,
                   lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
-                  lpf.constant(Data.Str("^a%$")),
-                  lpf.constant(Data.Bool(false)))),
+                  lpf.constant(Data.Str("a=%")),
+                  lpf.constant(Data.Str("=")))),
               lpf.constant(Data.Str("bar"))))))
     }
 
@@ -655,10 +655,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke2(MapProject, lpf.invoke2(Filter,
               lpf.free('__tmp0),
               lpf.invoke1(Not,
-                lpf.invoke3(Search,
+                lpf.invoke3(Like,
                   lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
-                  lpf.constant(Data.Str("^a.*$")),
-                  lpf.constant(Data.Bool(false))))),
+                  lpf.constant(Data.Str("a%")),
+                  lpf.constant(Data.Str("\\"))))),
               lpf.constant(Data.Str("bar"))))))
     }
 

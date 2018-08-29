@@ -244,13 +244,13 @@ trait StringLibModule extends ColumnarTableLibModule {
           }
 
           def isDefinedAt(row: Int) =
-            target.isDefinedAt(row) && pattern.isDefinedAt(row) && escape.isDefinedAt(row)
+            target.isDefinedAt(row) && pattern.isDefinedAt(row) && escape.isDefinedAt(row) && escape(row).length <= 1
         }
     }
 
     // please use this one as much as possible. it is orders of magnitude faster than likeDynamic
-    def like(pattern: String, escape: String): Op1SB =
-      search(regexForLikePattern(pattern, escape.headOption), false)
+    def like(pattern: String, escape: Option[Char]): Op1SB =
+      search(regexForLikePattern(pattern, escape), false)
 
     private def regexForLikePattern(pattern: String, escapeChar: Option[Char]): String = {
       def sansEscape(pat: List[Char]): List[Char] = pat match {
@@ -281,11 +281,10 @@ trait StringLibModule extends ColumnarTableLibModule {
             case l => sansEscape(l)
           }
       }
-    "^" + escape(pattern.toList).mkString + "$"
-  }
 
-    // starting to follow a different pattern  since we don't do evaluator lookups anymore
-    // note that this different pattern means we can't test in StringLibSpecs
+      "^" + escape(pattern.toList).mkString + "$"
+    }
+
     lazy val substring = CFNP {
       case List(s: StrColumn, f: LongColumn, c: LongColumn) =>
         new StrColumn {

@@ -44,54 +44,10 @@ trait StringLib extends Library {
         }
     })
 
-  private def regexForLikePattern(pattern: String, escapeChar: Option[Char]):
-      String = {
-    def sansEscape(pat: List[Char]): List[Char] = pat match {
-      case '_' :: t =>         '.' +: escape(t)
-      case '%' :: t => ".*".toList ⊹ escape(t)
-      case c   :: t =>
-        if ("\\^$.|?*+()[{".contains(c))
-          '\\' +: c +: escape(t)
-        else c +: escape(t)
-      case Nil      => Nil
-    }
-
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def escape(pat: List[Char]): List[Char] =
-      escapeChar match {
-        case None => sansEscape(pat)
-        case Some(esc) =>
-          pat match {
-            // NB: We only handle the escape char when it’s before a special
-            //     char, otherwise you run into weird behavior when the escape
-            //     char _is_ a special char. Will change if someone can find
-            //     an actual definition of SQL’s semantics.
-            case `esc` :: '%' :: t => '%' +: escape(t)
-            case `esc` :: '_' :: t => '_' +: escape(t)
-            case l                 => sansEscape(l)
-          }
-      }
-    "^" + escape(pattern.toList).mkString + "$"
-  }
-
   val Like = TernaryFunc(
     Mapping,
     "Determines if a string value matches a pattern.",
-    new Func.Simplifier {
-      def apply[T]
-        (orig: LP[T])
-        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
-        orig match {
-          case InvokeUnapply(_, Sized(Embed(str), Embed(Constant(Data.Str(pat))), Embed(Constant(Data.Str(esc))))) =>
-            if (esc.length > 1)
-              None
-            else
-              Search(str.embed,
-                constant[T](Data.Str(regexForLikePattern(pat, esc.headOption))).embed,
-                constant[T](Data.Bool(false)).embed).some
-          case _ => None
-        }
-    })
+    noSimplification)
 
   val Search = TernaryFunc(
     Mapping,

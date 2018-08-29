@@ -226,8 +226,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         (MapN((OuterArrayConcat(WrapArray(src), WrapArray(pattern), WrapArray(flag))), searchDynamic): TransSpec[A]).point[F]
 
       // significantly faster fast path
-      case MapFuncsCore.Like(src, ConstLiteral(CString(pattern), _), ConstLiteral(CString(escape), _)) =>
-        like(pattern, escape).spec[A](src).point[F]
+      case MapFuncsCore.Like(src, ConstLiteral(CString(pattern), _), ConstLiteral(CString(escape), _)) if escape.length <= 1 =>
+        like(pattern, escape.headOption).spec[A](src).point[F]
 
       // this case is hideously slow; hopefully we don't see it too often
       case MapFuncsCore.Like(src, pattern, escape) =>
