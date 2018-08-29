@@ -26,20 +26,10 @@ import quasar.fp.ski._
 import scala.Any
 
 import argonaut._, Argonaut._, ArgonautScalaz._
-import scalaz._, Scalaz._, Validation.{success, failureNel}
+import scalaz._, Scalaz._
 
 sealed abstract class Type extends Product with Serializable { self =>
   import Type._
-
-  final def toPrimaryType: Option[PrimaryType] =
-    if      (Str.contains(this))       common.Arr.some
-    else if (AnyArray.contains(this))  common.Arr.some
-    else if (Bool.contains(this))      common.Bool.some
-    else if (Dec.contains(this))       common.Dec.some
-    else if (Int.contains(this))       common.Int.some
-    else if (Null.contains(this))      common.Null.some
-    else if (AnyObject.contains(this)) common.Map.some
-    else                               none
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def ⨯ (that: Type): Type =
@@ -55,14 +45,6 @@ sealed abstract class Type extends Product with Serializable { self =>
       case (_, _)                     => Bottom
     }
 
-  final def lub: Type = mapUp(self) {
-    case x @ Coproduct(_, _) => x.flatten.foldLeft1(Type.lub)
-  }
-
-  final def glb: Type = mapUp(self) {
-    case x @ Coproduct(_, _) => x.flatten.foldLeft1(Type.glb)
-  }
-
   // FIXME: Using `≟` here causes runtime errors.
   @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   final def ⨿ (that: Type): Type =
@@ -71,135 +53,10 @@ sealed abstract class Type extends Product with Serializable { self =>
   final def contains(that: Type): Boolean =
     typecheck(self, that).fold(κ(false), κ(true))
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def objectType: Option[Type] = this match {
-    case Const(value) => dataType(value).objectType
-    case Obj(value, uk) =>
-      Some((uk.toList ++ value.toList.map(_._2)).concatenate(TypeOrMonoid))
-    case x @ Coproduct(_, _) =>
-      x.flatten.toList.traverse(_.objectType).map(_.concatenate(TypeOrMonoid))
-    case _ => None
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def objectLike: Boolean = this match {
-    case Const(value)        => dataType(value).objectLike
-    case Obj(_, _)           => true
-    case x @ Coproduct(_, _) => x.flatten.toList.forall(_.objectLike)
-    case _                   => false
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def arrayType: Option[Type] = this match {
-    case Const(value) => dataType(value).arrayType
-    case Arr(value) => Some(value.concatenate(TypeOrMonoid))
-    case FlexArr(_, _, value) => Some(value)
-    case x @ Coproduct(_, _) =>
-      x.flatten.toList.traverse(_.arrayType).map(_.concatenate(TypeLubMonoid))
-    case _ => None
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def arrayLike: Boolean = this match {
-    case Const(value)        => dataType(value).arrayLike
-    case Arr(_)              => true
-    case FlexArr(_, _, _)    => true
-    case x @ Coproduct(_, _) => x.flatten.toList.forall(_.arrayLike)
-    case _                   => false
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def arrayMinLength: Option[Int] = this match {
-    case Const(Data.Arr(value)) => Some(value.length)
-    case Arr(value)             => Some(value.length)
-    case FlexArr(minLen, _, _)  => Some(minLen)
-    case x @ Coproduct(_, _)    =>
-      x.flatten.toList.foldLeft[Option[Int]](None)((a, n) =>
-        (a |@| n.arrayMinLength)(_ min _))
-    case _ => None
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def arrayMaxLength: Option[Int] = this match {
-    case Const(Data.Arr(value)) => Some(value.length)
-    case Arr(value)             => Some(value.length)
-    case FlexArr(_, maxLen, _)  => maxLen
-    case x @ Coproduct(_, _)    =>
-      x.flatten.toList.foldLeft[Option[Int]](Some(0))((a, n) =>
-        (a |@| n.arrayMaxLength)(_ max _))
-    case _ => None
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def mapKey(key: Type): UnificationResult[Type] = {
-    if (Type.lub(key, Str) ≠ Str) failureNel(UnificationError(Str, key, None))
-    else (key, this) match {
-      case (_, x @ Coproduct (_, _)) => {
-        implicit val or: Monoid[Type] = Type.TypeOrMonoid
-        val rez = x.flatten.map(_.mapKey(key))
-        rez.foldMap(_.getOrElse(Bottom)) match {
-          case x if simplify(x) ≟ Bottom || simplify(x) ≟ Const(Data.NA) => rez.concatenate
-          case x                         => success(x)
-        }
-      }
-
-      case (Str, t) =>
-        t.objectType.fold[UnificationResult[Type]](
-          failureNel(UnificationError(AnyObject, this, None)))(
-          success)
-
-      case (Const(Data.Str(key)), Const(Data.Obj(map))) =>
-        success(Type.Const(map.get(key).getOrElse(Data.NA)))
-
-      case (Const(Data.Str(key)), Obj(map, uk)) =>
-        map.get(key).fold(
-          uk.fold[UnificationResult[Type]](
-            success(Type.Const(Data.NA)))(
-            success))(
-          success)
-
-      case _ => failureNel(UnificationError(AnyObject, this, None))
-    }
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def arrayElem(index: Type): UnificationResult[Type] = {
-    if (Type.lub(index, Int) ≠ Int) failureNel(UnificationError(Int, index, None))
-    else (index, this) match {
-      case (Const(Data.Int(index)), Const(Data.Arr(arr))) =>
-        success(Const(arr.lift(index.toInt).getOrElse(Data.NA)))
-
-      case (_, x @ Coproduct(_, _)) =>
-        implicit val lub: Monoid[Type] = Type.TypeLubMonoid
-        x.flatten.toList.foldMap(_.arrayElem(index))
-
-      case (Int, _) =>
-        this.arrayType.fold[UnificationResult[Type]](
-          failureNel(UnificationError(AnyArray, this, None)))(
-          success)
-
-      case (_, FlexArr(_, _, value)) =>
-          success(value)
-
-      case (Const(Data.Int(index)), Arr(value)) =>
-        success(value.lift(index.toInt).getOrElse(Const(Data.NA)))
-
-      case (_, _) => failureNel(UnificationError(AnyArray, this, None))
-    }
-  }
-
   def widenConst: Type = this match {
     case Type.Const(d) => dataType(d)
     case t => t
   }
-
-
-  def superOf: SubOf = new SubOf(this)
-}
-
-final class SubOf(val supertype: Type) extends AnyVal {
-  def unapply(subtype: Type): Option[Type] = 
-    Type.typecheck(supertype, subtype).fold(κ(None), κ(Some(subtype)))
 }
 
 trait TypeInstances {
