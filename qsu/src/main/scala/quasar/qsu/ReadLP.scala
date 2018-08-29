@@ -44,7 +44,6 @@ import quasar.qscript.{
   LeftSide3,
   MapFunc,
   MapFuncsCore,
-  MapFuncsDerived,
   MonadPlannerErr,
   PlannerError,
   ReduceFunc,
@@ -70,8 +69,6 @@ import scalaz.{\/, Free, Monad, StateT, Scalaz}, Scalaz._   // monad/traverse co
 import shapeless.Sized
 
 final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
-
-  import QSUGraph.Extractors._
 
   private type QSU[A] = QScriptUniform[A]
   private type LetS = SMap[Symbol, Symbol]
@@ -218,12 +215,6 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
         QSU.Unary[T, Symbol](
           _,
           IC(MapFuncsCore.TemporalTrunc(part, SrcHole))))
-
-    case lp.Typecheck(expr, tpe, cont, Unary(Unreferenced(), IC(MapFuncsCore.Undefined()))) if expr.root === cont.root =>
-      extend1[G](expr)(QSU.Unary[T, Symbol](_, ID(MapFuncsDerived.Typecheck(SrcHole, tpe))))
-
-    case lp.Typecheck(expr, tpe, cont, fallback) =>
-      autoJoin3[G](expr, cont, fallback)((e, c, f) => IC(MapFuncsCore.Guard[T, JoinSide3](e, tpe, c, f)))
 
     case lp.JoinSideName(name) =>
       withName[G](QSU.JoinSideRef[T, Symbol](name))

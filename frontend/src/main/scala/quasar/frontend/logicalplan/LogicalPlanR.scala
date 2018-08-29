@@ -72,9 +72,6 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
   def sort(src: T, order: NonEmptyList[(T, SortDir)]) =
     lp.sort(src, order).embed
 
-  def typecheck(expr: T, typ: Type, cont: T, fallback: T) =
-    lp.typecheck(expr, typ, cont, fallback).embed
-
   def temporalTrunc(part: TemporalPart, src: T) =
     lp.temporalTrunc(part, src).embed
 
@@ -129,7 +126,7 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
     * 1. Successive Lets are re-associated to the right:
     *    (let a = (let b = x1 in x2) in x3) becomes
     *    (let b = x1 in (let a = x2 in x3))
-    * 2. Lets are "hoisted" outside of Invoke and Typecheck nodes:
+    * 2. Lets are "hoisted" outside of Invoke  nodes:
     *    (add (let a = x1 in x2) (let b = x3 in x4)) becomes
     *    (let a = x1 in (let b = x3 in (add x2 x4))
     * Note that this is safe only if all bound names are unique; otherwise
@@ -181,12 +178,6 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
           lp.let(a, x1, join(l, x2, tpe, cond)).some
         case _ => None
       }
-
-    // we don't rewrite a `Let` as the `cont` to avoid illegally rewriting the continuation
-    case Typecheck(Embed(Let(a, x1, x2)), typ, cont, fallback) =>
-      lp.let(a, x1, typecheck(x2, typ, cont, fallback)).some
-    case Typecheck(expr, typ, cont, Embed(Let(a, x1, x2))) =>
-      lp.let(a, x1, typecheck(expr, typ, cont, x2)).some
 
     case t => None
   }

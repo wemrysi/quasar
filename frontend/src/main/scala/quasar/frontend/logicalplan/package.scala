@@ -73,11 +73,6 @@ package object logicalplan {
       case TemporalTrunc(part, a) => (part, a)
     } ((TemporalTrunc[A](_, _)).tupled)
 
-  def typecheck[A] =
-    Prism.partial[LogicalPlan[A], (A, Type, A, A)] {
-      case Typecheck(e, t, c, f) => (e, t, c, f)
-    } ((Typecheck[A](_, _, _, _)).tupled)
-
   type ArgumentErrors = NonEmptyList[ArgumentError]
 
   type MonadArgumentErrs[F[_]] = MonadError_[F, ArgumentErrors]
