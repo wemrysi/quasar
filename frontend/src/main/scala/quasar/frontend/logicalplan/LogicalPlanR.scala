@@ -31,14 +31,6 @@ import matryoshka.implicits._
 import scalaz._, Scalaz._
 import shapeless.{nat, Nat, Sized}
 
-final case class NamedConstraint[T](name: Symbol, inferred: Type, term: T)
-
-final case class ConstrainedPlan[T](
-    inferred: Type,
-    constraints: List[NamedConstraint[T]],
-    plan: T)
-
-// TODO: Move constraints to methods and/or pull the constructors into own class.
 final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) {
   import quasar.std.StdLib, StdLib._
   import quasar.time.TemporalPart
