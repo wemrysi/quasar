@@ -24,14 +24,10 @@ import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
 import matryoshka.implicits._
-import scalaz._, Scalaz._, Validation.success
+import scalaz._, Scalaz._
 import shapeless.{Data => _, :: => _, _}
 
 trait AggLib extends Library {
-  private val MathRel = Type.Numeric ⨿ Type.Interval
-
-  private val reflexiveUntyper: Func.Untyper[nat._1] =
-    untyper[nat._1](t => success(Func.Input1(t)))
 
   private def simplifiesOnConstants(cont: Data => LP[Nothing]) = new Func.Simplifier {
     def apply[T]
@@ -49,77 +45,42 @@ trait AggLib extends Library {
   val Count = UnaryFunc(
     Reduction,
     "Counts the values in a set",
-    Type.Int,
-    Func.Input1(Type.Top),
-    simplifiesOnConstants(_ => Constant(Data.Int(1))),
-    basicTyper[nat._1],
-    basicUntyper[nat._1])
+    simplifiesOnConstants(_ => Constant(Data.Int(1))))
 
   val Sum = UnaryFunc(
     Reduction,
     "Sums the values in a set",
-    Type.Numeric ⨿ Type.Interval,
-    Func.Input1(Type.Numeric ⨿ Type.Interval),
-    noSimplification,
-    widenConstTyper(_(0)),
-    reflexiveUntyper)
+    noSimplification)
 
   val Min = UnaryFunc(
     Reduction,
     "Finds the minimum in a set of values",
-    Type.Comparable,
-    Func.Input1(Type.Comparable),
-    simplifiesOnConstants(Constant(_)),
-    widenConstTyper(_(0)),
-    reflexiveUntyper)
+    simplifiesOnConstants(Constant(_)))
 
   val Max = UnaryFunc(
     Reduction,
     "Finds the maximum in a set of values",
-    Type.Comparable,
-    Func.Input1(Type.Comparable),
-    simplifiesOnConstants(Constant(_)),
-    widenConstTyper(_(0)),
-    reflexiveUntyper)
+    simplifiesOnConstants(Constant(_)))
 
   val First = UnaryFunc(
     Reduction,
     "Finds the first value in a set.",
-    Type.Top,
-    Func.Input1(Type.Top),
-    simplifiesOnConstants(Constant(_)),
-    widenConstTyper(_(0)),
-    reflexiveUntyper)
+    simplifiesOnConstants(Constant(_)))
 
   val Last = UnaryFunc(
     Reduction,
     "Finds the last value in a set.",
-    Type.Top,
-    Func.Input1(Type.Top),
-    simplifiesOnConstants(Constant(_)),
-    widenConstTyper(_(0)),
-    reflexiveUntyper)
+    simplifiesOnConstants(Constant(_)))
 
   val Avg = UnaryFunc(
     Reduction,
     "Finds the average in a set of numeric values",
-    Type.Numeric,
-    Func.Input1(Type.Numeric),
-    simplifiesOnConstants(Constant(_)),
-    partialTyperV[nat._1] {
-      case Sized(t) if MathRel.contains(t) =>
-        success(t.widenConst)
-    },
-    reflexiveUntyper)
+    simplifiesOnConstants(Constant(_)))
 
   val Arbitrary = UnaryFunc(
     Reduction,
     "Returns an arbitrary value from a set",
-    Type.Top,
-    Func.Input1(Type.Top),
-    simplifiesOnConstants(Constant(_)),
-    widenConstTyper(_(0)),
-    reflexiveUntyper)
+    simplifiesOnConstants(Constant(_)))
 }
 
 object AggLib extends AggLib

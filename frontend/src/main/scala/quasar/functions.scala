@@ -52,17 +52,12 @@ object DimensionalEffect {
   implicit val equal: Equal[DimensionalEffect] = Equal.equalA[DimensionalEffect]
 }
 
-final case class NullaryFunc
-  (val effect: DimensionalEffect,
+final case class NullaryFunc(
+    val effect: DimensionalEffect,
     val help: String,
-    val codomain: Func.Codomain,
-    val simplify: Func.Simplifier)
-    extends GenericFunc[nat._0] {
-  val domain = Sized[List]()
-  val typer0: Func.Typer[nat._0] = _ => Some(Validation.success(codomain))
-  val untyper0: Func.Untyper[nat._0] = {
-    case ((funcDomain, _), _) => Some(Validation.success(funcDomain))
-  }
+    val simplify: Func.Simplifier) extends GenericFunc[nat._0] {
+
+  val arity: Int = 0
 
   def apply[A](): LP[A] =
     applyGeneric(Sized[List]())
@@ -71,11 +66,9 @@ final case class NullaryFunc
 final case class UnaryFunc(
     val effect: DimensionalEffect,
     val help: String,
-    val codomain: Func.Codomain,
-    val domain: Func.Domain[nat._1],
-    val simplify: Func.Simplifier,
-    val typer0: Func.Typer[nat._1],
-    val untyper0: Func.Untyper[nat._1]) extends GenericFunc[nat._1] {
+    val simplify: Func.Simplifier) extends GenericFunc[nat._1] {
+
+  val arity: Int = 1
 
   def apply[A](a1: A): LP[A] =
     applyGeneric(Func.Input1[A](a1))
@@ -84,11 +77,9 @@ final case class UnaryFunc(
 final case class BinaryFunc(
     val effect: DimensionalEffect,
     val help: String,
-    val codomain: Func.Codomain,
-    val domain: Func.Domain[nat._2],
-    val simplify: Func.Simplifier,
-    val typer0: Func.Typer[nat._2],
-    val untyper0: Func.Untyper[nat._2]) extends GenericFunc[nat._2] {
+    val simplify: Func.Simplifier) extends GenericFunc[nat._2] {
+
+  val arity: Int = 2
 
   def apply[A](a1: A, a2: A): LP[A] =
     applyGeneric(Func.Input2[A](a1, a2))
@@ -97,11 +88,9 @@ final case class BinaryFunc(
 final case class TernaryFunc(
     val effect: DimensionalEffect,
     val help: String,
-    val codomain: Func.Codomain,
-    val domain: Func.Domain[nat._3],
-    val simplify: Func.Simplifier,
-    val typer0: Func.Typer[nat._3],
-    val untyper0: Func.Untyper[nat._3]) extends GenericFunc[nat._3] {
+    val simplify: Func.Simplifier) extends GenericFunc[nat._3] {
+
+  val arity: Int = 3
 
   def apply[A](a1: A, a2: A, a3: A): LP[A] =
     applyGeneric(Func.Input3[A](a1, a2, a3))
@@ -110,31 +99,14 @@ final case class TernaryFunc(
 sealed abstract class GenericFunc[N <: Nat](implicit toInt: ToInt[N]) { self =>
   def effect: DimensionalEffect
   def help: String
-  def codomain: Func.Codomain
-  def domain: Func.Domain[N]
   def simplify: Func.Simplifier
-  def typer0: Func.Typer[N]
-  def untyper0: Func.Untyper[N]
+  def arity: Int
 
   def applyGeneric[A](args: Func.Input[A, N]): LP[A] =
     Invoke[N, A](this, args)
 
   def applyUnsized[A](args: List[A]): Option[LP[A]] =
     args.sized[N].map(applyGeneric)
-
-  final def tpe(args: Func.Domain[N]): Func.VCodomain =
-    typer0(args).orElse {
-      Some(Success(codomain)).filter(_ => args.zip(domain).forall { case (a, d) => d.contains(a) })
-    }.getOrElse {
-      val msg: String = s"Unknown arguments: $args"
-      Failure(NonEmptyList(ArgumentError.invalidArgumentError(msg)))
-    }
-
-  final def untpe(tpe: Func.Codomain): Func.VDomain[N] = {
-    untyper0((domain, codomain), tpe).getOrElse(Success(domain))
-  }
-
-  final def arity: Int = domain.length
 
   def toFunction[A]: HomomorphicFunction[A, LP[A]] = new HomomorphicFunction[A, LP[A]] {
     def arity = self.arity
@@ -287,15 +259,6 @@ object Func {
   }
 
   type Input[A, N <: Nat] = Sized[List[A], N]
-
-  type Domain[N <: Nat] = Input[Type, N]
-  type Codomain = Type
-
-  type VDomain[N <: Nat] = ValidationNel[ArgumentError, Domain[N]]
-  type VCodomain = ValidationNel[ArgumentError, Codomain]
-
-  type Typer[N <: Nat] = Domain[N] => Option[VCodomain]
-  type Untyper[N <: Nat] = ((Domain[N], Codomain), Codomain) => Option[VDomain[N]]
 
   def Input1[A](a1: A): Input[A, nat._1] = Sized[List](a1)
   def Input2[A](a1: A, a2: A): Input[A, nat._2] = Sized[List](a1, a2)

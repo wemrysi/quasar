@@ -142,13 +142,13 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
       lp.let(a, x1, let(b, x2, x3)).some
 
     // TODO generalize the following three `GenericFunc` cases
-    case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) => a1 match {
+    case InvokeUnapply(func @ UnaryFunc(_, _, _), Sized(a1)) => a1 match {
       case Embed(Let(a, x1, x2)) =>
         lp.let(a, x1, invoke[nat._1](func, Func.Input1(x2))).some
       case _ => None
     }
 
-    case InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) => (a1, a2) match {
+    case InvokeUnapply(func @ BinaryFunc(_, _, _), Sized(a1, a2)) => (a1, a2) match {
       case (Embed(Let(a, x1, x2)), a2) =>
         lp.let(a, x1, invoke[nat._2](func, Func.Input2(x2, a2))).some
       case (a1, Embed(Let(a, x1, x2))) =>
@@ -163,7 +163,7 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
       case _ => None
     }
 
-    case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) => (a1, a2, a3) match {
+    case InvokeUnapply(func @ TernaryFunc(_, _, _), Sized(a1, a2, a3)) => (a1, a2, a3) match {
       case (Embed(Let(a, x1, x2)), a2, a3) =>
         lp.let(a, x1, invoke[nat._3](func, Func.Input3(x2, a2, a3))).some
       case (a1, Embed(Let(a, x1, x2)), a3) =>

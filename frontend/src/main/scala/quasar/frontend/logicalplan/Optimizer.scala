@@ -287,18 +287,18 @@ final class Optimizer[T: Equal]
         case Typecheck((_, cond), tpe, (_, cont), (_, fallback)) =>
           (Nil, (cond |@| cont |@| fallback)(lpr.typecheck(_, tpe, _, _)))
 
-        case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(t1)) =>
+        case InvokeUnapply(func @ UnaryFunc(_, _, _), Sized(t1)) =>
           (Nil, Func.Input1(t1).traverse(_._2).map(lpr.invoke(func, _)))
 
         // Preserve the previously-computed components in the `And`.
         // Return a constant `true` which is included as a no-op filter post-join.
-        case t @ InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(t1, t2)) if func == relations.And =>
+        case t @ InvokeUnapply(func @ BinaryFunc(_, _, _), Sized(t1, t2)) if func == relations.And =>
           (List(t1._2, t2._2), NeitherCond(lpr.constant(Data.Bool(true))))
 
-        case InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(t1, t2)) =>
+        case InvokeUnapply(func @ BinaryFunc(_, _, _), Sized(t1, t2)) =>
           (Nil, Func.Input2(t1, t2).traverse(_._2).map(lpr.invoke(func, _)))
 
-        case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(t1, t2, t3)) =>
+        case InvokeUnapply(func @ TernaryFunc(_, _, _), Sized(t1, t2, t3)) =>
           (Nil, Func.Input3(t1, t2, t3).traverse(_._2).map(lpr.invoke(func, _)))
 
         case Let(ident, form, body) =>
