@@ -50,6 +50,9 @@ object DatasourceError extends DatasourceErrorInstances {
 
   sealed trait DiscoveryError[+I] extends DatasourceError[I, Nothing]
 
+  final case class MalformedResource(path: ResourcePath)
+    extends DiscoveryError[Nothing]
+
   final case class PathNotFound(path: ResourcePath)
     extends DiscoveryError[Nothing]
 
@@ -151,6 +154,9 @@ sealed abstract class DatasourceErrorInstances {
 
   implicit def showDiscoveryError[I: Show]: Show[DiscoveryError[I]] =
     Show.show {
+      case MalformedResource(p) =>
+        Cord("MalformedResource(") ++ p.show ++ Cord(")")
+
       case PathNotAResource(p) =>
         Cord("PathNotAResource(") ++ p.show ++ Cord(")")
 
