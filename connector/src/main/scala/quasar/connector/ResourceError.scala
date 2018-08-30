@@ -29,9 +29,15 @@ import scalaz.std.tuple._
 sealed trait ResourceError extends Product with Serializable
 
 object ResourceError extends ResourceErrorInstances{
+  final case class MalformedResource(path: ResourcePath) extends ResourceError
   final case class NotAResource(path: ResourcePath) extends ResourceError
   sealed trait ExistentialError extends ResourceError
   final case class PathNotFound(path: ResourcePath) extends ExistentialError
+
+  val malformedResource: Prism[ResourceError, ResourcePath] =
+    Prism.partial[ResourceError, ResourcePath] {
+      case MalformedResource(p) => p
+    } (MalformedResource(_))
 
   val notAResource: Prism[ResourceError, ResourcePath] =
     Prism.partial[ResourceError, ResourcePath] {
@@ -58,7 +64,8 @@ sealed abstract class ResourceErrorInstances {
   implicit val equal: Equal[ResourceError] =
     Equal.equalBy(e => (
       ResourceError.notAResource.getOption(e),
-      ResourceError.pathNotFound.getOption(e)))
+      ResourceError.pathNotFound.getOption(e),
+      ResourceError.malformedResource.getOption(e)))
 
   implicit val show: Show[ResourceError] =
     Show.show {
@@ -67,5 +74,8 @@ sealed abstract class ResourceErrorInstances {
 
       case ResourceError.PathNotFound(p) =>
         Cord("PathNotFound(") ++ p.show ++ Cord(")")
+
+      case ResourceError.MalformedResource(p) =>
+        Cord("MalformedResource(") ++ p.show ++ Cord(")")
     }
 }
