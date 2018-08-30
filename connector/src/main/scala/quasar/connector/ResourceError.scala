@@ -16,7 +16,7 @@
 
 package quasar.connector
 
-import slamdata.Predef.{Exception, Product, Serializable, Throwable}
+import slamdata.Predef.{Exception, Option, Product, Serializable, String, Throwable}
 
 import quasar.api.resource._
 
@@ -29,15 +29,17 @@ import scalaz.std.tuple._
 sealed trait ResourceError extends Product with Serializable
 
 object ResourceError extends ResourceErrorInstances{
-  final case class MalformedResource(path: ResourcePath) extends ResourceError
+  final case class MalformedResource(path: ResourcePath, msg: Option[String]) extends ResourceError
   final case class NotAResource(path: ResourcePath) extends ResourceError
   sealed trait ExistentialError extends ResourceError
   final case class PathNotFound(path: ResourcePath) extends ExistentialError
 
-  val malformedResource: Prism[ResourceError, ResourcePath] =
-    Prism.partial[ResourceError, ResourcePath] {
-      case MalformedResource(p) => p
-    } (MalformedResource(_))
+  val malformedResource: Prism[ResourceError, (ResourcePath, Option[String])] =
+    Prism.partial[ResourceError, (ResourcePath, Option[String])] {
+      case MalformedResource(rp, msg) => (rp, msg)
+    } {
+      case (rp, msg) => MalformedResource(rp, msg)
+    }
 
   val notAResource: Prism[ResourceError, ResourcePath] =
     Prism.partial[ResourceError, ResourcePath] {
@@ -65,7 +67,7 @@ sealed abstract class ResourceErrorInstances {
     Equal.equalBy(e => (
       ResourceError.notAResource.getOption(e),
       ResourceError.pathNotFound.getOption(e),
-      ResourceError.malformedResource.getOption(e)))
+      ResourceError.malformedResource.getOption(e).map(_._1)))
 
   implicit val show: Show[ResourceError] =
     Show.show {
@@ -75,7 +77,7 @@ sealed abstract class ResourceErrorInstances {
       case ResourceError.PathNotFound(p) =>
         Cord("PathNotFound(") ++ p.show ++ Cord(")")
 
-      case ResourceError.MalformedResource(p) =>
+      case ResourceError.MalformedResource(p, _) =>
         Cord("MalformedResource(") ++ p.show ++ Cord(")")
     }
 }
