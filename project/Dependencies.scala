@@ -26,7 +26,7 @@ object Dependencies {
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
   private val fs2Version          = "0.10.5"
-  private val qdataVersion        = "1.0.4"
+  private val qdataVersion        = "1.1.0"
   private val slf4sVersion        = "1.7.25"
 
   def foundation = Seq(
