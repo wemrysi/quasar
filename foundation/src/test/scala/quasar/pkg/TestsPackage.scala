@@ -95,6 +95,15 @@ trait ScalacheckSupport {
     (setOfN(len, k) -> listOfN(len, v)) >> (_ zip _ toMap)
 
   def genAlphaNumString: Gen[String] = alphaNumChar.list ^^ (_.mkString)
+
+  def genUnicodeChar: Gen[Char] =
+    Gen.frequency(
+      (100, Gen.asciiChar),
+      (1, Gen.choose('λ', '貗')))
+
+  def genUnicodeString: Gen[String] =
+    Gen.listOf(genUnicodeChar).map(_.mkString)
+
   def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary
 
   // This is a hack to avoid underflow and overflow exceptions during tests. It's still a problem.
