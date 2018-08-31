@@ -140,15 +140,6 @@ trait SJValueGenerators extends ArbitraryBigDecimal with RCValueGenerators {
   }
 }
 
-case class LimitList[A](values: List[A])
-
-object LimitList {
-  def genLimitList[A: Gen](size: Int): Gen[LimitList[A]] = for {
-    i <- choose(0, size)
-    l <- Gen.listOfN(i, implicitly[Gen[A]])
-  } yield LimitList(l)
-}
-
 trait ArbitraryBigDecimal {
   val MAX_EXPONENT = 50000
   // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
