@@ -16,7 +16,7 @@
 
 package quasar.connector
 
-import slamdata.Predef.{Exception, Option, Product, Serializable, String, Throwable}
+import slamdata.Predef.{Exception, List, Product, Serializable, String, StringContext, Throwable}
 
 import quasar.api.resource._
 
@@ -29,17 +29,15 @@ import scalaz.std.tuple._
 sealed trait ResourceError extends Product with Serializable
 
 object ResourceError extends ResourceErrorInstances{
-  final case class MalformedResource(path: ResourcePath, msg: Option[String]) extends ResourceError
+  final case class MalformedResource(path: ResourcePath, expectedFormat: String, msg: String, additional: List[String]) extends ResourceError
   final case class NotAResource(path: ResourcePath) extends ResourceError
   sealed trait ExistentialError extends ResourceError
   final case class PathNotFound(path: ResourcePath) extends ExistentialError
 
-  val malformedResource: Prism[ResourceError, (ResourcePath, Option[String])] =
-    Prism.partial[ResourceError, (ResourcePath, Option[String])] {
-      case MalformedResource(rp, msg) => (rp, msg)
-    } {
-      case (rp, msg) => MalformedResource(rp, msg)
-    }
+  val malformedResource: Prism[ResourceError, (ResourcePath, String, String, List[String])] =
+    Prism.partial[ResourceError, (ResourcePath, String, String, List[String])] {
+      case MalformedResource(rp, expected, msg, addl) => (rp, expected, msg, addl)
+    } (MalformedResource.tupled)
 
   val notAResource: Prism[ResourceError, ResourcePath] =
     Prism.partial[ResourceError, ResourcePath] {
@@ -77,7 +75,7 @@ sealed abstract class ResourceErrorInstances {
       case ResourceError.PathNotFound(p) =>
         Cord("PathNotFound(") ++ p.show ++ Cord(")")
 
-      case ResourceError.MalformedResource(p, _) =>
-        Cord("MalformedResource(") ++ p.show ++ Cord(")")
+      case ResourceError.MalformedResource(p, expected, msg, _) =>
+        Cord(s"MalformedResource(path: ${p.show}, expected: $expected), msg: $msg")
     }
 }
