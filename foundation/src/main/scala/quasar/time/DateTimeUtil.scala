@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.precog
+package quasar.time
+
+import slamdata.Predef._
 
 import qdata.time.OffsetDate
 
+import java.lang.IllegalArgumentException
 import java.time._
 import java.time.format._
 import java.util.regex.Pattern
