@@ -27,17 +27,6 @@ object TestIdentities {
   type Identity = Long
   type Identities = Array[Identity]
 
-  object Identities {
-    val Empty = Vector.empty[Identity]
-  }
-
-  type SEvent = (Identities, SValue)
-
-  object SEvent {
-    @inline
-    def apply(id: Identities, sv: SValue): SEvent = (id, sv)
-  }
-
   def prefixIdentityOrdering(ids1: Identities, ids2: Identities, prefixLength: Int)
       : scalaz.Ordering = {
     var result: scalaz.Ordering = EQ
