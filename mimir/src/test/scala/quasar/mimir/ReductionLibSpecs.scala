@@ -16,8 +16,9 @@
 
 package quasar.mimir
 
+import quasar.blueeyes.json._
 import quasar.precog.common._
-import quasar.yggdrasil._
+
 import scalaz._
 
 trait ReductionLibSpecs extends EvaluatorSpecification
@@ -39,7 +40,7 @@ trait ReductionLibSpecs extends EvaluatorSpecification
     result must haveSize(1)
 
     val result2 = result collect {
-      case (ids, SDecimal(d)) if ids.length == 0 => d.toDouble
+      case (ids, JNum(d)) if ids.length == 0 => d.toDouble
     }
 
     result2.toSet must_== Set(value)
@@ -69,8 +70,8 @@ trait ReductionLibSpecs extends EvaluatorSpecification
       result must haveSize(1)
 
       result.head must beLike {
-        case (ids, SArray(elems)) =>
-          elems mustEqual Vector(42, 12, 77, 1, 13).map(SDecimal(_))
+        case (ids, JArray(elems)) =>
+          elems mustEqual Vector(42, 12, 77, 1, 13).map(JNum(_))
       }
     }
 
@@ -195,7 +196,7 @@ trait ReductionLibSpecs extends EvaluatorSpecification
       result must haveSize(1)
 
       val result2 = result collect {
-        case (ids, SBoolean(b)) if ids.length == 0 => b
+        case (ids, JBool(b)) if ids.length == 0 => b
       }
 
       result2.toSet must_== Set(false)
@@ -212,7 +213,7 @@ trait ReductionLibSpecs extends EvaluatorSpecification
       result must haveSize(1)
 
       val result2 = result collect {
-        case (ids, SBoolean(b)) if ids.length == 0 => b
+        case (ids, JBool(b)) if ids.length == 0 => b
       }
 
       result2.toSet must_== Set(true)

@@ -17,31 +17,31 @@
 package quasar.mimir
 
 import quasar.blueeyes._, json._
-import quasar.yggdrasil._
 import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz.Validation
 
 trait MemoryDatasetConsumer extends EvaluatorModule {
-  type IdType
+  type X = Throwable
 
-  type X      = Throwable
-  type SEvent = (Vector[IdType], SValue)
+  type IdType = JValue
+  type SEvent = (Vector[IdType], JValue)
 
   def Evaluator: EvaluatorLike
 
   def extractIds(jv: JValue): Seq[IdType]
 
-  def consumeEval(graph: DepGraph, ctx: EvaluationContext, optimize: Boolean = true): Validation[X, Set[SEvent]] = {
+  def consumeEval(graph: DepGraph, ctx: EvaluationContext, optimize: Boolean = true)
+      : Validation[X, Set[SEvent]] = {
     Validation.fromTryCatchNonFatal {
-      val evaluator   = Evaluator
-      val result      = evaluator.eval(graph, ctx, optimize)
+      val evaluator = Evaluator
+      val result = evaluator.eval(graph, ctx, optimize)
       val json = result.flatMap(_.toJson).unsafeRunSync filterNot { rvalue =>
         (rvalue.toJValue \ "value") == JUndefined
       }
 
-      val events = json map { rvalue =>
-        (Vector(extractIds(rvalue.toJValue \ "key"): _*), jvalueToSValue(rvalue.toJValue \ "value"))
+      val events: Iterable[SEvent] = json map { rvalue =>
+        (Vector(extractIds(rvalue.toJValue \ "key"): _*), rvalue.toJValue \ "value")
       }
 
       val back = events.toSet
@@ -49,19 +49,8 @@ trait MemoryDatasetConsumer extends EvaluatorModule {
       back
     }
   }
-
-  protected def jvalueToSValue(value: JValue): SValue = value match {
-    case JUndefined      => sys.error("don't use jnothing; doh!")
-    case JNull           => SNull
-    case JBool(value)    => SBoolean(value)
-    case JNum(bi)        => SDecimal(bi)
-    case JString(str)    => SString(str)
-    case JObject(fields) => SObject(fields mapValues jvalueToSValue toMap)
-    case JArray(values)  => SArray(Vector(values map jvalueToSValue: _*))
-  }
 }
 
 trait LongIdMemoryDatasetConsumer extends MemoryDatasetConsumer {
-  type IdType = SValue
-  def extractIds(jv: JValue): Seq[SValue] = (jv --> classOf[JArray]).elements map jvalueToSValue
+  def extractIds(jv: JValue): Seq[JValue] = (jv --> classOf[JArray]).elements
 }

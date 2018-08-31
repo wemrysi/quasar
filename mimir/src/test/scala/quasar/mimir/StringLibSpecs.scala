@@ -16,8 +16,9 @@
 
 package quasar.mimir
 
+import quasar.blueeyes.json._
 import quasar.precog.common._
-import quasar.yggdrasil._
+
 import scalaz._
 
 trait StringLibSpecs extends EvaluatorSpecification
@@ -53,7 +54,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(6, 12, 16, 26, 42, 0)
@@ -66,7 +67,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("quirky", "solstice + 7", "Monkey: [Brains]", """("alpha", "beta", "gamma")""", "Whitespace       is   awesome  !!!1!!", "")
@@ -79,7 +80,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("QUIRKY", "SOLSTICE + 7", "MONKEY: [BRAINS]", """("ALPHA", "BETA", "GAMMA")""", "  WHITESPACE       IS   AWESOME  !!!1!!   ", "")
@@ -92,7 +93,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("quirky", "solstice + 7", "monkey: [brains]", """("alpha", "beta", "gamma")""", "  whitespace       is   awesome  !!!1!!   ", "")
@@ -105,7 +106,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -118,7 +119,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("quirky", "solstice + 7", "Monkey: [Brains]", """("alpha", "beta", "gamma")""", "  Whitespace       is   awesome  !!!1!!   ", "")
@@ -132,7 +133,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(4)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(101, 32, 34, 115)
@@ -145,7 +146,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(0)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must haveSize(0)
@@ -158,7 +159,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -171,7 +172,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(-1, 3, 14, 27)
@@ -184,7 +185,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("quirky7", "solstice + 77", "Monkey: [Brains]7", """("alpha", "beta", "gamma")7""", "  Whitespace       is   awesome  !!!1!!   7", "7")
@@ -197,7 +198,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -210,7 +211,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(4)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(99, 58, 97, 101)
@@ -223,7 +224,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(0)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must haveSize(0)
@@ -235,7 +236,7 @@ trait StringLibSpecs extends EvaluatorSpecification
 
       result must haveSize(6)
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("", "quirky", "solstice", "Monkey: ", "(\"alpha\"", "  Whites")
@@ -247,7 +248,7 @@ trait StringLibSpecs extends EvaluatorSpecification
 
       result must haveSize(6)
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("", "quirky", "tice + 7", "[Brains]", "\"gamma\")", "!!1!!   ")
@@ -259,7 +260,7 @@ trait StringLibSpecs extends EvaluatorSpecification
 
       result must haveSize(6)
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("", " + 7", "[Brains]", ", \"beta\", \"gamma\")", "pace       is   awesome  !!!1!!   ")
@@ -270,7 +271,7 @@ trait StringLibSpecs extends EvaluatorSpecification
 
       result must haveSize(6)
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("", "sols", "Monkey: ", "(\"alpha\", \"beta\", ", "  Whitespace       is   awesome  !")
@@ -299,7 +300,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -311,10 +312,10 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(4)
 
       val result2 = result collect {
-        case (ids, SArray(vec)) if ids.length == 1 => vec
+        case (ids, JArray(vec)) if ids.length == 1 => vec
       }
 
-      result2 must contain(Vector(SString("e"), SString("a")), Vector(SString("e"), SString("")))
+      result2 must contain(Vector(JString("e"), JString("a")), Vector(JString("e"), JString("")))
     }
     "determine compare" in {
       val input = op2Input(compare, CString("quirky"), homStrings) //todo put regex here!
@@ -324,7 +325,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(0, 2, -36, -73, -81, -6)
@@ -339,7 +340,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(0, 2, -4, -73, -81, -6)
@@ -354,7 +355,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -369,7 +370,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(-1, 7, 4, 12, 6)
@@ -384,7 +385,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -401,7 +402,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(6, 12, 16, 26, 42, 0)
@@ -415,7 +416,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("quirky", "solstice + 7", "Monkey: [Brains]", """("alpha", "beta", "gamma")""", "Whitespace       is   awesome  !!!1!!", "")
@@ -429,7 +430,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("QUIRKY", "SOLSTICE + 7", "MONKEY: [BRAINS]", """("ALPHA", "BETA", "GAMMA")""", "  WHITESPACE       IS   AWESOME  !!!1!!   ", "")
@@ -443,7 +444,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("quirky", "solstice + 7", "monkey: [brains]", """("alpha", "beta", "gamma")""", "  whitespace       is   awesome  !!!1!!   ", "")
@@ -457,7 +458,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -471,7 +472,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("quirky", "solstice + 7", "Monkey: [Brains]", """("alpha", "beta", "gamma")""", "  Whitespace       is   awesome  !!!1!!   ", "")
@@ -487,7 +488,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(4)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(101, 32, 34, 115)
@@ -502,7 +503,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(0)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must haveSize(0)
@@ -517,7 +518,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -532,7 +533,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(-1, 3, 14, 27)
@@ -547,7 +548,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("quirky7", "solstice + 77", "Monkey: [Brains]7", """("alpha", "beta", "gamma")7""", "  Whitespace       is   awesome  !!!1!!   7", "7")
@@ -562,7 +563,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -577,7 +578,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(4)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(99, 58, 97, 101)
@@ -592,7 +593,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(0)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must haveSize(0)
@@ -606,7 +607,7 @@ trait StringLibSpecs extends EvaluatorSpecification
 
       result must haveSize(6)
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("", "quirky", "solstice", "Monkey: ", "(\"alpha\"", "  Whites")
@@ -620,7 +621,7 @@ trait StringLibSpecs extends EvaluatorSpecification
 
       result must haveSize(6)
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("", "quirky", "tice + 7", "[Brains]", "\"gamma\")", "!!1!!   ")
@@ -634,7 +635,7 @@ trait StringLibSpecs extends EvaluatorSpecification
 
       result must haveSize(6)
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("", " + 7", "[Brains]", ", \"beta\", \"gamma\")", "pace       is   awesome  !!!1!!   ")
@@ -648,7 +649,7 @@ trait StringLibSpecs extends EvaluatorSpecification
 
       result must haveSize(6)
       val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 1 => d
+        case (ids, JString(d)) if ids.length == 1 => d
       }
 
       result2 must contain("", "sols", "Monkey: ", "(\"alpha\", \"beta\", ", "  Whitespace       is   awesome  !")
@@ -676,7 +677,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -688,7 +689,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(0, 2, -36, -73, -81, -6)
@@ -700,7 +701,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(0, 2, -4, -73, -81, -6)
@@ -712,7 +713,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -727,7 +728,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
+        case (ids, JNum(d)) if ids.length == 1 => d
       }
 
       result2 must contain(-1, 7, 4, 12, 6)
@@ -742,7 +743,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val result2 = result collect {
-        case (ids, SBoolean(d)) if ids.length == 1 => d
+        case (ids, JBool(d)) if ids.length == 1 => d
       }
 
       result2 must contain(true, false)
@@ -759,7 +760,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(8)
 
       val ns = result.toList.collect {
-        case (_, SDecimal(n)) => n
+        case (_, JNum(n)) => n
       }
 
       ns.toSet must_== Set[BigDecimal](
@@ -785,7 +786,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       result must haveSize(6)
 
       val ss = result.toList.collect {
-        case (_, SString(s)) => s
+        case (_, JString(s)) => s
       }
 
       ss must contain(
@@ -807,7 +808,7 @@ trait StringLibSpecs extends EvaluatorSpecification
       resultE must haveSize(1)
 
       val result = resultE.collect {
-        case (_, SString(s)) => s
+        case (_, JString(s)) => s
       }
 
       result must contain("3")
@@ -816,12 +817,12 @@ trait StringLibSpecs extends EvaluatorSpecification
 
   "split" should {
 
-    val o = scala.math.Ordering.by[(SValue, _), SValue](_._1)
+    val o = scala.math.Ordering.by[(JValue, _), JValue](_._1)
 
-    def mogrify(result: Set[(Vector[SValue], SValue)]): List[Vector[String]] =
+    def mogrify(result: Set[(Vector[JValue], JValue)]): List[List[String]] =
       result.toList.collect {
-        case (Vector(n), SArray(elems)) => (n, elems)
-      }.sorted(o).map(_._2 collect { case SString(s) => s })
+        case (Vector(n), JArray(elems)) => (n, elems)
+      }.sorted(o).map(_._2 collect { case JString(s) => s })
 
     def mktree(f: Op2, path: String, sep: String) =
       Join(BuiltInFunction2Op(f), Cross(None),
@@ -851,7 +852,7 @@ trait StringLibSpecs extends EvaluatorSpecification
         Const(CString("{")))
 
       testEval(input) collect {
-        case (_, SArray(vec)) => vec collect { case SString(str) => str }
+        case (_, JArray(vec)) => vec collect { case JString(str) => str }
       } mustEqual Set(Vector("foo", "bar"))
     }
 
