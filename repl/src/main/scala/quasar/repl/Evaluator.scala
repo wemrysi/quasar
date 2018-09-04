@@ -28,7 +28,6 @@ import quasar.contrib.pathy._
 import quasar.contrib.std.uuid._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
-import quasar.fp.minspace
 import quasar.fp.ski._
 import quasar.frontend.data.DataCodec
 import quasar.impl.schema.{SstConfig, SstSchema}
@@ -321,9 +320,6 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         case None => raiseEvalError(s"Unsupported datasource type: $tp")
         case Some(z) => z.point[F]
       }
-
-    private def formatJson(codec: DataCodec)(data: Data): Option[String] =
-      codec.encode(data).map(_.pretty(minspace))
 
     private def fromEither[E: Show, A](e: E \/ A): F[A] =
       e match {
