@@ -321,32 +321,34 @@ abstract class StdLibSpec extends Qspec {
         "false" >> {
           unary(Boolean(_).embed, Data.Str("false"), Data.Bool(false))
         }
-
-        // TODO: how to express "should execute and may produce any result"
       }
 
       "Integer" >> {
         "any BigInt in the domain" >> prop { (x: BigInt) =>
           unary(Integer(_).embed, Data.Str(x.toString), Data.Int(x))
         }
-
-        // TODO: how to express "should execute and may produce any result"
       }
 
       "Decimal" >> {
         "any BigDecimal in the domain" >> prop { (x: BigDecimal) =>
           unary(Decimal(_).embed, Data.Str(x.toString), Data.Dec(x))
         }
+      }
 
-        // TODO: how to express "should execute and may produce any result"
+      "Number" >> {
+        "any BigInt in the domain" >> prop { (x: BigInt) =>
+          unary(Number(_).embed, Data.Str(x.toString), Data.Int(x))
+        }
+
+        "any BigDecimal in the domain" >> prop { (x: BigDecimal) =>
+          unary(Number(_).embed, Data.Str(x.toString), Data.Dec(x))
+        }
       }
 
       "Null" >> {
         "null" >> {
           unary(Null(_).embed, Data.Str("null"), Data.Null)
         }
-
-        // TODO: how to express "should execute and may produce any result"
       }
 
       "ToString" >> {
