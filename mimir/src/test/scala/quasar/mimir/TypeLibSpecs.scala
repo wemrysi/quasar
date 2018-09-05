@@ -16,8 +16,8 @@
 
 package quasar.mimir
 
+import quasar.blueeyes.json._
 import quasar.precog.common._
-import quasar.yggdrasil._
 
 import scalaz._
 
@@ -45,7 +45,7 @@ trait TypeLibSpecs extends EvaluatorSpecification
       result must haveSize(24)
 
       val result2 = result.toSeq collect {
-        case (ids, SBoolean(b)) if ids.length == 1 => b
+        case (ids, JBool(b)) if ids.length == 1 => b
       }
 
       val (trues, falses) = result2 partition identity
@@ -63,7 +63,7 @@ trait TypeLibSpecs extends EvaluatorSpecification
       result must haveSize(24)
 
       val result2 = result.toSeq collect {
-        case (ids, SBoolean(b)) if ids.length == 1 => b
+        case (ids, JBool(b)) if ids.length == 1 => b
       }
 
       val (trues, falses) = result2 partition identity
@@ -81,7 +81,7 @@ trait TypeLibSpecs extends EvaluatorSpecification
       result must haveSize(24)
 
       val result2 = result.toSeq collect {
-        case (ids, SBoolean(b)) if ids.length == 1 => b
+        case (ids, JBool(b)) if ids.length == 1 => b
       }
 
       val (trues, falses) = result2 partition identity
@@ -99,7 +99,7 @@ trait TypeLibSpecs extends EvaluatorSpecification
       result must haveSize(24)
 
       val result2 = result.toSeq collect {
-        case (ids, SBoolean(b)) if ids.length == 1 => b
+        case (ids, JBool(b)) if ids.length == 1 => b
       }
 
       val (trues, falses) = result2 partition identity
@@ -117,7 +117,7 @@ trait TypeLibSpecs extends EvaluatorSpecification
       result must haveSize(24)
 
       val result2 = result.toSeq collect {
-        case (ids, SBoolean(b)) if ids.length == 1 => b
+        case (ids, JBool(b)) if ids.length == 1 => b
       }
 
       val (trues, falses) = result2 partition identity
@@ -135,7 +135,7 @@ trait TypeLibSpecs extends EvaluatorSpecification
       result must haveSize(24)
 
       val result2 = result.toSeq collect {
-        case (ids, SBoolean(b)) if ids.length == 1 => b
+        case (ids, JBool(b)) if ids.length == 1 => b
       }
 
       val (trues, falses) = result2 partition identity
