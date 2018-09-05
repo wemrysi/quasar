@@ -143,13 +143,13 @@ object QDataData extends QData[Data] {
   type NascentArray = List[Data]
 
   def prepArray: NascentArray = List[Data]()
-  def pushArray(a: Data, na: NascentArray): NascentArray = a +: na // prepend
+  def pushArray(a: Data, na: NascentArray): NascentArray = a :: na // prepend
   def makeArray(na: NascentArray): Data = Data.Arr(na.reverse)
 
-  type ObjectCursor = List[(String, Data)]
+  type ObjectCursor = ListMap[String, Data]
 
   def getObjectCursor(a: Data): ObjectCursor = a match {
-    case Data.Obj(obj) => obj.toList
+    case Data.Obj(obj) => obj
     case _ => error(s"Expected `Data.Obj`. Received $a")
   }
   def hasNextObject(ac: ObjectCursor): Boolean = !ac.isEmpty
@@ -157,11 +157,11 @@ object QDataData extends QData[Data] {
   def getObjectValueAt(ac: ObjectCursor): Data = ac.head._2
   def stepObject(ac: ObjectCursor): ObjectCursor = ac.tail
 
-  type NascentObject = List[(String, Data)]
+  type NascentObject = ListMap[String, Data]
 
-  def prepObject: NascentObject = List[(String, Data)]()
-  def pushObject(key: String, a: Data, na: NascentObject): NascentObject = (key, a) +: na // prepend
-  def makeObject(na: NascentObject): Data = Data.Obj(ListMap(na.reverse: _*))
+  def prepObject: NascentObject = ListMap[String, Data]()
+  def pushObject(key: String, a: Data, na: NascentObject): NascentObject = na + ((key, a))
+  def makeObject(na: NascentObject): Data = Data.Obj(na)
 
   def getMetaValue(a: Data): Data = error(s"Unable to represent metadata in `Data`.")
   def getMetaMeta(a: Data): Data = error(s"Unable to represent metadata in `Data`.")
