@@ -16,27 +16,28 @@
 
 package quasar.connector
 
-import slamdata.Predef.{Exception, List, Product, Serializable, String, StringContext, Throwable}
+import slamdata.Predef.{Exception, Product, Serializable, String, StringContext, Throwable}
 
 import quasar.api.resource._
 
 import monocle.Prism
-import scalaz.{Cord, Equal, Show}
-import scalaz.syntax.show._
 import scalaz.std.option._
+import scalaz.std.string._
 import scalaz.std.tuple._
+import scalaz.syntax.show._
+import scalaz.{Cord, Equal, Show}
 
 sealed trait ResourceError extends Product with Serializable
 
 object ResourceError extends ResourceErrorInstances{
-  final case class MalformedResource(path: ResourcePath, expectedFormat: String, msg: String, additional: List[String]) extends ResourceError
+  final case class MalformedResource(path: ResourcePath, expectedFormat: String, msg: String) extends ResourceError
   final case class NotAResource(path: ResourcePath) extends ResourceError
   sealed trait ExistentialError extends ResourceError
   final case class PathNotFound(path: ResourcePath) extends ExistentialError
 
-  val malformedResource: Prism[ResourceError, (ResourcePath, String, String, List[String])] =
-    Prism.partial[ResourceError, (ResourcePath, String, String, List[String])] {
-      case MalformedResource(rp, expected, msg, addl) => (rp, expected, msg, addl)
+  val malformedResource: Prism[ResourceError, (ResourcePath, String, String)] =
+    Prism.partial[ResourceError, (ResourcePath, String, String)] {
+      case MalformedResource(rp, expected, msg) => (rp, expected, msg)
     } (MalformedResource.tupled)
 
   val notAResource: Prism[ResourceError, ResourcePath] =
@@ -61,11 +62,12 @@ object ResourceError extends ResourceErrorInstances{
 }
 
 sealed abstract class ResourceErrorInstances {
-  implicit val equal: Equal[ResourceError] =
+  implicit val equal: Equal[ResourceError] = {
     Equal.equalBy(e => (
       ResourceError.notAResource.getOption(e),
       ResourceError.pathNotFound.getOption(e),
-      ResourceError.malformedResource.getOption(e).map(_._1)))
+      ResourceError.malformedResource.getOption(e)))
+  }
 
   implicit val show: Show[ResourceError] =
     Show.show {
@@ -75,7 +77,7 @@ sealed abstract class ResourceErrorInstances {
       case ResourceError.PathNotFound(p) =>
         Cord("PathNotFound(") ++ p.show ++ Cord(")")
 
-      case ResourceError.MalformedResource(p, expected, msg, _) =>
-        Cord(s"MalformedResource(path: ${p.show}, expected: $expected), msg: $msg")
+      case ResourceError.MalformedResource(p, expected, msg) =>
+        Cord(s"MalformedResource(path: ${p.show}, expected: $expected, msg: $msg)")
     }
 }
