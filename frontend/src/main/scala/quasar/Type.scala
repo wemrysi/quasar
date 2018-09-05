@@ -19,13 +19,11 @@ package quasar
 import slamdata.Predef._
 import quasar.common.PrimaryType
 import quasar.common.data.Data
-import quasar.frontend.data.DataCodec
 import quasar.fp._
 import quasar.fp.ski._
 
 import scala.Any
 
-import argonaut._, Argonaut._, ArgonautScalaz._
 import scalaz._, Scalaz._
 
 sealed abstract class Type extends Product with Serializable { self =>
@@ -99,57 +97,6 @@ trait TypeInstances {
 
   implicit val TypeRenderTree: RenderTree[Type] =
     RenderTree.fromShow[Type]("Type")
-
-  implicit val typeEncodeJson: EncodeJson[Type] =
-    EncodeJson {
-      case Top =>
-        jString("Top")
-      case Bottom =>
-        jString("Bottom")
-      case Const(d) =>
-        Json("Const" -> DataCodec.Precise.encode(d).getOrElse(jString("Undefined")))
-      case Null =>
-        jString("Null")
-      case Str =>
-        jString("Str")
-      case Int =>
-        jString("Int")
-      case Dec =>
-        jString("Dec")
-      case Bool =>
-        jString("Bool")
-      case OffsetDateTime =>
-        jString("OffsetDateTime")
-      case OffsetTime =>
-        jString("OffsetTime")
-      case Type.OffsetDate =>
-        jString("OffsetDate")
-      case LocalDateTime =>
-        jString("LocalDateTime")
-      case LocalTime =>
-        jString("LocalTime")
-      case LocalDate =>
-        jString("LocalDate")
-      case Interval =>
-        jString("Interval")
-      case Arr(types) =>
-        Json("Array" := types)
-      case FlexArr(min, max, mbrs) =>
-        val flexarr =
-          ("minSize" :=  min) ->:
-          ("maxSize" :?= max) ->?:
-          ("members" :=  mbrs) ->:
-          jEmptyObject
-        Json("FlexArr" -> flexarr)
-      case Obj(assocs, unkns) =>
-        val obj =
-          ("associations" :=  assocs) ->:
-          ("unknownKeys"  :?= unkns)  ->?:
-          jEmptyObject
-        Json("Obj" -> obj)
-      case cp @ Coproduct(l, r) =>
-        Json("Coproduct" := cp.flatten)
-    }
 }
 
 object Type extends TypeInstances {
