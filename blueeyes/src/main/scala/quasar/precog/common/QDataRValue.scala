@@ -146,7 +146,7 @@ object QDataRValue extends QData[RValue] {
   type NascentArray = List[RValue]
 
   def prepArray: NascentArray = List[RValue]()
-  def pushArray(a: RValue, na: NascentArray): NascentArray = a +: na // prepend
+  def pushArray(a: RValue, na: NascentArray): NascentArray = a :: na // prepend
   def makeArray(na: NascentArray): RValue = if (na.isEmpty) CEmptyArray else RArray(na.reverse)
 
   type ObjectCursor = List[(String, RValue)]
