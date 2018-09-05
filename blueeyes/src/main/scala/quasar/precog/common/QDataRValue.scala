@@ -21,7 +21,7 @@ import slamdata.Predef._
 import qdata._
 import qdata.time.{DateTimeInterval, OffsetDate}
 
-import spire.math.{Natural, Real}
+import spire.math.Real
 
 import java.math.MathContext
 import java.time.{
@@ -132,16 +132,16 @@ object QDataRValue extends QData[RValue] {
   }
   def makeInterval(l: DateTimeInterval): RValue = CInterval(l)
 
-  final case class ArrayCursor(index: Natural, values: List[RValue])
+  type ArrayCursor = List[RValue]
 
   def getArrayCursor(a: RValue): ArrayCursor = a match {
-    case RArray(arr) => ArrayCursor(Natural.zero, arr)
-    case CEmptyArray => ArrayCursor(Natural.zero, List[RValue]())
+    case RArray(arr) => arr
+    case CEmptyArray => List[RValue]()
     case _ => error(s"Expected `RArray` or `CEmptyArray`. Received $a")
   }
-  def hasNextArray(ac: ArrayCursor): Boolean = ac.values.length > ac.index.toInt
-  def getArrayAt(ac: ArrayCursor): RValue = ac.values(ac.index.toInt)
-  def stepArray(ac: ArrayCursor): ArrayCursor = ac.copy(index = ac.index + Natural.one)
+  def hasNextArray(ac: ArrayCursor): Boolean = !ac.isEmpty
+  def getArrayAt(ac: ArrayCursor): RValue = ac.head
+  def stepArray(ac: ArrayCursor): ArrayCursor = ac.tail
 
   type NascentArray = List[RValue]
 
@@ -149,17 +149,17 @@ object QDataRValue extends QData[RValue] {
   def pushArray(a: RValue, na: NascentArray): NascentArray = a +: na // prepend
   def makeArray(na: NascentArray): RValue = if (na.isEmpty) CEmptyArray else RArray(na.reverse)
 
-  final case class ObjectCursor(index: Natural, values: List[(String, RValue)])
+  type ObjectCursor = List[(String, RValue)]
 
   def getObjectCursor(a: RValue): ObjectCursor = a match {
-    case RObject(obj) => ObjectCursor(Natural.zero, obj.toList)
-    case CEmptyObject => ObjectCursor(Natural.zero, List[(String, RValue)]())
+    case RObject(obj) => obj.toList
+    case CEmptyObject => List[(String, RValue)]()
     case _ => error(s"Expected `Data.Obj`. Received $a")
   }
-  def hasNextObject(ac: ObjectCursor): Boolean = ac.values.length > ac.index.toInt
-  def getObjectKeyAt(ac: ObjectCursor): String = ac.values(ac.index.toInt)._1
-  def getObjectValueAt(ac: ObjectCursor): RValue = ac.values(ac.index.toInt)._2
-  def stepObject(ac: ObjectCursor): ObjectCursor = ac.copy(index = ac.index + Natural.one)
+  def hasNextObject(ac: ObjectCursor): Boolean = !ac.isEmpty
+  def getObjectKeyAt(ac: ObjectCursor): String = ac.head._1
+  def getObjectValueAt(ac: ObjectCursor): RValue = ac.head._2
+  def stepObject(ac: ObjectCursor): ObjectCursor = ac.tail
 
   type NascentObject = Map[String, RValue]
 
