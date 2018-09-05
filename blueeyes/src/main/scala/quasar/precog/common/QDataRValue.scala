@@ -161,11 +161,11 @@ object QDataRValue extends QData[RValue] {
   def getObjectValueAt(ac: ObjectCursor): RValue = ac.values(ac.index.toInt)._2
   def stepObject(ac: ObjectCursor): ObjectCursor = ac.copy(index = ac.index + Natural.one)
 
-  type NascentObject = List[(String, RValue)]
+  type NascentObject = Map[String, RValue]
 
-  def prepObject: NascentObject = List[(String, RValue)]()
-  def pushObject(key: String, a: RValue, na: NascentObject): NascentObject = (key, a) +: na // prepend
-  def makeObject(na: NascentObject): RValue = if (na.isEmpty) CEmptyObject else RObject(na.reverse.toMap)
+  def prepObject: NascentObject = Map[String, RValue]()
+  def pushObject(key: String, a: RValue, na: NascentObject): NascentObject = na + ((key, a))
+  def makeObject(na: NascentObject): RValue = if (na.isEmpty) CEmptyObject else RObject(na)
 
   def getMetaValue(a: RValue): RValue = error(s"Unable to represent metadata in `RValue`.")
   def getMetaMeta(a: RValue): RValue = error(s"Unable to represent metadata in `RValue`.")
