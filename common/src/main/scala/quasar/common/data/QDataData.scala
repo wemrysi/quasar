@@ -21,7 +21,7 @@ import slamdata.Predef._
 import qdata._
 import qdata.time.{DateTimeInterval, OffsetDate}
 
-import spire.math.{Natural, Real}
+import spire.math.Real
 
 import java.math.MathContext
 import java.time.{
@@ -33,6 +33,7 @@ import java.time.{
 }
 import scala.sys.error
 
+@SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
 object QDataData extends QData[Data] {
   import QType._
 
@@ -129,38 +130,38 @@ object QDataData extends QData[Data] {
   }
   def makeInterval(l: DateTimeInterval): Data = Data.Interval(l)
 
-  final case class ArrayCursor(index: Natural, values: List[Data])
+  type ArrayCursor = List[Data]
 
   def getArrayCursor(a: Data): ArrayCursor = a match {
-    case Data.Arr(arr) => ArrayCursor(Natural.zero, arr)
+    case Data.Arr(arr) => arr
     case _ => error(s"Expected `Data.Arr`. Received $a")
   }
-  def hasNextArray(ac: ArrayCursor): Boolean = ac.values.length > ac.index.toInt
-  def getArrayAt(ac: ArrayCursor): Data = ac.values(ac.index.toInt)
-  def stepArray(ac: ArrayCursor): ArrayCursor = ac.copy(index = ac.index + Natural.one)
+  def hasNextArray(ac: ArrayCursor): Boolean = !ac.isEmpty
+  def getArrayAt(ac: ArrayCursor): Data = ac.head
+  def stepArray(ac: ArrayCursor): ArrayCursor = ac.tail
 
   type NascentArray = List[Data]
 
   def prepArray: NascentArray = List[Data]()
-  def pushArray(a: Data, na: NascentArray): NascentArray = a +: na // prepend
+  def pushArray(a: Data, na: NascentArray): NascentArray = a :: na // prepend
   def makeArray(na: NascentArray): Data = Data.Arr(na.reverse)
 
-  final case class ObjectCursor(index: Natural, values: List[(String, Data)])
+  type ObjectCursor = ListMap[String, Data]
 
   def getObjectCursor(a: Data): ObjectCursor = a match {
-    case Data.Obj(obj) => ObjectCursor(Natural.zero, obj.toList)
+    case Data.Obj(obj) => obj
     case _ => error(s"Expected `Data.Obj`. Received $a")
   }
-  def hasNextObject(ac: ObjectCursor): Boolean = ac.values.length > ac.index.toInt
-  def getObjectKeyAt(ac: ObjectCursor): String = ac.values(ac.index.toInt)._1
-  def getObjectValueAt(ac: ObjectCursor): Data = ac.values(ac.index.toInt)._2
-  def stepObject(ac: ObjectCursor): ObjectCursor = ac.copy(index = ac.index + Natural.one)
+  def hasNextObject(ac: ObjectCursor): Boolean = !ac.isEmpty
+  def getObjectKeyAt(ac: ObjectCursor): String = ac.head._1
+  def getObjectValueAt(ac: ObjectCursor): Data = ac.head._2
+  def stepObject(ac: ObjectCursor): ObjectCursor = ac.tail
 
-  type NascentObject = List[(String, Data)]
+  type NascentObject = ListMap[String, Data]
 
-  def prepObject: NascentObject = List[(String, Data)]()
-  def pushObject(key: String, a: Data, na: NascentObject): NascentObject = (key, a) +: na // prepend
-  def makeObject(na: NascentObject): Data = Data.Obj(ListMap(na.reverse: _*))
+  def prepObject: NascentObject = ListMap[String, Data]()
+  def pushObject(key: String, a: Data, na: NascentObject): NascentObject = na + ((key, a))
+  def makeObject(na: NascentObject): Data = Data.Obj(na)
 
   def getMetaValue(a: Data): Data = error(s"Unable to represent metadata in `Data`.")
   def getMetaMeta(a: Data): Data = error(s"Unable to represent metadata in `Data`.")

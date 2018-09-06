@@ -18,15 +18,16 @@ package quasar.pkg
 
 import slamdata.Predef._
 
+import scala.{Byte, Char}
 import scala.Predef.$conforms
 import scala.collection.mutable.Builder
 import scala.collection.Traversable
 import scala.language.postfixOps
-import scala.{ Byte, Char }
+import scala.math.exp
 
 package object tests extends TestsPackage
 
-trait TestsPackage extends ScalacheckSupport with SpecsSupport
+trait TestsPackage extends NestedGenerators with SpecsSupport
 
 trait SpecsSupport {
   import org.specs2._, matcher._
@@ -94,6 +95,15 @@ trait ScalacheckSupport {
     (setOfN(len, k) -> listOfN(len, v)) >> (_ zip _ toMap)
 
   def genAlphaNumString: Gen[String] = alphaNumChar.list ^^ (_.mkString)
+
+  def genUnicodeChar: Gen[Char] =
+    Gen.frequency(
+      (100, Gen.asciiChar),
+      (1, Gen.choose('λ', '貗')))
+
+  def genUnicodeString: Gen[String] =
+    Gen.listOf(genUnicodeChar).map(_.mkString)
+
   def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary
 
   // This is a hack to avoid underflow and overflow exceptions during tests. It's still a problem.
@@ -131,7 +141,7 @@ trait ScalacheckSupport {
     }: List[(Int, Gen[Char])]): _*)
   }
 
-  def genJSONString: Gen[String]       = Gen.listOf(genJSONChar).map(_.mkString)
+  def genJSONString: Gen[String] = Gen.listOf(genJSONChar).map(_.mkString)
 
   implicit class ScalacheckIntOps(private val n: Int) {
     def upTo(end: Int): Gen[Int] = choose(n, end)
@@ -146,6 +156,7 @@ trait ScalacheckSupport {
     def list: Gen[List[A]]  = gen.list
     def opt: Gen[Option[A]] = gen.opt
   }
+
   implicit class ScalacheckGenOps[A](gen: Gen[A]) {
     def ^^[B](f: A => B): Gen[B]      = gen map f
     def >>[B](f: A => Gen[B]): Gen[B] = gen flatMap f
@@ -159,12 +170,29 @@ trait ScalacheckSupport {
       10 -> (gen map (x => Some(x)))
     )
   }
+
   implicit class ScalacheckGen2Ops[A, B](gen: (Gen[A], Gen[B])) {
     def >>[C](f: (A, B) => C): Gen[C] = for (a <- gen._1; b <- gen._2) yield f(a, b)
     def zip: Gen[A -> B]              = >>(scala.Tuple2(_, _))
   }
+
   implicit class ScalacheckGen3Ops[A, B, C](gen: (Gen[A], Gen[B], Gen[C])) {
     def >>[D](f: (A, B, C) => D): Gen[D] = for (a <- gen._1; b <- gen._2; c <- gen._3) yield f(a, b, c)
     def zip: Gen[(A, B, C)]              = >>(scala.Tuple3(_, _, _))
+  }
+}
+
+trait NestedGenerators extends ScalacheckSupport {
+
+  def genNested[A](maxDepth: Int, maxRecursiveDepth: Int, atomic: Gen[A], nested: => Gen[A]): Gen[A] = {
+    val nestedWeight: Int =
+      if (maxDepth < 0) 0 else exp(maxRecursiveDepth.toDouble).toInt
+
+    val nonNestedWeight: Int =
+      exp(maxDepth.toDouble).toInt
+
+    Gen.frequency(
+      nestedWeight -> Gen.delay(nested),
+      nonNestedWeight -> atomic)
   }
 }

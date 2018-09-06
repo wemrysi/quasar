@@ -28,7 +28,6 @@ import java.time.{
   OffsetTime => JOffsetTime,
   ZoneOffset
 }
-import scala.math.exp
 
 trait DataGenerators {
   import DataGenerators._
@@ -69,26 +68,19 @@ object DataGenerators extends DataGenerators {
   ////
 
   private val maxDepthDefault: Int = 4
-  private val nonNestedWeight: Int = exp(maxDepthDefault.toDouble).toInt
 
-  def genData(maxDepth: Int, atomic: Gen[Data]): Gen[Data] = {
-    val nestedWeight: Int =
-      if (maxDepth < 0) 0 else exp(maxDepth.toDouble).toInt
+  private def genNestedData(max: Int, genKey: Gen[String], atomic: Gen[Data]): Gen[Data] =
+    Gen.oneOf[Data](
+      (genKey, genData(max, atomic)).zip.list ^^ (xs => Data.Obj(xs: _*)),
+      genData(max, atomic).list ^^ Data.Arr)
 
-    Gen.frequency(
-      nestedWeight -> Gen.delay(genNested(maxDepth - 1, genKey, atomic)),
-      nonNestedWeight -> atomic)
-  }
+  def genData(maxDepth: Int, atomic: Gen[Data]): Gen[Data] =
+    genNested[Data](maxDepthDefault, maxDepth, atomic, genNestedData(maxDepth - 1, genKey, atomic))
 
   def genDataDefault(atomic: Gen[Data]): Gen[Data] =
     genData(maxDepthDefault, atomic)
 
   val data: Gen[Data] = genDataDefault(simpleNonNested)
-
-  def genNested(max: Int, genKey: Gen[String], atomic: Gen[Data]): Gen[Data] =
-    Gen.oneOf[Data](
-      (genKey, genData(max, atomic)).zip.list ^^ (xs => Data.Obj(xs: _*)),
-      genData(max, atomic).list ^^ Data.Arr)
 
   /** Generator of atomic Data (everything but Obj and Arr). */
   def genNonNested(strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal])
