@@ -16,22 +16,29 @@
 
 package quasar.connector
 
-import slamdata.Predef.{Exception, Product, Serializable, Throwable}
+import slamdata.Predef.{Exception, Product, Serializable, String, StringContext, Throwable}
 
 import quasar.api.resource._
 
 import monocle.Prism
-import scalaz.{Cord, Equal, Show}
-import scalaz.syntax.show._
 import scalaz.std.option._
+import scalaz.std.string._
 import scalaz.std.tuple._
+import scalaz.syntax.show._
+import scalaz.{Cord, Equal, Show}
 
 sealed trait ResourceError extends Product with Serializable
 
 object ResourceError extends ResourceErrorInstances{
+  final case class MalformedResource(path: ResourcePath, expectedFormat: String, msg: String) extends ResourceError
   final case class NotAResource(path: ResourcePath) extends ResourceError
   sealed trait ExistentialError extends ResourceError
   final case class PathNotFound(path: ResourcePath) extends ExistentialError
+
+  val malformedResource: Prism[ResourceError, (ResourcePath, String, String)] =
+    Prism.partial[ResourceError, (ResourcePath, String, String)] {
+      case MalformedResource(rp, expected, msg) => (rp, expected, msg)
+    } (MalformedResource.tupled)
 
   val notAResource: Prism[ResourceError, ResourcePath] =
     Prism.partial[ResourceError, ResourcePath] {
@@ -55,10 +62,12 @@ object ResourceError extends ResourceErrorInstances{
 }
 
 sealed abstract class ResourceErrorInstances {
-  implicit val equal: Equal[ResourceError] =
+  implicit val equal: Equal[ResourceError] = {
     Equal.equalBy(e => (
       ResourceError.notAResource.getOption(e),
-      ResourceError.pathNotFound.getOption(e)))
+      ResourceError.pathNotFound.getOption(e),
+      ResourceError.malformedResource.getOption(e)))
+  }
 
   implicit val show: Show[ResourceError] =
     Show.show {
@@ -67,5 +76,8 @@ sealed abstract class ResourceErrorInstances {
 
       case ResourceError.PathNotFound(p) =>
         Cord("PathNotFound(") ++ p.show ++ Cord(")")
+
+      case ResourceError.MalformedResource(p, expected, msg) =>
+        Cord(s"MalformedResource(path: ${p.show}, expected: $expected, msg: $msg)")
     }
 }
