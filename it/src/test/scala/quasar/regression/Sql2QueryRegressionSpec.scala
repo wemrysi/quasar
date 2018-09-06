@@ -39,6 +39,7 @@ import quasar.run.{Quasar, QuasarError, SqlQuery}
 import quasar.run.implicits._
 import quasar.sql.Query
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.matching.Regex
@@ -78,7 +79,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
   /** A name to identify the suite in test output. */
   val suiteName: String = "SQL^2 Regression Queries"
 
-  val Q = for {
+  def Q(testsDir: JPath) = for {
     tmpPath <-
       Stream.bracket(IO(Files.createTempDirectory("quasar-test-")))(
         Stream.emit(_),
@@ -89,7 +90,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
     q <- Quasar[IO](precog, ExternalConfig.Empty, 1L)
 
     localCfg =
-      ("rootDir" := posixCodec.printPath(TestDataRoot)) ->:
+      ("rootDir" := testsDir.toString) ->:
       // 64 KB chunks, chosen mostly arbitrarily.
       ("readChunkSizeBytes" := 65535) ->:
       jEmptyObject
@@ -112,9 +113,10 @@ final class Sql2QueryRegressionSpec extends Qspec {
       tdef <- Promise.empty[IO, (Quasar[IO], UUID)]
       sdown <- Promise.empty[IO, Unit]
 
-      tests <- regressionTests[IO](TestsRoot, TestDataRoot)
+      testsDir <- IO(TestsRoot(Paths.get("")).toAbsolutePath)
+      tests <- regressionTests[IO](testsDir)
 
-      _ <- Q.evalMap(t => tdef.complete(t) *> sdown.get).compile.drain.start
+      _ <- Q(testsDir).evalMap(t => tdef.complete(t) *> sdown.get).compile.drain.start
       t <- tdef.get
       (q, i) = t
 
@@ -223,33 +225,29 @@ final class Sql2QueryRegressionSpec extends Qspec {
   /** Returns all the `RegressionTest`s found in the given directory, keyed by
     * file path.
     */
-  def regressionTests[F[_]: Effect: Timer](
-      testDir: RDir,
-      dataDir: RDir)
+  def regressionTests[F[_]: Effect: Timer](testDir: JPath)
       : F[Map[RFile, RegressionTest]] =
     descendantsMatching[F](testDir, TestPattern)
-      .flatMap(f => loadRegressionTest[F](f).map((f.relativeTo(dataDir).get, _)))
+      .flatMap(f => loadRegressionTest[F](f) strengthL asRFile(testDir relativize f))
       .compile
       .fold(Map[RFile, RegressionTest]())(_ + _)
 
   /** Loads a `RegressionTest` from the given file. */
-  def loadRegressionTest[F[_]: Effect: Timer](file: RFile): Stream[F, RegressionTest] =
+  def loadRegressionTest[F[_]: Effect: Timer](file: JPath): Stream[F, RegressionTest] =
     // all test files right now fit into 8K, which is a reasonable chunk size anyway
-    io.file.readAllAsync[F](jPath(file), 8192)
+    io.file.readAllAsync[F](file, 8192)
       .through(text.utf8Decode)
       .reduce(_ + _)
       .flatMap(txt =>
         decodeJson[RegressionTest](txt).fold(
-          err => Stream.raiseError(new RuntimeException(posixCodec.printPath(file) + ": " + err)),
+          err => Stream.raiseError(new RuntimeException(s"${file}: $err")),
           Stream.emit).covary[F])
 
   /** Returns all descendant files in the given dir matching `pattern`. */
-  def descendantsMatching[F[_]: Sync](d: RDir, pattern: Regex): Stream[F, RFile] =
-    convert.fromJavaStream(Sync[F].delay(Files.walk(jPath(d))))
-      .filter(p => pattern.findFirstIn(p.getFileName.toString).isDefined)
-      .map(p => posixCodec.parseRelFile(p.toString).flatMap(_.relativeTo(d)))
-      .unNone
-      .map(d </> _)
+  def descendantsMatching[F[_]: Sync](dir: JPath, pattern: Regex): Stream[F, JPath] =
+    convert.fromJavaStream(Sync[F].delay(Files.walk(dir))) filter { p =>
+      pattern.findFirstIn(p.getFileName.toString).isDefined
+    }
 
   /** Whether the backend has the specified directive in the given test. */
   def hasDirective(td: TestDirective, dirs: Directives, name: BackendName): Boolean =
@@ -266,16 +264,19 @@ final class Sql2QueryRegressionSpec extends Qspec {
     Foldable[Option].compose[NonEmptyList]
       .findMapM[Id, TestDirective, A](dirs get name)(pf.lift)(idInstance)
 
-  def jPath(p: Path[_, _, Sandboxed]): JPath =
-    Paths.get(posixCodec.printPath(p))
+  private def asRFile(p: JPath): RFile = {
+    val parentDir: RDir =
+      Option(p.getParent)
+        .fold(List[JPath]())(_.iterator.asScala.toList)
+        .foldLeft(currentDir[Sandboxed])((d, s) => d </> dir(s.getFileName.toString))
+
+    parentDir </> file(p.getFileName.toString)
+  }
 }
 
 object Sql2QueryRegressionSpec {
-  val TestDataRoot: RDir =
-    currentDir[Sandboxed] </> dir("it") </> dir("src") </> dir("main") </> dir("resources") </> dir("tests")
-
-  val TestsRoot: RDir =
-    TestDataRoot
+  def TestsRoot(quasarDir: JPath): JPath =
+    quasarDir.resolve("it").resolve("src").resolve("main").resolve("resources").resolve("tests")
 
   val TestPattern: Regex =
     """^([^.].*)\.test""".r
