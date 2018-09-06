@@ -45,6 +45,7 @@ import scala.Any
 import matryoshka._
 import matryoshka.patterns._
 import monocle.{Iso, Optional, Prism}
+import qdata.QData
 import scalaz.{Lens => _, Optional=>_, _}, Scalaz._
 
 sealed abstract class Data extends Product with Serializable
@@ -184,6 +185,8 @@ object Data {
   implicit val dataShow: Show[Data] = Show.showFromToString
 
   implicit val dataEqual: Equal[Data] = Equal.equalA
+
+  implicit val dataQData: QData[Data] = QDataData
 
   implicit val dataCorecursive: Corecursive.Aux[Data, EJson] =
     new Corecursive[Data] {
