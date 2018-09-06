@@ -35,6 +35,8 @@ import scalaz.syntax.monad._
 import shims._
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.SECONDS
+
 
 object PreparationsManagerSpec extends Specification {
   import PreparationsManager._
@@ -63,8 +65,8 @@ object PreparationsManagerSpec extends Specification {
 
         _ <- Stream.eval(IO {
           event must beLike {
-            case PreparationEvent.PreparationSucceeded(id, _, _) =>
-              // TODO assertions about time?
+            case PreparationEvent.PreparationSucceeded(id, _, duration) =>
+              duration.unit mustEqual SECONDS
               id mustEqual Id
           }
 
@@ -154,7 +156,8 @@ object PreparationsManagerSpec extends Specification {
       val event = results.compile.last.unsafeRunSync
 
       event must beLike {
-        case Some(PreparationEvent.PreparationErrored(_, _, _, TestException)) => ok
+        case Some(PreparationEvent.PreparationErrored(_, _, duration, TestException)) =>
+          duration.unit mustEqual SECONDS
       }
     }
 
