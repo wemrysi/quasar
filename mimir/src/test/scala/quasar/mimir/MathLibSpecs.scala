@@ -335,20 +335,6 @@ trait MathLibSpecs extends EvaluatorSpecification
 
       result2.toSet must_== Set(0.0, 0.7615941559557649, -0.7615941559557649, 1.0, -1.0)
     }
-    "compute round" in {
-      val input = dag.Operate(BuiltInFunction1Op(round),
-        dag.AbsoluteLoad(Const(CString("/hom/numbers4"))))
-
-      val result = testEval(input)
-
-      result must haveSize(6)
-
-      val result2 = result collect {
-        case (ids, JNum(d)) if ids.length == 1  => d
-      }
-
-      result2.toSet must_== Set(0, 1, -1, 42, -23)
-    }
     "compute cosh" in {
       val input = dag.Operate(BuiltInFunction1Op(cosh),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))))
@@ -832,20 +818,6 @@ trait MathLibSpecs extends EvaluatorSpecification
       }
 
       result2.toSet must_== Set(0.0, 0.7615941559557649, -0.7615941559557649, 1.0, -1.0)
-    }
-    "compute round" in {
-      val input = dag.Operate(BuiltInFunction1Op(round),
-        dag.AbsoluteLoad(Const(CString("/het/numbers4"))))
-
-      val result = testEval(input)
-
-      result must haveSize(6)
-
-      val result2 = result collect {
-        case (ids, JNum(d)) if ids.length == 1  => d
-      }
-
-      result2.toSet must_== Set(0, 1, -1, 42, -23)
     }
     "compute cosh" in {
       val input = dag.Operate(BuiltInFunction1Op(cosh),
@@ -1348,20 +1320,6 @@ trait MathLibSpecs extends EvaluatorSpecification
 
       result2.toSet must_== Set(0.0, 0.9999999999998128, -0.9950547536867305, -0.9999999999244973, 0.9999877116507956, -0.9999092042625951, 0.9999999958776927, 0.9999999994421064, 0.9999999999986171, -0.9999999999986171, -0.999999969540041, -0.9999983369439447, 0.9999983369439447, -0.9999999999897818, 0.9999999999897818)
     }
-    "compute round" in {
-      val input = dag.Operate(BuiltInFunction1Op(round),
-        dag.AbsoluteLoad(Const(CString("/hom/numbersAcrossSlices"))))
-
-      val result = testEval(input)
-
-      result must haveSize(22)
-
-      val result2 = result collect {
-        case (ids, JNum(d)) if ids.length == 1 => d
-      }
-
-      result2.toSet must_== Set(0, 10, -7, 14, -3, -12, 6, 13, -5, 7, -14, 11, -9, -13, 15)
-    }
     "compute cosh" in {
       val input = dag.Operate(BuiltInFunction1Op(cosh),
         dag.AbsoluteLoad(Const(CString("/hom/numbersAcrossSlices"))))
@@ -1817,20 +1775,6 @@ trait MathLibSpecs extends EvaluatorSpecification
       }
 
       result2.toSet must_== Set(0.0, -0.9950547536867305, 0.9999999999244973, -0.7615941559557649, 0.7615941559557649, 0.9999092042625951, 0.9640275800758169)
-    }
-    "compute round" in {
-      val input = dag.Operate(BuiltInFunction1Op(round),
-        dag.AbsoluteLoad(Const(CString("/het/numbersAcrossSlices"))))
-
-      val result = testEval(input)
-
-      result must haveSize(9)
-
-      val result2 = result collect {
-        case (ids, JNum(d)) if ids.length == 1 => d
-      }
-
-      result2.toSet must_== Set(0, 5, -3, 1, 2, 12, -1)
     }
     "compute cosh" in {
       val input = dag.Operate(BuiltInFunction1Op(cosh),

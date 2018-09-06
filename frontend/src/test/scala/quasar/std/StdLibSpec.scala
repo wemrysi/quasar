@@ -2174,6 +2174,15 @@ abstract class StdLibSpec extends Qspec {
           unary(Round(_).embed, Data.Int(x), Data.Int(x))
         }
 
+        "any Double" >> prop { (x: Double) =>
+          val bd = BigDecimal(x)
+          unary(Round(_).embed, Data.Dec(bd), Data.Dec(bd.setScale(0, RoundingMode.HALF_EVEN)))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Round(_).embed, Data.Dec(x), Data.Dec(x.setScale(0, RoundingMode.HALF_EVEN)))
+        }
+
         "0.5 -> 0" >> {
           unary(Round(_).embed, Data.Dec(0.5), Data.Int(0))
         }

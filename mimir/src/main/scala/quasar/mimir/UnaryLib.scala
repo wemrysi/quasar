@@ -105,19 +105,7 @@ trait UnaryLibModule extends ColumnarTableLibModule {
       object Round extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: CF1 = CF1P {
-          // encoding of half-even rounding
-          case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, { d =>
-            if (math.abs(d % 1) == 0.5) {
-              val candidate = math.ceil(d)
-
-              if (candidate % 2 == 0)
-                candidate
-              else
-                math.floor(d)
-            } else {
-              math.round(d)
-            }
-          })
+          case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, math.rint)
           case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
           case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.HALF_EVEN))
         }
