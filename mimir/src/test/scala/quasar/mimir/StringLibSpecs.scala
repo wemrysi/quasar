@@ -801,7 +801,7 @@ trait StringLibSpecs extends EvaluatorSpecification
 
     "trim the trailing '.0' in round double conversion" in {
       val input = dag.Operate(BuiltInFunction1Op(numToString),
-        dag.Operate(BuiltInFunction1Op(round),
+        dag.Operate(BuiltInFunction1Op(rint),
           Const(CDouble(3.14))))
 
       val resultE = testEval(input)

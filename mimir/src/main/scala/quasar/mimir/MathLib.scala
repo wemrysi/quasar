@@ -70,11 +70,6 @@ trait MathLibModule extends ColumnarTableLibModule with InfixLibModule {
 
     object tanh extends Op1DD(doubleIsDefined, Math.tanh)
 
-    // Math.round returns Long, so we have to improvise.
-    // 4503599627370496.0 is the point where Double can't represent fractional
-    // values anymore, so beyond that we just pass the value through
-    object round extends Op1DD(doubleIsDefined, n => if (Math.abs(n) >= 4503599627370496.0) n else Math.round(n))
-
     object cosh extends Op1DD(doubleIsDefined, Math.cosh)
 
     object tan extends Op1DD(doubleIsDefined, Math.tan)
