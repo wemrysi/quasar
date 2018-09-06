@@ -2619,8 +2619,8 @@ abstract class StdLibSpec extends Qspec {
         "any values with different types" >> prop { (x: Data, y: Data) =>
           // ...provided they are not both Numeric (Int | Dec)
           (dataType(x) != dataType(y) &&
-            !((Type.Numeric contains dataType(x)) &&
-              (Type.Numeric contains dataType(y)))) ==>
+            !((dataType(x) == Type.Int || dataType(x) == Type.Dec) &&
+              (dataType(y) == Type.Int || dataType(y) == Type.Dec))) ==>
             commute(Eq(_, _).embed, x, y, Data.Bool(false))
         }
       }
@@ -2673,8 +2673,8 @@ abstract class StdLibSpec extends Qspec {
         "any values with different types" >> prop { (x: Data, y: Data) =>
           // ...provided they are not both Numeric (Int | Dec)
           (dataType(x) != dataType(y) &&
-            !((Type.Numeric contains dataType(x)) &&
-              (Type.Numeric contains dataType(y)))) ==>
+            !((dataType(x) == Type.Int || dataType(x) == Type.Dec) &&
+              (dataType(y) == Type.Int || dataType(y) == Type.Dec))) ==>
             commute(Neq(_, _).embed, x, y, Data.Bool(true))
         }
       }

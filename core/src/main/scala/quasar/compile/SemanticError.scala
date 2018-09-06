@@ -17,7 +17,7 @@
 package quasar.compile
 
 import slamdata.Predef._
-import quasar.{ArgumentError, UnificationError, VarName, VarValue}
+import quasar.{ArgumentError, VarName, VarValue}
 import quasar.contrib.pathy.ADir
 import quasar.common.CIName
 import quasar.sql._
@@ -58,10 +58,6 @@ object SemanticError {
   // Compiler
   final case class FunctionNotFound(name: CIName) extends SemanticError {
     def message = s"The function '${name.shows}' could not be found in the standard library"
-  }
-
-  final case class TypeError(typeError: UnificationError) extends SemanticError {
-    def message = typeError.message
   }
 
   final case class VariableParseError(vari: VarName, value: VarValue, cause: quasar.sql.ParsingError) extends SemanticError {
