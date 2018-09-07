@@ -84,7 +84,7 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
                     PreparationEvent.PreparationErrored(
                       tableId,
                       start,
-                      (end.toEpochSecond - start.toEpochSecond).millis,
+                      (end.toEpochSecond - start.toEpochSecond).seconds,
                       t)))
               } yield ()
 
@@ -104,7 +104,7 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
                         PreparationEvent.PreparationSucceeded(
                           tableId,
                           start,
-                          (end.toEpochSecond - start.toEpochSecond).millis)))
+                          (end.toEpochSecond - start.toEpochSecond).seconds)))
                   } yield ()
                 }
               } yield ()
