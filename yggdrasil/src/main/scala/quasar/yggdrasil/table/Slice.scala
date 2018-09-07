@@ -501,6 +501,8 @@ abstract class Slice { source =>
         RangeUtil.loopDefined(0 to size, c){ i =>
           val s = c(i)
           try {
+            // TODO look into ways to parse this in a more performant way
+            // See ch1790
             val l = java.lang.Long.parseLong(s)
             lc.update(i, l)
           } catch {
