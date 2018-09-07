@@ -340,7 +340,15 @@ abstract class StdLibSpec extends Qspec {
           unary(Number(_).embed, Data.Str(x.toString), Data.Int(x))
         }
 
+        "any Long in the domain" >> prop { (x: Long) =>
+          unary(Number(_).embed, Data.Str(x.toString), Data.Int(x))
+        }
+
         "any BigDecimal in the domain" >> prop { (x: BigDecimal) =>
+          unary(Number(_).embed, Data.Str(x.toString), Data.Dec(x))
+        }
+
+        "any Double in the domain" >> prop { (x: Double) =>
           unary(Number(_).embed, Data.Str(x.toString), Data.Dec(x))
         }
       }
