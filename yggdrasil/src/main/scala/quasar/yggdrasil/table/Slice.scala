@@ -27,7 +27,7 @@ import qdata.time.{DateTimeInterval, OffsetDate}
 import quasar.yggdrasil._
 import quasar.yggdrasil.TransSpecModule._
 import quasar.yggdrasil.bytecode._
-import quasar.yggdrasil.util.CPathUtils
+import quasar.yggdrasil.util.{CPathUtils, RangeUtil}
 
 import scalaz._, Scalaz._, Ordering._
 import shims._
@@ -103,7 +103,7 @@ abstract class Slice { source =>
       } toMap
     })
 
-  def toArray[A](implicit tpe0: CValueType[A]) = {
+  def toArray[A](implicit tpe0: CValueType[A]): Slice = {
     val size = source.size
 
     val cols0 = (source.columns).toList sortBy { case (ref, _) => ref.selector }
@@ -411,7 +411,7 @@ abstract class Slice { source =>
     Slice (size, columns)
   }
 
-  def deleteFields(prefixes: scala.collection.Set[CPathField]) = {
+  def deleteFields(prefixes: scala.collection.Set[CPathField]): Slice = {
     val (removed, withoutPrefixes) = source.columns partition {
       case (ColumnRef(CPath(head @ CPathField(_), _ @_ *), _), _) => prefixes contains head
       case _ => false
@@ -490,7 +490,53 @@ abstract class Slice { source =>
     Slice (size, columns)
   }
 
-  def arraySwap(index: Int) = {
+  def toNumber: Slice = {
+    val size = source.size
+    val columns = source.columns.get(ColumnRef(CPath.Identity, CString)) match {
+      case Some(c: StrColumn) =>
+        // TODO it may be worth to only start allocating these columns
+        // once they are known to be non-empty
+        val lc = ArrayLongColumn.empty(size)
+        val dc = ArrayDoubleColumn.empty(size)
+        val nc = ArrayNumColumn.empty(size)
+
+        RangeUtil.loopDefined(0 to size, c){ i =>
+          val s = c(i)
+          try {
+            // TODO look into ways to parse this in a more performant way
+            // See ch1790
+            val l = java.lang.Long.parseLong(s)
+            lc.update(i, l)
+          } catch {
+            case _: NumberFormatException =>
+              try {
+                // Double.parseDouble doesn't work here because it parses ok
+                // in case of a loss of precision
+                // See https://gist.github.com/rintcius/49d1bfa161c53bdb733ab1a76fc19cbc
+                val n = BigDecimal(s)
+                if (n.isDecimalDouble) {
+                  dc.update(i, n.doubleValue)
+                } else {
+                  nc.update(i, n)
+                }
+              } catch {
+                case _: NumberFormatException => // don't set anything
+              }
+          }
+        }
+        Map[ColumnRef, BitsetColumn](
+          ColumnRef(CPath.Identity, CLong) -> lc,
+          ColumnRef(CPath.Identity, CDouble) -> dc,
+          ColumnRef(CPath.Identity, CNum) -> nc).foldLeft(Map.empty[ColumnRef, Column])
+        { case (acc, (cref, col)) =>
+            if (col.definedAt.size > 0) acc + (cref -> col.asInstanceOf[Column])
+            else acc }
+      case _ => Map.empty[ColumnRef, Column]
+    }
+    Slice(size, columns)
+  }
+
+  def arraySwap(index: Int): Slice = {
     val size = source.size
     val columns = source.columns.collect {
       case (ColumnRef(cPath @ CPath(CPathArray, _ *), cType), col: HomogeneousArrayColumn[a]) =>
@@ -537,7 +583,7 @@ abstract class Slice { source =>
     })
 
 
-  def remap(indices: ArrayIntList) = Slice(
+  def remap(indices: ArrayIntList): Slice = Slice(
     indices.size,
     source.columns lazyMapValues { col =>
       cf.util.RemapIndices(indices).apply(col).get
@@ -576,7 +622,7 @@ abstract class Slice { source =>
     Slice(size, columns)
   }
 
-  def filterDefined(filter: Slice, definedness: Definedness) = {
+  def filterDefined(filter: Slice, definedness: Definedness): Slice = {
     val colValues = filter.columns.values.toArray
     lazy val defined = definedness match {
       case AnyDefined =>
@@ -671,7 +717,7 @@ abstract class Slice { source =>
     Slice(size, columns)
   }
 
-  def retain(refs: Set[ColumnRef]) =
+  def retain(refs: Set[ColumnRef]): Slice =
     Slice(source.size, source.columns.filterKeys(refs))
 
   /**
