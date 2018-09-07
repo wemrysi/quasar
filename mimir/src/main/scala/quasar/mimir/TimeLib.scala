@@ -366,7 +366,7 @@ trait TimeLibModule extends ColumnarTableLibModule {
             override def isDefinedAt(row: Int) = {
               super.isDefinedAt(row) && {
                 val d = c(row)
-                (d == Math.rint(d))
+                d == d.longValue
               }
             }
 
