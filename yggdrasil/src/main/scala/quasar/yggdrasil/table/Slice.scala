@@ -494,6 +494,8 @@ abstract class Slice { source =>
     val size = source.size
     val columns = source.columns.get(ColumnRef(CPath.Identity, CString)) match {
       case Some(c: StrColumn) =>
+        // TODO it may be worth to only start allocating these columns
+        // once they are known to be non-empty
         val lc = ArrayLongColumn.empty(size)
         val dc = ArrayDoubleColumn.empty(size)
         val nc = ArrayNumColumn.empty(size)
