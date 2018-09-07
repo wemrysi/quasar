@@ -17,7 +17,7 @@ object Dependencies {
   private val scodecBitsVersion   = "1.1.2"
   private val scodecScalazVersion = "1.4.1a"
   private val scalacheckVersion   = "1.14.0"
-  private val scalazVersion       = "7.2.23"
+  private val scalazVersion       = "7.2.26"
   private val scalazStreamVersion = "0.8.6a"
   private val scoptVersion        = "3.5.0"
   private val shapelessVersion    = "2.3.3"
