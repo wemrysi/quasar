@@ -82,7 +82,7 @@ object LeftShiftBenchmark {
       })
 
   def mkTable(module: TestColumnarTableModule)(data: Stream[List[RValue]]): IO[module.Table] =
-    module.Table.fromRValueStream[WriterT[IO, List[IO[Unit]], ?]](
+    module.Table.fromQDataStream[WriterT[IO, List[IO[Unit]], ?], RValue](
       fs2.Stream.fromIterator[IO, fs2.Stream[IO, RValue]](
         data.iterator.map(fs2.Stream.emits(_).covary[IO])
       ).join).run.map(_._2)

@@ -86,7 +86,7 @@ class FromRValuesBenchmark {
   def createAndConsumeTable(data: Stream[List[RValue]], bh: Blackhole): IO[Unit] = {
     val table: WriterT[IO, List[IO[Unit]], P.Table] =
       if (streaming) {
-        P.Table.fromRValueStream[WriterT[IO, List[IO[Unit]], ?]](
+        P.Table.fromQDataStream[WriterT[IO, List[IO[Unit]], ?], RValue](
           fs2.Stream.fromIterator[IO, fs2.Stream[IO, RValue]](
             data.iterator.map(fs2.Stream.emits(_).covary[IO])
           ).flatMap(x => x))

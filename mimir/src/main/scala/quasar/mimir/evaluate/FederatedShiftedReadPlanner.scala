@@ -158,8 +158,7 @@ final class FederatedShiftedReadPlanner[
             }))
       }
 
-    P.Table.fromRValueStream[F](shiftedRValues) map { table =>
-
+    P.Table.fromQDataStream[F, RValue](shiftedRValues) map { table =>
       import P.trans._
 
       // TODO depending on the id status we may not need to wrap the table

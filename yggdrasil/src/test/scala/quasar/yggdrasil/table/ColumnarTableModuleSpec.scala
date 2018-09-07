@@ -168,9 +168,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
     type X[A] = XT[IO, A]
 
     val eff = for {
-      table <-
-        Table.fromRValueStream[X](fs2.Stream(seq: _*).map(RValue.fromData).unNone.covary[IO])
-
+      table <- Table.fromQDataStream[X, Data](fs2.Stream.emits(seq).covary[IO])
       jsonStr <- table.renderJson("[", ",", "]", precise = true).foldLeft("")(_ + _.toString).liftM[XT]
     } yield jsonStr
 

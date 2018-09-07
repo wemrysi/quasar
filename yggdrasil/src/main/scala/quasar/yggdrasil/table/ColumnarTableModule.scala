@@ -26,6 +26,8 @@ import quasar.precog.util.RawBitSet
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
+
+import qdata.QDataDecode
 import qdata.time.{DateTimeInterval, OffsetDate}
 
 import cats.effect.{IO, LiftIO}
@@ -361,11 +363,11 @@ trait ColumnarTableModule
       }
     }
 
-    def fromRValueStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](
-        values: fs2.Stream[IO, RValue])(
+    def fromQDataStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO, A: QDataDecode](
+        values: fs2.Stream[IO, A])(
         implicit ec: ExecutionContext)
         : M[Table] = {
-      val sliceStream = Slice.allFromRValues(values)
+      val sliceStream = Slice.allFromQData(values)
 
       for {
         d <- LiftIO[M].liftIO(convert.toStreamT(sliceStream))
@@ -376,7 +378,7 @@ trait ColumnarTableModule
       } yield Table(slices, UnknownSize)
     }
 
-    @deprecated("use fromRValueStream", "52.0.2")
+    @deprecated("Use fromQDataStream", "52.0.2")
     def fromRValues(values: Stream[RValue], maxSliceRows: Option[Int] = None): Table = {
       val sliceSize = maxSliceRows.getOrElse(Config.maxSliceRows)
 
