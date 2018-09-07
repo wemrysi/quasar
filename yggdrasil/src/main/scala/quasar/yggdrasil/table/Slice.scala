@@ -506,6 +506,9 @@ abstract class Slice { source =>
           } catch {
             case _: NumberFormatException =>
               try {
+                // Double.parseDouble doesn't work here because it parses ok
+                // in case of a loss of precision
+                // See https://gist.github.com/rintcius/49d1bfa161c53bdb733ab1a76fc19cbc
                 val n = BigDecimal(s)
                 if (n.isDecimalDouble) {
                   dc.update(i, n.doubleValue)
