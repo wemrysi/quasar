@@ -103,7 +103,7 @@ abstract class Slice { source =>
       } toMap
     })
 
-  def toArray[A](implicit tpe0: CValueType[A]) = {
+  def toArray[A](implicit tpe0: CValueType[A]): Slice = {
     val size = source.size
 
     val cols0 = (source.columns).toList sortBy { case (ref, _) => ref.selector }
@@ -411,7 +411,7 @@ abstract class Slice { source =>
     Slice (size, columns)
   }
 
-  def deleteFields(prefixes: scala.collection.Set[CPathField]) = {
+  def deleteFields(prefixes: scala.collection.Set[CPathField]): Slice = {
     val (removed, withoutPrefixes) = source.columns partition {
       case (ColumnRef(CPath(head @ CPathField(_), _ @_ *), _), _) => prefixes contains head
       case _ => false
@@ -490,7 +490,7 @@ abstract class Slice { source =>
     Slice (size, columns)
   }
 
-  def toNumber = {
+  def toNumber: Slice = {
     val size = source.size
     val columns = source.columns.get(ColumnRef(CPath.Identity, CString)) match {
       case Some(c: StrColumn) =>
@@ -529,7 +529,7 @@ abstract class Slice { source =>
     Slice(size, columns)
   }
 
-  def arraySwap(index: Int) = {
+  def arraySwap(index: Int): Slice = {
     val size = source.size
     val columns = source.columns.collect {
       case (ColumnRef(cPath @ CPath(CPathArray, _ *), cType), col: HomogeneousArrayColumn[a]) =>
@@ -576,7 +576,7 @@ abstract class Slice { source =>
     })
 
 
-  def remap(indices: ArrayIntList) = Slice(
+  def remap(indices: ArrayIntList): Slice = Slice(
     indices.size,
     source.columns lazyMapValues { col =>
       cf.util.RemapIndices(indices).apply(col).get
@@ -615,7 +615,7 @@ abstract class Slice { source =>
     Slice(size, columns)
   }
 
-  def filterDefined(filter: Slice, definedness: Definedness) = {
+  def filterDefined(filter: Slice, definedness: Definedness): Slice = {
     val colValues = filter.columns.values.toArray
     lazy val defined = definedness match {
       case AnyDefined =>
@@ -710,7 +710,7 @@ abstract class Slice { source =>
     Slice(size, columns)
   }
 
-  def retain(refs: Set[ColumnRef]) =
+  def retain(refs: Set[ColumnRef]): Slice =
     Slice(source.size, source.columns.filterKeys(refs))
 
   /**
