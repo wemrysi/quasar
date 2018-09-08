@@ -1527,6 +1527,47 @@ abstract class StdLibSpec extends Qspec {
             Data.Int(BigInt(l)),
             Data.OffsetDateTime(JOffsetDateTime.ofInstant(Instant.ofEpochMilli(l), ZoneOffset.UTC)))
         }
+
+        "arbitrary double" >> prop { (d: Double) =>
+          val n = BigDecimal(d)
+          val data =
+            // testing with the generated double if it is not a Long or 
+            // if it is an exact double
+            if ((d != d.toLong) || (n.isExactDouble)) Data.Dec(n)
+            // .. but if it is a Long but not an exact double then we test with
+            // d.toLong instead so that we can still test the outcome with exact precision
+            // An example where this happens is: d = -3.2714155255361766E17
+            // BigDecimal(d).toLong = -327141552553617660
+            // d.toLong = -327141552553617664
+            else Data.Dec(BigDecimal(d.toLong))
+          unary(
+            ToTimestamp(_).embed,
+            data,
+            if (d == d.toLong)
+              Data.OffsetDateTime(JOffsetDateTime.ofInstant(Instant.ofEpochMilli(d.toLong), ZoneOffset.UTC))
+            else
+              Data.NA)
+        }
+
+        "arbitrary big decimal" >> prop { (d: BigDecimal) =>
+          unary(
+            ToTimestamp(_).embed,
+            Data.Dec(d),
+            if (d == d.toLong)
+              Data.OffsetDateTime(JOffsetDateTime.ofInstant(Instant.ofEpochMilli(d.toLong), ZoneOffset.UTC))
+            else
+              Data.NA)
+        }
+
+        "arbitrary big int" >> prop { (i: BigInt) =>
+          unary(
+            ToTimestamp(_).embed,
+            Data.Int(i),
+            if (i.isValidLong)
+              Data.OffsetDateTime(JOffsetDateTime.ofInstant(Instant.ofEpochMilli(i.toLong), ZoneOffset.UTC))
+            else
+              Data.NA)
+        }
       }
 
       "ToLocal" >> {
