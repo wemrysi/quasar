@@ -49,6 +49,7 @@ final class ExtractSstSpec extends quasar.Qspec {
 
   def verify(cfg: SstConfig[J, Real], input: List[Data], expected: S) =
     Stream.emits(input)
+      .chunks
       .through(extractSst(cfg))
       .covary[cats.effect.IO]
       .compile.last.unsafeRunSync

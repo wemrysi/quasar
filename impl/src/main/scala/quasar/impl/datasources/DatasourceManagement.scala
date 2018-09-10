@@ -32,7 +32,6 @@ import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
-import quasar.fp.numeric.Positive
 import quasar.fp.ski.{κ, κ2}
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.{ByNeedDatasource, ConditionReportingDatasource, FailedDatasource}
@@ -64,7 +63,8 @@ final class DatasourceManagement[
     modules: DatasourceManagement.Modules,
     errors: Ref[F, IMap[I, Exception]],
     running: mutable.Signal[F, DatasourceManagement.Running[I, T, F]],
-    sstSampleSize: Positive)
+    sstEvalConfig: SstEvalConfig)(
+    implicit ec: ExecutionContext)
     extends DatasourceControl[F, Stream[F, ?], I, Json, SstConfig[T[EJson], N]]
     with DatasourceErrors[F, I] {
 
@@ -157,17 +157,18 @@ final class DatasourceManagement[
         Take,
         freeDsl.Map(
           freeDsl.Unreferenced,
-          recFunc.Constant(EJson.int(sstSampleSize.value))))
+          recFunc.Constant(EJson.int(sstEvalConfig.sampleSize.value))))
 
     withDs[DiscoveryError[I], Option[sstConfig.Schema]](datasourceId) { ds =>
       val dataStream = ds.fold(
-        lw => lw.evaluate(path).map(_.take(sstSampleSize.value)),
+        lw => lw.evaluate(path).map(_.take(sstEvalConfig.sampleSize.value)),
         hw => hw.evaluate(sampleQuery))
 
-      val k = ConvertableTo[N].fromLong(sstSampleSize.value)
+      val k = ConvertableTo[N].fromLong(sstEvalConfig.sampleSize.value)
 
       Stream.force(dataStream)
-        .through(extractSst(sstConfig))
+        .chunkLimit(sstEvalConfig.chunkSize.value.toInt)
+        .through(extractSstAsync(sstConfig, sstEvalConfig.parallelism.value.toInt))
         .map(s => SstSchema((SST.size(s) < k) either Population.subst[P, TS](s) or s))
         .compile.last
     }
@@ -246,7 +247,7 @@ object DatasourceManagement {
       N: ConvertableTo: Field: Order](
       modules: Modules,
       configured: IMap[I, DatasourceRef[Json]],
-      sstSampleSize: Positive,
+      sstEvalConfig: SstEvalConfig,
       scheduler: Scheduler)(
       implicit ec: ExecutionContext)
       : F[(MgmtControl[T, F, I, N] with DatasourceErrors[F, I], immutable.Signal[F, Running[I, T, F]])] = {
@@ -277,7 +278,7 @@ object DatasourceManagement {
 
       runningS <- mutable.Signal[F, Running[I, T, F]](running)
 
-      mgmt = new DatasourceManagement[T, F, I, N](modules, errors, runningS, sstSampleSize)
+      mgmt = new DatasourceManagement[T, F, I, N](modules, errors, runningS, sstEvalConfig)
     } yield (mgmt, runningS)
   }
 

@@ -23,11 +23,13 @@ import quasar.ejson.EJson
 import quasar.contrib.iota.copkTraverse
 import quasar.sst._
 
-import fs2.Pipe
+import scala.concurrent.ExecutionContext
+
+import cats.effect.Effect
+import fs2.{Chunk, Pipe}
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
-import scalaz.syntax.tag._
 import spire.algebra.Field
 import spire.math.ConvertableTo
 
@@ -39,9 +41,29 @@ package object schema {
       implicit
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
-      : Pipe[F, Data, SST[J, A]] = {
+      : Pipe[F, Chunk[Data], SST[J, A]] =
+    extractSst0[F, J, A](config)(f => _.map(f))
 
-    type W[A] = Writer[Boolean @@ Tags.Disjunction, A]
+  /** Reduces the input to an `SST` summarizing its structure. */
+  def extractSstAsync[F[_]: Effect, J: Order, A: ConvertableTo: Field: Order](
+      config: SstConfig[J, A],
+      paralellism: Int)(
+      implicit
+      ec: ExecutionContext,
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : Pipe[F, Chunk[Data], SST[J, A]] =
+    extractSst0[F, J, A](config)(f => _.mapAsyncUnordered(paralellism)(c => Effect[F].delay(f(c))))
+
+  ////
+
+  private def extractSst0[F[_], J: Order, A: ConvertableTo: Field: Order](
+      config: SstConfig[J, A])(
+      f: (Chunk[Data] => Option[SST[J, A]]) => Pipe[F, Chunk[Data], Option[SST[J, A]]])(
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : Pipe[F, Chunk[Data], SST[J, A]] = {
 
     val thresholding: ElgotCoalgebra[SST[J, A] \/ ?, SSTF[J, A, ?], SST[J, A]] = {
       val independent =
@@ -52,24 +74,46 @@ package object schema {
         .andThen(_.bimap(_.transAna[SST[J, A]](independent), independent))
     }
 
-    val reduction: SSTF[J, A, SST[J, A]] => W[SSTF[J, A, SST[J, A]]] = {
-      val f = applyTransforms(
+    val reduction: SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] =
+      applyTransforms(
         compression.coalesceWithUnknown[J, A](config.retainKeysSize),
         compression.coalesceKeys[J, A](config.mapMaxSize, config.retainKeysSize),
         compression.coalescePrimary[J, A],
         compression.narrowUnion[J, A](config.unionMaxSize))
 
-      sstf => f(sstf).fold(sstf.point[W])(r => WriterT.writer((true.disjunction, r)))
-    }
-
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
     def iterate(sst: SST[J, A]): Option[SST[J, A]] = {
-      val (changed, compressed) =
-        sst.transAnaM[W, SST[J, A], SSTF[J, A, ?]](reduction).run
+      var changed = false
 
-      changed.unwrap option compressed
+      val compressed = sst.transAna[SST[J, A]](sstf =>
+        reduction(sstf).fold(sstf) { next =>
+          changed = true
+          next
+        })
+
+      changed option compressed
     }
 
-    _.map(d => SST.fromData[J, A](Field[A].one, d).elgotApo[SST[J, A]](thresholding))
-      .reduce((x, y) => repeatedly(iterate)(x |+| y))
+    def fromData(d: Data): SST[J, A] =
+      SST.fromData[J, A](Field[A].one, d).elgotApo[SST[J, A]](thresholding)
+
+    @SuppressWarnings(Array(
+      "org.wartremover.warts.Equals",
+      "org.wartremover.warts.Var",
+      "org.wartremover.warts.While"))
+    def reduceChunk(c: Chunk[Data]): Option[SST[J, A]] =
+      if (c.isEmpty) none
+      else if (c.size == 1) some(fromData(c(0)))
+      else {
+        var i = 1
+        var acc = fromData(c(0))
+        while (i < c.size) {
+          acc = repeatedly(iterate)(acc |+| fromData(c(i)))
+          i = i + 1
+        }
+        some(acc)
+      }
+
+    _.through(f(reduceChunk)).unNone.scan1((x, y) => repeatedly(iterate)(x |+| y))
   }
 }

@@ -22,6 +22,7 @@ import quasar.impl.external.ExternalConfig
 import quasar.common.{PhaseResultCatsT, PhaseResultListen, PhaseResultTell}
 import quasar.contrib.cats.writerT.{catsWriterTMonadListen_, catsWriterTMonadTell_}
 import quasar.contrib.scalaz.MonadError_
+import quasar.impl.schema.SstEvalConfig
 import quasar.mimir.Precog
 import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
 
@@ -59,7 +60,8 @@ object Main extends StreamApp[PhaseResultCatsT[IO, ?]] {
     for {
       (dataPath, pluginPath) <- paths[F]
       precog <- Precog.stream(dataPath.toFile).translate(λ[FunctionK[IO, F]](_.to[F]))
-      q <- Quasar[F](precog, ExternalConfig.PluginDirectory(pluginPath), 1000L)
+      evalCfg = SstEvalConfig(1000L, 2L, 250L)
+      q <- Quasar[F](precog, ExternalConfig.PluginDirectory(pluginPath), evalCfg)
     } yield q
 
   def repl[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](

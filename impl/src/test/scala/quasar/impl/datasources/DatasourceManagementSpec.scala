@@ -29,7 +29,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.impl.DatasourceModule
-import quasar.impl.schema.{SstConfig, SstSchema}
+import quasar.impl.schema.{SstConfig, SstSchema, SstEvalConfig}
 import quasar.qscript.{MonadPlannerErr, PlannerError, QScriptEducated}
 import quasar.sst._, StructuralType.TypeST
 import quasar.tpe._
@@ -124,7 +124,8 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
   def withInitialMgmt[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgmt, IO[Running]) => IO[A]): A =
     (for {
       s <- Scheduler.allocate[IO](1)
-      t <- DatasourceManagement[Fix, IO, Int, Double](modules, configured, 10L, s._1)
+      evalCfg = SstEvalConfig(10L, 1L, 100L)
+      t <- DatasourceManagement[Fix, IO, Int, Double](modules, configured, evalCfg, s._1)
       (mgmt, run) = t
       a <- f(mgmt, run.get)
       _ <- s._2

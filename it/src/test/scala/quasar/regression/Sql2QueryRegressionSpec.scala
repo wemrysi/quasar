@@ -30,6 +30,7 @@ import quasar.fp._
 import quasar.frontend.data.DataCodec
 import quasar.impl.datasource.local.LocalType
 import quasar.impl.external.ExternalConfig
+import quasar.impl.schema.SstEvalConfig
 import quasar.mimir.Precog
 import quasar.run.{Quasar, QuasarError, SqlQuery}
 import quasar.run.implicits._
@@ -83,7 +84,9 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
     precog <- Precog.stream(tmpPath.toFile)
 
-    q <- Quasar[IO](precog, ExternalConfig.Empty, 1L)
+    evalCfg = SstEvalConfig(1L, 1L, 1L)
+
+    q <- Quasar[IO](precog, ExternalConfig.Empty, SstEvalConfig.single)
 
     localCfg =
       ("rootDir" := testsDir.toString) ->:
