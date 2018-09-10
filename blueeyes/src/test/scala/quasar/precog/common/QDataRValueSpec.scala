@@ -21,16 +21,31 @@ import slamdata.Predef._
 import quasar.Qspec
 
 import qdata._
+import scalaz.syntax.traverse._
+import scalaz.std.list._
+import scalaz.std.map._
+import scalaz.std.option._
 
 object QDataRValueSpec extends Qspec with RValueGenerators {
 
-  val qdataRoundtrip = new QDataRoundtrip[RValue](QDataRValue)
+  val qdataRoundtrip = new QDataRoundtrip[RValue]
 
   def adjustExpected(value: RValue): Option[RValue] = value match {
-    case RObject(obj) if obj.isEmpty => Some(CEmptyObject)
-    case RArray(arr) if arr.isEmpty => Some(CEmptyArray)
+    case RObject(obj) if obj.isEmpty =>
+      Some(CEmptyObject)
+
+    case RObject(obj) =>
+      obj.traverse(v => adjustExpected(v)).map(o => RObject(o))
+
+    case RArray(arr) if arr.isEmpty =>
+      Some(CEmptyArray)
+
+    case RArray(arr) =>
+      arr.traverse(v => adjustExpected(v)).map(RArray(_))
+
     case CUndefined => None // not supported by qdata
     case CArray(_, _) => None // not supported by quasar (or qdata)
+
     case d => Some(d)
   }
 

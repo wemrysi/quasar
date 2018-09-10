@@ -33,7 +33,7 @@ import java.time.{
 }
 import scala.sys.error
 
-object QDataRValue extends QData[RValue] {
+object QDataRValue extends QDataEncode[RValue] with QDataDecode[RValue] {
   import QType._
 
   def tpe(a: RValue): QType = a match {

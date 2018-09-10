@@ -23,7 +23,7 @@ import qdata.time.{DateTimeInterval, OffsetDate}
 
 import monocle.{Optional, Prism, Traversal}
 import monocle.function.{At, Each, Index}
-import qdata.QData
+import qdata.{QDataDecode, QDataEncode}
 import scalaz._, Scalaz._, Ordering._
 
 import java.math.MathContext.UNLIMITED
@@ -336,7 +336,8 @@ sealed abstract class RValueInstances {
   implicit val show: Show[RValue] =
     Show.showFromToString
 
-  implicit val qdata: QData[RValue] = QDataRValue
+  implicit val qdataEncode: QDataEncode[RValue] = QDataRValue
+  implicit val qdataDecode: QDataDecode[RValue] = QDataRValue
 }
 
 case class RObject(fields: Map[String, RValue]) extends RValue {
