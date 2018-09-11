@@ -25,13 +25,12 @@ import quasar.common.PhaseResultTell
 import quasar.contrib.pathy.ADir
 import quasar.contrib.std.uuid._
 import quasar.ejson.EJson
-import quasar.fp.numeric.Positive
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.local.LocalDatasourceModule
 import quasar.impl.datasources.{DatasourceManagement, DefaultDatasources}
 import quasar.impl.evaluate.FederatingQueryEvaluator
 import quasar.impl.external.{ExternalConfig, ExternalDatasources}
-import quasar.impl.schema.SstConfig
+import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.table.{DefaultTables, PreparationsManager}
 import quasar.mimir.{MimirRepr, Precog}
 import quasar.mimir.evaluate.MimirQueryFederation
@@ -81,11 +80,12 @@ object Quasar {
     * @param precog Precog instance to use by Quasar
     * @param extConfig datasource plugin configuration
     * @param sstSampleSize the number of records to sample when generating SST schemas
+    * @param sstParallelism the number of chunks to process in parallel when generating SST schemas
     */
   def apply[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultTell: Timer](
       precog: Precog,
       extConfig: ExternalConfig,
-      sstSampleSize: Positive)(
+      sstEvalConfig: SstEvalConfig)(
       implicit ec: ExecutionContext)
       : Stream[F, Quasar[F]] = {
 
@@ -119,7 +119,11 @@ object Quasar {
       scheduler <- Scheduler(corePoolSize = 1, threadPrefix = "quasar-scheduler")
 
       mr <- Stream.bracket(
-        DatasourceManagement[Fix, F, UUID, Double](modules, configured, sstSampleSize, scheduler))(
+        DatasourceManagement[Fix, F, UUID, Double](
+          modules,
+          configured,
+          sstEvalConfig,
+          scheduler))(
         Stream.emit(_),
         { case (_, r) => r.get.flatMap(_.traverse_(_.dispose)) })
 

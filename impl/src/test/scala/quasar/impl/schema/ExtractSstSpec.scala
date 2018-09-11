@@ -45,10 +45,11 @@ final class ExtractSstSpec extends quasar.Qspec {
     Show.showFromToString
 
   val J = Fixed[J]
-  val config = SstConfig[J, Real](1000L, 1000L, 1000L, 1000L, 1000L)
+  val config = SstConfig[J, Real](1000L, 1000L, 1000L, 1000L, true, 1000L)
 
   def verify(cfg: SstConfig[J, Real], input: List[Data], expected: S) =
     Stream.emits(input)
+      .chunks
       .through(extractSst(cfg))
       .covary[cats.effect.IO]
       .compile.last.unsafeRunSync
@@ -112,6 +113,27 @@ final class ExtractSstSpec extends quasar.Qspec {
       ), None))).embed
 
     verify(config.copy(stringMaxLength = 5L), input, expected)
+  }
+
+  "compress long strings without structure" >> {
+    val input = List(
+      _obj(ListMap("foo" -> _str("abcdef"))),
+      _obj(ListMap("bar" -> _str("abcde")))
+    )
+
+    val expected = envT(
+      TypeStat.coll(Real(2), Real(1).some, Real(1).some),
+      TypeST(TypeF.map[J, S](IMap(
+        J.str("foo") -> envT(
+          TypeStat.coll(Real(1), Real(6).some, Real(6).some),
+          TypeST(TypeF.simple[J, S](SimpleType.Str))).embed,
+
+        J.str("bar") -> envT(
+          TypeStat.coll(Real(1), Real(5).some, Real(5).some),
+          TypeST(TypeF.const[J, S](J.str("abcde")))).embed
+      ), None))).embed
+
+    verify(config.copy(stringMaxLength = 5L, stringPreserveStructure = false), input, expected)
   }
 
   "coalesce map keys until <= max size" >> {

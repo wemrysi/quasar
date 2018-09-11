@@ -65,6 +65,10 @@ final class StructuralTypeSpec extends Spec
   //checkAll(propz.comonad.laws[StructuralType[J, ?]])
 
   "structural semigroup" >> {
+    "is commutative" >> prop { (x: S, y: S) =>
+      (x |+| y) must equal(y |+| x)
+    }
+
     "accumulates measure for identical structure" >> prop { (ejs: J, k0: Int) =>
       val k = scala.math.abs(k0 % 100) + 1
       val st = mkST(ejs)

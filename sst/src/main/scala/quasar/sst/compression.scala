@@ -70,6 +70,7 @@ object compression {
     * also appears in the union.
     */
   def coalescePrimary[J: Order, A: Order: Field: ConvertableTo](
+      stringPreserveStructure: Boolean)(
       implicit
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
@@ -82,7 +83,7 @@ object compression {
       grouped.minView flatMap { case (nonPrimary, m0) =>
         val coalesced = nonPrimary.foldLeft(m0 map (_.suml1)) { (m, sst) =>
           sst.project.primaryTag flatMap { pt =>
-            m.member(some(pt)) option m.adjust(some(pt), _ |+| widenConst(sst))
+            m.member(some(pt)) option m.adjust(some(pt), _ |+| widenConst(stringPreserveStructure)(sst))
           } getOrElse m.updateAppend(none, sst)
         }
         coalesced.suml1Opt map (csst => envT(ts, csst.project.lower))
@@ -151,22 +152,29 @@ object compression {
         other.right
     }
 
-  /** Replace literal string types longer than the given limit with `char[]`. */
-  def limitStrings[J, A: ConvertableTo: Field: Order](maxLength: Natural)(
+  /** Replace literal string types longer than the given limit with `char[]`
+    * or `SimpleType.String` if `preserveStructure` is `false`. */
+  def limitStrings[J, A: ConvertableTo: Field: Order](
+      maxLength: Natural,
+      preserveStructure: Boolean)(
       implicit
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
       : SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] =
     _.some collect {
       case EnvT((ts, TypeST(TypeF.Const(Embed(C(Str(s))))))) if s.length > maxLength.value =>
-        strings.compress[SST[J, A], J, A](ts, s)
+        if (preserveStructure)
+          strings.compress[SST[J, A], J, A](ts, s)
+        else
+          strings.simple[SST[J, A], J, A](ts)
     }
 
   /** Compress a union larger than `maxSize` by reducing the largest group of
     * values sharing a primary type to their shared type.
     */
   def narrowUnion[J: Order, A: Order: Field: ConvertableTo](
-      maxSize: Positive)(
+      maxSize: Positive,
+      stringPreserveStructure: Boolean)(
       implicit
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
@@ -175,7 +183,9 @@ object compression {
       val grouped = xs.list groupBy (_.project.primaryTag)
 
       val compressed = (grouped - none).toList.maximumBy(_._2.length) map {
-        case (pt, ssts) => grouped.insert(pt, ssts.foldMap1(widenConst[J, A]).wrapNel)
+        case (pt, ssts) =>
+          val compress1 = ssts.foldMap1(widenConst[J, A](stringPreserveStructure)).wrapNel
+          grouped.insert(pt, compress1)
       }
 
       compressed flatMap (_.foldMap(_.list).toNel) collect {
@@ -190,13 +200,18 @@ object compression {
   }
 
   /** Returns the SST of the primary tag of the given EJson value. */
-  def primarySst[J: Order, A: ConvertableTo: Field: Order](cnt: A, j: J)(
+  def primarySst[J: Order, A: ConvertableTo: Field: Order](
+      stringPreserveStructure: Boolean)(
+      cnt: A, j: J)(
       implicit
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
       : SST[J, A] = j match {
-    case Embed(C(Str(s))) =>
+    case Embed(C(Str(s))) if stringPreserveStructure =>
       strings.widen[J, A](cnt, s).embed
+
+    case Embed(C(Str(_))) =>
+      strings.simple[SST[J, A], J, A](TypeStat.fromEJson(cnt, j)).embed
 
     case SimpleEJson(s) =>
       envT(TypeStat.fromEJson(cnt, j), TypeST(TypeF.simple[J, SST[J, A]](s))).embed
@@ -208,13 +223,15 @@ object compression {
     * the argument itself.
     */
   def widenConst[J: Order, A: ConvertableTo: Field: Order](
+      stringPreserveStructure: Boolean)(
       sst: SST[J, A])(
       implicit
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
       : SST[J, A] = {
     def psst(ts: TypeStat[A], j: J): SST[J, A] =
-      StructuralType.measure[J, TypeStat[A]].set(ts)(primarySst(ts.size, j))
+      StructuralType.measure[J, TypeStat[A]]
+        .set(ts)(primarySst(stringPreserveStructure)(ts.size, j))
 
     sst.project match {
       case ConstST(None, ts, j) =>

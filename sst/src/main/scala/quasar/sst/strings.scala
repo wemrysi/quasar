@@ -37,12 +37,12 @@ object strings {
 
   /** Compresses a string into a generic char[]. */
   def compress[T, J, A: ConvertableTo: Order](strStat: TypeStat[A], s: String)(
-    implicit
-    A: Field[A],
-    C: Corecursive.Aux[T, SSTF[J, A, ?]],
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, T] = {
+      implicit
+      A: Field[A],
+      C: Corecursive.Aux[T, SSTF[J, A, ?]],
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SSTF[J, A, T] = {
     // NB: Imported here so as not to pollute outer scope given Iterable's
     //     pervasiveness.
     import scalaz.std.iterable._
@@ -58,15 +58,19 @@ object strings {
     stringTagged(strStat, C.embed(envT(strStat, TypeST(TypeF.arr(charArr)))))
   }
 
+  def simple[T, J, A](strStat: TypeStat[A]): SSTF[J, A, T] =
+    envT(strStat, TypeST[J, T](TypeF.Simple(SimpleType.Str)))
+
   /** Widens a string into an array of its characters.
     *
     * FIXME: Overly specific, define in terms of [Co]Recursive.
     */
   def widen[J: Order, A: ConvertableTo: Field: Order](count: A, s: String)(
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] = {
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SSTF[J, A, SST[J, A]] = {
+
     val charArr =
       SST.fromEJson(count, EJson.arr(s.map(EJson.char[J](_)) : _*))
 

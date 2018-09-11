@@ -153,7 +153,7 @@ final class CompressionSpec extends quasar.Qspec
   "coalescePrimary" >> {
     "combines consts with their primary SST in unions" >> prop { (sj: LeafEjs, sjs: ISet[LeafEjs]) =>
       val pt = primaryTagOf(sj.ejs)
-      val primarySst = compression.primarySst(Real(1), sj.ejs)
+      val primarySst = compression.primarySst(true)(Real(1), sj.ejs)
 
       val leafs = sjs.insert(sj).toIList
       val ssts = leafs.map(_.toSst)
@@ -161,13 +161,13 @@ final class CompressionSpec extends quasar.Qspec
       val (matching, nonmatching) =
         leafs.partition(l => primaryTagOf(l.ejs) ≟ pt)
 
-      val simplified = matching.map(l => compression.primarySst(Real(1), l.ejs))
+      val simplified = matching.map(l => compression.primarySst(true)(Real(1), l.ejs))
       val coalesced = NonEmptyList.nel(primarySst, simplified).suml1
 
       val compressed =
         attemptCompression(
           NonEmptyList.nel(primarySst, ssts).suml1,
-          compression.coalescePrimary)
+          compression.coalescePrimary(true))
 
       compressed must_= NonEmptyList.nel(coalesced, nonmatching map (_.toSst)).suml1
     }
@@ -182,12 +182,12 @@ final class CompressionSpec extends quasar.Qspec
       val union = envT(cnt, TypeST(TypeF.union[J, S](y, ys.head, ys.tail))).embed
       val sum   = (y <:: ys).suml1
 
-      attemptCompression(union, compression.coalescePrimary) must_= sum
+      attemptCompression(union, compression.coalescePrimary(true)) must_= sum
     }
 
     "no effect when a const's primary tag not in the union" >> prop { ljs: NonEmptyList[LeafEjs] =>
       val sum = ljs.foldMap1(_.toSst)
-      attemptCompression(sum, compression.coalescePrimary) must_= sum
+      attemptCompression(sum, compression.coalescePrimary(true)) must_= sum
     }
   }
 
@@ -352,10 +352,21 @@ final class CompressionSpec extends quasar.Qspec
       val str = SST.fromEJson(Real(1), J.str(s))
       val arr = strings.compress[S, J, Real](str.copoint, s).embed
 
-      val req = attemptCompression(str, compression.limitStrings(plen))
-      val rlt = attemptCompression(str, compression.limitStrings(lt))
+      val req = attemptCompression(str, compression.limitStrings(plen, true))
+      val rlt = attemptCompression(str, compression.limitStrings(lt, true))
 
       (req must_= str) and (rlt must_= arr)
+    }}
+
+    "compresses to simple type when preserve structure is 'false'" >> prop { s: String => (s.length > 1) ==> {
+      val lt: Natural = Natural((s.length - 1).toLong) getOrElse 0L
+
+      val str = SST.fromEJson(Real(1), J.str(s))
+      val smp = strings.simple[S, J, Real](str.copoint).embed
+
+      val rlt = attemptCompression(str, compression.limitStrings(lt, false))
+
+      rlt must_= smp
     }}
   }
 
@@ -376,7 +387,7 @@ final class CompressionSpec extends quasar.Qspec
       val union0 = NonEmptyList.nel(dec, strs ::: chars).suml1
       val union1 = envT(union0.copoint, TypeST(TypeF.union[J, S](compChar, dec, strs))).embed
 
-      attemptCompression(union0, compression.narrowUnion(3L)) must_= union1
+      attemptCompression(union0, compression.narrowUnion(3L, true)) must_= union1
     }}
 
     "no effect on unions smaller or equal to maxSize" >> prop {
@@ -385,7 +396,7 @@ final class CompressionSpec extends quasar.Qspec
       val union = envT(cnt1, TypeST(TypeF.union[J, S](x.toSst, y.toSst, xs map (_.toSst)))).embed
 
       Positive((xs.length + 2).toLong).cata(
-        l => attemptCompression(union, compression.narrowUnion(l)),
+        l => attemptCompression(union, compression.narrowUnion(l, true)),
         union
       ) must_= union
     }
