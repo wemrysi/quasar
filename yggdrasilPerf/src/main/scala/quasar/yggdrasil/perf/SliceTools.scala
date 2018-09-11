@@ -29,15 +29,24 @@ import shims._
 
 object SliceTools {
 
-  def consumeSlice(slice: Slice, bh: Blackhole): IO[Unit] =
+  def consumeSliceMaterialize(slice: Slice, bh: Blackhole): IO[Unit] =
     IO(bh.consume(slice.materialized))
 
-  def consumeSlices(slices: StreamT[IO, Slice], bh: Blackhole): IO[Unit] =
-    slices.foldLeftRec(IO.unit)((i, o) => i.flatMap(_ => consumeSlice(o, bh))).flatMap(x => x)
+  def consumeSlicesMaterialize(slices: StreamT[IO, Slice], bh: Blackhole): IO[Unit] =
+    slices.foldLeftRec(IO.unit)((i, o) => i.flatMap(_ => consumeSliceMaterialize(o, bh))).flatMap(x => x)
 
-  def consumeTable(module: TestColumnarTableModule)(table: module.Table, bh: Blackhole): IO[Unit] =
-    consumeSlices(table.slices, bh)
+  def consumeTableMaterialize(module: TestColumnarTableModule)(table: module.Table, bh: Blackhole): IO[Unit] =
+    consumeSlicesMaterialize(table.slices, bh)
 
   def consumeTableJson(module: TestColumnarTableModule)(table: module.Table, bh: Blackhole): IO[Unit] =
     convert.fromStreamT(table.renderJson()).compile.drain
+
+  def consumeTable(module: TestColumnarTableModule)(consumption: String, table: module.Table, bh: Blackhole): IO[Unit] =
+    if (consumption == "json")
+      consumeTableJson(module)(table, bh)
+    else if (consumption == "materialize")
+      consumeTableMaterialize(module)(table, bh)
+    else
+      sys.error(s"Invalid value for consumption: $consumption")
+
 }

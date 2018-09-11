@@ -47,6 +47,9 @@ class FromRValuesBenchmark {
   @Param(value = Array("true", "false"))
   var streaming: Boolean = _
 
+  @Param(value = Array("json", "materialize"))
+  var consumption: String = _
+
   def scalars(chunks: Int, chunkSize: Int, scalar: CValue): Stream[List[RValue]] =
     Stream.fill(chunks)(
       List.fill(chunkSize)(scalar))
@@ -90,7 +93,7 @@ class FromRValuesBenchmark {
       } else {
         P.Table.fromRValues(data.flatten).pure[WriterT[IO, List[IO[Unit]], ?]]
       }
-    table.run.flatMap { case (_, t) => SliceTools.consumeTable(P)(t, bh) }
+    table.run.flatMap { case (_, t) => SliceTools.consumeTable(P)(consumption, t, bh) }
   }
 
   @Benchmark
