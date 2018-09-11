@@ -34,7 +34,7 @@ import java.time.{
 import scala.sys.error
 
 @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-object QDataData extends QData[Data] {
+object QDataData extends QDataEncode[Data] with QDataDecode[Data] {
   import QType._
 
   def tpe(a: Data): QType = a match {

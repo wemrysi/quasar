@@ -20,15 +20,29 @@ import slamdata.Predef._
 import quasar.Qspec
 
 import qdata._
+import scalaz.syntax.traverse._
+import scalaz.std.list._
+import scalaz.std.option._
 
 object QDataDataSpec extends Qspec with DataGenerators {
 
-  val qdataRoundtrip = new QDataRoundtrip[Data](QDataData)
+  val qdataRoundtrip = new QDataRoundtrip[Data]
 
   // Data.Int and Data.Dec type as QLong and QDouble resp. when possible, else default to QReal
   // we don't need to adjust for this case because Equal[Data] compares them as equal
   def adjustExpected(data: Data): Option[Data] = data match {
+    case Data.Obj(obj) =>
+      val traversed: Option[List[(String, Data)]] =
+        obj.toList.traverse {
+          case (k, v) => adjustExpected(v).map((k, _))
+        }
+      traversed.map(o => Data.Obj(ListMap(o: _*)))
+
+    case Data.Arr(arr) =>
+      arr.traverse(v => adjustExpected(v)).map(Data.Arr(_))
+
     case Data.NA => None // not supported by qdata
+
     case d => Some(d)
   }
 
