@@ -68,7 +68,7 @@ package object schema {
     val thresholding: ElgotCoalgebra[SST[J, A] \/ ?, SSTF[J, A, ?], SST[J, A]] = {
       val independent =
         orOriginal(applyTransforms(
-          compression.limitStrings[J, A](config.stringMaxLength)))
+          compression.limitStrings[J, A](config.stringMaxLength, config.stringPreserveStructure)))
 
       compression.limitArrays[J, A](config.arrayMaxLength)
         .andThen(_.bimap(_.transAna[SST[J, A]](independent), independent))
@@ -78,8 +78,8 @@ package object schema {
       applyTransforms(
         compression.coalesceWithUnknown[J, A](config.retainKeysSize),
         compression.coalesceKeys[J, A](config.mapMaxSize, config.retainKeysSize),
-        compression.coalescePrimary[J, A],
-        compression.narrowUnion[J, A](config.unionMaxSize))
+        compression.coalescePrimary[J, A](config.stringPreserveStructure),
+        compression.narrowUnion[J, A](config.unionMaxSize, config.stringPreserveStructure))
 
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     def iterate(sst: SST[J, A]): Option[SST[J, A]] = {
