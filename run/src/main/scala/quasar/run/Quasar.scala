@@ -25,7 +25,6 @@ import quasar.common.PhaseResultTell
 import quasar.contrib.pathy.ADir
 import quasar.contrib.std.uuid._
 import quasar.ejson.EJson
-import quasar.fp.numeric.Positive
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.local.LocalDatasourceModule
 import quasar.impl.datasources.{DatasourceManagement, DefaultDatasources}
