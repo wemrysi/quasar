@@ -97,6 +97,9 @@ object LeftShiftBenchmark {
     @Param(Array("true"))
     var emitOnUndef: Boolean = _
 
+    @Param(value = Array("json", "materialize"))
+    var consumption: String = _
+
     var table: P.Table = _
 
     @Setup
@@ -135,7 +138,7 @@ class LeftShiftBenchmark {
 
   def doTestForce(state: BenchmarkState, bh: Blackhole): Unit = {
     val tableAfter: P.Table = leftShift(state.table, state.emitOnUndef)
-    SliceTools.consumeTable(P)(tableAfter, bh).unsafeRunSync
+    SliceTools.consumeTable(P)(state.consumption, tableAfter, bh).unsafeRunSync
   }
 
   @Benchmark
