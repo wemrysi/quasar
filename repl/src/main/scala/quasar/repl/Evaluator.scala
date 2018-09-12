@@ -18,7 +18,7 @@ package quasar
 package repl
 
 import slamdata.Predef._
-import quasar.api._, datasource._, resource._
+import quasar.api._, datasource._, resource._, table._
 import quasar.common.{PhaseResultListen, PhaseResultTell, PhaseResults}
 import quasar.common.data.Data
 import quasar.contrib.fs2.convert.fromStreamT
@@ -197,6 +197,11 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       case DatasourceRemove(id) =>
         (q.datasources.removeDatasource(id) >>= ensureNormal[ExistentialError[UUID]]).map(
           κ(Stream.emit(s"Removed datasource $id")))
+
+      case TableList =>
+        q.tables.allTables.map { case (id, ref, status) =>
+          printTable(id, ref, status)
+        }.point[F]
 
       case ResourceSchema(replPath) =>
         for {
@@ -401,6 +406,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       }
     }
 
+    private def printTable(id: UUID, tableRef: TableRef[SqlQuery], status: PreparationStatus): String =
+      s"$id $tableRef $status"
+
     private def raiseEvalError[A](s: String): F[A] =
       F.raiseError(new EvalError(s))
 
@@ -484,6 +492,7 @@ object Evaluator {
       |  ds add [name] [type] [cfg]
       |  ds (remove | rm) [uuid]
       |  ds (lookup | get) [uuid]
+      |  table (list | ls)
       |  pwd
       |  cd [path]
       |  ls [path]

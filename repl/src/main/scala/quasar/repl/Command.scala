@@ -53,6 +53,7 @@ object Command {
   private val DatasourceAddPattern         = s"(?i)ds(?: +)(?:add +)($NamePattern)(?: +)($NamePattern)(?: +)(.*\\S)".r
   private val DatasourceLookupPattern      = """(?i)ds(?: +)(?:lookup|get) +([\S]+)""".r
   private val DatasourceRemovePattern      = """(?i)ds(?: +)(?:remove|rm) +([\S]+)""".r
+  private val TableListPattern             = "(?i)table(?: +)(?:list|ls)".r
   private val ResourceSchemaPattern        = "(?i)schema +(.+)".r
   private val ExplainPattern               = """(?i)(?:explain|compile)(?: +)(.*\S)""".r
 
@@ -79,6 +80,7 @@ object Command {
   final case class DatasourceLookup(id: UUID) extends Command
   final case class DatasourceAdd(name: DatasourceName, tp: DatasourceType.Name, config: String) extends Command
   final case class DatasourceRemove(id: UUID) extends Command
+  final case object TableList extends Command
   final case class ResourceSchema(path: ReplPath) extends Command
 
   implicit val equalCommand: Equal[Command] = Equal.equalA
@@ -108,6 +110,7 @@ object Command {
       case DatasourceAddPattern(n, DatasourceType.string(tp), cfg) =>
                                                        DatasourceAdd(DatasourceName(n), tp, cfg)
       case DatasourceRemovePattern(UuidString(u))   => DatasourceRemove(u)
+      case TableListPattern()                       => TableList
       case ResourceSchemaPattern(ReplPath(path))    => ResourceSchema(path)
       case ExplainPattern(s)                        => Explain(Query(s))
       case _                                        => Select(Query(input))
