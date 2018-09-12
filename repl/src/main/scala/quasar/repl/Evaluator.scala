@@ -80,6 +80,12 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
 
   ////
 
+  private def availableData[I: Show, A](r: PreparationResult[I, A]): F[(I, A)] =
+    r match {
+      case PreparationResult.Available(id, data) => F.pure((id, data))
+      case PreparationResult.Unavailable(id) => raiseEvalError(s"Preparation result of table ${id.show} is unavailable")
+    }
+
   private def children(path: ResourcePath)
       : F[Stream[F, (ResourceName, ResourcePathType)]] =
     path match {
@@ -222,6 +228,37 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           res <- q.tables.cancelPreparation(id)
           _ <- ensureNormal(res)
         } yield Stream.emit(s"Cancelled preparation of table $id").covary[F]
+
+      case TablePreparedData(id) =>
+
+        def renderTableData(id: UUID, format: OutputFormat): F[Stream[F, CharBuffer]] =
+          for {
+            res <- q.tables.preparedData(id)
+            prepRes <- fromEither[TableError.ExistenceError[UUID], PreparationResult[UUID, Stream[F, MimirRepr]]](res)
+            (_, data) <- availableData(prepRes)
+          } yield renderMimirReprStream(format, data)
+
+        for {
+          state <- stateRef.get
+          res <- state.mode match {
+            case OutputMode.Console =>
+              renderTableData(id, state.format).map { rendered =>
+                val maxLines = state.summaryCount
+                  .map(_.value + OutputFormat.headerLines(state.format))
+                printQueryResults(maxLines, rendered.map(_.toString))
+              }
+            case OutputMode.File =>
+              Paths.createTempFile("tableResults", ".txt").map { tmpFile =>
+                Stream.emit(s"Writing table results to ${tmpFile.toFile.getAbsolutePath}") ++
+                  Stream.eval {
+                    for {
+                      rendered <- renderTableData(id, state.format)
+                      _ <- writeToPath(tmpFile, rendered)
+                    } yield "Done"
+                  }
+            }
+          }
+        } yield res
 
       case ResourceSchema(replPath) =>
         for {
@@ -516,6 +553,7 @@ object Evaluator {
       |  table add [name] [query]
       |  table prepare [uuid]
       |  table (cancelPreparation | cancel) [uuid]
+      |  table (preparedData | data) [uuid]
       |  pwd
       |  cd [path]
       |  ls [path]
