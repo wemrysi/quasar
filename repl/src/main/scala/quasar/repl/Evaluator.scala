@@ -32,7 +32,7 @@ import quasar.fp.ski._
 import quasar.frontend.data.DataCodec
 import quasar.impl.schema.{SstConfig, SstSchema}
 import quasar.mimir.MimirRepr
-import quasar.run.{QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
+import quasar.run.{Quasar, QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
 import quasar.run.ResourceRouter.DatasourceResourcePrefix
 import quasar.run.optics.{stringUuidP => UuidString}
 import quasar.sst._
@@ -64,8 +64,7 @@ import spire.std.double._
 
 final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
     stateRef: Ref[F, ReplState],
-    sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-    queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])(
+    q: Quasar[F])(
     implicit ec: ExecutionContext) {
 
   import Command._
@@ -89,9 +88,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           .covary[F].point[F]
 
       case DatasourceResourcePrefix /: ResourcePath.Root =>
-        sources.allDatasourceMetadata.map(_.evalMap {
+        q.datasources.allDatasourceMetadata.map(_.evalMap {
           case (id, DatasourceMeta(_, n, _)) =>
-            sources.pathIsResource(id, ResourcePath.root())
+            q.datasources.pathIsResource(id, ResourcePath.root())
               .flatMap(fromEither[ExistentialError[UUID], Boolean])
               .map(b => (
                 ResourceName(s"$id"),
@@ -99,7 +98,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         })
 
       case DatasourceResourcePrefix /: UuidString(id) /: p =>
-        sources.prefixedChildPaths(id, p)
+        q.datasources.prefixedChildPaths(id, p)
           .flatMap(fromEither[DiscoveryError[UUID], Stream[F, (ResourceName, ResourcePathType)]])
 
       case _ =>
@@ -110,7 +109,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
   private def schema(path: ResourcePath): F[Option[SstSchema[Fix[EJson], Double]]] =
     path match {
       case DatasourceResourcePrefix /: UuidString(id) /: p =>
-        sources.resourceSchema(id, p, SstConfig.Default)
+        q.datasources.resourceSchema(id, p, SstConfig.Default)
           .flatMap(fromEither[DiscoveryError[UUID], Option[SstSchema[Fix[EJson], Double]]])
 
       case _ =>
@@ -170,7 +169,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
             .mkString("Variables:\n", "\n", "")).map(Stream.emit(_))
 
       case DatasourceList =>
-        sources.allDatasourceMetadata
+        q.datasources.allDatasourceMetadata
           .flatMap(_.map({ case (k, v) => s"$k ${printMetadata(v)}" }).compile.toList)
           .map(_.mkString("Datasources:\n", "\n", "")).map(Stream.emit(_))
 
@@ -180,7 +179,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
             .mkString("Supported datasource types:\n", "\n", "")).map(Stream.emit(_))
 
       case DatasourceLookup(id) =>
-        sources.datasourceRef(id)
+        q.datasources.datasourceRef(id)
           .flatMap(fromEither[ExistentialError[UUID], DatasourceRef[Json]])
           .map(ref =>
             List(s"Datasource[$id](name = ${ref.name.shows}, type = ${printType(ref.kind)})", ref.config.spaces2).mkString("\n"))
@@ -191,12 +190,12 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           tps <- supportedTypes
           dsType <- findTypeF(tps, tp)
           cfgJson <- JsonParser.parse(cfg).fold(raiseEvalError, _.point[F])
-          r <- sources.addDatasource(DatasourceRef(dsType, name, cfgJson))
+          r <- q.datasources.addDatasource(DatasourceRef(dsType, name, cfgJson))
           i <- r.fold(e => raiseEvalError(e.shows), _.point[F])
         } yield Stream.emit(s"Added datasource $i (${name.value})")
 
       case DatasourceRemove(id) =>
-        (sources.removeDatasource(id) >>= ensureNormal[ExistentialError[UUID]]).map(
+        (q.datasources.removeDatasource(id) >>= ensureNormal[ExistentialError[UUID]]).map(
           κ(Stream.emit(s"Removed datasource $id")))
 
       case ResourceSchema(replPath) =>
@@ -286,7 +285,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
     }
 
     private def doSupportedTypes: F[ISet[DatasourceType]] =
-      sources.supportedDatasourceTypes >>!
+      q.datasources.supportedDatasourceTypes >>!
         (types => stateRef.modify(_.copy(supportedTypes = types.some)))
 
     private def ensureNormal[E: Show](c: Condition[E]): F[Unit] =
@@ -304,9 +303,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         },
         F.unit)
 
-    private def evaluateQuery(q: SqlQuery, summaryCount: Option[Int Refined Positive])
+    private def evaluateQuery(sql: SqlQuery, summaryCount: Option[Int Refined Positive])
         : F[Stream[F, MimirRepr]] =
-      queryEvaluator.evaluate(q) map { s =>
+      q.queryEvaluator.evaluate(sql) map { s =>
         summaryCount.map(c => s.take(c.value.toLong)).getOrElse(s)
       }
 
@@ -469,11 +468,10 @@ object Evaluator {
 
   def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       stateRef: Ref[F, ReplState],
-      sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])(
+      quasar: Quasar[F])(
       implicit ec: ExecutionContext)
       : Evaluator[F] =
-    new Evaluator[F](stateRef, sources, queryEvaluator)
+    new Evaluator[F](stateRef, quasar)
 
   val helpMsg =
     """Quasar REPL, Copyright © 2014–2018 SlamData Inc.

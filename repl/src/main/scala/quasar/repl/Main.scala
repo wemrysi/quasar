@@ -69,7 +69,7 @@ object Main extends StreamApp[PhaseResultCatsT[IO, ?]] {
       : F[ExitCode] =
     for {
       ref <- Ref[F, ReplState](ReplState.mk)
-      repl <- Repl.mk[F](ref, q.datasources, q.queryEvaluator)
+      repl <- Repl.mk[F](ref, q)
       l <- repl.loop
     } yield l
 
