@@ -217,6 +217,12 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           _ <- ensureNormal(res)
         } yield Stream.emit(s"Preparing table $id").covary[F]
 
+      case TableCancelPrep(id) =>
+        for {
+          res <- q.tables.cancelPreparation(id)
+          _ <- ensureNormal(res)
+        } yield Stream.emit(s"Cancelled preparation of table $id").covary[F]
+
       case ResourceSchema(replPath) =>
         for {
           cwd <- stateRef.get.map(_.cwd)
@@ -509,6 +515,7 @@ object Evaluator {
       |  table (list | ls)
       |  table add [name] [query]
       |  table prepare [uuid]
+      |  table (cancelPreparation | cancel) [uuid]
       |  pwd
       |  cd [path]
       |  ls [path]
