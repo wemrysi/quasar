@@ -19,7 +19,6 @@ package quasar.frontend.data
 import slamdata.Predef._
 import quasar.common.data.Data
 import quasar.fp._
-import quasar.fp.ski._
 
 import argonaut._, Argonaut._
 import scalaz._, Scalaz._
@@ -73,7 +72,6 @@ object DataCodec {
     val OffsetDateKey = "$offsetdate"
     val OffsetTimeKey = "$offsettime"
     val IntervalKey = "$interval"
-    val ObjKey = "$obj"
   }
 
   object VerboseDateTimeFormatters {
@@ -116,15 +114,15 @@ object DataCodec {
     def encode(data: Data): Option[Json] = {
       import Data._
       import VerboseDateTimeFormatters._
+
       data match {
         case d@(Null | Bool(_) | Int(_) | Dec(_) | Str(_)) => Readable.encode(d)
-        // For Object, if we find one of the above keys, which means we serialized something particular
-        // to the precise encoding, wrap this object in another object with a single field with the name ObjKey
-        case Obj(value) =>
-          val obj = Json.obj(value.toList.map { case (k, v) => encode(v).map(k -> _) }.unite: _*)
-          value.keys.find(_.startsWith("$")).fold(obj)(κ(Json.obj(ObjKey -> obj))).some
 
-        case Arr(value) => Json.array(value.map(encode).unite: _*).some
+        case Obj(value) =>
+          Json.obj(value.toList.map { case (k, v) => encode(v).map(k -> _) }.unite: _*).some
+
+        case Arr(value) =>
+          Json.array(value.map(encode).unite: _*).some
 
         case OffsetDateTime(value) =>
           Json.obj(OffsetDateTimeKey -> jString(OffsetDateTimeFormatter.format(value))).some
@@ -173,8 +171,7 @@ object DataCodec {
             case (`LocalTimeKey`, value) :: Nil      => unpack(value.string, "string value for $localtime")(parseLocalTime(_).leftMap(err => ParseError(err.message)))
             case (`LocalDateKey`, value) :: Nil      => unpack(value.string, "string value for $localdate")(parseLocalDate(_).leftMap(err => ParseError(err.message)))
             case (`IntervalKey`, value) :: Nil       => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
-            case (`ObjKey`, value) :: Nil            => unpack(value.obj,    "object value for $obj")(decodeObj)
-            case _ => obj.fields.find(_.startsWith("$")).fold(decodeObj(obj))(κ(-\/(UnescapedKeyError(json))))
+            case _ => decodeObj(obj)
           }
         })
   }

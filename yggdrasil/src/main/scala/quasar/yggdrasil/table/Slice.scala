@@ -1766,9 +1766,6 @@ abstract class Slice { source =>
     import DataCodec.PreciseKeys._
 
     def inner(node: SchemaNode): SchemaNode = node match {
-      case obj @ SchemaNode.Obj(nodes) if obj.keys.exists(_.contains("$")) =>
-        SchemaNode.Obj(Map(ObjKey -> SchemaNode.Obj(nodes.mapValues(inner))))
-
       case SchemaNode.Obj(nodes) =>
         SchemaNode.Obj(nodes.mapValues(inner))
 
