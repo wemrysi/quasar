@@ -203,6 +203,14 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           printTable(id, ref, status)
         }.point[F]
 
+      case TableAdd(name, query) =>
+        for {
+          state <- stateRef.get
+          sql = SqlQuery(query, state.variables, toADir(state.cwd))
+          res <- q.tables.createTable(TableRef(name, sql))
+          id <- res.fold(e => raiseEvalError(e.shows), _.point[F])
+        } yield Stream.emit(s"Added table $id (${name.name})").covary[F]
+
       case ResourceSchema(replPath) =>
         for {
           cwd <- stateRef.get.map(_.cwd)
@@ -493,6 +501,7 @@ object Evaluator {
       |  ds (remove | rm) [uuid]
       |  ds (lookup | get) [uuid]
       |  table (list | ls)
+      |  table add [name] [query]
       |  pwd
       |  cd [path]
       |  ls [path]

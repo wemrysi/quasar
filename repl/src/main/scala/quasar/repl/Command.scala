@@ -20,6 +20,7 @@ package repl
 import slamdata.Predef._
 import quasar.api.datasource._
 import quasar.api.resource.ResourcePath
+import quasar.api.table.TableName
 import quasar.run.optics.{stringUuidP => UuidString}
 import quasar.sql.Query
 
@@ -54,6 +55,7 @@ object Command {
   private val DatasourceLookupPattern      = """(?i)ds(?: +)(?:lookup|get) +([\S]+)""".r
   private val DatasourceRemovePattern      = """(?i)ds(?: +)(?:remove|rm) +([\S]+)""".r
   private val TableListPattern             = "(?i)table(?: +)(?:list|ls)".r
+  private val TableAddPattern              = s"(?i)table(?: +)(?:add +)($NamePattern)(?: +)(.*\\S)".r
   private val ResourceSchemaPattern        = "(?i)schema +(.+)".r
   private val ExplainPattern               = """(?i)(?:explain|compile)(?: +)(.*\S)""".r
 
@@ -81,6 +83,7 @@ object Command {
   final case class DatasourceAdd(name: DatasourceName, tp: DatasourceType.Name, config: String) extends Command
   final case class DatasourceRemove(id: UUID) extends Command
   final case object TableList extends Command
+  final case class TableAdd(name: TableName, query: Query) extends Command
   final case class ResourceSchema(path: ReplPath) extends Command
 
   implicit val equalCommand: Equal[Command] = Equal.equalA
@@ -111,6 +114,7 @@ object Command {
                                                        DatasourceAdd(DatasourceName(n), tp, cfg)
       case DatasourceRemovePattern(UuidString(u))   => DatasourceRemove(u)
       case TableListPattern()                       => TableList
+      case TableAddPattern(n, s)                    => TableAdd(TableName(n), Query(s))
       case ResourceSchemaPattern(ReplPath(path))    => ResourceSchema(path)
       case ExplainPattern(s)                        => Explain(Query(s))
       case _                                        => Select(Query(input))

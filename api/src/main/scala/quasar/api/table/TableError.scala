@@ -18,6 +18,9 @@ package quasar.api.table
 
 import slamdata.Predef.{Product, Serializable}
 
+import scalaz.{Cord, Show}
+import scalaz.syntax.show._
+
 sealed trait TableError extends Product with Serializable
 
 object TableError {
@@ -32,4 +35,11 @@ object TableError {
 
   sealed trait ExistenceError[I] extends ModificationError[I] with PrePreparationError[I]
   final case class TableNotFound[I](tableId: I) extends ExistenceError[I]
+
+  implicit def showNameConflict: Show[NameConflict] =
+    Show.show {
+      case NameConflict(n) =>
+        Cord("NameConflict(") ++ n.show ++ Cord(")")
+    }
+
 }
