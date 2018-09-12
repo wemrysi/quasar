@@ -1,0 +1,31 @@
+{
+  "name": "offsetdatetime",
+
+  "backends": {
+    "lwc_local": "ignoreFieldOrder",
+    "mimir": "ignoreFieldOrder"
+  },
+
+  "data": "datetimestrings.data",
+
+  "query": "select nr, offsetdatetime(odt) from `datetimestrings.data`",
+
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+
+  "expected": [
+    {"nr":0},
+    {"nr":1,"1":{"$offsetdatetime":"2009-02-13T13:31:30.012345678+12:15:18"}},
+    {"nr":2,"1":{"$offsetdatetime":"2009-02-13T03:31:30.012000000+12:00"}},
+    {"nr":3,"1":{"$offsetdatetime":"2009-02-13T23:31:30.010000000+12:15"}},
+    {"nr":4,"1":{"$offsetdatetime":"2009-02-13T23:31:30.000000000+12:59"}},
+    {"nr":5,"1":{"$offsetdatetime":"2009-02-13T23:31:30.000000000+12:59"}},
+    {"nr":6,"1":{"$offsetdatetime":"2009-02-13T23:31:00.000000000+01:00"}},
+    {"nr":7,"1":{"$offsetdatetime":"2009-02-13T23:31:00.000000000+12:15"}},
+    {"nr":8,"1":{"$offsetdatetime":"1009-02-13T23:31:00.000000000+12:15"}},
+    {"nr":9,"1":{"$offsetdatetime":"0009-02-13T23:31:00.000000000+12:15"}},
+    {"nr":10,"1":{"$offsetdatetime":"-2009-02-13T23:31:00.000000000-12:15"}},
+    {"nr":11,"1":{"$offsetdatetime":"-0001-02-13T13:31:30.012345678-12:15:18"}},
+    {"nr":12,"1":{"$offsetdatetime":"0000-02-13T03:31:30.012000000Z"}}
+  ]
+}
