@@ -56,6 +56,7 @@ object Command {
   private val DatasourceRemovePattern      = """(?i)ds(?: +)(?:remove|rm) +([\S]+)""".r
   private val TableListPattern             = "(?i)table(?: +)(?:list|ls)".r
   private val TableAddPattern              = s"(?i)table(?: +)(?:add +)($NamePattern)(?: +)(.*\\S)".r
+  private val TablePreparePattern          = """(?i)table(?: +)(?:prepare +)([\S]+)""".r
   private val ResourceSchemaPattern        = "(?i)schema +(.+)".r
   private val ExplainPattern               = """(?i)(?:explain|compile)(?: +)(.*\S)""".r
 
@@ -84,6 +85,7 @@ object Command {
   final case class DatasourceRemove(id: UUID) extends Command
   final case object TableList extends Command
   final case class TableAdd(name: TableName, query: Query) extends Command
+  final case class TablePrepare(id: UUID) extends Command
   final case class ResourceSchema(path: ReplPath) extends Command
 
   implicit val equalCommand: Equal[Command] = Equal.equalA
@@ -115,6 +117,7 @@ object Command {
       case DatasourceRemovePattern(UuidString(u))   => DatasourceRemove(u)
       case TableListPattern()                       => TableList
       case TableAddPattern(n, s)                    => TableAdd(TableName(n), Query(s))
+      case TablePreparePattern(UuidString(u))       => TablePrepare(u)
       case ResourceSchemaPattern(ReplPath(path))    => ResourceSchema(path)
       case ExplainPattern(s)                        => Explain(Query(s))
       case _                                        => Select(Query(input))

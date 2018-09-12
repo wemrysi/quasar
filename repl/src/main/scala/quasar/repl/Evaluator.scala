@@ -211,6 +211,12 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           id <- res.fold(e => raiseEvalError(e.shows), _.point[F])
         } yield Stream.emit(s"Added table $id (${name.name})").covary[F]
 
+      case TablePrepare(id) =>
+        for {
+          res <- q.tables.prepareTable(id)
+          _ <- ensureNormal(res)
+        } yield Stream.emit(s"Preparing table $id").covary[F]
+
       case ResourceSchema(replPath) =>
         for {
           cwd <- stateRef.get.map(_.cwd)
@@ -502,6 +508,7 @@ object Evaluator {
       |  ds (lookup | get) [uuid]
       |  table (list | ls)
       |  table add [name] [query]
+      |  table prepare [uuid]
       |  pwd
       |  cd [path]
       |  ls [path]

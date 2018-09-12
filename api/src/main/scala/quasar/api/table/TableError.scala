@@ -36,10 +36,35 @@ object TableError {
   sealed trait ExistenceError[I] extends ModificationError[I] with PrePreparationError[I]
   final case class TableNotFound[I](tableId: I) extends ExistenceError[I]
 
-  implicit def showNameConflict: Show[NameConflict] =
+  implicit val showNameConflict: Show[NameConflict] =
     Show.show {
       case NameConflict(n) =>
         Cord("NameConflict(") ++ n.show ++ Cord(")")
     }
 
+  implicit def showPreparationNotInProgress[I: Show]: Show[PreparationNotInProgress[I]] =
+    Show.show {
+      case PreparationNotInProgress(id) =>
+        Cord("PreparationNotInProgress(") ++ id.show ++ Cord(")")
+    }
+
+  implicit def showModificationError[I: Show]: Show[ModificationError[I]] =
+    Show.show {
+      case PreparationExists(id) =>
+        Cord("PreparationExists(") ++ id.show ++ Cord(")")
+      case e:PrePreparationError[I] => e.show
+    }
+
+  implicit def showPrePreparationError[I: Show]: Show[PrePreparationError[I]] =
+    Show.show {
+      case PreparationInProgress(id) =>
+        Cord("PreparationInProgress(") ++ id.show ++ Cord(")")
+      case e:ExistenceError[I] => e.show
+    }
+
+  implicit def showExistenceError[I: Show]: Show[ExistenceError[I]] =
+    Show.show {
+      case TableNotFound(id) =>
+        Cord("TableNotFound(") ++ id.show ++ Cord(")")
+    }
 }
