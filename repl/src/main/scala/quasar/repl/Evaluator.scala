@@ -543,7 +543,7 @@ object Evaluator {
       |
       |Available commands:
       |  exit
-      |  help
+      |  (help | ?)
       |  ds (list | ls)
       |  ds types
       |  ds add [name] [type] [cfg]
@@ -565,6 +565,7 @@ object Evaluator {
       |  set mode = console | file
       |  set summaryCount = [rows]
       |  set [var] = [value]
+      |  unset [var]
       |  env
       |
       |TODO:
