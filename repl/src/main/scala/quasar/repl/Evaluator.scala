@@ -212,7 +212,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       case TableAdd(name, query) =>
         for {
           state <- stateRef.get
-          // add dummy variable to avoid CEmptyObject
+          // FIXME: The bogus map is to work around an issue with decoding CEmptyObject
+          //        via the rObject prism, this avoids creating the CEmptyObject.
+          //        (analogous to workaround in slamdata-backend)
           sql = SqlQuery(query, Variables.fromMap(Map("_" -> "_")) ++ state.variables, toADir(state.cwd))
           res <- q.tables.createTable(TableRef(name, sql))
           id <- res.fold(e => raiseEvalError(e.shows), _.point[F])
