@@ -212,7 +212,8 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       case TableAdd(name, query) =>
         for {
           state <- stateRef.get
-          sql = SqlQuery(query, state.variables, toADir(state.cwd))
+          // add dummy variable to avoid CEmptyObject
+          sql = SqlQuery(query, Variables.fromMap(Map("_" -> "_")) ++ state.variables, toADir(state.cwd))
           res <- q.tables.createTable(TableRef(name, sql))
           id <- res.fold(e => raiseEvalError(e.shows), _.point[F])
         } yield Stream.emit(s"Added table $id (${name.name})").covary[F]
