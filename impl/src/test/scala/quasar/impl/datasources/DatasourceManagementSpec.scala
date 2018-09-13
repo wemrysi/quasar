@@ -18,10 +18,10 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 import quasar.{ConditionMatchers, Disposable, RenderTreeT}
+import quasar.api.QueryEvaluator
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
-import quasar.common.data.Data
 import quasar.connector._
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka.envT
@@ -40,21 +40,28 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import argonaut.Json
 import argonaut.JsonScalaz._
 import argonaut.Argonaut.{jString, jEmptyObject}
+
 import cats.{Applicative, ApplicativeError, MonadError}
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
+
 import eu.timepit.refined.auto._
 import fs2.{Scheduler, Stream}
+
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
 import matryoshka.implicits._
+
+import qdata.QDataEncode
+
 import scalaz.{\/, -\/, IMap, Show}
 import scalaz.syntax.bind._
 import scalaz.syntax.either._
 import scalaz.syntax.show._
 import scalaz.std.anyVal._
 import scalaz.std.option._
+
 import shims.{orderToScalaz => _, eqToScalaz => _, _}
 import spire.std.double._
 
@@ -99,7 +106,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
     def sanitizeConfig(config: Json): Json = jString("sanitized")
 
     def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
-        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, Stream[F, Data]]]] =
+        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath]]] =
       mkDatasource[ResourcePath, F](kind).right.pure[F]
   }
 
@@ -112,7 +119,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
         T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
         F[_]: ConcurrentEffect: MonadPlannerErr: Timer](
         config: Json)
-        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], Stream[F, Data]]]] =
+        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]]]]] =
       mkDatasource[T[QScriptEducated[T, ?]], F](kind).right.pure[F]
   }
 
@@ -381,12 +388,19 @@ object DatasourceManagementSpec {
       extends Exception(Show[DatasourceError[Int, Json]].shows(ce))
 
   def mkDatasource[Q, F[_]: MonadError[?[_], Throwable]](kind0: DatasourceType)
-      : Disposable[F, Datasource[F, Stream[F, ?], Q, Stream[F, Data]]] =
-    new Datasource[F, Stream[F, ?], Q, Stream[F, Data]] {
+      : Disposable[F, Datasource[F, Stream[F, ?], Q]] =
+    new Datasource[F, Stream[F, ?], Q] {
       def kind = kind0
 
-      def evaluate(query: Q): F[Stream[F, Data]] =
-        Stream.emits(List(true, true, false, true, false) map (Data._bool(_))).covary[F].pure[F]
+      def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, Stream[F, R]] =
+        new QueryEvaluator[F, Q, Stream[F, R]] {
+          def evaluate(query: Q): F[Stream[F, R]] = {
+            val t = QDataEncode[R].makeBoolean(true)
+            val f = QDataEncode[R].makeBoolean(false)
+
+            Stream.emits(List(t, t, f, t, f)).covary[F].pure[F]
+          }
+        }
 
       def pathIsResource(path: ResourcePath): F[Boolean] =
         false.pure[F]

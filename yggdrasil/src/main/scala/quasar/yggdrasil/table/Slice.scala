@@ -17,6 +17,7 @@
 package quasar.yggdrasil.table
 
 import quasar.blueeyes._, json._
+import quasar.common.data.PreciseKeys
 import quasar.contrib.std.errorImpossible
 import quasar.frontend.data.DataCodec
 import quasar.precog._
@@ -1763,7 +1764,7 @@ abstract class Slice { source =>
   override def toString = (0 until size).map(toString(_).getOrElse("")).mkString("\n", "\n", "\n")
 
   private[this] def transformSchemaPrecise(precise: Boolean)(node: SchemaNode): SchemaNode = {
-    import DataCodec.PreciseKeys._
+    import PreciseKeys._
 
     def inner(node: SchemaNode): SchemaNode = node match {
       case SchemaNode.Obj(nodes) =>

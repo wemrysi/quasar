@@ -18,7 +18,6 @@ package quasar.mimir.evaluate
 
 import slamdata.Predef.{Stream => _, _}
 
-import quasar.common.data.Data
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.impl.evaluate.{Source => EvalSource}
@@ -105,24 +104,21 @@ final class FederatedShiftedReadPlanner[
     queryResult.to[F].flatMap(tableFromStream)
   }
 
-  private def tableFromStream(s: Stream[IO, Data])(implicit ec: ExecutionContext): F[P.Table] = {
-    val dataToRValue: Data => RValue =
-      d => RValue.fromData(d).getOrElse(sys.error(s"Cannot represent $d as a value"))
+  private def tableFromStream(s: Stream[IO, RValue])(implicit ec: ExecutionContext)
+      : F[P.Table] = {
 
-    // TODO{fs2}: Chunkiness
-    P.Table.fromRValueStream[F](s.mapChunks(_.map(dataToRValue).toSegment)) map { table =>
+    P.Table.fromRValueStream[F](s) map { table =>
 
       import P.trans._
 
       // TODO depending on the id status we may not need to wrap the table
-      table
-        .transform(OuterObjectConcat(
-          WrapObject(
-            Scan(Leaf(Source), P.freshIdScanner),
-            TransSpecModule.paths.Key.name),
-          WrapObject(
-            Leaf(Source),
-            TransSpecModule.paths.Value.name)))
+      table.transform(OuterObjectConcat(
+        WrapObject(
+          Scan(Leaf(Source), P.freshIdScanner),
+          TransSpecModule.paths.Key.name),
+        WrapObject(
+          Leaf(Source),
+          TransSpecModule.paths.Value.name)))
     }
   }
 }

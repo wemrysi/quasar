@@ -24,6 +24,7 @@ import quasar.contrib.std.uuid._
 import quasar.impl.datasources.DatasourceManagement.Running
 import quasar.impl.evaluate.Source
 import quasar.mimir.evaluate.QueryAssociate
+import quasar.precog.common.RValue
 import quasar.run.optics.{stringUuidP => UuidString}
 
 import java.util.UUID
@@ -56,8 +57,10 @@ object ResourceRouter {
       case DatasourceResourcePrefix /: UuidString(id) /: qaPath =>
         datasources.map(_.lookup(id) map { d =>
           val qa = d.unsafeValue.fold[QueryAssociate[T, IO]](
-            lw => QueryAssociate.lightweight(f => resultsToIO(lw.evaluate(f))),
-            hw => QueryAssociate.heavyweight(q => resultsToIO(hw.evaluate(q))))
+            lw => QueryAssociate.lightweight(f =>
+              resultsToIO(lw.evaluator[RValue].evaluate(f))),
+            hw => QueryAssociate.heavyweight(q =>
+              resultsToIO(hw.evaluator[RValue].evaluate(q))))
 
           Source(qaPath, qa)
         })

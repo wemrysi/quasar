@@ -17,18 +17,20 @@
 package quasar.frontend.data
 
 import slamdata.Predef._
-import DataEncodingError.{UnrepresentableDataError, UnescapedKeyError}
+import quasar.frontend.data.DataEncodingError.{UnrepresentableDataError, UnescapedKeyError}
 import quasar.common.data._
-import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.time._
 
 import argonaut._, Argonaut._
-import scalaz._, Scalaz._
+import qdata.time.{DateTimeInterval, OffsetDate}
+import scalaz.{\/, Show}
+import scalaz.syntax.either._
+import scalaz.std.string._
 
 class DataCodecSpecs extends quasar.Qspec {
   import DataGenerators._, RepresentableDataGenerators._
-  import DataCodec.PreciseKeys._
+  import PreciseKeys._
 
   implicit val DataShow = new Show[Data] { override def show(v: Data) = v.toString }
   implicit val ShowStr = new Show[String] { override def show(v: String) = v }

@@ -21,12 +21,16 @@ import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 
+import qdata.QDataEncode
+
 /** @tparam F effects
   * @tparam G multiple results
   * @tparam Q query
-  * @tparam R result
   */
-trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, Q, R] {
+trait Datasource[F[_], G[_], Q] {
+
+  /** The query evaluator for this datasource. */
+  def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, G[R]]
 
   /** The type of this datasource. */
   def kind: DatasourceType

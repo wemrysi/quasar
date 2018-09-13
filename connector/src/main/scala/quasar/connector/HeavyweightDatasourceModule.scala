@@ -19,7 +19,6 @@ package quasar.connector
 import quasar.{Disposable, RenderTreeT}
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
-import quasar.common.data.Data
 import quasar.qscript.{MonadPlannerErr, QScriptEducated}
 
 import argonaut.Json
@@ -35,5 +34,5 @@ trait HeavyweightDatasourceModule {
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: MonadPlannerErr: Timer](
       config: Json)
-      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], Stream[F, Data]]]]
+      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]]]]]
 }

@@ -20,5 +20,5 @@ import quasar.api.resource.ResourcePath
 import quasar.connector.{Datasource, MonadResourceErr}
 
 /** A Datasource capable of returning the contents of resources. */
-abstract class LightweightDatasource[F[_]: MonadResourceErr, G[_], R]
-    extends Datasource[F, G, ResourcePath, R]
+abstract class LightweightDatasource[F[_]: MonadResourceErr, G[_]]
+    extends Datasource[F, G, ResourcePath]

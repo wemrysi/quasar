@@ -17,7 +17,7 @@
 package quasar.frontend.data
 
 import slamdata.Predef._
-import quasar.common.data.Data
+import quasar.common.data.{Data, PreciseKeys}
 import quasar.fp._
 
 import argonaut._, Argonaut._
@@ -63,16 +63,6 @@ object DataCodec {
 
   def render(data: Data)(implicit C: DataCodec): Option[String] =
     C.encode(data).map(_.pretty(minspace))
-
-  object PreciseKeys {
-    val LocalDateTimeKey = "$localdatetime"
-    val LocalDateKey = "$localdate"
-    val LocalTimeKey = "$localtime"
-    val OffsetDateTimeKey = "$offsetdatetime"
-    val OffsetDateKey = "$offsetdate"
-    val OffsetTimeKey = "$offsettime"
-    val IntervalKey = "$interval"
-  }
 
   object VerboseDateTimeFormatters {
     import java.time.format._

@@ -17,7 +17,7 @@
 package quasar.mimir.evaluate
 
 import quasar.api.resource.ResourcePath
-import quasar.common.data.Data
+import quasar.precog.common.RValue
 import quasar.qscript.QScriptEducated
 
 import fs2.Stream
@@ -26,17 +26,17 @@ import scalaz.~>
 sealed trait QueryAssociate[T[_[_]], F[_]]
 
 object QueryAssociate {
-  final case class Lightweight[T[_[_]], F[_]](f: ResourcePath => F[Stream[F, Data]])
+  final case class Lightweight[T[_[_]], F[_]](f: ResourcePath => F[Stream[F, RValue]])
       extends QueryAssociate[T, F]
 
-  final case class Heavyweight[T[_[_]], F[_]](f: T[QScriptEducated[T, ?]] => F[Stream[F, Data]])
+  final case class Heavyweight[T[_[_]], F[_]](f: T[QScriptEducated[T, ?]] => F[Stream[F, RValue]])
       extends QueryAssociate[T, F]
 
-  def lightweight[T[_[_]], F[_]](f: ResourcePath => F[Stream[F, Data]])
+  def lightweight[T[_[_]], F[_]](f: ResourcePath => F[Stream[F, RValue]])
       : QueryAssociate[T, F] =
     Lightweight(f)
 
-  def heavyweight[T[_[_]], F[_]](f: T[QScriptEducated[T, ?]] => F[Stream[F, Data]])
+  def heavyweight[T[_[_]], F[_]](f: T[QScriptEducated[T, ?]] => F[Stream[F, RValue]])
       : QueryAssociate[T, F] =
     Heavyweight(f)
 

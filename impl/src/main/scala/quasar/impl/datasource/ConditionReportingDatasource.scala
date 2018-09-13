@@ -18,23 +18,28 @@ package quasar.impl.datasource
 
 import slamdata.Predef.{Boolean, None, Option, Some, Unit}
 import quasar.Condition
+import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.Datasource
 import quasar.contrib.scalaz.MonadError_
 
+import qdata.QDataEncode
 import scalaz.Monad
 
 final class ConditionReportingDatasource[
-    E, F[_]: Monad: MonadError_[?[_], E], G[_], Q, R] private (
+    E, F[_]: Monad: MonadError_[?[_], E], G[_], Q] private (
     report: Condition[E] => F[Unit],
-    underlying: Datasource[F, G, Q, R])
-    extends Datasource[F, G, Q, R] {
+    underlying: Datasource[F, G, Q])
+    extends Datasource[F, G, Q] {
+
+  def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, G[R]] =
+    new QueryEvaluator[F, Q, G[R]] {
+      def evaluate(query: Q): F[G[R]] =
+        reportCondition(underlying.evaluator.evaluate(query))
+    }
 
   val kind: DatasourceType = underlying.kind
-
-  def evaluate(query: Q): F[R] =
-    reportCondition(underlying.evaluate(query))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     reportCondition(underlying.pathIsResource(path))
@@ -53,9 +58,9 @@ final class ConditionReportingDatasource[
 }
 
 object ConditionReportingDatasource {
-  def apply[E, F[_]: Monad: MonadError_[?[_], E], G[_], Q, R](
+  def apply[E, F[_]: Monad: MonadError_[?[_], E], G[_], Q](
       f: Condition[E] => F[Unit],
-      ds: Datasource[F, G, Q, R])
-      : Datasource[F, G, Q, R] =
-    new ConditionReportingDatasource[E, F, G, Q, R](f, ds)
+      ds: Datasource[F, G, Q])
+      : Datasource[F, G, Q] =
+    new ConditionReportingDatasource[E, F, G, Q](f, ds)
 }

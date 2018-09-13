@@ -14,21 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.common.data
 
-import quasar.Disposable
-import quasar.api.datasource.DatasourceType
-import quasar.api.datasource.DatasourceError.InitializationError
-import quasar.api.resource.ResourcePath
-
-import argonaut.Json
-import cats.effect.{ConcurrentEffect, Timer}
-import fs2.Stream
-import scalaz.\/
-
-trait LightweightDatasourceModule {
-  def kind: DatasourceType
-  def sanitizeConfig(config: Json): Json
-  def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
-      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath]]]
+object PreciseKeys {
+  val LocalDateTimeKey = "$localdatetime"
+  val LocalDateKey = "$localdate"
+  val LocalTimeKey = "$localtime"
+  val OffsetDateTimeKey = "$offsetdatetime"
+  val OffsetDateKey = "$offsetdate"
+  val OffsetTimeKey = "$offsettime"
+  val IntervalKey = "$interval"
 }
