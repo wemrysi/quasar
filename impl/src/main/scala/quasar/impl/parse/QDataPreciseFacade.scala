@@ -36,10 +36,10 @@ object QDataPreciseFacade {
     "org.wartremover.warts.Null",
     "org.wartremover.warts.ToString",
     "org.wartremover.warts.Var"))
-  implicit def qdataPrecise[J](implicit qd: QDataEncode[J]): Facade[J] = {
-    import QDataFacade.{qdata => facade}
-
+  implicit def qdataPrecise[J](implicit qd: QDataEncode[J]): Facade[J] =
     new Facade[J] {
+      val facade: Facade[J] = QDataFacade.qdata[J]
+
       def jnull(): J = facade.jnull()
 
       def jfalse(): J = facade.jfalse()
@@ -124,5 +124,4 @@ object QDataPreciseFacade {
           def isObj: Boolean = true
         }
     }
-  }
 }
