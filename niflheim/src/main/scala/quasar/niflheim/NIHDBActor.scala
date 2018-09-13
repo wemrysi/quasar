@@ -134,7 +134,7 @@ trait NIHDB {
 
   def quiesce: Future[Unit]
 
-  def close(implicit actorSystem: ActorSystem): Future[Unit]
+  def close: Future[Unit]
 }
 
 private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: Timeout)(implicit executor: ExecutionContext) extends NIHDB with GracefulStopSupport with AskSupport {
@@ -178,7 +178,7 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
   def quiesce: Future[Unit] =
     (actor ? Quiesce).mapTo[Unit]
 
-  def close(implicit actorSystem: ActorSystem): Future[Unit] =
+  def close: Future[Unit] =
     gracefulStop(actor, timeout.duration).map(_ => ())
 }
 

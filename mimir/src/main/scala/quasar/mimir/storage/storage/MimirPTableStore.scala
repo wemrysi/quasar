@@ -77,9 +77,10 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
       }, {
         case Some((blob, version, db)) =>
           completed.get.flatMap { c =>
-            if (c) cake.commitDB(blob, version, db)
-            //TODO cleanup the orphaned version (ch1962)
-            else cake.closeDB(keyToFile(key))
+            if (c)
+              cake.commitDB(blob, version, db)
+            else
+              IO.fromFutureShift(IO(db.close))  // TODO cleanup the orphaned version (ch1962)
           }
 
         case None =>
