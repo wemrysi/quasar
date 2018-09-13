@@ -19,7 +19,6 @@ package quasar.yggdrasil.table
 import quasar.blueeyes._, json._
 import quasar.common.data.PreciseKeys
 import quasar.contrib.std.errorImpossible
-import quasar.frontend.data.DataCodec
 import quasar.precog._
 import quasar.precog.common._
 import quasar.precog.util._
