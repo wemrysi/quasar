@@ -18,6 +18,7 @@ package quasar.impl.parse
 
 import slamdata.Predef._
 
+import quasar.common.data.PreciseKeys
 import quasar.time.DateTimeUtil._
 
 import jawn.{Facade, FContext}
@@ -54,14 +55,7 @@ object QDataPreciseFacade {
 
       def objectContext(): FContext[J] =
         new FContext[J] {
-          val LocalDateTimeKey = "$localdatetime"
-          val LocalDateKey = "$localdate"
-          val LocalTimeKey = "$localtime"
-          val OffsetDateTimeKey = "$offsetdatetime"
-          val OffsetDateKey = "$offsetdate"
-          val OffsetTimeKey = "$offsettime"
-          val IntervalKey = "$interval"
-          val ObjKey = "$obj"
+          import PreciseKeys._
 
           var result: qd.NascentObject \/ J = qd.prepObject.left[J]
           var key: String = null
