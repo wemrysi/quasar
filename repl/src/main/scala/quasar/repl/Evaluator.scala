@@ -18,7 +18,7 @@ package quasar
 package repl
 
 import slamdata.Predef._
-import quasar.api._, datasource._, resource._
+import quasar.api._, datasource._, resource._, table._
 import quasar.common.{PhaseResultListen, PhaseResultTell, PhaseResults}
 import quasar.common.data.Data
 import quasar.contrib.fs2.convert.fromStreamT
@@ -32,7 +32,7 @@ import quasar.fp.ski._
 import quasar.frontend.data.DataCodec
 import quasar.impl.schema.{SstConfig, SstSchema}
 import quasar.mimir.MimirRepr
-import quasar.run.{QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
+import quasar.run.{Quasar, QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
 import quasar.run.ResourceRouter.DatasourceResourcePrefix
 import quasar.run.optics.{stringUuidP => UuidString}
 import quasar.sst._
@@ -64,8 +64,7 @@ import spire.std.double._
 
 final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
     stateRef: Ref[F, ReplState],
-    sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-    queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])(
+    q: Quasar[F])(
     implicit ec: ExecutionContext) {
 
   import Command._
@@ -81,6 +80,12 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
 
   ////
 
+  private def availableData[I: Show, A](r: PreparationResult[I, A]): F[(I, A)] =
+    r match {
+      case PreparationResult.Available(id, data) => F.pure((id, data))
+      case PreparationResult.Unavailable(id) => raiseEvalError(s"Preparation result of table ${id.show} is unavailable")
+    }
+
   private def children(path: ResourcePath)
       : F[Stream[F, (ResourceName, ResourcePathType)]] =
     path match {
@@ -89,9 +94,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           .covary[F].point[F]
 
       case DatasourceResourcePrefix /: ResourcePath.Root =>
-        sources.allDatasourceMetadata.map(_.evalMap {
+        q.datasources.allDatasourceMetadata.map(_.evalMap {
           case (id, DatasourceMeta(_, n, _)) =>
-            sources.pathIsResource(id, ResourcePath.root())
+            q.datasources.pathIsResource(id, ResourcePath.root())
               .flatMap(fromEither[ExistentialError[UUID], Boolean])
               .map(b => (
                 ResourceName(s"$id"),
@@ -99,7 +104,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         })
 
       case DatasourceResourcePrefix /: UuidString(id) /: p =>
-        sources.prefixedChildPaths(id, p)
+        q.datasources.prefixedChildPaths(id, p)
           .flatMap(fromEither[DiscoveryError[UUID], Stream[F, (ResourceName, ResourcePathType)]])
 
       case _ =>
@@ -110,7 +115,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
   private def schema(path: ResourcePath): F[Option[SstSchema[Fix[EJson], Double]]] =
     path match {
       case DatasourceResourcePrefix /: UuidString(id) /: p =>
-        sources.resourceSchema(id, p, SstConfig.Default)
+        q.datasources.resourceSchema(id, p, SstConfig.Default)
           .flatMap(fromEither[DiscoveryError[UUID], Option[SstSchema[Fix[EJson], Double]]])
 
       case _ =>
@@ -170,7 +175,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
             .mkString("Variables:\n", "\n", "")).map(Stream.emit(_))
 
       case DatasourceList =>
-        sources.allDatasourceMetadata
+        q.datasources.allDatasourceMetadata
           .flatMap(_.map({ case (k, v) => s"$k ${printMetadata(v)}" }).compile.toList)
           .map(_.mkString("Datasources:\n", "\n", "")).map(Stream.emit(_))
 
@@ -180,7 +185,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
             .mkString("Supported datasource types:\n", "\n", "")).map(Stream.emit(_))
 
       case DatasourceLookup(id) =>
-        sources.datasourceRef(id)
+        q.datasources.datasourceRef(id)
           .flatMap(fromEither[ExistentialError[UUID], DatasourceRef[Json]])
           .map(ref =>
             List(s"Datasource[$id](name = ${ref.name.shows}, type = ${printType(ref.kind)})", ref.config.spaces2).mkString("\n"))
@@ -191,13 +196,72 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           tps <- supportedTypes
           dsType <- findTypeF(tps, tp)
           cfgJson <- JsonParser.parse(cfg).fold(raiseEvalError, _.point[F])
-          r <- sources.addDatasource(DatasourceRef(dsType, name, cfgJson))
+          r <- q.datasources.addDatasource(DatasourceRef(dsType, name, cfgJson))
           i <- r.fold(e => raiseEvalError(e.shows), _.point[F])
         } yield Stream.emit(s"Added datasource $i (${name.value})")
 
       case DatasourceRemove(id) =>
-        (sources.removeDatasource(id) >>= ensureNormal[ExistentialError[UUID]]).map(
+        (q.datasources.removeDatasource(id) >>= ensureNormal[ExistentialError[UUID]]).map(
           κ(Stream.emit(s"Removed datasource $id")))
+
+      case TableList =>
+        q.tables.allTables.map { case (id, ref, status) =>
+          printTable(id, ref, status)
+        }.point[F]
+
+      case TableAdd(name, query) =>
+        for {
+          state <- stateRef.get
+          // FIXME: The bogus map is to work around an issue with decoding CEmptyObject
+          //        via the rObject prism, this avoids creating the CEmptyObject.
+          //        (analogous to workaround in slamdata-backend)
+          sql = SqlQuery(query, Variables.fromMap(Map("_" -> "_")) ++ state.variables, toADir(state.cwd))
+          res <- q.tables.createTable(TableRef(name, sql))
+          id <- res.fold(e => raiseEvalError(e.shows), _.point[F])
+        } yield Stream.emit(s"Added table $id (${name.name})").covary[F]
+
+      case TablePrepare(id) =>
+        for {
+          res <- q.tables.prepareTable(id)
+          _ <- ensureNormal(res)
+        } yield Stream.emit(s"Preparing table $id").covary[F]
+
+      case TableCancelPrep(id) =>
+        for {
+          res <- q.tables.cancelPreparation(id)
+          _ <- ensureNormal(res)
+        } yield Stream.emit(s"Cancelled preparation of table $id").covary[F]
+
+      case TablePreparedData(id) =>
+
+        def renderTableData(id: UUID, format: OutputFormat): F[Stream[F, CharBuffer]] =
+          for {
+            res <- q.tables.preparedData(id)
+            prepRes <- fromEither[TableError.ExistenceError[UUID], PreparationResult[UUID, Stream[F, MimirRepr]]](res)
+            (_, data) <- availableData(prepRes)
+          } yield renderMimirReprStream(format, data)
+
+        for {
+          state <- stateRef.get
+          res <- state.mode match {
+            case OutputMode.Console =>
+              renderTableData(id, state.format).map { rendered =>
+                val maxLines = state.summaryCount
+                  .map(_.value + OutputFormat.headerLines(state.format))
+                printQueryResults(maxLines, rendered.map(_.toString))
+              }
+            case OutputMode.File =>
+              Paths.createTempFile("tableResults", ".txt").map { tmpFile =>
+                Stream.emit(s"Writing table results to ${tmpFile.toFile.getAbsolutePath}") ++
+                  Stream.eval {
+                    for {
+                      rendered <- renderTableData(id, state.format)
+                      _ <- writeToPath(tmpFile, rendered)
+                    } yield "Done"
+                  }
+            }
+          }
+        } yield res
 
       case ResourceSchema(replPath) =>
         for {
@@ -286,7 +350,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
     }
 
     private def doSupportedTypes: F[ISet[DatasourceType]] =
-      sources.supportedDatasourceTypes >>!
+      q.datasources.supportedDatasourceTypes >>!
         (types => stateRef.modify(_.copy(supportedTypes = types.some)))
 
     private def ensureNormal[E: Show](c: Condition[E]): F[Unit] =
@@ -304,9 +368,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         },
         F.unit)
 
-    private def evaluateQuery(q: SqlQuery, summaryCount: Option[Int Refined Positive])
+    private def evaluateQuery(sql: SqlQuery, summaryCount: Option[Int Refined Positive])
         : F[Stream[F, MimirRepr]] =
-      queryEvaluator.evaluate(q) map { s =>
+      q.queryEvaluator.evaluate(sql) map { s =>
         summaryCount.map(c => s.take(c.value.toLong)).getOrElse(s)
       }
 
@@ -402,6 +466,9 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       }
     }
 
+    private def printTable(id: UUID, tableRef: TableRef[SqlQuery], status: PreparationStatus): String =
+      s"$id $tableRef $status"
+
     private def raiseEvalError[A](s: String): F[A] =
       F.raiseError(new EvalError(s))
 
@@ -469,23 +536,27 @@ object Evaluator {
 
   def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       stateRef: Ref[F, ReplState],
-      sources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])(
+      quasar: Quasar[F])(
       implicit ec: ExecutionContext)
       : Evaluator[F] =
-    new Evaluator[F](stateRef, sources, queryEvaluator)
+    new Evaluator[F](stateRef, quasar)
 
   val helpMsg =
     """Quasar REPL, Copyright © 2014–2018 SlamData Inc.
       |
       |Available commands:
       |  exit
-      |  help
+      |  (help | ?)
       |  ds (list | ls)
       |  ds types
       |  ds add [name] [type] [cfg]
       |  ds (remove | rm) [uuid]
       |  ds (lookup | get) [uuid]
+      |  table (list | ls)
+      |  table add [name] [query]
+      |  table prepare [uuid]
+      |  table (cancelPreparation | cancel) [uuid]
+      |  table (preparedData | data) [uuid]
       |  pwd
       |  cd [path]
       |  ls [path]
@@ -497,6 +568,7 @@ object Evaluator {
       |  set mode = console | file
       |  set summaryCount = [rows]
       |  set [var] = [value]
+      |  unset [var]
       |  env
       |
       |TODO:

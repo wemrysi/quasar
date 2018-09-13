@@ -18,25 +18,17 @@ package quasar
 package repl
 
 import slamdata.Predef._
-import quasar.api.QueryEvaluator
-import quasar.api.datasource.Datasources
 import quasar.build.BuildInfo
 import quasar.common.{PhaseResultListen, PhaseResultTell}
-import quasar.ejson.EJson
-import quasar.impl.schema.SstConfig
-import quasar.mimir.MimirRepr
-import quasar.run.{MonadQuasarErr, SqlQuery}
+import quasar.run.{MonadQuasarErr, Quasar}
 
 import java.io.File
-import java.util.UUID
 import scala.concurrent.ExecutionContext
 
-import argonaut.Json
 import cats.effect._
 import cats.syntax.{applicative, flatMap, functor}, applicative._, flatMap._, functor._
 import fs2.{Stream, StreamApp}, StreamApp.ExitCode
 import fs2.async.Ref
-import matryoshka.data.Fix
 import org.apache.commons.io.FileUtils
 import org.jline.reader._
 import org.jline.terminal._
@@ -76,11 +68,10 @@ object Repl {
 
   def mk[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       ref: Ref[F, ReplState],
-      datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-      queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])(
+      quasar: Quasar[F])(
       implicit ec: ExecutionContext)
       : F[Repl[F]] = {
-    val evaluator = Evaluator[F](ref, datasources, queryEvaluator)
+    val evaluator = Evaluator[F](ref, quasar)
     historyFile[F].map(f => Repl[F](prompt, mkLineReader(f), evaluator.evaluate))
   }
 
