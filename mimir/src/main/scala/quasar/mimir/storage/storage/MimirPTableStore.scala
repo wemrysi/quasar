@@ -33,6 +33,7 @@ import cats.arrow.FunctionK
 import cats.effect.{IO, LiftIO}
 
 import fs2.Stream
+import fs2.async.mutable.Signal
 
 import pathy.Path
 
@@ -58,26 +59,36 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
 
   // has overwrite semantics
   def write(key: StoreKey, table: PTable): Stream[F, Unit] = {
-    val ios = Stream.bracket(cake.createDB(keyToFile(key)).map(_.toOption))({
-      case Some((_, _, db)) =>
-        val can = table.compact(cake.trans.TransSpec1.Id).canonicalize(Config.maxSliceRows)
 
-        fromStreamT(can.slices).zipWithIndex evalMap {
-          case (slice, offset) =>
-            val segments = SegmentsWrapper.sliceToSegments(offset.toLong, slice)
-            IO.fromFutureShift(
-              IO(db.insertSegmentsVerified(offset.toLong, slice.size, segments)))
-        }
+    def doWrite(completed: Signal[IO, Boolean]) =
+      Stream.bracket(cake.createDB(keyToFile(key)).map(_.toOption))({
+        case Some((_, _, db)) =>
+          val can = table.compact(cake.trans.TransSpec1.Id).canonicalize(Config.maxSliceRows)
 
-      case None =>
-        Stream.empty
-    }, {
-      case Some((blob, version, db)) =>
-        cake.commitDB(blob, version, db)
+          (fromStreamT(can.slices).zipWithIndex evalMap {
+            case (slice, offset) =>
+              val segments = SegmentsWrapper.sliceToSegments(offset.toLong, slice)
+              IO.fromFutureShift(
+                IO(db.insertSegmentsVerified(offset.toLong, slice.size, segments)))
+          }) ++ Stream.eval_(completed.set(true))
 
-      case None =>
-        IO.pure(())
-    })
+        case None =>
+          Stream.empty
+      }, {
+        case Some((blob, version, db)) =>
+          completed.get.flatMap { c =>
+            if (c) cake.commitDB(blob, version, db)
+            else IO.pure(())
+          }
+
+        case None =>
+          IO.pure(())
+      })
+
+    val ios = for {
+      completed <- Stream.eval(fs2.async.signalOf[IO, Boolean](false))
+      res <- doWrite(completed)
+    } yield res
 
     ios.translate(λ[FunctionK[IO, F]](LiftIO[F].liftIO(_))).drain
   }
