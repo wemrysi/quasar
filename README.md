@@ -626,19 +626,16 @@ Type      | Readable        | Precise  | Notes
 null      | `null`          | *same*   |
 boolean   | `true`, `false` | *same*   |
 string    | `"abc"`         | *same*   |
-int       | `1`             | *same*   |
-decimal   | `2.1`           | *same*   |
-object    | `{ "a": 1 }`    | *same*   |
-object    | `{ "$foo": 2 }` | `{ "$obj": { "$foo": 2 } }` | Requires a type-specifier if any key starts with `$`.
+number    | `1`, `2.1`      | *same*   |
+object    | `{ "a": 1 }`    | *same*   | Keys that coincidentally equal a precise temporal key (e.g. "$localtime") are not supported.
 array     | `[1, 2, 3]`     | *same*   |
-localdatetime  | `"2015-01-31T10:30:00"`    | `{ "$localdatetime": "2015-01-31T10:30" }` |
-localdate      | `"2015-01-31"`    | `{ "$localdate": "2015-01-31" }` |
-localtime      | `"10:30:00.000"`    | `{ "$localtime": "10:30" }` |
-offsetdatetime | `"2015-01-31T10:30:00Z"`    | `{ "$offsetdatetime": "2015-01-31T10:30Z" }` |
-offsetdate | `"2015-01-31Z"`    | `{ "$offsetdate": "2015-01-31Z" }` |
-offsettime | `"10:30:00.000Z"`    | `{ "$offsettime": "10:30Z" }` |
-interval  | `"PT12H34M"`    | `{ "$interval": "P7DT12H34M" }` | 
-binary    | `"TE1OTw=="`    | `{ "$binary": "TE1OTw==" }` | BASE64-encoded.
+localdatetime  | `"2015-01-31T10:30:00"`  | `{ "$localdatetime": "2015-01-31T10:30" }`   |
+localdate      | `"2015-01-31"`           | `{ "$localdate": "2015-01-31" }`             |
+localtime      | `"10:30:00.000"`         | `{ "$localtime": "10:30" }`                  |
+offsetdatetime | `"2015-01-31T10:30:00Z"` | `{ "$offsetdatetime": "2015-01-31T10:30Z" }` |
+offsetdate     | `"2015-01-31Z"`          | `{ "$offsetdate": "2015-01-31Z" }`           |
+offsettime     | `"10:30:00.000Z"`        | `{ "$offsettime": "10:30Z" }`                |
+interval       | `"PT12H34M"`             | `{ "$interval": "P7DT12H34M" }`              |
 
 
 ### CSV

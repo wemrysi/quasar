@@ -98,17 +98,11 @@ class DataCodecSpecs extends quasar.Qspec {
           """{ "a": 1, "b": 2, "c": 3, "d": 4, "e": 5 }""")
       }
 
-      "encode obj with leading '$'s" in {
+      "encode nonsense obj with leading '$'s (precise)" in {
         DataCodec.render(Data.Obj(ListMap(
           "$a" -> Data.Int(1),
           LocalDateKey -> Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30"))))) must beSome(
-
-            s"""{ "$ObjKey": { "$$a": 1, "$LocalDateKey": { "$LocalDateTimeKey": "2015-01-31T10:30:00.000000000" } } }""")
-      }
-
-      "encode obj with $obj" in {
-        DataCodec.render(Data.Obj(ListMap(ObjKey -> Data.Obj(ListMap(ObjKey -> Data.Int(1)))))) must
-          beSome(s"""{ "$ObjKey": { "$ObjKey": { "$ObjKey": { "$ObjKey": 1 } } } }""")
+            s"""{ "$$a": 1, "$LocalDateKey": { "$LocalDateTimeKey": "2015-01-31T10:30:00.000000000" } }""")
       }
 
       "encode array" in {
@@ -190,13 +184,12 @@ class DataCodecSpecs extends quasar.Qspec {
         results must beSome(expected)
       }
 
+      "succeed with unescaped leading '$'" in {
+        DataCodec.parse("""{ "$a": 1 }""") must
+          be_\/-(Data.Obj(ListMap(("$a", Data.Int(1)))))
+      }
 
       // Some invalid inputs:
-
-      "fail with unescaped leading '$'" in {
-        DataCodec.parse("""{ "$a": 1 }""") must
-          be_-\/(UnescapedKeyError(jSingleObject("$a", jNumber(1))))
-      }
 
       "fail with invalid offset date time value" in {
         DataCodec.parse(s"""{ "$OffsetDateTimeKey": 123456 }""") must be_-\/
@@ -269,11 +262,11 @@ class DataCodecSpecs extends quasar.Qspec {
           beSome("""{ "a": 1, "b": 2, "c": 3, "d": 4, "e": 5 }""")
       }
 
-      "encode obj with leading '$'s" in {
+      "encode nonsense obj with precise key paired with non-precise key (readable)" in {
         DataCodec.render(Data.Obj(ListMap(
           "$a" -> Data.Int(1),
-          LocalDateTimeKey -> Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30"))))) must
-          beSome(s"""{ "$$a": 1, "$LocalDateTimeKey": "2015-01-31T10:30" }""")
+          LocalDateKey -> Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30"))))) must
+          beSome(s"""{ "$$a": 1, "$LocalDateKey": "2015-01-31T10:30" }""")
       }
 
       "encode array" in {
