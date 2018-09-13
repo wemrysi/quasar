@@ -1,7 +1,7 @@
 {
-    "name": "foo simple filter using date literals",
+    "name": "simple filter using date literals",
     "backends": {
-        "mimir":          "pending"
+        "mimir": "pending"
     },
     "data":  "../days.data",
     "query": "select ts from `../days.data` where ts > offsetdatetime(\"2014-08-18T00:00Z\")",
