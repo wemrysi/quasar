@@ -25,15 +25,16 @@ import quasar.pkg.tests._
 
 import jawn.{Facade, SupportParser}
 import qdata.QDataEncode
+import qdata.time.TimeGenerators
 import scalaz.syntax.std.option._
 
-object QDataFacadeSpec extends Qspec {
+object QDataPreciseFacadeSpec extends Qspec {
 
   def parser[J: QDataEncode]: SupportParser[J] = new SupportParser[J] {
-    implicit def facade: Facade[J] = QDataFacade.qdata[J]
+    implicit def facade: Facade[J] = QDataPreciseFacade.qdataPrecise[J]
   }
 
-  // does not generate temporal types or Data.NA
+  // does not generate Data.NA
   def genAtomic: Gen[Data] =
     Gen.oneOf[Data](
       Data.Null,
@@ -41,14 +42,21 @@ object QDataFacadeSpec extends Qspec {
       Data.False,
       genUnicodeString ^^ Data.Str,
       DataGenerators.defaultInt ^^ Data.Int,
-      DataGenerators.defaultDec ^^ Data.Dec)
+      DataGenerators.defaultDec ^^ Data.Dec,
+      TimeGenerators.genInterval ^^ Data.Interval,
+      TimeGenerators.genOffsetDateTime ^^ Data.OffsetDateTime,
+      TimeGenerators.genOffsetDate ^^ Data.OffsetDate,
+      TimeGenerators.genOffsetTime ^^ Data.OffsetTime,
+      TimeGenerators.genLocalDateTime ^^ Data.LocalDateTime,
+      TimeGenerators.genLocalDate ^^ Data.LocalDate,
+      TimeGenerators.genLocalTime ^^ Data.LocalTime)
 
-  implicit val codec: DataCodec = DataCodec.Readable
+  implicit val codec: DataCodec = DataCodec.Precise
 
   implicit val arbData: Arbitrary[Data] =
     Arbitrary(DataGenerators.genDataDefault(genAtomic))
 
-  "readable json facade parsing" >> {
+  "precise json facade parsing" >> {
 
     "parse arbitrary" >> prop { (data: Data) =>
       val json: Option[String] = DataCodec.render(data)
@@ -57,11 +65,11 @@ object QDataFacadeSpec extends Qspec {
 
     // a concrete example
     "parse concrete" >> {
-      val json: String = """{ "foo": true, "bar": [1, null, 2.3] }"""
+      val json: String = """{ "foo": true, "bar": { "$localtime": "12:34" } }"""
       parser[Data].parseFromString(json).toOption must_===
         Data.Obj(ListMap(
           ("foo", Data.True),
-          ("bar", Data.Arr(List(Data.Int(1), Data.Null, Data.Dec(2.3)))))).some
+          ("bar", Data.LocalTime(java.time.LocalTime.parse("12:34"))))).some
     }
   }
 }

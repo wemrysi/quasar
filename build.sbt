@@ -308,6 +308,7 @@ lazy val impl = project
   .settings(name := "quasar-impl-internal")
   .dependsOn(
     api % BothScopes,
+    common % "test->test",
     connector % BothScopes,
     sst)
   .settings(commonSettings)
