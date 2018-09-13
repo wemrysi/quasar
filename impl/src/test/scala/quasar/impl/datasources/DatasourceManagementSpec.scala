@@ -36,6 +36,7 @@ import quasar.tpe._
 
 import java.lang.IllegalArgumentException
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 import argonaut.Json
 import argonaut.JsonScalaz._
@@ -289,15 +290,25 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
       "computes an SST of the data" >> withMgmt { (mgmt, _) =>
         for {
           c <- mgmt.initDatasource(1, DatasourceRef(LightT, DatasourceName("b"), Json.jNull))
-          b <- mgmt.resourceSchema(1, ResourcePath.root() / ResourceName("data"), defaultCfg)
+          b <- mgmt.resourceSchema(1, ResourcePath.root() / ResourceName("data"), defaultCfg, 1.hour)
         } yield {
           c must beNormal
           b.toOption.join must_= Some(schema)
         }
       }
 
+      "halts computation after time limit" >> withMgmt { (mgmt, _) =>
+        for {
+          c <- mgmt.initDatasource(1, DatasourceRef(LightT, DatasourceName("b"), Json.jNull))
+          b <- mgmt.resourceSchema(1, ResourcePath.root() / ResourceName("data"), defaultCfg, Duration.Zero)
+        } yield {
+          c must beNormal
+          b.toOption.join must_= None
+        }
+      }
+
       "datasource not found when no datasource having id" >> withMgmt { (mgmt, _) =>
-        mgmt.resourceSchema(-1, ResourcePath.root() / ResourceName("data"), defaultCfg)
+        mgmt.resourceSchema(-1, ResourcePath.root() / ResourceName("data"), defaultCfg, 1.second)
           .map(_ must beLike { case -\/(DatasourceNotFound(-1)) => ok })
       }
     }

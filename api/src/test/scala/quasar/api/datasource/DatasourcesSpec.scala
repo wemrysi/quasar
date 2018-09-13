@@ -23,6 +23,7 @@ import quasar.api.resource.ResourcePath
 
 import scala.Predef.assert
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 import java.util.UUID
 
 import cats.effect.Effect
@@ -244,7 +245,7 @@ abstract class DatasourcesSpec[
   }
 
   "resource schema" >> {
-    discoveryExamples(datasources.resourceSchema(_, _, schemaConfig))
+    discoveryExamples(datasources.resourceSchema(_, _, schemaConfig, 30.seconds))
   }
 
   ////

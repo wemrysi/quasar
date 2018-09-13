@@ -25,6 +25,8 @@ import quasar.api.resource._
 import quasar.contrib.scalaz.{MonadState_, MonadTell_}
 import MockDatasourceControl.{MonadInit, MonadShutdown}
 
+import scala.concurrent.duration.FiniteDuration
+
 import scalaz.{\/, ISet, Monad, Order, PlusEmpty}
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
@@ -78,7 +80,11 @@ final class MockDatasourceControl[F[_]: Monad, G[_]: PlusEmpty, I: Order, C] pri
       else datasourceNotFound[I, DiscoveryError[I]](datasourceId).left
     }
 
-  def resourceSchema(datasourceId: I, path: ResourcePath, cfg: MockSchemaConfig.type)
+  def resourceSchema(
+      datasourceId: I,
+      path: ResourcePath,
+      cfg: MockSchemaConfig.type,
+      timeLimit: FiniteDuration)
       : F[DiscoveryError[I] \/ Option[cfg.Schema]] =
     initd.gets(_.member(datasourceId)) map { exists =>
       if (exists) MockSchemaConfig.MockSchema.some.right

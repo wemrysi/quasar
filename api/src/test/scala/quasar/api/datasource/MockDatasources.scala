@@ -23,6 +23,8 @@ import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource._
 import quasar.contrib.scalaz.MonadState_
 
+import scala.concurrent.duration.FiniteDuration
+
 import scalaz.{\/, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags, Tree}
 import scalaz.std.anyVal._
 import scalaz.std.stream._
@@ -134,7 +136,8 @@ final class MockDatasources[
   def resourceSchema(
       id: Int,
       path: ResourcePath,
-      cfg: MockSchemaConfig.type)
+      cfg: MockSchemaConfig.type,
+      timeLimit: FiniteDuration)
       : F[DiscoveryError[Int] \/ Option[cfg.Schema]] =
     mockState.gets { s =>
       if (s.dss member id)

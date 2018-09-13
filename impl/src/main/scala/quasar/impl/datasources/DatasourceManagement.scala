@@ -41,6 +41,7 @@ import quasar.qscript._
 import quasar.sst._
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 
 import argonaut.Json
 import argonaut.Argonaut.jEmptyObject
@@ -137,7 +138,8 @@ final class DatasourceManagement[
   def resourceSchema(
       datasourceId: I,
       path: ResourcePath,
-      sstConfig: SstConfig[T[EJson], N])
+      sstConfig: SstConfig[T[EJson], N],
+      timeLimit: FiniteDuration)
       : F[DiscoveryError[I] \/ Option[sstConfig.Schema]] = {
 
     type TS = TypeStat[N]
@@ -170,8 +172,9 @@ final class DatasourceManagement[
       Stream.force(dataStream)
         .chunkLimit(sstEvalConfig.chunkSize.value.toInt)
         .through(extractSstAsync(sstConfig, sstEvalConfig.parallelism.value.toInt))
-        .map(s => SstSchema((SST.size(s) < k) either Population.subst[P, TS](s) or s))
+        .interruptWhen(ConcurrentEffect[F].attempt(Timer[F].sleep(timeLimit)))
         .compile.last
+        .map(_.map(s => SstSchema((SST.size(s) < k) either Population.subst[P, TS](s) or s)))
     }
   }
 
