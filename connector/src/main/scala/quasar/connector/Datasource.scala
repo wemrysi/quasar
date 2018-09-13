@@ -21,7 +21,6 @@ import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 
-import fs2.Stream
 import qdata.QDataEncode
 
 /** @tparam F effects
@@ -31,7 +30,7 @@ import qdata.QDataEncode
 trait Datasource[F[_], G[_], Q] {
 
   /** The query evaluator for this datasource. */
-  def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, Stream[F, R]]
+  def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, G[R]]
 
   /** The type of this datasource. */
   def kind: DatasourceType

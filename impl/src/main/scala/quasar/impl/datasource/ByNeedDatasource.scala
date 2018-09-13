@@ -32,7 +32,7 @@ import cats.syntax.applicative._
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import fs2.{Scheduler, Stream}
+import fs2.Scheduler
 import fs2.async
 import fs2.async.mutable
 import qdata.QDataEncode
@@ -46,9 +46,9 @@ final class ByNeedDatasource[F[_], G[_], Q] private (
     implicit F: MonadError[F, Throwable])
     extends Datasource[F, G, Q] {
 
-  def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, Stream[F, R]] =
-    new QueryEvaluator[F, Q, Stream[F, R]] {
-      def evaluate(query: Q): F[Stream[F, R]] =
+  def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, G[R]] =
+    new QueryEvaluator[F, Q, G[R]] {
+      def evaluate(query: Q): F[G[R]] =
         getDatasource.flatMap(_.evaluator.evaluate(query))
     }
 

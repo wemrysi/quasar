@@ -24,7 +24,6 @@ import quasar.api.resource._
 import quasar.connector.Datasource
 import quasar.contrib.scalaz.MonadError_
 
-import fs2.Stream
 import qdata.QDataEncode
 import scalaz.Monad
 
@@ -34,9 +33,9 @@ final class ConditionReportingDatasource[
     underlying: Datasource[F, G, Q])
     extends Datasource[F, G, Q] {
 
-  def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, Stream[F, R]] =
-    new QueryEvaluator[F, Q, Stream[F, R]] {
-      def evaluate(query: Q): F[Stream[F, R]] =
+  def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, G[R]] =
+    new QueryEvaluator[F, Q, G[R]] {
+      def evaluate(query: Q): F[G[R]] =
         reportCondition(underlying.evaluator.evaluate(query))
     }
 
