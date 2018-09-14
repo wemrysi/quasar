@@ -363,6 +363,14 @@ object MapFuncCore {
       case _ => none
     }
 
+  // normalize but don't rewrite
+  def transform[T[_[_]]: BirecursiveT: EqualT, A: Equal]
+      : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
+    orOriginal(DedupeGuards[T, A]) <<<
+    repeatedly(applyTransforms(
+      foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](MFC(Constant(const)))),
+      ExtractFiltering[T, A]))
+
   def normalize[T[_[_]]: BirecursiveT: EqualT, A: Equal]
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
     orOriginal(DedupeGuards[T, A]) <<<
