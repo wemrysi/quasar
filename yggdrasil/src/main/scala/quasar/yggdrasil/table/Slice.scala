@@ -17,7 +17,6 @@
 package quasar.yggdrasil.table
 
 import quasar.blueeyes._, json._
-import quasar.common.data.PreciseKeys
 import quasar.contrib.std.errorImpossible
 import quasar.precog._
 import quasar.precog.common._
@@ -29,6 +28,7 @@ import quasar.yggdrasil.TransSpecModule._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util.{CPathUtils, RangeUtil}
 
+import qdata.json.PreciseKeys
 import scalaz._, Scalaz._, Ordering._
 import shims._
 
