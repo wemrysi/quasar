@@ -1,0 +1,21 @@
+{
+    "name": "[qa_s07] full outer join with static join condition",
+
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
+    },
+
+    "data": ["../extraSmallZips.data"],
+
+    "query": "select l.state as lstate, l.city as lcity, r.state as rstate, r.city as rcity from `../extraSmallZips.data` as l full outer join `../extraSmallZips.data` as r on 1 = 0",
+
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+
+    "expected": [
+        {"rcity": "AGAWAM",  "rstate": "MA" },
+        {"rcity": "CUSHMAN", "rstate": "MA" },
+        {"lcity": "AGAWAM",  "lstate": "MA" },
+        {"lcity": "CUSHMAN", "lstate": "MA" }]
+}
