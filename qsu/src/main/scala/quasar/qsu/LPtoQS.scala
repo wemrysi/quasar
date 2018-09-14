@@ -45,7 +45,11 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       RewriteGroupByArrays[T, F]             >-
       debug("RewriteGroupByArrays")          >-
       EliminateUnary[T]                      >-
-      debug("EliminateUnary")                >-
+      debug("EliminateUnary")                >==>
+      InlineNullary[T, F]                    >-
+      debug("InlineNullary")                 >-
+      CoalesceUnaryMappable[T]               >-
+      debug("CoalesceUnaryMappable")         >-
       RecognizeDistinct[T]                   >-
       debug("RecognizeDistinct")             >==>
       ExtractFreeMap[T, F]                   >-

@@ -16,7 +16,7 @@
 
 package quasar.qsu
 
-import slamdata.Predef.{Boolean, Option, None, Symbol}
+import slamdata.Predef.{Boolean, Option, None, Symbol, Map => SMap}
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski.κ
@@ -39,7 +39,7 @@ import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz.{Kleisli, Free, Scalaz, Traverse}, Scalaz._
+import scalaz.{Kleisli, Foldable, Free, Scalaz, Traverse}, Scalaz._
 
 /** The maximal "mappable" (expressable via MapFunc) region of a graph. */
 object MappableRegion {
@@ -60,16 +60,17 @@ object MappableRegion {
     apply(κ(false), g)
 
   def unaryOf[T[_[_]]](src: Symbol, g: QSUGraph[T]): Option[FreeMap[T]] =
-    funcOf(replaceWith(src, SrcHole), g)
+    funcOf(replaceWith(src, hole), g)
 
   def mappableRegionƒ[T[_[_]]](halt: Symbol => Boolean, g: QSUGraph[T])
-      : CoEnv[QSUGraph[T], FreeMapA[T, ?], QSUGraph[T]] =
+      : CoEnv[QSUGraph[T], FreeMapA[T, ?], QSUGraph[T]] = {
+
     g.project match {
       case QSUPattern(s, _) if halt(s) =>
         CoEnv(g.left[FreeMapA[T, QSUGraph[T]]])
 
       case QSUPattern(_, Map(srcG, fm)) =>
-        CoEnv(fm.linearize.map(_ => srcG).right[QSUGraph[T]])
+        CoEnv(fm.linearize.as(srcG).right[QSUGraph[T]])
 
       case QSUPattern(_, AutoJoin2(left, right, combine)) =>
         CoEnv(combine.map {
@@ -87,9 +88,10 @@ object MappableRegion {
       case _ =>
         CoEnv(g.left[FreeMapA[T, QSUGraph[T]]])
     }
+  }
 
   /**
-   * An extractor for pulling out the a unique unary root of a
+   * An extractor for pulling out the unique unary root of a
    * mappable region (if it exists) and the associated FreeMap.
    * If the unique unary root is Unreferenced(), then this extractor
    * will fail (produce None).  Note that this is less robust than
@@ -97,26 +99,37 @@ object MappableRegion {
    * will not attempt things such as rewriting Filter into Cond.
    */
   object MaximalUnary {
-    import QSUGraph.Extractors._
-
     def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T])] = {
-      val fm = maximal[T](g)
+      val (roots, fm) = maximalFunc(g)
 
-      val roots = fm.toList filter {
-        case Unreferenced() => false
-        case _ => true
-      }
-
-      val deduped = roots.map(_.root).distinct
-
-      if (deduped.lengthCompare(1) === 0)
-        deduped.headOption.map(sym => (g.refocus(sym), fm.map(κ(SrcHole: Hole))))
+      if (roots.size === 1)
+        roots.headOption map { case (_, v) => (v, fm) }
       else
         None
     }
   }
 
+  /** An extractor of nullary expressions (those where all roots are `Undefined`). */
+  object MaximalNullary {
+    def unapply[T[_[_]]](g: QSUGraph[T]): Option[FreeMap[T]] = {
+      val (roots, fm) = maximalFunc(g)
+      roots.isEmpty option fm
+    }
+  }
+
   ////
+
+  private val hole: Hole = SrcHole
+
+  private def maximalFunc[T[_[_]]](g: QSUGraph[T]): (SMap[Symbol, QSUGraph[T]], FreeMap[T]) = {
+    val fm = maximal[T](g)
+
+    val roots =
+      Foldable[FreeMapA[T, ?]].foldLeft(fm, SMap[Symbol, QSUGraph[T]]())(
+        (m, r) => m.updated(r.root, r))
+
+    (roots, fm.as(hole))
+  }
 
   private def replaceWith[A](target: Symbol, a: A): Symbol => Option[A] =
     s => (s === target) option a
