@@ -98,6 +98,8 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
+  val evalDelay = 250.millis
+
   val LightT = DatasourceType("light", 1L)
   val HeavyT = DatasourceType("heavy", 2L)
 
@@ -108,7 +110,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
     def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
         : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath]]] =
-      mkDatasource[ResourcePath, F](kind).right.pure[F]
+      mkDatasource[ResourcePath, F](kind, evalDelay).right.pure[F]
   }
 
   val heavyMod = new HeavyweightDatasourceModule {
@@ -121,7 +123,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
         F[_]: ConcurrentEffect: MonadPlannerErr: Timer](
         config: Json)
         : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]]]]] =
-      mkDatasource[T[QScriptEducated[T, ?]], F](kind).right.pure[F]
+      mkDatasource[T[QScriptEducated[T, ?]], F](kind, evalDelay).right.pure[F]
   }
 
   val modules: DatasourceManagement.Modules =
@@ -300,10 +302,13 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
       "halts computation after time limit" >> withMgmt { (mgmt, _) =>
         for {
           c <- mgmt.initDatasource(1, DatasourceRef(LightT, DatasourceName("b"), Json.jNull))
-          b <- mgmt.resourceSchema(1, ResourcePath.root() / ResourceName("data"), defaultCfg, Duration.Zero)
+          b <- mgmt.resourceSchema(1, ResourcePath.root() / ResourceName("data"), defaultCfg, evalDelay * 2)
         } yield {
           c must beNormal
-          b.toOption.join must_= None
+          b.toOption.join exists {
+            case SstSchema(s) =>
+              SST.size(s.swap.valueOr(Population.unsubst(_))) < SST.size(sst)
+          }
         }
       }
 
@@ -398,7 +403,9 @@ object DatasourceManagementSpec {
   final case class CreateErrorException(ce: CreateError[Json])
       extends Exception(Show[DatasourceError[Int, Json]].shows(ce))
 
-  def mkDatasource[Q, F[_]: MonadError[?[_], Throwable]](kind0: DatasourceType)
+  def mkDatasource[Q, F[_]: MonadError[?[_], Throwable]: Timer](
+      kind0: DatasourceType,
+      produceDelay: FiniteDuration)
       : Disposable[F, Datasource[F, Stream[F, ?], Q]] =
     new Datasource[F, Stream[F, ?], Q] {
       def kind = kind0
@@ -409,7 +416,9 @@ object DatasourceManagementSpec {
             val t = QDataEncode[R].makeBoolean(true)
             val f = QDataEncode[R].makeBoolean(false)
 
-            Stream.emits(List(t, t, f, t, f)).covary[F].pure[F]
+            Stream.emits(List(t, t, f, t, f))
+              .evalMap(r => Timer[F].sleep(produceDelay).as(r))
+              .covary[F].pure[F]
           }
         }
 
