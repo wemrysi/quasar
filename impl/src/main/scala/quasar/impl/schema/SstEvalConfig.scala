@@ -19,6 +19,7 @@ package quasar.impl.schema
 import quasar.fp.numeric.Positive
 
 import eu.timepit.refined.auto._
+import monocle.macros.Lenses
 
 /** Configuration parameters related to the computation of SSTs.
   *
@@ -26,6 +27,7 @@ import eu.timepit.refined.auto._
   * @param parallelism the number of chunks to process in parallel when generating SST schemas
   * @param chunkSize the size of each chunk when generating SST schemas
   */
+@Lenses
 final case class SstEvalConfig(
     sampleSize: Positive,
     parallelism: Positive,
