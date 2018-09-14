@@ -21,6 +21,8 @@ import quasar.Condition
 import quasar.api.SchemaConfig
 import quasar.api.resource._
 
+import scala.concurrent.duration.FiniteDuration
+
 import scalaz.{\/, ISet}
 
 /** @tparam F effects
@@ -72,9 +74,18 @@ trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
   /** Retrieves the schema of the resource at the given `path` with the
     * specified datasource according to the provided `schemaConfig`.
     *
+    * Execution time is limited to `timeLimit` and any available value will
+    * be returned upon expiration. If a "complete" schema, as defined by the
+    * specified config, is computed before the time limit, it will be returned
+    * immediately.
+    *
     * Returns `None` if the resource exists but a schema is not available.
     */
-  def resourceSchema(datasourceId: I, path: ResourcePath, schemaConfig: S)
+  def resourceSchema(
+      datasourceId: I,
+      path: ResourcePath,
+      schemaConfig: S,
+      timeLimit: FiniteDuration)
       : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]]
 
   /** The set of supported datasource types. */

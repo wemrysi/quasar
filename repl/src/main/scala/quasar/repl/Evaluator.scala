@@ -43,6 +43,7 @@ import java.nio.CharBuffer
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Path => JPath}
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 import argonaut.{Json, JsonParser, JsonScalaz}, JsonScalaz._
@@ -115,7 +116,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
   private def schema(path: ResourcePath): F[Option[SstSchema[Fix[EJson], Double]]] =
     path match {
       case DatasourceResourcePrefix /: UuidString(id) /: p =>
-        q.datasources.resourceSchema(id, p, SstConfig.Default)
+        q.datasources.resourceSchema(id, p, SstConfig.Default, 1.day)
           .flatMap(fromEither[DiscoveryError[UUID], Option[SstSchema[Fix[EJson], Double]]])
 
       case _ =>

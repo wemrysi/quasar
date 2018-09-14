@@ -24,6 +24,8 @@ import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.impl.storage.IndexedStore
 
+import scala.concurrent.duration.FiniteDuration
+
 import cats.effect.Sync
 import fs2.Stream
 import scalaz.{\/, -\/, \/-, EitherT, Equal, ISet, OptionT}
@@ -87,9 +89,13 @@ final class DefaultDatasources[
       case -\/(err) => Condition.abnormal(err).point[F]
     }
 
-  def resourceSchema(datasourceId: I, path: ResourcePath, schemaConfig: S)
+  def resourceSchema(
+      datasourceId: I,
+      path: ResourcePath,
+      schemaConfig: S,
+      timeLimit: FiniteDuration)
       : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]] =
-    control.resourceSchema(datasourceId, path, schemaConfig)
+    control.resourceSchema(datasourceId, path, schemaConfig, timeLimit)
 
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     control.supportedDatasourceTypes

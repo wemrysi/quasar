@@ -23,6 +23,8 @@ import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{CreateError, DiscoveryError, ExistentialError}
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 
+import scala.concurrent.duration.FiniteDuration
+
 import scalaz.{\/, ISet}
 
 /** A primitive facility for managing the lifecycle of datasources and
@@ -54,9 +56,18 @@ trait DatasourceControl[F[_], G[_], I, C, S <: SchemaConfig] {
   /** Retrieves the schema of the resource at the given `path` with the
     * specified datasource according to the provided `schemaConfig`.
     *
+    * Execution time is limited to `timeLimit` and any available value will
+    * be returned upon expiration. If a "complete" schema, as defined by the
+    * specified config, is computed before the time limit, it will be returned
+    * immediately.
+    *
     * Returns `None` if the resource exists but a schema is not available.
     */
-  def resourceSchema(datasourceId: I, path: ResourcePath, schemaConfig: S)
+  def resourceSchema(
+      datasourceId: I,
+      path: ResourcePath,
+      schemaConfig: S,
+      timeLimit: FiniteDuration)
       : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]]
 
   /** Stop the named datasource, discarding it and freeing any resources it may
