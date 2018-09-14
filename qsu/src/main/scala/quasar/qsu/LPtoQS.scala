@@ -45,8 +45,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       RewriteGroupByArrays[T, F]             >-
       debug("RewriteGroupByArrays")          >-
       EliminateUnary[T]                      >-
-      debug("EliminateUnary")                >==>
-      InlineNullary[T, F]                    >-
+      debug("EliminateUnary")                >-
+      InlineNullary[T]                       >-
       debug("InlineNullary")                 >-
       CoalesceUnaryMappable[T]               >-
       debug("CoalesceUnaryMappable")         >-

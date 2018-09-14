@@ -29,7 +29,6 @@ import quasar.qscript.{construction, Hole, JoinSide}
 import matryoshka._
 import matryoshka.data._
 import pathy.Path._
-import scalaz.State
 
 object InlineNullarySpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   import QSUGraph.Extractors._
@@ -43,7 +42,7 @@ object InlineNullarySpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   val dataB: AFile = rootDir </> file("dataB")
 
   def inlineNullary(g: QSUGraph): QSUGraph =
-    InlineNullary[Fix, State[Long, ?]](g).eval(1)
+    InlineNullary[Fix](g)
 
   "inlining nullary nodes" should {
     "be identity for nullary Map nodes" >> {
