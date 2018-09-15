@@ -17,10 +17,11 @@
 package quasar.frontend.data
 
 import slamdata.Predef._
-import quasar.common.data.{Data, PreciseKeys}
+import quasar.common.data.Data
 import quasar.fp._
 
 import argonaut._, Argonaut._
+import qdata.json.PreciseKeys
 import scalaz._, Scalaz._
 
 trait DataEncodingError {

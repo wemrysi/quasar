@@ -25,7 +25,6 @@ import quasar.connector.datasource.LightweightDatasource
 import quasar.contrib.fs2.convert
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
-import quasar.impl.parse.QDataPreciseFacade
 
 import java.nio.file.{Files, Path => JPath}
 
@@ -37,6 +36,7 @@ import jawn.Facade
 import jawnfs2._
 import pathy.Path
 import qdata.QDataEncode
+import qdata.json.QDataPreciseFacade
 import scalaz.{\/, Scalaz}, Scalaz._
 import shims._
 

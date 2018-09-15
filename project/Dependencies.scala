@@ -10,6 +10,7 @@ object Dependencies {
   private val argonautVersion     = "6.2.2"
   private val disciplineVersion   = "0.7.2"
   private val jawnVersion         = "0.11.1"
+  private val jawnfs2Version      = "0.12.2"
   private val matryoshkaVersion   = "0.18.3"
   private val monocleVersion      = "1.4.0"
   private val pathyVersion        = "0.2.11"
@@ -76,6 +77,7 @@ object Dependencies {
   )
 
   def frontend = Seq(
+    "com.slamdata"               %% "qdata-json"    % qdataVersion,
     "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
     "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test
   )
@@ -100,7 +102,7 @@ object Dependencies {
   )
 
   def impl = Seq(
-    "org.http4s"     %% "jawn-fs2"      % "0.12.2",
+    "org.http4s"     %% "jawn-fs2"      % jawnfs2Version,
     "org.slf4s"      %% "slf4s-api"     % slf4sVersion,
     "org.spire-math" %% "jawn-argonaut" % jawnVersion,
     "org.spire-math" %% "jawn-util"     % jawnVersion

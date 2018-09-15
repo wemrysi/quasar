@@ -23,6 +23,7 @@ import quasar.common.data._
 import java.time._
 
 import argonaut._, Argonaut._
+import qdata.json.PreciseKeys
 import qdata.time.{DateTimeInterval, OffsetDate}
 import scalaz.{\/, Show}
 import scalaz.syntax.either._
