@@ -571,11 +571,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile array length" in {
       testLogicalPlanCompile(
-        sqlE"select array_length(bar, 1) from foo",
+        sqlE"select array_length(bar) from foo",
         lpf.invoke1(Squash,
-          lpf.invoke2(ArrayLength,
-            lpf.invoke2(MapProject, read("foo"), lpf.constant(Data.Str("bar"))),
-            lpf.constant(Data.Int(1)))))
+          lpf.invoke1(ArrayLength,
+            lpf.invoke2(MapProject, read("foo"), lpf.constant(Data.Str("bar"))))))
     }
 
     "compile concat" in {
