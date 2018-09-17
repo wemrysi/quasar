@@ -3181,6 +3181,48 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      "ContainsKey" >> {
+        """CONTAINS_KEY({a:42, b:true}, "b")""" >> {
+          binary(
+            ContainsKey(_, _).embed,
+            Data.Obj("a" -> Data.Int(42), "b" -> Data.Bool(true)),
+            Data.Str("b"),
+            Data.Bool(true))
+        }
+
+        """CONTAINS_KEY({a:42, b:true}, "c")""" >> {
+          binary(
+            ContainsKey(_, _).embed,
+            Data.Obj("a" -> Data.Int(42), "b" -> Data.Bool(true)),
+            Data.Str("c"),
+            Data.Bool(false))
+        }
+
+        """CONTAINS_KEY({a:42, b:true + 12}, "b")""" >> {
+          binary(
+            ContainsKey(_, _).embed,
+            Data.Obj("a" -> Data.Int(42), "b" -> Data.NA),
+            Data.Str("b"),
+            Data.Bool(false))
+        }
+
+        """CONTAINS_KEY("derp", "b")""" >> {
+          binary(
+            ContainsKey(_, _).embed,
+            Data.Str("derp"),
+            Data.Str("b"),
+            Data.NA)
+        }
+
+        """CONTAINS_KEY(undefined, "b")""" >> {
+          binary(
+            ContainsKey(_, _).embed,
+            Data.NA,
+            Data.Str("b"),
+            Data.NA)
+        }
+      }
+
       "Meta" >> {
         // FIXME: Implement once we've switched to EJson in LogicalPlan.
         "returns metadata associated with a value" >> pending("Requires EJson.")
