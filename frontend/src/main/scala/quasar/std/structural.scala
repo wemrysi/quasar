@@ -85,6 +85,11 @@ trait StructuralLib extends Library {
     "Deletes a specified key from a map",
     noSimplification)
 
+  val ContainsKey: BinaryFunc = BinaryFunc(
+    Mapping,
+    "Checks for the existence of the specified key in a map",
+    noSimplification)
+
   val FlattenMap = UnaryFunc(
     Expansion,
     "Zooms in on the values of a map, extending the current dimension with the keys",

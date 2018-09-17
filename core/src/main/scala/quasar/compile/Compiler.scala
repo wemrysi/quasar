@@ -267,6 +267,7 @@ final class Compiler[M[_], T: Equal]
       CIName("map_concat")              -> structural.MapConcat,
       CIName("array_concat")            -> structural.ArrayConcat,
       CIName("delete_key")              -> structural.DeleteKey,
+      CIName("contains_key")            -> structural.ContainsKey,
       CIName("flatten_map")             -> structural.FlattenMap,
       CIName("flatten_array")           -> structural.FlattenArray,
       CIName("shift_map")               -> structural.ShiftMap,
