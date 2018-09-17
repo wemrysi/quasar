@@ -1,0 +1,7 @@
+{
+    "name": "array_length over a heterogeneous dataset",
+    "data": "heterogeneous.data",
+    "query": "select array_length(b) from `heterogeneous.data`",
+    "predicate": "exactly",
+    "expected": [2, 0, 1, 6, 7]
+}
