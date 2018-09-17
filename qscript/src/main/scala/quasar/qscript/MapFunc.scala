@@ -91,8 +91,6 @@ object MapFunc {
   def translateBinaryMapping[T[_[_]], MF[a] <: ACopK[a], A]
       (implicit MFC: MapFuncCore[T, ?] :<<: MF, MFD: MapFuncDerived[T, ?] :<<: MF)
       : scala.PartialFunction[BinaryFunc, (A, A) => MF[A]] = {
-    // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
-    //     about the second. And it shouldn’t even have two in LP.
     case date.SetTimeZone => (a1, a2) => MFC(C.SetTimeZone(a1, a2))
     case date.SetTimeZoneHour => (a1, a2) => MFC(C.SetTimeZoneHour(a1, a2))
     case date.SetTimeZoneMinute => (a1, a2) => MFC(C.SetTimeZoneMinute(a1, a2))
