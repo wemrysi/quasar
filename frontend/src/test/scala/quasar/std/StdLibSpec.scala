@@ -188,6 +188,34 @@ abstract class StdLibSpec extends Qspec {
       }
     }
 
+    "ArrayLib" >> {
+      import ArrayLib._
+
+      "ArrayLength" >> {
+        "empty" >> {
+          unary(ArrayLength(_).embed, Data.Arr(Nil), Data.Int(0))
+        }
+
+        "singleton" >> {
+          unary(ArrayLength(_).embed, Data.Arr(List(Data.Int(42))), Data.Int(1))
+        }
+
+        "three things" >> {
+          unary(
+            ArrayLength(_).embed,
+            Data.Arr(List(Data.Int(5), Data.Int(6), Data.Int(7))),
+            Data.Int(3))
+        }
+
+        "undefined" >> {
+          unary(
+            ArrayLength(_).embed,
+            Data.NA,
+            Data.NA)
+        }
+      }
+    }
+
     "StringLib" >> {
       import StringLib._
 
@@ -1531,7 +1559,7 @@ abstract class StdLibSpec extends Qspec {
         "arbitrary double" >> prop { (d: Double) =>
           val n = BigDecimal(d)
           val data =
-            // testing with the generated double if it is not a Long or 
+            // testing with the generated double if it is not a Long or
             // if it is an exact double
             if ((d != d.toLong) || (n.isExactDouble)) Data.Dec(n)
             // .. but if it is a Long but not an exact double then we test with

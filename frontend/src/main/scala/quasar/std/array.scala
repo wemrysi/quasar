@@ -16,12 +16,12 @@
 
 package quasar.std
 
-import quasar.{BinaryFunc, Mapping}
+import quasar.{UnaryFunc, Mapping}
 
 trait ArrayLib extends Library {
-  val ArrayLength = BinaryFunc(
+  val ArrayLength = UnaryFunc(
     Mapping,
-    "Gets the length of a given dimension of an array.",
+    "Gets the length an array.",
     noSimplification)
 }
 

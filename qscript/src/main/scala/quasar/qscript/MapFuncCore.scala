@@ -516,6 +516,7 @@ object MapFuncCore {
         case TypeOf(a1) => f(a1) ∘ (TypeOf(_))
         case Negate(a1) => f(a1) ∘ (Negate(_))
         case Not(a1) => f(a1) ∘ (Not(_))
+        case ArrayLength(a1) => f(a1) ∘ (ArrayLength(_))
         case Length(a1) => f(a1) ∘ (Length(_))
         case Lower(a1) => f(a1) ∘ (Lower(_))
         case Upper(a1) => f(a1) ∘ (Upper(_))
@@ -618,6 +619,7 @@ object MapFuncCore {
         case (TypeOf(a1), TypeOf(b1)) => in.equal(a1, b1)
         case (Negate(a1), Negate(b1)) => in.equal(a1, b1)
         case (Not(a1), Not(b1)) => in.equal(a1, b1)
+        case (ArrayLength(a1), ArrayLength(b1)) => in.equal(a1, b1)
         case (Length(a1), Length(b1)) => in.equal(a1, b1)
         case (Lower(a1), Lower(b1)) => in.equal(a1, b1)
         case (Upper(a1), Upper(b1)) => in.equal(a1, b1)
@@ -724,6 +726,7 @@ object MapFuncCore {
           case TypeOf(a1) => shz("TypeOf", a1)
           case Negate(a1) => shz("Negate", a1)
           case Not(a1) => shz("Not", a1)
+          case ArrayLength(a1) => shz("ArrayLength", a1)
           case Length(a1) => shz("Length", a1)
           case Lower(a1) => shz("Lower", a1)
           case Upper(a1) => shz("Upper", a1)
@@ -839,6 +842,7 @@ object MapFuncCore {
           case TypeOf(a1) => nAry("TypeOf", a1)
           case Negate(a1) => nAry("Negate", a1)
           case Not(a1) => nAry("Not", a1)
+          case ArrayLength(a1) => nAry("ArrayLength", a1)
           case Length(a1) => nAry("Length", a1)
           case Lower(a1) => nAry("Lower", a1)
           case Upper(a1) => nAry("Upper", a1)
@@ -913,6 +917,9 @@ object MapFuncsCore {
   @Lenses final case class JoinSideName[T[_[_]], A](name: Symbol) extends Nullary[T, A]
 
   // array
+  @Lenses final case class ArrayLength[T[_[_]], A](a1: A) extends Unary[T, A]
+
+  // string
   @Lenses final case class Length[T[_[_]], A](a1: A) extends Unary[T, A]
 
   // date
