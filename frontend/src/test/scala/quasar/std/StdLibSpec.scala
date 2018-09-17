@@ -1531,7 +1531,7 @@ abstract class StdLibSpec extends Qspec {
         "arbitrary double" >> prop { (d: Double) =>
           val n = BigDecimal(d)
           val data =
-            // testing with the generated double if it is not a Long or 
+            // testing with the generated double if it is not a Long or
             // if it is an exact double
             if ((d != d.toLong) || (n.isExactDouble)) Data.Dec(n)
             // .. but if it is a Long but not an exact double then we test with
@@ -3150,6 +3150,40 @@ abstract class StdLibSpec extends Qspec {
             Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)),
             Data.Str("c"),
             Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)))
+        }
+      }
+
+      "ContainsKey" >> {
+        """CONTAINS_KEY({a:42, b:true}, "b")""" >> {
+          binary(
+            ContainsKey(_, _).embed,
+            Data.Obj("a" -> Data.Int(42), "b" -> Data.Bool(true)),
+            Data.Str("b"),
+            Data.Bool(true))
+        }
+
+        """CONTAINS_KEY({a:42, b:true}, "c")""" >> {
+          binary(
+            ContainsKey(_, _).embed,
+            Data.Obj("a" -> Data.Int(42), "b" -> Data.Bool(true)),
+            Data.Str("c"),
+            Data.Bool(false))
+        }
+
+        """CONTAINS_KEY({a:42, b:true + 12}, "b")""" >> {
+          binary(
+            ContainsKey(_, _).embed,
+            Data.Obj("a" -> Data.Int(42), "b" -> Data.NA),
+            Data.Str("b"),
+            Data.Bool(false))
+        }
+
+        """CONTAINS_KEY("derp", "b")""" >> {
+          binary(
+            ContainsKey(_, _).embed,
+            Data.Str("derp"),
+            Data.Str("b"),
+            Data.NA)
         }
       }
 

@@ -113,7 +113,7 @@ object RenderQScriptDSL {
       }
     }
   }
-  
+
   def ejsonRenderQScriptDSLDelay: Delay[RenderQScriptDSL, EJson] = new Delay[RenderQScriptDSL, EJson] {
     def apply[A](fa: RenderQScriptDSL[A]): RenderQScriptDSL[EJson[A]] = {
       (base: String, a: EJson[A]) =>
@@ -258,6 +258,7 @@ object RenderQScriptDSL {
               case ProjectIndex(a1, a2) => ("ProjectIndex", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
               case ProjectKey(a1, a2) => ("ProjectKey", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
               case DeleteKey(a1, a2) => ("DeleteKey", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case ContainsKey(a1, a2) => ("ContainsKey", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
               case ConcatArrays(a1, a2) => ("ConcatArrays", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
               case Range(a1, a2) => ("Range", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
               case Split(a1, a2) => ("Split", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)

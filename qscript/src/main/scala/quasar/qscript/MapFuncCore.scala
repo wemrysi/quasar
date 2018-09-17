@@ -553,6 +553,7 @@ object MapFuncCore {
         case ProjectIndex(a1, a2) => (f(a1) ⊛ f(a2))(ProjectIndex(_, _))
         case ProjectKey(a1, a2) => (f(a1) ⊛ f(a2))(ProjectKey(_, _))
         case DeleteKey(a1, a2) => (f(a1) ⊛ f(a2))(DeleteKey(_, _))
+        case ContainsKey(a1, a2) => (f(a1) ⊛ f(a2))(ContainsKey(_, _))
         case ConcatArrays(a1, a2) => (f(a1) ⊛ f(a2))(ConcatArrays(_, _))
         case Range(a1, a2) => (f(a1) ⊛ f(a2))(Range(_, _))
         case Split(a1, a2) => (f(a1) ⊛ f(a2))(Split(_, _))
@@ -655,6 +656,7 @@ object MapFuncCore {
         case (ProjectIndex(a1, a2), ProjectIndex(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ProjectKey(a1, a2), ProjectKey(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (DeleteKey(a1, a2), DeleteKey(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (ContainsKey(a1, a2), ContainsKey(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ConcatArrays(a1, a2), ConcatArrays(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Range(a1, a2), Range(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Split(a1, a2), Split(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -758,6 +760,7 @@ object MapFuncCore {
           case ProjectIndex(a1, a2) => shz("ProjectIndex", a1, a2)
           case ProjectKey(a1, a2) => shz("ProjectKey", a1, a2)
           case DeleteKey(a1, a2) => shz("DeleteKey", a1, a2)
+          case ContainsKey(a1, a2) => shz("ContainsKey", a1, a2)
           case ConcatArrays(a1, a2) => shz("ConcatArrays", a1, a2)
           case Range(a1, a2) => shz("Range", a1, a2)
           case SetTimeZone(a1, a2) => shz("SetTimeZone", a1, a2)
@@ -873,6 +876,7 @@ object MapFuncCore {
           case ProjectIndex(a1, a2) => nAry("ProjectIndex", a1, a2)
           case ProjectKey(a1, a2) => nAry("ProjectKey", a1, a2)
           case DeleteKey(a1, a2) => nAry("DeleteKey", a1, a2)
+          case ContainsKey(a1, a2) => nAry("ContainsKey", a1, a2)
           case ConcatArrays(a1, a2) => nAry("ConcatArrays", a1, a2)
           case Range(a1, a2) => nAry("Range", a1, a2)
           case SetTimeZone(a1, a2) => nAry("SetTimeZone", a1, a2)
@@ -1043,6 +1047,11 @@ object MapFuncsCore {
     def a1 = src
     def a2 = key
   }
+  @Lenses final case class ContainsKey[T[_[_]], A](src: A, key: A) extends Binary[T, A] {
+    def a1 = src
+    def a2 = key
+  }
+
   @Lenses final case class Meta[T[_[_]], A](a1: A) extends Unary[T, A]
 
   @Lenses final case class Range[T[_[_]], A](from: A, to: A) extends Binary[T, A] {

@@ -122,6 +122,7 @@ object MapFunc {
     case structural.ArrayProject => (a1, a2) => MFC(C.ProjectIndex(a1, a2))
     case structural.MapProject => (a1, a2) => MFC(C.ProjectKey(a1, a2))
     case structural.DeleteKey => (a1, a2) => MFC(C.DeleteKey(a1, a2))
+    case structural.ContainsKey => (a1, a2) => MFC(C.ContainsKey(a1, a2))
     case string.Concat
        | structural.ArrayConcat
        | structural.ConcatOp => (a1, a2) => MFC(C.ConcatArrays(a1, a2))
