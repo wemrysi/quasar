@@ -143,8 +143,8 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
         lazy val primary = ((result must haveSize(0)) or
           (result.head must beCloseTo(expected)))
 
-        lazy val fallback = (expected mustNotEqual Data.NA) or
-          ((result must haveSize(0)))
+        lazy val fallback = ((result must haveSize(1))) or
+          (expected mustEqual Data.NA)
 
         (primary and fallback).toResult
       }
