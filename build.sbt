@@ -87,6 +87,7 @@ lazy val publishSettings = Seq(
       "scm:git@github.com:slamdata/quasar.git"
     )
   ),
+  publishArtifact in (Compile, packageDoc) := false,
   publishArtifact in (Test, packageBin) := true
 )
 

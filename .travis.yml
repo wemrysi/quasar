@@ -35,7 +35,6 @@ script:
       test:compile \
       "testOnly -- failtrace" \
       "exclusive:testOnly -- failtrace" \
-      doc \
       repl/assembly
 
   - scripts/testJar
