@@ -48,6 +48,9 @@ object DatasourceError extends DatasourceErrorInstances {
   final case class ConnectionFailed[C](kind: DatasourceType, config: C, cause: Exception)
     extends InitializationError[C]
 
+  final case class AccessDenied[C](kind: DatasourceType, config: C, reason: String)
+    extends InitializationError[C]
+
   sealed trait DiscoveryError[+I] extends DatasourceError[I, Nothing]
 
   final case class PathNotFound(path: ResourcePath)
@@ -177,5 +180,8 @@ sealed abstract class DatasourceErrorInstances {
 
       case ConnectionFailed(k, c, e) =>
         Cord("ConnectionFailed(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(s")\n\n$e")
+
+      case AccessDenied(k, c, r) =>
+        Cord("AccessDenied(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ r.show ++ Cord(")")
     }
 }
