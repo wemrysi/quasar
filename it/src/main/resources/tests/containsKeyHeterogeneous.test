@@ -1,0 +1,11 @@
+{
+    "name": "contains_key on heterogeneous dataset",
+    "backends": {
+        "lwc_local":         "ignoreFieldOrder",
+        "mimir":             "ignoreFieldOrder"
+    },
+    "data": "simple_heterogeneous.data",
+    "query": "select contains_key(h, \"a\") FROM `simple_heterogeneous.data` as h",
+    "predicate": "exactly",
+    "expected": [true, false, false, true]
+}
