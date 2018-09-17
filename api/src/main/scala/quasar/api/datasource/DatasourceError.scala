@@ -68,9 +68,7 @@ object DatasourceError extends DatasourceErrorInstances {
       : Prism[E, (DatasourceType, C, Exception)] =
     Prism.partial[E, (DatasourceType, C, Exception)] {
       case ConnectionFailed(k, c, e) => (k, c, e)
-    } {
-      case (t, c, e) => ConnectionFailed(t, c, e)
-    }
+    } ((ConnectionFailed[C](_, _, _)).tupled)
 
   def datasourceNameExists[E >: CreateError[Nothing] <: DatasourceError[_, _]]
       : Prism[E, DatasourceName] =
@@ -88,25 +86,25 @@ object DatasourceError extends DatasourceErrorInstances {
       : Prism[E, (DatasourceType, ISet[DatasourceType])] =
     Prism.partial[E, (DatasourceType, ISet[DatasourceType])] {
       case DatasourceUnsupported(k, s) => (k, s)
-    } {
-      case (k, s) => DatasourceUnsupported(k, s)
-    }
+    } (DatasourceUnsupported.tupled)
 
   def invalidConfiguration[C, E >: InitializationError[C] <: DatasourceError[_, C]]
       : Prism[E, (DatasourceType, C, NonEmptyList[String])] =
     Prism.partial[E, (DatasourceType, C, NonEmptyList[String])] {
       case InvalidConfiguration(t, c, rs) => (t, c, rs)
-    } {
-      case (t, c, rs) => InvalidConfiguration(t, c, rs)
-    }
+    } ((InvalidConfiguration[C](_, _, _)).tupled)
+
+  def accessDenied[C, E >: InitializationError[C] <: DatasourceError[_, C]]
+      : Prism[E, (DatasourceType, C, String)] =
+    Prism.partial[E, (DatasourceType, C, String)] {
+      case AccessDenied(t, c, r) => (t, c, r)
+    } ((AccessDenied[C](_, _, _)).tupled)
 
   def malformedConfiguration[C, E >: InitializationError[C] <: DatasourceError[_, C]]
       : Prism[E, (DatasourceType, C, String)] =
     Prism.partial[E, (DatasourceType, C, String)] {
       case MalformedConfiguration(t, c, r) => (t, c, r)
-    } {
-      case (t, c, r) => MalformedConfiguration(t, c, r)
-    }
+    } ((MalformedConfiguration[C](_, _, _)).tupled)
 
   def pathNotAResource[E >: DiscoveryError[Nothing] <: DatasourceError[_, _]]
       : Prism[E, ResourcePath] =
