@@ -234,6 +234,40 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
       normalizeFExpr(exp) must equal(expected)
     }
 
+    "simplify an outer ThetaJoin with a statically known condition" in {
+      val exp: Fix[QS] = {
+        import qsdsl._
+        fix.ThetaJoin(
+          fix.Unreferenced,
+          free.Read[AFile](rootDir </> file("foo")),
+          free.Read[AFile](rootDir </> file("bar")),
+          func.Eq(
+            func.Constant(json.int(0)),
+            func.Constant(json.int(1))),
+          JoinType.FullOuter,
+          func.ConcatMaps(func.LeftSide, func.RightSide))
+      }
+
+      simplifyJoinExpr(exp) must equal {
+        import qstdsl._
+        fix.Map(
+          fix.EquiJoin(
+            fix.Unreferenced,
+            free.Read[AFile](rootDir </> file("foo")),
+            free.Read[AFile](rootDir </> file("bar")),
+            List((
+              func.Constant(json.int(0)),
+              func.Constant(json.int(1)))),
+            JoinType.FullOuter,
+            func.StaticMapS(
+              SimplifyJoin.LeftK -> func.LeftSide,
+              SimplifyJoin.RightK -> func.RightSide)),
+          recFunc.ConcatMaps(
+            recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.LeftK),
+            recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.RightK)))
+      }
+    }
+
     "simplify a ThetaJoin" in {
       val exp: Fix[QS] = {
         import qsdsl._

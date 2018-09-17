@@ -17,6 +17,7 @@
 package quasar.qscript.rewrites
 
 import quasar.fp._
+import quasar.RenderTreeT
 import quasar.contrib.iota._
 import quasar.qscript.RecFreeS._
 import quasar.qscript._
@@ -56,7 +57,7 @@ object SimplifyJoin {
 
   def apply[T[_[_]], F[_], G[_]](implicit ev: SimplifyJoin.Aux[T, F, G]) = ev
 
-  def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T]): FreeQS[T] = {
+  def applyToBranch[T[_[_]]: BirecursiveT: RenderTreeT: ShowT](branch: FreeQS[T]): FreeQS[T] = {
     val modify: T[CoEnvQS[T, ?]] => T[CoEnvQS[T, ?]] =
       _.transCata[T[CoEnvQS[T, ?]]](
         liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism.reverseGet)))
@@ -64,7 +65,7 @@ object SimplifyJoin {
     applyCoEnvFrom[T, QScriptTotal[T, ?], Hole](modify).apply(branch)
   }
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]]
+  implicit def thetaJoin[T[_[_]]: BirecursiveT: RenderTreeT: ShowT, F[a] <: ACopK[a]]
     (implicit EJ: EquiJoin[T, ?] :<<: F, QC: QScriptCore[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, ThetaJoin[T, ?], F] =
     new SimplifyJoin[ThetaJoin[T, ?]] {
@@ -80,12 +81,12 @@ object SimplifyJoin {
           // TODO: This can potentially rewrite conditions to try to get left
           //       and right references on distinct sides.
           def alignCondition(l: JoinFunc[T], r: JoinFunc[T]): Option[EquiJoinKey[T]] =
-            if (l.element(LeftSide) && r.element(RightSide) &&
-              !l.element(RightSide) && !r.element(LeftSide))
+            if (l.all(_ === LeftSide) && r.all(_ === RightSide))
               EquiJoinKey(l.as[Hole](SrcHole), r.as[Hole](SrcHole)).some
-            else if (l.element(RightSide) && r.element(LeftSide) &&
-              !l.element(LeftSide) && !r.element(RightSide))
+            else if (l.all(_ === RightSide) && r.all(_ === LeftSide))
               EquiJoinKey(r.as[Hole](SrcHole), l.as[Hole](SrcHole)).some
+            else if (l.toList.length === 0 && r.toList.length === 0)
+              EquiJoinKey(l.as[Hole](SrcHole), r.as[Hole](SrcHole)).some
             else None
 
           @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -127,7 +128,7 @@ object SimplifyJoin {
         }
     }
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: RenderTreeT: ShowT, F[a] <: ACopK[a]]
     (implicit QC: QScriptCore[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, QScriptCore[T, ?], F] =
     new SimplifyJoin[QScriptCore[T, ?]] {
@@ -143,7 +144,7 @@ object SimplifyJoin {
           }))
     }
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]]
+  implicit def equiJoin[T[_[_]]: BirecursiveT: RenderTreeT: ShowT, F[a] <: ACopK[a]]
     (implicit EJ: EquiJoin[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, EquiJoin[T, ?], F] =
     new SimplifyJoin[EquiJoin[T, ?]] {

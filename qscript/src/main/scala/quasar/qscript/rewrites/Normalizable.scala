@@ -18,7 +18,7 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
-import quasar.common.SortDir
+import quasar.common.{SortDir, JoinType}
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
 import quasar.fp._
@@ -132,6 +132,14 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
   def freeMF[A: Equal: Show](fm: Free[MapFunc, A]): Free[MapFunc, A] =
     fm.transCata[Free[MapFunc, A]](MapFuncCore.normalize[T, A])
 
+  def transformMFEq[A: Equal](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
+    val fmTransformed = transformMF[A](fm)
+    (fm ≠ fmTransformed).option(fmTransformed)
+  }
+
+  def transformMF[A: Equal](fm: Free[MapFunc, A]): Free[MapFunc, A] =
+    fm.transCata[Free[MapFunc, A]](MapFuncCore.transform[T, A])
+
   def makeNorm[A, B, C](
     lOrig: A, rOrig: B)(
     left: A => Option[A], right: B => Option[B])(
@@ -206,8 +214,13 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
   }
 
   def ThetaJoin = make(
-    λ[ThetaJoin ~> (Option ∘ ThetaJoin)#λ](tj =>
-      (freeTCEq(tj.lBranch), freeTCEq(tj.rBranch), freeMFEq(tj.on), freeMFEq(tj.combine)) match {
+    λ[ThetaJoin ~> (Option ∘ ThetaJoin)#λ](tj => {
+      def normalizeOn(j: JoinFunc, jt: JoinType): Option[JoinFunc] = jt match {
+        case JoinType.Inner => freeMFEq(j)
+        case _ => transformMFEq(j)
+      }
+
+      (freeTCEq(tj.lBranch), freeTCEq(tj.rBranch), normalizeOn(tj.on, tj.f), freeMFEq(tj.combine)) match {
         case (None, None, None, None) =>
           extractFilterFromThetaJoin(tj)
 
@@ -219,7 +232,8 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
             onNorm.getOrElse(tj.on),
             tj.f,
             combineNorm.getOrElse(tj.combine)))
-      }))
+      }
+    }))
 
   def rebucket(bucket: List[FreeMap]): Option[List[FreeMap]] = {
     val bucketNormOpt: List[Option[FreeMap]] = bucket ∘ freeMFEq[Hole]
