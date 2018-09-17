@@ -225,6 +225,7 @@ object RenderQScriptDSL {
               case TypeOf(a1) => ("TypeOf", (fa(base, a1).right :: Nil).some)
               case Negate(a1) => ("Negate", (fa(base, a1).right :: Nil).some)
               case Not(a1) => ("Not", (fa(base, a1).right :: Nil).some)
+              case ArrayLength(a1) => ("ArrayLength", (fa(base, a1).right :: Nil).some)
               case Length(a1) => ("Length", (fa(base, a1).right :: Nil).some)
               case Lower(a1) => ("Lower", (fa(base, a1).right :: Nil).some)
               case Upper(a1) => ("Upper", (fa(base, a1).right :: Nil).some)

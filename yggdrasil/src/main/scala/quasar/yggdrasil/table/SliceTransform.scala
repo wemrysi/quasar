@@ -399,6 +399,9 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
               Map(ColumnRef(CPath.Identity, CBoolean) -> results))
           }
 
+        case ArrayLength(source) =>
+          composeSliceTransform2(source).map(_.arrayLength)
+
         case Range(lower, upper) =>
           composeSliceTransform2(upper).zip(composeSliceTransform2(lower)) { (upperS, lowerS) =>
             val upperColumns: Map[ColumnRef, Column] = upperS.materialized.columns

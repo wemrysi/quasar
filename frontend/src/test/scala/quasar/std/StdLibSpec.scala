@@ -188,6 +188,34 @@ abstract class StdLibSpec extends Qspec {
       }
     }
 
+    "ArrayLib" >> {
+      import ArrayLib._
+
+      "ArrayLength" >> {
+        "empty" >> {
+          unary(ArrayLength(_).embed, Data.Arr(Nil), Data.Int(0))
+        }
+
+        "singleton" >> {
+          unary(ArrayLength(_).embed, Data.Arr(List(Data.Int(42))), Data.Int(1))
+        }
+
+        "three things" >> {
+          unary(
+            ArrayLength(_).embed,
+            Data.Arr(List(Data.Int(5), Data.Int(6), Data.Int(7))),
+            Data.Int(3))
+        }
+
+        "undefined" >> {
+          unary(
+            ArrayLength(_).embed,
+            Data.NA,
+            Data.NA)
+        }
+      }
+    }
+
     "StringLib" >> {
       import StringLib._
 

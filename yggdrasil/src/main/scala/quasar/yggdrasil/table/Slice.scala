@@ -490,6 +490,38 @@ abstract class Slice { source =>
     Slice (size, columns)
   }
 
+  def arrayLength: Slice = {
+    val emptyCol = columns.get(ColumnRef(CPath.Identity, CEmptyArray))
+    val emptyBS = emptyCol.map(_.definedAt(0, size)).getOrElse(new BitSet)
+
+    val results = new Array[Long](size)
+    val resultsDefined = emptyBS    // start by defining everywhere that we're empty
+
+    val bitsetIndexes = columns collect {
+      case (ColumnRef(CPath(CPathIndex(i), _*), _), col) =>
+        (i -> col.definedAt(0, size))
+    }
+
+    val collapsed = bitsetIndexes.groupBy(_._1).toList map {
+      case (i, cols) =>
+        i -> cols.map(_._2).reduceOption(_ | _).getOrElse(new BitSet)
+    }
+
+    val reversed = collapsed.sortWith(_._1 > _._1)
+    val mask = collapsed.map(_._2).reduceOption(_ | _).getOrElse(new BitSet)
+
+    Loop.range(0, size) { row =>
+      if (!emptyBS(row) && mask(row)) {
+        // this could be less naive on performance, I think...
+        results(row) = reversed.find(_._2(row)).get._1 + 1    // the + 1 is because arrays are zero indexed
+        resultsDefined.set(row)
+      }
+    }
+
+    val col = new ArrayLongColumn(resultsDefined, results)
+    Slice(size, Map(ColumnRef(CPath.Identity, CLong) -> col))
+  }
+
   def toNumber: Slice = {
     val size = source.size
     val columns = source.columns.get(ColumnRef(CPath.Identity, CString)) match {

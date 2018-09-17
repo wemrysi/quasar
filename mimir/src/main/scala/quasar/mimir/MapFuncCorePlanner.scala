@@ -56,6 +56,9 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       case MapFuncsCore.JoinSideName(_) => errorImpossible // should never be received
 
+      case MapFuncsCore.ArrayLength(a1) =>
+        (ArrayLength[A](a1): TransSpec[A]).point[F]
+
       case MapFuncsCore.Length(a1) => length.spec(a1).point[F]
 
       case MapFuncsCore.ExtractCentury(a1) =>

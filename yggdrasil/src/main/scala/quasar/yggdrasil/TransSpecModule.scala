@@ -119,6 +119,9 @@ trait TransSpecModule {
     // this has to be primitive because of how nutso equality is
     case class Within[+A <: SourceType](item: TransSpec[A], in: TransSpec[A]) extends TransSpec[A]
 
+    // deals with arrays in a non-trivial way
+    case class ArrayLength[+A <: SourceType](source: TransSpec[A]) extends TransSpec[A]
+
     // this has to be primitive because it produces an array
     case class Range[+A <: SourceType](lower: TransSpec[A], upper: TransSpec[A]) extends TransSpec[A]
 
@@ -215,6 +218,7 @@ trait TransSpecModule {
           case trans.EqualLiteral(source, value, invert) => trans.EqualLiteral(mapSources(source)(f), value, invert)
 
           case trans.Within(item, in) => trans.Within(mapSources(item)(f), mapSources(in)(f))
+          case trans.ArrayLength(source) => trans.ArrayLength(mapSources(source)(f))
           case trans.Range(upper, lower) => trans.Range(mapSources(upper)(f), mapSources(lower)(f))
 
           case trans.Cond(pred, left, right) => trans.Cond(mapSources(pred)(f), mapSources(left)(f), mapSources(right)(f))
@@ -269,6 +273,7 @@ trait TransSpecModule {
         case trans.EqualLiteral(source, value, invert) => trans.EqualLiteral(deepMap(source)(f), value, invert)
 
         case trans.Within(item, in)                    => trans.Within(deepMap(item)(f), deepMap(in)(f))
+        case trans.ArrayLength(source)                 => trans.ArrayLength(deepMap(source)(f))
         case trans.Range(upper, lower)                 => trans.Range(deepMap(upper)(f), deepMap(lower)(f))
 
         case trans.Cond(pred, left, right) => trans.Cond(deepMap(pred)(f), deepMap(left)(f), deepMap(right)(f))
@@ -380,6 +385,7 @@ trait TransSpecModule {
             case Equal(f, s)             => Equal(normalize(f, undef), normalize(s, undef))
             case EqualLiteral(f, v, i)   => EqualLiteral(normalize(f, undef), v, i)
             case Within(item, in)        => Within(normalize(item, undef), normalize(in, undef))
+            case ArrayLength(source)     => ArrayLength(normalize(source, undef))
             case Range(upper, lower)     => Range(normalize(upper, undef), normalize(lower, undef))
             case Cond(p, l, r)           => Cond(normalize(p, undef), normalize(l, undef), normalize(r, undef))
             case Filter(s, t)            => Filter(normalize(s, undef), normalize(t, undef))
@@ -455,6 +461,7 @@ trait TransSpecModule {
           case Equal(f, s)               => paths(f) ++ paths(s) + r
           case EqualLiteral(s, _, _)     => paths(s) + r
           case Within(item, in)          => paths(item) ++ paths(in) + r
+          case ArrayLength(source)       => paths(source) + r
           case Range(upper, lower)       => paths(upper) ++ paths(lower) + r
           case Filter(f, p)              => paths(f) ++ paths(p) + r
           case FilterDefined(s, p, _)    => paths(s) ++ paths(p) + r

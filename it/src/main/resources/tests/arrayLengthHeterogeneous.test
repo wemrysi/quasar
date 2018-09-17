@@ -1,0 +1,21 @@
+{
+    "name": "array_length over a heterogeneous dataset",
+    "data": "heterogeneous.data",
+    "query": "select a, array_length(b) AS r from `heterogeneous.data`",
+    "predicate": "exactly",
+    "expected": [
+      {"a":1},
+      {"a":2,"r":2},
+      {"a":3},
+      {"a":4,"r":0},
+      {"a":5},
+      {"a":6,"r":1},
+      {"a":7},
+      {"a":8},
+      {"a":9},
+      {"a":10,"r":6},
+      {"a":11,"r":7},
+      {"a":12},
+      {"a":13}
+    ]
+}
