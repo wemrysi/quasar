@@ -3185,6 +3185,14 @@ abstract class StdLibSpec extends Qspec {
             Data.Str("b"),
             Data.NA)
         }
+
+        """CONTAINS_KEY(undefined, "b")""" >> {
+          binary(
+            ContainsKey(_, _).embed,
+            Data.NA,
+            Data.Str("b"),
+            Data.NA)
+        }
       }
 
       "Meta" >> {
