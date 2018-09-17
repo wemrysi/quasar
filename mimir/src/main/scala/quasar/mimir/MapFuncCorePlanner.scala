@@ -272,7 +272,9 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.DeleteKey(src, field) => errorNotImplemented
 
       case MapFuncsCore.ContainsKey(src, ConstLiteral(CString(key), _)) =>
-        (IsType[A](src, JObjectFixedT(Map(key -> JType.JUniverseT))): TransSpec[A]).point[F]
+        (IsType[A](
+          Typed[A](src, JObjectUnfixedT),
+          JObjectFixedT(Map(key -> JType.JUniverseT))): TransSpec[A]).point[F]
 
       // mimir doesn't have a way to implement this
       case MapFuncsCore.ContainsKey(_, _) => errorNotImplemented

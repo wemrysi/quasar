@@ -3183,7 +3183,7 @@ abstract class StdLibSpec extends Qspec {
             ContainsKey(_, _).embed,
             Data.Str("derp"),
             Data.Str("b"),
-            Data.Bool(false))
+            Data.NA)
         }
       }
 
