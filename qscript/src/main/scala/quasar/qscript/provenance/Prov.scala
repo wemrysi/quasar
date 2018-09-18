@@ -95,8 +95,39 @@ trait Prov[D, I, P] {
     implicit def provConjunctionSemiLattice(implicit D: Equal[D], I: Equal[I]): SemiLattice[P @@ Conjunction] =
       new SemiLattice[P @@ Conjunction] {
         def append(a: P @@ Conjunction, b: => P @@ Conjunction) =
-          Conjunction(distinctConjunctions(both(a.unwrap, b.unwrap)))
+          Conjunction(zipEq(a.unwrap, b.unwrap))
+
+        def zipEq(l: P, r: P): P = {
+          @tailrec
+          def zipEq0(ls: IList[P], rs: IList[P], out: P): P =
+            (ls, rs) match {
+              case (ICons(lh, lt), ICons(rh, rt)) if lh === rh =>
+                zipEq0(lt, rt, lh ≺: out)
+
+              case (ICons(lh, lt), ICons(rh, rt)) =>
+                val lout = lt.foldLeft(lh)((o, p) => p ≺: o)
+                val rout = rt.foldLeft(rh)((o, p) => p ≺: o)
+                distinctConjunctions(both(lout, rout)) ≺: out
+
+              case (ICons(_, _), INil()) =>
+                ls.foldLeft(out)((o, p) => p ≺: o)
+
+              case (INil(), ICons(_, _)) =>
+                rs.foldLeft(out)((o, p) => p ≺: o)
+
+              case (INil(), INil()) =>
+                out
+            }
+
+          val ls = flattenThen(l).reverse
+          val rs = flattenThen(r).reverse
+
+          if (ls.head === rs.head)
+            zipEq0(ls.tail, rs.tail, ls.head)
+          else
+            distinctConjunctions(both(l, r))
       }
+    }
 
     implicit def provSequenceSemigroup: Semigroup[P] =
       Semigroup.instance(thenn(_, _))

@@ -195,9 +195,11 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
       tree must haveDimensions(SMap(
         'n0 -> Dimensions.origin(
-          P.both(
-            P.thenn(P.injValue(J.int(0)), P.value(IdAccess.identity('n0))),
-            P.thenn(P.injValue(J.int(1)), P.value(IdAccess.identity('n0)))),
+          P.thenn(
+            P.both(
+              P.injValue(J.int(0)),
+              P.injValue(J.int(1))),
+            P.value(IdAccess.identity('n0))),
           P.prjPath(J.str("foobar"))),
         'n1 -> Dimensions.origin(
           P.prjPath(J.str("foobar")))
@@ -351,7 +353,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
       }
 
       res.exists(topDim all {
-        case P.both(P.thenn(P.injValue(J.int(i)), _), P.thenn(P.fresh(_), _)) if i == 0 => true
+        case P.thenn(P.both(P.injValue(J.int(i)), P.fresh(_)), _) if i == 0 => true
         case _ => false
       }) must beTrue
     }
