@@ -27,6 +27,7 @@ import quasar.qscript.rewrites._
 
 import iotaz.{CopK, TListK}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
+import matryoshka.implicits._
 import scalaz.{Functor, Monad}
 import scalaz.syntax.monad._
 
@@ -54,12 +55,16 @@ abstract class QScriptEvaluator[
   /** Returns the executable representation of the given optimized QScript. */
   def plan(cp: T[QSM]): F[Repr]
 
+  /** Rewrites the qscript to prepare for optimal evaluation. */
+  def optimize: QSM[T[QSM]] => QSM[T[QSM]]
+
   ////
 
   def evaluate(qsr: T[QScriptEducated[T, ?]]): F[R] =
     for {
       shifted <- Unirewrite[T, QS[T], F](new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
-      repr <- plan(shifted)
+      optimized = shifted.transCata[T[QSM]](optimize)
+      repr <- plan(optimized)
       result <- execute(repr)
     } yield result
 
