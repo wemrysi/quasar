@@ -56,26 +56,12 @@ final class MimirQScriptEvaluator[
 
   type Repr = MimirRepr
 
-  implicit def QSMFromQScriptCoreI: Injectable[QScriptCore[T, ?], QSM] =
-    Injectable.inject[QScriptCore[T, ?], QSM]
-
-  implicit def QSMFromEquiJoinI: Injectable[EquiJoin[T, ?], QSM] =
-    Injectable.inject[EquiJoin[T, ?], QSM]
-
-  implicit def QSMFromShiftedReadI: Injectable[Const[ShiftedRead[AFile], ?], QSM] =
-    Injectable.inject[Const[ShiftedRead[AFile], ?], QSM]
-
   implicit def QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]] =
     mimir.qScriptToQScriptTotal[T]
 
-  def QSMFunctor: Functor[QSM] =
-    Functor[QSM]
+  def QSMFunctor: Functor[QSM] = Functor[QSM]
 
-  def QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM =
-    CopK.Inject[QScriptCore[T, ?], QSM]
-
-  def UnirewriteT: Unirewrite[T, QS[T]] =
-    implicitly[Unirewrite[T, QS[T]]]
+  def UnirewriteT: Unirewrite[T, QS[T]] = implicitly[Unirewrite[T, QS[T]]]
 
   def optimize: QSM[T[QSM]] => QSM[T[QSM]] = Optimize[T, QSM]
 
