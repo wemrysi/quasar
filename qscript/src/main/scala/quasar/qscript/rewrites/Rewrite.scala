@@ -67,7 +67,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
               TJ: ThetaJoin :<<: G,
               SD: Const[ShiftedRead[ADir], ?] :<<: G,
               SF: Const[ShiftedRead[AFile], ?] :<<: G,
-              GI: Injectable[G, QScriptTotal],
               S: ShiftRead.Aux[T, F, G],
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
@@ -85,7 +84,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     QC: QScriptCore :<<: G,
     TJ: ThetaJoin :<<: G,
     SD: Const[ShiftedRead[ADir], ?] :<<: G,
-    GI: Injectable[G, QScriptTotal],
     S: ShiftReadDir.Aux[T, F, G],
     C: Coalesce.Aux[T, G, G],
     N: Normalizable[G]
@@ -101,7 +99,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
               TJ: ThetaJoin :<<: G,
               SD: Const[ShiftedRead[ADir], ?] :<<: G,
               SF: Const[ShiftedRead[AFile], ?] :<<: G,
-              GI: Injectable[G, QScriptTotal],
               S: ShiftRead.Aux[T, F, G],
               J: SimplifyJoin.Aux[T, G, H],
               C: Coalesce.Aux[T, G, G],
@@ -218,8 +215,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     prism: PrismNT[G, F],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
     implicit C: Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             QC: QScriptCore :<<: F):
       F[T[G]] => G[T[G]] = {
 
     val qcPrism = PrismNT.injectCopK[QScriptCore, F] compose prism
@@ -241,8 +237,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     prism: PrismNT[G, F],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
     implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             QC: QScriptCore :<<: F):
       F[A] => G[A] =
     fa => applyNormalizations[F, G](prism, normalizeJoins)
       .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
@@ -252,8 +247,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     prism: PrismNT[G, F])(
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             EJ: EquiJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             EJ: EquiJoin :<<: F):
       F[A] => G[A] = {
 
     val normEJ: G[T[G]] => Option[G[T[G]]] =
@@ -265,27 +259,23 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   def normalizeEJ[F[a] <: ACopK[a]: Functor: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             EJ: EquiJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             EJ: EquiJoin :<<: F):
       F[T[F]] => F[T[F]] =
     normalizeEJBijection[F, F, T[F]](bijectionId)(idPrism)
 
   def normalizeEJCoEnv[F[a] <: ACopK[a]: Functor: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             EJ: EquiJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             EJ: EquiJoin :<<: F):
       F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
     normalizeEJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism)
 
   private def normalizeTJBijection[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor, A](
     bij: Bijection[A, T[G]])(
-    prism: PrismNT[G, F],
-    rebase: FreeQS => T[G] => Option[T[G]])(
+    prism: PrismNT[G, F])(
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             TJ: ThetaJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             TJ: ThetaJoin :<<: F):
       F[A] => G[A] = {
 
     val normTJ = applyTransforms(
@@ -297,16 +287,14 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   def normalizeTJ[F[a] <: ACopK[a]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             TJ: ThetaJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             TJ: ThetaJoin :<<: F):
       F[T[F]] => F[T[F]] =
-    normalizeTJBijection[F, F, T[F]](bijectionId)(idPrism, rebaseT)
+    normalizeTJBijection[F, F, T[F]](bijectionId)(idPrism)
 
   def normalizeTJCoEnv[F[a] <: ACopK[a]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             TJ: ThetaJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             TJ: ThetaJoin :<<: F):
       F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
-    normalizeTJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism, rebaseTCo)
+    normalizeTJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism)
 }
