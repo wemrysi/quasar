@@ -100,13 +100,6 @@ package object qscript {
       CopK.Inject[QScriptCore[T, ?], QScriptEducated[T, ?]].prj(qt)
   }
 
-  /** QScript that has not gone through Read conversion. */
-  type QScript[T[_[_]], A] =
-    CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[DeadEnd, ?] ::: TNilK, A]
-
-  implicit def qScriptToQscriptTotal[T[_[_]]]
-      : Injectable[QScript[T, ?], QScriptTotal[T, ?]] = SubInject[QScript[T, ?], QScriptTotal[T, ?]]
-
   /** QScript that has gone through Read conversion.
     *
     * NB: Once QScriptTotal goes away, this could become parametric in the path type.
