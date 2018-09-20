@@ -42,15 +42,6 @@ package object mimir {
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]] =
     SubInject[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]]
 
-  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[MimirQScriptCP[T], ?]] =
-    Injectable.inject[QScriptCore[T, ?], CopK[MimirQScriptCP[T], ?]]
-
-  implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], CopK[MimirQScriptCP[T], ?]] =
-    Injectable.inject[EquiJoin[T, ?], CopK[MimirQScriptCP[T], ?]]
-
-  implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], CopK[MimirQScriptCP[T], ?]] =
-    Injectable.inject[Const[ShiftedRead[AFile], ?], CopK[MimirQScriptCP[T], ?]]
-
   def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, RValue] =
     convert.fromChunkedStreamT(slices.map(s => Chunk.indexedSeq(SliceIndexedSeq(s))))
 
