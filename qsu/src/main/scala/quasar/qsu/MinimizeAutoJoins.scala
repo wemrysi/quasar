@@ -30,6 +30,7 @@ import quasar.qscript.{
   construction,
   Center,
   Hole,
+  JoinSide3,
   LeftSide,
   LeftSide3,
   MonadPlannerErr,
@@ -154,6 +155,34 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       val singleG = qgraph.overwriteAtRoot(QSU.Map[T, Symbol](single.root, fm.as(srcHole).asRec))
 
       updateProvenance[T, G](singleG) as some(singleG)
+
+    case multiple if Minimizers.all(m => !m.couldApplyTo(multiple)) =>
+      multiple match {
+        case left :: right :: Nil => {
+          val fm2: JoinFunc = fm map {
+            case 0 => LeftSide
+            case 1 => RightSide
+          }
+
+          val aj2 = qgraph.overwriteAtRoot(QSU.AutoJoin2[T, Symbol](left.root, right.root, fm2))
+
+          updateProvenance[T, G](aj2) as some(aj2)
+        }
+
+        case left :: center :: right :: Nil => {
+          val fm2: FreeMapA[JoinSide3] = fm map {
+            case 0 => LeftSide3
+            case 1 => Center
+            case 2 => RightSide3
+          }
+
+          val aj3 = qgraph.overwriteAtRoot(QSU.AutoJoin3[T, Symbol](left.root, center.root, right.root, fm2))
+
+          updateProvenance[T, G](aj3) as some(aj3)
+        }
+
+        case _ => none[QSUGraph].point[G]
+      }
 
     case multiple =>
       for {
