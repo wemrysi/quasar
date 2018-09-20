@@ -293,10 +293,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             recFunc.Eq(recFunc.Hole, recFunc.Constant(J.str("foo")))),
           _(MapFuncsCore.Add(_, _)))))
 
-      import scalaz.syntax.show._
-
       val results = runOn(qgraph)
-      println(results.shows)
 
       results must beLike {
         case
@@ -499,9 +496,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.cint(42),
           _(MapFuncsCore.Add(_, _)))))
 
-      import scalaz.syntax.show._
       val results = runOn(qgraph)
-      println(results.shows)
 
       results must beLike {
         case AutoJoin2(Read(`afile`), Read(`afile2`), fm) =>

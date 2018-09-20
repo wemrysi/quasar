@@ -24,6 +24,7 @@ import quasar.common.effect.NameGenerator
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
+import quasar.fp._
 import quasar.qscript.{construction, HoleF, MonadPlannerErr, RecFreeS}, RecFreeS._
 import quasar.qsu.{QScriptUniform => QSU}
 
@@ -31,7 +32,6 @@ import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._
 
 import scalaz.Monad
-import scalaz.std.anyVal._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 
@@ -51,7 +51,13 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
       case _ => false
     }
 
-    filters.nonEmpty && notFilters.lengthCompare(1) === 0
+    val notShiftedRead = notFilters match {
+      case LeftShift(Read(_), _, _, _, _, _) :: Nil => false
+      case _ :: Nil => true
+      case _ => false
+    }
+
+    filters.nonEmpty && notShiftedRead
   }
 
   def extract[
@@ -95,10 +101,10 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
       fm: FreeMapA[Int]): G[Option[(QSUGraph, QSUGraph)]] = {
 
     val fms: Map[Int, RecFreeMap] = candidates.zipWithIndex.map({
-      case (Map(parent, fm), i) if parent.root == singleSource.root =>
+      case (Map(parent, fm), i) if parent.root === singleSource.root =>
         i -> fm
 
-      case (parent, i) if parent.root == singleSource.root =>
+      case (parent, i) if parent.root === singleSource.root =>
         i -> recFunc.Hole
 
       case _ =>
