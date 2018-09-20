@@ -28,19 +28,24 @@ import quasar.contrib.iota._
 import quasar.fp.ski.{ι, κ}
 import quasar.qscript.{
   construction,
+  Center,
   ExcludeId,
   ExtractFunc,
   FreeMapA,
   IdOnly,
   IdStatus,
   IncludeId,
+  LeftSide,
+  LeftSide3,
   MapFuncsCore,
   MapFuncsDerived,
   MFC,
   MFD,
   MonadPlannerErr,
   OnUndefined,
-  PlannerError
+  PlannerError,
+  RightSide,
+  RightSide3
 }
 import quasar.qscript.provenance.Dimensions
 
@@ -49,8 +54,9 @@ import matryoshka.data.free._
 import matryoshka.implicits._
 import monocle.macros.Lenses
 import pathy.Path
-import scalaz.{-\/, \/-, Applicative, Cord, Functor, IList, Monad, Show, StateT, ValidationNel}
+import scalaz.{-\/, \/-, Applicative, Cord, Foldable, Functor, IList, Monad, Show, StateT, ValidationNel}
 import scalaz.Scalaz._
+import scalaz.Tags.{Disjunction => Disj}
 
 final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends QSUTTypes[T] {
   import ApplyProvenance._
@@ -103,22 +109,65 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
     g.unfold match {
       case AutoJoin2(left, right, combine) =>
-        compute2[F](g, left, right) { (l, r) =>
-          val joined = dims.join(l, r)
-          computeFuncDims(combine)(κ(joined)).getOrElse(joined)
-        }
+        computeJoin2[F](g, left, right, combine)
 
       case AutoJoin3(left, center, right, combine) =>
         compute3[F](g, left, center, right) { (l, c, r) =>
+          val refs = Foldable[FreeMapA].foldMap(combine) {
+            case LeftSide3 => (true.disjunction, false.disjunction, false.disjunction)
+            case Center => (false.disjunction, true.disjunction, false.disjunction)
+            case RightSide3 => (false.disjunction, false.disjunction, true.disjunction)
+          }
+
           val joined = dims.join(l, dims.join(c, r))
-          computeFuncDims(combine)(κ(joined)).getOrElse(joined)
+
+          val maybeDims = refs match {
+            case (Disj(false), Disj(false), Disj(false)) =>
+              some(joined)
+
+            case (Disj(true), Disj(false), Disj(false)) =>
+              computeFuncDims(combine)(κ(joined))
+
+            case (Disj(false), Disj(true), Disj(false)) =>
+              computeFuncDims(combine)(κ(joined))
+
+            case (Disj(false), Disj(false), Disj(true)) =>
+              computeFuncDims(combine)(κ(joined))
+
+            case (Disj(true), Disj(true), Disj(false)) =>
+              computeFuncDims(combine) {
+                case LeftSide3 => l
+                case Center => dims.join(c, r)
+                case RightSide3 => dims.empty
+              }
+
+            case (Disj(true), Disj(false), Disj(true)) =>
+              computeFuncDims(combine) {
+                case LeftSide3 => l
+                case Center => dims.empty
+                case RightSide3 => dims.join(c, r)
+              }
+
+            case (Disj(false), Disj(true), Disj(true)) =>
+              computeFuncDims(combine) {
+                case LeftSide3 => dims.empty
+                case Center => dims.join(l, c)
+                case RightSide3 => r
+              }
+
+            case (Disj(true), Disj(true), Disj(true)) =>
+              computeFuncDims(combine) {
+                case LeftSide3 => l
+                case Center => c
+                case RightSide3 => r
+              }
+          }
+
+          maybeDims getOrElse joined
         }
 
       case QSAutoJoin(left, right, _, combine) =>
-        compute2[F](g, left, right) { (l, r) =>
-          val joined = dims.join(l, r)
-          computeFuncDims(combine)(κ(joined)).getOrElse(joined)
-        }
+        computeJoin2[F](g, left, right, combine)
 
       case DimEdit(src, DTrans.Squash()) =>
         compute1[F](g, src)(dims.squash)
@@ -248,10 +297,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         compute2[F](g, from, count)(dims.join(_, _))
 
       case ThetaJoin(left, right, _, _, combine) =>
-        compute2[F](g, left, right) { (l, r) =>
-          val joined = dims.join(l, r)
-          computeFuncDims(combine)(κ(joined)).getOrElse(joined)
-        }
+        computeJoin2[F](g, left, right, combine)
 
       case Transpose(src, _, rot) =>
         val tid = IdAccess.identity(g.root)
@@ -348,6 +394,30 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       : F[QDims] =
     handleMissingDims((dimsFor[F](l) |@| dimsFor[F](c) |@| dimsFor[F](r))(f)) flatMap { ds =>
       QAuthS.modify(_.addDims(g.root, ds)) as ds
+    }
+
+  private def computeJoin2[F[_]: Monad: MonadPlannerErr: QAuthS](
+      g: QSUGraph,
+      left: QSUGraph,
+      right: QSUGraph,
+      jf: JoinFunc)
+      : F[QDims] =
+    compute2[F](g, left, right) { (l, r) =>
+      val refs = Foldable[FreeMapA].foldMap(jf)(Set(_))
+      val joined = dims.join(l, r)
+
+      val maybeDims =
+        if (refs.size === 0)
+          some(joined)
+        else if (refs.size === 1)
+          computeFuncDims(jf)(κ(joined))
+        else
+          computeFuncDims(jf) {
+            case LeftSide => l
+            case RightSide => r
+          }
+
+      maybeDims getOrElse joined
     }
 
   private def dimsFor[F[_]: Functor: QAuthS](g: QSUGraph): V[F, QDims] =
