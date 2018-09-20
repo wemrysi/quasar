@@ -56,6 +56,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       debug("RecognizeDistinct")             >==>
       ExtractFreeMap[T, F]                   >==>
       debug("ExtractFreeMap")                >==>
+      PruneSymmetricDimEdits[T, F]           >==>
+      debug("PruneSymmetricDimEdits")        >==>
       ApplyProvenance[T, F]                  >==>
       debug("ApplyProvenance")               >==>
       ReifyBuckets[T, F]                     >==>
