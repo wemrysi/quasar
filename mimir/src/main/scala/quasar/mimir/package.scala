@@ -28,9 +28,10 @@ import shims._
 
 package object mimir {
 
-  def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, RValue] =
+  private def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, RValue] =
     convert.fromChunkedStreamT(slices.map(s => Chunk.indexedSeq(SliceIndexedSeq(s))))
 
+  // used in integration tests and the REPL
   def tableToData(repr: MimirRepr): Stream[IO, Data] =
     slicesToStream(repr.table.slices)
       // TODO{fs2}: Chunkiness
