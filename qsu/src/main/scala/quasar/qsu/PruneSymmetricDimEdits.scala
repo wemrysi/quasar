@@ -23,10 +23,7 @@ import quasar.contrib.scalaz.MonadState_
 import quasar.qscript.MonadPlannerErr
 import quasar.qsu.{QScriptUniform => QSU}
 
-import scalaz.{Monad, StateT}
-import scalaz.std.list._
-import scalaz.syntax.foldable._
-import scalaz.syntax.monad._
+import scalaz.{Monad, Scalaz, StateT}, Scalaz._
 
 import scala.collection.immutable.{Map => SMap}
 
@@ -57,16 +54,25 @@ final class PruneSymmetricDimEdits[T[_[_]]] private () extends QSUTTypes[T] {
           }
 
           if (shouldPrune) {
-            for {
-              back <- roots.foldLeftM(g) {
-                case (g, target @ DimEdit(parent, _)) =>
-                  g.replaceWithRename[G](target.root, parent.root)
+            val tip = g.unfold
 
-                case (g, _ ) => g.point[G]
+            for {
+              back <- tip traverse { sg =>
+                roots.foldLeftM(sg) {
+                  case (g, target @ DimEdit(parent, _)) =>
+                    g.replaceWithRename[G](target.root, parent.root)
+
+                  case (g, _ ) => g.point[G]
+                }
               }
 
+              gPat = g.unfold.map(_.root)
+              backPat = back.map(_.root)
+              _ <- MonadState_[G, RevIdx].modify(_ - gPat + (backPat -> g.root))
+
               _ <- MonadState_[G, RootsMemo].put(SMap())  // wipe the roots memo if we rewrite the graph
-            } yield back
+            } yield QSUGraph.refold(g.root, back)
+
           } else {
             g.point[G]
           }
