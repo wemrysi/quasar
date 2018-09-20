@@ -57,7 +57,7 @@ final class MimirQScriptEvaluator[
   type Repr = MimirRepr
 
   implicit def QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]] =
-    mimir.qScriptToQScriptTotal[T]
+    SubInject[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]]
 
   def QSMFunctor: Functor[QSM] = Functor[QSM]
 

@@ -18,9 +18,7 @@ package quasar
 
 import quasar.common.data.Data
 import quasar.contrib.fs2.convert
-import quasar.contrib.iota.SubInject
 import quasar.contrib.pathy.AFile
-import quasar.fp.Injectable
 import quasar.qscript._
 import quasar.precog.common.{CUndefined, RValue}
 import quasar.yggdrasil.table.Slice
@@ -28,7 +26,7 @@ import quasar.yggdrasil.table.Slice
 import cats.effect.IO
 import fs2.{Chunk, Stream}
 import iotaz.TListK.:::
-import iotaz.{TNilK, CopK}
+import iotaz.TNilK
 import scalaz.{Const, Functor, StreamT}
 import shims._
 
@@ -38,9 +36,6 @@ package object mimir {
     EquiJoin[T, ?]               :::
     Const[ShiftedRead[AFile], ?] :::
     TNilK
-
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]] =
-    SubInject[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]]
 
   def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, RValue] =
     convert.fromChunkedStreamT(slices.map(s => Chunk.indexedSeq(SliceIndexedSeq(s))))
