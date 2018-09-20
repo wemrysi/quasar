@@ -25,7 +25,7 @@ import quasar.contrib.std.errorImpossible
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.mimir
-import quasar.mimir.{MimirQScriptCP, MimirRepr}
+import quasar.mimir.MimirRepr
 import quasar.mimir.MimirCake._
 import quasar.qscript._
 import quasar.qscript.rewrites.{Optimize, Unirewrite}
@@ -36,6 +36,8 @@ import scala.concurrent.ExecutionContext
 
 import cats.effect.{IO, LiftIO}
 import iotaz.CopK
+import iotaz.TListK.:::
+import iotaz.TNilK
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._
@@ -52,12 +54,16 @@ final class MimirQScriptEvaluator[
   type MT[X[_], A] = Kleisli[X, Associates[T, IO], A]
   type M[A] = MT[F, A]
 
-  type QS[U[_[_]]] = MimirQScriptCP[U]
+  type QS[U[_[_]]] =
+    QScriptCore[U, ?]            :::
+    EquiJoin[U, ?]               :::
+    Const[ShiftedRead[AFile], ?] :::
+    TNilK
 
   type Repr = MimirRepr
 
   implicit def QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]] =
-    mimir.qScriptToQScriptTotal[T]
+    SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]]
 
   def QSMFunctor: Functor[QSM] = Functor[QSM]
 
