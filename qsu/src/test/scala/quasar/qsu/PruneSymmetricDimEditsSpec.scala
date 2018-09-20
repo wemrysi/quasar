@@ -130,6 +130,20 @@ object PruneSymmetricDimEditsSpec extends Qspec with QSUTTypes[Fix] {
         }
       }
     }
+
+    "remove trivial left root when right unreferenced" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.dimEdit((
+            qsu.read(afile),
+            QSU.DTrans.Squash())),
+          qsu.unreferenced(),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case AutoJoin2(Read(_), Unreferenced(), _) => ok
+      }
+    }
   }
 
   private def runOn(g: QSUGraph): QSUGraph = {
