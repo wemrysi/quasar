@@ -33,15 +33,8 @@ final class PruneSymmetricDimEdits[T[_[_]]] private () extends QSUTTypes[T] {
   private type RootsMemo = SMap[Symbol, Set[QSUGraph]]
 
   def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](g: QSUGraph): F[QSUGraph] = {
-    type G[A] = StateT[
-      // we need to memoize to avoid O(n^2) retraversals
-      StateT[
-        F,
-        RootsMemo,
-        ?],
-      // replacewithName needs this
-      QSUGraph.RevIdx[T],
-      A]
+    // we need to memoize to avoid O(n^2) retraversals
+    type G[A] = StateT[StateT[F, RootsMemo, ?], QSUGraph.RevIdx[T], A]
 
     val backM = g rewriteM[G] {
       case g @ (AutoJoin2(_, _, _) | AutoJoin3(_, _, _, _)) =>
