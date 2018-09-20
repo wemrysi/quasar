@@ -18,24 +18,15 @@ package quasar
 
 import quasar.common.data.Data
 import quasar.contrib.fs2.convert
-import quasar.contrib.pathy.AFile
-import quasar.qscript._
 import quasar.precog.common.{CUndefined, RValue}
 import quasar.yggdrasil.table.Slice
 
 import cats.effect.IO
 import fs2.{Chunk, Stream}
-import iotaz.TListK.:::
-import iotaz.TNilK
-import scalaz.{Const, Functor, StreamT}
+import scalaz.{Functor, StreamT}
 import shims._
 
 package object mimir {
-  type MimirQScriptCP[T[_[_]]] =
-    QScriptCore[T, ?]            :::
-    EquiJoin[T, ?]               :::
-    Const[ShiftedRead[AFile], ?] :::
-    TNilK
 
   def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, RValue] =
     convert.fromChunkedStreamT(slices.map(s => Chunk.indexedSeq(SliceIndexedSeq(s))))
