@@ -57,12 +57,16 @@ final class PruneSymmetricDimEdits[T[_[_]]] private () extends QSUTTypes[T] {
           }
 
           if (shouldPrune) {
-            roots.foldLeftM(g) {
-              case (g, target @ DimEdit(parent, _)) =>
-                g.replaceWithRename[G](target.root, parent.root)
+            for {
+              back <- roots.foldLeftM(g) {
+                case (g, target @ DimEdit(parent, _)) =>
+                  g.replaceWithRename[G](target.root, parent.root)
 
-              case (g, _ ) => g.point[G]
-            }
+                case (g, _ ) => g.point[G]
+              }
+
+              _ <- MonadState_[G, RootsMemo].put(SMap())  // wipe the roots memo if we rewrite the graph
+            } yield back
           } else {
             g.point[G]
           }
