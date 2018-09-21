@@ -46,18 +46,12 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
   private val recFunc = construction.RecFunc[T]
 
   def couldApplyTo(candidates: List[QSUGraph]): Boolean = {
-    val (filters, notFilters) = candidates partition {
+    val (filters, _) = candidates partition {
       case QSFilter(_, _) => true
       case _ => false
     }
 
-    val notShiftedRead = notFilters match {
-      case LeftShift(Read(_), _, _, _, _, _) :: Nil => false
-      case _ :: Nil => true
-      case _ => false
-    }
-
-    filters.nonEmpty && notShiftedRead
+    filters.nonEmpty // && notShiftedRead
   }
 
   def extract[

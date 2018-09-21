@@ -276,6 +276,32 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       }
     }
 
+    "rewrite filter into cond when there are two filters" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.qsFilter(
+            qsu.read(afile),
+            recFunc.Eq(recFunc.Hole, recFunc.Constant(J.str("foo")))),
+          qsu.qsFilter(
+            qsu.read(afile),
+            recFunc.Eq(recFunc.Hole, recFunc.Constant(J.str("bar")))),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case Map(Read(_), fm) =>
+          fm must beTreeEqual(
+            recFunc.Add(
+              recFunc.Cond(
+                recFunc.Eq(recFunc.Hole, recFunc.Constant(J.str("foo"))),
+                recFunc.Hole,
+                recFunc.Undefined),
+              recFunc.Cond(
+                recFunc.Eq(recFunc.Hole, recFunc.Constant(J.str("bar"))),
+                recFunc.Hole,
+                recFunc.Undefined)))
+      }
+    }
+
     "rewrite filter into cond to avoid randomly creating more shifts" in {
       val shift = qsu.leftShift(
         shiftedRead,
@@ -376,7 +402,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case QSFilter(_, _) => true.disjunction
         case _              => false.disjunction
       }.unwrap must beTrue
-    }
+    }.pendingUntilFixed
 
     "coalesce two summed bucketing reductions, inlining functions into the buckets" in {
       val readAndThings =
