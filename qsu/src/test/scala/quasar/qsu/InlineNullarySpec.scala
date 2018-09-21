@@ -16,7 +16,6 @@
 
 package quasar.qsu
 
-import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers}
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
