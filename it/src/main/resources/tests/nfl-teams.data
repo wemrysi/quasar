@@ -1,0 +1,26 @@
+{
+  "division": "al west",
+  "teams": [
+    {
+      "team": "LA Dodgers",
+      "wins": 85,
+      "losses": 68
+    }, {
+      "team": "Colorado Rockies",
+      "wins": 82,
+      "losses": 70
+    }, {
+      "team": "Arizona Diamondbacks",
+      "wins": 79,
+      "losses": 74
+    }, {
+      "team": "San Francisco Giants",
+      "wins": 72,
+      "losses": 81
+    }, {
+      "team": "San Diego Padres",
+      "wins": 61,
+      "losses": 92
+    }
+  ]
+}
