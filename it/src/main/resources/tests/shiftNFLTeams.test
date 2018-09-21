@@ -18,7 +18,7 @@
               WHERE type_of(v) = \"number\") AS g4, (
             SELECT * FROM (SELECT t.teams[_].losses FROM `nfl-teams.data` AS t) AS v
               WHERE type_of(v) = \"number\") AS g5
-            FROM `nfl-teams` AS gt2) AS pt1) AS c",
+            FROM `nfl-teams.data` AS gt2) AS pt1) AS c",
 
     "predicate": "exactly",
 
