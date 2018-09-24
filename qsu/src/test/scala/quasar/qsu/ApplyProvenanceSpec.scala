@@ -43,6 +43,7 @@ import matryoshka.data.Fix
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
 import pathy.Path, Path.{file, Sandboxed}
 import scalaz.{\/, Cofree}
+import scalaz.syntax.apply._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
 import scalaz.std.list._
@@ -265,6 +266,38 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         'n1 -> Dimensions.origin(
           P.prjPath(J.str("foobar")))
       ))
+    }
+  }
+
+  "AutoJoin provenance" >> {
+    "joining on projections is equivalent to projecting from the join" >> {
+      val joinOnP =
+        qsu._autojoin2('n0, (
+          qsu.map('n1, (
+            qsu.read('n2, afile),
+            recFunc.MakeMapS("A", recFunc.ProjectKeyS(recFunc.Hole, "X")))),
+          qsu.map('n3, (
+            qsu.read('n4, afile),
+            recFunc.MakeMapS("B", recFunc.ProjectKeyS(recFunc.Hole, "Y")))),
+          func.ConcatMaps(func.LeftSide, func.RightSide)))
+
+      val pOnJoin =
+        qsu._autojoin2('n0, (
+          qsu.read('n2, afile),
+          qsu.read('n4, afile),
+          func.ConcatMaps(
+            func.MakeMapS("A", func.ProjectKeyS(func.LeftSide, "X")),
+            func.MakeMapS("B", func.ProjectKeyS(func.RightSide, "Y")))))
+
+      val jop = app(QSUGraph.fromAnnotatedTree[Fix](joinOnP map (Some(_)))._2) flatMap {
+        case AuthenticatedQSU(g, a) => a.lookupDimsE[F](g.root)
+      }
+
+      val poj = app(QSUGraph.fromAnnotatedTree[Fix](pOnJoin map (Some(_)))._2) flatMap {
+        case AuthenticatedQSU(g, a) => a.lookupDimsE[F](g.root)
+      }
+
+      (jop |@| poj)(_ must_= _) getOrElse ko
     }
   }
 
