@@ -135,6 +135,32 @@ final class ProvSpec extends Qspec with ProvFGenerator {
     }
   }
 
+  "conjunction" >> {
+    "(z ≺ y ≺ x) ∧ (w ≺ y ≺ x) == (z ∧ w) ≺ y ≺ x" >> {
+      val l = pk1 ≺: p2 ≺: p1
+      val r = pk2 ≺: p2 ≺: p1
+      (l ∧ r) must_= P.both(pk1, pk2) ≺: p2 ≺: p1
+    }
+
+    "((z ∧ q) ≺ y ≺ x) ∧ ((w ∧ q) ≺ y ≺ x) == (z ∧ w ∧ q) ≺ y ≺ x" >> {
+      val l = (pk1 ∧ v1) ≺: p2 ≺: p1
+      val r = (pk2 ∧ v1) ≺: p2 ≺: p1
+      (l ∧ r) must_= P.both(pk1, P.both(pk2, v1)) ≺: p2 ≺: p1
+    }
+
+    "((a ∧ b) ≺ y ≺ x) ∧ ((c ∧ d) ≺ y ≺ x) == (a ∧ b ∧ c ∧ d) ≺ y ≺ x" >> {
+      val l = (pk1 ∧ v1) ≺: p2 ≺: p1
+      val r = (pk2 ∧ v2) ≺: p2 ≺: p1
+      (l ∧ r) must_= P.both(v2, P.both(pk1, P.both(pk2, v1))) ≺: p2 ≺: p1
+    }
+
+    "(a ≺ b ≺ x) ∧ (c ≺ d ≺ x) == (a ≺ b ∧ c ≺ d) ≺ x" >> {
+      val l = pk1 ≺: v1 ≺: p1
+      val r = pk2 ≺: v2 ≺: p1
+      (l ∧ r) must_= P.both(pk1 ≺: v1, pk2 ≺: v2) ≺: p1
+    }
+  }
+
   "autojoined" >> {
     "p1 θ p1" >> {
       autojoined(p1, p1) must_= ((JoinKeys.empty, true))

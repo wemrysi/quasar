@@ -16,7 +16,7 @@
 
 package quasar.qsu
 
-import slamdata.Predef.{Boolean, Option, None, Symbol, Map => SMap}
+import slamdata.Predef.{Boolean, Option, None, Set, Symbol}
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski.κ
@@ -99,37 +99,26 @@ object MappableRegion {
    * will not attempt things such as rewriting Filter into Cond.
    */
   object MaximalUnary {
+    import QSUGraph.Extractors._
+
     def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T])] = {
-      val (roots, fm) = maximalFunc(g)
+      val fm = maximal[T](g)
+
+      val roots = Foldable[FreeMapA[T, ?]].foldMap(fm) {
+        case Unreferenced() => Set.empty[Symbol]
+        case g => Set(g.root)
+      }
 
       if (roots.size === 1)
-        roots.headOption map { case (_, v) => (v, fm) }
+        roots.headOption.map(s => (g.refocus(s), fm.as(hole)))
       else
         None
-    }
-  }
-
-  /** An extractor of nullary expressions (those where all roots are `Undefined`). */
-  object MaximalNullary {
-    def unapply[T[_[_]]](g: QSUGraph[T]): Option[FreeMap[T]] = {
-      val (roots, fm) = maximalFunc(g)
-      roots.isEmpty option fm
     }
   }
 
   ////
 
   private val hole: Hole = SrcHole
-
-  private def maximalFunc[T[_[_]]](g: QSUGraph[T]): (SMap[Symbol, QSUGraph[T]], FreeMap[T]) = {
-    val fm = maximal[T](g)
-
-    val roots =
-      Foldable[FreeMapA[T, ?]].foldLeft(fm, SMap[Symbol, QSUGraph[T]]())(
-        (m, r) => m.updated(r.root, r))
-
-    (roots, fm.as(hole))
-  }
 
   private def replaceWith[A](target: Symbol, a: A): Symbol => Option[A] =
     s => (s === target) option a

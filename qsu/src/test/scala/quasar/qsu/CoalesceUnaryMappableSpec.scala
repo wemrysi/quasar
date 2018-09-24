@@ -38,6 +38,7 @@ object CoalesceUnaryMappableSpec extends Qspec with QSUTTypes[Fix] with TreeMatc
   val J = Fixed[Fix[EJson]]
 
   val dataA: AFile = rootDir </> file("dataA")
+  val dataB: AFile = rootDir </> file("dataB")
 
   val coalesce = CoalesceUnaryMappable[Fix] _
 
@@ -73,6 +74,61 @@ object CoalesceUnaryMappableSpec extends Qspec with QSUTTypes[Fix] with TreeMatc
 
           p must_= dataA
           f.linearize must beTreeEqual(exp)
+      }
+    }
+
+    "coalesce map nodes in AutoJoin2" >> {
+      val g = QSUGraph.fromTree[Fix](
+        qsu._autojoin2(
+          qsu.map(
+            qsu.map(
+              qsu.read(dataA),
+              rec.ProjectKeyS(rec.Hole, "X")),
+            rec.MakeMapS("A", rec.Hole)),
+          qsu.map(
+            qsu.map(
+              qsu.read(dataB),
+              rec.ProjectKeyS(rec.Hole, "Y")),
+            rec.MakeMapS("B", rec.Hole)),
+          mf.ConcatMaps(mf.LeftSide, mf.RightSide)))
+
+      coalesce(g) must beLike {
+        case AutoJoin2(Read(l), Read(r), f) =>
+          val exp =
+            mf.ConcatMaps(
+              mf.MakeMapS("A", mf.ProjectKeyS(mf.LeftSide, "X")),
+              mf.MakeMapS("B", mf.ProjectKeyS(mf.RightSide, "Y")))
+
+          l must_= dataA
+          r must_= dataB
+          f must beTreeEqual(exp)
+      }
+    }
+
+    "coalesce map nodes in AutoJoin3" >> {
+      val g = QSUGraph.fromTree[Fix](
+        qsu._autojoin3(
+          qsu.map(
+            qsu.read(dataA),
+            rec.ProjectKeyS(rec.Hole, "X")),
+          qsu.map(
+            qsu.read(dataB),
+            rec.ProjectKeyS(rec.Hole, "Y")),
+          qsu.read(dataA),
+          mf.Cond(mf.LeftSide3, mf.RightSide3, mf.Center)))
+
+      coalesce(g) must beLike {
+        case AutoJoin3(Read(l), Read(c), Read(r), f) =>
+          val exp =
+            mf.Cond(
+              mf.ProjectKeyS(mf.LeftSide3, "X"),
+              mf.RightSide3,
+              mf.ProjectKeyS(mf.Center, "Y"))
+
+          l must_= dataA
+          c must_= dataB
+          r must_= dataA
+          f must beTreeEqual(exp)
       }
     }
   }

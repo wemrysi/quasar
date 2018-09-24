@@ -95,8 +95,44 @@ trait Prov[D, I, P] {
     implicit def provConjunctionSemiLattice(implicit D: Equal[D], I: Equal[I]): SemiLattice[P @@ Conjunction] =
       new SemiLattice[P @@ Conjunction] {
         def append(a: P @@ Conjunction, b: => P @@ Conjunction) =
-          Conjunction(distinctConjunctions(both(a.unwrap, b.unwrap)))
+          Conjunction(zipWhileEq(a.unwrap, b.unwrap))
+
+        /** Takes the longest sequence prefix common to both sides, conjoining
+          * whatever is leftover as the head.
+          *
+          * Example: (z ≺ y ≺ x) ∧ (w ≺ y ≺ x) == (z ∧ w) ≺ y ≺ x
+          */
+        def zipWhileEq(l: P, r: P): P = {
+          @tailrec
+          def zipWhileEq0(ls: IList[P], rs: IList[P], out: P): P =
+            (ls, rs) match {
+              case (ICons(lh, lt), ICons(rh, rt)) if lh === rh =>
+                zipWhileEq0(lt, rt, lh ≺: out)
+
+              case (ICons(lh, lt), ICons(rh, rt)) =>
+                val lout = lt.foldLeft(lh)((o, p) => p ≺: o)
+                val rout = rt.foldLeft(rh)((o, p) => p ≺: o)
+                distinctConjunctions(both(lout, rout)) ≺: out
+
+              case (ICons(_, _), INil()) =>
+                ls.foldLeft(out)((o, p) => p ≺: o)
+
+              case (INil(), ICons(_, _)) =>
+                rs.foldLeft(out)((o, p) => p ≺: o)
+
+              case (INil(), INil()) =>
+                out
+            }
+
+          val ls = flattenThen(l).reverse
+          val rs = flattenThen(r).reverse
+
+          if (ls.head === rs.head)
+            zipWhileEq0(ls.tail, rs.tail, ls.head)
+          else
+            distinctConjunctions(both(l, r))
       }
+    }
 
     implicit def provSequenceSemigroup: Semigroup[P] =
       Semigroup.instance(thenn(_, _))
