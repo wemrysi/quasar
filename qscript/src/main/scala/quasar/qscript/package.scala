@@ -71,6 +71,7 @@ package object qscript {
      ::: EquiJoin[T, ?]
      ::: Const[ShiftedRead[ADir], ?]
      ::: Const[ShiftedRead[AFile], ?]
+     ::: Const[ExtraShiftedRead[AFile], ?]
      ::: Const[Read[ADir], ?]
      ::: Const[Read[AFile], ?]
      ::: Const[DeadEnd, ?]
