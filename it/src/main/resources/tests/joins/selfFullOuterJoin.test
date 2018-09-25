@@ -2,8 +2,8 @@
     "name": "[qa_s07] self full outer join",
 
     "backends": {
-        "lwc_local": "ignoreFieldOrder",
-        "mimir": "ignoreFieldOrder"
+        "lwc_local": "pendingIgnoreFieldOrder",
+        "mimir": "pendingIgnoreFieldOrder"
     },
 
     "data": "selfjoin.data",
@@ -24,6 +24,13 @@
         {"a":3,"nr1":3},
         {"b":4,"nr2":5},
         {"b":4,"nr2":7},
-        {"a":6,"b":6,"nr1":8,"nr2":8}
+        {"a":6,"b":6,"nr1":8,"nr2":8},
+        {"nr1":4},
+        {"nr1":5},
+        {"nr1":6},
+        {"nr2":1},
+        {"nr2":2},
+        {"nr2":3},
+        {"nr2":6}
     ]
 }
