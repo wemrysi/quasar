@@ -142,11 +142,13 @@ object compression {
       case EnvT((_, TagST(Tagged(strings.StructuralString, _)))) =>
         sst.left
 
-      case EnvT((ts, TypeST(TypeF.Arr(-\/(elts @ ICons(h, t)))))) if elts.length > maxLength.value =>
+      case EnvT((ts, TypeST(TypeF.Arr(elts @ ICons(h, t), u)))) if elts.length > maxLength.value =>
         val (cnt, len) = (ts.size, A fromInt elts.length)
         envT(
-          TypeStat.coll(cnt, some(len), some(len)),
-          TypeST(TypeF.arr[J, SST[J, A]](\/-(NonEmptyList.nel(h, t).suml1)))).right
+          TypeStat.coll(cnt, some(len), u.fold(some(len))(_ => none)),
+          TypeST(TypeF.arr[J, SST[J, A]](
+            IList[SST[J, A]](),
+            some(NonEmptyList.nel(h, t).suml1) |+| u))).right
 
       case other =>
         other.right

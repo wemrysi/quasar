@@ -326,7 +326,7 @@ final class CompressionSpec extends quasar.Qspec
 
       val sum = ints.foldMap1(x => SST.fromEJson(Real(1), x))
       val coll = TypeStat.coll(Real(1), rlen, rlen)
-      val lubarr = envT(coll, TypeST(TypeF.arr[J, S](sum.right))).embed
+      val lubarr = envT(coll, TypeST(TypeF.arr[J, S](IList[S](), Some(sum)))).embed
 
       val req = xsst.elgotApo[S](compression.limitArrays(alen))
       val rlt = xsst.elgotApo[S](compression.limitArrays(lt))

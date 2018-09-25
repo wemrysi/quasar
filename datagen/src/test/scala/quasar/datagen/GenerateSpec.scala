@@ -98,7 +98,7 @@ final class GenerateSpec extends quasar.Qspec {
         val asst =
           sst(
             TypeStat.coll(1.0, Some(3.0), Some(3.0)),
-            TypeF.arr(IList(a, b, c).left))
+            TypeF.arr(IList(a, b, c), None))
 
         valuesShould(asst)(_ ≟ J.arr(List(J.char('a'), J.char('b'), J.char('c'))))
       }
@@ -113,7 +113,7 @@ final class GenerateSpec extends quasar.Qspec {
         val vsst =
           sst(
             TypeStat.coll(100.0, Some(2.0), Some(5.0)),
-            TypeF.arr(IList(a, b, c, d, e).left))
+            TypeF.arr(IList(a, b, c, d, e), None))
 
         val ab = J.arr(List('a', 'b') map (J.char(_)))
         val abcd = J.arr(List('a', 'b', 'c', 'd') map (J.char(_)))
@@ -129,7 +129,7 @@ final class GenerateSpec extends quasar.Qspec {
         val kta =
           sst(
             TypeStat.coll(2.0, Some(3.0), Some(7.0)),
-            TypeF.arr((k ⊹ t).right))
+            TypeF.arr(IList[S](), Some(k ⊹ t)))
 
         valuesShould(kta)(J.arr.exist { js =>
           js.length >= 3 &&
@@ -145,12 +145,34 @@ final class GenerateSpec extends quasar.Qspec {
         val wza =
           sst(
             TypeStat.coll(2.0, None, None),
-            TypeF.arr((w ⊹ z).right))
+            TypeF.arr(IList[S](), Some(w ⊹ z)))
 
         valuesShould(wza)(J.arr.exist { js =>
           js.length <= maxL &&
           js.all(j => j >= J.char('w') && j <= J.char('z'))
         })
+      }
+
+      "variable length of known values according to probabilities with trailing lubs" >> {
+        val a = sstL(tsJ(100, J.char('a')), SimpleType.Char)
+        val b = sstL(tsJ(100, J.char('b')), SimpleType.Char)
+        val c = sstL(tsJ( 70, J.char('c')), SimpleType.Char)
+        val d = sstL(tsJ( 70, J.char('d')), SimpleType.Char)
+        val e = sstL(tsJ( 30, J.char('e')), SimpleType.Char)
+        val f = sstL(tsJ(100, J.char('f')), SimpleType.Char)
+
+        val vsst =
+          sst(
+            TypeStat.coll(100.0, Some(2.0), Some(7.0)),
+            TypeF.arr(IList(a, b, c, d, e), Some(f)))
+
+        val ab = J.arr(List('a', 'b') map (J.char(_)))
+        val abcd = J.arr(List('a', 'b', 'c', 'd') map (J.char(_)))
+        val abcde = J.arr(List('a', 'b', 'c', 'd', 'e') map (J.char(_)))
+        val abcdef = J.arr(List('a', 'b', 'c', 'd', 'e', 'f') map (J.char(_)))
+        val abcdeff = J.arr(List('a', 'b', 'c', 'd', 'e', 'f', 'f') map (J.char(_)))
+
+        valuesShould(vsst)(List(ab, abcd, abcde, abcdef, abcdeff) element _)
       }
     }
 

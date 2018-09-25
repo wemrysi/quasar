@@ -38,13 +38,13 @@ sealed abstract class TypeF[J, A] extends Product with Serializable
 object TypeF extends TypeFInstances {
   import SimpleType._
 
-  final case class Bottom[J, A]()                                        extends TypeF[J, A]
-  final case class Top[J, A]()                                           extends TypeF[J, A]
-  final case class Simple[J, A](simpleType: SimpleType)                  extends TypeF[J, A]
-  final case class Const[J, A](ejson: J)                                 extends TypeF[J, A]
-  final case class Arr[J, A](elementsOrLub: IList[A] \/ A)               extends TypeF[J, A]
+  final case class Bottom[J, A]() extends TypeF[J, A]
+  final case class Top[J, A]() extends TypeF[J, A]
+  final case class Simple[J, A](simpleType: SimpleType) extends TypeF[J, A]
+  final case class Const[J, A](ejson: J) extends TypeF[J, A]
+  final case class Arr[J, A](known: IList[A], unknown: Option[A]) extends TypeF[J, A]
   final case class Map[J, A](known: IMap[J, A], unknown: Option[(A, A)]) extends TypeF[J, A]
-  final case class Union[J, A](fst: A, snd: A, rest: IList[A])           extends TypeF[J, A]
+  final case class Union[J, A](fst: A, snd: A, rest: IList[A]) extends TypeF[J, A]
 
   object Leaf {
     def unapply[J, A](tf: TypeF[J, A]): Option[SimpleType \/ J] =
@@ -81,10 +81,10 @@ object TypeF extends TypeFInstances {
       case Const(j) => j
     } (Const(_))
 
-  def arr[J, A]: Prism[TypeF[J, A], IList[A] \/ A] =
-    Prism.partial[TypeF[J, A], IList[A] \/ A] {
-      case Arr(asOrLub) => asOrLub
-    } (Arr(_))
+  def arr[J, A]: Prism[TypeF[J, A], (IList[A], Option[A])] =
+    Prism.partial[TypeF[J, A], (IList[A], Option[A])] {
+      case Arr(kn, unk) => (kn, unk)
+    } { case (k, u) => Arr(k, u) }
 
   def map[J, A]: Prism[TypeF[J, A], (IMap[J, A], Option[(A, A)])] =
     Prism.partial[TypeF[J, A], (IMap[J, A], Option[(A, A)])] {
@@ -149,54 +149,53 @@ object TypeF extends TypeFInstances {
     TC: Corecursive.Aux[T, TypeF[J, ?]],
     JR: Recursive.Aux[J, EJson]
   ): GCoalgebra[T \/ ?, TypeF[J, ?], (T, T)] = {
-    type LR  = (T, T)
-    val ⊤    = top[J, T]().embed
-    val ⊥    = bottom[J, T]().embed
-
-    val arrayGlb: ((IList[T] \/ T, IList[T] \/ T)) => IList[LR] \/ LR = {
-      case (\/-( x), \/-( y)) => (x, y).right
-      case (\/-( x), -\/(ys)) => ys.map((x, _)).left
-      case (-\/(xs), \/-( y)) => xs.map((_, y)).left
-      case (-\/(xs), -\/(ys)) => xs.alignWith(ys)(_.fold((_, ⊤), (⊤, _), (_, _))).left
-    }
-
-    // NB: We could do a bit better in the scenario where X includes known keys
-    //     not present in Y and Y has unknown keys by taking the glb of the
-    //     product of the keys of (X - Y) and Y's unknown key type.
-    //
-    //     To do this we'd need a way to specify a product or, analogously, the
-    //     glb of more than two types.
-    def mapGlb(xs: IMap[J, T], ux: Option[(T, T)], ys: IMap[J, T], uy: Option[(T, T)]): TypeF[J, LR] =
-      map[J, LR](
-        xs.alignWith(ys)(_.fold(
-          x      => (x, uy ? ⊥ | ⊤),
-          y      => (ux ? ⊥ | ⊤, y),
-          (x, y) => (x, y)
-        )),
-        ux.alignWith(uy)(_.fold(
-          _.umap((_, ⊤)),
-          _.umap((⊤, _)),
-          untupled({ case ((xk, xv), (yk, yv)) => ((xk, yk), (xv, yv)) })
-        )))
+    type LR = (T, T)
+    val ⊤ = top[J, T]().embed
+    val ⊥ = bottom[J, T]().embed
 
     _.umap(_.project) match {
-      case (        Bottom(),                _)                   => bottom()
-      case (               _,         Bottom())                   => bottom()
-      case (           Top(),                y)                   => y map (_.left)
-      case (               x,            Top())                   => x map (_.left)
-      case (       Simple(x),        Simple(y)) if x ≟ y          => simple(x)
-      case (        Const(x),         Const(y)) if x ≟ y          => const(x)
-      case (       Simple(s),         Const(j)) if isSimply(j, s) => const(j)
-      case (        Const(j),        Simple(s)) if isSimply(j, s) => const(j)
-      case (Arr(-\/(INil())),           Arr(y))                   => arr[J, T](y) map (_.left)
-      case (          Arr(x), Arr(-\/(INil())))                   => arr[J, T](x) map (_.left)
-      case (          Arr(x),           Arr(y))                   => arr[J, LR](arrayGlb((x, y))) map (_.right)
-      case (   Map(xs, None),      Map(ys, uy)) if xs.isEmpty     => map[J, T](ys, uy) map (_.left)
-      case (     Map(xs, ux),    Map(ys, None)) if ys.isEmpty     => map[J, T](xs, ux) map (_.left)
-      case (     Map(xs, ux),      Map(ys, uy))                   => mapGlb(xs, ux, ys, uy) map (_.right)
-      case ( Union(a, b, cs),                y)                   => union[J, T](a, b, cs) map ((_, y.embed).right)
-      case (               x,  Union(a, b, cs))                   => union[J, T](a, b, cs) map ((x.embed, _).right)
-      case _                                                      => bottom()
+      case (Bottom(), _) => bottom()
+      case (_, Bottom()) => bottom()
+
+      case (Top(), y) => y map (_.left)
+      case (x, Top()) => x map (_.left)
+
+      case (Simple(x), Simple(y)) if x ≟ y => simple(x)
+      case (Const(x), Const(y)) if x ≟ y => const(x)
+      case (Simple(s), Const(j)) if isSimply(j, s) => const(j)
+      case (Const(j), Simple(s)) if isSimply(j, s) => const(j)
+
+      case (Arr(INil(), None), Arr(ys, uy)) => arr[J, T](ys, uy) map (_.left)
+      case (Arr(xs, ux), Arr(INil(), None)) => arr[J, T](xs, ux) map (_.left)
+      case (Arr(xs, None), Arr(INil(), Some(uy))) => arr[J, LR](xs strengthR uy, None) map (_.right)
+      case (Arr(INil(), Some(ux)), Arr(ys, None)) => arr[J, LR](ys strengthL ux, None) map (_.right)
+
+      case (Arr(xs, ux), Arr(ys, uy)) =>
+        arr[J, LR](
+          xs.alignWith(ys)(_.fold((_, uy | ⊤), (ux | ⊤, _), (_, _))),
+          ux tuple uy).map(_.right)
+
+      case (Map(xs, None), Map(ys, uy)) if xs.isEmpty => map[J, T](ys, uy) map (_.left)
+      case (Map(xs, ux), Map(ys, None)) if ys.isEmpty => map[J, T](xs, ux) map (_.left)
+      case (Map(xs, ux), Map(ys, uy)) =>
+        // NB: We could do a bit better in the scenario where X includes known keys
+        //     not present in Y and Y has unknown keys by taking the glb of the
+        //     product of the keys of (X - Y) and Y's unknown key type.
+        //
+        //     To do this we'd need a way to specify a product or, analogously, the
+        //     glb of more than two types.
+        map[J, LR](
+          xs.alignWith(ys)(_.fold((_, uy ? ⊥ | ⊤), (ux ? ⊥ | ⊤, _), (_, _))),
+          ux.alignWith(uy)(_.fold(
+            _.umap((_, ⊤)),
+            _.umap((⊤, _)),
+            untupled({ case ((xk, xv), (yk, yv)) => ((xk, yk), (xv, yv)) })
+          ))).map(_.right)
+
+      case (Union(a, b, cs), y) => union[J, T](a, b, cs) map ((_, y.embed).right)
+      case (x, Union(a, b, cs)) => union[J, T](a, b, cs) map ((x.embed, _).right)
+
+      case _ => bottom()
     }
   }
 
@@ -263,10 +262,10 @@ object TypeF extends TypeFInstances {
   def primary[J](tf: TypeF[J, _])(
     implicit J: Recursive.Aux[J, EJson]
   ): Option[PrimaryType] = tf match {
-    case Simple(s)                         => some(s.left)
-    case Const(j)                          => some(primaryTypeOf(j))
-    case Arr(_)                            => some(CompositeType.Arr.right)
-    case Map(_, _)                         => some(CompositeType.Map.right)
+    case Simple(s) => some(s.left)
+    case Const(j) => some(primaryTypeOf(j))
+    case Arr(_, _) => some(CompositeType.Arr.right)
+    case Map(_, _) => some(CompositeType.Map.right)
     case Bottom() | Top() | Union(_, _, _) => none
   }
 
@@ -287,7 +286,7 @@ object TypeF extends TypeFInstances {
       ): T =
         ts.toNel match {
           case NonEmptyList(x, ICons(y, zs)) => union[J, T](x, y, zs).embed
-          case NonEmptyList(x,       INil()) => x
+          case NonEmptyList(x, INil()) => x
         }
     }
   }
@@ -378,9 +377,15 @@ private[quasar] sealed abstract class TypeFInstances {
             }
 
           case Type.Arr =>
-            j.decodeKeyS(OfKey) map { a =>
-              TypeF.arr[A, J](a.array.map(_.toIList) <\/ a)
-            }
+            val known = for {
+              a <- j.decodeKeyS(OfKey)
+              js <- Decoded.attempt(a, a.array \/> "Array")
+            } yield IList.fromList(js)
+
+            val unknown =
+              Decoded.success(j.keyS(OtherKey))
+
+            (known |@| unknown)(TypeF.arr[A, J](_, _))
 
           case Type.Map =>
             val known = for {
@@ -405,14 +410,15 @@ private[quasar] sealed abstract class TypeFInstances {
   implicit def encodeEJsonK[A](implicit A: EncodeEJson[A]): EncodeEJsonK[TypeF[A, ?]] =
     new EncodeEJsonK[TypeF[A, ?]] {
       def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[TypeF[A, ?], J] = {
-        case Bottom()        => tlabel(Type.Bottom)
-        case Top()           => tlabel(Type.Top)
-        case Simple(s)       => tlabel(SimpleType.name(s))
-        case Const(a)        => tof(Type.Const, A.encode[J](a))
+        case Bottom() => tlabel(Type.Bottom)
+        case Top() => tlabel(Type.Top)
+        case Simple(s) => tlabel(SimpleType.name(s))
+        case Const(a) => tof(Type.Const, A.encode[J](a))
         case Union(x, y, zs) => tof(Type.Union, EJson.arr((x :: y :: zs).toList : _*))
 
-        case Arr(a) =>
-          tof(Type.Arr, a.leftMap(js => EJson.arr(js.toList : _*)).merge)
+        case Arr(k, u) =>
+          val other = u.strengthL(EJson.str(OtherKey))
+          tof(Type.Arr, EJson.arr(k.toList : _*), other.toList: _*)
 
         case Map(kvs, unk) =>
           val jjs   = kvs.toList.map(_.leftMap(A.encode[J](_)))
@@ -447,12 +453,12 @@ private[quasar] sealed abstract class TypeFInstances {
   implicit def traverse[J]: Traverse[TypeF[J, ?]] =
     new Traverse[TypeF[J, ?]] {
       def traverseImpl[G[_]: Applicative, A, B](tf: TypeF[J, A])(f: A => G[B]): G[TypeF[J, B]] = tf match {
-        case Bottom()        => bottom[J, B]().point[G]
-        case Top()           => top[J, B]().point[G]
-        case Simple(t)       => simple[J, B](t).point[G]
-        case Const(j)        => const[J, B](j).point[G]
-        case Arr(eltsOrLub)  => (eltsOrLub bitraverse (_ traverse f, f)) map (arr[J, B](_))
-        case Map(kn, unk)    => (kn.traverse(f) |@| UT.traverse(unk)(f))(TypeF.map[J, B](_, _))
+        case Bottom() => bottom[J, B]().point[G]
+        case Top() => top[J, B]().point[G]
+        case Simple(t) => simple[J, B](t).point[G]
+        case Const(j) => const[J, B](j).point[G]
+        case Arr(k, u) => (k.traverse(f) |@| u.traverse(f))(TypeF.arr[J, B](_, _))
+        case Map(kn, unk) => (kn.traverse(f) |@| UT.traverse(unk)(f))(TypeF.map[J, B](_, _))
         case Union(x, y, zs) => (f(x) |@| f(y) |@| zs.traverse(f))(union[J, B](_, _, _))
       }
 
@@ -473,18 +479,24 @@ private[quasar] sealed abstract class TypeFInstances {
           } intercalate Cord(", ")
 
         Show.show {
-          case Bottom()              => Cord("⊥")
-          case Simple(t)             => t.show
-          case Const(j)              => showJ(j)
-          case Arr(-\/(as))          => as.show
-          case Arr(\/-(lub))         => lub.show ++ Cord("[]")
-          case Map(kn, Some((k, v))) => Cord("{") ++
-                                          showKnown(kn) ++
-                                          Cord(" ? ") ++ k.show ++ Cord(" : ") ++ v.show ++
-                                        Cord("}")
-          case Map(kn, None)         => Cord("{") ++ showKnown(kn) ++ Cord("}")
-          case Unioned(xs)           => Cord("(") ++ (xs map (_.show) intercalate Cord(" | ")) ++ Cord(")")
-          case Top()                 => Cord("⊤")
+          case Bottom() => Cord("⊥")
+          case Simple(t) => t.show
+          case Const(j) => showJ(j)
+
+          case Arr(k, None) => k.show
+          case Arr(INil(), Some(u)) => u.show ++ Cord("[]")
+          case Arr(k, Some(u)) =>
+            Cord("[") ++ k.map(_.show).intercalate(Cord(", ")) ++ Cord(" ? ") ++ u.show ++ Cord("]")
+
+          case Map(kn, Some((k, v))) =>
+            Cord("{") ++ showKnown(kn) ++ Cord(" ? ") ++ k.show ++ Cord(" : ") ++ v.show ++ Cord("}")
+
+          case Map(kn, None) => Cord("{") ++ showKnown(kn) ++ Cord("}")
+
+          case Unioned(xs) =>
+            Cord("(") ++ (xs map (_.show) intercalate Cord(" | ")) ++ Cord(")")
+
+          case Top() => Cord("⊤")
         }
       }
     }

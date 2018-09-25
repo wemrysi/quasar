@@ -114,32 +114,38 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
       isSubtypeOf[J](m, n) ≟ (isSubtypeOf[J](t, v) && isSubtypeOf[J](u, w))
     }
 
-    "<array> <: []" >> prop { a: IList[T] \/ T =>
-      isSubtypeOf[J](
-        arr[J, T](a           ).embed,
-        arr[J, T](IList().left).embed)
+    "<array> <: []" >> prop { (k: IList[T], u: Option[T]) =>
+      isSubtypeOf[J](arr[J, T](k, u).embed, arr[J, T](IList[T](), None).embed)
     }
 
     "[x, y] <: z[] iff (x <: z) && (y <: z)" >> prop { (a: T, b: T, c: T) =>
       val (x, y, z) = (orT(a), orT(b), orT(c))
       isSubtypeOf[J](
-        arr[J, T](IList(x, y).left).embed,
-        arr[J, T](         z.right).embed
+        arr[J, T](IList(x, y), None).embed,
+        arr[J, T](IList[T](), Some(z)).embed
       ) ≟ (isSubtypeOf[J](x, z) && isSubtypeOf[J](y, z))
     }
 
     "[t, u] <: [v, w] iff (t <: v) && (u <: w)" >> prop { (a: T, b: T, c: T, d: T) =>
       val (t, u, v, w) = (orT(a), orT(b), orT(c), orT(d))
       isSubtypeOf[J](
-        arr[J, T](IList(t, u).left).embed,
-        arr[J, T](IList(v, w).left).embed
+        arr[J, T](IList(t, u), None).embed,
+        arr[J, T](IList(v, w), None).embed
       ) ≟ (isSubtypeOf[J](t, v) && isSubtypeOf[J](u, w))
     }
 
     "[a, b] <: [a]" >> prop { (as: IList[T], b: T) =>
       isSubtypeOf[J](
-        arr[J, T]((as ::: IList(b)).left).embed,
-        arr[J, T]( as.left              ).embed)
+        arr[J, T](as ::: IList(b), None).embed,
+        arr[J, T](as, None).embed)
+    }
+
+    "[a, b, x, y] <: [a, b ? c] iff (x <: c) && (y <: c)" >> prop { (a: T, b: T, c: T, d: T, e: T) =>
+      val (v, w, x, y, z) = (orT(a), orT(b), orT(c), orT(d), orT(e))
+      isSubtypeOf[J](
+        arr[J, T](IList(v, w, x, y), None).embed,
+        arr[J, T](IList(v, w), Some(z)).embed
+      ) ≟ (isSubtypeOf[J](x, z) && isSubtypeOf[J](y, z))
     }
 
     "(x ∧ y) <: x && (x ∧ y) <: y" >> prop { (x: T, y: T) =>

@@ -25,7 +25,6 @@ import quasar.contrib.iota.copkTraverse
 import matryoshka.{Corecursive, Recursive}
 import scalaz.{IList, Order}
 import scalaz.std.option._
-import scalaz.syntax.either._
 import scalaz.syntax.foldable._
 import spire.algebra.Field
 import spire.math.ConvertableTo
@@ -51,11 +50,11 @@ object strings {
       s.toIterable.foldMap(c => some(TypeStat.fromEJson(A.one, EJson.char(c))))
 
     val charArr =
-      charStat.fold(IList.empty[T].left[T]) { ts =>
-        C.embed(envT(ts, TypeST(TypeF.simple(SimpleType.Char)))).right
+      charStat map { ts =>
+        C.embed(envT(ts, TypeST(TypeF.simple(SimpleType.Char))))
       }
 
-    stringTagged(strStat, C.embed(envT(strStat, TypeST(TypeF.arr(charArr)))))
+    stringTagged(strStat, C.embed(envT(strStat, TypeST(TypeF.arr(IList[T](), charArr)))))
   }
 
   def simple[T, J, A](strStat: TypeStat[A]): SSTF[J, A, T] =

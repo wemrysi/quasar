@@ -75,11 +75,11 @@ final class ExtractSstSpec extends quasar.Qspec {
       TypeST(TypeF.map[J, S](IMap(
         J.str("foo") -> envT(
           TypeStat.coll(Real(1), Real(2).some, Real(2).some),
-          TypeST(TypeF.arr[J, S](ints(1, 2).list.left))).embed,
+          TypeST(TypeF.arr[J, S](ints(1, 2).list, None))).embed,
 
         J.str("bar") -> envT(
           TypeStat.coll(Real(1), Real(3).some, Real(3).some),
-          TypeST(TypeF.arr[J, S](ints(1, 2, 3).suml1.right))).embed
+          TypeST(TypeF.arr[J, S](IList[S](), Some(ints(1, 2, 3).suml1)))).embed
       ), None))).embed
 
     verify(config.copy(arrayMaxLength = 2L), input, expected)
@@ -100,9 +100,9 @@ final class ExtractSstSpec extends quasar.Qspec {
             strings.StructuralString,
             envT(
               TypeStat.coll(Real(1), Real(6).some, Real(6).some),
-              TypeST(TypeF.arr[J, S](envT(
+              TypeST(TypeF.arr[J, S](IList[S](), Some(envT(
                 TypeStat.char(strSS("abcdef"), 'a', 'f'),
-                TypeST(TypeF.simple[J, S](SimpleType.Char))).embed.right))
+                TypeST(TypeF.simple[J, S](SimpleType.Char))).embed)))
             ).embed))
           ).embed,
 
@@ -166,7 +166,7 @@ final class ExtractSstSpec extends quasar.Qspec {
                 envT(
                   TypeStat.char(strSS("x"), 'x', 'x'),
                   TypeST(TypeF.const[J, S](J.char('x')))).embed
-              ).left))).embed))).embed,
+              ), None))).embed))).embed,
         envT(
           TypeStat.int(SampleStats.freq(Real(4), Real(1)), BigInt(1), BigInt(1)),
           TypeST(TypeF.const[J, S](J.int(1)))
@@ -214,7 +214,7 @@ final class ExtractSstSpec extends quasar.Qspec {
                 envT(
                   TypeStat.char(strSS("x"), 'x', 'x'),
                   TypeST(TypeF.const[J, S](J.char('x')))).embed
-              ).left))).embed))).embed,
+              ), None))).embed))).embed,
           fourOnes))))).embed
 
     verify(config.copy(mapMaxSize = 3L, retainKeysSize = 2L, unionMaxSize = 1L), input, expected)
@@ -250,7 +250,7 @@ final class ExtractSstSpec extends quasar.Qspec {
                 envT(
                   TypeStat.char(strSS("x"), 'x', 'x'),
                   TypeST(TypeF.const[J, S](J.char('x')))).embed
-              ).left))).embed))).embed,
+              ), None))).embed))).embed,
         envT(
           TypeStat.int(SampleStats.freq(Real(4), Real(1)), BigInt(1), BigInt(1)),
           TypeST(TypeF.const[J, S](J.int(1)))
