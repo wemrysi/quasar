@@ -764,7 +764,7 @@ trait ColumnarTableModule
             val SlicePosition(rSliceId, rpos0, rkstate, rkey, rhead, rtail) = rightPosition
 
             val comparator = Slice.rowComparatorFor(lkey, rkey) {
-              // since we've used the key transforms, and since transforms are contracturally
+              // since we've used the key transforms, and since transforms are contractually
               // forbidden from changing slice size, we can just use all
               _.columns.keys map (_.selector)
             }
@@ -791,9 +791,19 @@ trait ColumnarTableModule
                   // We're currently in a cartesian.
                   if (lpos < lhead.size && rpos < rhead.size) {
                     comparator.compare(lpos, rpos) match {
-                      case LT if rightStartSliceId == rSliceId =>
+                      // Workaround in the following 3 cases:
+                      // Comparator also returns EQ if both are undefined
+                      // However we don't want to treat these as EQ because that
+                      // would *multiply* left rows with right rows.
+                      // We want to *sum* them instead. We can accomplish by
+                      // treating 2 undefineds as if they were LT
+                      case EQ if lkey.isDefinedAt(lpos) =>
+                        ibufs.advanceBoth(lpos, rpos)
+                        buildRemappings(lpos, rpos + 1, rightStart, rightEnd, endRight)
+                      // .. so we treat 2 undefineds as LT instead:
+                      case EQ | LT if rightStartSliceId == rSliceId =>
                         buildRemappings(lpos + 1, rightStartPos, rightStart, Some(rightPosition.copy(pos = rpos)), endRight)
-                      case LT =>
+                      case EQ | LT =>
                         // Transition to emit the current slice and reset the right side, carry rightPosition through
                         RestartRight(leftPosition.copy(pos = lpos + 1), resetMarker, rightPosition.copy(pos = rpos))
                       case GT =>
@@ -813,9 +823,6 @@ trait ColumnarTableModule
                             // Step out of buildRemappings so that we can restart with the current rightEnd
                             SkipRight(leftPosition.copy(pos = lpos), rend)
                         }
-                      case EQ =>
-                        ibufs.advanceBoth(lpos, rpos)
-                        buildRemappings(lpos, rpos + 1, rightStart, rightEnd, endRight)
                     }
                   } else if (lpos < lhead.size) {
                     if (endRight) {
@@ -838,15 +845,21 @@ trait ColumnarTableModule
                   // not currently in a cartesian, hence we can simply proceed.
                   if (lpos < lhead.size && rpos < rhead.size) {
                     comparator.compare(lpos, rpos) match {
-                      case LT =>
+                      // Workaround in the following 2 cases:
+                      // Comparator also returns EQ if both are undefined
+                      // However we don't want to treat these as EQ because that
+                      // would *multiply* left rows with right rows.
+                      // We want to *sum* them instead. We can accomplish by 
+                      // treating 2 undefineds as if they were LT
+                      case EQ if lkey.isDefinedAt(lpos) =>
+                        ibufs.advanceBoth(lpos, rpos)
+                        buildRemappings(lpos, rpos + 1, Some(rightPosition.copy(pos = rpos)), None, endRight)
+                      case EQ | LT =>
                         ibufs.advanceLeft(lpos)
                         buildRemappings(lpos + 1, rpos, None, None, endRight)
                       case GT =>
                         ibufs.advanceRight(rpos)
                         buildRemappings(lpos, rpos + 1, None, None, endRight)
-                      case EQ =>
-                        ibufs.advanceBoth(lpos, rpos)
-                        buildRemappings(lpos, rpos + 1, Some(rightPosition.copy(pos = rpos)), None, endRight)
                     }
                   } else if (lpos < lhead.size) {
                     // right side is exhausted, so we should just split the left and emit
