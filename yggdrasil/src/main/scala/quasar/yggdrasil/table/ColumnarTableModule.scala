@@ -622,9 +622,13 @@ trait ColumnarTableModule
       * Cogroups this table with another table, using equality on the specified
       * transformation on rows of the table.
       */
-    def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1,
-                                                                        rightResultTrans: TransSpec1,
-                                                                        bothResultTrans: TransSpec2)
+    def cogroup(
+      leftKey: TransSpec1,
+      rightKey: TransSpec1,
+      that: Table)(
+      leftResultTrans: TransSpec1,
+      rightResultTrans: TransSpec1,
+      bothResultTrans: TransSpec2)
     : Table = {
 
       // println("Cogrouping with respect to\nleftKey: " + leftKey + "\nrightKey: " + rightKey)
@@ -1030,9 +1034,8 @@ trait ColumnarTableModule
         } // end of step
 
         val initialState = for {
-          // We have to compact both sides to avoid any rows for which the key is completely undefined
-          leftUnconsed <- self.compact(leftKey).slices.uncons
-          rightUnconsed <- that.compact(rightKey).slices.uncons
+          leftUnconsed <- self.slices.uncons
+          rightUnconsed <- that.slices.uncons
 
           back <- {
             val cogroup = for {
