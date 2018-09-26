@@ -131,12 +131,17 @@ final class FederatedShiftedReadPlanner[
       rvalue match {
         case RObject(fields) => shiftInfo.idStatus match {
           case IdOnly =>
-            fields.keys.toList.map(key => RObject((shiftKey, CString(key))))
-          case IncludeId => fields.toList map {
-            case (k, v) => RObject((shiftKey, RArray(CString(k), v)))
-          }
+            fields.foldLeft(List[RValue]()) {
+              case (acc, (k, _)) => RObject((shiftKey, CString(k))) :: acc
+            }
+          case IncludeId =>
+            fields.foldLeft(List[RValue]()) {
+              case (acc, (k, v)) => RObject((shiftKey, RArray(CString(k), v))) :: acc
+            }
           case ExcludeId =>
-            fields.values.toList.map(rv => RObject((shiftKey, rv)))
+            fields.foldLeft(List[RValue]()) {
+              case (acc, (_, v)) => RObject((shiftKey, v)) :: acc
+            }
         }
         case _ =>  Nil // omit rows that cannot be shifted
       }
