@@ -337,9 +337,10 @@ object RenderQScriptDSL {
       Materializer.induct(equiJoinRenderDelay[T],
       Materializer.induct(shiftedReadDirRenderDelay,
       Materializer.induct(shiftedReadFileRenderDelay,
+      Materializer.induct(extraShiftedReadFileRenderDelay,
       Materializer.induct(readDirRenderDelay,
       Materializer.induct(readFileRenderDelay,
-      Materializer.base  (deadEndRenderDelay))))))))))
+      Materializer.base  (deadEndRenderDelay)))))))))))
   }
 
   def freeQSRender[T[_[_]]: RecursiveT]: RenderQScriptDSL[FreeQS[T]] =
@@ -498,30 +499,30 @@ object RenderQScriptDSL {
   def readFileRenderDelay: Delay[RenderQScriptDSL, Const[Read[AFile], ?]] =
     delayRenderConst(
       (base: String, a: Read[AFile]) =>
-        DSLTree(base, "Read[AFile]", (a.path.shows.left :: Nil).some)
-    )
+        DSLTree(base, "Read[AFile]", (a.path.shows.left :: Nil).some))
 
   def readDirRenderDelay: Delay[RenderQScriptDSL, Const[Read[ADir], ?]] =
     delayRenderConst(
       (base: String, a: Read[ADir]) =>
-        DSLTree(base, "Read[ADir]", (a.path.shows.left :: Nil).some)
-    )
+        DSLTree(base, "Read[ADir]", (a.path.shows.left :: Nil).some))
 
   def shiftedReadFileRenderDelay: Delay[RenderQScriptDSL, Const[ShiftedRead[AFile], ?]] =
     delayRenderConst(
       (base: String, a: ShiftedRead[AFile]) =>
-        DSLTree(base, "ShiftedRead[AFile]", (a.path.shows.left :: a.idStatus.shows.left :: Nil).some)
-    )
+        DSLTree(base, "ShiftedRead[AFile]", (a.path.shows.left :: a.idStatus.shows.left :: Nil).some))
+
+  def extraShiftedReadFileRenderDelay: Delay[RenderQScriptDSL, Const[ExtraShiftedRead[AFile], ?]] =
+    delayRenderConst(
+      (base: String, a: ExtraShiftedRead[AFile]) =>
+        DSLTree(base, "ExtraShiftedRead[AFile]", (a.path.shows.left :: a.shiftStatus.shows.left :: Nil).some))
 
   def shiftedReadDirRenderDelay: Delay[RenderQScriptDSL, Const[ShiftedRead[ADir], ?]] =
     delayRenderConst(
       (base: String, a: ShiftedRead[ADir]) =>
-        DSLTree(base, "ShiftedRead[ADir]", (a.path.shows.left :: a.idStatus.shows.left :: Nil).some)
-    )
+        DSLTree(base, "ShiftedRead[ADir]", (a.path.shows.left :: a.idStatus.shows.left :: Nil).some))
 
   def deadEndRenderDelay: Delay[RenderQScriptDSL, Const[DeadEnd, ?]] =
     delayRenderConst(
       (base: String, a: DeadEnd) =>
-        DSLTree(base, "Root", none)
-    )
+        DSLTree(base, "Root", none))
 }
