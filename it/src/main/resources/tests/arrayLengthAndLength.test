@@ -2,14 +2,16 @@
     "name": "Retrieve array length and string length",
 
     "backends": {
-        "lwc_local": "pendingIgnoreFieldOrder",
-        "mimir": "pendingIgnoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
-    "NB": "ch891",
+
     "data": "smallZips.data",
 
-    "query": "select city, array_length(loc, 1) as loc_length, length(city) as city_length from `smallZips.data`",
+    "query": "select city, array_length(loc) as loc_length, length(city) as city_length from `smallZips.data`",
+
     "predicate": "atLeast",
+
     "ignoreResultOrder": true,
 
     "expected": [
