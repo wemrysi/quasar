@@ -16,7 +16,7 @@
 
 package quasar.run
 
-import slamdata.Predef.{Exception, Product, Serializable, Throwable}
+import slamdata.Predef.{Exception, Product, Serializable, String, StringContext, Throwable}
 import quasar.api.datasource.DatasourceError.CreateError
 import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
@@ -74,5 +74,7 @@ object QuasarError {
 
   ////
 
-  private final case class QuasarException(qe: QuasarError) extends Exception
+  private final case class QuasarException(qe: QuasarError) extends Exception {
+    override def toString: String = s"QuasarException: $qe"
+  }
 }

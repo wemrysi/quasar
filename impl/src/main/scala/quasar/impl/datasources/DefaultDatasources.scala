@@ -58,7 +58,7 @@ final class DefaultDatasources[
 
   def datasourceRef(datasourceId: I): F[ExistentialError[I] \/ DatasourceRef[C]] =
     EitherT(lookupRef[ExistentialError[I]](datasourceId))
-    .map(c => control.sanitizeRef(c)).run
+      .map(c => control.sanitizeRef(c)).run
 
   def datasourceStatus(datasourceId: I): F[ExistentialError[I] \/ Condition[Exception]] =
     EitherT(lookupRef[ExistentialError[I]](datasourceId))
