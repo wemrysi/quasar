@@ -70,7 +70,7 @@ package object schema {
         orOriginal(applyTransforms(
           compression.limitStrings[J, A](config.stringMaxLength, config.stringPreserveStructure)))
 
-      compression.limitArrays[J, A](config.arrayMaxLength)
+      compression.limitArrays[J, A](config.arrayMaxLength, config.retainIndicesSize)
         .andThen(_.bimap(_.transAna[SST[J, A]](independent), independent))
     }
 

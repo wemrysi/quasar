@@ -133,7 +133,7 @@ object compression {
   }
 
   /** Replace statically known arrays longer than the given limit with a lub array. */
-  def limitArrays[J: Order, A: Order](maxLength: Natural)(
+  def limitArrays[J: Order, A: Order](maxLength: Natural, retainCount: Natural)(
       implicit
       A : Field[A],
       JR: Recursive.Aux[J, EJson])
@@ -142,13 +142,9 @@ object compression {
       case EnvT((_, TagST(Tagged(strings.StructuralString, _)))) =>
         sst.left
 
-      case EnvT((ts, TypeST(TypeF.Arr(elts @ ICons(h, t), u)))) if elts.length > maxLength.value =>
-        val (cnt, len) = (ts.size, A fromInt elts.length)
-        envT(
-          TypeStat.coll(cnt, some(len), u.fold(some(len))(_ => none)),
-          TypeST(TypeF.arr[J, SST[J, A]](
-            IList[SST[J, A]](),
-            some(NonEmptyList.nel(h, t).suml1) |+| u))).right
+      case EnvT((ts, TypeST(TypeF.Arr(elts, u)))) if elts.length > maxLength.value =>
+        val (ret, lim) = elts.splitAt(retainCount.value.toInt)
+        envT(ts, TypeST(TypeF.arr[J, SST[J, A]](ret, lim.suml1Opt |+| u))).right
 
       case other =>
         other.right

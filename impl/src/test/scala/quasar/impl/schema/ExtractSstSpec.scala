@@ -45,7 +45,7 @@ final class ExtractSstSpec extends quasar.Qspec {
     Show.showFromToString
 
   val J = Fixed[J]
-  val config = SstConfig[J, Real](1000L, 1000L, 1000L, 1000L, true, 1000L)
+  val config = SstConfig[J, Real](1000L, 1000L, 0L, 0L, 1000L, true, 1000L)
 
   def verify(cfg: SstConfig[J, Real], input: List[Data], expected: S) =
     Stream.emits(input)
@@ -83,6 +83,27 @@ final class ExtractSstSpec extends quasar.Qspec {
       ), None))).embed
 
     verify(config.copy(arrayMaxLength = 2L), input, expected)
+  }
+
+  "compress arrays, retaining 1 key" >> {
+    val input = List(
+      _obj(ListMap("foo" -> _arr(List(_int(1), _int(2))))),
+      _obj(ListMap("bar" -> _arr(List(_int(1), _int(2), _int(3)))))
+    )
+
+    val expected = envT(
+      TypeStat.coll(Real(2), Real(1).some, Real(1).some),
+      TypeST(TypeF.map[J, S](IMap(
+        J.str("foo") -> envT(
+          TypeStat.coll(Real(1), Real(2).some, Real(2).some),
+          TypeST(TypeF.arr[J, S](ints(1, 2).list, None))).embed,
+
+        J.str("bar") -> envT(
+          TypeStat.coll(Real(1), Real(3).some, Real(3).some),
+          TypeST(TypeF.arr[J, S](ints(1).list, Some(ints(2, 3).suml1)))).embed
+      ), None))).embed
+
+    verify(config.copy(arrayMaxLength = 2L, retainIndicesSize = 1L), input, expected)
   }
 
   "compress long strings" >> {

@@ -328,8 +328,8 @@ final class CompressionSpec extends quasar.Qspec
       val coll = TypeStat.coll(Real(1), rlen, rlen)
       val lubarr = envT(coll, TypeST(TypeF.arr[J, S](IList[S](), Some(sum)))).embed
 
-      val req = xsst.elgotApo[S](compression.limitArrays(alen))
-      val rlt = xsst.elgotApo[S](compression.limitArrays(lt))
+      val req = xsst.elgotApo[S](compression.limitArrays(alen, 0L))
+      val rlt = xsst.elgotApo[S](compression.limitArrays(lt, 0L))
 
       (req must_= xsst) and (rlt must_= lubarr)
     }}
@@ -340,8 +340,28 @@ final class CompressionSpec extends quasar.Qspec
       val lim: Natural = Natural((s.length - 1).toLong) getOrElse 0L
       val stringSst = strings.widen[J, Real](Real(1), s).embed
 
-      stringSst.elgotApo[S](compression.limitArrays(lim)) must_= stringSst
+      stringSst.elgotApo[S](compression.limitArrays(lim, 0L)) must_= stringSst
     }}
+
+    "preserves the first k indices" >> {
+      val a = BigInt(1)
+      val b = BigInt(2)
+      val c = BigInt(3)
+      val d = BigInt(4)
+
+      val rlen = Real(4).some
+      val ints = NonEmptyList(J.int(a), J.int(b), J.int(c), J.int(d))
+      val xsst = SST.fromEJson(Real(1), J.arr(ints.toList))
+
+      val known = IList(J.int(a), J.int(b)).map(SST.fromEJson(Real(1), _))
+      val sum = NonEmptyList(J.int(c), J.int(d)).foldMap1(SST.fromEJson(Real(1), _))
+      val coll = TypeStat.coll(Real(1), rlen, rlen)
+      val exp = envT(coll, TypeST(TypeF.arr[J, S](known, Some(sum)))).embed
+
+      val res = xsst.elgotApo[S](compression.limitArrays(3L, 2L))
+
+      res must_= exp
+    }
   }
 
   "limitStrings" >> {
