@@ -416,12 +416,12 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       "perform deepmap1 using numeric coercion" in testDeepMap1CoerceToDouble
       "perform map1 using numeric coercion" in testMap1CoerceToDouble
       "fail to map1 into array and object" in testMap1ArrayObject
-      "perform a less trivial map1" in checkMap1.pendingUntilFixed
+      "perform a less trivial map1" in checkMap1
 
       //"give the identity transform for the trivial filter" in checkTrivialFilter // FIXME qz-3775
       "give the identity transform for the trivial 'true' filter" in checkTrueFilter
-      //"give the identity transform for a nontrivial filter" in checkFilter.pendingUntilFixed // FIXME qz-3775
-      "give a transformation for a big decimal and a long" in testMod2Filter.pendingUntilFixed
+      "give the identity transform for a nontrivial filter" in checkFilter
+      "give a transformation for a big decimal and a long" in testMod2Filter
 
       "perform an object dereference" in checkObjectDeref
       "perform an array dereference" in checkArrayDeref
@@ -538,7 +538,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       "perform a ToNumber transformation resulting in big decimals" in testToNumberBigDecimals
       "perform a ToNumber transformation resulting in a mix of longs, doubles and big decimals" in testToNumberMix
 
-      //"check cond" in checkCond.pendingUntilFixed // FIXME qz-3775
+      "check cond" in checkCond
     }
 
     "in compact" >> {

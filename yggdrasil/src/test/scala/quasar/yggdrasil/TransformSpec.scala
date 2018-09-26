@@ -116,13 +116,12 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
       val results = toJson(table.transform {
         Map1(
           DerefObjectStatic(Leaf(Source), CPathField("value")),
-          lookupF2(Nil, "mod").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(0)))
+          lookupF2(Nil, "add").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(2)))
       })
 
       val expected = sample.data.map(_.toJValue) flatMap { jv =>
         (jv \ "value") match {
-          case JNum(x) if x % 2 == 0 => Some(JBool(true))
-          case JNum(_) => Some(JBool(false))
+          case JNum(x) => if (x + 2 == 2) Some(JBool(true)) else Some(JBool(false))
           case _ => None
         }
       }
@@ -172,14 +171,14 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
           Leaf(Source),
           Map1(
             DerefObjectStatic(Leaf(Source), CPathField("value")),
-            lookupF2(Nil, "mod").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(0))
+            lookupF2(Nil, "add").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(2))
           )
         )
       })
 
       val expected = sample.data.map(_.toJValue) flatMap { jv =>
         (jv \ "value") match {
-          case JNum(x) if x % 2 == 0 => Some(jv)
+          case JNum(x) => if (x + 2 == 2) Some(jv) else None
           case _ => None
         }
       }
@@ -195,7 +194,11 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         "key":[7.0]
       },
       {
-        "value":-4611686018427387904,
+        "value":-4611686017,
+        "key":[6.0]
+      },
+      {
+        "value":-4611686018,
         "key":[5.0]
       }]""")
 
@@ -209,20 +212,18 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
 
     val results = toJson(table.transform {
       Filter(Leaf(Source),
-      Map1(
-        DerefObjectStatic(Leaf(Source), CPathField("value")),
-        lookupF2(Nil, "mod").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(0)))
-      )
+        Map1(
+          DerefObjectStatic(Leaf(Source), CPathField("value")),
+          lookupF2(Nil, "mod").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(0))))
     })
 
-    val expected = data flatMap { jv =>
-      (jv \ "value") match {
-        case JNum(x) if x % 2 == 0 => Some(jv)
-        case _                     => None
-      }
-    }
-
-    results.getJValues must_== expected
+    results.getJValues must_== List(
+      JObject(Map(
+        ("value", JNumBigDec(-6.846973248137671E+307)),
+        ("key", JArray(List(JNumDouble(7.0)))))),
+      JObject(Map(
+        ("value", JNumLong(-4611686018L)),
+        ("key", JArray(List(JNumDouble(5.0)))))))
   }
 
   def checkMetaDeref = {
@@ -2226,14 +2227,14 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         Cond(
           Map1(
             DerefObjectStatic(Leaf(Source), CPathField("value")),
-            lookupF2(Nil, "mod").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(0))),
+            lookupF2(Nil, "add").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(2))),
           DerefObjectStatic(Leaf(Source), CPathField("value")),
           ConstLiteral(CBoolean(false), Leaf(Source)))
       })
 
       val expected = sample.data.map(_.toJValue) flatMap { jv =>
         (jv \ "value") match {
-          case jv @ JNum(x) => Some(if (x % 2 == 0) jv else JBool(false))
+          case jv @ JNum(x) => if (x + 2 == 2) Some(jv) else Some(JBool(false))
           case _ => None
         }
       }
