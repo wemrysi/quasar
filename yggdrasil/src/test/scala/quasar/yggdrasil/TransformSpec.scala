@@ -21,7 +21,7 @@ import quasar.pkg.tests._
 import quasar.precog.common._
 import quasar.yggdrasil.TestIdentities._
 import quasar.yggdrasil.bytecode._
-import quasar.yggdrasil.table.CFN
+import quasar.yggdrasil.table.{cf, CFN}
 
 import scala.util.Random
 
@@ -48,7 +48,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
   def testMap1IntLeaf = {
     val sample = (-10 to 10).map(JNum(_)).toStream
     val table = fromSample(SampleData(sample))
-    val results = toJson(table.transform { Map1(Leaf(Source), lookupF1(Nil, "negate")) })
+    val results = toJson(table.transform { Map1(Leaf(Source), cf.math.Negate) })
 
     results.getJValues must_== (-10 to 10).map(x => JNum(-x))
   }
@@ -62,7 +62,8 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     val sample = SampleData(data)
     val table = fromSample(sample)
 
-    val results = toJson(table.transform { Map1(DerefObjectStatic(Leaf(Source), CPathField("value")), lookupF1(Nil, "negate")) })
+    val results = toJson(table.transform { Map1(DerefObjectStatic(Leaf(Source), CPathField("value")), cf.math.Negate) })
+
     val expected = Stream(JNum(-20))
 
     results.getJValues mustEqual expected
@@ -80,7 +81,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     val sample = SampleData(data)
     val table = fromSample(sample)
 
-    val results = toJson(table.transform { DeepMap1(DerefObjectStatic(Leaf(Source), CPathField("value")), lookupF1(Nil, "coerceToDouble")) })
+    val results = toJson(table.transform { DeepMap1(DerefObjectStatic(Leaf(Source), CPathField("value")), cf.util.CoerceToDouble) })
     val expected = Stream(JNum(12), JNum(34.5), JNum(31.9), JObject(JField("baz", JNum(31)) :: Nil), JNum(20))
 
     results.unsafeRunSync must haveSize(5)
@@ -100,7 +101,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     val sample = SampleData(data)
     val table = fromSample(sample)
 
-    val results = toJson(table.transform { Map1(DerefObjectStatic(Leaf(Source), CPathField("value")), lookupF1(Nil, "coerceToDouble")) })
+    val results = toJson(table.transform { Map1(DerefObjectStatic(Leaf(Source), CPathField("value")), cf.util.CoerceToDouble) })
     val expected = Stream(JNum(12), JNum(34.5), JNum(31.9), JNum(20))
 
     results.unsafeRunSync must haveSize(4)
@@ -116,7 +117,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
       val results = toJson(table.transform {
         Map1(
           DerefObjectStatic(Leaf(Source), CPathField("value")),
-          lookupF2(Nil, "add").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(2)))
+          cf.math.Add.applyr(CLong(2)) andThen cf.std.Eq.applyr(CLong(2)))
       })
 
       val expected = sample.data.map(_.toJValue) flatMap { jv =>
@@ -154,7 +155,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
           Leaf(Source),
           Map1(
             DerefObjectStatic(Leaf(Source), CPathField("value")),
-            lookupF2(Nil, "add").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(2))
+            cf.math.Add.applyr(CLong(2)) andThen cf.std.Eq.applyr(CLong(2))
           )
         )
       })
@@ -197,7 +198,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
       Filter(Leaf(Source),
         Map1(
           DerefObjectStatic(Leaf(Source), CPathField("value")),
-          lookupF2(Nil, "mod").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(0))))
+          cf.math.Mod.applyr(CLong(2)) andThen cf.std.Eq.applyr(CLong(0))))
     })
 
     results.getJValues must_== List(
@@ -273,8 +274,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         Map2(
           DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value1")),
           DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value2")),
-          lookupF2(Nil, "eq")
-        )
+          cf.std.Eq)
       })
 
       val expected = sample.data.map(_.toJValue) flatMap { jv =>
@@ -297,8 +297,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         Map2(
           DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value1")),
           DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value2")),
-          lookupF2(Nil, "add")
-        )
+          cf.math.Add)
       })
 
       val expected = sample.data.map(_.toJValue) flatMap { jv =>
@@ -326,7 +325,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     val results = toJson(table.transform { Map2(
       DerefObjectStatic(Leaf(Source), CPathField("value1")),
       DerefObjectStatic(Leaf(Source), CPathField("value2")),
-      lookupF2(Nil, "add"))
+      cf.math.Add)
     })
     val expected = Stream(JNum(80))
 
@@ -2210,7 +2209,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         Cond(
           Map1(
             DerefObjectStatic(Leaf(Source), CPathField("value")),
-            lookupF2(Nil, "add").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(2))),
+            cf.math.Add.applyr(CLong(2)) andThen cf.std.Eq.applyr(CLong(2))),
           DerefObjectStatic(Leaf(Source), CPathField("value")),
           ConstLiteral(CBoolean(false), Leaf(Source)))
       })
