@@ -119,6 +119,7 @@ final class FederatedShiftedReadPlanner[
     queryResult.to[F].flatMap(tableFromStream(_, shiftInfo))
   }
 
+  // we do not preserve the order of shifted results
   private def tableFromStream(
       rvalues: Stream[IO, RValue],
       shift: Option[ShiftInfo])(
@@ -151,11 +152,10 @@ final class FederatedShiftedReadPlanner[
       shift match {
         case None => rvalues
         case Some(shiftInfo) =>
-          rvalues.mapSegments(s =>
-            s.flatMap(rv => Segment.seq(shiftRValue(rv, shiftInfo)))
-              .force
-              .toChunk
-              .toSegment)
+          rvalues.mapChunks(chunk =>
+            Segment.seq(chunk.foldLeft(List[RValue]()) {
+              case (acc, rv) => shiftRValue(rv, shiftInfo) ::: acc
+            }))
       }
 
     P.Table.fromRValueStream[F](shiftedRValues) map { table =>
