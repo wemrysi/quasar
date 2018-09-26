@@ -29,7 +29,7 @@ import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 
 /* LeftShift(
- *   ShitedRead(path, ExcludeId),
+ *   ShiftedRead(path, ExcludeId),
  *   Hole,
  *   shiftStatus,
  *   ShiftType.Map,
