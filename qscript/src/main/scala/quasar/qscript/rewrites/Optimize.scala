@@ -49,7 +49,7 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     case qc @ LeftShift(Embed(src), struct, shiftStatus, ShiftType.Map, OnUndefined.Omit, repair)
         if struct === HoleR => {
 
-      val key = ShiftKey("shifted")
+      val key = ShiftKey(ShiftedKey)
 
       val mfOpt: Option[FreeMap] =
         repair.traverseM[Option, Hole] {

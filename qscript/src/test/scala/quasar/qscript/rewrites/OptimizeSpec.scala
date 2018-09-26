@@ -89,12 +89,12 @@ object OptimizeSpec extends Qspec {
             fixE.ExtraShiftedRead[AFile](
               rootDir </> file("foo"),
               IncludeId,
-              ShiftKey("shifted")),
+              ShiftKey(ShiftedKey)),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
-                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, "shifted"), 0)),
+                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 0)),
               recFuncE.MakeMapS("v1",
-                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, "shifted"), 1))))
+                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 1))))
 
         extraShift(initial) must equal(expected)
       }
@@ -114,9 +114,9 @@ object OptimizeSpec extends Qspec {
             fixE.ExtraShiftedRead[AFile](
               rootDir </> file("foo"),
               IdOnly,
-              ShiftKey("shifted")),
+              ShiftKey(ShiftedKey)),
             recFuncE.MakeMapS("k1",
-              recFuncE.ProjectKeyS(recFuncE.Hole, "shifted")))
+              recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
 
         extraShift(initial) must equal(expected)
       }
@@ -136,9 +136,9 @@ object OptimizeSpec extends Qspec {
             fixE.ExtraShiftedRead[AFile](
               rootDir </> file("foo"),
               ExcludeId,
-              ShiftKey("shifted")),
+              ShiftKey(ShiftedKey)),
             recFuncE.MakeMapS("v1",
-              recFuncE.ProjectKeyS(recFuncE.Hole, "shifted")))
+              recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
 
         extraShift(initial) must equal(expected)
       }
