@@ -1,0 +1,30 @@
+{
+    "name": "[qa_s07] self left outer join",
+
+    "backends": {
+        "lwc_local": "pendingIgnoreFieldOrder",
+        "mimir": "pendingIgnoreFieldOrder"
+    },
+
+    "data": "selfjoin.data",
+
+    "query": "select t1.a, t2.b, t1.nr as nr1, t2.nr as nr2 FROM
+              `selfjoin.data` as t1
+              LEFT OUTER JOIN
+              `selfjoin.data` as t2
+              ON t1.a = t2.b",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
+    "expected": [
+        {"a":1,"b":1,"nr1":1,"nr2":4},
+        {"a":2,"nr1":2},
+        {"a":2,"nr1":7},
+        {"a":3,"nr1":3},
+        {"a":6,"b":6,"nr1":8,"nr2":8},
+        {"nr1":4},
+        {"nr1":5},
+        {"nr1":6}
+    ]
+}
