@@ -418,7 +418,6 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       "fail to map1 into array and object" in testMap1ArrayObject
       "perform a less trivial map1" in checkMap1
 
-      //"give the identity transform for the trivial filter" in checkTrivialFilter // FIXME qz-3775
       "give the identity transform for the trivial 'true' filter" in checkTrueFilter
       "give the identity transform for a nontrivial filter" in checkFilter
       "give a transformation for a big decimal and a long" in testMod2Filter

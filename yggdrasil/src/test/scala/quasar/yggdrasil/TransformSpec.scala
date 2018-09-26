@@ -130,23 +130,6 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     }
   }
 
-  /* Do we want to allow non-boolean sets to be used as filters without an explicit existence predicate?
-  def checkTrivialFilter = {
-    implicit val gen = sample(schema)
-    prop { (sample: SampleData) =>
-      val table = fromSample(sample)
-      val results = toJson(table.transform {
-        Filter(
-          Leaf(Source),
-          Leaf(Source)
-        )
-      })
-
-      results.getJValues must_== sample.data
-    }
-  }
-  */
-
   def checkTrueFilter = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
