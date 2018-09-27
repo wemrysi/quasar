@@ -60,7 +60,8 @@ object Command {
   private val TableCancelPrepPattern       = """(?i)table(?: +)(?:cancelPreparation +|cancel +)([\S]+)""".r
   private val TablePreparedDataPattern     = """(?i)table(?: +)(?:preparedData +|data +)([\S]+)""".r
   private val ResourceSchemaPattern        = "(?i)schema +(.+)".r
-  private val ExplainPattern               = """(?i)(?:explain|compile)(?: +)(.*\S)""".r
+  private val ExplainPattern               = """(?i)(?:explain)(?: +)(.*\S)""".r
+  private val CompilePattern               = """(?i)(?:compile)(?: +)(.*\S)""".r
 
   final case object Exit extends Command
   final case object NoOp extends Command
@@ -70,6 +71,7 @@ object Command {
   final case class Cd(dir: ReplPath) extends Command
   final case class Select(query: Query) extends Command
   final case class Explain(query: Query) extends Command
+  final case class Compile(query: Query) extends Command
   final case class Ls(dir: Option[ReplPath]) extends Command
   final case class Debug(level: DebugLevel) extends Command
   final case class SummaryCount(rows: Int) extends Command
@@ -126,6 +128,7 @@ object Command {
       case TablePreparedDataPattern(UuidString(u))  => TablePreparedData(u)
       case ResourceSchemaPattern(ReplPath(path))    => ResourceSchema(path)
       case ExplainPattern(s)                        => Explain(Query(s))
+      case CompilePattern(s)                        => Compile(Query(s))
       case _                                        => Select(Query(input))
     }
 }

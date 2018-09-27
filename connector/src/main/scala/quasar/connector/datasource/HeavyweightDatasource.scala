@@ -17,6 +17,7 @@
 package quasar.connector.datasource
 
 import quasar.RenderTreeT
+import quasar.common.PhaseResultTell
 import quasar.connector.{Datasource, QScriptEvaluator}
 import quasar.qscript.{MonadPlannerErr, QScriptEducated}
 
@@ -26,7 +27,7 @@ import scalaz.Monad
 /** A Datasource capable of executing QScript. */
 abstract class HeavyweightDatasource[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: MonadPlannerErr,
+    F[_]: Monad: MonadPlannerErr: PhaseResultTell,
     G[_],
     R]
     extends QScriptEvaluator[T, F, R]

@@ -34,6 +34,9 @@ import iotaz.{CopK, TListK}
 
 @SuppressWarnings(Array("org.wartremover.warts.ImplicitConversion"))
 object RenderTree extends RenderTreeInstances {
+  def contramap[A, B: RenderTree](f: A => B): RenderTree[A] =
+    new RenderTree[A] { def render(v: A) = RenderTree[B].render(f(v)) }
+
   def make[A](f: A => RenderedTree): RenderTree[A] =
     new RenderTree[A] { def render(v: A) = f(v) }
 

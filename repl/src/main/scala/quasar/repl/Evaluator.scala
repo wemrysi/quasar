@@ -338,6 +338,14 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       case Explain(q) =>
         for {
           state <- stateRef.get
+          sql = SqlQuery(q, state.variables, toADir(state.cwd))
+          (_, phaseResults) <- PhaseResultListen[F].listen(evaluateQuery(sql, state.summaryCount))
+          log = printLog(Order[DebugLevel].max(DebugLevel.Normal, state.debugLevel), state.phaseFormat, phaseResults)
+        } yield Stream.emits(log.toList)
+
+      case Compile(q) =>
+        for {
+          state <- stateRef.get
           (_, phaseResults) <- PhaseResultListen[F].listen(
             Sql2QueryEvaluator.sql2ToQScript[Fix, F](SqlQuery(q, state.variables, toADir(state.cwd))))
           log = printLog(Order[DebugLevel].max(DebugLevel.Normal, state.debugLevel), state.phaseFormat, phaseResults)
