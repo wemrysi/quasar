@@ -191,6 +191,11 @@ object ShiftRead {
       : ShiftRead.Aux[T, Const[ShiftedRead[A], ?], F] =
     default
 
+  implicit def extraShiftedRead[T[_[_]], F[a] <: ACopK[a], A]
+    (implicit SR: Const[ExtraShiftedRead[A], ?] :<<: F)
+      : ShiftRead.Aux[T, Const[ExtraShiftedRead[A], ?], F] =
+    default
+
   implicit def projectBucket[T[_[_]], F[a] <: ACopK[a]]
     (implicit PB: ProjectBucket[T, ?] :<<: F)
       : ShiftRead.Aux[T, ProjectBucket[T, ?], F] =

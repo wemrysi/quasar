@@ -22,12 +22,12 @@ import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.impl.evaluate.{Source => EvalSource}
 import quasar.mimir._, MimirCake._
-import quasar.precog.common.RValue
+import quasar.precog.common.{CString, RArray, RObject, RValue}
 import quasar.qscript._, PlannerError.InternalError
 import quasar.yggdrasil.{MonadFinalizers, TransSpecModule}
 
 import cats.effect.{IO, LiftIO}
-import fs2.Stream
+import fs2.{Segment, Stream}
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -42,36 +42,15 @@ final class FederatedShiftedReadPlanner[
   type Assocs = Associates[T, IO]
   type M[A] = AssociatesT[T, F, IO, A]
 
+  type Read[A] = Const[ShiftedRead[AFile], A] \/ Const[ExtraShiftedRead[AFile], A]
+
   def plan(implicit ec: ExecutionContext)
-      : AlgebraM[M, Const[ShiftedRead[AFile], ?], MimirRepr] = {
-    case Const(ShiftedRead(file, status)) =>
-      Kleisli.ask[F, Assocs].map(_(file)) andThenK { maybeSource =>
-        for {
-          source <- MonadPlannerErr[F].unattempt_(
-            maybeSource \/> InternalError.fromMsg(s"No source for '${posixCodec.printPath(file)}'."))
+      : AlgebraM[M, Read, MimirRepr] = {
+    case -\/(Const(ShiftedRead(file, status))) =>
+      planRead(file, status, None)
 
-          tbl <- sourceTable(source)
-
-          repr = MimirRepr(P)(tbl)
-        } yield {
-          import repr.P.trans._
-
-          status match {
-            case IdOnly =>
-              repr.map(_.transform(constants.SourceKey.Single))
-
-            case IncludeId =>
-              val ids = constants.SourceKey.Single
-              val values = constants.SourceValue.Single
-
-              // note that ids are already an array
-              repr.map(_.transform(InnerArrayConcat(ids, WrapArray(values))))
-
-            case ExcludeId =>
-              repr.map(_.transform(constants.SourceValue.Single))
-          }
-        }
-      }
+    case \/-(Const(ExtraShiftedRead(file, shiftStatus, shiftKey))) =>
+      planRead(file, ExcludeId, Some(ShiftInfo(shiftStatus, shiftKey)))
   }
 
   ////
@@ -80,7 +59,43 @@ final class FederatedShiftedReadPlanner[
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
 
-  private def sourceTable(source: EvalSource[QueryAssociate[T, IO]])(implicit ec: ExecutionContext)
+  private final case class ShiftInfo(idStatus: IdStatus, shiftKey: ShiftKey)
+
+  private def planRead(file: AFile, readStatus: IdStatus, shiftInfo: Option[ShiftInfo])(
+      implicit ec: ExecutionContext)
+      : M[MimirRepr] =
+    Kleisli.ask[F, Assocs].map(_(file)) andThenK { maybeSource =>
+      for {
+        source <- MonadPlannerErr[F].unattempt_(
+          maybeSource \/> InternalError.fromMsg(s"No source for '${posixCodec.printPath(file)}'."))
+
+        tbl <- sourceTable(source, shiftInfo)
+
+        repr = MimirRepr(P)(tbl)
+      } yield {
+        import repr.P.trans._
+
+        readStatus match {
+          case IdOnly =>
+            repr.map(_.transform(constants.SourceKey.Single))
+
+          case IncludeId =>
+            val ids = constants.SourceKey.Single
+            val values = constants.SourceValue.Single
+
+            // note that ids are already an array
+            repr.map(_.transform(InnerArrayConcat(ids, WrapArray(values))))
+
+          case ExcludeId =>
+            repr.map(_.transform(constants.SourceValue.Single))
+        }
+      }
+    }
+
+  private def sourceTable(
+      source: EvalSource[QueryAssociate[T, IO]],
+      shiftInfo: Option[ShiftInfo])(
+      implicit ec: ExecutionContext)
       : F[P.Table] = {
     val queryResult =
       source.src match {
@@ -101,13 +116,49 @@ final class FederatedShiftedReadPlanner[
           f(shiftedRead)
       }
 
-    queryResult.to[F].flatMap(tableFromStream)
+    queryResult.to[F].flatMap(tableFromStream(_, shiftInfo))
   }
 
-  private def tableFromStream(s: Stream[IO, RValue])(implicit ec: ExecutionContext)
+  // we do not preserve the order of shifted results
+  private def tableFromStream(
+      rvalues: Stream[IO, RValue],
+      shift: Option[ShiftInfo])(
+      implicit ec: ExecutionContext)
       : F[P.Table] = {
 
-    P.Table.fromRValueStream[F](s) map { table =>
+    def shiftRValue(rvalue: RValue, shiftInfo: ShiftInfo): List[RValue] = {
+      val shiftKey: String = shiftInfo.shiftKey.key
+
+      rvalue match {
+        case RObject(fields) => shiftInfo.idStatus match {
+          case IdOnly =>
+            fields.foldLeft(List[RValue]()) {
+              case (acc, (k, _)) => RObject((shiftKey, CString(k))) :: acc
+            }
+          case IncludeId =>
+            fields.foldLeft(List[RValue]()) {
+              case (acc, (k, v)) => RObject((shiftKey, RArray(CString(k), v))) :: acc
+            }
+          case ExcludeId =>
+            fields.foldLeft(List[RValue]()) {
+              case (acc, (_, v)) => RObject((shiftKey, v)) :: acc
+            }
+        }
+        case _ =>  Nil // omit rows that cannot be shifted
+      }
+    }
+
+    val shiftedRValues: Stream[IO, RValue] =
+      shift match {
+        case None => rvalues
+        case Some(shiftInfo) =>
+          rvalues.mapChunks(chunk =>
+            Segment.seq(chunk.foldLeft(List[RValue]()) {
+              case (acc, rv) => shiftRValue(rv, shiftInfo) ::: acc
+            }))
+      }
+
+    P.Table.fromRValueStream[F](shiftedRValues) map { table =>
 
       import P.trans._
 

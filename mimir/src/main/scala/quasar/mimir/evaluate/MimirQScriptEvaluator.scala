@@ -32,7 +32,6 @@ import quasar.qscript._
 import quasar.qscript.rewrites.{Optimize, Unirewrite}
 import quasar.yggdrasil.MonadFinalizers
 
-import slamdata.Predef.String
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext
 
@@ -44,6 +43,7 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._
 import scalaz.syntax.monad._
+import scalaz.syntax.either._
 import shims._
 
 final class MimirQScriptEvaluator[
@@ -56,28 +56,35 @@ final class MimirQScriptEvaluator[
   type MT[X[_], A] = Kleisli[X, Associates[T, IO], A]
   type M[A] = MT[F, A]
 
-  type QS[U[_[_]]] =
+  type QSRewrite[U[_[_]]] =
     QScriptCore[U, ?]            :::
     EquiJoin[U, ?]               :::
     Const[ShiftedRead[AFile], ?] :::
     TNilK
 
+  type QS[U[_[_]]] = Const[ExtraShiftedRead[AFile], ?] ::: QSRewrite[U]
+
   type Repr = MimirRepr
 
-  implicit def QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]] =
-    SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]]
+  implicit def QSMToQScriptTotal: Injectable[QSMRewrite, QScriptTotal[T, ?]] =
+    SubInject[CopK[QSRewrite[T], ?], QScriptTotal[T, ?]]
 
+  implicit def QSMRewriteToQSM: Injectable[QSMRewrite, QSM] =
+    SubInject[CopK[QSRewrite[T], ?], CopK[QS[T], ?]]
+
+  def QSMRewriteFunctor: Functor[QSMRewrite] = Functor[QSMRewrite]
   def QSMFunctor: Functor[QSM] = Functor[QSM]
 
-  def UnirewriteT: Unirewrite[T, QS[T]] = implicitly[Unirewrite[T, QS[T]]]
+  def UnirewriteT: Unirewrite[T, QSRewrite[T]] =
+    implicitly[Unirewrite[T, QSRewrite[T]]]
 
-  def optimize: QSM[T[QSM]] => QSM[T[QSM]] = Optimize[T, QSM]
+  def optimize: QSMRewrite[T[QSM]] => QSM[T[QSM]] =
+    Optimize[T, QSM, QSMRewrite, AFile]
 
   def toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
-    _.cata[T[QScriptTotal[T, ?]]](implicitly[Injectable[QSM, QScriptTotal[T, ?]]].inject(_).embed)
+    _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]].inject(_).embed)
 
-  def execute(repr: Repr): M[Repr] =
-    repr.point[M]
+  def execute(repr: Repr): M[Repr] = repr.point[M]
 
   def plan(cp: T[QSM]): M[Repr] = {
     def qScriptCorePlanner =
@@ -96,7 +103,7 @@ final class MimirQScriptEvaluator[
       _ match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value.left)
         case _ => errorImpossible
       }
     }
@@ -105,11 +112,13 @@ final class MimirQScriptEvaluator[
       val QScriptCore = CopK.Inject[QScriptCore[T, ?],            QSM]
       val EquiJoin    = CopK.Inject[EquiJoin[T, ?],               QSM]
       val ShiftedRead = CopK.Inject[Const[ShiftedRead[AFile], ?], QSM]
+      val ExtraShiftedRead = CopK.Inject[Const[ExtraShiftedRead[AFile], ?], QSM]
 
       in match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value.left)
+        case ExtraShiftedRead(value) => shiftedReadPlanner.plan(ec)(value.right)
       }
     }
 

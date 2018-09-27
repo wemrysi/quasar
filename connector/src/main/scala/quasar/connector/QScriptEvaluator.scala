@@ -38,15 +38,20 @@ abstract class QScriptEvaluator[
     F[_]: Monad: MonadPlannerErr: PhaseResultTell,
     R] {
 
-  /** QScript used by this evaluator. */
+  /** QScript used by this evaluator in Unirewrite. */
+  type QSRewrite[U[_[_]]] <: TListK
+  type QSMRewrite[A] = CopK[QSRewrite[T], A]
+
+  /** QScript used by this evaluator in planning. */
   type QS[U[_[_]]] <: TListK
   type QSM[A] = CopK[QS[T], A]
 
   /** Executable representation. */
   type Repr
 
+  def QSMRewriteFunctor: Functor[QSMRewrite]
   def QSMFunctor: Functor[QSM]
-  def UnirewriteT: Unirewrite[T, QS[T]]
+  def UnirewriteT: Unirewrite[T, QSRewrite[T]]
 
   /** Returns the result of executing the `Repr`. */
   def execute(repr: Repr): F[R]
@@ -55,7 +60,7 @@ abstract class QScriptEvaluator[
   def plan(cp: T[QSM]): F[Repr]
 
   /** Rewrites the qscript to prepare for optimal evaluation. */
-  def optimize: QSM[T[QSM]] => QSM[T[QSM]]
+  def optimize: QSMRewrite[T[QSM]] => QSM[T[QSM]]
 
   def toTotal: T[QSM] => T[QScriptTotal[T, ?]]
 
@@ -65,12 +70,14 @@ abstract class QScriptEvaluator[
 
   def evaluate(qsr: T[QScriptEducated[T, ?]]): F[R] =
     for {
-      shifted <- Unirewrite[T, QS[T], F](new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
+      shifted <- Unirewrite[T, QSRewrite[T], F](
+        new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
       optimized <- phase[F][T[QSM]]("QScript (Optimized)", shifted.transCata[T[QSM]](optimize))
       repr <- plan(optimized)
       result <- execute(repr)
     } yield result
 
+  private final implicit def _QSMRewriteFunctor: Functor[QSMRewrite] = QSMRewriteFunctor
   private final implicit def _QSMFunctor: Functor[QSM] = QSMFunctor
-  private final implicit def _UnirewriteT: Unirewrite[T, QS[T]] = UnirewriteT
+  private final implicit def _UnirewriteT: Unirewrite[T, QSRewrite[T]] = UnirewriteT
 }

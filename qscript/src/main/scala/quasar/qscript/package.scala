@@ -57,6 +57,11 @@ import iotaz.TListK.:::
 //     operation that doesn’t include the cross portion.
 package object qscript {
 
+  /** The key that wraps the shifted RValues in the evaluation of
+   *  an ExtraShiftedRead.
+   */
+  val ShiftedKey: String = "shifted"
+
   type MonadPlannerErr[F[_]] = MonadError_[F, PlannerError]
   def MonadPlannerErr[F[_]](implicit ev: MonadPlannerErr[F]): MonadPlannerErr[F] = ev
 
@@ -71,6 +76,7 @@ package object qscript {
      ::: EquiJoin[T, ?]
      ::: Const[ShiftedRead[ADir], ?]
      ::: Const[ShiftedRead[AFile], ?]
+     ::: Const[ExtraShiftedRead[AFile], ?]
      ::: Const[Read[ADir], ?]
      ::: Const[Read[AFile], ?]
      ::: Const[DeadEnd, ?]

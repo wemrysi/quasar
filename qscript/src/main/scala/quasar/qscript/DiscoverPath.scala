@@ -204,6 +204,16 @@ abstract class DiscoverPathInstances {
       FI: Injectable[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, Const[ShiftedRead[A], ?], F] =
     discoverPath[T, F].default[Const[ShiftedRead[A], ?]]
+
+  implicit def extraShiftedRead[T[_[_]]: BirecursiveT, F[a] <: ACopK[a] : Functor, A]
+    (implicit
+      RD:     Const[Read[ADir], ?] :<<: F,
+      RF:    Const[Read[AFile], ?] :<<: F,
+      QC:        QScriptCore[T, ?] :<<: F,
+      IN: Const[ExtraShiftedRead[A], ?] :<<: F,
+      FI: Injectable[F, QScriptTotal[T, ?]])
+      : DiscoverPath.Aux[T, Const[ExtraShiftedRead[A], ?], F] =
+    discoverPath[T, F].default[Const[ExtraShiftedRead[A], ?]]
 }
 
 private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[a] <: ACopK[a] : Functor](

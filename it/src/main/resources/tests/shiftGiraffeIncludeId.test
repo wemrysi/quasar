@@ -1,0 +1,25 @@
+{
+    "name": "shift real-giraffe-plus with IncludeId",
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir":     "ignoreFieldOrder"
+    },
+    "data": "real-giraffe-plus.data",
+    "query": "select *{_}.testField as testField, *{_:} as key from `real-giraffe-plus.data`",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      {"testField":"A","key":"b2fe01ea-a7e0-452c-95e6-7047a62ecc71"},
+      {"key":"X"},
+      {"testField":"B","key":"f5fb62c9-564d-4c3f-b0a5-a804a3cc4d25"},
+      {"key":"X"},
+      {"testField":"C","key":"d153fccb-1707-42e3-ba90-03c473687964"},
+      {"key":"X"},
+      {"testField":"D","key":"b5207e48-10b4-4a42-8e6e-9a4551a88249"},
+      {"key":"X"},
+      {"testField":"E","key":"cfc2c0d5-b81e-4f3c-9bf4-d6d06e4ba82f"},
+      {"key":"X"},
+      {"key":"shifted"},
+      {"key":"shifted"}
+    ]
+}
