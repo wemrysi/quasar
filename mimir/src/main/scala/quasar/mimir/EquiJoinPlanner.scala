@@ -156,7 +156,15 @@ final class EquiJoinPlanner[
               }
               newSortOrder = rephrase2(transMiddle, transLKey, transRKey)
               newSortState = newSortOrder.map(order => SortState(None, order :: Nil))
-              joinedTable = lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle)
+              lcompactSorted = tpe match {
+                case JoinType.LeftOuter | JoinType.FullOuter => lsorted
+                case JoinType.Inner | JoinType.RightOuter => lsorted.compact(transLKey)
+              }
+              rcompactSorted = tpe match {
+                case JoinType.RightOuter | JoinType.FullOuter => rsorted
+                case JoinType.Inner | JoinType.LeftOuter => rsorted.compact(transRKey)
+              }
+              joinedTable = lcompactSorted.cogroup(transLKey, transRKey, rcompactSorted)(transLeft, transRight, transMiddle)
             } yield (joinedTable, newSortState)
           }
         }

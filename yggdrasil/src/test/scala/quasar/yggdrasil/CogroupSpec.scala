@@ -406,14 +406,21 @@ trait CogroupSpec extends TableModuleTestSupport with SpecificationLike with Sca
     import JParser.parseUnsafe
 
     val ltable = fromSample(SampleData(Stream(
+      parseUnsafe("""{ "val" : 0 }"""),
+      parseUnsafe("""{ "val" : 2 }"""),
       parseUnsafe("""{ "id" : "foo", "val" : 4 }"""))))
 
     val rtable = fromSample(SampleData(Stream(
-      parseUnsafe("""{ "id" : "foo", "val" : 2 }"""),
+      parseUnsafe("""{ "val" : 1 }"""),
       parseUnsafe("""{ "val" : 3 }"""),
+      parseUnsafe("""{ "id" : "foo", "val" : 2 }"""),
       parseUnsafe("""{ "id" : "foo", "val" : 4 }"""))))
 
     val expected = Stream(
+      parseUnsafe("""{ "val": 0 }"""),
+      parseUnsafe("""{ "val": 2 }"""),
+      parseUnsafe("""{ "val" : 1 }"""),
+      parseUnsafe("""{ "val" : 3 }"""),
       parseUnsafe("""{ "id": "foo", "left": 4, "right": 2 }"""),
       parseUnsafe("""{ "id": "foo", "left": 4, "right": 4 }""")
     )
@@ -423,7 +430,6 @@ trait CogroupSpec extends TableModuleTestSupport with SpecificationLike with Sca
       OuterObjectConcat(WrapObject(DerefObjectStatic(Leaf(SourceLeft), CPathField("id")), "id"),
                         WrapObject(DerefObjectStatic(Leaf(SourceLeft), CPathField("val")), "left"),
                         WrapObject(DerefObjectStatic(Leaf(SourceRight), CPathField("val")), "right")))
-
     toJson(result).getJValues must_== expected
   }
 
