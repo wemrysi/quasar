@@ -17,6 +17,7 @@
 package quasar.mimir.evaluate
 
 import quasar.RenderTreeT
+import quasar.common.PhaseResultTell
 import quasar.contrib.cats.effect.liftio._
 import quasar.impl.evaluate.{FederatedQuery, QueryFederation}
 import quasar.mimir._, MimirCake._
@@ -34,7 +35,7 @@ import scala.concurrent.ExecutionContext
 
 final class MimirQueryFederation[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: LiftIO: Monad: MonadPlannerErr] private (
+    F[_]: LiftIO: Monad: MonadPlannerErr: PhaseResultTell] private (
     P: Cake)(
     implicit ec: ExecutionContext)
     extends QueryFederation[T, F, QueryAssociate[T, IO], Stream[IO, MimirRepr]] {
@@ -42,7 +43,7 @@ final class MimirQueryFederation[
   type FinalizersT[X[_], A] = WriterT[X, List[IO[Unit]], A]
 
   private val qscriptEvaluator =
-    MimirQScriptEvaluator[T, WriterT[F, List[IO[Unit]], ?]](P)
+    MimirQScriptEvaluator[T, FinalizersT[F, ?]](P)
 
   def evaluateFederated(q: FederatedQuery[T, QueryAssociate[T, IO]]): F[Stream[IO, MimirRepr]] = {
     val finalize: ((List[IO[Unit]], MimirRepr)) => Stream[IO, MimirRepr] = {
@@ -60,7 +61,7 @@ final class MimirQueryFederation[
 object MimirQueryFederation {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: LiftIO: Monad: MonadPlannerErr](
+      F[_]: LiftIO: Monad: MonadPlannerErr: PhaseResultTell](
       P: Cake)(
       implicit ec: ExecutionContext)
       : QueryFederation[T, F, QueryAssociate[T, IO], Stream[IO, MimirRepr]] =

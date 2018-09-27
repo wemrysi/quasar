@@ -17,6 +17,7 @@
 package quasar.mimir.evaluate
 
 import quasar._
+import quasar.common.PhaseResultTell
 import quasar.connector.QScriptEvaluator
 import quasar.contrib.cats.effect.liftio._
 import quasar.contrib.iota._
@@ -31,6 +32,7 @@ import quasar.qscript._
 import quasar.qscript.rewrites.{Optimize, Unirewrite}
 import quasar.yggdrasil.MonadFinalizers
 
+import slamdata.Predef.String
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext
 
@@ -46,7 +48,7 @@ import shims._
 
 final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]] private (
+    F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]: PhaseResultTell] private (
     cake: Cake)(
     implicit ec: ExecutionContext)
     extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] {
@@ -70,6 +72,9 @@ final class MimirQScriptEvaluator[
   def UnirewriteT: Unirewrite[T, QS[T]] = implicitly[Unirewrite[T, QS[T]]]
 
   def optimize: QSM[T[QSM]] => QSM[T[QSM]] = Optimize[T, QSM]
+
+  def toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
+    _.cata[T[QScriptTotal[T, ?]]](implicitly[Injectable[QSM, QScriptTotal[T, ?]]].inject(_).embed)
 
   def execute(repr: Repr): M[Repr] =
     repr.point[M]
@@ -115,7 +120,7 @@ final class MimirQScriptEvaluator[
 object MimirQScriptEvaluator {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]](
+      F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]: PhaseResultTell](
       cake: Cake)(
       implicit ec: ExecutionContext)
       : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] =

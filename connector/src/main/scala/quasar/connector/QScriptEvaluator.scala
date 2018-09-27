@@ -17,11 +17,14 @@
 package quasar.connector
 
 import slamdata.Predef.Set
-import quasar.RenderTreeT
+import quasar.{RenderTree, RenderTreeT}
+import quasar.common.PhaseResultTell
+import quasar.common.phase
 import quasar.contrib.pathy._
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.rewrites._
+import quasar.contrib.iota._
 
 import iotaz.{CopK, TListK}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
@@ -32,7 +35,7 @@ import scalaz.syntax.monad._
 /** Provides for evaluating QScript to a result. */
 abstract class QScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: MonadPlannerErr,
+    F[_]: Monad: MonadPlannerErr: PhaseResultTell,
     R] {
 
   /** QScript used by this evaluator. */
@@ -54,12 +57,16 @@ abstract class QScriptEvaluator[
   /** Rewrites the qscript to prepare for optimal evaluation. */
   def optimize: QSM[T[QSM]] => QSM[T[QSM]]
 
+  def toTotal: T[QSM] => T[QScriptTotal[T, ?]]
+
   ////
+
+  private implicit def renderTQSM: RenderTree[T[QSM]] = RenderTree.contramap(toTotal)
 
   def evaluate(qsr: T[QScriptEducated[T, ?]]): F[R] =
     for {
       shifted <- Unirewrite[T, QS[T], F](new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
-      optimized = shifted.transCata[T[QSM]](optimize)
+      optimized <- phase[F][T[QSM]]("QScript (Optimized)", shifted.transCata[T[QSM]](optimize))
       repr <- plan(optimized)
       result <- execute(repr)
     } yield result
