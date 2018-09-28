@@ -160,7 +160,8 @@ trait TableModule extends TransSpecModule {
     def parseJson[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](
         bytes: fs2.Stream[IO, Byte],
         instructions: List[ParseInstruction],
-        precise: Boolean = false)(
+        precise: Boolean = false,
+        arrayWrapped: Boolean = false)(
         implicit
         cs: ContextShift[IO],
         ec: ExecutionContext)

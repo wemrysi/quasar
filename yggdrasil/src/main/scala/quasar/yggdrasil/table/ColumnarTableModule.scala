@@ -370,7 +370,8 @@ trait ColumnarTableModule
           : LiftIO](
         bytes: fs2.Stream[IO, Byte],
         instructions: List[ParseInstruction],
-        precise: Boolean = false)(
+        precise: Boolean = false,
+        arrayWrapped: Boolean = false)(
         implicit
         cs: ContextShift[IO],
         ec: ExecutionContext)
@@ -394,7 +395,7 @@ trait ColumnarTableModule
           new PivotPlate(instr, plate)
       }
 
-      val parser = Parser(plate, Parser.ValueStream)
+      val parser = Parser(plate, if (arrayWrapped) Parser.UnwrapArray else Parser.ValueStream)
 
       val absorbed: Stream[IO, Chunk[Slice]] =
         bytes.chunks evalMap { bc =>

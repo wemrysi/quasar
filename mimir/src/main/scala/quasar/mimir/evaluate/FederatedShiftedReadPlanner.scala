@@ -20,18 +20,21 @@ import slamdata.Predef.{Stream => _, _}
 
 import quasar.ParseInstruction
 import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
+import quasar.connector.{QueryResult, ParsableType}
+import quasar.connector.ParsableType.JsonVariant
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.impl.evaluate.{Source => EvalSource}
 import quasar.mimir._, MimirCake._
 import quasar.precog.common.RValue
 import quasar.qscript._, PlannerError.InternalError
-import quasar.yggdrasil.{MonadFinalizers, TransSpecModule}
+import quasar.yggdrasil.MonadFinalizers
 
 import cats.effect.{ContextShift, IO, LiftIO}
 import fs2.{Chunk, Stream}
 import matryoshka._
 import pathy.Path._
+import qdata.{QData, QDataDecode}
 import scalaz._, Scalaz._
 
 import scala.concurrent.ExecutionContext
@@ -52,10 +55,27 @@ final class FederatedShiftedReadPlanner[
 
   def plan: AlgebraM[M, Read, MimirRepr] = {
     case -\/(Const(ShiftedRead(file, status))) =>
-      planRead(file, status, List())
+      planRead(file, Nil) map { repr =>
+        import repr.P.trans._
+
+        repr map { table =>
+          status match {
+            case IdOnly =>
+              table.transform(Scan(Leaf(Source), P.freshIdScanner))
+
+            case IncludeId =>
+              table.transform(InnerArrayConcat(
+                WrapArray(Scan(Leaf(Source), P.freshIdScanner)),
+                WrapArray(Leaf(Source))))
+
+            case ExcludeId =>
+              table
+          }
+        }
+      }
 
     case \/-(Const(InterpretedRead(file, instructions))) =>
-      planRead(file, ExcludeId, instructions)
+      planRead(file, instructions)
   }
 
   ////
@@ -64,7 +84,7 @@ final class FederatedShiftedReadPlanner[
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
 
-  private def planRead(file: AFile, readStatus: IdStatus, instructions: List[ParseInstruction])
+  private def planRead(file: AFile, instructions: List[ParseInstruction])
       : M[MimirRepr] =
     Kleisli.ask[F, Assocs].map(_(file)) andThenK { maybeSource =>
       for {
@@ -73,35 +93,17 @@ final class FederatedShiftedReadPlanner[
 
         tbl <- sourceTable(source, instructions)
 
-        repr = MimirRepr(P)(tbl)
-      } yield {
-        import repr.P.trans._
-
-        readStatus match {
-          case IdOnly =>
-            repr.map(_.transform(constants.SourceKey.Single))
-
-          case IncludeId =>
-            val ids = constants.SourceKey.Single
-            val values = constants.SourceValue.Single
-
-            // note that ids are already an array
-            repr.map(_.transform(InnerArrayConcat(ids, WrapArray(values))))
-
-          case ExcludeId =>
-            repr.map(_.transform(constants.SourceValue.Single))
-        }
-      }
+      } yield MimirRepr(P)(tbl)
     }
 
   private def sourceTable(
       source: EvalSource[QueryAssociate[T, IO]],
       instructions: List[ParseInstruction])
-      : F[P.Table] = {
-    val queryResult =
-      source.src match {
+      : F[P.Table] =
+    for {
+      queryResult <- source.src match {
         case QueryAssociate.Lightweight(f) =>
-          f(source.path)
+          f(source.path).to[F]
 
         case QueryAssociate.Heavyweight(f) =>
           val shiftedRead =
@@ -114,41 +116,54 @@ final class FederatedShiftedReadPlanner[
               OnUndefined.Omit,
               func.RightSide)
 
-          f(shiftedRead)
+          f(shiftedRead).to[F]
       }
 
-    queryResult.to[F].flatMap(tableFromStream(_, instructions))
-  }
+      table <- queryResult match {
+        case QueryResult.Parsed(qd, data) =>
+          tableFromParsed(data, instructions)(qd)
+
+        case QueryResult.Typed(tpe, data) =>
+          tableFromTyped(tpe, data, instructions)
+      }
+    } yield table
 
   // we do not preserve the order of shifted results
-  private def tableFromStream(
-      rvalues: Stream[IO, RValue],
+  private def tableFromParsed[A: QDataDecode](
+      data: Stream[IO, A],
       instructions: List[ParseInstruction])
       : F[P.Table] = {
 
     val interpretedRValues: Stream[IO, RValue] =
-      instructions match {
-        case Nil => rvalues
-        case instrs =>
-          rvalues mapChunks { chunk =>
-            val buf = ArrayBuffer.empty[RValue]
-            chunk.foreach(rv => buf ++= RValueParseInstructionInterpreter.interpret(instrs, rv))
-            Chunk.buffer(buf)
+      if (instructions.isEmpty)
+        data.map(QData.convert[A, RValue] _)
+      else
+        data mapChunks { chunk =>
+          val buf = ArrayBuffer.empty[RValue]
+
+          chunk foreach { a =>
+            val rvalues =
+              RValueParseInstructionInterpreter.interpret(
+                instructions,
+                QData.convert[A, RValue](a))
+
+            buf ++= rvalues
           }
-      }
 
-    P.Table.fromQDataStream[F, RValue](interpretedRValues) map { table =>
-      import P.trans._
+          Chunk.buffer(buf)
+        }
 
-      // TODO depending on the id status we may not need to wrap the table
-      // Also, we will need to handle this using ParseInstruction
-      table.transform(OuterObjectConcat(
-        WrapObject(
-          Scan(Leaf(Source), P.freshIdScanner),
-          TransSpecModule.paths.Key.name),
-        WrapObject(
-          Leaf(Source),
-          TransSpecModule.paths.Value.name)))
-    }
+    P.Table.fromQDataStream[F, RValue](interpretedRValues)
   }
+
+  private def tableFromTyped(
+      tpe: ParsableType,
+      data: Stream[IO, Byte],
+      instructions: List[ParseInstruction])
+      : F[P.Table] =
+    tpe match {
+      case ParsableType.Json(vnt, isPrecise) =>
+        val isArrayWrapped = vnt === JsonVariant.ArrayWrapped
+        P.Table.parseJson[F](data, instructions, isPrecise, isArrayWrapped)
+    }
 }

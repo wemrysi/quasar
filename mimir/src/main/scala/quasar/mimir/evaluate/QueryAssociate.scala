@@ -17,35 +17,32 @@
 package quasar.mimir.evaluate
 
 import quasar.api.resource.ResourcePath
-import quasar.precog.common.RValue
+import quasar.connector.QueryResult
 import quasar.qscript.QScriptEducated
-
-import fs2.Stream
-import scalaz.~>
 
 sealed trait QueryAssociate[T[_[_]], F[_]]
 
 object QueryAssociate {
-  final case class Lightweight[T[_[_]], F[_]](f: ResourcePath => F[Stream[F, RValue]])
+  final case class Lightweight[T[_[_]], F[_]](f: ResourcePath => F[QueryResult[F]])
       extends QueryAssociate[T, F]
 
-  final case class Heavyweight[T[_[_]], F[_]](f: T[QScriptEducated[T, ?]] => F[Stream[F, RValue]])
+  final case class Heavyweight[T[_[_]], F[_]](f: T[QScriptEducated[T, ?]] => F[QueryResult[F]])
       extends QueryAssociate[T, F]
 
-  def lightweight[T[_[_]], F[_]](f: ResourcePath => F[Stream[F, RValue]])
+  def lightweight[T[_[_]], F[_]](f: ResourcePath => F[QueryResult[F]])
       : QueryAssociate[T, F] =
     Lightweight(f)
 
-  def heavyweight[T[_[_]], F[_]](f: T[QScriptEducated[T, ?]] => F[Stream[F, RValue]])
+  def heavyweight[T[_[_]], F[_]](f: T[QScriptEducated[T, ?]] => F[QueryResult[F]])
       : QueryAssociate[T, F] =
     Heavyweight(f)
 
   def transformResult[T[_[_]], F[_], G[_]](
       qa: QueryAssociate[T, F])(
-      f: λ[a => F[Stream[F, a]]] ~> λ[a => G[Stream[G, a]]])
+      f: F[QueryResult[F]] => G[QueryResult[G]])
       : QueryAssociate[T, G] =
     qa match {
-      case Lightweight(k) => Lightweight(k andThen (f(_)))
-      case Heavyweight(k) => Heavyweight(k andThen (f(_)))
+      case Lightweight(k) => Lightweight(k andThen f)
+      case Heavyweight(k) => Heavyweight(k andThen f)
     }
 }

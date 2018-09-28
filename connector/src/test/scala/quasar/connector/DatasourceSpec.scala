@@ -29,7 +29,7 @@ import shims._
 abstract class DatasourceSpec[F[_]: Effect, G[_]]
     extends EffectfulQSpec[F] {
 
-  def datasource: Datasource[F, G, _]
+  def datasource: Datasource[F, G, _, _]
 
   def nonExistentPath: ResourcePath
 
