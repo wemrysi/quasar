@@ -126,28 +126,12 @@ object StructuralMerge {
         def mergeThese[F[_]: Align](xs: F[T], ys: F[T]): F[R] =
           xs.alignWith(ys)(_.fold(_.left, _.left, (_, _).right))
 
-        def mergeArr(l: (V, IList[T] \/ T), r: (V, IList[T] \/ T)): TypeF[L, R] =
-          (l, r) match {
-            case ((_, -\/(              xs)), (_, -\/(              ys))) => arr[L, R](mergeThese(xs, ys).left)
-            case ((_, \/-(               x)), (_, \/-(               y))) => arr[L, R]((x, y).right.right)
-            case ((_, -\/(          INil())), (_, y @ \/-(           _))) => arr[L, R](y map (_.left))
-            case ((_, x @ \/-(           _)), (_, -\/(          INil()))) => arr[L, R](x map (_.left))
-            case ((_, -\/(ICons(x, INil()))), (_, \/-(               y))) => arr[L, R]((x, y).right.right)
-            case ((_, \/-(               x)), (_, -\/(ICons(y, INil())))) => arr[L, R]((x, y).right.right)
-
-            case ((v, -\/(ICons(a, ICons(b, cs)))), (_, \/-(y))) =>
-              arr[L, R]((envT(v, union[L, T](a, b, cs)).embed, y).right.right)
-
-            case ((_, \/-(x)), (v, -\/(ICons(a, ICons(b, cs))))) =>
-              arr[L, R]((x, envT(v, union[L, T](a, b, cs)).embed).right.right)
-          }
-
         def mergeUnk(xu: Option[TT], yu: Option[TT]): Option[(R, R)] =
           (xu, yu) match {
             case (Some((xk, xv)), Some((yk, yv))) => some(((xk, yk).right, (xv, yv).right))
-            case (Some((xk, xv)),           None) => some((xk.left, xv.left))
-            case (          None, Some((yk, yv))) => some((yk.left, yv.left))
-            case (          None,           None) => none
+            case (Some((xk, xv)), None) => some((xk.left, xv.left))
+            case (None, Some((yk, yv))) => some((yk.left, yv.left))
+            case (None, None) => none
           }
 
         {
@@ -163,8 +147,13 @@ object StructuralMerge {
           case (EnvT((v, Const(x))), EnvT((w, Const(y)))) if (x ≟ y) =>
             envT(v |+| w, const[L, R](x))
 
-          case (EnvT((v, Arr(x))), EnvT((w, Arr(y)))) =>
-            envT(v |+| w, mergeArr((v, x), (w, y)))
+          case (EnvT((v, Arr(xs, ux))), EnvT((w, Arr(ys, uy)))) =>
+            envT(v |+| w, arr[L, R](
+              xs.alignWith(ys)(_.fold(
+                x => uy.fold(x.left[TT])(y => (x, y).right),
+                y => ux.fold(y.left[TT])(x => (x, y).right),
+                (x, y) => (x, y).right)),
+              mergeThese(ux, uy)))
 
           case (EnvT((v, Map(xs, xunk))), EnvT((w, Map(ys, yunk)))) =>
             envT(v |+| w, map[L, R](mergeThese(xs, ys), mergeUnk(xunk, yunk)))

@@ -32,7 +32,7 @@ import matryoshka.implicits._
 import matryoshka.patterns.EnvT
 import monocle.syntax.fields.{_2, _3}
 import monocle.std.option.{some => someP}
-import scalaz.{-\/, \/-, ==>>, Bifunctor, Equal, INil, NonEmptyList, Order, Tags}
+import scalaz.{-\/, \/-, ==>>, Bifunctor, Equal, IList, INil, NonEmptyList, Order, Tags}
 import scalaz.Scalaz._
 import spire.algebra.{AdditiveMonoid, Field, IsReal, NRoot}
 import spire.math.ConvertableFrom
@@ -116,26 +116,38 @@ object dist {
       case ((p, _), TypeF.Unioned(xs)) =>
         some((p, Dist.weightedMix(xs.foldMap(_.map(_.leftMap(_.toDouble)).toList) : _*)))
 
-      case ((p, _), TypeF.Arr(-\/(INil()))) =>
+      case ((p, _), TypeF.Arr(INil(), None)) =>
         some((p, Dist.constant(EJson.arr[J]())))
 
-      case ((p, _), TypeF.Arr(-\/(xs))) =>
-        val probSpans = spansBy(xs.unite.toList)(_._1) map { dists =>
-          Tags.FirstVal.unsubst[(?, NonEmptyList[Dist[J]]), A](
-            dists.traverse1(Tags.FirstVal.subst[(?, Dist[J]), A](_)))
-        }
-
-        val arrDists =
-          probSpans.mapAccumL(List[Dist[J]]()) { case (s0, (p, ds)) =>
-            val s1 = s0 ::: ds.toList
-            (s1, (p.toDouble, s1.sequence))
-          }
-
-        some((p, Dist.weightedMix(arrDists._2 : _*) map (EJson.arr(_ : _*))))
-
-      case ((p, s), TypeF.Arr(\/-(x))) =>
+      case ((p, s), TypeF.Arr(INil(), Some(x))) =>
         val (minl, maxl) = collBounds(s, maxCollLen).umap(_.toInt)
         x map { case (_, d) => (p, Dist.list(minl, maxl)(d) map (EJson.arr(_ : _*))) }
+
+      case ((p, _), TypeF.Arr(xs, None)) =>
+        some((p, knownElementsDist(xs) map (EJson.arr(_ : _*))))
+
+      case ((p, s), TypeF.Arr(xs, Some(ux))) =>
+        val maxKnown = xs.length
+
+        val unkDist = ux traverse { case (a, d) =>
+          val cnt =
+            (collMax getOption s getOrElse maxCollLen).toInt - maxKnown
+
+          Dist.weightedMix(
+            a.toDouble -> Dist.list(1, cnt)(d),
+            (1.0 - a.toDouble) -> Dist.constant(List.empty[J]))
+        }
+
+        val arrDist = for {
+          kn <- knownElementsDist(xs)
+
+          uk <-
+            if (kn.length === maxKnown) unkDist
+            else Dist.constant(None)
+
+        } yield kn ::: uk.getOrElse(List.empty[J])
+
+        some((p, arrDist map (EJson.arr(_ : _*))))
 
       case ((p, s), TypeF.Map(kn, None)) =>
         some((p, knownKeysDist(kn mapOption ι) map (EJson.map(_ : _*))))
@@ -150,8 +162,8 @@ object dist {
           (k |@| v) { case ((a, kd), (_, vd)) =>
             Dist.weightedMix(
               a.toDouble -> Dist.list(1, unkct)(kd tuple vd),
-              (1.0 - a.toDouble) -> Dist.constant(List[(J, J)]()))
-          } getOrElse Dist.constant(List())
+              (1.0 - a.toDouble) -> Dist.constant(List.empty[(J, J)]))
+          } getOrElse Dist.constant(List.empty[(J, J)])
 
         some((p, (knownKeysDist(defkn) |@| unkDist)((kn, unk) => EJson.map(kn ::: unk : _*))))
 
@@ -189,6 +201,21 @@ object dist {
 
   private def collMin[A] = TypeStat.coll[A] composeLens _2 composePrism someP
   private def collMax[A] = TypeStat.coll[A] composeLens _3 composePrism someP
+
+  private def knownElementsDist[J, A: ConvertableFrom: Equal](elts: IList[Option[(A, Dist[J])]]): Dist[List[J]] = {
+    val probSpans = spansBy(elts.unite.toList)(_._1) map { dists =>
+      Tags.FirstVal.unsubst[(?, NonEmptyList[Dist[J]]), A](
+        dists.traverse1(Tags.FirstVal.subst[(?, Dist[J]), A](_)))
+    }
+
+    val knownDists =
+      probSpans.mapAccumL(List[Dist[J]]()) { case (s0, (p, ds)) =>
+        val s1 = s0 ::: ds.toList
+        (s1, (p.toDouble, s1.sequence))
+      }
+
+    Dist.weightedMix(knownDists._2 : _*)
+  }
 
   private def knownKeysDist[J, A: ConvertableFrom](kn: J ==>> (A, Dist[J])): Dist[List[(J, J)]] =
     kn.toList traverse { case (k, (a, v)) =>

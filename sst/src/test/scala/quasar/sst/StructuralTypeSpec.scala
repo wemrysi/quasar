@@ -82,23 +82,21 @@ final class StructuralTypeSpec extends Spec
       (xst |+| yst) must equal(exp)
     }}
 
-    "known and unknown arrays merge union of known with lub" >> prop { (xs: List[J], y: SimpleType) =>
+    "known and unknown arrays merge to both known and unknown" >> prop { (xs: List[J], y: SimpleType) =>
       val arr = mkST(J.arr(xs))
       val ySimple = envT(1, TypeST(TypeF.simple[J, S](y))).embed
-      val lubArr = envT(1, TypeST(TypeF.arr[J, S](ySimple.right))).embed
+      val lubArr = envT(1, TypeST(TypeF.arr[J, S](IList[S](), Some(ySimple)))).embed
       val consts = xs.toIList.map(mkST)
 
-      val exp = envT(2, TypeST(TypeF.arr[J, S](\/-(consts match {
-        case INil() => ySimple
+      val exp = envT(2, TypeST(consts match {
+        case INil() =>
+          TypeF.arr[J, S](IList[S](), Some(ySimple))
 
-        case ICons(a, INil()) =>
-          envT(2, TypeST(TypeF.coproduct[J, S](ySimple, a))).embed
-
-        case ICons(a, ICons(b, cs)) =>
-          StructuralType.disjoinUnionsƒ[J, Int, StructuralType.ST[J, ?], S].apply(
-            envT(2, TypeST(TypeF.union[J, S](ySimple, a, b :: cs)))
-          ).embed
-      })))).embed
+        case cs =>
+          TypeF.arr[J, S](
+            cs.map(c => envT(2, TypeST(TypeF.coproduct[J, S](c, ySimple))).embed),
+            Some(ySimple))
+      })).embed
 
       (lubArr |+| arr) must equal(exp)
     }
@@ -120,8 +118,8 @@ final class StructuralTypeSpec extends Spec
     }
 
     "unions merge by accumulating mergeable values" >> prop { (xs: IList[S], ys: IList[S], i: BigInt, s: String, st: SimpleType) =>
-      val xst = envT(1, TypeST(TypeF.arr[J, S](xs.left))).embed
-      val yst = envT(1, TypeST(TypeF.arr[J, S](ys.left))).embed
+      val xst = envT(1, TypeST(TypeF.arr[J, S](xs, None))).embed
+      val yst = envT(1, TypeST(TypeF.arr[J, S](ys, None))).embed
       val ist = mkST(J.int(i))
       val sst = mkST(J.str(s))
       val pst = envT(1, TypeST(TypeF.simple[J, S](st))).embed

@@ -95,10 +95,11 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           .covary[F].point[F]
 
       case DatasourceResourcePrefix /: ResourcePath.Root =>
-        q.datasources.allDatasourceMetadata.map(_.evalMap {
+        q.datasources.allDatasourceMetadata.map(_.flatMap {
           case (id, DatasourceMeta(_, n, _)) =>
-            q.datasources.pathIsResource(id, ResourcePath.root())
-              .flatMap(fromEither[ExistentialError[UUID], Boolean])
+            Stream.eval(F.attempt(q.datasources.pathIsResource(id, ResourcePath.root())))
+              .map(_.toOption.flatMap(_.toOption))
+              .unNone
               .map(b => (
                 ResourceName(s"$id"),
                 if (b) ResourcePathType.leafResource else ResourcePathType.prefix))
@@ -427,7 +428,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
       s"${t.name}-v${t.version}"
 
     private def printMetadata(m: DatasourceMeta): String =
-      s"${m.name.shows} (${printType(m.kind)}): ${printCondition[Exception](m.status, _.getMessage)}"
+      s"${m.name.shows} (${printType(m.kind)}): ${printCondition[Exception](m.status, _.toString)}"
 
     private def printCondition[A](c: Condition[A], onAbnormal: A => String) =
       c match {

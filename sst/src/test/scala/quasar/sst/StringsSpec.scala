@@ -16,7 +16,7 @@
 
 package quasar.sst
 
-import slamdata.Predef.List
+import slamdata.Predef.{List, Some}
 import quasar.contrib.algebra._
 import quasar.contrib.matryoshka.envT
 import quasar.ejson.EJson
@@ -29,9 +29,8 @@ import StructuralType.{TagST, TypeST}
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz.{NonEmptyList, Show}
+import scalaz.{IList, NonEmptyList, Show}
 import scalaz.syntax.foldable1._
-import scalaz.syntax.either._
 import scalaz.syntax.std.option._
 import spire.math.Real
 
@@ -59,7 +58,7 @@ final class StringsSpec extends quasar.Qspec {
     val comp =
       envT(ts, TagST[J](Tagged(
         strings.StructuralString,
-        envT(ts, TypeST(TypeF.arr[J, SST[J, Real]](char.right))).embed))).embed
+        envT(ts, TypeST(TypeF.arr[J, SST[J, Real]](IList[SST[J, Real]](), Some(char)))).embed))).embed
 
     strings.compress[SST[J, Real], J, Real](ts, "foo").embed must_= comp
   }

@@ -91,8 +91,8 @@ object normalization {
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
   ): TypeF[J, T] => TypeF[J, T] = totally {
-    case a @ Arr(-\/(ts)) =>
-      ts.traverse(t => const[J, T].getOption(t.project))
+    case a @ Arr(kn, None) =>
+      kn.traverse(t => const[J, T].getOption(t.project))
         .cata(js => const[J, T](fromCommon(JArr(js.toList))), a)
 
     case m @ Map(kn, None) =>
@@ -109,8 +109,9 @@ object normalization {
     JR: Recursive.Aux[J, EJson]
   ): TypeF[J, T] => TypeF[J, T] = totally {
     case Const(Embed(CommonEJson(JArr(js)))) =>
-      arr[J, T](js.foldRight(IList[T]())((j, ts) =>
-        const[J, T](j).embed :: ts).left)
+      arr[J, T](
+        js.foldRight(IList[T]())((j, ts) => const[J, T](j).embed :: ts),
+        none)
 
     case Const(Embed(ExtEJson((JMap(tts))))) =>
       map[J, T](tts.foldLeft(IMap.empty[J, T])((m, kv) =>
@@ -139,11 +140,11 @@ object normalization {
   def reduceToBottom[J, T](
     implicit TR: Recursive.Aux[T, TypeF[J, ?]]
   ): TypeF[J, T] => TypeF[J, T] = totally {
-    case Arr(-\/(ts)) if ts.any(isBottom[J](_)) => bottom[J, T]()
-    case Arr(\/-(Embed(Bottom())))              => bottom[J, T]()
-    case Map(kn, _)   if kn.any(isBottom[J](_)) => bottom[J, T]()
-    case Map(_, Some((Embed(Bottom()), _)))     => bottom[J, T]()
-    case Map(_, Some((_, Embed(Bottom()))))     => bottom[J, T]()
+    case Arr(kn, _) if kn.any(isBottom[J](_)) => bottom[J, T]()
+    case Arr(_, Some(Embed(Bottom()))) => bottom[J, T]()
+    case Map(kn, _) if kn.any(isBottom[J](_)) => bottom[J, T]()
+    case Map(_, Some((Embed(Bottom()), _))) => bottom[J, T]()
+    case Map(_, Some((_, Embed(Bottom())))) => bottom[J, T]()
   }
 
   /** Reduce unions containing `top` to `top`. */

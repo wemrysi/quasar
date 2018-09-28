@@ -120,19 +120,22 @@ object TypeStat extends TypeStatInstances {
     J: Recursive.Aux[J, EJson],
     F: Field[A]
   ): Algebra[TypeF[J, ?], TypeStat[A]] = {
-    case TypeF.Bottom()              => count(F.zero)
-    case TypeF.Top()                 => count(cnt)
-    case TypeF.Simple(_)             => count(cnt)
-    case TypeF.Const(j)              => fromEJson(cnt, j)
-    case TypeF.Arr(-\/(xs))          => fromFoldable(maxOr(cnt, xs), xs)
-    case TypeF.Arr(\/-(x))           => coll(x.size, none, none)
-    case TypeF.Map(xs, None)         => fromFoldable(maxOr(cnt, xs), xs)
+    case TypeF.Bottom() => count(F.zero)
+    case TypeF.Top() => count(cnt)
+    case TypeF.Simple(_) => count(cnt)
+    case TypeF.Const(j) => fromEJson(cnt, j)
 
+    case TypeF.Arr(xs, None) => fromFoldable(maxOr(cnt, xs), xs)
+    case TypeF.Arr(xs, Some(ux)) =>
+      val n = NonEmptyList.nel(ux, xs).maximumOf1(_.size)
+      coll(n, some(F.fromInt(xs.length)), none)
+
+    case TypeF.Map(xs, None) => fromFoldable(maxOr(cnt, xs), xs)
     case TypeF.Map(xs, Some((a, b))) =>
       val n = OneAnd(a, OneAnd(b, xs)).maximumOf1(_.size)
-      coll(n, some(F fromInt xs.size), none)
+      coll(n, some(F.fromInt(xs.size)), none)
 
-    case TypeF.Union(a, b, cs)       => nel(a, b :: cs).suml1
+    case TypeF.Union(a, b, cs) => nel(a, b :: cs).suml1
   }
 
   ////
