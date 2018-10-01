@@ -42,7 +42,7 @@ object ToRValuesBenchmark {
 
   def createAndConsumeTable(data: Stream[IO, RValue], bh: Blackhole): IO[Unit] = {
     val table: WriterT[IO, List[IO[Unit]], P.Table] =
-      P.Table.fromRValueStream[WriterT[IO, List[IO[Unit]], ?]](data)
+      P.Table.fromQDataStream[WriterT[IO, List[IO[Unit]], ?], RValue](data)
     table.run.flatMap {
       case (_, t) =>
         t.slices.foreachRec(slice => IO(slice.toRValues.foreach(bh.consume)))

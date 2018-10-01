@@ -41,7 +41,10 @@ object QDataData extends QDataEncode[Data] with QDataDecode[Data] {
     case Data.Null => QNull
     case Data.Str(_) => QString
     case Data.Bool(_) => QBoolean
-    case Data.Dec(v) => if (v.isDecimalDouble) QDouble else QReal
+    case Data.Dec(v) =>
+      if (v.isValidLong) QLong
+      else if (v.isDecimalDouble) QDouble
+      else QReal
     case Data.Int(v) => if (v.isValidLong) QLong else QReal
     case Data.OffsetDateTime(_) => QOffsetDateTime
     case Data.OffsetDate(_) => QOffsetDate
@@ -56,8 +59,9 @@ object QDataData extends QDataEncode[Data] with QDataDecode[Data] {
   }
 
   def getLong(a: Data): Long = a match {
+    case Data.Dec(value) => value.toLong
     case Data.Int(value) => value.toLong
-    case _ => error(s"Expected `Data.Int`. Received $a")
+    case _ => error(s"Expected `Data.Dec` or `Data.Int`. Received $a")
   }
   def makeLong(l: Long): Data = Data.Int(l)
 
@@ -70,7 +74,7 @@ object QDataData extends QDataEncode[Data] with QDataDecode[Data] {
   def getReal(a: Data): Real = a match {
     case Data.Dec(value) => Real.algebra.fromBigDecimal(value)
     case Data.Int(value) => Real.algebra.fromBigDecimal(BigDecimal(value))
-    case _ => error(s"Expected `Data.Dec`. Received $a")
+    case _ => error(s"Expected `Data.Dec` or `Data.Int`. Received $a")
   }
   def makeReal(l: Real): Data = Data.Dec(l.toRational.toBigDecimal(MathContext.UNLIMITED))
 

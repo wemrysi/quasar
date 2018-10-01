@@ -32,10 +32,11 @@ import org.specs2.execute.Result
 import org.specs2.matcher.Matcher
 import Gen.listOfN
 
-import fs2.Stream
+import fs2.{Chunk, Stream}
 
 class SliceSpec extends Specification with ScalaCheck {
   import ArbitrarySlice._
+  import SliceIngest.ChunkSliced
 
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering
   implicit def listOrdering[A](implicit ord0: Ordering[A]) = new Ordering[List[A]] {
@@ -133,13 +134,6 @@ class SliceSpec extends Specification with ScalaCheck {
     }
   }
 
-  // have to override this because of `Array.equals`
-  private[table] def arraySlicesEqual[A](expected: ArraySliced[A], actual: ArraySliced[A]): Result = {
-    expected.arr.deep must_== actual.arr.deep
-    expected.start must_== actual.start
-    expected.size must_== actual.size
-  }
-
   def valueCalcs(values: List[RValue]): (Int, Int, Int) = {
     val totalRows = values.size
 
@@ -150,52 +144,52 @@ class SliceSpec extends Specification with ScalaCheck {
     (totalRows, nrColumnsBiggestValue, totalColumns)
   }
 
-  def testFromRValuesMaxSliceColumnsEqualsBiggestValue(values: List[CValue]) = {
+  def testFromQDataMaxSliceColumnsEqualsBiggestValue(values: List[CValue]) = {
     val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
 
-    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue)).toList
+    val slices = Slice.allFromQData(Stream.emits(values: List[RValue]), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue)).toList
     assertSlices(values, slices, be_>(0))
   }
 
-  def testFromRValuesMaxSliceColumnsLowerThanBiggestValue(values: List[CValue]) = {
+  def testFromQDataMaxSliceColumnsLowerThanBiggestValue(values: List[CValue]) = {
     val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
 
-    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue - 1)).toList
+    val slices = Slice.allFromQData(Stream.emits(values: List[RValue]), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(nrColumnsBiggestValue - 1)).toList
     assertSlices(values, slices, be_>(0))
   }
 
-  def testFromRValuesMaxSliceRowsOverflow(values: List[CValue]) = {
+  def testFromQDataMaxSliceRowsOverflow(values: List[CValue]) = {
     val (totalRows, _, totalColumns) = valueCalcs(values)
     val maxSliceRows = Math.max(1, Math.ceil(totalRows.toDouble / 3).toInt)
     val expectedNrSlices = Math.min(Math.ceil(totalRows.toDouble / maxSliceRows).toInt, 3)
-    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).toList
+    val slices = Slice.allFromQData(Stream.emits(values: List[RValue]), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).toList
     assertSlices(values, slices, be_==(expectedNrSlices))
   }
 
-  def testFromRValuesMaxSliceRows1(values: List[CValue]) = {
+  def testFromQDataMaxSliceRows1(values: List[CValue]) = {
     val (totalRows, _, totalColumns) = valueCalcs(values)
     val maxSliceRows = 1
 
-    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).toList
+    val slices = Slice.allFromQData(Stream.emits(values: List[RValue]), maxRows = Some(maxSliceRows), maxColumns = Some(totalColumns)).toList
     assertSlices(values, slices, be_==(totalRows))
   }
 
-  def testFromRValuesFittingIn1Slice(values: List[RValue]) = {
+  def testFromQDataFittingIn1Slice(values: List[RValue]) = {
     val (totalRows, _, totalColumns) = valueCalcs(values)
 
     // test with a slice that's just big enough to hold the values
-    val slices = Slice.allFromRValues(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(totalColumns + 1)).toList
+    val slices = Slice.allFromQData(Stream.emits(values), maxRows = Some(Math.max(totalRows, 1)), maxColumns = Some(totalColumns + 1)).toList
     assertSlices(values, slices, be_==(1))
   }
 
 
-  def testFromRValuesTemplate(input: JValue, maxRows: Int, maxCols: Int, expectedNrRows: List[Int], expectedNrCols: List[Int]) = {
+  def testFromQDataTemplate(input: JValue, maxRows: Int, maxCols: Int, expectedNrRows: List[Int], expectedNrCols: List[Int]) = {
     val data: List[RValue] = input match {
       case JArray(rows) => rows.toList.flatMap(RValue.fromJValue)
       case _ => ???
     }
 
-    val result: List[Slice] = Slice.allFromRValues(Stream.emits(data), Some(maxRows), Some(maxCols)).toList
+    val result: List[Slice] = Slice.allFromQData(Stream.emits(data), Some(maxRows), Some(maxCols)).toList
 
     result.map(s => toCValues(s))
       .foldLeft(List.empty[CValue])(_ ++ _.flatten)
@@ -205,32 +199,32 @@ class SliceSpec extends Specification with ScalaCheck {
     result.map(_.columns.size) mustEqual expectedNrCols
   }
 
-  "allFromRValues" should {
+  "allFromQData" should {
 
     val v = List(CString("x"), CNum(42))
 
     "construct slices from a simple vector" in {
-      "fits in 1 slice" >> testFromRValuesFittingIn1Slice(v)
-      "maxSliceRows < nrRows" >> testFromRValuesMaxSliceRowsOverflow(v)
-      "maxSliceRows = 1" >> testFromRValuesMaxSliceRows1(v)
-      "maxSliceColumns = nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsEqualsBiggestValue(v)
-      "maxSliceColumns < nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsLowerThanBiggestValue(v)
+      "fits in 1 slice" >> testFromQDataFittingIn1Slice(v)
+      "maxSliceRows < nrRows" >> testFromQDataMaxSliceRowsOverflow(v)
+      "maxSliceRows = 1" >> testFromQDataMaxSliceRows1(v)
+      "maxSliceColumns = nrColumns of biggest value" >> testFromQDataMaxSliceColumnsEqualsBiggestValue(v)
+      "maxSliceColumns < nrColumns of biggest value" >> testFromQDataMaxSliceColumnsLowerThanBiggestValue(v)
     }
 
     val v1 = List.tabulate(10000)(CNum(_))
 
     "construct slices from a big vector" in {
-      "fits in 1 slice" >> testFromRValuesFittingIn1Slice(v1)
-      "maxSliceRows < nrRows" >> testFromRValuesMaxSliceRowsOverflow(v1)
-      "maxSliceRows = 1" >> testFromRValuesMaxSliceRows1(v1)
-      "maxSliceColumns = nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsEqualsBiggestValue(v1)
-      "maxSliceColumns < nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsLowerThanBiggestValue(v1)
+      "fits in 1 slice" >> testFromQDataFittingIn1Slice(v1)
+      "maxSliceRows < nrRows" >> testFromQDataMaxSliceRowsOverflow(v1)
+      "maxSliceRows = 1" >> testFromQDataMaxSliceRows1(v1)
+      "maxSliceColumns = nrColumns of biggest value" >> testFromQDataMaxSliceColumnsEqualsBiggestValue(v1)
+      "maxSliceColumns < nrColumns of biggest value" >> testFromQDataMaxSliceColumnsLowerThanBiggestValue(v1)
     }
 
     val v2 = List.tabulate(2)(i => RArray(v))
 
     "construct slices from a vector of arrays" in {
-      testFromRValuesFittingIn1Slice(v2)
+      testFromQDataFittingIn1Slice(v2)
     }
 
     import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
@@ -259,20 +253,20 @@ class SliceSpec extends Specification with ScalaCheck {
       // instead of holding off on adding an RValue unless we're sure it won't put us over
       // the column limit, it would stop adding RValues *after* it hit the limit.
       // this data hits that edge case.
-      testFromRValuesFittingIn1Slice(pathological) and
-      testFromRValuesMaxSliceRowsOverflow(pathological) and
-      testFromRValuesMaxSliceRows1(pathological) and
-      testFromRValuesMaxSliceColumnsEqualsBiggestValue(pathological) and
-      testFromRValuesMaxSliceColumnsLowerThanBiggestValue(pathological)
+      testFromQDataFittingIn1Slice(pathological) and
+      testFromQDataMaxSliceRowsOverflow(pathological) and
+      testFromQDataMaxSliceRows1(pathological) and
+      testFromQDataMaxSliceColumnsEqualsBiggestValue(pathological) and
+      testFromQDataMaxSliceColumnsLowerThanBiggestValue(pathological)
     }
 
 
     "construct slices from arbitrary values" in Prop.forAll(genCValues){ values =>
-      testFromRValuesFittingIn1Slice(values)
-      testFromRValuesMaxSliceRowsOverflow(values) and
-      testFromRValuesMaxSliceRows1(values) and
-      testFromRValuesMaxSliceColumnsEqualsBiggestValue(values) and
-      testFromRValuesMaxSliceColumnsLowerThanBiggestValue(values)
+      testFromQDataFittingIn1Slice(values)
+      testFromQDataMaxSliceRowsOverflow(values) and
+      testFromQDataMaxSliceRows1(values) and
+      testFromQDataMaxSliceColumnsEqualsBiggestValue(values) and
+      testFromQDataMaxSliceColumnsLowerThanBiggestValue(values)
     }
 
     "construct slices with various bounds" in {
@@ -283,22 +277,22 @@ class SliceSpec extends Specification with ScalaCheck {
         ]""")
 
       "rows just fits in 1 slice (simple)" >>
-        testFromRValuesTemplate(testInput1, 2, 10000, List(2), List(3))
+        testFromQDataTemplate(testInput1, 2, 10000, List(2), List(3))
 
       "columns just fits in 1 slice (simple)" >>
-        testFromRValuesTemplate(testInput1, 1000, 3, List(2), List(3))
+        testFromQDataTemplate(testInput1, 1000, 3, List(2), List(3))
 
       "columns and rows just fits in 1 slice (simple)" >>
-        testFromRValuesTemplate(testInput1, 2, 3, List(2), List(3))
+        testFromQDataTemplate(testInput1, 2, 3, List(2), List(3))
 
       "columns boundary hit (simple)" >>
-        testFromRValuesTemplate(testInput1, 1000, 2, List(1, 1), List(2, 2))
+        testFromQDataTemplate(testInput1, 1000, 2, List(1, 1), List(2, 2))
 
       "rows boundary hit (simple)" >>
-        testFromRValuesTemplate(testInput1, 1, 1000, List(1, 1), List(2, 2))
+        testFromQDataTemplate(testInput1, 1, 1000, List(1, 1), List(2, 2))
 
       "columns boundary exceeded in 1 row (simple)" >>
-        testFromRValuesTemplate(testInput1, 1000, 1, List(1, 1), List(2, 2))
+        testFromQDataTemplate(testInput1, 1000, 1, List(1, 1), List(2, 2))
 
       val testInput2: JValue = JParser.parseUnsafe("""[
           {"foo":1},
@@ -318,61 +312,62 @@ class SliceSpec extends Specification with ScalaCheck {
         ]""")
 
       "fits in 1 slice" >>
-        testFromRValuesTemplate(testInput2, 1000, 1000, List(14), List(10))
+        testFromQDataTemplate(testInput2, 1000, 1000, List(14), List(10))
 
       "columns just fits in 1 slice" >>
-        testFromRValuesTemplate(testInput2, 1000, 11, List(14), List(10))
+        testFromQDataTemplate(testInput2, 1000, 11, List(14), List(10))
 
       "rows just fits in 1 slice" >>
-        testFromRValuesTemplate(testInput2, 14, 1000, List(14), List(10))
+        testFromQDataTemplate(testInput2, 14, 1000, List(14), List(10))
 
       "rows and columns just fits in 1 slice" >>
-        testFromRValuesTemplate(testInput2, 14, 10, List(14), List(10))
+        testFromQDataTemplate(testInput2, 14, 10, List(14), List(10))
 
       "columns boundary hit" >>
-        testFromRValuesTemplate(testInput2, 1000, 9, List(13, 1), List(9, 2))
+        testFromQDataTemplate(testInput2, 1000, 9, List(13, 1), List(9, 2))
 
       "rows boundary hit" >>
-        testFromRValuesTemplate(testInput2, 13, 1000, List(13, 1), List(9, 2))
+        testFromQDataTemplate(testInput2, 13, 1000, List(13, 1), List(9, 2))
 
       "columns boundary exceeded in 1 row" >>
-        testFromRValuesTemplate(testInput2, 1000, 3, List(2, 1, 1, 2, 1, 6, 1), List(2, 3, 3, 2, 4, 3, 2))
+        testFromQDataTemplate(testInput2, 1000, 3, List(2, 1, 1, 2, 1, 6, 1), List(2, 3, 3, 2, 4, 3, 2))
 
       "columns boundary exceeded in 1 row multiple times" >>
-        testFromRValuesTemplate(testInput2, 1000, 2, List(2, 1, 1, 2, 1, 1, 2, 3, 1), List(2, 3, 3, 2, 4, 2, 2, 2, 2))
+        testFromQDataTemplate(testInput2, 1000, 2, List(2, 1, 1, 2, 1, 1, 2, 3, 1), List(2, 3, 3, 2, 4, 2, 2, 2, 2))
 
       "column and row boundary hit" >>
-        testFromRValuesTemplate(testInput2, 3, 4, List(3, 3, 2, 3, 3), List(4, 4, 4, 3, 3))
+        testFromQDataTemplate(testInput2, 3, 4, List(3, 3, 2, 3, 3), List(4, 4, 4, 3, 3))
     }
   }
 
-  "fromRValuesStep" should {
+  "fromQDataStep" should {
+    import SliceIngest.fromQDataStep
+
     "emit an empty slice given no data" >> {
-      val (actualSlice, actualRemaining) = Slice.fromRValuesStep(ArraySliced.noRValues, 10, 10, 32)
+      val (actualSlice, actualRemaining) = fromQDataStep(ChunkSliced.empty[RValue], 10, 10, 32)
       sliceEqualityAtDefinedRows(actualSlice, Slice.empty)
-      arraySlicesEqual(actualRemaining, ArraySliced.noRValues)
+      actualRemaining mustEqual ChunkSliced.empty
     }
 
     "increase slice size to the next power of two when slice size cannot be predicted" >> {
-      val data = ArraySliced(
-        Array.fill[RValue](64)(CLong(1)) ++ Array(RArray(List(CLong(1)))), 0, 65)
-      val columnSize = Slice.fromRValuesStep(data, 64, 3, 2)
+      val data = ChunkSliced.fromChunk(Chunk.array(
+        Array.fill[RValue](64)(CLong(1)) ++ Array(RArray(List(CLong(1))))))
+      val columnSize = fromQDataStep(data, 64, 3, 2)
         ._1.columns(ColumnRef(CPath.Identity, CLong)).asInstanceOf[ArrayLongColumn].values.length
       columnSize must_== 64
     }
 
     "increase slice size to the next power of two when slice size can be predicted" >> {
-      val data = ArraySliced(Array.fill[RValue](65)(CLong(1)), 0, 64)
-      val columnSize = Slice.fromRValuesStep(data, 64, 3, 2)
+      val data = ChunkSliced(Chunk.array(Array.fill[RValue](65)(CLong(1))), 0, 64)
+      val columnSize = fromQDataStep(data, 64, 3, 2)
         ._1.columns(ColumnRef(CPath.Identity, CLong)).asInstanceOf[ArrayLongColumn].values.length
       columnSize must_== 64
     }
 
     "stop increasing slice size at maxRows" >> {
-      val data = ArraySliced(Array[RValue](
-        CLong(1), CLong(2), CLong(3), CLong(4), CLong(5)
-      ), 0, 5)
-      val (slice, rest) = Slice.fromRValuesStep(data, 4, 1, 2)
+      val data = ChunkSliced.fromChunk(Chunk.array(
+        Array[RValue](CLong(1), CLong(2), CLong(3), CLong(4), CLong(5))))
+      val (slice, rest) = fromQDataStep(data, 4, 1, 2)
       val columnSize =
         slice.columns(ColumnRef(CPath.Identity, CLong)).asInstanceOf[ArrayLongColumn].values.length
       columnSize must_== 4
@@ -380,25 +375,24 @@ class SliceSpec extends Specification with ScalaCheck {
     }
 
     "not add values that overflow the column limit" >> {
-      val data = ArraySliced(Array[RValue](
+      val data = ChunkSliced.fromChunk(Chunk.array(Array[RValue](
         CLong(1),
         CLong(2),
-        RArray(List(CLong(1), CLong(2), CLong(3)))), 0, 3)
+        RArray(List(CLong(1), CLong(2), CLong(3))))))
       val expectedDefined = new BitSet(1)
       expectedDefined.set(0, 2)
       val expectedSlice = Slice(2,
         Map(
           ColumnRef(CPath.Identity, CLong) ->
             new ArrayLongColumn(expectedDefined, Array(1L, 2L))))
-      val expectedRemaining = ArraySliced(data.arr, 2, 1)
-      val (actualSlice, actualRemaining) =
-        Slice.fromRValuesStep(data, 3, 2, 32)
+      val expectedRemaining = ChunkSliced(data.chunk, 2, 1)
+      val (actualSlice, actualRemaining) = fromQDataStep(data, 3, 2, 32)
       sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
-      arraySlicesEqual(actualRemaining, expectedRemaining)
+      actualRemaining mustEqual expectedRemaining
     }
 
     "add a value that overflows the column limit, if otherwise the slice would be empty" >> {
-      val data = ArraySliced(Array[RValue](RArray(List(CLong(1), CLong(2), CLong(3)))), 0, 1)
+      val data = ChunkSliced(Chunk.array(Array[RValue](RArray(List(CLong(1), CLong(2), CLong(3))))), 0, 1)
       val expectedDefined = new BitSet(1)
       expectedDefined.set(0)
       val expectedSlice = {
@@ -410,16 +404,15 @@ class SliceSpec extends Specification with ScalaCheck {
         )
         Slice(size, columns)
       }
-      val expectedRemaining = ArraySliced.noRValues
-      val (actualSlice, actualRemaining) =
-        Slice.fromRValuesStep(data, 1, 2, 32)
+      val expectedRemaining = ChunkSliced.empty[RValue]
+      val (actualSlice, actualRemaining) = fromQDataStep(data, 1, 2, 32)
       sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
-      arraySlicesEqual(actualRemaining, expectedRemaining)
+      actualRemaining mustEqual expectedRemaining
     }
 
     "grow slices to maxRows given only scalars" >> {
       val data = Array[Long](1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-      val arraySliced = ArraySliced(data.map[RValue, Array[RValue]](CLong(_)), start = 0, size = 10)
+      val chunkSliced = ChunkSliced.fromChunk(Chunk.array(data.map[RValue, Array[RValue]](CLong(_))))
       val expectedDefined = new BitSet(8)
       expectedDefined.set(0, 8)
       val expectedSlice = {
@@ -429,11 +422,10 @@ class SliceSpec extends Specification with ScalaCheck {
             new ArrayLongColumn(expectedDefined, data))
         Slice(size, columns)
       }
-      val expectedRemaining = ArraySliced(arraySliced.arr, 8, 2)
-      val (actualSlice, actualRemaining) =
-        Slice.fromRValuesStep(arraySliced, 8, 10, 32)
+      val expectedRemaining = ChunkSliced(chunkSliced.chunk, 8, 2)
+      val (actualSlice, actualRemaining) = fromQDataStep(chunkSliced, 8, 10, 32)
       sliceEqualityAtDefinedRows(actualSlice, expectedSlice)
-      arraySlicesEqual(actualRemaining, expectedRemaining)
+      actualRemaining mustEqual expectedRemaining
     }
 
   }
