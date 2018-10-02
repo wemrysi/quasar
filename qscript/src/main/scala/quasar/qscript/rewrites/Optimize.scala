@@ -18,6 +18,7 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
 import quasar.contrib.iota._
+import quasar.ejson
 import quasar.fp.{liftFG, Injectable}
 import quasar.qscript._
 import quasar.qscript.MapFuncCore._
@@ -26,12 +27,16 @@ import quasar.qscript.RecFreeS._
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
+import matryoshka.patterns.{ginterpretM, CoEnv}
 
-import scalaz.{Const, Functor}
+import scalaz.{\/, -\/, \/-, Const, Functor}
 import scalaz.Scalaz._ // apply-traverse syntax conflict
 
 final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
+  // We perform this rewrite before `extraShift` because sometimes
+  // a no-op Map is added in the transformation from `QScriptEducated`,
+  // which interferes with the pattern matching in `extraShift`.
   def elideNoopMap[F[a] <: ACopK[a]: Functor](implicit QC: QScriptCore :<<: F)
       : QScriptCore[T[F]] => F[T[F]] = {
     case Map(Embed(src), mf) if mf === HoleR => src
@@ -45,11 +50,12 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         QC: QScriptCore :<<: F)
       : QScriptCore[T[F]] => F[T[F]] = {
 
-    // LeftShift(ShiftedRead(_, ExcludeId), Hole, _, Map, Omit, f(RightSide))
-    case qc @ LeftShift(Embed(src), struct, shiftStatus, ShiftType.Map, OnUndefined.Omit, repair)
-        if struct === HoleR => {
+    // LeftShift(ShiftedRead(_, ExcludeId), /foo/bar/, _, Map, Omit, f(RightSide))
+    case qc @ LeftShift(Embed(src), struct, shiftStatus, ShiftType.Map, OnUndefined.Omit, repair) => {
 
-      val key = ShiftKey(ShiftedKey)
+      val key: ShiftKey = ShiftKey(ShiftedKey)
+
+      val pathOpt: Option[ShiftPath] = findPath(struct.linearize)
 
       val mfOpt: Option[FreeMap] =
         repair.traverseM[Option, Hole] {
@@ -66,17 +72,57 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         }
       }
 
-      val rewritten: Option[F[T[F]]] = (mfOpt |@| srOpt) { case (mf, sr) =>
-        val src: T[F] = ER.inj(Const[ExtraShiftedRead[A], T[F]](
-          ExtraShiftedRead[A](sr.path, shiftStatus, key))).embed
+      val rewritten: Option[F[T[F]]] = (mfOpt |@| srOpt |@| pathOpt) {
+        case (mf, sr, path) =>
+          val src: T[F] = ER.inj(Const[ExtraShiftedRead[A], T[F]](
+            ExtraShiftedRead[A](sr.path, path, shiftStatus, key))).embed
 
-        QC.inj(Map(src, mf.asRec))
+          QC.inj(Map(src, mf.asRec))
       }
 
       rewritten.getOrElse(QC.inj(qc))
     }
 
     case qc => QC.inj(qc)
+  }
+
+  def findPath(fm: FreeMap): Option[ShiftPath] = {
+    import MapFuncsCore.{Constant, ProjectKey}
+
+    // A `FreeMap` effectively has two leaf types: `Constant` and `Hole`.
+    // When we hit a `Constant` we need to keep searching even though
+    // we haven't found a path to shift, and so we encode this as `Unit`.
+    type Acc = Unit \/ ShiftPath
+
+    type CoFreeMap = CoEnv[Hole, MapFunc, (FreeMap, Acc)]
+
+    def transformHole(hole: Hole): Option[Acc] =
+      ShiftPath(List[String]()).right.some
+
+    def transformFunc(func: MapFunc[(FreeMap, Acc)]): Option[Acc] =
+      func match {
+        case MFC(Constant(Embed(EC(ejson.Str(_))))) =>
+          ().left.some // this is awkward but we have to keep going
+
+        // the source of a `ProjectKey` must have encoded as a `ShiftPath`
+        case MFC(ProjectKey((_, \/-(srcPath)), (ExtractFunc(Constant(Embed(EC(ejson.Str(str))))), _))) =>
+          ShiftPath(str :: srcPath.path).right.some
+
+        case _ => none
+      }
+
+    def transform: CoFreeMap => Option[Acc] =
+      ginterpretM[(FreeMap, ?), Option, MapFunc, Hole, Acc](
+        transformHole(_),
+        transformFunc(_))
+
+    val transformed: Option[Acc] =
+      fm.paraM[Option, Acc](transform)
+
+    transformed flatMap {
+      case -\/(_) => none
+      case \/-(path) => ShiftPath(path.path.reverse).some
+    }
   }
 }
 

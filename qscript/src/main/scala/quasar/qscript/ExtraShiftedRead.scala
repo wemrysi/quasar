@@ -23,6 +23,7 @@ import quasar.contrib.pathy.APath
 import monocle.macros.Lenses
 import pathy.Path.posixCodec
 import scalaz.{Equal, Show}
+import scalaz.std.list._
 import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.syntax.show._
@@ -30,7 +31,7 @@ import scalaz.syntax.std.option._
 
 /* LeftShift(
  *   ShiftedRead(path, ExcludeId),
- *   Hole,
+ *   ProjectKey(ProjectKey(Hole, foo), bar),
  *   shiftStatus,
  *   ShiftType.Map,
  *   OnUndefined.Omit,
@@ -38,17 +39,18 @@ import scalaz.syntax.std.option._
  *
  * is equivalent to
  *
- * ExtraShiftedRead(path, shiftStatus, _)
+ * ExtraShiftedRead(path, List(foo, bar), shiftStatus, _)
  */
 @Lenses final case class ExtraShiftedRead[A](
   path: A,
+  shiftPath: ShiftPath,
   shiftStatus: IdStatus,
   shiftKey: ShiftKey)
 
 object ExtraShiftedRead {
 
   implicit def equal[A: Equal]: Equal[ExtraShiftedRead[A]] =
-    Equal.equalBy(r => (r.path, r.shiftStatus, r.shiftKey.key))
+    Equal.equalBy(r => (r.path, r.shiftPath.path, r.shiftStatus, r.shiftKey.key))
 
   implicit def show[A <: APath]: Show[ExtraShiftedRead[A]] =
     RenderTree.toShow
@@ -56,9 +58,28 @@ object ExtraShiftedRead {
   implicit def renderTree[A <: APath]: RenderTree[ExtraShiftedRead[A]] =
     RenderTree.simple(List("ExtraShiftedRead"), r => {
       (posixCodec.printPath(r.path) + ", " +
+        r.shiftPath.path.shows + ", " +
         r.shiftStatus.shows + ", " +
         r.shiftKey.key.shows).some
     })
 }
 
 final case class ShiftKey(key: String)
+
+object ShiftKey {
+  implicit val equal: Equal[ShiftKey] =
+    Equal.equalBy(_.key)
+
+  implicit val show: Show[ShiftKey] =
+    Show.showFromToString
+}
+
+final case class ShiftPath(path: List[String])
+
+object ShiftPath {
+  implicit val equal: Equal[ShiftPath] =
+    Equal.equalBy(_.path)
+
+  implicit val show: Show[ShiftPath] =
+    Show.showFromToString
+}
