@@ -51,8 +51,8 @@ final class FederatedShiftedReadPlanner[
     case -\/(Const(ShiftedRead(file, status))) =>
       planRead(file, status, None)
 
-    case \/-(Const(ExtraShiftedRead(file, shiftPath, shiftStatus, shiftKey))) =>
-      planRead(file, ExcludeId, Some(ShiftInfo(shiftPath, shiftStatus, shiftKey)))
+    case \/-(Const(ExtraShiftedRead(file, shiftPath, shiftStatus, shiftType, shiftKey))) =>
+      planRead(file, ExcludeId, Some(ShiftInfo(shiftPath, shiftStatus, shiftType, shiftKey)))
   }
 
   ////

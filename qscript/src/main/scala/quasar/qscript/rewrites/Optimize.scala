@@ -50,8 +50,8 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         QC: QScriptCore :<<: F)
       : QScriptCore[T[F]] => F[T[F]] = {
 
-    // LeftShift(ShiftedRead(_, ExcludeId), /foo/bar/, _, Map, Omit, f(RightSide))
-    case qc @ LeftShift(Embed(src), struct, shiftStatus, ShiftType.Map, OnUndefined.Omit, repair) => {
+    // LeftShift(ShiftedRead(_, ExcludeId), /foo/bar/, _, _, Omit, f(RightSide))
+    case qc @ LeftShift(Embed(src), struct, shiftStatus, shiftType, OnUndefined.Omit, repair) => {
 
       val key: ShiftKey = ShiftKey(ShiftedKey)
 
@@ -75,7 +75,7 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       val rewritten: Option[F[T[F]]] = (mfOpt |@| srOpt |@| pathOpt) {
         case (mf, sr, path) =>
           val src: T[F] = ER.inj(Const[ExtraShiftedRead[A], T[F]](
-            ExtraShiftedRead[A](sr.path, path, shiftStatus, key))).embed
+            ExtraShiftedRead[A](sr.path, path, shiftStatus, shiftType, key))).embed
 
           QC.inj(Map(src, mf.asRec))
       }

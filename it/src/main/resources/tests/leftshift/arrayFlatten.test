@@ -1,14 +1,12 @@
 {
   "name": "[qa_s09] array flatten simple",
 
-  "backends": {
-    "mimir":          "skip"
-  },
   "data": "../arrayProcessing.data",
 
   "query": "select a[*] as b from `../arrayProcessing.data`",
 
   "predicate": "exactly",
+  "ignoreResultOrder": true,
 
   "expected": [
     {"b": "a"},

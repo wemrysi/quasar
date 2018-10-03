@@ -33,24 +33,30 @@ import scalaz.syntax.std.option._
  *   ShiftedRead(path, ExcludeId),
  *   ProjectKey(ProjectKey(Hole, foo), bar),
  *   shiftStatus,
- *   ShiftType.Map,
+ *   shiftType,
  *   OnUndefined.Omit,
  *   repair) where `repair` does not reference `LeftSide`
  *
  * is equivalent to
  *
- * ExtraShiftedRead(path, List(foo, bar), shiftStatus, _)
+ * ExtraShiftedRead(path, List(foo, bar), shiftStatus, shiftType, _)
  */
 @Lenses final case class ExtraShiftedRead[A](
   path: A,
   shiftPath: ShiftPath,
   shiftStatus: IdStatus,
+  shiftType: ShiftType,
   shiftKey: ShiftKey)
 
 object ExtraShiftedRead {
 
   implicit def equal[A: Equal]: Equal[ExtraShiftedRead[A]] =
-    Equal.equalBy(r => (r.path, r.shiftPath.path, r.shiftStatus, r.shiftKey.key))
+    Equal.equalBy(r =>
+      (r.path,
+      r.shiftPath.path,
+      r.shiftStatus,
+      r.shiftType,
+      r.shiftKey.key))
 
   implicit def show[A <: APath]: Show[ExtraShiftedRead[A]] =
     RenderTree.toShow
@@ -58,9 +64,10 @@ object ExtraShiftedRead {
   implicit def renderTree[A <: APath]: RenderTree[ExtraShiftedRead[A]] =
     RenderTree.simple(List("ExtraShiftedRead"), r => {
       (posixCodec.printPath(r.path) + ", " +
-        r.shiftPath.path.shows + ", " +
+        r.shiftPath.shows + ", " +
         r.shiftStatus.shows + ", " +
-        r.shiftKey.key.shows).some
+        r.shiftType.shows + ", " +
+        r.shiftKey.shows).some
     })
 }
 
