@@ -194,6 +194,7 @@ lazy val api = project
 lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
   .dependsOn(foundation % BothScopes)
+  .settings(libraryDependencies ++= Dependencies.ejson)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)

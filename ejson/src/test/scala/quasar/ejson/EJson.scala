@@ -27,10 +27,15 @@ import quasar.contrib.iota._
 import scala.Predef.implicitly
 import scala.Predef.$conforms
 
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
+
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
+import monocle.syntax.fields._
 import org.specs2.scalacheck._
+import qdata._
+import qdata.time.{DateTimeInterval, OffsetDate, TimeGenerators}
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties.{equal => eql, _}
 
@@ -42,6 +47,8 @@ class EJsonSpecs extends Spec with EJsonArbitrary {
 
   type J = Fix[EJson]
   type JS = Fix[Json]
+
+  val J = Fixed[J]
 
   checkAll("Common", order.laws[Common[String]])
   checkAll("Common", traverse.laws[Common])
@@ -89,5 +96,53 @@ class EJsonSpecs extends Spec with EJsonArbitrary {
 
     js.transCata[J](EJson.fromJson(str(_)))
       .transAnaM[Option, JS, Json](EJson.toJson(str.getOption(_))) ≟ js.some
+  }
+
+  "qdata" >> {
+    import TimeGenerators._
+
+    val rt = new QDataRoundtrip[J]
+
+    val strKey = _1[(J, J), J] composePrism J.str
+
+    val normalize: EJson[J] => EJson[J] = {
+      case ExtEJson(Char(c)) => CommonEJson(Str(c.toString))
+      case CommonEJson(Dec(n)) if n.isWhole => ExtEJson(Int(n.toBigInt))
+      case ExtEJson(Map(js)) => ExtEJson(Map(js.filter(strKey.nonEmpty)))
+      case j => j
+    }
+
+    "roundtrips representable values" >> prop { j: J =>
+      val norm = j.transCata[J](normalize)
+      rt.roundtrip(norm) must_=== Some(norm)
+    }
+
+    "roundtrips LocalDate" >> prop { t: LocalDate =>
+      QDataDecode[J].getLocalDate(QDataEncode[J].makeLocalDate(t)) must_=== t
+    }
+
+    "roundtrips LocalDateTime" >> prop { t: LocalDateTime =>
+      QDataDecode[J].getLocalDateTime(QDataEncode[J].makeLocalDateTime(t)) must_=== t
+    }
+
+    "roundtrips LocalTime" >> prop { t: LocalTime =>
+      QDataDecode[J].getLocalTime(QDataEncode[J].makeLocalTime(t)) must_=== t
+    }
+
+    "roundtrips OffsetDate" >> prop { t: OffsetDate =>
+      QDataDecode[J].getOffsetDate(QDataEncode[J].makeOffsetDate(t)) must_=== t
+    }
+
+    "roundtrips OffsetDateTime" >> prop { t: OffsetDateTime =>
+      QDataDecode[J].getOffsetDateTime(QDataEncode[J].makeOffsetDateTime(t)) must_=== t
+    }
+
+    "roundtrips OffsetTime" >> prop { t: OffsetTime =>
+      QDataDecode[J].getOffsetTime(QDataEncode[J].makeOffsetTime(t)) must_=== t
+    }
+
+    "roundtrips DateTimeInterval" >> prop { t: DateTimeInterval =>
+      QDataDecode[J].getInterval(QDataEncode[J].makeInterval(t)) must_=== t
+    }
   }
 }

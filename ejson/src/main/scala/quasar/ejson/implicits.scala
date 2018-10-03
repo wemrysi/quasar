@@ -20,6 +20,8 @@ import slamdata.Predef._
 import quasar.contrib.matryoshka.{project => projectg, _}
 import quasar.contrib.iota.{copkTraverse, copkOrder}
 
+import qdata.{QDataDecode, QDataEncode}
+
 import matryoshka._
 import matryoshka.implicits._
 import scalaz.{==>>, Equal, Order}
@@ -42,6 +44,12 @@ object implicits {
         x.transCata[T](EJson.elideMetadata[T]),
         y.transCata[T](EJson.elideMetadata[T]))
     }
+
+  implicit def ejsonQDataDecode[J](implicit T: Recursive.Aux[J, EJson]): QDataDecode[J] =
+    QDataEJson.ejsonQDataDecode[J]
+
+  implicit def ejsonQDataEncode[J](implicit T: Corecursive.Aux[J, EJson]): QDataEncode[J] =
+    QDataEJson.ejsonQDataEncode[J]
 
   implicit final class EJsonOps[J](val j: J) extends scala.AnyVal {
     def array(implicit JR: Recursive.Aux[J, EJson]): Option[List[J]] =
