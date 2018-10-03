@@ -1,0 +1,18 @@
+{
+    "name": "shift deep-giraffe-plus with ExcludeId",
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir":     "ignoreFieldOrder"
+    },
+    "data": "deep-giraffe-plus.data",
+    "query": "select first.second{_}.testField as testField from `deep-giraffe-plus.data`",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      {"testField":"A"},
+      {"testField":"B"},
+      {"testField":"C"},
+      {"testField":"D"},
+      {"testField":"E"}
+    ]
+}
