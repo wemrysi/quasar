@@ -31,8 +31,9 @@ object Shifting {
     shiftType: ShiftType,
     shiftKey: ShiftKey)
 
-  /* Returns the `RObject` at the provided path, returning `None` when
-   * the path points to a non-object or the path does not exist.
+  /* Returns the `RObject` or `RArray` (determined by the `ShiftType`)
+   * at the provided path, returning `None` when the path points to a
+   * a non-composite or the path does not exist.
    *
    * A path `foo.bar.baz` is represented as `List("foo", "bar", "baz")`
    *
@@ -83,12 +84,14 @@ object Shifting {
       case Some(RArray(elems)) => shiftInfo.idStatus match {
         case IdOnly =>
           0.until(elems.length).toList.map(idx => RObject((shiftKey, CLong(idx))))
+
         case IncludeId => // the qscript expects the results to be returned in an array
           val (_, res) = elems.foldLeft((0, List[RValue]())) {
             case ((idx, acc), elem) =>
               (idx + 1, RObject((shiftKey, RArray(CLong(idx), elem))) :: acc)
           }
           res.reverse
+
         case ExcludeId =>
           elems.map(elem => RObject((shiftKey, elem)))
       }
