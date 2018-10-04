@@ -20,8 +20,6 @@ import quasar.precog.common.{CString, RArray, RObject, RValue}
 import quasar.qscript._
 
 import scalaz.syntax.std.option._
-import scalaz.syntax.equal._
-import scalaz.std.string._
 
 object Shifting {
 
@@ -39,9 +37,7 @@ object Shifting {
       case (v @ RObject(_), Nil) => v.some
       case (RObject(fields), head :: tail) =>
         val remainder: Option[(RValue, List[String])] =
-          fields.collectFirst {
-            case (key, target) if key === head => (target, tail)
-          }
+          fields.get(head).map((_, tail))
         remainder flatMap { case (target, tail) => drillToObject(target, tail) }
       case (_, _) => None
     }
