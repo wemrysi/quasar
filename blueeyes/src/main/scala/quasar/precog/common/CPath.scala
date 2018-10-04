@@ -16,8 +16,6 @@
 
 package quasar.precog.common
 
-import quasar.blueeyes._, json._
-
 import scalaz.Ordering._
 import scalaz.syntax.std.boolean._
 
@@ -85,42 +83,9 @@ sealed trait CPath { self =>
 
   def apply(index: Int): CPathNode = nodes(index)
 
-  def extract(jvalue: JValue): JValue = {
-    def extract0(path: List[CPathNode], d: JValue): JValue = path match {
-      case Nil                       => d
-      case CPathField(name) :: tail  => extract0(tail, d \ name)
-      case CPathIndex(index) :: tail => extract0(tail, d(index))
-      case head :: _                 => abort("Unexpected CPathNode " + head)
-    }
-    extract0(nodes, jvalue)
-  }
-
   def head: Option[CPathNode] = nodes.headOption
 
   def tail: CPath = CPath(nodes.tail: _*)
-
-  def expand(jvalue: JValue): List[CPath] = {
-    def isRegex(s: String) = s.startsWith("(") && s.endsWith(")")
-
-    def expand0(current: List[CPathNode], right: List[CPathNode], d: JValue): List[CPath] = right match {
-      case Nil                                              => CPath(current) :: Nil
-      case (x @ CPathIndex(index)) :: tail                  => expand0(current :+ x, tail, jvalue(index))
-      case (x @ CPathField(name)) :: tail if !isRegex(name) => expand0(current :+ x, tail, jvalue \ name)
-      case (x @ CPathField(name)) :: tail =>
-        val R = name.r
-        val fields = jvalue match {
-          case JObject(fs) => fs.toList
-          case _           => Nil
-        }
-        fields flatMap {
-          case (R(name), value) => expand0(current :+ CPathField(name), tail, value)
-          case _                => Nil
-        }
-      case head :: _ => abort("Unexpected CPathNode " + head)
-    }
-
-    expand0(Nil, nodes, jvalue)
-  }
 
   def path = nodes.mkString("")
 
