@@ -177,7 +177,7 @@ private[table] final class SlicePlate extends Plate[List[Slice]] {
     var back = try {
       columns(ref)
     } catch {
-      case _: Exception => null
+      case _: NoSuchElementException => null
     }
 
     if (back == null) {
@@ -203,8 +203,8 @@ private[table] final class SlicePlate extends Plate[List[Slice]] {
     if (size >= nextThreshold) {
       nextThreshold *= 2
 
-      for ((_, col) <- columns) {
-        col.resize(nextThreshold)
+      for ((ref, col) <- columns) {
+        columns(ref) = col.resize(nextThreshold)
       }
     }
   }
