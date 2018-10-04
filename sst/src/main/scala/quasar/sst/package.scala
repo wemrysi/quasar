@@ -41,6 +41,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
+import qdata.QDataEncode
 import scalaz._, Scalaz._
 import spire.algebra.{AdditiveSemigroup, Field, NRoot}
 import spire.math.ConvertableTo
@@ -120,6 +121,13 @@ package object sst {
       case C(Str(_))                     => strings.StructuralString.right
       case _                             => primaryTypeOf(ejs).left
     }
+
+  implicit def sstQDataEncode[J: Order, A: ConvertableTo: Field: Order](
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : QDataEncode[SST[J, A]] =
+    QDataSst.encode[J, A]
 
   // NB: Defined here as adding the tag causes the compiler not to consider the TypeStat companion.
   implicit def populationTypeStatDecodeEJson[A: DecodeEJson: Equal: Field: NRoot]: DecodeEJson[TypeStat[A] @@ Population] =
