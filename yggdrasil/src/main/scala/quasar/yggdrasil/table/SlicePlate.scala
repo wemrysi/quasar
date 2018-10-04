@@ -174,13 +174,18 @@ private[table] final class SlicePlate extends Plate[List[Slice]] {
   }
 
   private def checkGet(ref: ColumnRef): ArrayColumn[_] = {
-    var back = columns(ref)
+    var back = try {
+      columns(ref)
+    } catch {
+      case _: Exception => null
+    }
 
     if (back == null) {
       back = ref.ctype match {
         case CBoolean => ArrayBoolColumn.empty(nextThreshold)
         case CLong => ArrayLongColumn.empty(nextThreshold)
         case CDouble => ArrayDoubleColumn.empty(nextThreshold)
+        case CNum => ArrayNumColumn.empty(nextThreshold)
         case CString => ArrayStrColumn.empty(nextThreshold)
         case CNull => MutableNullColumn.empty()
         case CEmptyArray => MutableEmptyArrayColumn.empty()
