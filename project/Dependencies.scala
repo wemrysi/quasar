@@ -132,6 +132,8 @@ object Dependencies {
   )
 
   def yggdrasil = Seq(
+    "com.slamdata" %% "tectonic" % tectonicVersion,
+    "com.slamdata" %% "tectonic-test" % tectonicVersion % "test",
     "com.codecommit" %% "smock" % "0.4.0-specs2-4.0.2" % "test"
   )
 
