@@ -1,0 +1,23 @@
+{
+    "name": "shift deep-giraffe-array with IdOnly",
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir":     "ignoreFieldOrder"
+    },
+    "data": "deep-giraffe-array.data",
+    "query": "select first.second[_:] as key from `deep-giraffe-array.data`",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      {"key":0},
+      {"key":1},
+      {"key":0},
+      {"key":1},
+      {"key":0},
+      {"key":1},
+      {"key":0},
+      {"key":1},
+      {"key":0},
+      {"key":1}
+    ]
+}
