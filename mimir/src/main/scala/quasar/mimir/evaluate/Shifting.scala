@@ -16,32 +16,44 @@
 
 package quasar.mimir.evaluate
 
-import quasar.precog.common.{CString, RArray, RObject, RValue}
+import quasar.precog.common.{CLong, CString, RArray, RObject, RValue}
 import quasar.qscript._
 
+import scalaz.syntax.equal._
 import scalaz.syntax.std.option._
 
 object Shifting {
 
-  final case class ShiftInfo(shiftPath: ShiftPath, idStatus: IdStatus, shiftKey: ShiftKey)
+  final case class ShiftInfo(
+    shiftPath: ShiftPath,
+    idStatus: IdStatus,
+    shiftType: ShiftType,
+    shiftKey: ShiftKey)
 
-  /* Returns the `RObject` at the provided path, returning `None` when
-   * the path points to a non-object or the path does not exist.
+  /* Returns the `RObject` or `RArray` (determined by the `ShiftType`)
+   * at the provided path, returning `None` when the path points to a
+   * a non-composite or the path does not exist.
    *
    * A path `foo.bar.baz` is represented as `List("foo", "bar", "baz")`
    *
    * Paths including static array derefs are not currently supported.
    */
-  def compositeValueAtPath(path: List[String], rvalue: RValue): Option[RValue] = {
+  def compositeValueAtPath(path: List[String], shiftType: ShiftType, rvalue: RValue)
+      : Option[RValue] =
     (rvalue, path) match {
-      case (v @ RObject(_), Nil) => v.some
+      case (v @ RObject(_), Nil) if shiftType === ShiftType.Map => v.some
+      case (v @ RArray(_), Nil) if shiftType === ShiftType.Array => v.some
+
       case (RObject(fields), head :: tail) =>
         val remainder: Option[(RValue, List[String])] =
           fields.get(head).map((_, tail))
-        remainder flatMap { case (target, tail) => compositeValueAtPath(tail, target) }
+
+        remainder flatMap { case (target, tail) =>
+          compositeValueAtPath(tail, shiftType, target)
+        }
+
       case (_, _) => None
     }
-  }
 
   /* Shifts the provided `RValue`, returning the shifted rows and omitting
    * unused fields.
@@ -51,7 +63,9 @@ object Shifting {
    */
   def shiftRValue(rvalue: RValue, shiftInfo: ShiftInfo): List[RValue] = {
     val shiftKey: String = shiftInfo.shiftKey.key
-    val target: Option[RValue] = compositeValueAtPath(shiftInfo.shiftPath.path, rvalue)
+
+    val target: Option[RValue] =
+      compositeValueAtPath(shiftInfo.shiftPath.path, shiftInfo.shiftType, rvalue)
 
     target match {
       case Some(RObject(fields)) => shiftInfo.idStatus match {
@@ -68,6 +82,22 @@ object Shifting {
             case (acc, (_, v)) => RObject((shiftKey, v)) :: acc
           }
       }
+
+      case Some(RArray(elems)) => shiftInfo.idStatus match {
+        case IdOnly =>
+          0.until(elems.length).toList.map(idx => RObject((shiftKey, CLong(idx))))
+
+        case IncludeId => // the qscript expects the results to be returned in an array
+          val (_, res) = elems.foldLeft((0, List[RValue]())) {
+            case ((idx, acc), elem) =>
+              (idx + 1, RObject((shiftKey, RArray(CLong(idx), elem))) :: acc)
+          }
+          res.reverse
+
+        case ExcludeId =>
+          elems.map(elem => RObject((shiftKey, elem)))
+      }
+
       case _ =>  Nil // omit rows that cannot be shifted
     }
   }

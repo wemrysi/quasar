@@ -182,6 +182,7 @@ object OptimizeSpec extends Qspec {
               rootDir </> file("foo"),
               ShiftPath(List()),
               IncludeId,
+              ShiftType.Map,
               ShiftKey(ShiftedKey)),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
@@ -208,6 +209,7 @@ object OptimizeSpec extends Qspec {
               rootDir </> file("foo"),
               ShiftPath(List()),
               IdOnly,
+              ShiftType.Map,
               ShiftKey(ShiftedKey)),
             recFuncE.MakeMapS("k1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
@@ -231,6 +233,7 @@ object OptimizeSpec extends Qspec {
               rootDir </> file("foo"),
               ShiftPath(List()),
               ExcludeId,
+              ShiftType.Map,
               ShiftKey(ShiftedKey)),
             recFuncE.MakeMapS("v1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
@@ -258,6 +261,7 @@ object OptimizeSpec extends Qspec {
               rootDir </> file("foo"),
               ShiftPath(List()),
               ExcludeId,
+              ShiftType.Map,
               ShiftKey(ShiftedKey)),
             recFuncE.MakeMapS("v1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey))),
@@ -284,6 +288,7 @@ object OptimizeSpec extends Qspec {
               rootDir </> file("foo"),
               ShiftPath(List("xyz")),
               IncludeId,
+              ShiftType.Map,
               ShiftKey(ShiftedKey)),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
@@ -317,6 +322,7 @@ object OptimizeSpec extends Qspec {
               rootDir </> file("foo"),
               ShiftPath(List("aaa", "bbb", "ccc")),
               IncludeId,
+              ShiftType.Map,
               ShiftKey(ShiftedKey)),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
