@@ -95,7 +95,6 @@ private[table] final class SlicePlate extends Plate[List[Slice]] {
         case _: NumberFormatException =>
           val col = checkGet(ColumnRef(CPath(cursor.reverse), CNum)).asInstanceOf[ArrayNumColumn]
           col(size) = BigDecimal(s.toString)
-
       }
     } else {
       val num = BigDecimal(s.toString)
