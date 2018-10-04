@@ -1717,7 +1717,7 @@ abstract class Slice { source =>
     columns.foldLeft[RValue](CUndefined) {
       case (rv, (ColumnRef(selector, _), col)) if col.isDefinedAt(row) =>
         CPathUtils.cPathToJPaths(selector, col.cValue(row)).foldLeft(rv) {
-          case (rv, (path, value)) => rv.unsafeInsert(CPath(path), value)
+          case (rv, (path, value)) => rv.unsafeInsert(jPathToCPath(path), value)
         }
 
       case (rv, _) => rv
@@ -2107,7 +2107,7 @@ object Slice {
       case (acc, (jpath, JUndefined)) => acc
       case (acc, (jpath, v)) =>
         val ctype = CType.forJValueRaw(v) getOrElse { sys.error("Cannot determine ctype for " + v + " at " + jpath + " in " + jv) }
-        val ref   = ColumnRef(remapPath.map(_ (jpath)).getOrElse(CPath(jpath)), ctype)
+        val ref   = ColumnRef(remapPath.map(_ (jpath)).getOrElse(jPathToCPath(jpath)), ctype)
 
         val updatedColumn: ArrayColumn[_] = v match {
           case JBool(b) =>

@@ -53,7 +53,7 @@ trait BlockSortSpec extends SpecificationLike with ScalaCheck {
       JArray(sortKeys.map(_.extract(v \ "value")).toList ::: List(v \ "globalId")).asInstanceOf[JValue]
     }(desiredJValueOrder).map(_.delete(globalIdPath).get).toList
 
-    val cSortKeys = sortKeys map { CPath(_) }
+    val cSortKeys = sortKeys map { jPathToCPath(_) }
 
     val resultM = for {
       sorted <- module.fromSample(sample).sort(module.sortTransspec(cSortKeys: _*), sortOrder)

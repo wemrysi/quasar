@@ -143,7 +143,6 @@ case object CPathArray extends CPathNode {
 }
 
 object CPath {
-  import quasar.blueeyes.json._
 
   private[this] case class CompositeCPath(nodes: List[CPathNode]) extends CPath
 
@@ -155,15 +154,6 @@ object CPath {
   def apply(n: CPathNode*): CPath = CompositeCPath(n.toList)
 
   def apply(l: List[CPathNode]): CPath = apply(l: _*)
-
-  def apply(path: JPath): CPath = {
-    val nodes2 = path.nodes map {
-      case JPathField(name) => CPathField(name)
-      case JPathIndex(idx)  => CPathIndex(idx)
-    }
-
-    CPath(nodes2: _*)
-  }
 
   def unapplySeq(path: CPath): Option[List[CPathNode]] = Some(path.nodes)
 

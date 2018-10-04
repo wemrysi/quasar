@@ -79,7 +79,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
       (back \ "value" != JUndefined).option(back)
     }
 
-    val cschema = module.schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
+    val cschema = module.schema map { case (jpath, ctype) => ColumnRef(jPathToCPath(jpath), ctype) }
 
     val result = module.Table.constString(Set("/test")).load(Schema.mkType(cschema).get).flatMap(t => EitherT.rightT(t.toJson)).run.unsafeRunSync
     result.map(_.toList) must_== \/.right(expected.toList.map(RValue.fromJValueRaw))
