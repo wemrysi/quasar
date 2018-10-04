@@ -32,13 +32,13 @@ object Shifting {
    *
    * Paths including static array derefs are not currently supported.
    */
-  def drillToObject(rvalue: RValue, path: List[String]): Option[RValue] = {
+  def compositeValueAtPath(path: List[String], rvalue: RValue): Option[RValue] = {
     (rvalue, path) match {
       case (v @ RObject(_), Nil) => v.some
       case (RObject(fields), head :: tail) =>
         val remainder: Option[(RValue, List[String])] =
           fields.get(head).map((_, tail))
-        remainder flatMap { case (target, tail) => drillToObject(target, tail) }
+        remainder flatMap { case (target, tail) => compositeValueAtPath(tail, target) }
       case (_, _) => None
     }
   }
@@ -51,7 +51,7 @@ object Shifting {
    */
   def shiftRValue(rvalue: RValue, shiftInfo: ShiftInfo): List[RValue] = {
     val shiftKey: String = shiftInfo.shiftKey.key
-    val target: Option[RValue] = drillToObject(rvalue, shiftInfo.shiftPath.path)
+    val target: Option[RValue] = compositeValueAtPath(shiftInfo.shiftPath.path, rvalue)
 
     target match {
       case Some(RObject(fields)) => shiftInfo.idStatus match {
