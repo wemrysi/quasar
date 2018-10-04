@@ -53,10 +53,10 @@ object ExtraShiftedRead {
   implicit def equal[A: Equal]: Equal[ExtraShiftedRead[A]] =
     Equal.equalBy(r =>
       (r.path,
-      r.shiftPath.path,
+      r.shiftPath,
       r.shiftStatus,
       r.shiftType,
-      r.shiftKey.key))
+      r.shiftKey))
 
   implicit def show[A <: APath]: Show[ExtraShiftedRead[A]] =
     RenderTree.toShow

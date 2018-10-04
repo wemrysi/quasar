@@ -86,6 +86,12 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     case qc => QC.inj(qc)
   }
 
+  /* Matches on a `FreeMap` of the form
+   * ```
+   * ProjectKey(ProjectKey(...(ProjectKey(Hole, Const(Str))), Const(Str)), Const(Str))
+   * ```
+   * returning the `ShiftPath` when that form is matched.
+   */
   def findPath(fm: FreeMap): Option[ShiftPath] = {
     import MapFuncsCore.{Constant, ProjectKey}
 

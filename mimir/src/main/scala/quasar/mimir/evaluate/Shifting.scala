@@ -19,9 +19,8 @@ package quasar.mimir.evaluate
 import quasar.precog.common.{CLong, CString, RArray, RObject, RValue}
 import quasar.qscript._
 
-import scalaz.syntax.std.option._
 import scalaz.syntax.equal._
-import scalaz.std.string._
+import scalaz.syntax.std.option._
 
 object Shifting {
 
@@ -39,17 +38,20 @@ object Shifting {
    *
    * Paths including static array derefs are not currently supported.
    */
-  def drillToTarget(rvalue: RValue, path: List[String], shiftType: ShiftType)
+  def compositeValueAtPath(path: List[String], shiftType: ShiftType, rvalue: RValue)
       : Option[RValue] =
     (rvalue, path) match {
       case (v @ RObject(_), Nil) if shiftType === ShiftType.Map => v.some
       case (v @ RArray(_), Nil) if shiftType === ShiftType.Array => v.some
+
       case (RObject(fields), head :: tail) =>
         val remainder: Option[(RValue, List[String])] =
-          fields.collectFirst {
-            case (key, target) if key === head => (target, tail)
-          }
-        remainder flatMap { case (target, tail) => drillToTarget(target, tail, shiftType) }
+          fields.get(head).map((_, tail))
+
+        remainder flatMap { case (target, tail) =>
+          compositeValueAtPath(tail, shiftType, target)
+        }
+
       case (_, _) => None
     }
 
@@ -63,7 +65,7 @@ object Shifting {
     val shiftKey: String = shiftInfo.shiftKey.key
 
     val target: Option[RValue] =
-      drillToTarget(rvalue, shiftInfo.shiftPath.path, shiftInfo.shiftType)
+      compositeValueAtPath(shiftInfo.shiftPath.path, shiftInfo.shiftType, rvalue)
 
     target match {
       case Some(RObject(fields)) => shiftInfo.idStatus match {

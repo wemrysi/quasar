@@ -25,22 +25,22 @@ import scalaz.std.option._
 
 object ShiftingSpec extends Qspec {
 
-  "rvalue shifting" >> {
+  import Shifting.{compositeValueAtPath, shiftRValue, ShiftInfo}
 
-    import Shifting.{drillToTarget, shiftRValue, ShiftInfo}
+  "rvalue shifting" >> {
 
     "return entire array when provided path is empty and shift type is array" >> {
       val target =
         RArray(List(CString("target"), CDouble(1.2)))
 
-      drillToTarget(target, List(), ShiftType.Array) must equal(Some(target))
+      compositeValueAtPath(List(), ShiftType.Array, target) must equal(Some(target))
     }
 
     "return entire object when provided path is empty and shift type is object" >> {
       val target =
         RObject(("target", CDouble(1.2)))
 
-      drillToTarget(target, List(), ShiftType.Map) must equal(Some(target))
+      compositeValueAtPath(List(), ShiftType.Map, target) must equal(Some(target))
     }
 
     "return no results when the provided path is not present" >> {
@@ -55,7 +55,7 @@ object ShiftingSpec extends Qspec {
 
       val shiftInfo = ShiftInfo(shiftPath, IncludeId, ShiftType.Map, shiftKey)
 
-      drillToTarget(rvalue, shiftPath.path, shiftInfo.shiftType) must equal(None)
+      compositeValueAtPath(shiftPath.path, shiftInfo.shiftType, rvalue) must equal(None)
 
       shiftRValue(rvalue, shiftInfo) must equal(List())
     }
@@ -67,13 +67,13 @@ object ShiftingSpec extends Qspec {
           CBoolean(true),
           RObject(("target", CDouble(1.2))))
 
-      drillToTarget(rvalue, List("target"), ShiftType.Map) must equal(None)
+      compositeValueAtPath(List("target"), ShiftType.Map, rvalue) must equal(None)
     }
 
     "return no results when the provided rvalue is a constant" >> {
       val rvalue = CLong(4L)
 
-      drillToTarget(rvalue, List("target"), ShiftType.Map) must equal(None)
+      compositeValueAtPath(List("target"), ShiftType.Map, rvalue) must equal(None)
     }
 
     "return correct results when the provided path points to an object at the top level" >> {
@@ -86,7 +86,7 @@ object ShiftingSpec extends Qspec {
           ("two", CBoolean(true)),
           ("three", target))
 
-      drillToTarget(rvalue, List("three"), ShiftType.Map) must equal(Some(target))
+      compositeValueAtPath(List("three"), ShiftType.Map, rvalue) must equal(Some(target))
     }
 
     "return no results when the provided path points to an object but the shift type is array" >> {
@@ -99,7 +99,7 @@ object ShiftingSpec extends Qspec {
           ("two", CBoolean(true)),
           ("three", target))
 
-      drillToTarget(rvalue, List("three"), ShiftType.Array) must equal(None)
+      compositeValueAtPath(List("three"), ShiftType.Array, rvalue) must equal(None)
     }
 
     "return correct results when the provided path points to an array at the top level" >> {
@@ -112,7 +112,7 @@ object ShiftingSpec extends Qspec {
           ("two", CBoolean(true)),
           ("three", target))
 
-      drillToTarget(rvalue, List("three"), ShiftType.Array) must equal(Some(target))
+      compositeValueAtPath(List("three"), ShiftType.Array, rvalue) must equal(Some(target))
     }
 
     "return no results when the provided path points to an array but the shift type is an object" >> {
@@ -125,7 +125,7 @@ object ShiftingSpec extends Qspec {
           ("two", CBoolean(true)),
           ("three", target))
 
-      drillToTarget(rvalue, List("three"), ShiftType.Map) must equal(None)
+      compositeValueAtPath(List("three"), ShiftType.Map, rvalue) must equal(None)
     }
 
     "return no results when the provided path is two levels deep and is not an object" >> {
@@ -135,7 +135,7 @@ object ShiftingSpec extends Qspec {
           ("two", CBoolean(true)),
           ("three", RObject(("target", CDouble(1.2)))))
 
-      drillToTarget(rvalue, List("three", "target"), ShiftType.Map) must equal(None)
+      compositeValueAtPath(List("three", "target"), ShiftType.Map, rvalue) must equal(None)
     }
 
     "return correct results when the provided path is two levels deep and is an object" >> {
@@ -155,7 +155,7 @@ object ShiftingSpec extends Qspec {
       val shiftInfoExcludeId = ShiftInfo(shiftPath, ExcludeId, ShiftType.Map, shiftKey)
       val shiftInfoIdOnly = ShiftInfo(shiftPath, IdOnly, ShiftType.Map, shiftKey)
 
-      drillToTarget(rvalue, shiftPath.path, ShiftType.Map) must equal(Some(target))
+      compositeValueAtPath(shiftPath.path, ShiftType.Map, rvalue) must equal(Some(target))
 
       shiftRValue(rvalue, shiftInfoIncludeId) must equal(
         List(RObject((shiftKey.key, RArray(CString("target"), CDouble(1.2))))))
@@ -184,7 +184,7 @@ object ShiftingSpec extends Qspec {
       val shiftInfoExcludeId = ShiftInfo(shiftPath, ExcludeId, ShiftType.Array, shiftKey)
       val shiftInfoIdOnly = ShiftInfo(shiftPath, IdOnly, ShiftType.Array, shiftKey)
 
-      drillToTarget(rvalue, shiftPath.path, ShiftType.Array) must equal(Some(target))
+      compositeValueAtPath(shiftPath.path, ShiftType.Array, rvalue) must equal(Some(target))
 
       shiftRValue(rvalue, shiftInfoIncludeId) must equal(
         List(
@@ -222,7 +222,7 @@ object ShiftingSpec extends Qspec {
       val shiftInfoExcludeId = ShiftInfo(shiftPath, ExcludeId, ShiftType.Map, shiftKey)
       val shiftInfoIdOnly = ShiftInfo(shiftPath, IdOnly, ShiftType.Map, shiftKey)
 
-      drillToTarget(rvalue, shiftPath.path, ShiftType.Map) must equal(Some(target))
+      compositeValueAtPath(shiftPath.path, ShiftType.Map, rvalue) must equal(Some(target))
 
       shiftRValue(rvalue, shiftInfoIncludeId) must equal(
         List(
