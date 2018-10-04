@@ -50,7 +50,7 @@ import scalaz.syntax.std.option._
 object ExtraShiftedRead {
 
   implicit def equal[A: Equal]: Equal[ExtraShiftedRead[A]] =
-    Equal.equalBy(r => (r.path, r.shiftPath.path, r.shiftStatus, r.shiftKey.key))
+    Equal.equalBy(r => (r.path, r.shiftPath, r.shiftStatus, r.shiftKey))
 
   implicit def show[A <: APath]: Show[ExtraShiftedRead[A]] =
     RenderTree.toShow
