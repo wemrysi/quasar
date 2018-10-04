@@ -16,6 +16,8 @@
 
 package quasar.qscript.rewrites
 
+import slamdata.Predef._
+
 import quasar.Qspec
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
@@ -29,6 +31,7 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
 import scalaz.Const
+import scalaz.std.option._
 
 object OptimizeSpec extends Qspec {
 
@@ -63,6 +66,95 @@ object OptimizeSpec extends Qspec {
 
   val optimize = new Optimize[Fix]
 
+  "path-finding" >> {
+
+    "find the path of Hole" >> {
+      optimize.findPath(funcE.Hole) must equal(
+        Some(ShiftPath(List[String]())))
+    }
+
+    "find the path of a single object projection" >> {
+      optimize.findPath(funcE.ProjectKeyS(funcE.Hole, "xyz")) must equal(
+        Some(ShiftPath(List[String]("xyz"))))
+    }
+
+    "find the path of a triple object projection" >> {
+      val fm =
+        funcE.ProjectKeyS(
+          funcE.ProjectKeyS(
+            funcE.ProjectKeyS(
+              funcE.Hole,
+              "aaa"),
+            "bbb"),
+          "ccc")
+
+      optimize.findPath(fm) must equal(
+        Some(ShiftPath(List[String]("aaa", "bbb", "ccc"))))
+    }
+
+    "fail find the path of an object projection with a non-string key" >> {
+      val fm =
+        funcE.ProjectKey(funcE.Hole, funcE.Constant(ejs.bool(true)))
+
+      optimize.findPath(fm) must equal(None)
+    }
+
+    "fail find the path of an object projection with a dynamic key" >> {
+      val fm =
+        funcE.ProjectKey(
+          funcE.Hole,
+          funcE.ToString(funcE.ProjectKeyS(funcE.Hole, "foobar")))
+
+      optimize.findPath(fm) must equal(None)
+    }
+
+    "fail find the path of an object projection with a dynamic key that is itself a projection" >> {
+      val fm =
+        funcE.ProjectKey(
+          funcE.Hole,
+          funcE.ProjectKeyS(funcE.Hole, "foobar"))
+
+      optimize.findPath(fm) must equal(None)
+    }
+
+    "fail to find the path of non-projection" >> {
+      val fm =
+        funcE.ProjectKeyS(
+          funcE.MakeMapS(
+            "map key",
+            funcE.ProjectKeyS(funcE.Hole, "aaa")),
+          "ccc")
+
+      optimize.findPath(fm) must equal(None)
+    }
+
+    "fail to find the path of an array projection" >> {
+      val fm =
+        funcE.ProjectKeyS(
+          funcE.ProjectIndexI(
+            funcE.ProjectKeyS(
+              funcE.Hole,
+              "aaa"),
+            42),
+          "ccc")
+
+      optimize.findPath(fm) must equal(None)
+    }
+
+    "fail to find the path of a projection whose source is not Hole" >> {
+      val fm =
+        funcE.ProjectKeyS(
+          funcE.ProjectKeyS(
+            funcE.ProjectKeyS(
+              funcE.Constant[Hole](ejs.str("constant string")),
+              "aaa"),
+            "bbb"),
+          "ccc")
+
+      optimize.findPath(fm) must equal(None)
+    }
+  }
+
   "ExtraLeftShift rewrite" >> {
 
     val extraShiftFunc: QSExtra[Fix[QSExtra]] => QSExtra[Fix[QSExtra]] =
@@ -88,6 +180,7 @@ object OptimizeSpec extends Qspec {
           fixE.Map(
             fixE.ExtraShiftedRead[AFile](
               rootDir </> file("foo"),
+              ShiftPath(List()),
               IncludeId,
               ShiftKey(ShiftedKey)),
             recFuncE.ConcatMaps(
@@ -113,6 +206,7 @@ object OptimizeSpec extends Qspec {
           fixE.Map(
             fixE.ExtraShiftedRead[AFile](
               rootDir </> file("foo"),
+              ShiftPath(List()),
               IdOnly,
               ShiftKey(ShiftedKey)),
             recFuncE.MakeMapS("k1",
@@ -135,6 +229,7 @@ object OptimizeSpec extends Qspec {
           fixE.Map(
             fixE.ExtraShiftedRead[AFile](
               rootDir </> file("foo"),
+              ShiftPath(List()),
               ExcludeId,
               ShiftKey(ShiftedKey)),
             recFuncE.MakeMapS("v1",
@@ -144,11 +239,142 @@ object OptimizeSpec extends Qspec {
       }
     }
 
-    "not rewrite when the shift source is not Hole" >> {
+    "rewrite when the target LeftShift is the source of another node" >> {
+      val initial: Fix[QSExtra] =
+        fixE.Filter(
+          fixE.LeftShift(
+            fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+            recFuncE.Hole,
+            ExcludeId, // ExcludeId
+            ShiftType.Map,
+            OnUndefined.Omit,
+            funcE.MakeMapS("v1", funcE.RightSide)),
+          recFuncE.Constant(ejs.bool(true)))
+
+      val expected: Fix[QSExtra] =
+        fixE.Filter(
+          fixE.Map(
+            fixE.ExtraShiftedRead[AFile](
+              rootDir </> file("foo"),
+              ShiftPath(List()),
+              ExcludeId,
+              ShiftKey(ShiftedKey)),
+            recFuncE.MakeMapS("v1",
+              recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey))),
+          recFuncE.Constant(ejs.bool(true)))
+
+      extraShift(initial) must equal(expected)
+    }
+
+    "rewrite when the shift source is a single projection" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
           fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
-          recFuncE.ProjectKeyS(recFunc.Hole, "xyz"), // shift source is not Hole
+          recFuncE.ProjectKeyS(recFunc.Hole, "xyz"), // shift source is a single projection
+          IncludeId,
+          ShiftType.Map,
+          OnUndefined.Omit,
+          funcE.ConcatMaps(
+            funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
+            funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
+
+        val expected: Fix[QSExtra] =
+          fixE.Map(
+            fixE.ExtraShiftedRead[AFile](
+              rootDir </> file("foo"),
+              ShiftPath(List("xyz")),
+              IncludeId,
+              ShiftKey(ShiftedKey)),
+            recFuncE.ConcatMaps(
+              recFuncE.MakeMapS("k1",
+                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 0)),
+              recFuncE.MakeMapS("v1",
+                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 1))))
+
+      extraShift(initial) must equal(expected)
+    }
+
+    "rewrite when the shift source is three projections" >> {
+      val initial: Fix[QSExtra] =
+        fixE.LeftShift(
+          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          recFuncE.ProjectKeyS( // shift source is three projections
+            recFuncE.ProjectKeyS(
+              recFuncE.ProjectKeyS(recFunc.Hole,
+                "aaa"),
+              "bbb"),
+            "ccc"),
+          IncludeId,
+          ShiftType.Map,
+          OnUndefined.Omit,
+          funcE.ConcatMaps(
+            funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
+            funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
+
+        val expected: Fix[QSExtra] =
+          fixE.Map(
+            fixE.ExtraShiftedRead[AFile](
+              rootDir </> file("foo"),
+              ShiftPath(List("aaa", "bbb", "ccc")),
+              IncludeId,
+              ShiftKey(ShiftedKey)),
+            recFuncE.ConcatMaps(
+              recFuncE.MakeMapS("k1",
+                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 0)),
+              recFuncE.MakeMapS("v1",
+                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 1))))
+
+      extraShift(initial) must equal(expected)
+    }
+
+    "not rewrite when the shift struct is a (nonsensical) constant" >> {
+      val initial: Fix[QSExtra] =
+        fixE.LeftShift(
+          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          recFuncE.Constant(ejs.str("string!")), // constant string
+          IncludeId,
+          ShiftType.Map,
+          OnUndefined.Omit,
+          funcE.ConcatMaps(
+            funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
+            funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
+
+      extraShift(initial) must equal(initial)
+    }
+
+    // we can support projection through arrays in the future.
+    // 🦖  rawr!
+    "not rewrite when the shift struct contains static array and object projections" >> {
+      val initial: Fix[QSExtra] =
+        fixE.LeftShift(
+          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          recFuncE.ProjectKeyS(
+            recFuncE.ProjectIndexI( // shift source contains an array projection
+              recFuncE.ProjectKeyS(recFunc.Hole,
+                "aaa"),
+              42),
+            "ccc"),
+          IncludeId,
+          ShiftType.Map,
+          OnUndefined.Omit,
+          funcE.ConcatMaps(
+            funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
+            funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
+
+      extraShift(initial) must equal(initial)
+    }
+
+    // we will need to allow certain static mapfuncs as structs in the future.
+    // 🦕  herbivore rawr!
+    "not rewrite when the shift struct is not a projection and not Hole" >> {
+      val initial: Fix[QSExtra] =
+        fixE.LeftShift(
+          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          recFuncE.ProjectKeyS(
+            recFuncE.MakeMapS( // shift source is not a projection
+              "i am a key",
+              recFuncE.ProjectKeyS(recFunc.Hole, "aaa")),
+            "ccc"),
           IncludeId,
           ShiftType.Map,
           OnUndefined.Omit,
@@ -170,6 +396,32 @@ object OptimizeSpec extends Qspec {
           funcE.ConcatMaps(
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.LeftSide))) // LeftSide is referenced
+
+      extraShift(initial) must equal(initial)
+    }
+
+    "not rewrite when the ShiftedRead has IncludeId" >> {
+      val initial: Fix[QSExtra] =
+        fixE.LeftShift(
+          fixE.ShiftedRead[AFile](rootDir </> file("foo"), IncludeId), // IncludeId
+          recFunc.Hole,
+          IncludeId,
+          ShiftType.Map,
+          OnUndefined.Emit,
+          funcE.RightSide)
+
+      extraShift(initial) must equal(initial)
+    }
+
+    "not rewrite when the ShiftedRead has IdOnly" >> {
+      val initial: Fix[QSExtra] =
+        fixE.LeftShift(
+          fixE.ShiftedRead[AFile](rootDir </> file("foo"), IdOnly), // IdOnly
+          recFunc.Hole,
+          IncludeId,
+          ShiftType.Map,
+          OnUndefined.Emit,
+          funcE.RightSide)
 
       extraShift(initial) must equal(initial)
     }

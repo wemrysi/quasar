@@ -22,7 +22,7 @@ import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.impl.evaluate.{Source => EvalSource}
 import quasar.mimir._, MimirCake._
-import quasar.precog.common.{CString, RArray, RObject, RValue}
+import quasar.precog.common.RValue
 import quasar.qscript._, PlannerError.InternalError
 import quasar.yggdrasil.{MonadFinalizers, TransSpecModule}
 
@@ -39,6 +39,8 @@ final class FederatedShiftedReadPlanner[
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]](
     val P: Cake) {
 
+  import Shifting.ShiftInfo
+
   type Assocs = Associates[T, IO]
   type M[A] = AssociatesT[T, F, IO, A]
 
@@ -49,8 +51,8 @@ final class FederatedShiftedReadPlanner[
     case -\/(Const(ShiftedRead(file, status))) =>
       planRead(file, status, None)
 
-    case \/-(Const(ExtraShiftedRead(file, shiftStatus, shiftKey))) =>
-      planRead(file, ExcludeId, Some(ShiftInfo(shiftStatus, shiftKey)))
+    case \/-(Const(ExtraShiftedRead(file, shiftPath, shiftStatus, shiftKey))) =>
+      planRead(file, ExcludeId, Some(ShiftInfo(shiftPath, shiftStatus, shiftKey)))
   }
 
   ////
@@ -58,8 +60,6 @@ final class FederatedShiftedReadPlanner[
   private val dsl = construction.mkGeneric[T, QScriptRead[T, ?]]
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
-
-  private final case class ShiftInfo(idStatus: IdStatus, shiftKey: ShiftKey)
 
   private def planRead(file: AFile, readStatus: IdStatus, shiftInfo: Option[ShiftInfo])(
       implicit ec: ExecutionContext)
@@ -126,35 +126,13 @@ final class FederatedShiftedReadPlanner[
       implicit ec: ExecutionContext)
       : F[P.Table] = {
 
-    def shiftRValue(rvalue: RValue, shiftInfo: ShiftInfo): List[RValue] = {
-      val shiftKey: String = shiftInfo.shiftKey.key
-
-      rvalue match {
-        case RObject(fields) => shiftInfo.idStatus match {
-          case IdOnly =>
-            fields.foldLeft(List[RValue]()) {
-              case (acc, (k, _)) => RObject((shiftKey, CString(k))) :: acc
-            }
-          case IncludeId =>
-            fields.foldLeft(List[RValue]()) {
-              case (acc, (k, v)) => RObject((shiftKey, RArray(CString(k), v))) :: acc
-            }
-          case ExcludeId =>
-            fields.foldLeft(List[RValue]()) {
-              case (acc, (_, v)) => RObject((shiftKey, v)) :: acc
-            }
-        }
-        case _ =>  Nil // omit rows that cannot be shifted
-      }
-    }
-
     val shiftedRValues: Stream[IO, RValue] =
       shift match {
         case None => rvalues
         case Some(shiftInfo) =>
           rvalues.mapChunks(chunk =>
             Segment.seq(chunk.foldLeft(List[RValue]()) {
-              case (acc, rv) => shiftRValue(rv, shiftInfo) ::: acc
+              case (acc, rv) => Shifting.shiftRValue(rv, shiftInfo) ::: acc
             }))
       }
 
