@@ -1,0 +1,23 @@
+{
+    "name": "shift deep-giraffe-array with IncludeId and field",
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir":     "ignoreFieldOrder"
+    },
+    "data": "deep-giraffe-array.data",
+    "query": "select first.second[_].testField as testField, first.second[_:] as key, first.second[1] as x from `deep-giraffe-array.data`",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      {"key":1,"x":"P"},
+      {"testField":"A","key":0,"x":"P"},
+      {"key":1,"x":"Q"},
+      {"testField":"B","key":0,"x":"Q"},
+      {"key":1,"x":"R"},
+      {"testField":"C","key":0,"x":"R"},
+      {"key":1,"x":"S"},
+      {"testField":"D","key":0,"x":"S"},
+      {"key":1,"x":"T"},
+      {"testField":"E","key":0,"x":"T"}
+    ]
+}
