@@ -46,10 +46,10 @@ object implicits {
     }
 
   implicit def ejsonQDataDecode[J](implicit T: Recursive.Aux[J, EJson]): QDataDecode[J] =
-    QDataEJson.ejsonQDataDecode[J]
+    QDataEJson.decode[J]
 
   implicit def ejsonQDataEncode[J](implicit T: Corecursive.Aux[J, EJson]): QDataEncode[J] =
-    QDataEJson.ejsonQDataEncode[J]
+    QDataEJson.encode[J]
 
   implicit final class EJsonOps[J](val j: J) extends scala.AnyVal {
     def array(implicit JR: Recursive.Aux[J, EJson]): Option[List[J]] =

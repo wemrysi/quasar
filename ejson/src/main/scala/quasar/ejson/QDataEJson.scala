@@ -41,7 +41,7 @@ private[ejson] object QDataEJson {
   import QType._
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def ejsonQDataDecode[J](implicit J: Recursive.Aux[J, EJson]): QDataDecode[J] =
+  def decode[J](implicit J: Recursive.Aux[J, EJson]): QDataDecode[J] =
     new QDataDecode[J] {
       def tpe(a: J): QType =
         a.project match {
@@ -313,7 +313,7 @@ private[ejson] object QDataEJson {
       }
     }
 
-  def ejsonQDataEncode[J](implicit J: Corecursive.Aux[J, EJson]): QDataEncode[J] =
+  def encode[J](implicit J: Corecursive.Aux[J, EJson]): QDataEncode[J] =
     new QDataEncode[J] {
       def makeLong(l: Long): J =
         EJson.int(BigInt(l))
