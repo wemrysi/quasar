@@ -88,6 +88,13 @@ object Dependencies {
     "eu.timepit"       %% "refined-scalaz" % refinedVersion
   )
 
+  def ejson = Seq(
+    "com.slamdata" %% "qdata-core" % qdataVersion,
+    "com.slamdata" %% "qdata-time" % qdataVersion,
+    "com.slamdata" %% "qdata-core" % qdataVersion % "test->test" classifier "tests",
+    "com.slamdata" %% "qdata-time" % qdataVersion % "test->test" classifier "tests"
+  )
+
   def sql = Seq(
     "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
     "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6"

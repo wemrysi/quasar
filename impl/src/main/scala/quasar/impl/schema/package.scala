@@ -17,7 +17,6 @@
 package quasar.impl
 
 import slamdata.Predef._
-import quasar.common.data.Data
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.contrib.iota.copkTraverse
@@ -35,35 +34,35 @@ import spire.math.ConvertableTo
 
 package object schema {
 
-  /** Reduces the input to an `SST` summarizing its structure. */
-  def extractSst[F[_], J: Order, A: ConvertableTo: Field: Order](
+  /** Merges input chunks into increasingly accurate SSTs. */
+  def progressiveSst[F[_], J: Order, A: ConvertableTo: Field: Order](
       config: SstConfig[J, A])(
       implicit
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
-      : Pipe[F, Chunk[Data], SST[J, A]] =
-    extractSst0[F, J, A](config)(f => _.map(f))
+      : Pipe[F, Chunk[SST[J, A]], SST[J, A]] =
+    progressiveSst0[F, J, A](config)(f => _.map(f))
 
-  /** Reduces the input to an `SST` summarizing its structure. */
-  def extractSstAsync[F[_]: Effect, J: Order, A: ConvertableTo: Field: Order](
+  /** Merges input chunks, in parallel, into increasingly accurate SSTs. */
+  def progressiveSstAsync[F[_]: Effect, J: Order, A: ConvertableTo: Field: Order](
       config: SstConfig[J, A],
       paralellism: Int)(
       implicit
       ec: ExecutionContext,
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
-      : Pipe[F, Chunk[Data], SST[J, A]] =
-    extractSst0[F, J, A](config)(f => _.mapAsyncUnordered(paralellism)(c => Effect[F].delay(f(c))))
+      : Pipe[F, Chunk[SST[J, A]], SST[J, A]] =
+    progressiveSst0[F, J, A](config)(f => _.mapAsyncUnordered(paralellism)(c => Effect[F].delay(f(c))))
 
   ////
 
-  private def extractSst0[F[_], J: Order, A: ConvertableTo: Field: Order](
+  private def progressiveSst0[F[_], J: Order, A: ConvertableTo: Field: Order](
       config: SstConfig[J, A])(
-      f: (Chunk[Data] => Option[SST[J, A]]) => Pipe[F, Chunk[Data], Option[SST[J, A]]])(
+      f: (Chunk[SST[J, A]] => Option[SST[J, A]]) => Pipe[F, Chunk[SST[J, A]], Option[SST[J, A]]])(
       implicit
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
-      : Pipe[F, Chunk[Data], SST[J, A]] = {
+      : Pipe[F, Chunk[SST[J, A]], SST[J, A]] = {
 
     val thresholding: ElgotCoalgebra[SST[J, A] \/ ?, SSTF[J, A, ?], SST[J, A]] = {
       val independent =
@@ -94,21 +93,21 @@ package object schema {
       changed option compressed
     }
 
-    def fromData(d: Data): SST[J, A] =
-      SST.fromData[J, A](Field[A].one, d).elgotApo[SST[J, A]](thresholding)
+    val prepare: SST[J, A] => SST[J, A] =
+      _.elgotApo[SST[J, A]](thresholding)
 
     @SuppressWarnings(Array(
       "org.wartremover.warts.Equals",
       "org.wartremover.warts.Var",
       "org.wartremover.warts.While"))
-    def reduceChunk(c: Chunk[Data]): Option[SST[J, A]] =
+    def reduceChunk(c: Chunk[SST[J, A]]): Option[SST[J, A]] =
       if (c.isEmpty) none
-      else if (c.size == 1) some(fromData(c(0)))
+      else if (c.size == 1) some(prepare(c(0)))
       else {
         var i = 1
-        var acc = fromData(c(0))
+        var acc = prepare(c(0))
         while (i < c.size) {
-          acc = repeatedly(iterate)(acc |+| fromData(c(i)))
+          acc = repeatedly(iterate)(acc |+| prepare(c(i)))
           i = i + 1
         }
         some(acc)
