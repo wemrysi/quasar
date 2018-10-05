@@ -31,7 +31,6 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz.{IList, NonEmptyList, Show}
 import scalaz.syntax.foldable1._
-import scalaz.syntax.std.option._
 import spire.math.Real
 
 final class StringsSpec extends quasar.Qspec {
@@ -41,9 +40,10 @@ final class StringsSpec extends quasar.Qspec {
 
   "widen string yields an array of its characters" >> {
     val exp = EJson.arr(List('f', 'o', 'o') map (EJson.char[J](_)) : _*)
+    val strS = TypeStat.fromEJson(Real(5), EJson.str[J]("foo"))
     val wid0 = SST.fromEJson(Real(5), exp)
-    val wid = envT(wid0.copoint, TagST[J](Tagged(strings.StructuralString, wid0))).embed
-    strings.widen[J, Real](Real(5), "foo").embed must_= wid
+    val wid = envT(strS, TagST[J](Tagged(strings.StructuralString, wid0))).embed
+    strings.widen[J, Real](strS, "foo").embed must_= wid
   }
 
   "compress string yields a generic array sampled from its characters" >> {
@@ -53,13 +53,14 @@ final class StringsSpec extends quasar.Qspec {
     val char =
       envT(char0, TypeST(TypeF.simple[J, SST[J, Real]](SimpleType.Char))).embed
 
-    val ts = TypeStat.coll(Real(5), Real(3).some, Real(3).some)
+    val ss = TypeStat.str(Real(5), Real(3), Real(3), "foo", "foo")
+    val cs = TypeStat.coll(Real(5), Some(Real(3)), Some(Real(3)))
 
     val comp =
-      envT(ts, TagST[J](Tagged(
+      envT(ss, TagST[J](Tagged(
         strings.StructuralString,
-        envT(ts, TypeST(TypeF.arr[J, SST[J, Real]](IList[SST[J, Real]](), Some(char)))).embed))).embed
+        envT(cs, TypeST(TypeF.arr[J, SST[J, Real]](IList[SST[J, Real]](), Some(char)))).embed))).embed
 
-    strings.compress[SST[J, Real], J, Real](ts, "foo").embed must_= comp
+    strings.compress[SST[J, Real], J, Real](ss, "foo").embed must_= comp
   }
 }

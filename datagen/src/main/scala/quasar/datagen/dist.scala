@@ -34,6 +34,7 @@ import monocle.syntax.fields.{_2, _3}
 import monocle.std.option.{some => someP}
 import scalaz.{-\/, \/-, ==>>, Bifunctor, Equal, IList, INil, NonEmptyList, Order, Tags}
 import scalaz.Scalaz._
+import scalaz.syntax.tag._
 import spire.algebra.{AdditiveMonoid, Field, IsReal, NRoot}
 import spire.math.ConvertableFrom
 import spire.random.{Dist, Gaussian}
@@ -262,27 +263,41 @@ object dist {
       implicit
       J: Corecursive.Aux[J, EJson])
       : Option[Dist[J]] =
-    some(stat) collect {
+    stat match {
       case TypeStat.Bool(ts, fs) =>
         val total = ts + fs
-        Dist.weightedMix(
+        some(Dist.weightedMix(
           ((ts / total).toDouble, Dist.constant(true)),
-          ((fs / total).toDouble, Dist.constant(false))
-        ) map (EJson.bool(_))
+          ((fs / total).toDouble, Dist.constant(false))).map(EJson.bool(_)))
 
       case TypeStat.Char(ss, cn, cx) =>
-        gaussian(ss)
+        some(gaussian(ss)
           .cata((Dist.gaussian[A] _).tupled, Dist.constant(ss.mean))
-          .map((EJson.char[J](_)) <<< ((_: Int).toChar) <<< clamp(cn.toInt, cx.toInt) <<< ((_: A).round.toInt))
+          .map((EJson.char[J](_)) <<< ((_: Int).toChar) <<< clamp(cn.toInt, cx.toInt) <<< ((_: A).round.toInt)))
+
+      case TypeStat.Str(c, mnl, mxl, mn, mx) =>
+        val minmax =
+          (mn + mx).toList.foldMap(c => some((Tags.MinVal(c), Tags.MaxVal(c))))
+
+        val (minc, maxc) =
+          minmax.fold((Char.MinValue, Char.MaxValue))(_.bimap(_.unwrap, _.unwrap))
+
+        val charRange =
+          Dist.intrange(minc.toInt, maxc.toInt) map (_.toChar)
+
+        some(Dist.list(mnl.toInt, mxl.toInt)(charRange) map (cs => EJson.str(cs.mkString)))
 
       case TypeStat.Int(ss, mn, mx) =>
-        gaussian(ss)
+        some(gaussian(ss)
           .cata((Dist.gaussian[A] _).tupled, Dist.constant(ss.mean))
-          .map((EJson.int[J](_)) <<< clamp(mn, mx) <<< ((_: A).toBigInt))
+          .map((EJson.int[J](_)) <<< clamp(mn, mx) <<< ((_: A).toBigInt)))
 
       case TypeStat.Dec(ss, mn, mx) =>
-        gaussian(ss)
+        some(gaussian(ss)
           .cata((Dist.gaussian[A] _).tupled, Dist.constant(ss.mean))
-          .map((EJson.dec[J](_)) <<< clamp(mn, mx) <<< ((_: A).toBigDecimal))
+          .map((EJson.dec[J](_)) <<< clamp(mn, mx) <<< ((_: A).toBigDecimal)))
+
+      case TypeStat.Coll(_, _, _) => none
+      case TypeStat.Count(_) => none
     }
 }

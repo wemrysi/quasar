@@ -27,7 +27,6 @@ import quasar.ejson.{
   Meta,
   Null,
   SizedType,
-  Str,
   TypeTag,
   Type => EType
 }
@@ -118,8 +117,7 @@ package object sst {
   def primaryTagOf[J](ejs: J)(implicit J: Recursive.Aux[J, EJson]): PrimaryTag =
     ejs.project match {
       case E(Meta(_, Embed(EType(tag)))) => tag.right
-      case C(Str(_))                     => strings.StructuralString.right
-      case _                             => primaryTypeOf(ejs).left
+      case _ => primaryTypeOf(ejs).left
     }
 
   implicit def sstQDataEncode[J: Order, A: ConvertableTo: Field: Order](

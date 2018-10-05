@@ -16,10 +16,11 @@
 
 package quasar.sst
 
-import slamdata.Predef._
+import slamdata.Predef.{Char => SChar, Int => SInt, _}
 import quasar.contrib.algebra._
 import quasar.contrib.specs2.Spec
 import quasar.ejson.{Decoded, DecodeEJson, EJson, EncodeEJson}
+import quasar.fp.numeric.SampleStats
 
 import matryoshka.data.Fix
 import scalaz.Show
@@ -43,6 +44,22 @@ final class TypeStatSpec extends Spec with TypeStatArbitrary {
 
   "combining sums counts" >> prop { (x: TypeStat[Real], y: TypeStat[Real]) =>
     (x + y).size must equal(x.size + y.size)
+  }
+
+  "combining int and dec widens to dec" >> prop { (x: SInt, y: SInt) =>
+    val xi = TypeStat.int(SampleStats.one(Real(x)), BigInt(x), BigInt(x))
+    val xd = TypeStat.dec(SampleStats.one(Real(x)), BigDecimal(x), BigDecimal(x))
+    val yd = TypeStat.dec(SampleStats.one(Real(y)), BigDecimal(y), BigDecimal(y))
+
+    (xi + yd) must equal(xd + yd)
+  }
+
+  "combining char and str widens to str" >> prop { (c: SChar, s: String) =>
+    val cc = TypeStat.char(SampleStats.one(Real(c.toInt)), c, c)
+    val cs = TypeStat.str(Real(1), Real(1), Real(1), c.toString, c.toString)
+    val ss = TypeStat.str(Real(1), Real(s.length), Real(s.length), s, s)
+
+    (cc + ss) must equal(cs + ss)
   }
 
   "EJson codec" >> prop { ts: TypeStat[Double] =>
