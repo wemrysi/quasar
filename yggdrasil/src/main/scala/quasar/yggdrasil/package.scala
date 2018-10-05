@@ -16,8 +16,6 @@
 
 package quasar 
 
-import quasar.blueeyes.json.{JPath, JPathField, JPathIndex}
-import quasar.common.{CPath, CPathField, CPathIndex}
 import quasar.contrib.scalaz.MonadTell_
 
 package object yggdrasil {
@@ -26,13 +24,4 @@ package object yggdrasil {
 
   type MonadFinalizers[F[_], G[_]] = MonadTell_[F, Finalizers[G]]
   def MonadFinalizers[F[_], G[_]](implicit ev: MonadFinalizers[F, G]): MonadFinalizers[F, G] = ev
-
-  def jPathToCPath(jpath: JPath): CPath = {
-    val nodes2 = jpath.nodes map {
-      case JPathField(name) => CPathField(name)
-      case JPathIndex(idx)  => CPathIndex(idx)
-    }
-
-    CPath(nodes2: _*)
-  }
 }

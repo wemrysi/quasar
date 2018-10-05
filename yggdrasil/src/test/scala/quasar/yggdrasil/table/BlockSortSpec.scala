@@ -22,6 +22,7 @@ import quasar.precog.common._
 import quasar.pkg.tests._
 import SampleData._
 import TableModule._
+import quasar.yggdrasil.util.CPathUtils
 
 /** Ugh, without this import it still compiles but the tests
  *  no longer pass (specifically "heterogeneous sort keys case 2")
@@ -53,7 +54,7 @@ trait BlockSortSpec extends SpecificationLike with ScalaCheck {
       JArray(sortKeys.map(_.extract(v \ "value")).toList ::: List(v \ "globalId")).asInstanceOf[JValue]
     }(desiredJValueOrder).map(_.delete(globalIdPath).get).toList
 
-    val cSortKeys = sortKeys map { jPathToCPath(_) }
+    val cSortKeys = sortKeys map { CPathUtils.jPathToCPath(_) }
 
     val resultM = for {
       sorted <- module.fromSample(sample).sort(module.sortTransspec(cSortKeys: _*), sortOrder)

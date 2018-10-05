@@ -23,6 +23,7 @@ import quasar.precog.common._
 import quasar.yggdrasil.TestIdentities._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table.{cf, CFN}
+import quasar.yggdrasil.util.CPathUtils
 
 import scala.util.Random
 
@@ -1738,7 +1739,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
 
   def testIsType(sample: SampleData) = {
     val (_, schema) = sample.schema.getOrElse(0 -> List())
-    val cschema = schema map { case (jpath, ctype) => ColumnRef(jPathToCPath(jpath), ctype) }
+    val cschema = schema map { case (jpath, ctype) => ColumnRef(CPathUtils.jPathToCPath(jpath), ctype) }
 
     // using a generator with heterogeneous data, we're just going to produce
     // the jtype that chooses all of the elements of the non-random data.
@@ -1751,7 +1752,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     val results                         = toJson(table.transform(IsType(Leaf(Source), jtpe)))
     val schemasSeq: Stream[Seq[JValue]] = toJson(table).unsafeRunSync.map(rv => Seq(rv.toJValueRaw))
     val schemas0                        = schemasSeq map { inferSchema(_) }
-    val schemas                         = schemas0 map { _ map { case (jpath, ctype) => (jPathToCPath(jpath), ctype) } }
+    val schemas                         = schemas0 map { _ map { case (jpath, ctype) => (CPathUtils.jPathToCPath(jpath), ctype) } }
     val expected                        = schemas map (schema => JBool(Schema.subsumes(schema, jtpe)))
 
     results.getJValues mustEqual expected
@@ -1797,7 +1798,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
 
   def testTyped(sample: SampleData) = {
     val (_, schema) = sample.schema.getOrElse(0 -> List())
-    val cschema = schema map { case (jpath, ctype) => ColumnRef(jPathToCPath(jpath), ctype) }
+    val cschema = schema map { case (jpath, ctype) => ColumnRef(CPathUtils.jPathToCPath(jpath), ctype) }
 
     // using a generator with heterogeneous data, we're just going to produce
     // the jtype that chooses all of the elements of the non-random data.
