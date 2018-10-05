@@ -37,12 +37,12 @@ sealed abstract class TypeStat[A] {
 
   /** The number of observations. */
   def size(implicit A: AdditiveSemigroup[A]): A = this match {
-    case  Bool(t, f   )       => A.plus(t, f)
-    case  Char(s, _, _)       => s.size
-    case   Int(s, _, _)       => s.size
-    case   Dec(s, _, _)       => s.size
-    case  Coll(c, _, _)       => c
-    case Count(c      )       => c
+    case Bool(t, f) => A.plus(t, f)
+    case Char(s, _, _) => s.size
+    case Int(s, _, _) => s.size
+    case Dec(s, _, _) => s.size
+    case Coll(c, _, _) => c
+    case Count(c) => c
   }
 
   /** Combine with `other` accumulating type specific information when possible
@@ -50,12 +50,12 @@ sealed abstract class TypeStat[A] {
     */
   def + (other: TypeStat[A])(implicit O: Order[A], F: Field[A]): TypeStat[A] =
     (this, other) match {
-      case (Bool(t1, f1        ), Bool(t2, f2        )) => bool(t1 + t2, f1 + f2)
+      case (Bool(t1, f1), Bool(t2, f2)) => bool(t1 + t2, f1 + f2)
       case (Char(s1, min1, max1), Char(s2, min2, max2)) => char(s1 + s2, mn(min1, min2), mx(max1, max2))
-      case ( Int(s1, min1, max1),  Int(s2, min2, max2)) =>  int(s1 + s2, mn(min1, min2), mx(max1, max2))
-      case ( Dec(s1, min1, max1),  Dec(s2, min2, max2)) =>  dec(s1 + s2, mn(min1, min2), mx(max1, max2))
+      case (Int(s1, min1, max1), Int(s2, min2, max2)) => int(s1 + s2, mn(min1, min2), mx(max1, max2))
+      case (Dec(s1, min1, max1), Dec(s2, min2, max2)) => dec(s1 + s2, mn(min1, min2), mx(max1, max2))
       case (Coll(c1, min1, max1), Coll(c2, min2, max2)) => coll(c1 + c2, mn(min1, min2), mx(max1, max2))
-      case (                   x,                    y) => count(x.size + y.size)
+      case (x, y) => count(x.size + y.size)
     }
 
   // NB: Avoids conflicts between min/max and implicit widening for byte
@@ -64,12 +64,12 @@ sealed abstract class TypeStat[A] {
 }
 
 object TypeStat extends TypeStatInstances {
-  final case class  Bool[A](trues: A, falses: A)                                     extends TypeStat[A]
-  final case class  Char[A](stats: SampleStats[A], min: SChar, max: SChar)           extends TypeStat[A]
-  final case class   Int[A](stats: SampleStats[A], min: BigInt, max: BigInt)         extends TypeStat[A]
-  final case class   Dec[A](stats: SampleStats[A], min: BigDecimal, max: BigDecimal) extends TypeStat[A]
-  final case class  Coll[A](cnt: A, minSize: Option[A], maxSize: Option[A])          extends TypeStat[A]
-  final case class Count[A](cnt: A)                                                  extends TypeStat[A]
+  final case class Bool[A](trues: A, falses: A) extends TypeStat[A]
+  final case class Char[A](stats: SampleStats[A], min: SChar, max: SChar) extends TypeStat[A]
+  final case class Int[A](stats: SampleStats[A], min: BigInt, max: BigInt) extends TypeStat[A]
+  final case class Dec[A](stats: SampleStats[A], min: BigDecimal, max: BigDecimal) extends TypeStat[A]
+  final case class Coll[A](cnt: A, minSize: Option[A], maxSize: Option[A]) extends TypeStat[A]
+  final case class Count[A](cnt: A) extends TypeStat[A]
 
   def bool[A] = Prism.partial[TypeStat[A], (A, A)] {
     case Bool(t, f) => (t, f)
@@ -96,30 +96,31 @@ object TypeStat extends TypeStatInstances {
   } (Count(_))
 
   def fromEJson[A, J](cnt: A, j: J)(
-    implicit
-    J: Recursive.Aux[J, EJson],
-    M: AdditiveMonoid[A],
-    A: ConvertableTo[A]
-  ): TypeStat[A] = j.project match {
-    case C(   ejs.Null())  => count(cnt)
-    case C(   ejs.Bool(b)) => bool(b.fold(cnt, M.zero), b.fold(M.zero, cnt))
-    case E(   ejs.Char(c)) => char(SampleStats.freq(cnt, A fromInt c.toInt), c, c)
-    case C(    ejs.Str(s)) => coll(cnt, some(A fromInt s.length), some(A fromInt s.length))
-    case E(    ejs.Int(i)) => int(SampleStats.freq(cnt, A fromBigInt     i), i, i)
-    case C(    ejs.Dec(d)) => dec(SampleStats.freq(cnt, A fromBigDecimal d), d, d)
-    case C(   ejs.Arr(xs)) => fromFoldable(cnt, xs)
-    case E(   ejs.Map(xs)) => fromFoldable(cnt, xs)
-    case E(ejs.Meta(_, _)) => count(cnt)
-  }
+      implicit
+      J: Recursive.Aux[J, EJson],
+      M: AdditiveMonoid[A],
+      A: ConvertableTo[A])
+      : TypeStat[A] =
+    j.project match {
+      case C(ejs.Null())  => count(cnt)
+      case C(ejs.Bool(b)) => bool(b.fold(cnt, M.zero), b.fold(M.zero, cnt))
+      case E(ejs.Char(c)) => char(SampleStats.freq(cnt, A fromInt c.toInt), c, c)
+      case C(ejs.Str(s)) => coll(cnt, some(A fromInt s.length), some(A fromInt s.length))
+      case E(ejs.Int(i)) => int(SampleStats.freq(cnt, A fromBigInt i), i, i)
+      case C(ejs.Dec(d)) => dec(SampleStats.freq(cnt, A fromBigDecimal d), d, d)
+      case C(ejs.Arr(xs)) => fromFoldable(cnt, xs)
+      case E(ejs.Map(xs)) => fromFoldable(cnt, xs)
+      case E(ejs.Meta(_, _)) => count(cnt)
+    }
 
   def fromFoldable[F[_]: Foldable, A](cnt: A, fa: F[_])(implicit A: ConvertableTo[A]): TypeStat[A] =
     (coll(cnt, _: Option[A], _: Option[A])).tupled(some(A fromInt fa.length).squared)
 
   def fromTypeFƒ[J, A: Order: ConvertableTo](cnt: A)(
-    implicit
-    J: Recursive.Aux[J, EJson],
-    F: Field[A]
-  ): Algebra[TypeF[J, ?], TypeStat[A]] = {
+      implicit
+      J: Recursive.Aux[J, EJson],
+      F: Field[A])
+      : Algebra[TypeF[J, ?], TypeStat[A]] = {
     case TypeF.Bottom() => count(F.zero)
     case TypeF.Top() => count(cnt)
     case TypeF.Simple(_) => count(cnt)
@@ -211,24 +212,23 @@ sealed abstract class TypeStatInstances {
 
   implicit def equal[A: Equal]: Equal[TypeStat[A]] =
     Equal.equal((a, b) => (a, b) match {
-      case ( Bool(x1, x2    ),  Bool(y1, y2    )) => x1 ≟ y1 && x2 ≟ y2
-      case ( Char(x1, x2, x3),  Char(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
-      case (  Int(x1, x2, x3),   Int(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
-      case (  Dec(x1, x2, x3),   Dec(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
-      case ( Coll(x1, x2, x3),  Coll(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
-      case (Count(x1        ), Count(y1        )) => x1 ≟ y1
-
+      case (Bool(x1, x2), Bool(y1, y2)) => x1 ≟ y1 && x2 ≟ y2
+      case (Char(x1, x2, x3), Char(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
+      case (Int(x1, x2, x3), Int(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
+      case (Dec(x1, x2, x3), Dec(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
+      case (Coll(x1, x2, x3), Coll(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
+      case (Count(x1), Count(y1)) => x1 ≟ y1
       case _ => false
     })
 
   implicit def show[A: Show: Equal: Field: NRoot]: Show[TypeStat[A]] =
     Show.shows {
-      case  Bool(t, f       )             => s"Bool(${t.shows}, ${f.shows})"
-      case  Char(s, min, max)             => s"Char(${s.shows}, ${min.shows}, ${max.shows})"
-      case   Int(s, min, max)             => s"Int(${s.shows}, ${min.shows}, ${max.shows})"
-      case   Dec(s, min, max)             => s"Dec(${s.shows}, ${min.shows}, ${max.shows})"
-      case  Coll(c, min, max)             => s"Coll(${c.shows}, ${min.shows}, ${max.shows})"
-      case Count(c          )             => s"Count(${c.shows})"
+      case Bool(t, f) => s"Bool(${t.shows}, ${f.shows})"
+      case Char(s, min, max) => s"Char(${s.shows}, ${min.shows}, ${max.shows})"
+      case Int(s, min, max) => s"Int(${s.shows}, ${min.shows}, ${max.shows})"
+      case Dec(s, min, max) => s"Dec(${s.shows}, ${min.shows}, ${max.shows})"
+      case Coll(c, min, max) => s"Coll(${c.shows}, ${min.shows}, ${max.shows})"
+      case Count(c) => s"Count(${c.shows})"
     }
 
   ////
@@ -263,12 +263,12 @@ sealed abstract class TypeStatInstances {
   }
 
   private[sst] def encodeEJson0[A: EncodeEJson: Equal: Field: NRoot, J](
-    ts: TypeStat[A],
-    isPopulation: Boolean
-  )(implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): J = {
+      ts: TypeStat[A],
+      isPopulation: Boolean)(
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : J = {
     def emap(xs: (String, J)*): J =
       ejs.Fixed[J].map(xs.toList.map(_.leftMap(_.asEJson[J])))
 
@@ -280,23 +280,23 @@ sealed abstract class TypeStatInstances {
 
     def minmax[B: EncodeEJson](kind: String, c: A, mn: B, mx: B): J =
       kmap(
-        kind
-      , CountKey -> c.asEJson[J]
-      , MinKey   -> mn.asEJson[J]
-      , MaxKey   -> mx.asEJson[J])
+        kind,
+        CountKey -> c.asEJson[J],
+        MinKey -> mn.asEJson[J],
+        MaxKey -> mx.asEJson[J])
 
     def sstats(ss: SampleStats[A]): J = {
 			val state =
 				emap(
-					SizeKey -> ss.size.asEJson[J]
-				, M1Key   -> ss.m1.asEJson[J]
-				, M2Key   -> ss.m2.asEJson[J]
-				, M3Key   -> ss.m3.asEJson[J]
-				, M4Key   -> ss.m4.asEJson[J])
+					SizeKey -> ss.size.asEJson[J],
+				  M1Key -> ss.m1.asEJson[J],
+				  M2Key -> ss.m2.asEJson[J],
+				  M3Key -> ss.m3.asEJson[J],
+				  M4Key -> ss.m4.asEJson[J])
 
       emap(
-				(StateKey, state)                                         ::
-        (MeanKey, ss.mean.asEJson[J])                             ::
+				(StateKey, state) ::
+        (MeanKey, ss.mean.asEJson[J]) ::
         optEntry(VarianceKey,
           isPopulation.fold(ss.variance, ss.populationVariance)) :::
         optEntry(SkewnessKey,
@@ -307,18 +307,18 @@ sealed abstract class TypeStatInstances {
 
     def dist[B: EncodeEJson](kind: String, ss: SampleStats[A], mn: B, mx: B): J =
       kmap(
-        kind
-      , CountKey        -> ss.size.asEJson[J]
-      , DistributionKey -> sstats(ss)
-      , MinKey          -> mn.asEJson[J]
-      , MaxKey          -> mx.asEJson[J])
+        kind,
+        CountKey -> ss.size.asEJson[J],
+        DistributionKey -> sstats(ss),
+        MinKey -> mn.asEJson[J],
+        MaxKey -> mx.asEJson[J])
 
     ts match {
       case Bool(t, f) =>
         kmap(
-          Kind.Boolean
-        , TrueKey  -> t.asEJson[J]
-        , FalseKey -> f.asEJson[J])
+          Kind.Boolean,
+          TrueKey -> t.asEJson[J],
+          FalseKey -> f.asEJson[J])
 
       case Char(s, mn, mx) =>
         dist(Kind.Char, s, mn, mx)
