@@ -54,6 +54,8 @@ sealed abstract class TypeStat[A] {
       case (Char(s1, min1, max1), Char(s2, min2, max2)) => char(s1 + s2, mn(min1, min2), mx(max1, max2))
       case (Int(s1, min1, max1), Int(s2, min2, max2)) => int(s1 + s2, mn(min1, min2), mx(max1, max2))
       case (Dec(s1, min1, max1), Dec(s2, min2, max2)) => dec(s1 + s2, mn(min1, min2), mx(max1, max2))
+      case (Int(s1, min1, max1), Dec(s2, min2, max2)) => dec(s1 + s2, mn(BigDecimal(min1), min2), mx(BigDecimal(max1), max2))
+      case (Dec(s1, min1, max1), Int(s2, min2, max2)) => dec(s1 + s2, mn(min1, BigDecimal(min2)), mx(max1, BigDecimal(max2)))
       case (Coll(c1, min1, max1), Coll(c2, min2, max2)) => coll(c1 + c2, mn(min1, min2), mx(max1, max2))
       case (x, y) => count(x.size + y.size)
     }
