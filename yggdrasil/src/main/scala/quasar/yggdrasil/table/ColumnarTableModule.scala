@@ -1367,9 +1367,9 @@ trait ColumnarTableModule
 
         // put the fields and index columns into the same path, in the first index of the array
         val fassigned: List[(ColumnRef, Column)] =
-          fieldsCol.map(col => ColumnRef(pathNode, CString) -> col).toList
+          fieldsCol.map(col => ColumnRef(CPath(pathNode), CString) -> col).toList
         val iassigned: List[(ColumnRef, Column)] =
-          indicesCol.map(col => ColumnRef(pathNode, CLong) -> col).toList
+          indicesCol.map(col => ColumnRef(CPath(pathNode), CLong) -> col).toList
 
         // merge them together to produce the heterogeneous output
         Map(fassigned ++ iassigned: _*)

@@ -45,7 +45,7 @@ trait SegmentFormatSupport extends RCValueGenerators {
   def genCPath: Gen[CPath] = for {
     len <- Gen.choose(0, 5)
     parts <- Gen.listOfN(len, Gen.identifier)
-  } yield CPath(parts mkString ".")
+  } yield CPath.parse(parts mkString ".")
 
   def genBitSet(length: Int, density: Double): Gen[BitSet] = for {
     seeds <- Gen.listOfN(length, arbitrary[Double])
@@ -123,7 +123,7 @@ trait SegmentFormatMatchers { self: Specification with ScalaCheck =>
 }
 
 final class StubSegmentFormat extends SegmentFormat {
-  val TheOneSegment = NullSegment(42L, CPath("w.t.f"), CNull, BitSetUtil.create(), 100)
+  val TheOneSegment = NullSegment(42L, CPath.parse("w.t.f"), CNull, BitSetUtil.create(), 100)
 
   object reader extends SegmentReader {
     def readSegmentId(channel: ReadableByteChannel): Validation[IOException, SegmentId] =

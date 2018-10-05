@@ -27,35 +27,6 @@ import org.specs2.execute.Result
 
 trait TransSpecModuleSpec extends TransSpecModule with FNModule with SpecificationLike with ScalazSpecs2Instances {
   import trans._
-  import CPath._
-
-  "concatChildren" should {
-    "transform a CPathTree into a TransSpec" in {
-      val tree: CPathTree[Int] = RootNode(List(
-        FieldNode(CPathField("bar"),
-          List(
-            IndexNode(CPathIndex(0), List(LeafNode(4))),
-            IndexNode(CPathIndex(1), List(FieldNode(CPathField("baz"), List(LeafNode(6))))),
-            IndexNode(CPathIndex(2), List(LeafNode(2))))),
-        FieldNode(CPathField("foo"), List(LeafNode(0)))))
-
-      val result = TransSpec.concatChildren(tree)
-
-      def leafSpec(idx: Int) = DerefArrayStatic(Leaf(Source), CPathIndex(idx))
-
-      val expected = InnerObjectConcat(
-        WrapObject(
-          InnerArrayConcat(
-            InnerArrayConcat(
-              WrapArray(leafSpec(4)),
-              WrapArray(WrapObject(leafSpec(6),"baz"))),
-            WrapArray(DerefArrayStatic(Leaf(Source),CPathIndex(2)))),"bar"),
-          WrapObject(
-            leafSpec(0),"foo"))
-
-      result mustEqual expected
-    }
-  }
 
   "rephrase" should {
     import scalaz.syntax.std.option._

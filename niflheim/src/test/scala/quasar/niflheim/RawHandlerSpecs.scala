@@ -86,8 +86,8 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
       h.length must_== 3
 
       val segs1 = h.snapshot(None).segments
-      segs1 must contain(ArraySegment(blockid, CPath(".a"), CNum, bitset(0, 1, 2), decs(123, 9999.0, 0)))
-      segs1 must contain(BooleanSegment(blockid, CPath(".b"), bitset(0, 2), bitset(0), 3))
+      segs1 must contain(ArraySegment(blockid, CPath.parse(".a"), CNum, bitset(0, 1, 2), decs(123, 9999.0, 0)))
+      segs1 must contain(BooleanSegment(blockid, CPath.parse(".b"), bitset(0, 2), bitset(0), 3))
 
       val segs1R = h.snapshotRef(None).segments
       segs1R mustEqual segs1
@@ -103,7 +103,7 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
       h.length must_== 8
 
       val segs2 = h.snapshot(None).segments
-      segs2 must contain(BooleanSegment(blockid, CPath(".b"), bitset(0, 2, 7), bitset(0, 7), 8))
+      segs2 must contain(BooleanSegment(blockid, CPath.parse(".b"), bitset(0, 2, 7), bitset(0, 7), 8))
 
       val segs2R = h.snapshotRef(None).segments
       segs2R mustEqual segs2
@@ -253,8 +253,8 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
       ok must_== false
 
       // double-check the data
-      val cpa = CPath(".a")
-      val cpb = CPath(".b")
+      val cpa = CPath.parse(".a")
+      val cpb = CPath.parse(".b")
 
       val cpaR = ColumnRef(cpa, CNum)
       val cpbR = ColumnRef(cpb, CNum)
@@ -278,8 +278,8 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
     val tmp9 = tempfile()
     "make sure we defensively copy" in new cleanup(tmp9) {
       val h = RawHandler.empty(blockid, tmp9)
-      val cpa = CPath(".a")
-      val cpb = CPath(".b")
+      val cpa = CPath.parse(".a")
+      val cpb = CPath.parse(".b")
 
       val struct1 = h.structure
       struct1.toSet must_== Set()

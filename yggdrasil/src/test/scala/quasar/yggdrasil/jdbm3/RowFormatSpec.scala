@@ -32,7 +32,7 @@ class RowFormatSpec extends Specification with ScalaCheck with SJValueGenerators
   // This should generate some jpath ids, then generate CTypes for these.
   def genJpathIds: Gen[List[String]] = Gen.alphaStr filter (_.length > 0) list
   def genColumnRefs: Gen[List[ColumnRef]] = genJpathIds >> { ids =>
-    val generators = ids.distinct map (id => listOf(ctype) ^^ (_.distinct map (tp => ColumnRef(CPath(id), tp))))
+    val generators = ids.distinct map (id => listOf(ctype) ^^ (_.distinct map (tp => ColumnRef(CPath.parse(id), tp))))
     Gen.sequence(generators) ^^ (_.flatten.toList)
   }
 

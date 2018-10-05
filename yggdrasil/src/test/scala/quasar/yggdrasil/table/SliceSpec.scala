@@ -536,14 +536,14 @@ class SliceSpec extends Specification with ScalaCheck {
   }
 
   private def concatProjDesc = Seq(
-    ColumnRef(CPath("0"), CLong),
-    ColumnRef(CPath("1"), CBoolean),
-    ColumnRef(CPath("2"), CString),
-    ColumnRef(CPath("3"), CDouble),
-    ColumnRef(CPath("4"), CNum),
-    ColumnRef(CPath("5"), CEmptyObject),
-    ColumnRef(CPath("6"), CEmptyArray),
-    ColumnRef(CPath("7"), CNum)
+    ColumnRef(CPath.parse("0"), CLong),
+    ColumnRef(CPath.parse("1"), CBoolean),
+    ColumnRef(CPath.parse("2"), CString),
+    ColumnRef(CPath.parse("3"), CDouble),
+    ColumnRef(CPath.parse("4"), CNum),
+    ColumnRef(CPath.parse("5"), CEmptyObject),
+    ColumnRef(CPath.parse("6"), CEmptyArray),
+    ColumnRef(CPath.parse("7"), CNum)
   )
 
   "concat" should {
