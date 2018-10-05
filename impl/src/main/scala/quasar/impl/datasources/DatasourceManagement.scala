@@ -26,7 +26,6 @@ import quasar.api.datasource.DatasourceError.{
   ExistentialError
 }
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
-import quasar.common.data.Data
 import quasar.connector.{Datasource, MonadResourceErr}
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
@@ -163,15 +162,15 @@ final class DatasourceManagement[
 
     withDs[DiscoveryError[I], Option[sstConfig.Schema]](datasourceId) { ds =>
 
-      val dataStream: F[Stream[F, Data]] = ds.fold(
-        lw => lw.evaluator[Data].evaluate(path).map(_.take(sstEvalConfig.sampleSize.value)),
-        hw => hw.evaluator[Data].evaluate(sampleQuery))
+      val sstStream: F[Stream[F, SST[T[EJson], N]]] = ds.fold(
+        lw => lw.evaluator[SST[T[EJson], N]].evaluate(path).map(_.take(sstEvalConfig.sampleSize.value)),
+        hw => hw.evaluator[SST[T[EJson], N]].evaluate(sampleQuery))
 
       val k: N = ConvertableTo[N].fromLong(sstEvalConfig.sampleSize.value)
 
-      Stream.force(dataStream)
+      Stream.force(sstStream)
         .chunkLimit(sstEvalConfig.chunkSize.value.toInt)
-        .through(extractSstAsync(sstConfig, sstEvalConfig.parallelism.value.toInt))
+        .through(progressiveSstAsync(sstConfig, sstEvalConfig.parallelism.value.toInt))
         .interruptWhen(ConcurrentEffect[F].attempt(Timer[F].sleep(timeLimit)))
         .compile.last
         .map(_.map(s => SstSchema((SST.size(s) < k) either Population.subst[P, TS](s) or s)))

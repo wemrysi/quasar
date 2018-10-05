@@ -35,7 +35,7 @@ import matryoshka.implicits._
 import scalaz._, Scalaz._
 import spire.math.Real
 
-final class ExtractSstSpec extends quasar.Qspec {
+object ProgressiveSstSpec extends quasar.Qspec {
   import Data._, StructuralType.{TagST, TypeST}
 
   type J = Fix[EJson]
@@ -48,9 +48,9 @@ final class ExtractSstSpec extends quasar.Qspec {
   val config = SstConfig[J, Real](1000L, 1000L, 0L, 0L, 1000L, true, 1000L)
 
   def verify(cfg: SstConfig[J, Real], input: List[Data], expected: S) =
-    Stream.emits(input)
+    Stream.emits(input map (SST.fromData[J, Real](Real.one, _)))
       .chunks
-      .through(extractSst(cfg))
+      .through(progressiveSst(cfg))
       .covary[cats.effect.IO]
       .compile.last.unsafeRunSync
       .must(beSome(equal(expected)))
