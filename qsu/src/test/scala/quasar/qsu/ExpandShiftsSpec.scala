@@ -17,11 +17,12 @@
 package quasar.qsu
 
 import quasar.{Qspec, TreeMatchers}
+import quasar.IdStatus.{ExcludeId, IdOnly}
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.qscript.{construction, Hole, ExcludeId, IdOnly, OnUndefined, PlannerError, SrcHole}
+import quasar.qscript.{construction, Hole, OnUndefined, PlannerError, SrcHole}
 import quasar.qsu.{QScriptUniform => QSU}
 import slamdata.Predef.{Map => _, _}
 import quasar.contrib.iota.{copkEqual, copkTraverse}

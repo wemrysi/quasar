@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef._
 
 import quasar.{Qspec, RenderTree}, RenderTree.ops._
+import quasar.IdStatus.ExcludeId
 import quasar.common.PhaseResults
 import quasar.common.data.Data
 import quasar.contrib.matryoshka._
@@ -27,7 +28,7 @@ import quasar.fp._
 import quasar.contrib.iota._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.construction
-import quasar.qscript.{qScriptReadToQscriptTotal, ExcludeId, HoleF, LeftShift, OnUndefined, PlannerError, ReduceFuncs, ReduceIndex, RightSideF, ShiftType}
+import quasar.qscript.{qScriptReadToQscriptTotal, HoleF, LeftShift, OnUndefined, PlannerError, ReduceFuncs, ReduceIndex, RightSideF, ShiftType}
 import quasar.std.{AggLib, IdentityLib, StructuralLib}
 
 import iotaz.CopK

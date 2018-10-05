@@ -17,7 +17,7 @@
 package quasar.impl.datasources
 
 import slamdata.Predef.{Boolean, Exception, None, Option, Some, StringContext, Unit}
-import quasar.{Condition, Disposable, RenderTreeT}
+import quasar.{Condition, Disposable, IdStatus, RenderTreeT}
 import quasar.api.datasource.{DatasourceError, DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{
   CreateError,
@@ -151,7 +151,7 @@ final class DatasourceManagement[
           Path.refineType(path.toPath)
             .fold(freeDsl.Read(_), freeDsl.Read(_)),
           recFunc.Hole,
-          ExcludeId,
+          IdStatus.ExcludeId,
           ShiftType.Map,
           OnUndefined.Omit,
           func.RightSide),

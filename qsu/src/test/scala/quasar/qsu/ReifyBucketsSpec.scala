@@ -19,10 +19,11 @@ package quasar.qsu
 import slamdata.Predef.{List, Long, Nil}
 
 import quasar.{Qspec, TreeMatchers}
+import quasar.IdStatus.ExcludeId
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.contrib.iota.{copkEqual, copkTraverse}
-import quasar.qscript.{construction, ExcludeId, Hole, MapFuncsCore, PlannerError, ReduceFuncs, SrcHole}
+import quasar.qscript.{construction, Hole, MapFuncsCore, PlannerError, ReduceFuncs, SrcHole}
 
 import matryoshka.{delayEqual, delayShow, showTShow, Embed}
 import matryoshka.data.Fix

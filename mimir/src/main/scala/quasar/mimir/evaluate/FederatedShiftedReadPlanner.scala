@@ -18,6 +18,7 @@ package quasar.mimir.evaluate
 
 import slamdata.Predef.{Stream => _, _}
 
+import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.impl.evaluate.{Source => EvalSource}

@@ -16,6 +16,7 @@
 
 package quasar.mimir.evaluate
 
+import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.precog.common.{CLong, CString, RArray, RObject, RValue}
 import quasar.qscript._
 

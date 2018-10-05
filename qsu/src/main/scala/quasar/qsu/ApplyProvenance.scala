@@ -18,6 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 
+import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.contrib.matryoshka.ginterpret
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
@@ -29,12 +30,8 @@ import quasar.fp.ski.{ι, κ}
 import quasar.qscript.{
   construction,
   Center,
-  ExcludeId,
   ExtractFunc,
   FreeMapA,
-  IdOnly,
-  IdStatus,
-  IncludeId,
   LeftSide,
   LeftSide3,
   MapFuncsCore,

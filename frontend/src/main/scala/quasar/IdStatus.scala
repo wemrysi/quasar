@@ -14,25 +14,26 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar
 
-import quasar.RenderTree
-
-import scalaz._, Scalaz._
+import scalaz.{Equal, Semigroup, Show}
+import scalaz.syntax.std.boolean._
+import scalaz.syntax.equal._
 
 sealed abstract class IdStatus
-case object IdOnly    extends IdStatus
-case object IncludeId extends IdStatus
-case object ExcludeId extends IdStatus
 
 object IdStatus {
+  case object IdOnly extends IdStatus
+  case object IncludeId extends IdStatus
+  case object ExcludeId extends IdStatus
+
   implicit def equal: Equal[IdStatus] = Equal.equalA
 
   implicit def renderTree: RenderTree[IdStatus] = RenderTree.fromShow("IdStatus")
 
   // NB: This forms a semilattice, if we ever have such a type class available.
   implicit def semigroup: Semigroup[IdStatus] = new Semigroup[IdStatus] {
-    def append(a: IdStatus, b: => IdStatus) = (a ≟ b).fold(a, IncludeId)
+    def append(a: IdStatus, b: => IdStatus) = (a === b).fold(a, IncludeId)
   }
 
   implicit def show: Show[IdStatus] = Show.showFromToString

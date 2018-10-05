@@ -17,6 +17,7 @@
 package quasar.qscript.rewrites
 
 import slamdata.Predef._
+import quasar.IdStatus.IncludeId
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.qscript._

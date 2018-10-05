@@ -18,20 +18,17 @@ package quasar.qsu
 
 import slamdata.Predef._
 
+import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.common.effect.NameGenerator
+import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,
-  ExcludeId,
   Hole,
-  IdOnly,
-  IdStatus,
-  IncludeId,
   MFC,
   MonadPlannerErr,
   ReduceFunc}

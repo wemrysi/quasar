@@ -18,6 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 import quasar.Qspec
+import quasar.IdStatus.IncludeId
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
@@ -27,7 +28,6 @@ import quasar.qscript.{
   construction,
   Hole,
   HoleF,
-  IncludeId,
   JoinSide,
   OnUndefined,
   PlannerError,

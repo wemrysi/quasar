@@ -17,19 +17,23 @@
 package quasar.qscript
 
 import slamdata.Predef.{Eq => _, _}
+
 import quasar.Type
-import quasar.fp._
+import quasar.IdStatus.ExcludeId
+import quasar.common.{JoinType, SortDir}
 import quasar.contrib.iota._
+import quasar.contrib.pathy._
+import quasar.ejson.{EJson, Extension}
+import quasar.fp._
+import quasar.qscript.RenderQScriptDSL.RenderQScriptDSL
+import quasar.time.TemporalPart
+
 import matryoshka.Delay
 import matryoshka.data.{Fix, freeEqual, freeShow}
 import matryoshka.{delayEqual, delayShow}
 import org.specs2.execute.Result
-import quasar.ejson.{EJson, Extension}
-import quasar.time.TemporalPart
-import quasar.qscript.RenderQScriptDSL.RenderQScriptDSL
-import quasar.common.{JoinType, SortDir}
+
 import pathy.Path._
-import quasar.contrib.pathy._
 
 import scalaz.{Equal, NonEmptyList, Show}
 import scalaz.syntax.show._

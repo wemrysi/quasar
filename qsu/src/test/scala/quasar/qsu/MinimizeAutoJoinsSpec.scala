@@ -18,15 +18,13 @@ package quasar.qsu
 
 import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers, Type}
+import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.qscript.{
   construction,
-  ExcludeId,
-  IdOnly,
-  IncludeId,
   Hole,
   LeftSide,
   MapFuncsCore,
