@@ -981,10 +981,6 @@ object MapFuncsCore {
   @Lenses final case class CurrentTimeZone[T[_[_]], A]() extends Nullary[T, A]
 
   // identity
-  /** Returns a string describing the type of the value. If the value has a
-    * metadata map containing an "_ejson.type" entry, that value is returned.
-    * Otherwise, it returns a string naming a [[quasar.common.PrimaryType]].
-    */
   @Lenses final case class TypeOf[T[_[_]], A](a1: A) extends Unary[T, A]
 
   // math
