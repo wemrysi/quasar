@@ -18,6 +18,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._, json._
+import quasar.common.{CPath, CPathField, CPathIndex}
 import quasar.precog.common._
 
 import cats.effect.IO

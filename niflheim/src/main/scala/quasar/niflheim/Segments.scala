@@ -17,6 +17,7 @@
 package quasar.niflheim
 
 import quasar.blueeyes.json._
+import quasar.common.{CPath, CPathField, CPathIndex}
 import quasar.precog.BitSet
 import quasar.precog.common._
 

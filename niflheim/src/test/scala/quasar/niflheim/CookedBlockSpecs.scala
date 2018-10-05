@@ -16,11 +16,12 @@
 
 package quasar.niflheim
 
+import quasar.common.CPath
 import quasar.precog.common._
 
+import org.scalacheck._
 import org.specs2.mutable.Specification
 import org.specs2._
-import org.scalacheck._
 
 import java.io.File
 

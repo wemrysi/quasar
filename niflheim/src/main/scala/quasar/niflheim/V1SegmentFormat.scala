@@ -16,9 +16,9 @@
 
 package quasar.niflheim
 
-import quasar.precog.common._
-
+import quasar.common.CPath
 import quasar.precog.BitSet
+import quasar.precog.common._
 import quasar.precog.util.BitSetUtil.Implicits._
 
 import java.io.IOException

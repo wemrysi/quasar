@@ -17,6 +17,7 @@
 package quasar.yggdrasil
 package nihdb
 
+import quasar.common.CPath
 import quasar.contrib.cats.effect._
 import quasar.niflheim.NIHDB
 import quasar.precog.common._

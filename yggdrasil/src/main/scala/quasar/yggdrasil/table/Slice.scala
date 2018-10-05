@@ -17,6 +17,7 @@
 package quasar.yggdrasil.table
 
 import quasar.blueeyes._, json._
+import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta, CPathNode}
 import quasar.contrib.std.errorImpossible
 import quasar.precog._
 import quasar.precog.common._

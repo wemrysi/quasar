@@ -17,8 +17,8 @@
 package quasar 
 
 import quasar.blueeyes.json.{JPath, JPathField, JPathIndex}
+import quasar.common.{CPath, CPathField, CPathIndex}
 import quasar.contrib.scalaz.MonadTell_
-import quasar.precog.common.{CPath, CPathField, CPathIndex}
 
 package object yggdrasil {
 

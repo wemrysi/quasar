@@ -16,12 +16,14 @@
 
 package quasar.yggdrasil
 
-import qdata.time.OffsetDate
-import quasar.precog._
+import quasar.common.{CPath, CPathArray, CPathField, CPathIndex}
 import quasar.pkg.tests._
+import quasar.precog._
 import quasar.precog.common._
 import quasar.precog.util._
 import quasar.yggdrasil.table._
+
+import qdata.time.OffsetDate
 
 import java.time._
 

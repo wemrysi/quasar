@@ -17,22 +17,25 @@
 package quasar.yggdrasil.table
 
 import quasar.RCValueGenerators
+import quasar.common.{CPath, CPathField}
 import quasar.blueeyes._
 import quasar.blueeyes.json._
-import quasar.precog.BitSet
 import quasar.pkg.tests._
+import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util._
-import qdata.time.TimeGenerators
 import quasar.yggdrasil.TableModule.SortDescending
 
-import scala.util.Random
+import fs2.{Chunk, Stream}
+
 import org.scalacheck.{Arbitrary, Gen}
 import org.specs2.execute.Result
 import org.specs2.matcher.Matcher
 import Gen.listOfN
 
-import fs2.{Chunk, Stream}
+import qdata.time.TimeGenerators
+
+import scala.util.Random
 
 class SliceSpec extends Specification with ScalaCheck {
   import ArbitrarySlice._

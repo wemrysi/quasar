@@ -18,6 +18,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
+import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta, CPathNode}
 import quasar.contrib.fs2.convert
 import quasar.contrib.std.errorImpossible
 import quasar.precog.BitSet

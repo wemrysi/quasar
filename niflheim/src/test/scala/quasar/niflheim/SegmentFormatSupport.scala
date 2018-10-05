@@ -16,11 +16,13 @@
 
 package quasar.niflheim
 
+import quasar.RCValueGenerators
+import quasar.common.CPath
 import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util._
 import quasar.precog.util.BitSetUtil.Implicits._
-import quasar.RCValueGenerators
+
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import org.scalacheck._

@@ -16,6 +16,7 @@
 
 package quasar.yggdrasil
 
+import quasar.common.{CPath, CPathField, CPathIndex, CPathMeta}
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.table.{CF1, CF2, CFN, CMapper, CScanner}

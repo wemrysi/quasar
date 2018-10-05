@@ -16,14 +16,15 @@
 
 package quasar.niflheim
 
-import java.io._
-
 import quasar.blueeyes.json._
-import quasar.precog.common._
+import quasar.common.CPath
 import quasar.precog.BitSet
+import quasar.precog.common._
 
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
+
+import java.io._
 
 abstract class cleanup(f: File) extends After {
   def after = {

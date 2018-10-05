@@ -17,6 +17,7 @@
 package quasar.niflheim
 
 import quasar.precog.BitSet
+import quasar.common.CPath
 import quasar.precog.common._
 
 import org.slf4j.LoggerFactory

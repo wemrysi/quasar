@@ -17,6 +17,7 @@
 package quasar.yggdrasil
 package jdbm3
 
+import quasar.common.{CPath, CPathIndex}
 import quasar.precog.common._
 import quasar.pkg.tests._
 import quasar.yggdrasil.table._

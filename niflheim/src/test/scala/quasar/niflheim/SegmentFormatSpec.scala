@@ -16,13 +16,15 @@
 
 package quasar.niflheim
 
+import quasar.common.CPath
 import quasar.precog.common._
 import quasar.precog.util._
-import qdata.time.{DateTimeInterval, OffsetDate}
 
+import org.scalacheck._, Prop._
 import org.specs2._
 import org.specs2.mutable.Specification
-import org.scalacheck._, Prop._
+
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.time._
 

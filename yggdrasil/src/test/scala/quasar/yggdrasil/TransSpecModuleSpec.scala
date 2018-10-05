@@ -16,12 +16,14 @@
 
 package quasar.yggdrasil
 
-import org.specs2.execute.Result
 import quasar.ScalazSpecs2Instances
-import quasar.precog.common._
+import quasar.common._
 import quasar.pkg.tests._
+import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JNumberT
 import quasar.yggdrasil.table.{CF1, CF2, CFN}
+
+import org.specs2.execute.Result
 
 trait TransSpecModuleSpec extends TransSpecModule with FNModule with SpecificationLike with ScalazSpecs2Instances {
   import trans._
@@ -29,13 +31,13 @@ trait TransSpecModuleSpec extends TransSpecModule with FNModule with Specificati
 
   "concatChildren" should {
     "transform a CPathTree into a TransSpec" in {
-      val tree: CPathTree[Int] = RootNode(Seq(
+      val tree: CPathTree[Int] = RootNode(List(
         FieldNode(CPathField("bar"),
-          Seq(
-            IndexNode(CPathIndex(0), Seq(LeafNode(4))),
-            IndexNode(CPathIndex(1), Seq(FieldNode(CPathField("baz"), Seq(LeafNode(6))))),
-            IndexNode(CPathIndex(2), Seq(LeafNode(2))))),
-        FieldNode(CPathField("foo"), Seq(LeafNode(0)))))
+          List(
+            IndexNode(CPathIndex(0), List(LeafNode(4))),
+            IndexNode(CPathIndex(1), List(FieldNode(CPathField("baz"), List(LeafNode(6))))),
+            IndexNode(CPathIndex(2), List(LeafNode(2))))),
+        FieldNode(CPathField("foo"), List(LeafNode(0)))))
 
       val result = TransSpec.concatChildren(tree)
 

@@ -17,10 +17,11 @@
 package quasar.yggdrasil
 package util
 
+import quasar.common.{CPath, CPathArray, CPathIndex}
 import quasar.precog.common._
-import qdata.time.OffsetDate
 import quasar.yggdrasil.table._
 
+import qdata.time.OffsetDate
 import scalaz._, Scalaz._
 
 import java.time.{Instant, LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}

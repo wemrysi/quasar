@@ -17,6 +17,7 @@
 package quasar.niflheim
 
 import quasar.blueeyes.json._
+import quasar.common.CPath
 import quasar.precog.common._
 
 import scala.collection.mutable

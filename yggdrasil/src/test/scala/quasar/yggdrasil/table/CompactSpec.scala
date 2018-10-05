@@ -16,9 +16,9 @@
 
 package quasar.yggdrasil.table
 
+import quasar.common.{CPath, CPathField, CPathIndex, CPathNode}
 import quasar.precog.BitSet
 import quasar.pkg.tests._
-import quasar.precog.common._
 import quasar.precog.util._
 import quasar.yggdrasil._
 

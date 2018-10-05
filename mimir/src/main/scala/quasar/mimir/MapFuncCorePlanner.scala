@@ -16,6 +16,7 @@
 
 package quasar.mimir
 
+import quasar.common.{CPathField, CPathIndex}
 import quasar.common.data.Data
 import quasar.contrib.iota.copkTraverse
 import quasar.contrib.std.{errorImpossible, errorNotImplemented}

@@ -17,6 +17,7 @@
 package quasar.yggdrasil
 
 import quasar.blueeyes.json._
+import quasar.common.CPathField
 import quasar.precog.common._
 import quasar.yggdrasil.TestIdentities._
 

@@ -18,6 +18,7 @@ package quasar.precog
 package common
 
 import quasar.blueeyes._, json._
+import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta}
 import quasar.common.data.Data
 import qdata.time.{DateTimeInterval, OffsetDate}
 

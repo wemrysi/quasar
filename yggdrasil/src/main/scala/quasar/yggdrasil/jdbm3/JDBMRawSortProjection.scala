@@ -17,18 +17,17 @@
 package quasar.yggdrasil
 package jdbm3
 
+import quasar.common.CPath
 import quasar.precog.common._
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.TableModule._
 
+import cats.effect.IO
 import org.apache.jdbm._
-
 import org.slf4s.Logging
 
 import java.io.File
 import java.util.SortedMap
-
-import cats.effect.IO
 
 import scala.collection.JavaConverters._
 

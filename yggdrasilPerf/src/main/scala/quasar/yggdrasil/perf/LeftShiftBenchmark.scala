@@ -18,9 +18,10 @@ package quasar
 package yggdrasil
 package perf
 
+import quasar.common.CPath
 import quasar.contrib.cats.effect.liftio._
 import quasar.fp.ski.κ
-import quasar.precog.common.{CLong, CPath, RArray, RObject, RValue}
+import quasar.precog.common.{CLong, RArray, RObject, RValue}
 import quasar.yggdrasil.table.TestColumnarTableModule
 
 import cats.effect.IO

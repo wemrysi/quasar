@@ -17,6 +17,7 @@
 package quasar.yggdrasil
 package table
 
+import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta, CPathNode}
 import quasar.precog.common._
 
 import tectonic.{Enclosure, Plate, Signal}

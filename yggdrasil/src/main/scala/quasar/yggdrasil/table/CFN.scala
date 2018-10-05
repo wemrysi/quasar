@@ -17,14 +17,15 @@
 package quasar.yggdrasil
 package table
 
+import quasar.common.{CPath, CPathIndex}
 import quasar.precog.BitSet
 import quasar.precog.common._
-import qdata.time.{DateTimeInterval, OffsetDate}
 import quasar.yggdrasil.bytecode.JType
 
-import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
-
 import cats.effect.IO
+import qdata.time.{DateTimeInterval, OffsetDate}
+
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 sealed trait CFId
 case object LeafCFId extends CFId

@@ -17,6 +17,7 @@
 package quasar.yggdrasil
 package table
 
+import quasar.common.{CPath, CPathArray, CPathIndex, CPathNode}
 import quasar.precog.common._
 
 object DerefSlice {

@@ -18,11 +18,11 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._, json._
+import quasar.common.CPathField
 import quasar.common.data.{Data, DataGenerators}
 import quasar.contrib.cats.effect.liftio._
 import quasar.frontend.data.DataCodec
 import quasar.pkg.tests._, Gen._
-import quasar.precog.common._
 import quasar.yggdrasil.TestIdentities._
 import quasar.yggdrasil.bytecode.JType
 

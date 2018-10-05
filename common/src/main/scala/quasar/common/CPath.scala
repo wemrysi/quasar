@@ -14,11 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
+package quasar.common
+
+import slamdata.Predef._
 
 import scalaz.Ordering._
 import scalaz.syntax.std.boolean._
 
+@SuppressWarnings(Array(
+  "org.wartremover.warts.Overloading",
+  "org.wartremover.warts.Recursion",
+  "org.wartremover.warts.TraversableOps"))
 sealed trait CPath { self =>
   def nodes: List[CPathNode]
 
@@ -36,8 +42,8 @@ sealed trait CPath { self =>
     ancestors0(this, Nil).reverse
   }
 
-  def combine(paths: Seq[CPath]): Seq[CPath] = {
-    if (paths.isEmpty) Seq(this)
+  def combine(paths: List[CPath]): List[CPath] = {
+    if (paths.isEmpty) List(this)
     else
       paths map { path =>
         CPath(this.nodes ++ path.nodes)
@@ -96,11 +102,13 @@ sealed trait CPath { self =>
   override def toString = if (nodes.isEmpty) "." else path
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 sealed trait CPathNode {
   def \(that: CPath)     = CPath(this :: that.nodes)
   def \(that: CPathNode) = CPath(this :: that :: Nil)
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.Equals"))
 object CPathNode {
   implicit def s2PathNode(name: String): CPathNode = CPathField(name)
   implicit def i2PathNode(index: Int): CPathNode   = CPathIndex(index)
@@ -126,25 +134,32 @@ object CPathNode {
   implicit val CPathNodeOrdering = CPathNodeOrder.toScalaOrdering
 }
 
-sealed case class CPathField(name: String) extends CPathNode {
+final case class CPathField(name: String) extends CPathNode {
   override def toString = "." + name
 }
 
-sealed case class CPathMeta(name: String) extends CPathNode {
+final case class CPathMeta(name: String) extends CPathNode {
   override def toString = "@" + name
 }
 
-sealed case class CPathIndex(index: Int) extends CPathNode {
-  override def toString = "[" + index + "]"
+final case class CPathIndex(index: Int) extends CPathNode {
+  override def toString = "[" + index.toString + "]"
 }
 
-case object CPathArray extends CPathNode {
+final case object CPathArray extends CPathNode {
   override def toString = "[*]"
 }
 
+@SuppressWarnings(Array(
+  "org.wartremover.warts.Equals",
+  "org.wartremover.warts.Overloading",
+  "org.wartremover.warts.Product",
+  "org.wartremover.warts.Recursion",
+  "org.wartremover.warts.Serializable",
+  "org.wartremover.warts.TraversableOps"))
 object CPath {
 
-  private[this] case class CompositeCPath(nodes: List[CPathNode]) extends CPath
+  private[this] final case class CompositeCPath(nodes: List[CPathNode]) extends CPath
 
   private val PathPattern  = """\.|(?=\[\d+\])|(?=\[\*\])""".r
   private val IndexPattern = """^\[(\d+)\]$""".r
@@ -167,7 +182,7 @@ object CPath {
         if (head.trim.length == 0) parse0(tail, acc)
         else
           parse0(tail, (head match {
-            case "[*]"               => CPathArray
+            case "[*]" => CPathArray
             case IndexPattern(index) => CPathIndex(index.toInt)
 
             case name => CPathField(name)
@@ -179,31 +194,31 @@ object CPath {
     apply(parse0(PathPattern.split(properPath).toList, Nil).reverse: _*)
   }
 
-  trait CPathTree[A]
-  case class RootNode[A](children: Seq[CPathTree[A]])                     extends CPathTree[A]
-  case class FieldNode[A](field: CPathField, children: Seq[CPathTree[A]]) extends CPathTree[A]
-  case class IndexNode[A](index: CPathIndex, children: Seq[CPathTree[A]]) extends CPathTree[A]
-  case class LeafNode[A](value: A)                                        extends CPathTree[A]
+  sealed trait CPathTree[A]
+  final case class RootNode[A](children: List[CPathTree[A]])                     extends CPathTree[A]
+  final case class FieldNode[A](field: CPathField, children: List[CPathTree[A]]) extends CPathTree[A]
+  final case class IndexNode[A](index: CPathIndex, children: List[CPathTree[A]]) extends CPathTree[A]
+  final case class LeafNode[A](value: A)                                         extends CPathTree[A]
 
-  case class PathWithLeaf[A](path: Seq[CPathNode], value: A) {
+  final case class PathWithLeaf[A](path: List[CPathNode], value: A) {
     val size: Int = path.length
     def tail: PathWithLeaf[A] = PathWithLeaf(path.tail, value)
   }
 
-  def makeStructuredTree[A](pathsAndValues: Seq[(CPath, A)]) = {
-    def inner[X](paths: Seq[PathWithLeaf[X]]): Seq[CPathTree[X]] = {
+  def makeStructuredTree[A](pathsAndValues: List[(CPath, A)]) = {
+    def inner[X](paths: List[PathWithLeaf[X]]): List[CPathTree[X]] = {
       if (paths.size == 1 && paths.head.size == 0) {
         List(LeafNode(paths.head.value))
       } else {
         val filtered = paths filterNot { case PathWithLeaf(path, _)  => path.isEmpty }
         val grouped  = filtered groupBy { case PathWithLeaf(path, _) => path.head }
 
-        val result = grouped.toSeq.sortBy(_._1) map {
+        val result = grouped.toList.sortBy(_._1) map {
           case (node, paths) =>
             node match {
               case (field: CPathField) => FieldNode(field, inner(paths.map(_.tail)))
               case (index: CPathIndex) => IndexNode(index, inner(paths.map(_.tail)))
-              case _                   => sys.error("CPathArray and CPathMeta not supported")
+              case _                   => scala.sys.error("CPathArray and CPathMeta not supported")
             }
         }
         result
@@ -218,13 +233,13 @@ object CPath {
     RootNode(inner(leaves))
   }
 
-  def makeTree[A](cpaths0: Seq[CPath], values: Seq[A]): CPathTree[A] = {
+  def makeTree[A](cpaths0: List[CPath], values: List[A]): CPathTree[A] = {
     if (cpaths0.isEmpty && values.length == 1)
-      RootNode(Seq(LeafNode(values.head)))
+      RootNode(List(LeafNode(values.head)))
     else if (cpaths0.length == values.length)
       makeStructuredTree(cpaths0.sorted zip values)
     else
-      RootNode(Seq.empty[CPathTree[A]])
+      RootNode(List.empty[CPathTree[A]])
   }
 
   implicit def singleNodePath(node: CPathNode) = CPath(node)
@@ -244,5 +259,5 @@ object CPath {
     }
   }
 
-  implicit val CPathOrdering: Ordering[CPath] = CPathOrder.toScalaOrdering
+  implicit val CPathOrdering: scala.Ordering[CPath] = CPathOrder.toScalaOrdering
 }
