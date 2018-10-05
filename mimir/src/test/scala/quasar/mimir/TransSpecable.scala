@@ -60,41 +60,10 @@ trait TransSpecableModule
       def Cond(node: dag.Cond)(pred: T, left: T, right: T): T
     }
 
-    def isTransSpecable(to: DepGraph, from: DepGraph): Boolean =
-      foldDownTransSpecable(to, Some(from))(new TransSpecableFold[Boolean] {
-        def EqualLiteral(node: Join)(parent: Boolean, value: RValue, invert: Boolean)            = parent
-        def WrapObject(node: Join)(parent: Boolean, field: String)                               = parent
-        def DerefObjectStatic(node: Join)(parent: Boolean, field: String)                        = parent
-        def DerefMetadataStatic(node: Join)(parent: Boolean, field: String)                      = parent
-        def DerefArrayStatic(node: Join)(parent: Boolean, index: Int)                            = parent
-        def ArraySwap(node: Join)(parent: Boolean, index: Int)                                   = parent
-        def InnerObjectConcat(node: Join)(parent: Boolean)                                       = parent
-        def InnerArrayConcat(node: Join)(parent: Boolean)                                        = parent
-        def Map1Left(node: Join)(parent: Boolean, op: Op2F2, graph: DepGraph, value: RValue)     = parent
-        def Map1Right(node: Join)(parent: Boolean, op: Op2F2, graph: DepGraph, value: RValue)    = parent
-        def binOp(node: Join)(leftParent: Boolean, rightParent: => Boolean, op: BinaryOperation) = leftParent && rightParent
-        def Filter(node: dag.Filter)(leftParent: Boolean, rightParent: => Boolean)               = leftParent && rightParent
-        def WrapArray(node: Operate)(parent: Boolean)                                            = parent
-        def Op1(node: Operate)(parent: Boolean, op: UnaryOperation)                              = parent
-        def Cond(node: dag.Cond)(pred: Boolean, left: Boolean, right: Boolean)                   = pred && left && right
-        def Const(node: dag.Const)(under: Boolean)                                               = under
-        def unmatched(node: DepGraph)                                                            = false
-        def done(node: DepGraph)                                                                 = true
-      })
-
     private[this] def snd[A, B](a: A, b: B): Option[B] = Some(b)
-
-    def mkTransSpec(to: DepGraph, from: DepGraph, ctx: EvaluationContext): Option[TransSpec1] =
-      mkTransSpecWithState[Option, (TransSpec1, DepGraph)](to, Some(from), ctx, identity, snd, some).map(_._1)
-
-    def findAncestor(to: DepGraph, ctx: EvaluationContext): Option[DepGraph] =
-      mkTransSpecWithState[Option, (TransSpec1, DepGraph)](to, None, ctx, identity, snd, some).map(_._2)
 
     def findTransSpecAndAncestor(to: DepGraph, ctx: EvaluationContext): Option[(TransSpec1, DepGraph)] =
       mkTransSpecWithState[Option, (TransSpec1, DepGraph)](to, None, ctx, identity, snd, some)
-
-    def findOrderAncestor(to: DepGraph, ctx: EvaluationContext): Option[DepGraph] =
-      mkTransSpecOrderWithState[Option, (TransSpec1, DepGraph)](to, None, ctx, identity, snd, some).map(_._2)
 
     def transFold[N[_]: Monad, S](to: DepGraph,
                                     from: Option[DepGraph],
@@ -231,15 +200,6 @@ trait TransSpecableModule
       foldDownTransSpecable(to, from)(transFold[N, S](to, from, ctx, get, set, init))
     }
 
-    def mkTransSpecOrderWithState[N[+ _]: Monad, S](to: DepGraph,
-                                                    from: Option[DepGraph],
-                                                    ctx: EvaluationContext,
-                                                    get: S => (TransSpec1, DepGraph),
-                                                    set: (S, (TransSpec1, DepGraph)) => N[S],
-                                                    init: ((TransSpec1, DepGraph)) => N[S]): N[S] = {
-      foldDownTransSpecableOrder(to, from)(transFold[N, S](to, from, ctx, get, set, init))
-    }
-
     object ConstInt {
       def unapply(c: Const) = c match {
         case Const(CNum(n))    => Some(n.toInt)
@@ -254,29 +214,6 @@ trait TransSpecableModule
         case op2f2: Op2F2 => Some(op2f2)
         case _            => None
       }
-    }
-
-    def foldDownTransSpecableOrder[T](to: DepGraph, from: Option[DepGraph])(alg: TransSpecableOrderFold[T]): T = {
-
-      def loop(graph: DepGraph): T = graph match {
-        case node if from.map(_ == node).getOrElse(false) => alg.done(node)
-
-        case node @ Join(instructions.WrapObject, Cross(_), Const(CString(field)), right) =>
-          alg.WrapObject(node)(loop(right), field)
-
-        case node @ Join(DerefObject, Cross(_), left, Const(CString(field))) =>
-          alg.DerefObjectStatic(node)(loop(left), field)
-
-        case node @ Join(DerefArray, Cross(_), left, ConstInt(index)) =>
-          alg.DerefArrayStatic(node)(loop(left), index)
-
-        case node @ Operate(instructions.WrapArray, parent) =>
-          alg.WrapArray(node)(loop(parent))
-
-        case node => alg.unmatched(node)
-      }
-
-      loop(to)
     }
 
     def foldDownTransSpecable[T](to: DepGraph, from: Option[DepGraph])(alg: TransSpecableFold[T]): T = {
