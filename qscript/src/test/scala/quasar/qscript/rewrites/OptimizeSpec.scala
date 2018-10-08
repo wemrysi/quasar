@@ -19,6 +19,7 @@ package quasar.qscript.rewrites
 import slamdata.Predef._
 
 import quasar.Qspec
+import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.ejson.{EJson, Fixed}

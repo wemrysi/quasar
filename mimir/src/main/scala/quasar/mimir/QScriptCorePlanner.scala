@@ -47,6 +47,8 @@ final class QScriptCorePlanner[
     F[_]: LiftIO: Monad: MonadFinalizers[?[_], IO]](
     val P: Cake) {
 
+  import IdStatus.{ExcludeId, IdOnly, IncludeId}
+
   def mapFuncPlanner[G[_]: Monad] = MapFuncPlanner[T, G, MapFunc[T, ?]]
 
   def plan(planQST: AlgebraM[F, QScriptTotal[T, ?], MimirRepr])

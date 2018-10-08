@@ -17,6 +17,7 @@
 package quasar.mimir.evaluate
 
 import quasar.Qspec
+import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.precog.common._
 import quasar.qscript._
 

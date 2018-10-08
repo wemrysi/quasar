@@ -18,10 +18,11 @@ package quasar.qsu
 
 import slamdata.Predef.{Boolean, Option, Symbol}
 
+import quasar.IdStatus, IdStatus.{IdOnly, IncludeId}
+import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
 import quasar.fp._
-import quasar.contrib.iota._
-import quasar.qscript.{construction, Hole, IdOnly, IdStatus, IncludeId}
+import quasar.qscript.{construction, Hole}
 import quasar.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import QSUGraph.Extractors._
 

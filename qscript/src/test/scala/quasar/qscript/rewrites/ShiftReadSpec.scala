@@ -18,7 +18,7 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{List, Nil}
 
-import quasar.TreeMatchers
+import quasar.{IdStatus, TreeMatchers}
 import quasar.contrib.pathy.AFile
 import quasar.fp._
 import quasar.contrib.iota._
@@ -31,6 +31,8 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
+  import IdStatus.{ExcludeId, IncludeId}
+
   val rewrite = new Rewrite[Fix]
 
   "shiftRead" should {

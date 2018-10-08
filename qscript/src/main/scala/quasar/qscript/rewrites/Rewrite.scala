@@ -18,6 +18,7 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
+import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
@@ -43,7 +44,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
   def rewriteShift(idStatus: IdStatus, repair: JoinFunc)
       : Option[(IdStatus, JoinFunc)] =
-    (idStatus ≟ IncludeId).option[Option[(IdStatus, JoinFunc)]] {
+    (idStatus === IncludeId).option[Option[(IdStatus, JoinFunc)]] {
       def makeRef(idx: Int): JoinFunc =
         Free.roll[MapFunc, JoinSide](MFC(ProjectIndex(RightSideF, IntLit(idx))))
 
@@ -51,7 +52,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       val oneRef: JoinFunc = makeRef(1)
       val rightCount: Int = repair.elgotPara[Int](count(RightSideF))
 
-      if (repair.elgotPara[Int](count(oneRef)) ≟ rightCount)
+      if (repair.elgotPara[Int](count(oneRef)) === rightCount)
         // all `RightSide` access is through `oneRef`
         (ExcludeId, repair.transApoT(substitute[JoinFunc](oneRef, RightSideF))).some
       else if (repair.elgotPara[Int](count(zeroRef)) ≟ rightCount)

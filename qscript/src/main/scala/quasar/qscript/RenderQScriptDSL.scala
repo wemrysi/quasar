@@ -16,10 +16,7 @@
 
 package quasar.qscript
 
-import matryoshka.data.Fix
 import slamdata.Predef.{Eq => _, _}
-import matryoshka.{Hole => _, _}
-import matryoshka.implicits._
 import quasar.{DSLTree, RenderDSL, Type, ejson}
 import quasar.common.data.Data
 import quasar.contrib.pathy.{ADir, AFile}
@@ -27,6 +24,10 @@ import quasar.ejson.{EJson, ExtEJson, CommonEJson}
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski._
+
+import matryoshka.{Hole => _, _}
+import matryoshka.data.Fix
+import matryoshka.implicits._
 
 import scalaz.{Const, Free, Functor}
 import scalaz.syntax.bifunctor._
@@ -37,6 +38,7 @@ import scalaz.syntax.std.tuple._
 import scalaz.std.anyVal._
 import scalaz.std.option._
 import scalaz.std.tuple._
+
 import iotaz.{TListK, CopK, TNilK}
 import iotaz.TListK.:::
 

@@ -18,6 +18,7 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
+import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._

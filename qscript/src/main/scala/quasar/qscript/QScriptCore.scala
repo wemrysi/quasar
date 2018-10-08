@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef.{Map => ScalaMap, _}
-import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
+import quasar.{IdStatus, NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.fp._

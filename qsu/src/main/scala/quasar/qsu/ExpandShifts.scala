@@ -18,13 +18,13 @@ package quasar.qsu
 
 import slamdata.Predef._
 
+import quasar.IdStatus
 import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp.ski.κ
 import quasar.qscript.{
-  IdStatus,
   MonadPlannerErr,
   OnUndefined,
   construction

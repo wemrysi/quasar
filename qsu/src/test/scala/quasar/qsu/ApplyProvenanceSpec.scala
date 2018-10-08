@@ -18,7 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef.{Map => SMap, _}
 
-import quasar.{Qspec, Type}
+import quasar.{IdStatus, Qspec, Type}, IdStatus.{ExcludeId, IncludeId}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
@@ -27,8 +27,6 @@ import quasar.fp.ski.κ
 import quasar.contrib.iota._
 import quasar.qscript.{
   construction,
-  ExcludeId,
-  IncludeId,
   LeftSide,
   OnUndefined,
   PlannerError,

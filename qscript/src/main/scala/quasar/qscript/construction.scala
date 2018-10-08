@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef._
+import quasar.IdStatus
 import quasar.common.{JoinType, SortDir}
 import quasar.{ejson, qscript}
 import quasar.ejson.EJson

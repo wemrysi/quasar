@@ -18,7 +18,7 @@ package quasar.qsu
 package minimizers
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.RenderTreeT
+import quasar.{IdStatus, RenderTreeT}, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.common.effect.NameGenerator
 import quasar.contrib.std.errorImpossible
 import quasar.contrib.matryoshka._
@@ -28,12 +28,8 @@ import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,
-  ExcludeId,
   Hole,
   HoleF,
-  IdOnly,
-  IdStatus,
-  IncludeId,
   JoinSide,
   LeftSide,
   MFC,

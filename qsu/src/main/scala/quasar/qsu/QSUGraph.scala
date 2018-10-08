@@ -17,13 +17,14 @@
 package quasar.qsu
 
 import slamdata.Predef.{Map => SMap, _}
+import quasar.IdStatus
 import quasar.common.effect.NameGenerator
+import quasar.contrib.iota._
 import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp._
-import quasar.contrib.iota._
 import quasar.fp.ski.κ
-import quasar.qscript.{FreeMapA, IdStatus, OnUndefined, RecFreeMap}
+import quasar.qscript.{FreeMapA, OnUndefined, RecFreeMap}
 
 import monocle.macros.Lenses
 import matryoshka._

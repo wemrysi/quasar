@@ -38,6 +38,8 @@ import iotaz.{CopK, TNilK}
 import iotaz.TListK.:::
 
 class RewriteSpec extends quasar.Qspec with QScriptHelpers {
+  import IdStatus.{ExcludeId, IncludeId}
+
   val rewrite = new Rewrite[Fix]
 
   def normalizeFExpr(expr: Fix[QS]): Fix[QS] =

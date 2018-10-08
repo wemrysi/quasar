@@ -17,6 +17,7 @@
 package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
+import quasar.IdStatus.ExcludeId
 import quasar.contrib.iota._
 import quasar.ejson
 import quasar.fp.{liftFG, Injectable}

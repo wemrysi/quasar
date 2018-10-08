@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef.List
-import quasar.RenderTree
+import quasar.{IdStatus, RenderTree}
 import quasar.contrib.pathy.APath
 
 import monocle.macros.Lenses

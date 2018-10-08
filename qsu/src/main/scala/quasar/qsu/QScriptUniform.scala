@@ -17,16 +17,16 @@
 package quasar.qsu
 
 import slamdata.Predef._
-import quasar.{RenderTree, RenderTreeT, RenderedTree}
+import quasar.{IdStatus, RenderTree, RenderTreeT, RenderedTree}
 import quasar.common.{JoinType, SortDir}
+import quasar.contrib.iota._
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.std.errorNotImplemented
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
-import quasar.contrib.matryoshka._
 import quasar.fp.ski.{ι, κ}
 import quasar.fp._
-import quasar.contrib.iota._
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
 import quasar.qscript.provenance.JoinKeys

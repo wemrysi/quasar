@@ -17,6 +17,7 @@
 package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
+import quasar.IdStatus
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.fp._
