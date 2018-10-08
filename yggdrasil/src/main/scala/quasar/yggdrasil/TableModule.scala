@@ -16,6 +16,7 @@
 
 package quasar.yggdrasil
 
+import quasar.common.CPath
 import quasar.precog.common._
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType

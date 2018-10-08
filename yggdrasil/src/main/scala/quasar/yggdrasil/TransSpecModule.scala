@@ -16,6 +16,7 @@
 
 package quasar.yggdrasil
 
+import quasar.common.{CPathField, CPathIndex, CPathMeta}
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.table.{CF1, CF2, CFN, CMapper, CScanner}
@@ -141,36 +142,6 @@ trait TransSpecModule {
     type TransSpec1 = TransSpec[Source1]
 
     object TransSpec {
-
-      import CPath._
-
-      def concatChildren[A <: SourceType](tree: CPathTree[Int], leaf: TransSpec[A] = Leaf(Source)): TransSpec[A] = {
-        def createSpecs(trees: Seq[CPathTree[Int]]): Seq[TransSpec[A]] = trees.map { child =>
-          child match {
-            case node @ RootNode(seq)                  => concatChildren(node, leaf)
-            case node @ FieldNode(CPathField(name), _) => trans.WrapObject(concatChildren(node, leaf), name)
-            case node @ IndexNode(CPathIndex(_), _)    => trans.WrapArray(concatChildren(node, leaf)) //assuming that indices received in order
-            case LeafNode(idx)                         => trans.DerefArrayStatic(leaf, CPathIndex(idx))
-          }
-        }
-
-        val initialSpecs = tree match {
-          case RootNode(children)     => createSpecs(children)
-          case FieldNode(_, children) => createSpecs(children)
-          case IndexNode(_, children) => createSpecs(children)
-          case LeafNode(_)            => Seq()
-        }
-
-        val result = initialSpecs reduceOption { (t1, t2) =>
-          (t1, t2) match {
-            case (t1: ObjectSpec[_], t2: ObjectSpec[_]) => trans.InnerObjectConcat(t1, t2)
-            case (t1: ArraySpec[_], t2: ArraySpec[_])   => trans.InnerArrayConcat(t1, t2)
-            case _                                      => sys.error("cannot have this")
-          }
-        }
-
-        result getOrElse leaf
-      }
 
       def mapSources[A <: SourceType, B <: SourceType](spec: TransSpec[A])(f: A => B): TransSpec[B] = {
         spec match {

@@ -26,7 +26,7 @@ import quasar.contrib.std.{errorImpossible, errorNotImplemented}
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.ski.κ
-import quasar.precog.common.{CNumericValue, ColumnRef, CPath, CPathField, CPathIndex}
+import quasar.precog.common.{CNumericValue, ColumnRef}
 import quasar.mimir.MimirCake._
 import quasar.qscript._, MapFuncCore._
 import quasar.yggdrasil.{MonadFinalizers, TableModule}

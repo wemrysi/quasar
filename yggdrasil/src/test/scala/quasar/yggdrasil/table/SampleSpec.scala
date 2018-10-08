@@ -18,8 +18,8 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._, json._
+import quasar.common.CPathField
 import quasar.pkg.tests._
-import quasar.precog.common._
 import quasar.yggdrasil.TestIdentities._
 
 trait SampleSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {
@@ -93,4 +93,3 @@ trait SampleSpec extends ColumnarTableModuleTestSupport with SpecificationLike w
     }
   }
 }
-

@@ -17,6 +17,7 @@
 package quasar.yggdrasil
 package nihdb
 
+import quasar.common.{CPath, CPathField}
 import quasar.contrib.cats.effect._
 import quasar.niflheim.NIHDB
 import quasar.precog.common._
@@ -43,21 +44,21 @@ object SegmentsWrapperSpec extends Specification with ScalaCheck with NIHDBAkkaS
 
   "direct columnmar table persistence" should {
     val paths = Vector(
-      CPath("0") -> CLong,
-      CPath("1") -> CBoolean,
-      CPath("2") -> CString,
-      CPath("3") -> CDouble,
-      CPath("4") -> CNum,
-      CPath("5") -> CEmptyObject,
-      CPath("6") -> CEmptyArray,
-      CPath("7") -> CNum,
-      CPath("8") -> COffsetDateTime,
-      CPath("9") -> COffsetDate,
-      CPath("10") -> COffsetTime,
-      CPath("11") -> CLocalDateTime,
-      CPath("12") -> CLocalDate,
-      CPath("13") -> CLocalTime,
-      CPath("14") -> CInterval)
+      CPath.parse("0") -> CLong,
+      CPath.parse("1") -> CBoolean,
+      CPath.parse("2") -> CString,
+      CPath.parse("3") -> CDouble,
+      CPath.parse("4") -> CNum,
+      CPath.parse("5") -> CEmptyObject,
+      CPath.parse("6") -> CEmptyArray,
+      CPath.parse("7") -> CNum,
+      CPath.parse("8") -> COffsetDateTime,
+      CPath.parse("9") -> COffsetDate,
+      CPath.parse("10") -> COffsetTime,
+      CPath.parse("11") -> CLocalDateTime,
+      CPath.parse("12") -> CLocalDate,
+      CPath.parse("13") -> CLocalTime,
+      CPath.parse("14") -> CInterval)
 
     val pd = paths.toList map {
       case (cpath, ctype) =>
@@ -92,7 +93,7 @@ object SegmentsWrapperSpec extends Specification with ScalaCheck with NIHDBAkkaS
           proj <- NIHDBProjection.wrap(nihdb)
           stream <- proj.getBlockStream(None).toStream
         } yield {
-          val slices2 = stream.toList.map(_.deref("value"))
+          val slices2 = stream.toList.map(_.deref(CPathField("value")))
 
           slices.flatMap(_.toRValues) mustEqual slices2.flatMap(_.toRValues)
         }

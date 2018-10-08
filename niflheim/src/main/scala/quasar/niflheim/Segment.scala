@@ -17,6 +17,7 @@
 package quasar.niflheim
 
 import quasar.blueeyes.arrayEq
+import quasar.common.CPath
 import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util._

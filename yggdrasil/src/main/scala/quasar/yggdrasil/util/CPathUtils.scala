@@ -16,10 +16,21 @@
 
 package quasar.yggdrasil.util
 
+import quasar.common.{CPath, CPathArray, CPathIndex, CPathField, CPathNode}
 import quasar.blueeyes.json._
 import quasar.precog.common._
 
 object CPathUtils {
+
+  def jPathToCPath(jpath: JPath): CPath = {
+    val nodes2 = jpath.nodes map {
+      case JPathField(name) => CPathField(name)
+      case JPathIndex(idx)  => CPathIndex(idx)
+    }
+
+    CPath(nodes2: _*)
+  }
+
   def cPathToJPaths(cpath: CPath, value: CValue): List[(JPath, CValue)] = (cpath.nodes, value) match {
     case (CPathField(name) :: tail, _) => addComponent(JPathField(name), cPathToJPaths(CPath(tail), value))
     case (CPathIndex(i) :: tail, _)    => addComponent(JPathIndex(i), cPathToJPaths(CPath(tail), value))

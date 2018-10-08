@@ -17,6 +17,7 @@
 package quasar.yggdrasil
 
 import quasar.blueeyes._
+import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathNode}
 import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
@@ -52,12 +53,15 @@ object Schema {
     case _                => Set.empty
   }
 
-  def cpath(jtype: JType): Seq[CPath] = {
+  def cpath(jtype: JType): List[CPath] = {
     val cpaths = jtype match {
-      case JArrayFixedT(indices)                           => indices flatMap { case (idx, tpe) => CPath(CPathIndex(idx)) combine cpath(tpe) } toSeq
-      case JObjectFixedT(fields)                           => fields flatMap { case (name, tpe) => CPath(CPathField(name)) combine cpath(tpe) } toSeq
-      case JArrayHomogeneousT(elemType)                    => Seq(CPath(CPathArray))
-      case _                                               => Nil
+      case JArrayFixedT(indices) =>
+        indices.toList flatMap { case (idx, tpe) => CPath(CPathIndex(idx)) combine cpath(tpe) }
+      case JObjectFixedT(fields) =>
+        fields.toList flatMap { case (name, tpe) => CPath(CPathField(name)) combine cpath(tpe) }
+      case JArrayHomogeneousT(elemType) =>
+        List(CPath(CPathArray))
+      case _ => Nil
     }
 
     cpaths.sorted

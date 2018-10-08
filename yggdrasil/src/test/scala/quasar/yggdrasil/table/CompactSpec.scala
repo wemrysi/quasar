@@ -16,9 +16,9 @@
 
 package quasar.yggdrasil.table
 
+import quasar.common.{CPath, CPathField, CPathIndex, CPathNode}
 import quasar.precog.BitSet
 import quasar.pkg.tests._
-import quasar.precog.common._
 import quasar.precog.util._
 import quasar.yggdrasil._
 
@@ -56,10 +56,10 @@ trait CompactSpec extends ColumnarTableModuleTestSupport with SpecificationLike 
   }
 
   def extractPath(spec: TransSpec1): Option[CPath] = spec match {
-    case DerefObjectStatic(TransSpec1.Id, f) => Some(f)
-    case DerefObjectStatic(lhs, f) => extractPath(lhs).map(_ \ f)
-    case DerefArrayStatic(TransSpec1.Id, i) => Some(i)
-    case DerefArrayStatic(lhs, f) => extractPath(lhs).map(_ \ f)
+    case DerefObjectStatic(TransSpec1.Id, f) => Some(CPath(f))
+    case DerefObjectStatic(lhs, f) => extractPath(lhs).map(_ \ CPath(f))
+    case DerefArrayStatic(TransSpec1.Id, i) => Some(CPath(i))
+    case DerefArrayStatic(lhs, f) => extractPath(lhs).map(_ \ CPath(f))
     case _ => None
   }
 

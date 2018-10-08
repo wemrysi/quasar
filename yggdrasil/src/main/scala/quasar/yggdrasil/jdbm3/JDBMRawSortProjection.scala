@@ -17,18 +17,17 @@
 package quasar.yggdrasil
 package jdbm3
 
+import quasar.common.CPath
 import quasar.precog.common._
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.TableModule._
 
+import cats.effect.IO
 import org.apache.jdbm._
-
 import org.slf4s.Logging
 
 import java.io.File
 import java.util.SortedMap
-
-import cats.effect.IO
 
 import scala.collection.JavaConverters._
 
@@ -111,8 +110,8 @@ class JDBMRawSortProjection private[yggdrasil] (dbFile: File,
      IO(if (iterator.isEmpty) {
         None
       } else {
-        val keyColumns = sortKeyRefs.map(JDBMSlice.columnFor(CPath("[0]"), sliceSize))
-        val valColumns = valRefs.map(JDBMSlice.columnFor(CPath("[1]"), sliceSize))
+        val keyColumns = sortKeyRefs.map(JDBMSlice.columnFor(CPath.parse("[0]"), sliceSize))
+        val valColumns = valRefs.map(JDBMSlice.columnFor(CPath.parse("[1]"), sliceSize))
 
         val keyColumnDecoder = keyFormat.ColumnDecoder(keyColumns.map(_._2)(collection.breakOut))
         val valColumnDecoder = rowFormat.ColumnDecoder(valColumns.map(_._2)(collection.breakOut))

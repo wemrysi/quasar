@@ -16,6 +16,7 @@
 
 package quasar.yggdrasil.table
 
+import quasar.common.CPath
 import quasar.precog.common._
 import quasar.yggdrasil.Config
 

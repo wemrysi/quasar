@@ -16,8 +16,7 @@
 
 package quasar.yggdrasil.nihdb
 
-import scala.util.control.NonFatal
-
+import quasar.common.CPath
 import quasar.contrib.cats.effect._
 import quasar.precog.common._
 import quasar.niflheim._
@@ -29,6 +28,7 @@ import org.slf4s.Logging
 import cats.effect.IO
 
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 final class NIHDBProjection(snapshot: NIHDBSnapshot, projectionId: Int) extends ProjectionLike[Slice] with Logging {
   type Key = Long

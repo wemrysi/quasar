@@ -16,6 +16,7 @@
 
 package quasar.mimir
 
+import quasar.common.{CPath, CPathField, CPathIndex}
 import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.TableModule._

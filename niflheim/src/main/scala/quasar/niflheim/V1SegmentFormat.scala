@@ -16,9 +16,9 @@
 
 package quasar.niflheim
 
-import quasar.precog.common._
-
+import quasar.common.CPath
 import quasar.precog.BitSet
+import quasar.precog.common._
 import quasar.precog.util.BitSetUtil.Implicits._
 
 import java.io.IOException
@@ -41,7 +41,7 @@ object V1SegmentFormat extends SegmentFormat {
     def readSegmentId(channel: ReadableByteChannel): Validation[IOException, SegmentId] = for {
       buffer <- readChunk(channel)
       blockId <- wrapException(buffer.getLong())
-      cpath <- wrapException(CPath(Codec.Utf8Codec.read(buffer)))
+      cpath <- wrapException(CPath.parse(Codec.Utf8Codec.read(buffer)))
       ctype <- CTypeFlags.readCType(buffer)
     } yield SegmentId(blockId, cpath, ctype)
 

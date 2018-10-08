@@ -16,6 +16,7 @@
 
 package quasar.niflheim
 
+import quasar.common.CPath
 import quasar.precog.common._
 
 import java.io.{File, IOException}
@@ -48,7 +49,7 @@ object V1CookedBlockFormat extends CookedBlockFormat with Chunker {
   val verify = true
 
   val FileCodec = Codec.Utf8Codec.as[File](_.getPath(), new File(_))
-  val CPathCodec = Codec.Utf8Codec.as[CPath](_.toString, CPath(_))
+  val CPathCodec = Codec.Utf8Codec.as[CPath](_.toString, CPath.parse(_))
   val CTypeCodec = Codec.ArrayCodec(Codec.ByteCodec).as[CType](CTypeFlags.getFlagFor, CTypeFlags.cTypeForFlag)
   val ColumnRefCodec = Codec.CompositeCodec[CPath, CType, (CPath, CType)](CPathCodec, CTypeCodec,
     identity, { (a: CPath, b: CType) => (a, b) })

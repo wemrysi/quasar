@@ -18,6 +18,7 @@ package quasar.yggdrasil
 package jdbm3
 
 import table._
+import quasar.common.CPath
 import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.precog.util.{ByteBufferMonad, ByteBufferPool, NumericComparisons, RawBitSet}

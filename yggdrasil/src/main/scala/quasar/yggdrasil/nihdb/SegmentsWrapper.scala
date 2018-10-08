@@ -16,13 +16,14 @@
 
 package quasar.yggdrasil.nihdb
 
-import org.slf4j.LoggerFactory
-
+import quasar.common.CPath
+import quasar.niflheim._
 import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
-import quasar.niflheim._
+
+import org.slf4j.LoggerFactory
 import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}

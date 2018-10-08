@@ -16,11 +16,12 @@
 
 package quasar.niflheim
 
+import quasar.common.CPath
 import quasar.precog.common._
 
+import org.scalacheck._
 import org.specs2.mutable.Specification
 import org.specs2._
-import org.scalacheck._
 
 import java.io.File
 
@@ -50,7 +51,7 @@ trait CookedBlockFormatSpecs extends Specification with ScalaCheck with SegmentF
 
     "round trip simple segments" in {
       surviveRoundTrip(format)(CookedBlockMetadata(999L, 1,
-          Array(SegmentId(1234L, CPath("a.b.c"), CLong) -> new File("/hello/there/abc.cooked"))
+          Array(SegmentId(1234L, CPath.parse("a.b.c"), CLong) -> new File("/hello/there/abc.cooked"))
       ))
     }
 

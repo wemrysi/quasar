@@ -16,6 +16,7 @@
 
 package quasar.niflheim
 
+import quasar.common.CPath
 import quasar.precog.common._
 
 import java.lang.ref.SoftReference

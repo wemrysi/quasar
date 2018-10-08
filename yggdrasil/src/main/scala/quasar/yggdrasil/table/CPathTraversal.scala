@@ -17,7 +17,7 @@
 package quasar.yggdrasil
 package table
 
-import quasar.precog.common._
+import quasar.common.{CPath, CPathArray, CPathIndex, CPathNode}
 import quasar.yggdrasil.util._
 
 import scalaz._, Scalaz._

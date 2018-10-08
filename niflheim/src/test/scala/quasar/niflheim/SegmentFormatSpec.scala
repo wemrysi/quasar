@@ -16,13 +16,15 @@
 
 package quasar.niflheim
 
+import quasar.common.CPath
 import quasar.precog.common._
 import quasar.precog.util._
-import qdata.time.{DateTimeInterval, OffsetDate}
 
+import org.scalacheck._, Prop._
 import org.specs2._
 import org.specs2.mutable.Specification
-import org.scalacheck._, Prop._
+
+import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.time._
 
@@ -62,41 +64,41 @@ trait SegmentFormatSpec extends Specification with ScalaCheck with SegmentFormat
 
   "segment formats" should {
     "roundtrip trivial null segments" in {
-      surviveRoundTrip(NullSegment(1234L, CPath("a.b.c"), CNull, EmptyBitSet, 0))
-      surviveRoundTrip(NullSegment(1234L, CPath("a.b.c"), CEmptyObject, EmptyBitSet, 0))
-      surviveRoundTrip(NullSegment(1234L, CPath("a.b.c"), CEmptyArray, EmptyBitSet, 0))
+      surviveRoundTrip(NullSegment(1234L, CPath.parse("a.b.c"), CNull, EmptyBitSet, 0))
+      surviveRoundTrip(NullSegment(1234L, CPath.parse("a.b.c"), CEmptyObject, EmptyBitSet, 0))
+      surviveRoundTrip(NullSegment(1234L, CPath.parse("a.b.c"), CEmptyArray, EmptyBitSet, 0))
     }
-    "roundtrip trivial boolean segments" in surviveRoundTrip(BooleanSegment(1234L, CPath("a.b.c"), EmptyBitSet, EmptyBitSet, 0))
+    "roundtrip trivial boolean segments" in surviveRoundTrip(BooleanSegment(1234L, CPath.parse("a.b.c"), EmptyBitSet, EmptyBitSet, 0))
     "roundtrip trivial array segments" in {
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CLong, EmptyBitSet, new Array[Long](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDouble, EmptyBitSet, new Array[Double](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CNum, EmptyBitSet, new Array[BigDecimal](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CString, EmptyBitSet, new Array[String](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), COffsetDateTime, EmptyBitSet, new Array[OffsetDateTime](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), COffsetTime, EmptyBitSet, new Array[OffsetTime](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), COffsetDate, EmptyBitSet, new Array[OffsetDate](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CLocalDateTime, EmptyBitSet, new Array[LocalDateTime](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CLocalTime, EmptyBitSet, new Array[LocalTime](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CLocalDate, EmptyBitSet, new Array[LocalDate](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CInterval, EmptyBitSet, new Array[DateTimeInterval](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath.parse("a.b.c"), CLong, EmptyBitSet, new Array[Long](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath.parse("a.b.c"), CDouble, EmptyBitSet, new Array[Double](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath.parse("a.b.c"), CNum, EmptyBitSet, new Array[BigDecimal](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath.parse("a.b.c"), CString, EmptyBitSet, new Array[String](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath.parse("a.b.c"), COffsetDateTime, EmptyBitSet, new Array[OffsetDateTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath.parse("a.b.c"), COffsetTime, EmptyBitSet, new Array[OffsetTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath.parse("a.b.c"), COffsetDate, EmptyBitSet, new Array[OffsetDate](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath.parse("a.b.c"), CLocalDateTime, EmptyBitSet, new Array[LocalDateTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath.parse("a.b.c"), CLocalTime, EmptyBitSet, new Array[LocalTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath.parse("a.b.c"), CLocalDate, EmptyBitSet, new Array[LocalDate](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath.parse("a.b.c"), CInterval, EmptyBitSet, new Array[DateTimeInterval](0)))
     }
     "roundtrip simple boolean segment" in {
-      val segment = BooleanSegment(1234L, CPath("a.b.c"),
+      val segment = BooleanSegment(1234L, CPath.parse("a.b.c"),
         BitSetUtil.create(Seq(0)), BitSetUtil.create(Seq(0)), 1)
       surviveRoundTrip(segment)
     }
     "roundtrip undefined boolean segment" in {
-      val segment = BooleanSegment(1234L, CPath("a.b.c"),
+      val segment = BooleanSegment(1234L, CPath.parse("a.b.c"),
         EmptyBitSet, EmptyBitSet, 10)
       surviveRoundTrip(segment)
     }
     "roundtrip simple array segment" in {
-      val segment = ArraySegment(1234L, CPath("a.b.c"), CDouble,
+      val segment = ArraySegment(1234L, CPath.parse("a.b.c"), CDouble,
         BitSetUtil.create(Seq(0)), Array(4.2))
       surviveRoundTrip(segment)
     }
     "roundtrip undefined array segment" in {
-      val segment = ArraySegment(1234L, CPath("a.b.c"), CDouble,
+      val segment = ArraySegment(1234L, CPath.parse("a.b.c"), CDouble,
         EmptyBitSet, new Array[Double](100))
       surviveRoundTrip(segment)
     }
