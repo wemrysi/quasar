@@ -51,7 +51,7 @@ object SstConfig {
   val DefaultMapMaxSize: Natural = 32L
   val DefaultRetainIndicesSize: Natural = 0L
   val DefaultRetainKeysSize: Natural = 0L
-  val DefaultStringMaxLength: Natural = 0L
+  val DefaultStringMaxLength: Natural = 64L
   val DefaultStringPreserveStructure: Boolean = false
   val DefaultUnionMaxSize: Positive = 1L
 

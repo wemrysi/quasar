@@ -75,8 +75,8 @@ package object schema {
 
     val reduction: SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] =
       applyTransforms(
-        compression.coalesceWithUnknown[J, A](config.retainKeysSize),
-        compression.coalesceKeys[J, A](config.mapMaxSize, config.retainKeysSize),
+        compression.coalesceWithUnknown[J, A](config.retainKeysSize, config.stringPreserveStructure),
+        compression.coalesceKeys[J, A](config.mapMaxSize, config.retainKeysSize, config.stringPreserveStructure),
         compression.coalescePrimary[J, A](config.stringPreserveStructure),
         compression.narrowUnion[J, A](config.unionMaxSize, config.stringPreserveStructure))
 

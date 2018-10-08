@@ -116,7 +116,7 @@ object ProgressiveSstSpec extends quasar.Qspec {
       TypeStat.coll(Real(2), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap(
         J.str("foo") -> envT(
-          TypeStat.coll(Real(1), Real(6).some, Real(6).some),
+          TypeStat.str(Real(1), Real(6), Real(6), "abcde", "abcde"),
           TagST[J](Tagged(
             strings.StructuralString,
             envT(
@@ -128,7 +128,7 @@ object ProgressiveSstSpec extends quasar.Qspec {
           ).embed,
 
         J.str("bar") -> envT(
-          TypeStat.coll(Real(1), Real(5).some, Real(5).some),
+          TypeStat.str(Real(1), Real(5), Real(5), "abcde", "abcde"),
           TypeST(TypeF.const[J, S](J.str("abcde")))
         ).embed
       ), None))).embed
@@ -146,11 +146,11 @@ object ProgressiveSstSpec extends quasar.Qspec {
       TypeStat.coll(Real(2), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap(
         J.str("foo") -> envT(
-          TypeStat.coll(Real(1), Real(6).some, Real(6).some),
+          TypeStat.str(Real(1), Real(6), Real(6), "abcde", "abcde"),
           TypeST(TypeF.simple[J, S](SimpleType.Str))).embed,
 
         J.str("bar") -> envT(
-          TypeStat.coll(Real(1), Real(5).some, Real(5).some),
+          TypeStat.str(Real(1), Real(5), Real(5), "abcde", "abcde"),
           TypeST(TypeF.const[J, S](J.str("abcde")))).embed
       ), None))).embed
 
@@ -169,7 +169,7 @@ object ProgressiveSstSpec extends quasar.Qspec {
       TypeStat.coll(Real(4), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap.empty[J, S], Some((
         envT(
-          TypeStat.coll(Real(4), Real(3).some, Real(4).some),
+          TypeStat.str(Real(4), Real(3), Real(4), "bar", "quux"),
           TagST[J](Tagged(
             strings.StructuralString,
             envT(
@@ -217,7 +217,7 @@ object ProgressiveSstSpec extends quasar.Qspec {
           J.str("a") -> fourOnes,
           J.str("b") -> fourOnes),
         Some((envT(
-          TypeStat.coll(Real(4), Real(3).some, Real(4).some),
+          TypeStat.str(Real(4), Real(3), Real(4), "bar", "quux"),
           TagST[J](Tagged(
             strings.StructuralString,
             envT(
@@ -253,7 +253,7 @@ object ProgressiveSstSpec extends quasar.Qspec {
       TypeStat.coll(Real(4), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap.empty[J, S], Some((
         envT(
-          TypeStat.coll(Real(4), Real(3).some, Real(4).some),
+          TypeStat.str(Real(4), Real(3), Real(4), "bar", "quux"),
           TagST[J](Tagged(
             strings.StructuralString,
             envT(

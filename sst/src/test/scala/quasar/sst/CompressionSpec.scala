@@ -100,7 +100,7 @@ final class CompressionSpec extends quasar.Qspec
         val unk1 = ukey.strengthR(uval) |+| unk
         val exp  = envT(cnt1, TypeST(TypeF.map[J, S](m1, unk1))).embed
 
-        attemptCompression(msst, compression.coalesceKeys(2L, 0L)) must_= exp
+        attemptCompression(msst, compression.coalesceKeys(2L, 0L, false)) must_= exp
       }}
 
       s"compresses largest group of keys having same primary ${kind}, with retention" >> prop {
@@ -126,7 +126,7 @@ final class CompressionSpec extends quasar.Qspec
         val unk1 = unk |+| Some((ukey, sc2))
         val exp  = envT(cnt1, TypeST(TypeF.map[J, S](m1, unk1))).embed
 
-        attemptCompression(msst, compression.coalesceKeys(2L, 1L)) must_= exp
+        attemptCompression(msst, compression.coalesceKeys(2L, 1L, false)) must_= exp
       }}
 
       ()
@@ -144,7 +144,7 @@ final class CompressionSpec extends quasar.Qspec
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, unk))).embed
 
       Natural(m.size.toLong).cata(
-        l => attemptCompression(sst, compression.coalesceKeys(l, 0L)),
+        l => attemptCompression(sst, compression.coalesceKeys(l, 0L, false)),
         sst
       ) must_= sst
     }
@@ -213,8 +213,8 @@ final class CompressionSpec extends quasar.Qspec
         val exp1 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u1)))).embed
         val exp2 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u2)))).embed
 
-        (attemptCompression(sst1, compression.coalesceWithUnknown(0L)) must_= exp1) and
-        (attemptCompression(sst2, compression.coalesceWithUnknown(0L)) must_= exp2)
+        (attemptCompression(sst1, compression.coalesceWithUnknown(0L, false)) must_= exp1) and
+        (attemptCompression(sst2, compression.coalesceWithUnknown(0L, false)) must_= exp2)
       }
 
     def testUnkUnion(kind: String, f: Char => J, g: (TypeStat[Real], SimpleType) => SSTF[J, Real, S]) =
@@ -242,8 +242,8 @@ final class CompressionSpec extends quasar.Qspec
         val exp1 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u1u)))).embed
         val exp2 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u2u)))).embed
 
-        (attemptCompression(sst1, compression.coalesceWithUnknown(0L)) must_= exp1) and
-        (attemptCompression(sst2, compression.coalesceWithUnknown(0L)) must_= exp2)
+        (attemptCompression(sst1, compression.coalesceWithUnknown(0L, false)) must_= exp1) and
+        (attemptCompression(sst2, compression.coalesceWithUnknown(0L, false)) must_= exp2)
       }
 
     def testUnkRetain(kind: String, f: Char => J, g: (TypeStat[Real], SimpleType) => SSTF[J, Real, S]) =
@@ -268,8 +268,8 @@ final class CompressionSpec extends quasar.Qspec
         val exp1 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u1)))).embed
         val exp2 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u2)))).embed
 
-        (attemptCompression(sst1, compression.coalesceWithUnknown(1L)) must_= exp1) and
-        (attemptCompression(sst2, compression.coalesceWithUnknown(1L)) must_= exp2)
+        (attemptCompression(sst1, compression.coalesceWithUnknown(1L, false)) must_= exp1) and
+        (attemptCompression(sst2, compression.coalesceWithUnknown(1L, false)) must_= exp2)
       }
 
     def test(kind: String, f: Char => J, g: (TypeStat[Real], SimpleType) => SSTF[J, Real, S]) = {
@@ -292,7 +292,7 @@ final class CompressionSpec extends quasar.Qspec
       val m   = IMap.fromFoldable(xs.map(_.bimap(_.ejs, _.toSst)))
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, None))).embed
 
-      attemptCompression(sst, compression.coalesceWithUnknown(0L)) must_= sst
+      attemptCompression(sst, compression.coalesceWithUnknown(0L, false)) must_= sst
     }
 
     "has no effect on maps when primary type not in unknown" >> prop { xs: IList[(LeafEjs, LeafEjs)] =>
@@ -300,7 +300,7 @@ final class CompressionSpec extends quasar.Qspec
       val T   = envT(cnt1, TypeST(TypeF.top[J, S]())).embed
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, Some((T, T))))).embed
 
-      attemptCompression(sst, compression.coalesceWithUnknown(0L)) must_= sst
+      attemptCompression(sst, compression.coalesceWithUnknown(0L, false)) must_= sst
     }
 
     "has no effect on maps when primary tag not in unknown" >> prop { xs: IList[(LeafEjs, LeafEjs)] =>
@@ -310,7 +310,7 @@ final class CompressionSpec extends quasar.Qspec
       val T = envT(cnt1, TagST[J](Tagged(bar, envT(cnt1, TypeST(TypeF.top[J, S]())).embed))).embed
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, Some((T, T))))).embed
 
-      attemptCompression(sst, compression.coalesceWithUnknown(0L)) must_= sst
+      attemptCompression(sst, compression.coalesceWithUnknown(0L, false)) must_= sst
     }
   }
 
@@ -338,7 +338,7 @@ final class CompressionSpec extends quasar.Qspec
       s: String => (s.length > 1) ==> {
 
       val lim: Natural = Natural((s.length - 1).toLong) getOrElse 0L
-      val stringSst = strings.widen[J, Real](Real(1), s).embed
+      val stringSst = strings.widen[J, Real](TypeStat.fromEJson(Real(1), J.str(s)), s).embed
 
       stringSst.elgotApo[S](compression.limitArrays(lim, 0L)) must_= stringSst
     }}
@@ -370,7 +370,12 @@ final class CompressionSpec extends quasar.Qspec
       val lt: Natural = Natural((s.length - 1).toLong) getOrElse 0L
 
       val str = SST.fromEJson(Real(1), J.str(s))
-      val arr = strings.compress[S, J, Real](str.copoint, s).embed
+      val strtrunc = str.map(TypeStat.str.modify {
+        case (c, n, x, ns, _) =>
+          val i = lt.value.toInt
+          (c, n, x, ns.substring(0, i), ns.substring(0, i))
+      })
+      val arr = strings.compress[S, J, Real](strtrunc.copoint, s).embed
 
       val req = attemptCompression(str, compression.limitStrings(plen, true))
       val rlt = attemptCompression(str, compression.limitStrings(lt, true))
@@ -382,7 +387,12 @@ final class CompressionSpec extends quasar.Qspec
       val lt: Natural = Natural((s.length - 1).toLong) getOrElse 0L
 
       val str = SST.fromEJson(Real(1), J.str(s))
-      val smp = strings.simple[S, J, Real](str.copoint).embed
+      val strtrunc = str.map(TypeStat.str.modify {
+        case (c, n, x, ns, _) =>
+          val i = lt.value.toInt
+          (c, n, x, ns.substring(0, i), ns.substring(0, i))
+      })
+      val smp = strings.simple[S, J, Real](strtrunc.copoint).embed
 
       val rlt = attemptCompression(str, compression.limitStrings(lt, false))
 

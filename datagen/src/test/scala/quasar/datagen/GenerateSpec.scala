@@ -50,7 +50,7 @@ final class GenerateSpec extends quasar.Qspec {
     sst(ts, TypeF.simple(st))
 
   def sstS(n: Int, s: String): S =
-    strings.widen[J, Double](n.toDouble, s).embed
+    strings.widen[J, Double](tsJ(n, J.str(s)), s).embed
 
   def tsJ(n: Int, j: J): TypeStat[Double] =
     TypeStat.fromEJson(n.toDouble, j)
@@ -249,11 +249,10 @@ final class GenerateSpec extends quasar.Qspec {
       valuesShould(csst)(J.char.exist(c => (c >= 'e') && (c <= 'l')))
     }
 
-    "str within length range and char range" >> {
+    "str within length range and char range of min/max values" >> {
       val ssst =
         NonEmptyList("foo", "quux", "xex", "orp") foldMap1 { s =>
-          val strStat = TypeStat.fromEJson(1.0, J.str(s))
-          strings.compress[S, J, Double](strStat, s).embed
+          sstL(tsJ1(J.str(s)), SimpleType.Str)
         }
 
       valuesShould(ssst)(J.str.exist { s =>
@@ -262,7 +261,19 @@ final class GenerateSpec extends quasar.Qspec {
       })
     }
 
-    "str within length range and positional char range" >> {
+    "structural str within length range and char range" >> {
+      val ssst =
+        NonEmptyList("foo", "quux", "xex", "orp") foldMap1 { s =>
+          strings.compress[S, J, Double](tsJ1(J.str(s)), s).embed
+        }
+
+      valuesShould(ssst)(J.str.exist { s =>
+        (s.length ≟ 4 || s.length ≟ 3) &&
+        s.toList.all(c => c >= 'e' && c <= 'x')
+      })
+    }
+
+    "structural str within length range and positional char range" >> {
       val ssst =
         NonEmptyList("foo", "quux", "xex", "orp") foldMap1 (sstS(1, _))
 

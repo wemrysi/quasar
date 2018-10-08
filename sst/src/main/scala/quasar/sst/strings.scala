@@ -54,26 +54,26 @@ object strings {
         C.embed(envT(ts, TypeST(TypeF.simple(SimpleType.Char))))
       }
 
-    stringTagged(strStat, C.embed(envT(strStat, TypeST(TypeF.arr(IList[T](), charArr)))))
+    val arrStat =
+      TypeStat.coll(strStat.size, some(A.fromInt(s.length)), some(A.fromInt(s.length)))
+
+    stringTagged(strStat, C.embed(envT(arrStat, TypeST(TypeF.arr(IList[T](), charArr)))))
   }
 
   def simple[T, J, A](strStat: TypeStat[A]): SSTF[J, A, T] =
     envT(strStat, TypeST[J, T](TypeF.Simple(SimpleType.Str)))
 
-  /** Widens a string into an array of its characters.
-    *
-    * FIXME: Overly specific, define in terms of [Co]Recursive.
-    */
-  def widen[J: Order, A: ConvertableTo: Field: Order](count: A, s: String)(
+  /** Widens a string into an array of its characters. */
+  def widen[J: Order, A: ConvertableTo: Field: Order](strStat: TypeStat[A], s: String)(
       implicit
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
       : SSTF[J, A, SST[J, A]] = {
 
     val charArr =
-      SST.fromEJson(count, EJson.arr(s.map(EJson.char[J](_)) : _*))
+      SST.fromEJson(strStat.size, EJson.arr(s.map(EJson.char[J](_)) : _*))
 
-    stringTagged(charArr.copoint, charArr)
+    stringTagged(strStat, charArr)
   }
 
   ////
