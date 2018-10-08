@@ -45,17 +45,18 @@ object ParseInstruction {
    * according to the `structure`, maintaining their association with the original
    * corresponding value.
    *
-   * `retain` indicates two things:
-   *   1) In the case of a successful pivot, if surrounding structure should be retained.
-   *   2) In the case of an unsuccessful pivot (`path` does not reference a value of
-   *      the provided `structure`), if the row should be returned.
-   *
    * `idStatus` determines how the values is returned:
    *   - `IncludeId` wraps the key/value pair in a two element array.
    *   - `IdOnly` returns the value unwrapped.
    *   - `ExcludeId` returns the value unwrapped.
+   *
+   * We plan to add a boolean `retain` parameter. Currently, `retain` implicitly
+   * defaults to `false`. `retain` will indicate two things:
+   *   1) In the case of a successful pivot, if surrounding structure should be retained.
+   *   2) In the case of an unsuccessful pivot (`path` does not reference a value of
+   *      the provided `structure`), if the row should be returned.
    */
-  final case class Pivot(path: CPath, idStatus: IdStatus, structure: CompositeType, retain: Boolean)
+  final case class Pivot(path: CPath, idStatus: IdStatus, structure: CompositeType)
       extends ParseInstruction
 
   /* The instructions that must be interpreted sequentially while parsing. These
