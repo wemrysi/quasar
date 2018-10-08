@@ -19,9 +19,8 @@ package quasar
 import slamdata.Predef._
 
 import quasar.common.CPath
-import quasar.tpe.{CompositeType, PrimaryType}
 
-sealed abstract class ParseInstruction
+sealed abstract class ParseInstruction extends Product with Serializable
 
 object ParseInstruction {
 
@@ -37,9 +36,15 @@ object ParseInstruction {
   final case class Wrap(path: CPath, name: String) extends ParseInstruction
   
   /* Removes all values that are not both at the path `path` and of the type `tpe`.
-   * An empty set indicates that all values should be retained.
+   *
+   * A `Mask` is not a `ParseInstruction` and must be constructed with `Masks`.
    */
-  final case class Mask(path: CPath, tpe: Set[PrimaryType]) extends ParseInstruction
+  final case class Mask(path: CPath, tpe: ParseType)
+
+  /* `Masks` represents the disjunction of the provided `masks`. An empty set indicates
+   * that all values should be dropped.
+   */
+  final case class Masks(masks: Set[Mask]) extends ParseInstruction
   
   /* Pivots the indices and keys out of arrays and objects, respectively,
    * according to the `structure`, maintaining their association with the original
@@ -56,11 +61,11 @@ object ParseInstruction {
    *   2) In the case of an unsuccessful pivot (`path` does not reference a value of
    *      the provided `structure`), if the row should be returned.
    */
-  final case class Pivot(path: CPath, idStatus: IdStatus, structure: CompositeType)
+  final case class Pivot(path: CPath, idStatus: IdStatus, structure: CompositeParseType)
       extends ParseInstruction
 
   /* The instructions that must be interpreted sequentially while parsing. These
    * instructions are not optional and will result in incorrect query results if ignored.
    */
-  final case class ParseInstructions(instructions: List[Set[ParseInstruction]])
+  final case class ParseInstructions(instructions: List[ParseInstruction])
 }
