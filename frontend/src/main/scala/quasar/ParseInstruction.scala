@@ -63,9 +63,4 @@ object ParseInstruction {
    */
   final case class Pivot(path: CPath, idStatus: IdStatus, structure: CompositeParseType)
       extends ParseInstruction
-
-  /* The instructions that must be interpreted sequentially while parsing. These
-   * instructions are not optional and will result in incorrect query results if ignored.
-   */
-  final case class ParseInstructions(instructions: List[ParseInstruction])
 }
