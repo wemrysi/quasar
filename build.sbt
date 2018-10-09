@@ -433,7 +433,8 @@ lazy val yggdrasil = project
 lazy val yggdrasilPerf = project
   .settings(
     name := "quasar-yggdrasil-perf-internal",
-    scalacStrictMode := false)
+    scalacStrictMode := false,
+    javaOptions += "-XX:+HeapDumpOnOutOfMemoryError")
   .dependsOn(yggdrasil % "compile->compile;compile->test")
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
