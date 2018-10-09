@@ -110,10 +110,8 @@ class TableConstructionBenchmark {
     table.run flatMap { case (_, t) => SliceTools.consumeTableMaterialize(P)(t, bh) }
   }
 
-  def dataToGiantStrings(data: Stream[List[RValue]]): fs2.Stream[IO, Byte] = {
-    val bytes = data
-      .map(_.map(_.toJValue.renderCompact).mkString("\n").getBytes).toList
-      .map(ByteBuffer.wrap).map(fs2.Chunk.byteBuffer)
+  def chunkStringsToGiantStrings(data: List[List[String]]): fs2.Stream[IO, Byte] = {
+    val bytes = data.map(_.mkString("\n").getBytes).map(ByteBuffer.wrap).map(fs2.Chunk.byteBuffer)
 
     fs2.Stream
       .emits(bytes)
@@ -121,58 +119,87 @@ class TableConstructionBenchmark {
       .covary[IO]
   }
 
-  val longsData = dataToGiantStrings(scalars(10, 50000, CLong(100)))
+  def rvaluesToGiantStrings(data: Stream[List[RValue]]): fs2.Stream[IO, Byte] =
+    chunkStringsToGiantStrings(data.map(_.map(_.toJValue.renderCompact)).toList)
+
+  val longsData = rvaluesToGiantStrings(scalars(10, 50000, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestLongs(bh: Blackhole): Unit = createAndConsumeTable(longsData, bh).unsafeRunSync
 
-  val arrsWithFittingColumnsData = dataToGiantStrings(arrays(10, 500, 80, CLong(100)))
+  val arrsWithFittingColumnsData = rvaluesToGiantStrings(arrays(10, 500, 80, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestArrsWithFittingColumns(bh: Blackhole): Unit =
     createAndConsumeTable(arrsWithFittingColumnsData, bh).unsafeRunSync
 
-  val arrsWithOverflowingColumnsData = dataToGiantStrings(arrays(10, 500, 200, CLong(100)))
+  val arrsWithOverflowingColumnsData = rvaluesToGiantStrings(arrays(10, 500, 200, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestArrsWithOverflowingColumns(bh: Blackhole): Unit =
     createAndConsumeTable(arrsWithOverflowingColumnsData, bh).unsafeRunSync
 
-  val objectsWithFittingColumnsData = dataToGiantStrings(objects(10, 500, 80, CLong(100)))
+  val objectsWithFittingColumnsData = rvaluesToGiantStrings(objects(10, 500, 80, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestObjectsWithFittingColumns(bh: Blackhole): Unit =
     createAndConsumeTable(objectsWithFittingColumnsData, bh).unsafeRunSync
 
-  val objectsWithOverflowingColumnsData = dataToGiantStrings(objects(10, 500, 200, CLong(100)))
+  val objectsWithOverflowingColumnsData = rvaluesToGiantStrings(objects(10, 500, 200, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestObjectsWithOverflowingColumns(bh: Blackhole): Unit =
     createAndConsumeTable(objectsWithOverflowingColumnsData, bh).unsafeRunSync
 
-  val objectsWithDistinctColumnsData = dataToGiantStrings(distinctFieldObjects(10, 500, 100, CLong(100)))
+  val objectsWithDistinctColumnsData = rvaluesToGiantStrings(distinctFieldObjects(10, 500, 100, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestObjectsWithDistinctColumns(bh: Blackhole): Unit =
     createAndConsumeTable(objectsWithDistinctColumnsData, bh).unsafeRunSync
 
-  val objectsWithWideScrollingColumnsData = dataToGiantStrings(scrollingFieldObjects(10, 500, 200, 100, CLong(100)))
+  val objectsWithWideScrollingColumnsData = rvaluesToGiantStrings(scrollingFieldObjects(10, 500, 200, 100, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestObjectsWithWideScrollingColumns(bh: Blackhole): Unit =
     createAndConsumeTable(objectsWithWideScrollingColumnsData, bh).unsafeRunSync
 
-  val objectsWithNarrowScrollingColumnsData = dataToGiantStrings(scrollingFieldObjects(10, 500, 80, 50, CLong(100)))
+  val objectsWithNarrowScrollingColumnsData = rvaluesToGiantStrings(scrollingFieldObjects(10, 500, 80, 50, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   def ingestObjectsWithNarrowScrollingColumns(bh: Blackhole): Unit =
     createAndConsumeTable(objectsWithNarrowScrollingColumnsData, bh).unsafeRunSync
+
+  val largeDatasetData = {
+    val data = Stream.fill(200) {
+      // 2100 rows more or less corresponds to 2^16 bytes with 30 bytes per row
+      List.tabulate(2100) { s =>
+        // 15 keys per object
+        val keys = List.tabulate(15) { i =>
+          "\"k" + i + "\": " + (if (i % 3 == 0)
+            "\"" + i + s + "\""
+          else if (i % 3 == 1)
+            (s.toDouble / i).toString
+          else
+            (s % 2 == 0).toString)
+        }
+
+        keys.mkString("{", ", ", "}")
+      }
+    }
+
+    chunkStringsToGiantStrings(data.toList)
+  }
+
+  @Benchmark
+  @BenchmarkMode(Array(Mode.AverageTime))
+  def largeDataset(bh: Blackhole): Unit =
+    createAndConsumeTable(largeDatasetData, bh).unsafeRunSync
 }
