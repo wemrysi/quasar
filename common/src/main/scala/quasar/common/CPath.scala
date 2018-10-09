@@ -18,7 +18,12 @@ package quasar.common
 
 import slamdata.Predef._
 
+import scalaz.{Cord, Show}
 import scalaz.Ordering._
+import scalaz.std.anyVal._
+import scalaz.std.list._
+import scalaz.std.string._
+import scalaz.syntax.show._
 
 @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 sealed trait CPath { self =>
@@ -161,6 +166,17 @@ object CPath {
     val properPath: String = if (path.startsWith(".")) path else "." + path
 
     apply(parse0(PathPattern.split(properPath).toList, Nil).reverse: _*)
+  }
+
+  implicit val cpathNodeShow: Show[CPathNode] = Show.show {
+    case CPathField(name) => Cord("CPathField(") ++ name.show ++ Cord(")")
+    case CPathIndex(idx) => Cord("CPathIndex(") ++ idx.show ++ Cord(")")
+    case CPathArray => Cord("CPathArray()")
+    case CPathMeta(name) => Cord("CPathMeta(") ++ name.show ++ Cord(")")
+  }
+
+  implicit val cPathShow: Show[CPath] = Show.show {
+    case CompositeCPath(nodes) => nodes.show
   }
 
   implicit object CPathOrder extends scalaz.Order[CPath] {
