@@ -50,8 +50,9 @@ import matryoshka._
 import matryoshka.data.free._
 import matryoshka.implicits._
 import monocle.macros.Lenses
+import monocle.Traversal
 import pathy.Path
-import scalaz.{-\/, \/-, Applicative, Cord, Foldable, Functor, IList, Monad, Show, StateT, ValidationNel}
+import scalaz.{-\/, \/-, Applicative, Cord, Foldable, Functor, IList, Monad, NonEmptyList, Show, StateT, ValidationNel}
 import scalaz.Scalaz._
 import scalaz.Tags.{Disjunction => Disj}
 
@@ -71,6 +72,8 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   val dims = QProv[T]
   val func = construction.Func[T]
   val recFunc = construction.RecFunc[T]
+
+  import dims.prov.implicits._
 
   def apply[F[_]: Monad: MonadPlannerErr](graph: QSUGraph): F[AuthenticatedQSU[T]] = {
     type X[A] = StateT[F, QAuth, A]
@@ -281,7 +284,14 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       case Map(src, fm) =>
         compute1[F](g, src) { sdims =>
-          computeFuncDims(fm.linearize)(κ(sdims)) getOrElse sdims
+          val sigil = dims.prov.fresh()
+          val fdims = computeFuncDims(fm.linearize)(κ(Dimensions.origin(sigil)))
+          val fhead = fdims.flatMap(Dimensions.join[dims.P].headOption)
+
+          fhead.fold(sdims)(h =>
+            Dimensions.join[dims.P]
+              .modify(j => joinT.modify(_.transApoT(substitute(sigil, j.head)))(h) :::> j.tail)
+              .apply(sdims))
         }
 
       case Read(file) =>
@@ -367,6 +377,9 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   }
 
   ////
+
+  private val joinT: Traversal[NonEmptyList[dims.P], dims.P] =
+    Traversal.fromTraverse
 
   private def compute1[F[_]: Monad: MonadPlannerErr: QAuthS]
       (g: QSUGraph, src: QSUGraph)
