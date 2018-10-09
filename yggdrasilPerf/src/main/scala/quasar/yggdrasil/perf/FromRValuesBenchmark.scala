@@ -33,8 +33,10 @@ import org.openjdk.jmh.infra.Blackhole
 
 import scalaz.WriterT
 import scalaz.std.list._
-import scalaz.syntax.applicative._
+import scalaz.syntax.monad._
 import shims._
+
+import java.nio.ByteBuffer
 
 /* Default settings for benchmarks in this class */
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -44,11 +46,8 @@ class FromRValuesBenchmark {
 
   val P = new TestColumnarTableModule {}
 
-  @Param(value = Array("true", "false"))
-  var streaming: Boolean = _
-
-  @Param(value = Array("json", "materialize"))
-  var consumption: String = _
+  @Param(value = Array("old", "streaming", "tectonic"))
+  var mode: String = _
 
   def scalars(chunks: Int, chunkSize: Int, scalar: CValue): Stream[List[RValue]] =
     Stream.fill(chunks)(
@@ -83,65 +82,97 @@ class FromRValuesBenchmark {
           ("k" + ((s * keysPerObject + i) % keys)) -> scalar
         ).toMap)))
 
-  def createAndConsumeTable(data: Stream[List[RValue]], bh: Blackhole): IO[Unit] = {
-    val table: WriterT[IO, List[IO[Unit]], P.Table] =
-      if (streaming) {
-        P.Table.fromQDataStream[WriterT[IO, List[IO[Unit]], ?], RValue](
-          fs2.Stream.fromIterator[IO, fs2.Stream[IO, RValue]](
-            data.iterator.map(fs2.Stream.emits(_).covary[IO])
-          ).flatMap(x => x))
-      } else {
-        P.Table.fromRValues(data.flatten).pure[WriterT[IO, List[IO[Unit]], ?]]
-      }
-    table.run.flatMap { case (_, t) => SliceTools.consumeTable(P)(consumption, t, bh) }
+  def createAndConsumeTable(data: fs2.Stream[IO, Byte], bh: Blackhole): IO[Unit] = {
+    def parseWithJawn: fs2.Stream[IO, RValue] = {
+      implicit val facade = qdata.json.QDataFacade.qdata[RValue]
+      val parser = jawn.AsyncParser[RValue](jawn.AsyncParser.ValueStream)
+
+      val absorbtion =
+        data.chunks.scan(fs2.Chunk.empty[RValue]) { (_, chunk) =>
+          fs2.Chunk.seq(parser.absorb(chunk.toByteBuffer).right.get)
+        }
+
+      absorbtion.flatMap(fs2.Stream.chunk(_)) ++
+        fs2.Stream.chunk(fs2.Chunk.seq(parser.finish().right.get))
+    }
+
+    val table: WriterT[IO, List[IO[Unit]], P.Table] = if (mode == "streaming") {
+      P.Table.fromQDataStream[WriterT[IO, List[IO[Unit]], ?], RValue](
+        parseWithJawn)
+    } else if (mode == "old") {
+      parseWithJawn.compile.to[Stream].map(P.Table.fromRValues(_, None)).liftM[WriterT[?[_], List[IO[Unit]], ?]]
+    } else if (mode == "tectonic") {
+      ???
+    } else {
+      sys.error("invalid mode")
+    }
+
+    table.run flatMap { case (_, t) => SliceTools.consumeTableJson(P)(t, bh) }
   }
+
+  def dataToGiantStrings(data: Stream[List[RValue]]): fs2.Stream[IO, Byte] = {
+    fs2.Stream suspend {
+      val bytes = data.map(_.map(_.toJValue.renderCompact).mkString("\n").getBytes).toList
+
+      fs2.Stream
+        .emits(bytes.map(ByteBuffer.wrap).map(fs2.Chunk.byteBuffer))
+        .flatMap(fs2.Stream.chunk(_))
+        .covary[IO]
+    }
+  }
+
+  val longsData = dataToGiantStrings(scalars(10, 50000, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
-  def ingestLongs(bh: Blackhole): Unit = {
-    createAndConsumeTable(scalars(10, 50000, CLong(100)), bh).unsafeRunSync
-  }
+  def ingestLongs(bh: Blackhole): Unit = createAndConsumeTable(longsData, bh).unsafeRunSync
+
+  val arrsWithFittingColumnsData = dataToGiantStrings(arrays(10, 500, 80, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
-  def ingestArrsWithFittingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(arrays(10, 500, 80, CLong(100)), bh).unsafeRunSync
-  }
+  def ingestArrsWithFittingColumns(bh: Blackhole): Unit =
+    createAndConsumeTable(arrsWithFittingColumnsData, bh).unsafeRunSync
+
+  val arrsWithOverflowingColumnsData = dataToGiantStrings(arrays(10, 500, 200, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
-  def ingestArrsWithOverflowingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(arrays(10, 500, 200, CLong(100)), bh).unsafeRunSync
-  }
+  def ingestArrsWithOverflowingColumns(bh: Blackhole): Unit =
+    createAndConsumeTable(arrsWithOverflowingColumnsData, bh).unsafeRunSync
+
+  val objectsWithFittingColumnsData = dataToGiantStrings(objects(10, 500, 80, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
-  def ingestObjectsWithFittingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(objects(10, 500, 80, CLong(100)), bh).unsafeRunSync
-  }
+  def ingestObjectsWithFittingColumns(bh: Blackhole): Unit =
+    createAndConsumeTable(objectsWithFittingColumnsData, bh).unsafeRunSync
+
+  val objectsWithOverflowingColumnsData = dataToGiantStrings(objects(10, 500, 200, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
-  def ingestObjectsWithOverflowingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(objects(10, 500, 200, CLong(100)), bh).unsafeRunSync
-  }
+  def ingestObjectsWithOverflowingColumns(bh: Blackhole): Unit =
+    createAndConsumeTable(objectsWithOverflowingColumnsData, bh).unsafeRunSync
+
+  val objectsWithDistinctColumnsData = dataToGiantStrings(distinctFieldObjects(10, 500, 100, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
-  def ingestObjectsWithDistinctColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(distinctFieldObjects(10, 500, 100, CLong(100)), bh).unsafeRunSync
-  }
+  def ingestObjectsWithDistinctColumns(bh: Blackhole): Unit =
+    createAndConsumeTable(objectsWithDistinctColumnsData, bh).unsafeRunSync
+
+  val objectsWithWideScrollingColumnsData = dataToGiantStrings(scrollingFieldObjects(10, 500, 200, 100, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
-  def ingestObjectsWithWideScrollingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(scrollingFieldObjects(10, 500, 200, 100, CLong(100)), bh).unsafeRunSync
-  }
+  def ingestObjectsWithWideScrollingColumns(bh: Blackhole): Unit =
+    createAndConsumeTable(objectsWithWideScrollingColumnsData, bh).unsafeRunSync
+
+  val objectsWithNarrowScrollingColumnsData = dataToGiantStrings(scrollingFieldObjects(10, 500, 80, 50, CLong(100)))
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
-  def ingestObjectsWithNarrowScrollingColumns(bh: Blackhole): Unit = {
-    createAndConsumeTable(scrollingFieldObjects(10, 500, 80, 50, CLong(100)), bh).unsafeRunSync
-  }
-
+  def ingestObjectsWithNarrowScrollingColumns(bh: Blackhole): Unit =
+    createAndConsumeTable(objectsWithNarrowScrollingColumnsData, bh).unsafeRunSync
 }
