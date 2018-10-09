@@ -52,8 +52,8 @@ object OptimizeSpec extends Qspec {
   val fix = qsDsl.fix
   val recFunc = qsDsl.recFunc
 
-  // initial QScript with ExtraShiftedRead
-  type QSExtra[A] = CopK[Const[ExtraShiftedRead[AFile], ?] ::: QSBase, A]
+  // initial QScript with InterpretedRead
+  type QSExtra[A] = CopK[Const[InterpretedRead[AFile], ?] ::: QSBase, A]
 
   implicit val QSExtra: Injectable[QSExtra, QScriptTotal[Fix, ?]] =
     SubInject[QSExtra, QScriptTotal[Fix, ?]]
@@ -179,7 +179,7 @@ object OptimizeSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.ExtraShiftedRead[AFile](
+            fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
               ShiftPath(List()),
               IncludeId,
@@ -206,7 +206,7 @@ object OptimizeSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.ExtraShiftedRead[AFile](
+            fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
               ShiftPath(List()),
               IdOnly,
@@ -230,7 +230,7 @@ object OptimizeSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.ExtraShiftedRead[AFile](
+            fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
               ShiftPath(List()),
               ExcludeId,
@@ -258,7 +258,7 @@ object OptimizeSpec extends Qspec {
       val expected: Fix[QSExtra] =
         fixE.Filter(
           fixE.Map(
-            fixE.ExtraShiftedRead[AFile](
+            fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
               ShiftPath(List()),
               ExcludeId,
@@ -285,7 +285,7 @@ object OptimizeSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.ExtraShiftedRead[AFile](
+            fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
               ShiftPath(List("xyz")),
               IncludeId,
@@ -319,7 +319,7 @@ object OptimizeSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.ExtraShiftedRead[AFile](
+            fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
               ShiftPath(List("aaa", "bbb", "ccc")),
               IncludeId,
