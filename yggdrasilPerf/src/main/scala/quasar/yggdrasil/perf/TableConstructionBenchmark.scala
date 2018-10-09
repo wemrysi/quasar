@@ -42,7 +42,7 @@ import java.nio.ByteBuffer
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @BenchmarkMode(Array(Mode.Throughput))
 @State(Scope.Benchmark)
-class FromRValuesBenchmark {
+class TableConstructionBenchmark {
 
   val P = new TestColumnarTableModule {}
 
