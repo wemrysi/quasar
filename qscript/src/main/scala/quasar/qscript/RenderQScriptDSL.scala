@@ -513,10 +513,10 @@ object RenderQScriptDSL {
       (base: String, a: ShiftedRead[AFile]) =>
         DSLTree(base, "ShiftedRead[AFile]", (a.path.shows.left :: a.idStatus.shows.left :: Nil).some))
 
-  def extraShiftedReadFileRenderDelay: Delay[RenderQScriptDSL, Const[ExtraShiftedRead[AFile], ?]] =
+  def extraShiftedReadFileRenderDelay: Delay[RenderQScriptDSL, Const[InterpretedRead[AFile], ?]] =
     delayRenderConst(
-      (base: String, a: ExtraShiftedRead[AFile]) =>
-        DSLTree(base, "ExtraShiftedRead[AFile]", (a.path.shows.left :: a.shiftStatus.shows.left :: Nil).some))
+      (base: String, a: InterpretedRead[AFile]) =>
+        DSLTree(base, "InterpretedRead[AFile]", (a.path.shows.left :: a.shiftStatus.shows.left :: Nil).some))
 
   def shiftedReadDirRenderDelay: Delay[RenderQScriptDSL, Const[ShiftedRead[ADir], ?]] =
     delayRenderConst(

@@ -39,18 +39,18 @@ import scalaz.syntax.std.option._
  *
  * is equivalent to
  *
- * ExtraShiftedRead(path, List(foo, bar), shiftStatus, shiftType, _)
+ * InterpretedRead(path, List(foo, bar), shiftStatus, shiftType, _)
  */
-@Lenses final case class ExtraShiftedRead[A](
+@Lenses final case class InterpretedRead[A](
   path: A,
   shiftPath: ShiftPath,
   shiftStatus: IdStatus,
   shiftType: ShiftType,
   shiftKey: ShiftKey)
 
-object ExtraShiftedRead {
+object InterpretedRead {
 
-  implicit def equal[A: Equal]: Equal[ExtraShiftedRead[A]] =
+  implicit def equal[A: Equal]: Equal[InterpretedRead[A]] =
     Equal.equalBy(r =>
       (r.path,
       r.shiftPath,
@@ -58,11 +58,11 @@ object ExtraShiftedRead {
       r.shiftType,
       r.shiftKey))
 
-  implicit def show[A <: APath]: Show[ExtraShiftedRead[A]] =
+  implicit def show[A <: APath]: Show[InterpretedRead[A]] =
     RenderTree.toShow
 
-  implicit def renderTree[A <: APath]: RenderTree[ExtraShiftedRead[A]] =
-    RenderTree.simple(List("ExtraShiftedRead"), r => {
+  implicit def renderTree[A <: APath]: RenderTree[InterpretedRead[A]] =
+    RenderTree.simple(List("InterpretedRead"), r => {
       (posixCodec.printPath(r.path) + ", " +
         r.shiftPath.shows + ", " +
         r.shiftStatus.shows + ", " +

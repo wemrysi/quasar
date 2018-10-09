@@ -792,13 +792,13 @@ object construction {
                       (implicit F: Injectable[Const[ShiftedRead[A], ?], F]): R =
       embed(F.inject(Const(qscript.ShiftedRead(path, idStatus))))
 
-    def ExtraShiftedRead[A](path: A,
+    def InterpretedRead[A](path: A,
                        shiftPath: ShiftPath,
                        shiftStatus: IdStatus,
                        shiftType: ShiftType,
                        shiftKey: ShiftKey)
-                      (implicit F: Injectable[Const[ExtraShiftedRead[A], ?], F]): R =
-      embed(F.inject(Const(qscript.ExtraShiftedRead(path, shiftPath, shiftStatus, shiftType, shiftKey))))
+                      (implicit F: Injectable[Const[InterpretedRead[A], ?], F]): R =
+      embed(F.inject(Const(qscript.InterpretedRead(path, shiftPath, shiftStatus, shiftType, shiftKey))))
 
     def Read[A](path: A)
                (implicit F: Injectable[Const[Read[A], ?], F]): R =

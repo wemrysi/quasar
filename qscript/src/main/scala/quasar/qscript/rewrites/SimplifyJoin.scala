@@ -231,8 +231,8 @@ object SimplifyJoin {
     default
 
   implicit def extraShiftedRead[T[_[_]], F[a] <: ACopK[a], A]
-    (implicit SR: Const[ExtraShiftedRead[A], ?] :<<: F)
-      : SimplifyJoin.Aux[T, Const[ExtraShiftedRead[A], ?], F] =
+    (implicit SR: Const[InterpretedRead[A], ?] :<<: F)
+      : SimplifyJoin.Aux[T, Const[InterpretedRead[A], ?], F] =
     default
 
   implicit def projectBucket[T[_[_]], F[a] <: ACopK[a]]

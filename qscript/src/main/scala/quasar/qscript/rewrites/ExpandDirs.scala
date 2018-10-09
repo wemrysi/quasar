@@ -171,8 +171,8 @@ abstract class ExpandDirsInstances {
     default
 
   implicit def extraShiftedReadFile[T[_[_]], F[a] <: ACopK[a]]
-    (implicit SR: Const[ExtraShiftedRead[AFile], ?] :<<: F)
-      : ExpandDirs.Aux[T, Const[ExtraShiftedRead[AFile], ?], F] =
+    (implicit SR: Const[InterpretedRead[AFile], ?] :<<: F)
+      : ExpandDirs.Aux[T, Const[InterpretedRead[AFile], ?], F] =
     default
 
   implicit def projectBucket[T[_[_]], F[a] <: ACopK[a]]
