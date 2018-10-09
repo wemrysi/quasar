@@ -370,7 +370,7 @@ trait ColumnarTableModule
           : MonadFinalizers[?[_], IO]
           : LiftIO](
         bytes: fs2.Stream[IO, Byte],
-        precise: Boolean)(
+        precise: Boolean = false)(
         implicit ec: ExecutionContext)
         : M[Table] = {
 
