@@ -164,8 +164,10 @@ private[table] final class SlicePlate extends Plate[List[Slice]] {
     }
   }
 
-  def finishBatch(): List[Slice] = {
-    finishSlice()
+  def finishBatch(terminal: Boolean): List[Slice] = {
+    if (terminal) {
+      finishSlice()
+    }
 
     val back = completed.toList
     completed.clear()
