@@ -56,7 +56,7 @@ trait Coalesce[IN[_]] {
     applyTransforms(coalesceQC[F](FToOut), N.normalizeF(_: IN[IT[F]]))
 
   /** Coalesce for types containing ShiftedRead.
-   *  We don't coalesce ExtraShiftedRead.
+   *  We don't coalesce InterpretedRead.
    */
   protected[qscript] def coalesceSR[F[_]: Functor, A]
     (FToOut: PrismNT[F, OUT])
@@ -231,7 +231,7 @@ trait CoalesceInstances {
   implicit def shiftedRead[T[_[_]], OUT[a] <: ACopK[a], A]: Coalesce.Aux[T, Const[ShiftedRead[A], ?], OUT] =
     default
 
-  implicit def extraShiftedRead[T[_[_]], OUT[a] <: ACopK[a], A]: Coalesce.Aux[T, Const[ExtraShiftedRead[A], ?], OUT] =
+  implicit def extraShiftedRead[T[_[_]], OUT[a] <: ACopK[a], A]: Coalesce.Aux[T, Const[InterpretedRead[A], ?], OUT] =
     default
 }
 
