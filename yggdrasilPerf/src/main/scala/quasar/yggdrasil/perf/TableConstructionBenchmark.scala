@@ -107,18 +107,18 @@ class TableConstructionBenchmark {
       sys.error("invalid mode")
     }
 
-    table.run flatMap { case (_, t) => SliceTools.consumeTableJson(P)(t, bh) }
+    table.run flatMap { case (_, t) => SliceTools.consumeTableMaterialize(P)(t, bh) }
   }
 
   def dataToGiantStrings(data: Stream[List[RValue]]): fs2.Stream[IO, Byte] = {
-    fs2.Stream suspend {
-      val bytes = data.map(_.map(_.toJValue.renderCompact).mkString("\n").getBytes).toList
+    val bytes = data
+      .map(_.map(_.toJValue.renderCompact).mkString("\n").getBytes).toList
+      .map(ByteBuffer.wrap).map(fs2.Chunk.byteBuffer)
 
-      fs2.Stream
-        .emits(bytes.map(ByteBuffer.wrap).map(fs2.Chunk.byteBuffer))
-        .flatMap(fs2.Stream.chunk(_))
-        .covary[IO]
-    }
+    fs2.Stream
+      .emits(bytes)
+      .flatMap(fs2.Stream.chunk(_))
+      .covary[IO]
   }
 
   val longsData = dataToGiantStrings(scalars(10, 50000, CLong(100)))
