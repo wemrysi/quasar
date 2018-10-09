@@ -46,7 +46,7 @@ class TableConstructionBenchmark {
 
   val P = new TestColumnarTableModule {}
 
-  @Param(value = Array("old", "streaming", "tectonic"))
+  @Param(value = Array(/*"old",*/ "streaming", "tectonic"))
   var mode: String = _
 
   def scalars(chunks: Int, chunkSize: Int, scalar: CValue): Stream[List[RValue]] =
