@@ -158,6 +158,12 @@ trait TableModule extends TransSpecModule {
 
     def fromQDataStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO, A: QDataDecode](values: fs2.Stream[IO, A])(implicit ec: ExecutionContext): M[Table]
 
+    def parseJson[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](
+        bytes: fs2.Stream[IO, Byte],
+        precise: Boolean = false)(
+        implicit ec: ExecutionContext)
+        : M[Table]
+
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): IO[(Table, Table)]
 
     /**

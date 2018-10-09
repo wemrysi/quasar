@@ -364,6 +364,46 @@ trait ColumnarTableModule
       }
     }
 
+    def parseJson[
+        M[_]
+          : Monad
+          : MonadFinalizers[?[_], IO]
+          : LiftIO](
+        bytes: fs2.Stream[IO, Byte],
+        precise: Boolean)(
+        implicit ec: ExecutionContext)
+        : M[Table] = {
+
+      import fs2.{Chunk, Stream}
+      import tectonic.AsyncParser
+
+      val parser = AsyncParser(new SlicePlate, AsyncParser.ValueStream)
+
+      val absorbed: Stream[IO, Chunk[Slice]] =
+        bytes.chunks.evalScan(Chunk.empty[Slice]) { (_, bc) =>
+          parser.absorb(bc.toByteBuffer).fold(
+            pe => IO.raiseError[Chunk[Slice]](pe),
+            slices => IO.pure(Chunk.seq(slices)))
+        }
+
+      val tail = Stream suspend {
+        val eff = parser.finish().fold(
+          pe => IO.raiseError[Chunk[Slice]](pe),
+          slices => IO.pure(Chunk.seq(slices)))
+
+        Stream.eval(eff)
+      }
+
+      val slices = (absorbed ++ tail).flatMap(Stream.chunk(_))
+
+      for {
+        d <- LiftIO[M].liftIO(convert.toStreamT(slices))
+        _ <- MonadFinalizers[M, IO].tell(List(d.dispose))
+
+        slices = d.unsafeValue
+      } yield Table(slices, UnknownSize)
+    }
+
     def fromQDataStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO, A: QDataDecode](
         values: fs2.Stream[IO, A])(
         implicit ec: ExecutionContext)
@@ -852,7 +892,7 @@ trait ColumnarTableModule
                       // Comparator also returns EQ if both are undefined
                       // However we don't want to treat these as EQ because that
                       // would *multiply* left rows with right rows.
-                      // We want to *sum* them instead. We can accomplish by 
+                      // We want to *sum* them instead. We can accomplish by
                       // treating 2 undefineds as if they were LT
                       case EQ if lkey.isDefinedAt(lpos) =>
                         ibufs.advanceBoth(lpos, rpos)
