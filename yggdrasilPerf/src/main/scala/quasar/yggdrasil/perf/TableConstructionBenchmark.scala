@@ -87,7 +87,7 @@ class TableConstructionBenchmark {
       implicit val facade = qdata.json.QDataFacade.qdata[RValue]
       val parser = jawn.AsyncParser[RValue](jawn.AsyncParser.ValueStream)
 
-      val absorbtion =
+      val absorption =
         data.chunks map { chunk =>
           fs2.Chunk.seq(parser.absorb(chunk.toByteBuffer).right.get)
         }
