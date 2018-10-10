@@ -88,7 +88,7 @@ class TableConstructionBenchmark {
       val parser = jawn.AsyncParser[RValue](jawn.AsyncParser.ValueStream)
 
       val absorbtion =
-        data.chunks.scan(fs2.Chunk.empty[RValue]) { (_, chunk) =>
+        data.chunks map { chunk =>
           fs2.Chunk.seq(parser.absorb(chunk.toByteBuffer).right.get)
         }
 

@@ -380,7 +380,7 @@ trait ColumnarTableModule
       val parser = AsyncParser(new SlicePlate, AsyncParser.ValueStream)
 
       val absorbed: Stream[IO, Chunk[Slice]] =
-        bytes.chunks.evalScan(Chunk.empty[Slice]) { (_, bc) =>
+        bytes.chunks evalMap { bc =>
           parser.absorb(bc.toByteBuffer).fold(
             pe => IO.raiseError[Chunk[Slice]](pe),
             slices => IO.pure(Chunk.seq(slices)))
