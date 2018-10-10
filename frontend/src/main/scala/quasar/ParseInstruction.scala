@@ -20,6 +20,13 @@ import slamdata.Predef._
 
 import quasar.common.CPath
 
+import scalaz.{Cord, Equal, Order, Show}
+import scalaz.std.set._
+import scalaz.std.string._
+import scalaz.std.tuple._
+import scalaz.syntax.equal._
+import scalaz.syntax.show._
+
 sealed abstract class ParseInstruction extends Product with Serializable
 
 object ParseInstruction {
@@ -63,4 +70,29 @@ object ParseInstruction {
    */
   final case class Pivot(path: CPath, idStatus: IdStatus, structure: CompositeParseType)
       extends ParseInstruction
+
+  ////
+
+  implicit val maskShow: Show[Mask] = Show.show(m =>
+    Cord("Mask(") ++ m.path.show ++ Cord(", ") ++ m.tpe.show ++ Cord(")"))
+
+  implicit val maskOrder: Order[Mask] = Order.orderBy(m => (m.path, m.tpe))
+
+  implicit val parseInstructionEqual: Equal[ParseInstruction] =
+    Equal.equal {
+      case (Ids(i1, v1), Ids(i2, v2)) => i1 === i2 && v1 === v2
+      case (Wrap(p1, n1), Wrap(p2, n2)) => p1 === p2 && n1 === n2
+      case (Masks(m1), Masks(m2)) => m1 === m2
+      case (Pivot(p1, i1, s1), Pivot(p2, i2, s2)) => p1 === p2 && i1 === i2 && s1 === s2
+      case (_, _) => false
+    }
+
+  implicit val parseInstructionShow: Show[ParseInstruction] =
+    Show.show {
+      case Ids(i, v) => Cord("Ids(") ++ i.show ++ Cord(", ") ++ v.show ++ Cord(")")
+      case Wrap(p, n) => Cord("Wrap(") ++ p.show ++ Cord(", ") ++ n.show ++ Cord(")")
+      case Masks(m) => Cord("Masks(") ++ m.show ++ Cord(")")
+      case Pivot(p, i, s) =>
+        Cord("Pivot(") ++ p.show ++ Cord(", ") ++ i.show ++ Cord(", ") ++ s.show ++ Cord(")")
+    }
 }
