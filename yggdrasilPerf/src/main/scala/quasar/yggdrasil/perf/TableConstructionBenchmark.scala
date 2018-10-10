@@ -92,7 +92,7 @@ class TableConstructionBenchmark {
           fs2.Chunk.seq(parser.absorb(chunk.toByteBuffer).right.get)
         }
 
-      absorbtion.flatMap(fs2.Stream.chunk(_)) ++
+      absorption.flatMap(fs2.Stream.chunk(_)) ++
         fs2.Stream.chunk(fs2.Chunk.seq(parser.finish().right.get))
     }
 
