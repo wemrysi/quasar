@@ -1,5 +1,5 @@
 language: scala
-scala: 2.12.4 # this needs to be in sync with Scala version used in .appveyor.yml
+scala: 2.12.7 # this needs to be in sync with Scala version used in .appveyor.yml
 jdk: oraclejdk8
 
 dist: trusty

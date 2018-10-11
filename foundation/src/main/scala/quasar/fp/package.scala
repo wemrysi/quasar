@@ -282,7 +282,7 @@ package object fp
       _.convertTo[Free[F, A]])
 
   def applyFrom[A, B](bij: Bijection[A, B])(modify: B => B): A => A =
-    bij.toK >>> kleisli[Id, B, B](modify) >>> bij.fromK
+    (bij.toK >>> kleisli[Id, B, B](modify) >>> bij.fromK).run
 
   def applyCoEnvFrom[T[_[_]]: BirecursiveT, F[_]: Functor, A](
     modify: T[CoEnv[A, F, ?]] => T[CoEnv[A, F, ?]]):
