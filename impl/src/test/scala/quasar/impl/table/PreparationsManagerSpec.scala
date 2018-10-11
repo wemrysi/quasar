@@ -363,6 +363,30 @@ object PreparationsManagerSpec extends Specification {
 
       results.compile.drain.unsafeRunTimed(1.second) must beSome
     }
+
+    "report error in evaluating query" in {
+      case object EvalException extends Exception
+
+      val results = for {
+        manager <- PreparationsManager[IO, Unit, Unit, Unit](
+          _ => IO.raiseError(EvalException))(
+          (_, _) => IO.pure(Stream.empty))
+
+        _ <- Stream.eval(manager.prepareTable((), ()))
+
+        event <- manager.notifications.take(1)
+        _ <- Stream.eval(IO {
+          event must beLike {
+            case PreparationEvent.PreparationErrored((), _, _, EvalException) => ok
+          }
+        })
+
+        status <- Stream.eval(manager.preparationStatus(()))
+        _ <- Stream.eval(IO(status mustEqual Status.Unknown))
+      } yield ()
+
+      results.compile.drain.unsafeRunTimed(1.second) must beSome
+    }
   }
 
   def latchGet(s: Signal[IO, Boolean]): IO[Unit] =
