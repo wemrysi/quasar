@@ -355,7 +355,10 @@ object PreparationsManagerSpec extends Specification {
           (_, _) => IO.pure(Stream.empty))
 
         _ <- Stream.eval(manager.prepareTable((), ()))
-        _ <- Stream.eval(manager.cancelAll)
+        _ <- Stream.eval(manager.cancelPreparation(()))
+
+        status <- Stream.eval(manager.preparationStatus(()))
+        _ <- Stream.eval(IO(status mustEqual Status.Unknown))
       } yield ()
 
       results.compile.drain.unsafeRunTimed(1.second) must beSome
