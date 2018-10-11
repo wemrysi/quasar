@@ -23,7 +23,7 @@ import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
 import quasar.qscript.{FreeMap, FreeMapA}
 
-import matryoshka.{delayShow, delayEqual, equalTEqual, showTShow, BirecursiveT, ShowT, EqualT}
+import matryoshka.{delayShow, delayEqual, BirecursiveT, ShowT, EqualT}
 import matryoshka.data._
 import scalaz.{\/, Cord, Equal, IMap, ISet, Monoid, Show}
 import scalaz.std.list._

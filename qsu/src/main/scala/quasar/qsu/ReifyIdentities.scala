@@ -38,7 +38,7 @@ import quasar.qscript.provenance.JoinKey
 import quasar.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
 
-import matryoshka.{showTShow, BirecursiveT, ShowT}
+import matryoshka.{BirecursiveT, ShowT}
 import monocle.{Lens, Optional}
 import monocle.syntax.fields._1
 import scalaz.{Cord, Foldable, Free, Functor, IList, IMap, ISet, Monad, NonEmptyList, Show, StateT, Traverse}

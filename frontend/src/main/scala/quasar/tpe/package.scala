@@ -17,7 +17,6 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.contrib.matryoshka._
 import quasar.{ejson => ejs}
 import quasar.ejson.{CommonEJson => C, EJson, ExtEJson => E}
 import quasar.contrib.iota.copkTraverse

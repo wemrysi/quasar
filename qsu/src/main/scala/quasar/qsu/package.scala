@@ -24,7 +24,7 @@ import quasar.qscript._, PlannerError.InternalError
 import quasar.qscript.provenance.Dimensions
 import quasar.qsu.QScriptUniform.ShiftTarget
 
-import matryoshka.{Hole => _, _}
+import matryoshka.{Hole => _}
 import scalaz.{Free, Functor, Show, Traverse}
 import scalaz.std.string._
 import scalaz.syntax.traverse._

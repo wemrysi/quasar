@@ -16,7 +16,6 @@
 
 package quasar.qscript
 
-import matryoshka._
 import matryoshka.patterns._
 
 import monocle._
