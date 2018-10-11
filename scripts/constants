@@ -17,7 +17,7 @@ mkdir -p "$TEMP_DIR"
 QUASAR_VERSION=$(cat $WS_DIR/version.sbt | sed -n -e 's/^ *version.*:= "\(.*\)"[^\n]*/\1/p')
 
 QUASAR_REPL_JAR="quasar-repl-assembly-${QUASAR_VERSION}.jar"
-QUASAR_REPL_JAR_DIR="$WS_DIR/.targets/repl/scala-2.12"
+QUASAR_REPL_JAR_DIR="$WS_DIR/repl/target/scala-2.12"
 QUASAR_REPL_JAR_PATH="$QUASAR_REPL_JAR_DIR/$QUASAR_REPL_JAR"
 
 echo "Quasar Version: $QUASAR_VERSION"
