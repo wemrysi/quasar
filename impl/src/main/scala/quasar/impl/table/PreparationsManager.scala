@@ -171,6 +171,7 @@ object PreparationsManager {
   def apply[F[_]: ConcurrentEffect, I, Q, R](
       evaluator: QueryEvaluator[F, Q, R],
       maxStreams: Int = 10,
+      maxConcurrency: Int = 10,   // it's a good idea to keep this equal to maxStreams (different values are sometimes useful for testing)
       maxNotifications: Int = 10)(
       runToStore: (I, R) => F[Stream[F, Unit]])(
       implicit ec: ExecutionContext): Stream[F, PreparationsManager[F, I, Q, R]] = {
@@ -184,8 +185,7 @@ object PreparationsManager {
 
       emit = Stream(new PreparationsManager[F, I, Q, R](evaluator, notificationsQ, q.enqueue1(_))(runToStore))
 
-      // we have to be explicit here because scalaz's MonadSyntax includes .join
-      back <- emit.concurrently(Stream.InvariantOps(q.dequeue).join(maxStreams)) onComplete {
+      back <- emit.concurrently(Stream.InvariantOps(q.dequeue).join(maxConcurrency)) onComplete {
         Stream.eval_(notificationsQ.enqueue1(None))
       }
     } yield back

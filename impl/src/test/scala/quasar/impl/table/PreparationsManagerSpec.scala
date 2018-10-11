@@ -244,27 +244,29 @@ object PreparationsManagerSpec extends Specification {
     }
 
     "cancel preparation when pending" in {
+      val Id1 = "identity-1"
+      val Id2 = "identity-2"
+
       val results = for {
         a <- Stream.eval(async.signalOf[IO, Boolean](false))
 
-        manager <- PreparationsManager[IO, Unit, PreparationsManager[IO, Unit, _, Unit], Unit](
-          { manager =>    // is this not clever? (actually it's probably really stupid; feel free to say so)
-            for {
-              status <- manager.preparationStatus(())
-              // we do the assertion here because it's during the setup but before eval
-              _ <- IO(status mustEqual Status.Pending)
-              _ <- a.set(true)
-            } yield ()
-          })(
+        manager <- PreparationsManager[IO, String, Unit, Unit](
+          _ => IO.pure(()),
+          maxConcurrency = 1)(    // we force sequential evaluation of preparations
           (_, _) => IO.pure(Stream.eval(IO.never)))
 
-        _ <- Stream.eval(manager.prepareTable((), manager))   // tie the knot on the fixedpoint
+        // enqueue the first table, which will never finish preparing
+        _ <- Stream.eval(manager.prepareTable(Id1, ()))
 
-        _ <- Stream.eval(latchGet(a))
-        status1 <- Stream.eval(manager.cancelPreparation(()))
+        // enqueue the second, which we will test
+        _ <- Stream.eval(manager.prepareTable(Id2, ()))
+        initStatus <- Stream.eval(manager.preparationStatus(Id2))
+        _ <- Stream.eval(IO(initStatus mustEqual Status.Pending))
+
+        status1 <- Stream.eval(manager.cancelPreparation(Id2))
         _ <- Stream.eval(IO(status1 mustEqual Condition.normal()))
 
-        status2 <- Stream.eval(manager.preparationStatus(()))
+        status2 <- Stream.eval(manager.preparationStatus(Id2))
         _ <- Stream.eval(IO(status2 mustEqual Status.Unknown))
       } yield ()
 
