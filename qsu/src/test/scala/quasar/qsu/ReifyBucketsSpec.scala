@@ -25,7 +25,7 @@ import quasar.ejson.implicits._
 import quasar.contrib.iota.{copkEqual, copkTraverse}
 import quasar.qscript.{construction, Hole, MapFuncsCore, PlannerError, ReduceFuncs, SrcHole}
 
-import matryoshka.{delayEqual, delayShow, showTShow, Embed}
+import matryoshka.{delayEqual, Embed}
 import matryoshka.data.Fix
 import matryoshka.data.{freeEqual, freeRecursive}
 import matryoshka.patterns.CoEnv
