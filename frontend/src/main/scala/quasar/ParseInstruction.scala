@@ -31,29 +31,34 @@ sealed abstract class ParseInstruction extends Product with Serializable
 
 object ParseInstruction {
 
-  /* Generates one unique identity per row. Creates a top-level object with
+  /**
+   * Generates one unique identity per row. Creates a top-level object with
    * `idName` providing the unique identity and `valueName` providing the
    * original value.
    */
   final case class Ids(idName: String, valueName: String) extends ParseInstruction
-  
-  /* Wraps the provided `path` into an object with key `name`, thus adding
+
+  /**
+   * Wraps the provided `path` into an object with key `name`, thus adding
    * another layer of structure. All other paths are retained.
    */
   final case class Wrap(path: CPath, name: String) extends ParseInstruction
-  
-  /* Removes all values that are not both at the path `path` and of the type `tpe`.
+
+  /**
+   * Removes all values that are not both at the path `path` and of the type `tpe`.
    *
    * A `Mask` is not a `ParseInstruction` and must be constructed with `Masks`.
    */
   final case class Mask(path: CPath, tpe: ParseType)
 
-  /* `Masks` represents the disjunction of the provided `masks`. An empty set indicates
+  /**
+   *`Masks` represents the disjunction of the provided `masks`. An empty set indicates
    * that all values should be dropped.
    */
   final case class Masks(masks: Set[Mask]) extends ParseInstruction
-  
-  /* Pivots the indices and keys out of arrays and objects, respectively,
+
+  /**
+   * Pivots the indices and keys out of arrays and objects, respectively,
    * according to the `structure`, maintaining their association with the original
    * corresponding value.
    *
