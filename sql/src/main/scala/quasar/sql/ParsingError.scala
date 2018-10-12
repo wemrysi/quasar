@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.common.PathError
 import quasar.fp._
 
-import matryoshka._
 import scalaz._, Scalaz._
 
 sealed abstract class ParsingError { def message: String}

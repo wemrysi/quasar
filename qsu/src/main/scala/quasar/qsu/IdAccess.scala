@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.RenderTree
 import quasar.fp.symbolOrder
 
-import matryoshka._
 import monocle.{Prism, Traversal}
 import scalaz.{Applicative, Equal, Order, Show}
 import scalaz.std.anyVal._
