@@ -28,14 +28,14 @@ import scalaz.{~>, \/, \/-, -\/, Equal, Id, Monad, Show}, Id.Id
 import scalaz.syntax.monad._
 import scalaz.std.list._
 
-abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
+abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D, S]
     extends Qspec
     with ConditionMatchers
     with BeforeEach {
 
   import TableRef._
 
-  def tables: Tables[F, I, Q, D]
+  def tables: Tables[F, I, Q, D, S]
 
   // `table1` and `table2` must have distinct names
   val table1: TableRef[Q]
@@ -130,6 +130,32 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D]
       } yield {
         result must beLike {
           case \/-(PreparationResult.Unavailable(i)) => i must_= id
+        }
+      }
+    }
+
+    "error when requesting schema of nonexistant talbe" >>* {
+      for {
+        id <- uniqueId.point[F]
+        result <- tables.preparedSchema(id)
+      } yield {
+        result must beLike {
+          case -\/(TableError.TableNotFound(i)) => i must_= id
+        }
+      }
+    }
+
+    "error when requesting schema for unprepared table" >>* {
+      for {
+        errorOrId <- tables.createTable(table1)
+        id <- isSuccess(errorOrId)
+        //statusId <- tables.preparationStatus(id)
+        result <- tables.preparedSchema(id)
+      } yield {
+        result must beLike {
+          case \/-(PreparationResult.Unavailable(i)) => {
+            i must_= id
+          }
         }
       }
     }

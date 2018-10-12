@@ -43,12 +43,13 @@ import scalaz.syntax.monad._
 
 import shims._
 
-final class DefaultTables[F[_]: Effect, I: Equal, Q, D](
+final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     freshId: F[I],
     tableStore: IndexedStore[F, I, TableRef[Q]],
     manager: PreparationsManager[F, I, Q, D],
-    lookupFromPTableStore: I => F[Option[D]])
-    extends Tables[F, I, Q, D] {
+    lookupFromPTableStore: I => F[Option[D]],
+    lookupTableSchema: I => F[Option[S]])
+    extends Tables[F, I, Q, D, S] {
 
   import TableError.{
     ExistenceError,
@@ -147,6 +148,22 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D](
   def table(tableId: I): F[ExistenceError[I] \/ TableRef[Q]] =
     tableStore.lookup(tableId).map(option.toRight(_)(TableNotFound(tableId)))
 
+  def preparedSchema(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, S]] =
+    tableStore.lookup(tableId).flatMap {
+      case Some(_) =>
+        lookupFromPTableStore(tableId).flatMap {
+          case Some(_) => lookupTableSchema(tableId).map {
+            case Some(s) =>
+              PreparationResult.Available[I, S](tableId, s).right
+            case None =>
+              PreparationResult.Unavailable[I, S](tableId).right
+          }
+          case None => (PreparationResult.Unavailable[I, S](tableId): PreparationResult[I, S]).right.pure[F]
+        }
+      case None =>
+        (TableNotFound(tableId): ExistenceError[I]).left.pure[F]
+    }
+
   ////
 
   private def liveStatus(tableId: I): F[PreparationStatus] = {
@@ -169,15 +186,17 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D](
 }
 
 object DefaultTables {
-  def apply[F[_]: Effect, I: Equal, Q, D](
+  def apply[F[_]: Effect, I: Equal, Q, D, S](
       freshId: F[I],
       tableStore: IndexedStore[F, I, TableRef[Q]],
       manager: PreparationsManager[F, I, Q, D],
-      lookupFromPTableStore: I => F[Option[D]])
-      : Tables[F, I, Q, D] =
-      new DefaultTables[F, I, Q, D](
+      lookupFromPTableStore: I => F[Option[D]],
+      lookupTableSchema: I => F[Option[S]])
+      : Tables[F, I, Q, D, S] =
+      new DefaultTables[F, I, Q, D, S](
         freshId,
         tableStore,
         manager,
-        lookupFromPTableStore)
+        lookupFromPTableStore,
+        lookupTableSchema)
 }

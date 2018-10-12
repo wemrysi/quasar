@@ -37,6 +37,7 @@ import quasar.mimir.evaluate.MimirQueryFederation
 import quasar.mimir.storage.{MimirIndexedStore, MimirPTableStore, StoreKey}
 import quasar.run.implicits._
 import quasar.run.optics._
+import quasar.yggdrasil.PTableSchema
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext
@@ -57,7 +58,7 @@ import spire.std.double._
 
 final class Quasar[F[_]](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-    val tables: Tables[F, UUID, SqlQuery, Stream[F, MimirRepr]],
+    val tables: Tables[F, UUID, SqlQuery, Stream[F, MimirRepr], PTableSchema],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -153,14 +154,15 @@ object Quasar {
           }
       }
 
-      tables = DefaultTables[F, UUID, SqlQuery, Stream[F, MimirRepr]](
+      tables = DefaultTables[F, UUID, SqlQuery, Stream[F, MimirRepr], PTableSchema](
         freshUUID,
         tableRefs,
         preparationsManager,
         key => pTableStore.read(storeKeyUuidP.reverseGet(key))
           .map(_.map(t =>
             Stream(MimirRepr(pTableStore.cake)(
-              t.asInstanceOf[pTableStore.cake.Table])).covary[F]))) // yolo x2
+              t.asInstanceOf[pTableStore.cake.Table])).covary[F])), // yolo x2
+        i => pTableStore.schema(storeKeyUuidP.reverseGet(i)))
 
     } yield new Quasar(datasources, tables, queryEvaluator)
   }

@@ -23,7 +23,7 @@ import quasar.contrib.fs2.convert._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz.MonadError_
 import quasar.mimir.MimirCake.Cake
-import quasar.yggdrasil.{Config, ExactSize}
+import quasar.yggdrasil.{Config, ExactSize, PTableSchema}
 import quasar.yggdrasil.nihdb.SegmentsWrapper
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.niflheim.NIHDB
@@ -121,6 +121,23 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
     val path = keyToFile(key)
     LiftIO[F].liftIO(cake.closeDB(path) *> cake.fs.delete(path).as(()))
   }
+
+  def schema(key: StoreKey): F[Option[PTableSchema]] = {
+    val optColRef = for {
+      dbOr <- cake.openDB(keyToFile(key)).mapT(LiftIO[F].liftIO(_))
+
+      db <- dbOr match {
+        case \/-(db) => db.point[OptionT[F, ?]]
+        case -\/(ResourceError.NotFound(_)) => OptionT.none[F, NIHDB]
+        case -\/(err) => ME.raiseError(err).liftM[OptionT]
+      }
+
+      cols <- LiftIO[F].liftIO(IO.fromFutureShift(IO(db.structure))).liftM[OptionT]
+    } yield PTableSchema(cols)
+
+    optColRef.run
+  }
+
 
   private[this] def keyToFile(key: StoreKey): AFile =
     tablesPrefix </> Path.file(key.value)
