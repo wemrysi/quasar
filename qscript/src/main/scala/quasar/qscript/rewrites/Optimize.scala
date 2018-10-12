@@ -46,7 +46,7 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
   def extraShift[F[a] <: ACopK[a]: Functor, A](
       implicit
-        ER: Const[ExtraShiftedRead[A], ?] :<<: F,
+        ER: Const[InterpretedRead[A], ?] :<<: F,
         SR: Const[ShiftedRead[A], ?] :<<: F,
         QC: QScriptCore :<<: F)
       : QScriptCore[T[F]] => F[T[F]] = {
@@ -75,8 +75,8 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
       val rewritten: Option[F[T[F]]] = (mfOpt |@| srOpt |@| pathOpt) {
         case (mf, sr, path) =>
-          val src: T[F] = ER.inj(Const[ExtraShiftedRead[A], T[F]](
-            ExtraShiftedRead[A](sr.path, path, shiftStatus, shiftType, key))).embed
+          val src: T[F] = ER.inj(Const[InterpretedRead[A], T[F]](
+            InterpretedRead[A](sr.path, path, shiftStatus, shiftType, key))).embed
 
           QC.inj(Map(src, mf.asRec))
       }
@@ -136,7 +136,7 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 object Optimize {
   def apply[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, G[a] <: ACopK[a], A](
       implicit GF: Injectable[G, F],
-               ESRF: Const[ExtraShiftedRead[A], ?] :<<: F,
+               ESRF: Const[InterpretedRead[A], ?] :<<: F,
                SRF: Const[ShiftedRead[A], ?] :<<: F,
                QCF: QScriptCore[T, ?] :<<: F,
                QCG: QScriptCore[T, ?] :<<: G)

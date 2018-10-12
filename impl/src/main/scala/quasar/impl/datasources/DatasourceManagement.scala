@@ -141,9 +141,6 @@ final class DatasourceManagement[
       timeLimit: FiniteDuration)
       : F[DiscoveryError[I] \/ Option[sstConfig.Schema]] = {
 
-    type TS = TypeStat[N]
-    type P[X] = StructuralType[T[EJson], X]
-
     def sampleQuery =
       dsl.Subset(
         dsl.Unreferenced,
@@ -173,7 +170,7 @@ final class DatasourceManagement[
         .through(progressiveSstAsync(sstConfig, sstEvalConfig.parallelism.value.toInt))
         .interruptWhen(ConcurrentEffect[F].attempt(Timer[F].sleep(timeLimit)))
         .compile.last
-        .map(_.map(s => SstSchema((SST.size(s) < k) either Population.subst[P, TS](s) or s)))
+        .map(_.map(SstSchema.fromSampled(k, _)))
     }
   }
 

@@ -35,8 +35,7 @@ import scalaz.syntax.monad._
 import shims._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.SECONDS
-
+import scala.concurrent.duration._
 
 object PreparationsManagerSpec extends Specification {
   import PreparationsManager._
@@ -245,33 +244,33 @@ object PreparationsManagerSpec extends Specification {
     }
 
     "cancel preparation when pending" in {
-      val Id = "table-id"
+      val Id1 = "identity-1"
+      val Id2 = "identity-2"
 
       val results = for {
         a <- Stream.eval(async.signalOf[IO, Boolean](false))
 
-        manager <- PreparationsManager[IO, String, PreparationsManager[IO, String, _, Unit], Unit](
-          { manager =>    // is this not clever? (actually it's probably really stupid; feel free to say so)
-            for {
-              status <- manager.preparationStatus(Id)
-              // we do the assertion here because it's during the setup but before eval
-              _ <- IO(status mustEqual Status.Pending)
-            } yield ()
-          })(
-          (_, _) => IO.pure(Stream.eval(latchGet(a))))
+        manager <- PreparationsManager[IO, String, Unit, Unit](
+          _ => IO.pure(()),
+          maxConcurrency = 1)(    // we force sequential evaluation of preparations
+          (_, _) => IO.pure(Stream.eval(IO.never)))
 
-        _ <- Stream.eval(manager.prepareTable(Id, manager))   // tie the knot on the fixedpoint
+        // enqueue the first table, which will never finish preparing
+        _ <- Stream.eval(manager.prepareTable(Id1, ()))
 
-        status1 <- Stream.eval(manager.cancelPreparation(Id))
+        // enqueue the second, which we will test
+        _ <- Stream.eval(manager.prepareTable(Id2, ()))
+        initStatus <- Stream.eval(manager.preparationStatus(Id2))
+        _ <- Stream.eval(IO(initStatus mustEqual Status.Pending))
+
+        status1 <- Stream.eval(manager.cancelPreparation(Id2))
         _ <- Stream.eval(IO(status1 mustEqual Condition.normal()))
 
-        status2 <- Stream.eval(manager.preparationStatus(Id))
+        status2 <- Stream.eval(manager.preparationStatus(Id2))
         _ <- Stream.eval(IO(status2 mustEqual Status.Unknown))
       } yield ()
 
-      results.compile.drain.unsafeRunSync
-
-      ok
+      results.compile.drain.unsafeRunTimed(5.seconds) must beSome
     }
 
     "cancel preparation when started" in {
@@ -347,6 +346,46 @@ object PreparationsManagerSpec extends Specification {
       results.compile.drain.unsafeRunSync
 
       ok
+    }
+
+    "immediately return when evaluation takes forever" in {
+      val results = for {
+        manager <- PreparationsManager[IO, Unit, Unit, Unit](
+          _ => IO.never)(
+          (_, _) => IO.pure(Stream.empty))
+
+        _ <- Stream.eval(manager.prepareTable((), ()))
+        _ <- Stream.eval(manager.cancelPreparation(()))
+
+        status <- Stream.eval(manager.preparationStatus(()))
+        _ <- Stream.eval(IO(status mustEqual Status.Unknown))
+      } yield ()
+
+      results.compile.drain.unsafeRunTimed(1.second) must beSome
+    }
+
+    "report error in evaluating query" in {
+      case object EvalException extends Exception
+
+      val results = for {
+        manager <- PreparationsManager[IO, Unit, Unit, Unit](
+          _ => IO.raiseError(EvalException))(
+          (_, _) => IO.pure(Stream.empty))
+
+        _ <- Stream.eval(manager.prepareTable((), ()))
+
+        event <- manager.notifications.take(1)
+        _ <- Stream.eval(IO {
+          event must beLike {
+            case PreparationEvent.PreparationErrored((), _, _, EvalException) => ok
+          }
+        })
+
+        status <- Stream.eval(manager.preparationStatus(()))
+        _ <- Stream.eval(IO(status mustEqual Status.Unknown))
+      } yield ()
+
+      results.compile.drain.unsafeRunTimed(1.second) must beSome
     }
   }
 

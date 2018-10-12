@@ -28,7 +28,6 @@ import scala.Predef.$conforms
 import argonaut._, Argonaut._
 import cats.effect.Sync
 import fs2.Stream
-import matryoshka._
 import org.specs2.execute._
 import org.specs2.matcher._
 import scalaz.{Failure => _, _}, Scalaz._

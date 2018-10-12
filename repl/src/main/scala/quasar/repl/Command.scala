@@ -26,7 +26,6 @@ import quasar.sql.Query
 
 import java.util.UUID
 
-import eu.timepit.refined.auto._
 import scalaz._, Scalaz._
 
 sealed abstract class Command

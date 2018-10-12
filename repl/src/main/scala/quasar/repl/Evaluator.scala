@@ -270,7 +270,10 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           cwd <- stateRef.get.map(_.cwd)
           path = newPath(cwd, replPath)
           s <- schema(path)
-          t = s.map(_.sst.fold(_.asEJson[Fix[EJson]], _.asEJson[Fix[EJson]]))
+          t = s map {
+            case SstSchema.PopulationSchema(s) => s.asEJson[Fix[EJson]]
+            case SstSchema.SampleSchema(s) => s.asEJson[Fix[EJson]]
+          }
         } yield {
           Stream.emit(
             t.flatMap(ejs => DataCodec.Precise.encode(ejs.cata(Data.fromEJson)))

@@ -53,17 +53,6 @@ lazy val buildSettings = Seq(
    */
   addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4")) // console alias test:console
 
-val targetSettings = Seq(
-  target := {
-    import java.io.File
-
-    val root = (baseDirectory in ThisBuild).value.getAbsolutePath
-    val ours = baseDirectory.value.getAbsolutePath
-
-    new File(root + File.separator + ".targets" + File.separator + ours.substring(root.length))
-  }
-)
-
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
 concurrentRestrictions in Global := {
@@ -167,7 +156,6 @@ lazy val root = project.in(file("."))
 lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(
     buildInfoKeys := Seq[BuildInfoKey](version, isCIBuild, isIsolatedEnv, exclusiveTestTag),
     buildInfoPackage := "quasar.build",
@@ -184,7 +172,6 @@ lazy val api = project
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.api)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -196,7 +183,6 @@ lazy val ejson = project
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.ejson)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -210,7 +196,6 @@ lazy val common = project
     ejson)
   .settings(libraryDependencies ++= Dependencies.common)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -222,7 +207,6 @@ lazy val frontend = project
     common % BothScopes,
     ejson % BothScopes)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(
     libraryDependencies ++= Dependencies.frontend)
   .settings(excludeTypelevelScalaLibrary)
@@ -232,7 +216,6 @@ lazy val sst = project
   .settings(name := "quasar-sst-internal")
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -240,7 +223,6 @@ lazy val datagen = project
   .settings(name := "quasar-datagen")
   .dependsOn(sst % BothScopes)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .settings(
     mainClass in Compile := Some("quasar.datagen.Main"),
@@ -253,7 +235,6 @@ lazy val sql = project
   .settings(name := "quasar-sql-internal")
   .dependsOn(common % BothScopes)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .settings(
     libraryDependencies ++= Dependencies.sql)
@@ -263,7 +244,6 @@ lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -271,7 +251,6 @@ lazy val qsu = project
   .settings(name := "quasar-qsu-internal")
   .dependsOn(qscript % BothScopes)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .settings(libraryDependencies ++= Dependencies.qsu)
   .settings(scalacOptions ++= {
@@ -289,7 +268,6 @@ lazy val connector = project
     foundation % "test->test",
     qscript)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -299,7 +277,6 @@ lazy val core = project
     frontend % BothScopes,
     sql % BothScopes)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(
     libraryDependencies ++= Dependencies.core)
   .settings(excludeTypelevelScalaLibrary)
@@ -314,7 +291,6 @@ lazy val impl = project
     connector % BothScopes,
     sst)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.impl)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
@@ -327,7 +303,6 @@ lazy val runp = (project in file("run"))
     mimir,
     qsu)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -339,7 +314,6 @@ lazy val repl = project
     common % "test->test",
     runp)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.repl)
   .settings(
     mainClass in Compile := Some("quasar.repl.Main"),
@@ -358,7 +332,6 @@ lazy val it = project
     qscript % "test->test",
     runp)
   .settings(commonSettings)
-  .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.it)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
@@ -378,7 +351,6 @@ lazy val precog = project
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -395,7 +367,6 @@ lazy val blueeyes = project
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -409,7 +380,6 @@ lazy val niflheim = project
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -426,20 +396,19 @@ lazy val yggdrasil = project
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasilPerf = project
   .settings(
     name := "quasar-yggdrasil-perf-internal",
-    scalacStrictMode := false)
+    scalacStrictMode := false,
+    javaOptions += "-XX:+HeapDumpOnOutOfMemoryError")
   .dependsOn(yggdrasil % "compile->compile;compile->test")
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(noPublishSettings)
   .settings(assemblySettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
   .enablePlugins(JmhPlugin)
@@ -457,6 +426,5 @@ lazy val mimir = project
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
-  .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)

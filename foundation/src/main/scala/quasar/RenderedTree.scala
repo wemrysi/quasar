@@ -21,7 +21,6 @@ import quasar.fp._
 import quasar.fp.ski._
 
 import argonaut._, Argonaut._
-import matryoshka._
 import scalaz._, Scalaz._
 
 final case class RenderedTree(nodeType: List[String], label: Option[String], children: List[RenderedTree]) {

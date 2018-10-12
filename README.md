@@ -90,7 +90,7 @@ To build a JAR for the REPL, which allows entering commands at a command-line pr
 ./sbt 'repl/assembly'
 ```
 
-The path of the JAR will be `./.targets/repl/scala-2.11/quasar-repl-assembly-[version].jar`, where `[version]` is the Quasar version number.
+The path of the JAR will be `repl/target/scala-2.12/quasar-repl-assembly-[version].jar`, where `[version]` is the Quasar version number.
 
 To run the JAR, execute the following command:
 
@@ -129,7 +129,7 @@ Now run the `assembly` task for the relevant backend:
 $ ./sbt mongodb/assembly
 ```
 
-The path to the JAR will be something like `./.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar`, though the exact name of the JAR (and the directory path in question) will of course depend on the backend built (for example, `mongodb/assembly` will produce a very different JAR from `mongodb/assembly`).
+The path to the JAR will be something like `mongodb/target/scala-2.12/quasar-mongodb-internal-assembly-23.1.5.jar`, though the exact name of the JAR (and the directory path in question) will of course depend on the backend built (for example, `mongodb/assembly` will produce a very different JAR from `mongodb/assembly`).
 
 For each backend that you wish to support, run that backend's `assembly`. See the [launcher](https://github.com/slamdata/launcher) for further instructions.
 
@@ -140,7 +140,7 @@ This technique is designed for local development use, where the backend implemen
 As with the plugins directory approach, you will need to run the `assembly` task for each backend that you want to use.  But instead of copying the JAR files into a directory, you will be referencing each JAR file individually using the `--backend` switch on the REPL JAR invocation:
 
 ```bash
-java -jar [<path to jar>] [-c <config file>] --backend:quasar.physical.mongodb.MongoDb\$=.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar
+java -jar [<path to jar>] [-c <config file>] --backend:quasar.physical.mongodb.MongoDb\target/mongodb/scala-2.12/quasar-mongodb-internal-assembly-23.1.5.jar
 ```
 
 Replace the JAR file in the above with the path to the backend whose `assembly` you ran.  The `--backend` switch may be repeated as many times as necessary: once for each backend you wish to add.  The value to the left of the `=` is the `BackendModule` object *class name* which defines the backend in question.  Note that we need to escape the `$` character which will be present in each class name, solely because of bash syntax. If you are invoking the `--backend` option within `sbt` (for example running `repl/run`) you do not need to escape the `$`.

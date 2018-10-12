@@ -23,7 +23,7 @@ import quasar.common.effect.NameGenerator
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.qscript.MonadPlannerErr
 
-import matryoshka.{delayShow, showTShow, BirecursiveT, EqualT, ShowT}
+import matryoshka.{BirecursiveT, EqualT, ShowT}
 import org.slf4s.Logging
 import scalaz.{Cord, Functor, Kleisli => K, Monad, Show}
 import scalaz.syntax.functor._

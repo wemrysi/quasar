@@ -20,7 +20,6 @@ import slamdata.Predef.{Map => SMap, _}
 import quasar.common.effect.NameGenerator
 import quasar.RenderTreeT
 import quasar.contrib.std.errorImpossible
-import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
@@ -44,7 +43,7 @@ import quasar.qscript.rewrites.NormalizableT
 import quasar.qsu.{QScriptUniform => QSU}
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
 
-import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
+import matryoshka.{BirecursiveT, EqualT, ShowT}
 import monocle.Traversal
 import monocle.std.option.{some => someP}
 import monocle.syntax.fields._1

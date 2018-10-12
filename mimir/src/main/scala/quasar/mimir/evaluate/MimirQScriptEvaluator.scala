@@ -62,7 +62,7 @@ final class MimirQScriptEvaluator[
     Const[ShiftedRead[AFile], ?] :::
     TNilK
 
-  type QS[U[_[_]]] = Const[ExtraShiftedRead[AFile], ?] ::: QSRewrite[U]
+  type QS[U[_[_]]] = Const[InterpretedRead[AFile], ?] ::: QSRewrite[U]
 
   type Repr = MimirRepr
 
@@ -112,13 +112,13 @@ final class MimirQScriptEvaluator[
       val QScriptCore = CopK.Inject[QScriptCore[T, ?],            QSM]
       val EquiJoin    = CopK.Inject[EquiJoin[T, ?],               QSM]
       val ShiftedRead = CopK.Inject[Const[ShiftedRead[AFile], ?], QSM]
-      val ExtraShiftedRead = CopK.Inject[Const[ExtraShiftedRead[AFile], ?], QSM]
+      val InterpretedRead = CopK.Inject[Const[InterpretedRead[AFile], ?], QSM]
 
       in match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
         case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value.left)
-        case ExtraShiftedRead(value) => shiftedReadPlanner.plan(ec)(value.right)
+        case InterpretedRead(value) => shiftedReadPlanner.plan(ec)(value.right)
       }
     }
 

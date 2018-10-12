@@ -45,14 +45,14 @@ final class FederatedShiftedReadPlanner[
   type Assocs = Associates[T, IO]
   type M[A] = AssociatesT[T, F, IO, A]
 
-  type Read[A] = Const[ShiftedRead[AFile], A] \/ Const[ExtraShiftedRead[AFile], A]
+  type Read[A] = Const[ShiftedRead[AFile], A] \/ Const[InterpretedRead[AFile], A]
 
   def plan(implicit ec: ExecutionContext)
       : AlgebraM[M, Read, MimirRepr] = {
     case -\/(Const(ShiftedRead(file, status))) =>
       planRead(file, status, None)
 
-    case \/-(Const(ExtraShiftedRead(file, shiftPath, shiftStatus, shiftType, shiftKey))) =>
+    case \/-(Const(InterpretedRead(file, shiftPath, shiftStatus, shiftType, shiftKey))) =>
       planRead(file, ExcludeId, Some(ShiftInfo(shiftPath, shiftStatus, shiftType, shiftKey)))
   }
 

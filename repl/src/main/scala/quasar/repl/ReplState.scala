@@ -21,7 +21,6 @@ import slamdata.Predef._
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource.ResourcePath
-import quasar.fp.numeric.widenPositive
 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._

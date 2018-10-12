@@ -16,9 +16,10 @@
 
 package quasar
 
-import slamdata.Predef.{Product, Serializable}
+import slamdata.Predef.{Int, Product, Serializable}
 
-import scalaz.{Equal, Show}
+import scalaz.{Order, Show}
+import scalaz.std.anyVal._
 
 sealed abstract class ParseType extends Product with Serializable
 
@@ -34,6 +35,36 @@ object ParseType {
   final case object Array extends CompositeParseType
   final case object Object extends CompositeParseType
 
+  // ParseType implicits
   implicit val parseTypeShow: Show[ParseType] = Show.showFromToString
-  implicit val parseTypeEqual: Equal[ParseType] = Equal.equalA
+
+  implicit val parseTypeOrder: Order[ParseType] =
+    Order.orderBy[ParseType, Int] {
+      case Boolean => 0
+      case Null => 1
+      case Number => 2
+      case String => 3
+      case Array => 4
+      case Object => 5
+    }
+
+  // CompositeParseType implicits
+  implicit val compositeParseTypeShow: Show[CompositeParseType] = Show.showFromToString
+
+  implicit val compositeParseTypeOrder: Order[CompositeParseType] =
+    Order.orderBy[CompositeParseType, Int] {
+      case Array => 0
+      case Object => 1
+    }
+
+  // ScalarParseType implicits
+  implicit val scalarParseTypeShow: Show[ScalarParseType] = Show.showFromToString
+
+  implicit val scalarParseTypeOrder: Order[ScalarParseType] =
+    Order.orderBy[ScalarParseType, Int] {
+      case Boolean => 0
+      case Null => 1
+      case Number => 2
+      case String => 3
+    }
 }

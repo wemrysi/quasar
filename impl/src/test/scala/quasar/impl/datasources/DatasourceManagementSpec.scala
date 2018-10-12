@@ -285,9 +285,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
         TypeStat.bool(3.0, 2.0),
         TypeST(TypeF.simple[Fix[EJson], SST[Fix[EJson], Double]](SimpleType.Bool))).embed
 
-      val schema =
-        SstSchema[Fix[EJson], Double](
-          Population.subst[StructuralType[Fix[EJson], ?], TypeStat[Double]](sst).right)
+      val schema = SstSchema.fromSampled(100.0, sst)
 
       "computes an SST of the data" >> withMgmt { (mgmt, _) =>
         for {
@@ -305,10 +303,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
           b <- mgmt.resourceSchema(1, ResourcePath.root() / ResourceName("data"), defaultCfg, evalDelay * 2)
         } yield {
           c must beNormal
-          b.toOption.join exists {
-            case SstSchema(s) =>
-              SST.size(s.swap.valueOr(Population.unsubst(_))) < SST.size(sst)
-          }
+          b.toOption.join.exists(_.size < SST.size(sst))
         }
       }
 

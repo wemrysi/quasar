@@ -21,7 +21,6 @@ import quasar.RenderTree.ops._
 import quasar.fp.ski._
 import quasar.fp._
 
-import matryoshka._
 import org.specs2.matcher._
 import scalaz._, Scalaz._
 
