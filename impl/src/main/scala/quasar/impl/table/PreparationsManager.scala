@@ -66,60 +66,61 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
       back <- if (check) {
         Condition.abnormal(InProgressError(tableId)).point[F]
       } else {
-        for {
-          result <- evaluator.evaluate(query)
-          persist <- runToStore(tableId, result)
+        val persist = for {
+          result <- Stream.eval(evaluator.evaluate(query))
+          persistStream <- Stream.eval(runToStore(tableId, result))
+          results <- persistStream
+        } yield results
 
-          configured = Stream.eval(F.delay(OffsetDateTime.now())) flatMap { start =>
-            val preparation = Preparation(cancel, start)
-            val halted = persist.interruptWhen(s)
+        val configured = Stream.eval(F.delay(OffsetDateTime.now())) flatMap { start =>
+          val preparation = Preparation(cancel, start)
+          val halted = persist.interruptWhen(s)
 
-            val handled = halted handleErrorWith { t =>
-              val eff = for {
-                end <- F.delay(OffsetDateTime.now())
-                _ <- s.set(true)    // prevent the onComplete handler
+          val handled = halted handleErrorWith { t =>
+            val eff = for {
+              end <- F.delay(OffsetDateTime.now())
+              _ <- s.set(true)    // prevent the onComplete handler
 
-                _ <- notificationsQ.enqueue1(
-                  Some(
-                    PreparationEvent.PreparationErrored(
-                      tableId,
-                      start,
-                      (end.toEpochSecond - start.toEpochSecond).seconds,
-                      t)))
-              } yield ()
+              _ <- notificationsQ.enqueue1(
+                Some(
+                  PreparationEvent.PreparationErrored(
+                    tableId,
+                    start,
+                    (end.toEpochSecond - start.toEpochSecond).seconds,
+                    t)))
+            } yield ()
 
-              Stream.eval_(eff)
-            } onComplete {
-              val eff = for {
-                canceled <- s.get
+            Stream.eval_(eff)
+          } onComplete {
+            val eff = for {
+              canceled <- s.get
 
-                _ <- if (canceled) {
-                  ().point[F]
-                } else {
-                  for {
-                    end <- F.delay(OffsetDateTime.now())
+              _ <- if (canceled) {
+                ().point[F]
+              } else {
+                for {
+                  end <- F.delay(OffsetDateTime.now())
 
-                    _ <- notificationsQ.enqueue1(
-                      Some(
-                        PreparationEvent.PreparationSucceeded(
-                          tableId,
-                          start,
-                          (end.toEpochSecond - start.toEpochSecond).seconds)))
-                  } yield ()
-                }
-              } yield ()
+                  _ <- notificationsQ.enqueue1(
+                    Some(
+                      PreparationEvent.PreparationSucceeded(
+                        tableId,
+                        start,
+                        (end.toEpochSecond - start.toEpochSecond).seconds)))
+                } yield ()
+              }
+            } yield ()
 
-              Stream.eval_(eff)
-            }
-
-            Stream.bracket(
-              F.delay(status.replace(tableId, -\/(cancel), \/-(preparation))))(
-              flag => if (flag) handled else Stream.empty,
-              _ => F.delay(status.remove(tableId, \/-(preparation))).void)
+            Stream.eval_(eff)
           }
 
-          _ <- background(configured.drain)
-        } yield Condition.normal[InProgressError[I]]()
+          Stream.bracket(
+            F.delay(status.replace(tableId, -\/(cancel), \/-(preparation))))(
+            flag => if (flag) handled else Stream.empty,
+            _ => F.delay(status.remove(tableId, \/-(preparation))).void)
+        }
+
+        background(configured.drain).as(Condition.normal[InProgressError[I]]())
       }
     } yield back
   }
@@ -170,6 +171,7 @@ object PreparationsManager {
   def apply[F[_]: ConcurrentEffect, I, Q, R](
       evaluator: QueryEvaluator[F, Q, R],
       maxStreams: Int = 10,
+      maxConcurrency: Int = 10,   // it's a good idea to keep this equal to maxStreams (different values are sometimes useful for testing)
       maxNotifications: Int = 10)(
       runToStore: (I, R) => F[Stream[F, Unit]])(
       implicit ec: ExecutionContext): Stream[F, PreparationsManager[F, I, Q, R]] = {
@@ -183,8 +185,7 @@ object PreparationsManager {
 
       emit = Stream(new PreparationsManager[F, I, Q, R](evaluator, notificationsQ, q.enqueue1(_))(runToStore))
 
-      // we have to be explicit here because scalaz's MonadSyntax includes .join
-      back <- emit.concurrently(Stream.InvariantOps(q.dequeue).join(maxStreams)) onComplete {
+      back <- emit.concurrently(Stream.InvariantOps(q.dequeue).join(maxConcurrency)) onComplete {
         Stream.eval_(notificationsQ.enqueue1(None))
       }
     } yield back
