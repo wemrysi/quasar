@@ -84,7 +84,8 @@ final class MimirQScriptEvaluator[
   def toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
     _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]].inject(_).embed)
 
-  def execute(repr: Repr): M[Repr] = repr.point[M]
+  def execute(repr: Repr): M[Repr] =
+    repr.map(_.materialized).asInstanceOf[Repr].point[M]    // stupid dependent types...
 
   def plan(cp: T[QSM]): M[Repr] = {
     def qScriptCorePlanner =

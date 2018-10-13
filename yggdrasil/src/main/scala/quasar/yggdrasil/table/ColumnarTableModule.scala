@@ -601,6 +601,12 @@ trait ColumnarTableModule
     }
 
     /**
+     * Materializes the table by materializing all of the constituent slices (lazily).
+     * Basically removes the laziness *within* all of the slices.
+     */
+    def materialized: Table = Table(slices.map(_.materialized), size)
+
+    /**
       * Returns a table where each slice (except maybe the last) has slice size `length`.
       * Also removes slices of size zero. If an optional `maxLength0` size is provided,
       * then the slices need only land in the range between `length` and `maxLength0`.
