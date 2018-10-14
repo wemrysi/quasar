@@ -16,9 +16,7 @@
 
 package quasar
 
-import scalaz.Equal
-
-import scala.{Any, StringContext}
+import java.lang.String
 
 /**
  * Defines common machinery for testing functions that manipulate JSON
@@ -29,11 +27,5 @@ abstract class JsonSpec extends Qspec {
   // like List[JValue] or something
   type JsonStream
 
-  protected val JsonStreamEq: Equal[JsonStream]
-
-  protected implicit def jsonStringSyntax(self: StringContext): JsonStringSyntax
-
-  protected trait JsonStringSyntax {
-    def ldjson(params: Any*): JsonStream
-  }
+  protected def ldjson(str: String): JsonStream
 }

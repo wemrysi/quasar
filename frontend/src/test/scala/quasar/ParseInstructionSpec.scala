@@ -42,17 +42,17 @@ object ParseInstructionSpec {
 
     "pivot" should {
       "shift an array at identity" >> {
-        val input = ldjson"""
+        val input = ldjson("""
           [1, 2, 3]
           [4, 5, 6]
           [7, 8, 9, 10]
           [11]
           []
           [12, 13]
-          """
+          """)
 
         "ExcludeId" >> {
-          val expected = ldjson"""
+          val expected = ldjson("""
             1
             2
             3
@@ -66,13 +66,13 @@ object ParseInstructionSpec {
             11
             12
             13
-            """
+            """)
 
           input must pivotInto(CPath.parse("."), IdStatus.ExcludeId, ParseType.Array)(expected)
         }
 
         "IdOnly" >> {
-          val expected = ldjson"""
+          val expected = ldjson("""
             0
             1
             2
@@ -86,13 +86,13 @@ object ParseInstructionSpec {
             0
             0
             1
-            """
+            """)
 
           input must pivotInto(CPath.parse("."), IdStatus.IdOnly, ParseType.Array)(expected)
         }
 
         "IncludeId" >> {
-          val expected = ldjson"""
+          val expected = ldjson("""
             [0, 1]
             [1, 2]
             [2, 3]
@@ -106,7 +106,7 @@ object ParseInstructionSpec {
             [0, 11]
             [0, 12]
             [1, 13]
-            """
+            """)
 
           input must pivotInto(CPath.parse("."), IdStatus.IncludeId, ParseType.Array)(expected)
         }
@@ -121,7 +121,9 @@ object ParseInstructionSpec {
         structure: CompositeParseType)(
         expected: JsonStream)
         : Matcher[JsonStream] = { input: JsonStream =>
-      evalPivot(Pivot(path, idStatus, structure), input) === expected
+
+      val results = evalPivot(Pivot(path, idStatus, structure), input)
+      (results == expected, s"$results did not equal $expected")
     }
   }
 }
