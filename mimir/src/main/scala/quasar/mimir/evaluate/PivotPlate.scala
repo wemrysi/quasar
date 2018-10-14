@@ -36,6 +36,7 @@ final class PivotPlate[A](
   // if this is true, it means we're under the focus and might unnest once without moving
   private var underFocus = false
   private var suppress = false
+  private var pivoted = false
 
   private val IdOnly = IdStatus.IdOnly
   private val IncludeId = IdStatus.IncludeId
@@ -63,17 +64,25 @@ final class PivotPlate[A](
   }
 
   override def map(): Signal = {
-    if (suppress)
+    if (suppress) {
       Signal.Continue
-    else
+    } else if (atFocus()) {
+      pivoted = true
+      Signal.Continue
+    } else {
       super.map()
+    }
   }
 
   override def arr(): Signal = {
-    if (suppress)
+    if (suppress) {
       Signal.Continue
-    else
+    } else if (atFocus()) {
+      pivoted = true
+      Signal.Continue
+    } else {
       super.arr()
+    }
   }
 
   override def num(s: CharSequence, decIdx: Int, expIdx: Int): Signal = {
@@ -108,6 +117,7 @@ final class PivotPlate[A](
       }
 
       underFocus = true
+      pivoted = true
 
       back
     } else {
@@ -132,6 +142,7 @@ final class PivotPlate[A](
       }
 
       underFocus = true
+      pivoted = true
 
       back
     } else {
@@ -156,6 +167,7 @@ final class PivotPlate[A](
       }
 
       underFocus = true
+      pivoted = true
 
       back
     } else {
@@ -196,6 +208,13 @@ final class PivotPlate[A](
     } else {
       super.unnest()
     }
+  }
+
+  override def finishRow(): Unit = {
+    if (!pivoted) {
+      super.finishRow()
+    }
+    pivoted = false
   }
 
   private def atFocus(): Boolean = cursor == rfocus
