@@ -38,6 +38,9 @@ final class PivotPlate[A](
   private var suppress = false
   private var pivoted = false
 
+  // we can't trust nextIndex.head because it only considers post-shift data
+  private var focusedArrayIndex = 0
+
   private val IdOnly = IdStatus.IdOnly
   private val IncludeId = IdStatus.IncludeId
   // private val ExcludeId = IdStatus.ExcludeId
@@ -103,14 +106,14 @@ final class PivotPlate[A](
   override def nestMap(pathComponent: CharSequence): Signal = {
     if (atFocus() && !underFocus) {
       val back = if (idStatus eq IdOnly) {
-        delegate.str(pathComponent)
+        super.str(pathComponent)
         suppress = true
         Signal.SkipColumn
       } else if (idStatus eq IncludeId) {
-        delegate.nestArr()
-        delegate.str(pathComponent)
-        delegate.unnest()
-        delegate.nestArr()
+        super.nestArr()
+        super.str(pathComponent)
+        super.unnest()
+        super.nestArr()
         Signal.Continue
       } else {
         Signal.Continue
@@ -128,14 +131,14 @@ final class PivotPlate[A](
   override def nestArr(): Signal = {
     if (atFocus() && !underFocus) {
       val back = if (idStatus eq IdOnly) {
-        delegate.num(nextIndex.head.toString, -1, -1)
+        super.num(focusedArrayIndex.toString, -1, -1)
         suppress = true
         Signal.SkipColumn
       } else if (idStatus eq IncludeId) {
-        delegate.nestArr()
-        delegate.num(nextIndex.head.toString, -1, -1)
-        delegate.unnest()
-        delegate.nestArr()
+        super.nestArr()
+        super.num(focusedArrayIndex.toString, -1, -1)
+        super.unnest()
+        super.nestArr()
         Signal.Continue
       } else {
         Signal.Continue
@@ -153,14 +156,14 @@ final class PivotPlate[A](
   override def nestMeta(pathComponent: CharSequence): Signal = {
     if (atFocus() && !underFocus) {
       val back = if (idStatus eq IdOnly) {
-        delegate.str(pathComponent)
+        super.str(pathComponent)
         suppress = true
         Signal.SkipColumn
       } else if (idStatus eq IncludeId) {
-        delegate.nestArr()
-        delegate.str(pathComponent)
-        delegate.unnest()
-        delegate.nestArr()
+        super.nestArr()
+        super.str(pathComponent)
+        super.unnest()
+        super.nestArr()
         Signal.Continue
       } else {
         Signal.Continue
@@ -178,19 +181,19 @@ final class PivotPlate[A](
   override def unnest(): Signal = {
     if (atFocus() && underFocus) {
       if (idStatus eq IncludeId) {
-        delegate.unnest()   // get out of the second array component
+        super.unnest()   // get out of the second array component
       }
 
       // we just unnested once at the focus
       def renest(cursor: List[CPathNode]): Unit = cursor match {
         case hd :: tail =>
-          delegate.unnest()
+          super.unnest()
           renest(tail)
 
           hd match {
-            case CPathField(field) => delegate.nestMap(field)
-            case CPathIndex(_) => delegate.nestArr()
-            case CPathMeta(field) => delegate.nestMeta(field)
+            case CPathField(field) => super.nestMap(field)
+            case CPathIndex(_) => super.nestArr()
+            case CPathMeta(field) => super.nestMeta(field)
             case c => sys.error(s"impossible component $c")
           }
 
@@ -199,10 +202,12 @@ final class PivotPlate[A](
         case Nil =>
       }
 
-      delegate.finishRow()
+      super.finishRow()
       renest(cursor)
       underFocus = false
       suppress = false
+
+      focusedArrayIndex += 1
 
       Signal.Continue
     } else {
@@ -215,6 +220,7 @@ final class PivotPlate[A](
       super.finishRow()
     }
     pivoted = false
+    focusedArrayIndex = 0
   }
 
   private def atFocus(): Boolean = cursor == rfocus
