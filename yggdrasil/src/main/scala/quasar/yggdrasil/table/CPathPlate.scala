@@ -21,14 +21,14 @@ import quasar.common.{CPathNode, CPathField, CPathIndex, CPathMeta}
 
 import tectonic.{Plate, Signal}
 
-trait CPathPlate[A] { self: Plate[A] =>
+trait CPathPlate[A] extends Plate[A] {
   protected var cursor: List[CPathNode] = Nil
   protected var nextIndex: List[Int] = 0 :: Nil
 
   abstract override def nestMap(pathComponent: CharSequence): Signal = {
     cursor ::= CPathField(pathComponent.toString)
     nextIndex ::= 0
-    self.nestMap(pathComponent)
+    super.nestMap(pathComponent)
   }
 
   abstract override def nestArr(): Signal = {
@@ -36,18 +36,18 @@ trait CPathPlate[A] { self: Plate[A] =>
     nextIndex = 0 :: (idx + 1) :: tail
 
     cursor ::= CPathIndex(idx)
-    self.nestArr()
+    super.nestArr()
   }
 
   abstract override def nestMeta(pathComponent: CharSequence): Signal = {
     cursor ::= CPathMeta(pathComponent.toString)
     nextIndex ::= 0
-    self.nestMeta(pathComponent)
+    super.nestMeta(pathComponent)
   }
 
   abstract override def unnest(): Signal = {
     nextIndex = nextIndex.tail
     cursor = cursor.tail
-    self.unnest()
+    super.unnest()
   }
 }
