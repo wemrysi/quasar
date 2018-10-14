@@ -32,6 +32,7 @@ final class PivotPlate[A](
   import pivot._
 
   private val rfocus = path.nodes.reverse
+  private val rfocusPlus1 = CPathIndex(1) :: rfocus
 
   // if this is true, it means we're under the focus and might unnest once without moving
   private var underFocus = false
@@ -179,7 +180,13 @@ final class PivotPlate[A](
   }
 
   override def unnest(): Signal = {
-    if (atFocus() && underFocus) {
+    /*
+     * When we come into this function with IncludeId, we're going to be one position
+     * deeper than the focus (specifically, the second array index). We need to account
+     * for this in our testing here. Note that InclueId is the only wrapping scenario,
+     * which is why we need to special-case it.
+     */
+    if ((atFocus() || ((idStatus eq IncludeId) && atFocusPlus1())) && underFocus) {
       if (idStatus eq IncludeId) {
         super.unnest()   // get out of the second array component
       }
@@ -199,10 +206,9 @@ final class PivotPlate[A](
 
           ()
 
-        case Nil =>
+        case Nil => super.finishRow()
       }
 
-      super.finishRow()
       renest(cursor)
       underFocus = false
       suppress = false
@@ -224,4 +230,6 @@ final class PivotPlate[A](
   }
 
   private def atFocus(): Boolean = cursor == rfocus
+
+  private def atFocusPlus1(): Boolean = cursor == rfocusPlus1
 }

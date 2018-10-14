@@ -18,10 +18,7 @@ package quasar
 
 import quasar.common.CPath
 
-// the implicits aren't part of qspec? wtf?
-import org.specs2.matcher.{Matcher, MatchersImplicits}
-
-import scala.StringContext
+import org.specs2.matcher.Matcher
 
 abstract class ParseInstructionSpec
     extends JsonSpec
@@ -36,7 +33,7 @@ object ParseInstructionSpec {
   trait WrapSpec extends JsonSpec
   trait MasksSpec extends JsonSpec
 
-  trait PivotSpec extends JsonSpec with MatchersImplicits {
+  trait PivotSpec extends JsonSpec {
     protected final type Pivot = ParseInstruction.Pivot
     protected final val Pivot = ParseInstruction.Pivot
 
@@ -120,10 +117,7 @@ object ParseInstructionSpec {
         idStatus: IdStatus,
         structure: CompositeParseType)(
         expected: JsonStream)
-        : Matcher[JsonStream] = { input: JsonStream =>
-
-      val results = evalPivot(Pivot(path, idStatus, structure), input)
-      (results == expected, s"$results did not equal $expected")
-    }
+        : Matcher[JsonStream] =
+      bestSemanticEqual(expected) ^^ { str: JsonStream => evalPivot(Pivot(path, idStatus, structure), str)}
   }
 }

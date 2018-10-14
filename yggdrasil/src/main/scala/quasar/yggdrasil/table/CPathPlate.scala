@@ -50,4 +50,9 @@ trait CPathPlate[A] extends Plate[A] {
     cursor = cursor.tail
     super.unnest()
   }
+
+  abstract override def finishRow(): Unit = {
+    nextIndex = 0 :: Nil
+    super.finishRow()
+  }
 }

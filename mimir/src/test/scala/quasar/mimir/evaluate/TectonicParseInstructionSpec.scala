@@ -21,6 +21,8 @@ import quasar.ParseInstructionSpec
 import tectonic.AsyncParser
 import tectonic.test.{Event, ReifiedTerminalPlate}
 
+import org.specs2.matcher.Matcher
+
 object TectonicParseInstructionSpec extends ParseInstructionSpec {
   type JsonStream = List[Event]
 

@@ -24,8 +24,12 @@ import tectonic.{Enclosure, Plate, Signal}
 
 import scala.collection.mutable
 
+private[table] abstract class EmptyFinishRowPlate[A] extends Plate[A] {
+  def finishRow() = ()
+}
+
 private[table] final class SlicePlate
-    extends Plate[List[Slice]]
+    extends EmptyFinishRowPlate[List[Slice]]    // <3 Scala
     with ContinuingNestPlate[List[Slice]]
     with CPathPlate[List[Slice]] {
 
@@ -131,9 +135,9 @@ private[table] final class SlicePlate
     case Nil => Enclosure.None
   }
 
-  def finishRow(): Unit = {
+  final override def finishRow(): Unit = {
+    super.finishRow()
     size += 1
-    nextIndex = 0 :: Nil
 
     if (size > Config.maxSliceRows || columns.size > Config.maxSliceColumns) {
       finishSlice()

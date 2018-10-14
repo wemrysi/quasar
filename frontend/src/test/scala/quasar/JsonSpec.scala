@@ -16,6 +16,8 @@
 
 package quasar
 
+import org.specs2.matcher.Matcher
+
 import java.lang.String
 
 /**
@@ -28,4 +30,7 @@ abstract class JsonSpec extends Qspec {
   type JsonStream
 
   protected def ldjson(str: String): JsonStream
+
+  protected def bestSemanticEqual(str: JsonStream): Matcher[JsonStream] =
+    beEqualTo(str)
 }
