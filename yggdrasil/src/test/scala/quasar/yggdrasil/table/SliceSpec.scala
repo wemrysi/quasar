@@ -680,6 +680,22 @@ class SliceSpec extends Specification with ScalaCheck {
       values mustEqual expectedData
     }
   }
+
+  "materialize" should {
+    "discard entirely empty columns" in {
+      val columns = Map(
+        ColumnRef(CPath.parse(".a"), CString) -> new StrColumn {
+          def apply(row: Int) = "foo"
+          def isDefinedAt(row: Int) = true
+        },
+        ColumnRef(CPath.parse(".b"), CLong) -> new LongColumn {
+          def apply(row: Int) = 42
+          def isDefinedAt(row: Int) = false
+        })
+
+      Slice(2, columns).materialized.columns must haveSize(1)
+    }
+  }
 }
 
 
