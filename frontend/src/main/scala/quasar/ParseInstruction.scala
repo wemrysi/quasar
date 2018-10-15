@@ -49,7 +49,7 @@ object ParseInstruction {
    * that all values should be dropped. Removes all values which are not in one of the
    * path/type designations. The inner set is assumed to be non-empty.
    */
-  final case class Masks(masks: Map[CPath, Set[ParseType]]) extends ParseInstruction
+  final case class Mask(masks: Map[CPath, Set[ParseType]]) extends ParseInstruction
 
   /**
    * Pivots the indices and keys out of arrays and objects, respectively,
@@ -76,7 +76,7 @@ object ParseInstruction {
     Equal.equal {
       case (Ids, Ids) => true
       case (Wrap(p1, n1), Wrap(p2, n2)) => p1 === p2 && n1 === n2
-      case (Masks(m1), Masks(m2)) => m1 === m2
+      case (Mask(m1), Mask(m2)) => m1 === m2
       case (Pivot(p1, i1, s1), Pivot(p2, i2, s2)) => p1 === p2 && i1 === i2 && s1 === s2
       case (_, _) => false
     }
@@ -85,7 +85,7 @@ object ParseInstruction {
     Show.show {
       case Ids => Cord("Ids")
       case Wrap(p, n) => Cord("Wrap(") ++ p.show ++ Cord(", ") ++ n.show ++ Cord(")")
-      case Masks(m) => Cord("Masks(") ++ m.show ++ Cord(")")
+      case Mask(m) => Cord("Mask(") ++ m.show ++ Cord(")")
       case Pivot(p, i, s) =>
         Cord("Pivot(") ++ p.show ++ Cord(", ") ++ i.show ++ Cord(", ") ++ s.show ++ Cord(")")
     }
