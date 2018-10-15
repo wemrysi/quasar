@@ -78,10 +78,12 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
       val rewritten: Option[F[T[F]]] = (mfOpt |@| srOpt |@| pathOpt) {
         case (mf, sr, path) =>
+          val tpe = ShiftType.toParseType(shiftType)
+
           val instructions: List[ParseInstruction] = List(
-            Mask(SMap((path, Set(ShiftType.toParseType(shiftType))))),
+            Mask(SMap((path, Set(tpe)))),
             Wrap(path, ShiftedKey),
-            Pivot(path \ ShiftedKey, shiftStatus, ShiftType.toParseType(shiftType)))
+            Pivot(path \ ShiftedKey, shiftStatus, tpe))
 
           val src: T[F] = ER.inj(Const[InterpretedRead[A], T[F]](
             InterpretedRead[A](sr.path, instructions))).embed

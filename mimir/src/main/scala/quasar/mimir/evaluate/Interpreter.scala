@@ -16,90 +16,225 @@
 
 package quasar.mimir.evaluate
 
-import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
-import quasar.precog.common.{CLong, CString, RArray, RObject, RValue}
-import quasar.qscript._
+import slamdata.Predef.List
 
-import scalaz.syntax.equal._
-import scalaz.syntax.std.option._
+import quasar.{CompositeParseType, IdStatus, ParseInstruction, ParseType}
+import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
+import quasar.ParseInstruction.{Ids, Mask, Pivot, Wrap}
+import quasar.common.{CPathField, CPathIndex, CPathNode}
+import quasar.precog.common._
 
 object Interpreter {
 
-  final case class ShiftInfo(
-    shiftPath: ShiftPath,
-    idStatus: IdStatus,
-    shiftType: ShiftType,
-    shiftKey: ShiftKey)
+  def interpret(instructions: List[ParseInstruction], rvalue: RValue): List[RValue] =
+    instructions.reverse.foldRight(List[RValue](rvalue)) {
+      case (instr @ Mask(_), prev) =>
+        prev.flatMap(interpretMask(instr, _).toList)
 
-  /* Returns the `RObject` or `RArray` (determined by the `ShiftType`)
-   * at the provided path, returning `None` when the path points to a
-   * a non-composite or the path does not exist.
-   *
-   * A path `foo.bar.baz` is represented as `List("foo", "bar", "baz")`
-   *
-   * Paths including static array derefs are not currently supported.
-   */
-  def compositeValueAtPath(path: List[String], shiftType: ShiftType, rvalue: RValue)
-      : Option[RValue] =
-    (rvalue, path) match {
-      case (v @ RObject(_), Nil) if shiftType === ShiftType.Map => v.some
-      case (v @ RArray(_), Nil) if shiftType === ShiftType.Array => v.some
+      case (instr @ Pivot(_, _, _), prev) =>
+        prev.flatMap(interpretPivot(instr, _))
 
-      case (RObject(fields), head :: tail) =>
-        val remainder: Option[(RValue, List[String])] =
-          fields.get(head).map((_, tail))
+      case (instr @ Wrap(_, _), prev) =>
+        prev.flatMap(interpretWrap(instr, _) :: Nil)
 
-        remainder flatMap { case (target, tail) =>
-          compositeValueAtPath(tail, shiftType, target)
+      case (Ids, _) =>
+        scala.sys.error("ParseInstruction.Ids not supported for RValue interpretation")
+    }
+
+  private def maskTarget(tpes: Set[ParseType], rvalue: RValue): Boolean =
+    rvalue match {
+      case RObject(_) => tpes.contains(ParseType.Object)
+      case CEmptyObject => tpes.contains(ParseType.Object)
+
+      case RArray(_) => tpes.contains(ParseType.Array)
+      case CEmptyArray => tpes.contains(ParseType.Array)
+
+      case CString(_) => tpes.contains(ParseType.String)
+      case CBoolean(_) => tpes.contains(ParseType.Boolean)
+      case CNull => tpes.contains(ParseType.Null)
+
+      case CLong(_) => tpes.contains(ParseType.Number)
+      case CDouble(_) => tpes.contains(ParseType.Number)
+      case CNum(_) => tpes.contains(ParseType.Number)
+
+      case _ => false
+    }
+
+  def interpretMask(mask: Mask, rvalue: RValue): Option[RValue] = {
+
+    // recurse down:
+    // remove structure which is definitely not needed based on the current cpaths
+    //
+    // build up:
+    // only retain if type checks
+    def inner(masks: Map[List[CPathNode], Set[ParseType]], rvalue: RValue): Option[RValue] = {
+
+      val prefixes: Set[CPathNode] = masks.keySet collect {
+        case head :: _ => head
+      }
+
+      def relevantMasks(prefix: CPathNode): Map[List[CPathNode], Set[ParseType]] =
+        masks collect {
+          case (`prefix` :: tail, tpes) => (tail, tpes)
         }
 
-      case (_, _) => None
+      if (masks.isEmpty) {
+        None
+      } else {
+        (rvalue, masks.get(Nil)) match {
+          case (rv, Some(tpes)) =>
+            if (maskTarget(tpes, rv))
+              Some(rv) // stop because we subsume
+            else
+              inner(masks - Nil, rvalue) // continue with the disjunction
+
+          case (RObject(fields), None) =>
+            val result: Map[String, Option[RValue]] = fields map {
+              case (field, rv) =>
+                val cpath = CPathField(field)
+
+                if (prefixes.contains(cpath))
+                  (field, inner(relevantMasks(cpath), rv))
+                else
+                  (field, None)
+            }
+            val back: Map[String, RValue] = result collect {
+              case (field, Some(x)) => (field, x)
+            }
+            if (back.isEmpty)
+              None
+            else
+              Some(RObject(back))
+
+          case (RArray(elems), None) =>
+            val result: List[Option[RValue]] = elems.zipWithIndex map {
+              case (elem, idx) =>
+                if (prefixes.contains(CPathIndex(idx)))
+                  inner(relevantMasks(CPathIndex(idx)), elem)
+                else
+                  None
+            }
+            val back: List[RValue] = result collect {
+              case (Some(x)) => x
+            }
+            if (back.isEmpty)
+              None
+            else
+              Some(RArray(back))
+
+          case (_, None) => None
+        }
+      }
     }
 
-  /* Shifts the provided `RValue`, returning the shifted rows and omitting
-   * unused fields.
-   *
-   * The empty list is returned when the input row is not required
-   * to evaluate the query.
-   */
-  def interpret(rvalue: RValue, shiftInfo: ShiftInfo): List[RValue] = {
-    val shiftKey: String = shiftInfo.shiftKey.key
-
-    val target: Option[RValue] =
-      compositeValueAtPath(shiftInfo.shiftPath.path, shiftInfo.shiftType, rvalue)
-
-    target match {
-      case Some(RObject(fields)) => shiftInfo.idStatus match {
-        case IdOnly =>
-          fields.foldLeft(List[RValue]()) {
-            case (acc, (k, _)) => RObject((shiftKey, CString(k))) :: acc
-          }
-        case IncludeId => // the qscript expects the results to be returned in an array
-          fields.foldLeft(List[RValue]()) {
-            case (acc, (k, v)) => RObject((shiftKey, RArray(CString(k), v))) :: acc
-          }
-        case ExcludeId =>
-          fields.foldLeft(List[RValue]()) {
-            case (acc, (_, v)) => RObject((shiftKey, v)) :: acc
-          }
-      }
-
-      case Some(RArray(elems)) => shiftInfo.idStatus match {
-        case IdOnly =>
-          0.until(elems.length).toList.map(idx => RObject((shiftKey, CLong(idx))))
-
-        case IncludeId => // the qscript expects the results to be returned in an array
-          val (_, res) = elems.foldLeft((0, List[RValue]())) {
-            case ((idx, acc), elem) =>
-              (idx + 1, RObject((shiftKey, RArray(CLong(idx), elem))) :: acc)
-          }
-          res.reverse
-
-        case ExcludeId =>
-          elems.map(elem => RObject((shiftKey, elem)))
-      }
-
-      case _ =>  Nil // omit rows that cannot be shifted
+    val input = mask.masks map {
+      case (k, v) => (k.nodes, v)
     }
+
+    inner(input, rvalue)
+  }
+
+  def interpretPivot(pivot: Pivot, rvalue: RValue): List[RValue] = {
+    val structure: CompositeParseType = pivot.structure
+    val status: IdStatus = pivot.idStatus
+
+    def inner(remaining: List[CPathNode], rvalue: RValue): List[RValue] =
+      remaining match {
+        // perform the pivot
+        case Nil => {
+          (rvalue, structure) match {
+
+            // pivot object
+            case (RObject(fields), ParseType.Object) => {
+              val pivoted: List[RValue] = status match {
+                case IdOnly =>
+                  fields.foldLeft(List[RValue]()) {
+                    case (acc, (k, _)) => CString(k) :: acc
+                  }
+                case IncludeId => // the qscript expects the results to be returned in an array
+                  fields.foldLeft(List[RValue]()) {
+                    case (acc, (k, v)) => RArray(CString(k), v) :: acc
+                  }
+                case ExcludeId =>
+                  fields.foldLeft(List[RValue]()) {
+                    case (acc, (_, v)) => v :: acc
+                  }
+              }
+              pivoted.reverse
+            }
+
+            // pivot array
+            case (RArray(elems), ParseType.Array) =>
+              status match {
+                case IdOnly =>
+                  0.until(elems.length).toList.map(CLong(_))
+                case IncludeId => // the qscript expects the results to be returned in an array
+                  val (_, res) = elems.foldLeft((0, List[RValue]())) {
+                    case ((idx, acc), elem) =>
+                      (idx + 1, RArray(CLong(idx), elem) :: acc)
+                  }
+                  res.reverse
+                case ExcludeId => elems
+              }
+
+            // pivot empty object drops the row
+            case (CEmptyObject, ParseType.Object) => Nil
+
+            // pivot empty array drops the row
+            case (CEmptyArray, ParseType.Array) => Nil
+
+            case (v, t) =>
+              scala.sys.error(s"No surrounding structure allowed when pivoting. Received: ${(v, t)}")
+          }
+        }
+
+        // recurse on an object deref
+        case CPathField(field) :: tail => rvalue match {
+          case obj @ RObject(fields) =>
+            fields.toList match {
+              case (`field`, target) :: Nil =>
+                inner(tail, target).map(v => RObject((field, v)))
+              case _ =>
+                scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $obj")
+            }
+          case rv =>
+            scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $rv")
+        }
+
+        // recurse on an array deref
+        case CPathIndex(0) :: tail => rvalue match {
+          case arr @ RArray(target :: Nil) =>
+            inner(tail, target).map(v => RArray(List(v)))
+          case rv =>
+            scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $rv")
+        }
+
+        case nodes =>
+          scala.sys.error(s"Cannot pivot through $nodes")
+      }
+
+    inner(pivot.path.nodes, rvalue)
+  }
+
+  def interpretWrap(wrap: Wrap, rvalue: RValue): RValue = {
+
+    def inner(remaining: List[CPathNode], rvalue: RValue): RValue =
+      (remaining, rvalue) match {
+        case (Nil, rv) => RObject((wrap.name, rv))
+
+        case (CPathField(field) :: tail, obj @ RObject(fields)) =>
+          fields.get(field).map(target =>
+            RObject(fields.updated(field, inner(tail, target)))).getOrElse(obj)
+
+        case (CPathIndex(idx) :: tail, arr @ RArray(elems)) =>
+          if ((idx < elems.length) && (idx >= 0))
+            RArray(elems.updated(idx, inner(tail, elems(idx))))
+          else
+            arr
+
+        case (_, rv) => rv
+      }
+
+    inner(wrap.path.nodes, rvalue)
   }
 }
