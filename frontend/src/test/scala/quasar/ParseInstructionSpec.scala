@@ -20,6 +20,8 @@ import quasar.common.CPath
 
 import org.specs2.matcher.Matcher
 
+import java.lang.String
+
 abstract class ParseInstructionSpec
     extends JsonSpec
     with ParseInstructionSpec.IdsSpec
@@ -30,7 +32,119 @@ abstract class ParseInstructionSpec
 object ParseInstructionSpec {
   // TODO these things too
   trait IdsSpec extends JsonSpec
-  trait WrapSpec extends JsonSpec
+
+  trait WrapSpec extends JsonSpec {
+    protected final type Wrap = ParseInstruction.Wrap
+    protected final val Wrap = ParseInstruction.Wrap
+
+    "wrap" should {
+      "nest scalars at ." in {
+        val input = ldjson("""
+          1
+          "hi"
+          true
+          """)
+
+        val expected = ldjson("""
+          { "foo": 1 }
+          { "foo": "hi" }
+          { "foo": true }
+          """)
+
+        input must wrapInto(CPath.parse("."), "foo")(expected)
+      }
+
+      "nest vectors at ." in {
+        val input = ldjson("""
+          [1, 2, 3]
+          { "a": "hi", "b": { "c": null } }
+          [{ "d": {} }]
+          """)
+
+        val expected = ldjson("""
+          { "bar": [1, 2, 3] }
+          { "bar": { "a": "hi", "b": { "c": null } } }
+          { "bar": [{ "d": {} }] }
+          """)
+
+        input must wrapInto(CPath.parse("."), "bar")(expected)
+      }
+
+      "nest scalars at .a.b" in {
+        val input = ldjson("""
+          { "a": { "b": 1 } }
+          { "a": { "b": "hi" } }
+          { "a": { "b": true } }
+          """)
+
+        val expected = ldjson("""
+          { "a": { "b": { "foo": 1 } } }
+          { "a": { "b": { "foo": "hi" } } }
+          { "a": { "b": { "foo": true } } }
+          """)
+
+        input must wrapInto(CPath.parse(".a.b"), "foo")(expected)
+      }
+
+      "nest scalars at .a[1] with surrounding structure" in {
+        val input = ldjson("""
+          { "a": [null, 1, "nada"] }
+          { "a": [[], "hi"] }
+          { "a": [null, true, "nada"] }
+          """)
+
+        val expected = ldjson("""
+          { "a": [null, { "bin": 1 }, "nada"] }
+          { "a": [[], { "bin": "hi" }] }
+          { "a": [null, { "bin": true }, "nada"] }
+          """)
+
+        input must wrapInto(CPath.parse(".a[1]"), "bin")(expected)
+      }
+
+      "nest vectors at .a.b" in {
+        val input = ldjson("""
+          { "a": { "b": [1, 2, 3] } }
+          { "a": { "b": { "a": "hi", "b": { "c": null } } } }
+          { "a": { "b": [{ "d": {} }] } }
+          """)
+
+        val expected = ldjson("""
+          { "a": { "b": { "bar": [1, 2, 3] } } }
+          { "a": { "b": { "bar": { "a": "hi", "b": { "c": null } } } } }
+          { "a": { "b": { "bar": [{ "d": {} }] } } }
+          """)
+
+        input must wrapInto(CPath.parse(".a.b"), "bar")(expected)
+      }
+
+      "retain surrounding structure with scalars at .a.b" in {
+        val input = ldjson("""
+          { "z": null, "a": { "b": 1 }, "d": false, "b": [] }
+          { "z": [], "a": { "b": "hi" }, "d": "to be or not to be", "b": { "a": 321} }
+          { "z": { "a": { "b": 3.14 } }, "a": { "b": true }, "d": {} }
+          """)
+
+        val expected = ldjson("""
+          { "z": null, "a": { "b": { "qux": 1 } }, "d": false, "b": [] }
+          { "z": [], "a": { "b": { "qux": "hi" } }, "d": "to be or not to be", "b": { "a": 321} }
+          { "z": { "a": { "b": 3.14 } }, "a": { "b": { "qux": true } }, "d": {} }
+          """)
+
+        input must wrapInto(CPath.parse(".a.b"), "foo")(expected)
+      }
+    }
+
+    def evalWrap(pivot: Wrap, stream: JsonStream): JsonStream
+
+    def wrapInto(
+        path: CPath,
+        name: String)(
+        expected: JsonStream)
+        : Matcher[JsonStream] =
+      bestSemanticEqual(expected) ^^ { str: JsonStream => evalWrap(Wrap(path, name), str)}
+  }
+
   trait MasksSpec extends JsonSpec
 
   trait PivotSpec extends JsonSpec {

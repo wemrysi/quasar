@@ -21,7 +21,7 @@ import quasar.ParseInstructionSpec
 import tectonic.AsyncParser
 import tectonic.test.{Event, ReifiedTerminalPlate}
 
-object TectonicParseInstructionSpec extends ParseInstructionSpec {
+object TectonicParseInstructionSpec extends ParseInstructionSpec.PivotSpec {
   type JsonStream = List[Event]
 
   def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream = {
