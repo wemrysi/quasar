@@ -16,11 +16,13 @@
 
 package quasar.mimir.evaluate
 
-import quasar.{IdStatus, ParseInstruction}
+import quasar.{IdStatus, ParseInstruction, ParseType}
 import quasar.common.{CPathField, CPathIndex, CPathMeta, CPathNode}
 import quasar.yggdrasil.table.CPathPlate
 
 import tectonic.{DelegatingPlate, Plate, Signal}
+
+import scala.annotation.tailrec
 
 // currently assumes retain = false, meaning you *cannot* have any non-shifted stuff in the row
 final class PivotPlate[A](
@@ -37,7 +39,10 @@ final class PivotPlate[A](
   // if this is true, it means we're under the focus and might unnest once without moving
   private var underFocus = false
   private var suppress = false
+
+  // we pivoted at least once
   private var pivoted = false
+  private var pivotedTwice = false
 
   // we can't trust nextIndex.head because it only considers post-shift data
   private var focusedArrayIndex = 0
@@ -45,6 +50,9 @@ final class PivotPlate[A](
   private val IdOnly = IdStatus.IdOnly
   private val IncludeId = IdStatus.IncludeId
   // private val ExcludeId = IdStatus.ExcludeId
+
+  private val ObjectStruct = ParseType.Object
+  private val ArrayStruct = ParseType.Array
 
   override def nul(): Signal = {
     if (suppress)
@@ -70,8 +78,9 @@ final class PivotPlate[A](
   override def map(): Signal = {
     if (suppress) {
       Signal.Continue
-    } else if (atFocus()) {
+    } else if (atFocus() && (structure eq ObjectStruct)) {
       pivoted = true
+      pivotedTwice = true   // because we don't unnest. it's a bit weird
       Signal.Continue
     } else {
       super.map()
@@ -81,8 +90,9 @@ final class PivotPlate[A](
   override def arr(): Signal = {
     if (suppress) {
       Signal.Continue
-    } else if (atFocus()) {
+    } else if (atFocus() && (structure eq ArrayStruct)) {
       pivoted = true
+      pivotedTwice = true   // because we don't unnest. it's a bit weird
       Signal.Continue
     } else {
       super.arr()
@@ -106,6 +116,11 @@ final class PivotPlate[A](
   // TODO suppress nestMap?
   override def nestMap(pathComponent: CharSequence): Signal = {
     if (atFocus() && !underFocus) {
+      if (pivoted) {
+        renest(cursor)
+        pivotedTwice = true
+      }
+
       val back = if (idStatus eq IdOnly) {
         super.str(pathComponent)
         suppress = true
@@ -131,6 +146,11 @@ final class PivotPlate[A](
 
   override def nestArr(): Signal = {
     if (atFocus() && !underFocus) {
+      if (pivoted) {
+        renest(cursor)
+        pivotedTwice = true
+      }
+
       val back = if (idStatus eq IdOnly) {
         super.num(focusedArrayIndex.toString, -1, -1)
         suppress = true
@@ -156,6 +176,11 @@ final class PivotPlate[A](
 
   override def nestMeta(pathComponent: CharSequence): Signal = {
     if (atFocus() && !underFocus) {
+      if (pivoted) {
+        renest(cursor)
+        pivotedTwice = true
+      }
+
       val back = if (idStatus eq IdOnly) {
         super.str(pathComponent)
         suppress = true
@@ -191,25 +216,6 @@ final class PivotPlate[A](
         super.unnest()   // get out of the second array component
       }
 
-      // we just unnested once at the focus
-      def renest(cursor: List[CPathNode]): Unit = cursor match {
-        case hd :: tail =>
-          super.unnest()
-          renest(tail)
-
-          hd match {
-            case CPathField(field) => super.nestMap(field)
-            case CPathIndex(_) => super.nestArr()
-            case CPathMeta(field) => super.nestMeta(field)
-            case c => sys.error(s"impossible component $c")
-          }
-
-          ()
-
-        case Nil => super.finishRow()
-      }
-
-      renest(cursor)
       underFocus = false
       suppress = false
 
@@ -224,9 +230,42 @@ final class PivotPlate[A](
   override def finishRow(): Unit = {
     if (!pivoted) {
       super.finishRow()
+    } else if (pivotedTwice) {
+      @tailrec
+      def unnestAll(cursor: List[CPathNode]): Unit = cursor match {
+        case _ :: tail =>
+          super.unnest()
+          unnestAll(cursor)
+
+        case Nil =>
+          super.finishRow()
+      }
+
+      unnestAll(cursor)
     }
+
     pivoted = false
+    pivotedTwice = false
+
     focusedArrayIndex = 0
+  }
+
+  // we just hit the focus and nested a non-first time
+  private def renest(cursor: List[CPathNode]): Unit = cursor match {
+    case hd :: tail =>
+      super.unnest()
+      renest(tail)
+
+      hd match {
+        case CPathField(field) => super.nestMap(field)
+        case CPathIndex(_) => super.nestArr()
+        case CPathMeta(field) => super.nestMeta(field)
+        case c => sys.error(s"impossible component $c")
+      }
+
+      ()
+
+    case Nil => super.finishRow()
   }
 
   private def atFocus(): Boolean = cursor == rfocus

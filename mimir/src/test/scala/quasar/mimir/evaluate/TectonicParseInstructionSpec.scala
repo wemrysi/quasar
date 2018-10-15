@@ -21,14 +21,28 @@ import quasar.ParseInstructionSpec
 import tectonic.AsyncParser
 import tectonic.test.{Event, ReifiedTerminalPlate}
 
-import org.specs2.matcher.Matcher
-
 object TectonicParseInstructionSpec extends ParseInstructionSpec {
   type JsonStream = List[Event]
 
   def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream = {
+    import Event._
+
     val plate = new PivotPlate(pivot, new ReifiedTerminalPlate)
-    ReifiedTerminalPlate.visit(stream, plate)
+
+    // remove no-op nesting (paired adjacent nest/unnest)
+    val (_, backV) = ReifiedTerminalPlate.visit(stream, plate).foldLeft((Vector[Event](), Vector[Event]())) {
+      case ((Vector(), acc), Unnest) => (Vector(), acc :+ Unnest)
+
+      case ((buffer, acc), n @ NestMap(_)) => (buffer :+ n, acc)
+      case ((buffer, acc), NestArr) => (buffer :+ NestArr, acc)
+      case ((buffer, acc), n @ NestMeta(_)) => (buffer :+ n, acc)
+
+      case ((buffer, acc), Unnest) => (buffer.dropRight(1), acc)
+
+      case ((buffer, acc), e) => (Vector(), acc ++ buffer :+ e)
+    }
+
+    backV.toList
   }
 
   protected def ldjson(str: String): JsonStream = {

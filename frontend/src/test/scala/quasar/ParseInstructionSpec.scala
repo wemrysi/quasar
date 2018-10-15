@@ -108,6 +108,77 @@ object ParseInstructionSpec {
           input must pivotInto(CPath.parse("."), IdStatus.IncludeId, ParseType.Array)(expected)
         }
       }
+
+      "shift an array at .a.b (with no surrounding structure)" >> {
+        val input = ldjson("""
+          { "a": { "b": [1, 2, 3] } }
+          { "a": { "b": [4, 5, 6] } }
+          { "a": { "b": [7, 8, 9, 10] } }
+          { "a": { "b": [11] } }
+          { "a": { "b": [] } }
+          { "a": { "b": [12, 13] } }
+          """)
+
+        "ExcludeId" >> {
+          val expected = ldjson("""
+            { "a": { "b": 1 } }
+            { "a": { "b": 2 } }
+            { "a": { "b": 3 } }
+            { "a": { "b": 4 } }
+            { "a": { "b": 5 } }
+            { "a": { "b": 6 } }
+            { "a": { "b": 7 } }
+            { "a": { "b": 8 } }
+            { "a": { "b": 9 } }
+            { "a": { "b": 10 } }
+            { "a": { "b": 11 } }
+            { "a": { "b": 12 } }
+            { "a": { "b": 13 } }
+            """)
+
+          input must pivotInto(CPath.parse(".a.b"), IdStatus.ExcludeId, ParseType.Array)(expected)
+        }
+
+        "IdOnly" >> {
+          val expected = ldjson("""
+            { "a": { "b": 0 } }
+            { "a": { "b": 1 } }
+            { "a": { "b": 2 } }
+            { "a": { "b": 0 } }
+            { "a": { "b": 1 } }
+            { "a": { "b": 2 } }
+            { "a": { "b": 0 } }
+            { "a": { "b": 1 } }
+            { "a": { "b": 2 } }
+            { "a": { "b": 3 } }
+            { "a": { "b": 0 } }
+            { "a": { "b": 0 } }
+            { "a": { "b": 1 } }
+            """)
+
+          input must pivotInto(CPath.parse(".a.b"), IdStatus.IdOnly, ParseType.Array)(expected)
+        }
+
+        "IncludeId" >> {
+          val expected = ldjson("""
+            { "a": { "b": [0, 1] } }
+            { "a": { "b": [1, 2] } }
+            { "a": { "b": [2, 3] } }
+            { "a": { "b": [0, 4] } }
+            { "a": { "b": [1, 5] } }
+            { "a": { "b": [2, 6] } }
+            { "a": { "b": [0, 7] } }
+            { "a": { "b": [1, 8] } }
+            { "a": { "b": [2, 9] } }
+            { "a": { "b": [3, 10] } }
+            { "a": { "b": [0, 11] } }
+            { "a": { "b": [0, 12] } }
+            { "a": { "b": [1, 13] } }
+            """)
+
+          input must pivotInto(CPath.parse(".a.b"), IdStatus.IncludeId, ParseType.Array)(expected)
+        }
+      }
     }
 
     def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream
