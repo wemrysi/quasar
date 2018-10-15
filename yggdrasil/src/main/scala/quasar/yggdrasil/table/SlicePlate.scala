@@ -17,10 +17,10 @@
 package quasar.yggdrasil
 package table
 
-import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta}
+import quasar.common.CPath
 import quasar.precog.common._
 
-import tectonic.{Enclosure, Plate, Signal}
+import tectonic.{Plate, Signal}
 
 import scala.collection.mutable
 
@@ -125,14 +125,6 @@ private[table] final class SlicePlate
     col(size) = s.toString
 
     Signal.Continue
-  }
-
-  def enclosure(): Enclosure = cursor match {
-    case CPathIndex(_) :: _ => Enclosure.Array
-    case CPathField(_) :: _ => Enclosure.Map
-    case CPathMeta(_) :: _ => Enclosure.Meta
-    case CPathArray :: _ => sys.error("no")
-    case Nil => Enclosure.None
   }
 
   final override def finishRow(): Unit = {

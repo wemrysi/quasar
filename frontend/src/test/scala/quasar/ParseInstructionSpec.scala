@@ -60,7 +60,7 @@ object ParseInstructionSpec {
           [2, true]
           """)
 
-        input must idInto(expected)
+        input must assignIdsTo(expected)
       }
 
       "wrap each vector row in monotonic integers" in {
@@ -76,14 +76,14 @@ object ParseInstructionSpec {
           [2, [{ "d": {} }]]
           """)
 
-        input must idInto(expected)
+        input must assignIdsTo(expected)
       }
     }
 
-    def evalId(stream: JsonStream): JsonStream
+    def evalIds(stream: JsonStream): JsonStream
 
-    def idInto(expected: JsonStream) : Matcher[JsonStream] =
-      bestSemanticEqual(expected) ^^ { str: JsonStream => evalId(str) }
+    def assignIdsTo(expected: JsonStream) : Matcher[JsonStream] =
+      bestSemanticEqual(expected) ^^ { str: JsonStream => evalIds(str) }
   }
 
   trait WrapSpec extends JsonSpec {

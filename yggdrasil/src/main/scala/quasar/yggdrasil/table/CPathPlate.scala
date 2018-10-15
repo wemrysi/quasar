@@ -17,9 +17,9 @@
 package quasar.yggdrasil
 package table
 
-import quasar.common.{CPathNode, CPathField, CPathIndex, CPathMeta}
+import quasar.common.{CPathArray, CPathField, CPathIndex, CPathMeta, CPathNode}
 
-import tectonic.{Plate, Signal}
+import tectonic.{Enclosure, Plate, Signal}
 
 trait CPathPlate[A] extends Plate[A] {
   protected var cursor: List[CPathNode] = Nil
@@ -54,5 +54,13 @@ trait CPathPlate[A] extends Plate[A] {
   abstract override def finishRow(): Unit = {
     nextIndex = 0 :: Nil
     super.finishRow()
+  }
+
+  final override def enclosure(): Enclosure = cursor match {
+    case CPathIndex(_) :: _ => Enclosure.Array
+    case CPathField(_) :: _ => Enclosure.Map
+    case CPathMeta(_) :: _ => Enclosure.Meta
+    case CPathArray :: _ => sys.error("no")
+    case Nil => Enclosure.None
   }
 }

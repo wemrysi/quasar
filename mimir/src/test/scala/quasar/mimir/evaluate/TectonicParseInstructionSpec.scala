@@ -18,19 +18,31 @@ package quasar.mimir.evaluate
 
 import quasar.ParseInstructionSpec
 
-import tectonic.AsyncParser
+import tectonic.{AsyncParser, Plate}
 import tectonic.test.{Event, ReifiedTerminalPlate}
 
-object TectonicParseInstructionSpec extends ParseInstructionSpec.PivotSpec {
+object TectonicParseInstructionSpec
+    extends ParseInstructionSpec.PivotSpec
+    with ParseInstructionSpec.IdsSpec {
+
   type JsonStream = List[Event]
 
-  def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream = {
+  def evalIds(stream: JsonStream): JsonStream =
+    evalPlate(stream)(new IdsPlate(_))
+
+  def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream =
+    evalPlate(stream)(new PivotPlate(pivot, _))
+
+  private def evalPlate(stream: JsonStream)(f: Plate[List[Event]] => Plate[List[Event]]): JsonStream = {
+    val plate = f(new ReifiedTerminalPlate)
+    stripNoOps(ReifiedTerminalPlate.visit(stream, plate))
+  }
+
+  // remove no-op nesting (paired adjacent nest/unnest)
+  private def stripNoOps(stream: JsonStream): JsonStream = {
     import Event._
 
-    val plate = new PivotPlate(pivot, new ReifiedTerminalPlate)
-
-    // remove no-op nesting (paired adjacent nest/unnest)
-    val (_, backV) = ReifiedTerminalPlate.visit(stream, plate).foldLeft((Vector[Event](), Vector[Event]())) {
+    val (_, backV) = stream.foldLeft((Vector[Event](), Vector[Event]())) {
       case ((Vector(), acc), Unnest) => (Vector(), acc :+ Unnest)
 
       case ((buffer, acc), n @ NestMap(_)) => (buffer :+ n, acc)
