@@ -19,7 +19,7 @@ package table
 
 import quasar.common.{CPathArray, CPathField, CPathIndex, CPathMeta, CPathNode}
 
-import tectonic.{Enclosure, Plate, Signal}
+import tectonic.{DelegatingPlate, Enclosure, Plate, Signal}
 
 trait CPathPlate[A] extends Plate[A] {
   protected var cursor: List[CPathNode] = Nil
@@ -63,4 +63,10 @@ trait CPathPlate[A] extends Plate[A] {
     case CPathArray :: _ => sys.error("no")
     case Nil => Enclosure.None
   }
+}
+
+object CPathPlate {
+  // this is kind of a hack for now. we should probably think about the meaning of enclosure()
+  def wrapWithSoundEnclosure[A](plate: Plate[A]): Plate[A] =
+    new DelegatingPlate(plate) with CPathPlate[A]
 }
