@@ -30,7 +30,7 @@ abstract class ParseInstructionSpec
     extends JsonSpec
     with ParseInstructionSpec.IdsSpec
     with ParseInstructionSpec.WrapSpec
-    with ParseInstructionSpec.MasksSpec
+    with ParseInstructionSpec.MaskSpec
     with ParseInstructionSpec.PivotSpec
 
 object ParseInstructionSpec {
@@ -198,7 +198,7 @@ object ParseInstructionSpec {
       bestSemanticEqual(expected) ^^ { str: JsonStream => evalWrap(Wrap(CPath.parse(path), name), str)}
   }
 
-  trait MasksSpec extends JsonSpec {
+  trait MaskSpec extends JsonSpec {
     import ParseType._
 
     protected final type Mask = ParseInstruction.Mask
