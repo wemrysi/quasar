@@ -184,7 +184,7 @@ object ParseInstructionSpec {
           { "z": { "a": { "b": 3.14 } }, "a": { "b": { "qux": true } }, "d": {} }
           """)
 
-        input must wrapInto(".a.b", "foo")(expected)
+        input must wrapInto(".a.b", "qux")(expected)
       }
     }
 

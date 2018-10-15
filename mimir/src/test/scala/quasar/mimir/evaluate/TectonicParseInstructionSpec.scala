@@ -23,9 +23,13 @@ import tectonic.test.{Event, ReifiedTerminalPlate}
 
 object TectonicParseInstructionSpec
     extends ParseInstructionSpec.PivotSpec
-    with ParseInstructionSpec.IdsSpec {
+    with ParseInstructionSpec.IdsSpec
+    with ParseInstructionSpec.WrapSpec {
 
   type JsonStream = List[Event]
+
+  def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream =
+    evalPlate(stream)(new WrapPlate(wrap, _))
 
   def evalIds(stream: JsonStream): JsonStream =
     evalPlate(stream)(new IdsPlate(_))
