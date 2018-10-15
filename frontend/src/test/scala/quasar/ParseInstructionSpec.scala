@@ -30,8 +30,57 @@ abstract class ParseInstructionSpec
     with ParseInstructionSpec.PivotSpec
 
 object ParseInstructionSpec {
-  // TODO these things too
-  trait IdsSpec extends JsonSpec
+
+  /*
+   * Please note that this is currently *over*-specified.
+   * We don't technically need monotonic ids or even numerical
+   * ones, we just need *unique* identities. That assertion is
+   * quite hard to encode though. If we find we need such an
+   * implementation in the future, these assertions should be
+   * changed.
+   */
+  trait IdsSpec extends JsonSpec {
+    protected final val Ids = ParseInstruction.Ids
+
+    "ids" should {
+      "wrap each scalar row in monotonic integers" in {
+        val input = ldjson("""
+          1
+          "hi"
+          true
+          """)
+
+        val expected = ldjson("""
+          [0, 1]
+          [1, "hi"]
+          [2, true]
+          """)
+
+        input must idInto(expected)
+      }
+
+      "wrap each vector row in monotonic integers" in {
+        val input = ldjson("""
+          [1, 2, 3]
+          { "a": "hi", "b": { "c": null } }
+          [{ "d": {} }]
+          """)
+
+        val expected = ldjson("""
+          [0, [1, 2, 3]]
+          [1, { "a": "hi", "b": { "c": null } }]
+          [2, [{ "d": {} }]]
+          """)
+
+        input must idInto(expected)
+      }
+    }
+
+    def evalId(stream: JsonStream): JsonStream
+
+    def idInto(expected: JsonStream) : Matcher[JsonStream] =
+      bestSemanticEqual(expected) ^^ { str: JsonStream => evalId(str) }
+  }
 
   trait WrapSpec extends JsonSpec {
     protected final type Wrap = ParseInstruction.Wrap
