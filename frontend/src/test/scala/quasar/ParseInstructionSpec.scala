@@ -179,6 +179,148 @@ object ParseInstructionSpec {
           input must pivotInto(CPath.parse(".a.b"), IdStatus.IncludeId, ParseType.Array)(expected)
         }
       }
+
+      "shift an object at identity" >> {
+        val input = ldjson("""
+          { "a": 1, "b": 2, "c": 3 }
+          { "d": 4, "e": 5, "f": 6 }
+          { "g": 7, "h": 8, "i": 9, "j": 10 }
+          { "k": 11 }
+          {}
+          { "l": 12, "m": 13 }
+          """)
+
+        "ExcludeId" >> {
+          val expected = ldjson("""
+            1
+            2
+            3
+            4
+            5
+            6
+            7
+            8
+            9
+            10
+            11
+            12
+            13
+            """)
+
+          input must pivotInto(CPath.parse("."), IdStatus.ExcludeId, ParseType.Object)(expected)
+        }
+
+        "IdOnly" >> {
+          val expected = ldjson("""
+            "a"
+            "b"
+            "c"
+            "d"
+            "e"
+            "f"
+            "g"
+            "h"
+            "i"
+            "j"
+            "k"
+            "l"
+            "m"
+            """)
+
+          input must pivotInto(CPath.parse("."), IdStatus.IdOnly, ParseType.Object)(expected)
+        }
+
+        "IncludeId" >> {
+          val expected = ldjson("""
+            ["a", 1]
+            ["b", 2]
+            ["c", 3]
+            ["d", 4]
+            ["e", 5]
+            ["f", 6]
+            ["g", 7]
+            ["h", 8]
+            ["i", 9]
+            ["j", 10]
+            ["k", 11]
+            ["l", 12]
+            ["m", 13]
+            """)
+
+          input must pivotInto(CPath.parse("."), IdStatus.IncludeId, ParseType.Object)(expected)
+        }
+      }
+
+      "shift an object at .a.b (no surrounding structure)" >> {
+        val input = ldjson("""
+          { "a": { "b": { "a": 1, "b": 2, "c": 3 } } }
+          { "a": { "b": { "d": 4, "e": 5, "f": 6 } } }
+          { "a": { "b": { "g": 7, "h": 8, "i": 9, "j": 10 } } }
+          { "a": { "b": { "k": 11 } } }
+          { "a": { "b": {} } }
+          { "a": { "b": { "l": 12, "m": 13 } } }
+          """)
+
+        "ExcludeId" >> {
+          val expected = ldjson("""
+            { "a": { "b": 1 } }
+            { "a": { "b": 2 } }
+            { "a": { "b": 3 } }
+            { "a": { "b": 4 } }
+            { "a": { "b": 5 } }
+            { "a": { "b": 6 } }
+            { "a": { "b": 7 } }
+            { "a": { "b": 8 } }
+            { "a": { "b": 9 } }
+            { "a": { "b": 10 } }
+            { "a": { "b": 11 } }
+            { "a": { "b": 12 } }
+            { "a": { "b": 13 } }
+            """)
+
+          input must pivotInto(CPath.parse(".a.b"), IdStatus.ExcludeId, ParseType.Object)(expected)
+        }
+
+        "IdOnly" >> {
+          val expected = ldjson("""
+            { "a": { "b": "a" } }
+            { "a": { "b": "b" } }
+            { "a": { "b": "c" } }
+            { "a": { "b": "d" } }
+            { "a": { "b": "e" } }
+            { "a": { "b": "f" } }
+            { "a": { "b": "g" } }
+            { "a": { "b": "h" } }
+            { "a": { "b": "i" } }
+            { "a": { "b": "j" } }
+            { "a": { "b": "k" } }
+            { "a": { "b": "l" } }
+            { "a": { "b": "m" } }
+            """)
+
+          input must pivotInto(CPath.parse(".a.b"), IdStatus.IdOnly, ParseType.Object)(expected)
+        }
+
+        "IncludeId" >> {
+          val expected = ldjson("""
+            { "a": { "b": ["a", 1] } }
+            { "a": { "b": ["b", 2] } }
+            { "a": { "b": ["c", 3] } }
+            { "a": { "b": ["d", 4] } }
+            { "a": { "b": ["e", 5] } }
+            { "a": { "b": ["f", 6] } }
+            { "a": { "b": ["g", 7] } }
+            { "a": { "b": ["h", 8] } }
+            { "a": { "b": ["i", 9] } }
+            { "a": { "b": ["j", 10] } }
+            { "a": { "b": ["k", 11] } }
+            { "a": { "b": ["l", 12] } }
+            { "a": { "b": ["m", 13] } }
+            """)
+
+          input must pivotInto(CPath.parse(".a.b"), IdStatus.IncludeId, ParseType.Object)(expected)
+        }
+      }
     }
 
     def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream
