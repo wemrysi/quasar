@@ -21,12 +21,12 @@ import quasar.ParseInstructionSpec
 import tectonic.{AsyncParser, Plate}
 import tectonic.test.{Event, ReifiedTerminalPlate}
 
-object TectonicParseInstructionSpec
-    extends ParseInstructionSpec.PivotSpec
-    with ParseInstructionSpec.IdsSpec
-    with ParseInstructionSpec.WrapSpec {
+object TectonicParseInstructionSpec extends ParseInstructionSpec {
 
   type JsonStream = List[Event]
+
+  def evalMask(mask: Mask, stream: JsonStream): JsonStream =
+    evalPlate(stream)(new MaskPlate(mask, _))
 
   def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream =
     evalPlate(stream)(new WrapPlate(wrap, _))

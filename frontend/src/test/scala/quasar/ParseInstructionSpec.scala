@@ -408,6 +408,36 @@ object ParseInstructionSpec {
 
         input must maskInto(".a.c" -> Set(Boolean), ".c" -> Set(Array))(expected)
       }
+
+      "subsume inner by outer" in {
+        val input = ldjson("""
+          { "a": { "b": 42, "c": true }, "c": [] }
+          """)
+
+        val expected = ldjson("""
+          { "a": { "b": 42, "c": true } }
+          """)
+
+        input must maskInto(".a.b" -> Set(Boolean), ".a" -> Set(Object))(expected)
+      }
+
+      "disallow the wrong sort of vector" in {
+        val input = ldjson("""
+          { "a": true }
+          [1, 2, 3]
+          """)
+
+        val expected1 = ldjson("""
+          { "a": true }
+          """)
+
+        val expected2 = ldjson("""
+          [1, 2, 3]
+          """)
+
+        input must maskInto("." -> Set(Object))(expected1)
+        input must maskInto("." -> Set(Array))(expected2)
+      }
     }
 
     def evalMask(mask: Mask, stream: JsonStream): JsonStream
