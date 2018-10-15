@@ -32,11 +32,11 @@ sealed abstract class ParseInstruction extends Product with Serializable
 object ParseInstruction {
 
   /**
-   * Generates one unique identity per row. Creates a top-level object with
-   * `idName` providing the unique identity and `valueName` providing the
-   * original value.
+   * Generates one unique identity per row. Creates a top-level array with
+   * the identities in the first component, the original values in the second.
+   * Just like `Pivot` with `IdStatus.IncludeId`.
    */
-  final case class Ids(idName: String, valueName: String) extends ParseInstruction
+  case object Ids extends ParseInstruction
 
   /**
    * Wraps the provided `path` into an object with key `name`, thus adding
@@ -85,7 +85,7 @@ object ParseInstruction {
 
   implicit val parseInstructionEqual: Equal[ParseInstruction] =
     Equal.equal {
-      case (Ids(i1, v1), Ids(i2, v2)) => i1 === i2 && v1 === v2
+      case (Ids, Ids) => true
       case (Wrap(p1, n1), Wrap(p2, n2)) => p1 === p2 && n1 === n2
       case (Masks(m1), Masks(m2)) => m1 === m2
       case (Pivot(p1, i1, s1), Pivot(p2, i2, s2)) => p1 === p2 && i1 === i2 && s1 === s2
@@ -94,7 +94,7 @@ object ParseInstruction {
 
   implicit val parseInstructionShow: Show[ParseInstruction] =
     Show.show {
-      case Ids(i, v) => Cord("Ids(") ++ i.show ++ Cord(", ") ++ v.show ++ Cord(")")
+      case Ids => Cord("Ids")
       case Wrap(p, n) => Cord("Wrap(") ++ p.show ++ Cord(", ") ++ n.show ++ Cord(")")
       case Masks(m) => Cord("Masks(") ++ m.show ++ Cord(")")
       case Pivot(p, i, s) =>
