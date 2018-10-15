@@ -20,10 +20,10 @@ import slamdata.Predef._
 
 import quasar.common.CPath
 
-import scalaz.{Cord, Equal, Order, Show}
+import scalaz.{Cord, Equal, Show}
+import scalaz.std.map._
 import scalaz.std.set._
 import scalaz.std.string._
-import scalaz.std.tuple._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
 
@@ -45,17 +45,11 @@ object ParseInstruction {
   final case class Wrap(path: CPath, name: String) extends ParseInstruction
 
   /**
-   * Removes all values that are not both at the path `path` and of the type `tpe`.
-   *
-   * A `Mask` is not a `ParseInstruction` and must be constructed with `Masks`.
+   *`Masks` represents the disjunction of the provided `masks`. An empty map indicates
+   * that all values should be dropped. Removes all values which are not in one of the
+   * path/type designations. The inner set is assumed to be non-empty.
    */
-  final case class Mask(path: CPath, tpe: ParseType)
-
-  /**
-   *`Masks` represents the disjunction of the provided `masks`. An empty set indicates
-   * that all values should be dropped.
-   */
-  final case class Masks(masks: Set[Mask]) extends ParseInstruction
+  final case class Masks(masks: Map[CPath, Set[ParseType]]) extends ParseInstruction
 
   /**
    * Pivots the indices and keys out of arrays and objects, respectively,
@@ -77,11 +71,6 @@ object ParseInstruction {
       extends ParseInstruction
 
   ////
-
-  implicit val maskShow: Show[Mask] = Show.show(m =>
-    Cord("Mask(") ++ m.path.show ++ Cord(", ") ++ m.tpe.show ++ Cord(")"))
-
-  implicit val maskOrder: Order[Mask] = Order.orderBy(m => (m.path, m.tpe))
 
   implicit val parseInstructionEqual: Equal[ParseInstruction] =
     Equal.equal {
