@@ -438,6 +438,10 @@ object ParseInstructionSpec {
         input must maskInto("." -> Set(Object))(expected1)
         input must maskInto("." -> Set(Array))(expected2)
       }
+
+      "compact surrounding array" in {
+        ldjson("[1, 2, 3]") must maskInto("[1]" -> Set(Number))(ldjson("[2]"))
+      }
     }
 
     def evalMask(mask: Mask, stream: JsonStream): JsonStream

@@ -143,12 +143,14 @@ final class MaskPlate[A](
     if (underValidVector) {
       super.nestArr()
     } else if (!(extraCursor eq Nil)) {
+      incrementIndex()
       extraCursor ::= c
       Signal.SkipColumn
     } else if (vectorLoci.contains(cursor) && vectorLoci(cursor).contains(ParseType.Array)) {
       underValidVector = true
       super.nestArr()
     } else if (!prefixes.contains(c :: cursor)) {
+      incrementIndex()
       extraCursor ::= c
       Signal.SkipColumn
     } else {

@@ -32,8 +32,8 @@ trait CPathPlate[A] extends Plate[A] {
   }
 
   abstract override def nestArr(): Signal = {
-    val idx :: tail = nextIndex
-    nextIndex = 0 :: (idx + 1) :: tail
+    val idx = incrementIndex()
+    nextIndex ::= 0
 
     cursor ::= CPathIndex(idx)
     super.nestArr()
@@ -62,6 +62,13 @@ trait CPathPlate[A] extends Plate[A] {
     case CPathMeta(_) :: _ => Enclosure.Meta
     case CPathArray :: _ => sys.error("no")
     case Nil => Enclosure.None
+  }
+
+  protected final def incrementIndex(): Int = {
+    val idx :: tail = nextIndex
+    nextIndex = (idx + 1) :: tail
+
+    idx
   }
 }
 
