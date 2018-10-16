@@ -493,7 +493,7 @@ object ParseInstructionSpec {
         input must maskInto(".a.b.c" -> Set(Boolean), ".b.c" -> Set(Array))(expected)
       }
 
-      "compose disjunctively across paths where one side is false (right) (vector)" in {
+      "compose disjunctively across paths where one side is false" in {
         val input = ldjson("""
           { "a": { "b": 42, "c": true } }
           """)
@@ -503,18 +503,6 @@ object ParseInstructionSpec {
           """)
 
         input must maskInto(".a.c" -> Set(Boolean), ".a" -> Set(Array))(expected)
-      }
-
-      "compose disjunctively across paths where one side is false (left) (vector)" in {
-        val input = ldjson("""
-          { "a": { "b": 42, "c": true } }
-          """)
-
-        val expected = ldjson("""
-          { "a": { "c": true } }
-          """)
-
-        input must maskInto(".a" -> Set(Array), ".a.c" -> Set(Boolean))(expected)
       }
 
       "subsume inner by outer" in {
