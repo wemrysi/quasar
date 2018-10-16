@@ -17,22 +17,28 @@
 package quasar.yggdrasil
 package table
 
-import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta, CPathNode}
+import quasar.common.CPath
 import quasar.precog.common._
 
-import tectonic.{Enclosure, Plate, Signal}
+import tectonic.{Plate, Signal}
 
 import scala.collection.mutable
 
-private[table] final class SlicePlate extends Plate[List[Slice]] {
+private[table] abstract class EmptyFinishRowPlate[A] extends Plate[A] {
+  def finishRow() = ()
+}
+
+private[table] final class SlicePlate
+    extends EmptyFinishRowPlate[List[Slice]]    // <3 Scala
+    with ContinuingNestPlate[List[Slice]]
+    with CPathPlate[List[Slice]] {
+
   private val MaxLongStrLength = Long.MinValue.toString.length
 
   private var nextThreshold = Config.defaultMinRows
 
   private var size = 0    // rows in process don't count toward size
   private val columns = mutable.Map[ColumnRef, ArrayColumn[_]]()
-  private var cursor: List[CPathNode] = Nil
-  private var nextIndex: List[Int] = 0 :: Nil
 
   private val completed = mutable.ListBuffer[Slice]()
 
@@ -121,43 +127,9 @@ private[table] final class SlicePlate extends Plate[List[Slice]] {
     Signal.Continue
   }
 
-  def enclosure(): Enclosure = cursor match {
-    case CPathIndex(_) :: _ => Enclosure.Array
-    case CPathField(_) :: _ => Enclosure.Map
-    case CPathMeta(_) :: _ => Enclosure.Meta
-    case CPathArray :: _ => sys.error("no")
-    case Nil => Enclosure.None
-  }
-
-  def nestMap(pathComponent: CharSequence): Signal = {
-    cursor ::= CPathField(pathComponent.toString)
-    nextIndex ::= 0
-    Signal.Continue
-  }
-
-  def nestArr(): Signal = {
-    val idx :: tail = nextIndex
-    nextIndex = 0 :: (idx + 1) :: tail
-
-    cursor ::= CPathIndex(idx)
-    Signal.Continue
-  }
-
-  def nestMeta(pathComponent: CharSequence): Signal = {
-    cursor ::= CPathMeta(pathComponent.toString)
-    nextIndex ::= 0
-    Signal.Continue
-  }
-
-  def unnest(): Signal = {
-    nextIndex = nextIndex.tail
-    cursor = cursor.tail
-    Signal.Continue
-  }
-
-  def finishRow(): Unit = {
+  final override def finishRow(): Unit = {
+    super.finishRow()
     size += 1
-    nextIndex = 0 :: Nil
 
     if (size > Config.maxSliceRows || columns.size > Config.maxSliceColumns) {
       finishSlice()

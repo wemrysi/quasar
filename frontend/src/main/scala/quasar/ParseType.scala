@@ -34,6 +34,7 @@ object ParseType {
 
   final case object Array extends CompositeParseType
   final case object Object extends CompositeParseType
+  final case object Meta extends CompositeParseType
 
   // ParseType implicits
   implicit val parseTypeShow: Show[ParseType] = Show.showFromToString
@@ -46,6 +47,7 @@ object ParseType {
       case String => 3
       case Array => 4
       case Object => 5
+      case Meta => 6
     }
 
   // CompositeParseType implicits
@@ -55,6 +57,7 @@ object ParseType {
     Order.orderBy[CompositeParseType, Int] {
       case Array => 0
       case Object => 1
+      case Meta => 2
     }
 
   // ScalarParseType implicits
