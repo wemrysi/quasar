@@ -674,6 +674,78 @@ object ParseInstructionSpec {
         }
       }
 
+     "shift an array at .a[0] (with no surrounding structure)" >> {
+        val input = ldjson("""
+          { "a": [ [1, 2, 3] ] }
+          { "a": [ [4, 5, 6] ] }
+          { "a": [ [7, 8, 9, 10] ] }
+          { "a": [ [11] ] }
+          { "a": [ [] ] }
+          { "a": [ [12, 13] ] }
+          """)
+
+        "ExcludeId" >> {
+          val expected = ldjson("""
+            { "a": [ 1 ] }
+            { "a": [ 2 ] }
+            { "a": [ 3 ] }
+            { "a": [ 4 ] }
+            { "a": [ 5 ] }
+            { "a": [ 6 ] }
+            { "a": [ 7 ] }
+            { "a": [ 8 ] }
+            { "a": [ 9 ] }
+            { "a": [ 10 ] }
+            { "a": [ 11 ] }
+            { "a": [ 12 ] }
+            { "a": [ 13 ] }
+            """)
+
+          input must pivotInto(".a[0]", IdStatus.ExcludeId, ParseType.Array)(expected)
+        }
+
+        "IdOnly" >> {
+          val expected = ldjson("""
+            { "a": [ 0 ] }
+            { "a": [ 1 ] }
+            { "a": [ 2 ] }
+            { "a": [ 0 ] }
+            { "a": [ 1 ] }
+            { "a": [ 2 ] }
+            { "a": [ 0 ] }
+            { "a": [ 1 ] }
+            { "a": [ 2 ] }
+            { "a": [ 3 ] }
+            { "a": [ 0 ] }
+            { "a": [ 0 ] }
+            { "a": [ 1 ] }
+            """)
+
+          input must pivotInto(".a[0]", IdStatus.IdOnly, ParseType.Array)(expected)
+        }
+
+        "IncludeId" >> {
+          val expected = ldjson("""
+            { "a": [ [0, 1] ] }
+            { "a": [ [1, 2] ] }
+            { "a": [ [2, 3] ] }
+            { "a": [ [0, 4] ] }
+            { "a": [ [1, 5] ] }
+            { "a": [ [2, 6] ] }
+            { "a": [ [0, 7] ] }
+            { "a": [ [1, 8] ] }
+            { "a": [ [2, 9] ] }
+            { "a": [ [3, 10] ] }
+            { "a": [ [0, 11] ] }
+            { "a": [ [0, 12] ] }
+            { "a": [ [1, 13] ] }
+            """)
+
+          input must pivotInto(".a[0]", IdStatus.IncludeId, ParseType.Array)(expected)
+        }
+      }
+
+
       "shift an object at identity" >> {
         val input = ldjson("""
           { "a": 1, "b": 2, "c": 3 }
@@ -813,6 +885,77 @@ object ParseInstructionSpec {
             """)
 
           input must pivotInto(".a.b", IdStatus.IncludeId, ParseType.Object)(expected)
+        }
+      }
+
+      "shift an object at .a[0] (no surrounding structure)" >> {
+        val input = ldjson("""
+          { "a": [ { "a": 1, "b": 2, "c": 3 } ] }
+          { "a": [ { "d": 4, "e": 5, "f": 6 } ] }
+          { "a": [ { "g": 7, "h": 8, "i": 9, "j": 10 } ] }
+          { "a": [ { "k": 11 } ] }
+          { "a": [ {} ] }
+          { "a": [ { "l": 12, "m": 13 } ] }
+          """)
+
+        "ExcludeId" >> {
+          val expected = ldjson("""
+            { "a": [ 1 ] }
+            { "a": [ 2 ] }
+            { "a": [ 3 ] }
+            { "a": [ 4 ] }
+            { "a": [ 5 ] }
+            { "a": [ 6 ] }
+            { "a": [ 7 ] }
+            { "a": [ 8 ] }
+            { "a": [ 9 ] }
+            { "a": [ 10 ] }
+            { "a": [ 11 ] }
+            { "a": [ 12 ] }
+            { "a": [ 13 ] }
+            """)
+
+          input must pivotInto(".a[0]", IdStatus.ExcludeId, ParseType.Object)(expected)
+        }
+
+        "IdOnly" >> {
+          val expected = ldjson("""
+            { "a": [ "a" ] }
+            { "a": [ "b" ] }
+            { "a": [ "c" ] }
+            { "a": [ "d" ] }
+            { "a": [ "e" ] }
+            { "a": [ "f" ] }
+            { "a": [ "g" ] }
+            { "a": [ "h" ] }
+            { "a": [ "i" ] }
+            { "a": [ "j" ] }
+            { "a": [ "k" ] }
+            { "a": [ "l" ] }
+            { "a": [ "m" ] }
+            """)
+
+          input must pivotInto(".a[0]", IdStatus.IdOnly, ParseType.Object)(expected)
+        }
+
+        "IncludeId" >> {
+          val expected = ldjson("""
+            { "a": [ ["a", 1] ] }
+            { "a": [ ["b", 2] ] }
+            { "a": [ ["c", 3] ] }
+            { "a": [ ["d", 4] ] }
+            { "a": [ ["e", 5] ] }
+            { "a": [ ["f", 6] ] }
+            { "a": [ ["g", 7] ] }
+            { "a": [ ["h", 8] ] }
+            { "a": [ ["i", 9] ] }
+            { "a": [ ["j", 10] ] }
+            { "a": [ ["k", 11] ] }
+            { "a": [ ["l", 12] ] }
+            { "a": [ ["m", 13] ] }
+            """)
+
+          input must pivotInto(".a[0]", IdStatus.IncludeId, ParseType.Object)(expected)
         }
       }
     }
