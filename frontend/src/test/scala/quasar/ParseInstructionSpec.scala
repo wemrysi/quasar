@@ -481,6 +481,30 @@ object ParseInstructionSpec {
         input must maskInto(".a.c" -> Set(Boolean), ".c" -> Set(Array))(expected)
       }
 
+      "compose disjunctively across suffix-overlapped paths" in {
+        val input = ldjson("""
+          { "a": { "x": 42, "b": { "c": true } }, "b": { "c": [] }, "c": [1, 2] }
+          """)
+
+        val expected = ldjson("""
+          { "a": { "b": { "c": true } }, "b": { "c": [] } }
+          """)
+
+        input must maskInto(".a.b.c" -> Set(Boolean), ".b.c" -> Set(Array))(expected)
+      }
+
+      "compose disjunctively across paths where one side is false" in {
+        val input = ldjson("""
+          { "a": { "b": 42, "c": true } }
+          """)
+
+        val expected = ldjson("""
+          { "a": { "c": true } }
+          """)
+
+        input must maskInto(".a.c" -> Set(Boolean), ".a" -> Set(Array))(expected)
+      }
+
       "subsume inner by outer" in {
         val input = ldjson("""
           { "a": { "b": 42, "c": true }, "c": [] }
