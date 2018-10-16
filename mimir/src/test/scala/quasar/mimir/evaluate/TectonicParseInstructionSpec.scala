@@ -18,7 +18,8 @@ package quasar.mimir.evaluate
 
 import quasar.ParseInstructionSpec
 
-import tectonic.{AsyncParser, Plate}
+import tectonic.Plate
+import tectonic.json.Parser
 import tectonic.test.{Event, ReifiedTerminalPlate}
 
 object TectonicParseInstructionSpec extends ParseInstructionSpec {
@@ -63,7 +64,7 @@ object TectonicParseInstructionSpec extends ParseInstructionSpec {
 
   protected def ldjson(str: String): JsonStream = {
     val plate = new ReifiedTerminalPlate
-    val parser = AsyncParser(plate, AsyncParser.ValueStream)
+    val parser = Parser(plate, Parser.ValueStream)
 
     val events1 = parser.absorb(str).right.get
     val events2 = parser.finish().right.get

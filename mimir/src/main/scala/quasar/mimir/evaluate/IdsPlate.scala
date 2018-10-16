@@ -16,7 +16,7 @@
 
 package quasar.mimir.evaluate
 
-import tectonic.{Enclosure, Plate, Signal}
+import tectonic.{Plate, Signal}
 
 final class IdsPlate[A](delegate: Plate[A]) extends Plate[A] {
   private var sawSomething = false
@@ -55,11 +55,6 @@ final class IdsPlate[A](delegate: Plate[A]) extends Plate[A] {
   def str(s: CharSequence): Signal = {
     emitId()
     delegate.str(s)
-  }
-
-  def enclosure(): Enclosure = {
-    emitId()
-    delegate.enclosure()
   }
 
   def nestMap(pathComponent: CharSequence): Signal = {
