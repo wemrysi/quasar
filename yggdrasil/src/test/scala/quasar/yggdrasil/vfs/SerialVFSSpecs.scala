@@ -16,21 +16,20 @@
 
 package quasar.yggdrasil.vfs
 
-import cats.effect.IO
-import cats.syntax.flatMap._
-
-import org.specs2.mutable._
-
-import pathy.Path
-
 import java.io.File
 import java.nio.file.Files
-
-// For cats.effect.Timer[IO]
 import scala.concurrent.ExecutionContext.Implicits.global
+
+import cats.effect.IO
+import cats.syntax.flatMap._
+import org.specs2.mutable._
+import pathy.Path
 import shims._
 
 object SerialVFSSpecs extends Specification {
+
+  implicit val cs = IO.contextShift(global)
+
   "serial vfs facade" should {
     "create a scratch directory, assign a path, work with real files, and list" in {
       val base = Files.createTempDirectory("SerialVFSSpecs").toFile

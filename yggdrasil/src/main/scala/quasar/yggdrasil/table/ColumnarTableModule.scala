@@ -377,6 +377,8 @@ trait ColumnarTableModule
       import fs2.{Chunk, Stream}
       import tectonic.AsyncParser
 
+      implicit val cs = IO.contextShift(ec)
+
       val parser = AsyncParser(new SlicePlate, AsyncParser.ValueStream)
 
       val absorbed: Stream[IO, Chunk[Slice]] =
@@ -408,6 +410,9 @@ trait ColumnarTableModule
         values: fs2.Stream[IO, A])(
         implicit ec: ExecutionContext)
         : M[Table] = {
+
+      implicit val cs = IO.contextShift(ec)
+
       val sliceStream = Slice.allFromQData(values)
 
       for {

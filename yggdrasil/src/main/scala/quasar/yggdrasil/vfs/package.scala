@@ -17,17 +17,17 @@
 package quasar.yggdrasil
 
 import slamdata.Predef.Throwable
-
 import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.fp.free
 
-import cats.StackSafeMonad
-import cats.effect.{IO, Sync}
+import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
+import cats.StackSafeMonad
+import cats.effect.{ContextShift, ExitCase, IO, Sync}
 import iotaz.{CopK, TNilK}
 import iotaz.TListK.:::
-
-import scalaz.{~>, EitherT, Free}
+import scalaz.{EitherT, Free, ~>}
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.either._
@@ -49,6 +49,16 @@ package object vfs {
             ioa => Free.liftF(I(ioa.attempt.map(_.disjunction)))))
         }
 
+
+      def bracketCase[A, B](acquire: Free[S, A])(use: A => Free[S, B])(release: (A, ExitCase[Throwable]) => Free[S, Unit]): Free[S, B] =
+        for {
+          a <- acquire
+          r <- use(a).foldMap(attemptT).run
+          b <- r.fold(
+            t => release(a, ExitCase.error(t)) *> raiseError[B](t),
+            b => release(a, ExitCase.complete).as(b))
+        } yield b
+
       def suspend[A](thunk: => Free[S, A]): Free[S, A] =
         delay(thunk).join
 
@@ -66,5 +76,27 @@ package object vfs {
 
       def flatMap[A, B](fa: Free[S, A])(f: A => Free[S, B]): Free[S, B] =
         fa.flatMap(f)
+    }
+
+  implicit def contextShiftForS[S[a] <: ACopK[a]](
+    implicit
+    ec: ExecutionContext,
+    I: IO :<<: S)
+      : ContextShift[Free[S, ?]] =
+    new ContextShift[Free[S, ?]] {
+      def shift: Free[S, Unit] = Free.liftF(I(IO.contextShift(ec).shift))
+
+      def evalOn[A](ctx: ExecutionContext)(fa: Free[S, A]): Free[S, A] =
+        IO.async[Free[S, A]] { cb =>
+          ctx.execute(new Runnable {
+            override def run(): Unit =
+              try {
+                cb(Right(fa))
+              } catch {
+                case NonFatal(t) => cb(Left(t))
+              }
+          })
+        }.unsafeRunSync()
+
     }
 }

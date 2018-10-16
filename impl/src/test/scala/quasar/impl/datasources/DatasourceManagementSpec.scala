@@ -43,12 +43,12 @@ import argonaut.JsonScalaz._
 import argonaut.Argonaut.{jString, jEmptyObject}
 
 import cats.{Applicative, ApplicativeError, MonadError}
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 
 import eu.timepit.refined.auto._
-import fs2.{Scheduler, Stream}
+import fs2.Stream
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
@@ -98,6 +98,9 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
+  implicit val cs = IO.contextShift(global)
+  implicit val tmr = IO.timer(global)
+
   val evalDelay = 250.millis
 
   val LightT = DatasourceType("light", 1L)
@@ -108,7 +111,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
     def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-    def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
+    def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](config: Json)
         : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath]]] =
       mkDatasource[ResourcePath, F](kind, evalDelay).right.pure[F]
   }
@@ -133,12 +136,8 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
   def withInitialMgmt[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgmt, IO[Running]) => IO[A]): A =
     (for {
-      s <- Scheduler.allocate[IO](1)
-      evalCfg = SstEvalConfig(10L, 1L, 100L)
-      t <- DatasourceManagement[Fix, IO, Int, Double](modules, configured, evalCfg, s._1)
-      (mgmt, run) = t
+      (mgmt, run) <- DatasourceManagement[Fix, IO, Int, Double](modules, configured, SstEvalConfig(10L, 1L, 100L))
       a <- f(mgmt, run.get)
-      _ <- s._2
     } yield a).unsafeRunSync()
 
   def withMgmt[A](f: (Mgmt, IO[Running]) => IO[A]): A =
@@ -398,9 +397,10 @@ object DatasourceManagementSpec {
   final case class CreateErrorException(ce: CreateError[Json])
       extends Exception(Show[DatasourceError[Int, Json]].shows(ce))
 
-  def mkDatasource[Q, F[_]: MonadError[?[_], Throwable]: Timer](
+  def mkDatasource[Q, F[_]: MonadError[?[_], Throwable]](
       kind0: DatasourceType,
-      produceDelay: FiniteDuration)
+      produceDelay: FiniteDuration)(
+      implicit tmr: Timer[F])
       : Disposable[F, Datasource[F, Stream[F, ?], Q]] =
     new Datasource[F, Stream[F, ?], Q] {
       def kind = kind0
@@ -412,8 +412,8 @@ object DatasourceManagementSpec {
             val f = QDataEncode[R].makeBoolean(false)
 
             Stream.emits(List(t, t, f, t, f))
-              .evalMap(r => Timer[F].sleep(produceDelay).as(r))
-              .covary[F].pure[F]
+              .evalMap(r => tmr.sleep(produceDelay).as(r))
+              .pure[F]
           }
         }
 

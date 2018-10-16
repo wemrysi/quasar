@@ -36,20 +36,21 @@ import quasar.run.{Quasar, QuasarError, SqlQuery}
 import quasar.run.implicits._
 import quasar.sql.Query
 
+import java.math.{MathContext, RoundingMode}
+import java.nio.file.{Files, Paths, Path => JPath}
+import java.util.UUID
+
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.matching.Regex
 
-import java.math.{MathContext, RoundingMode}
-import java.nio.file.{Files, Path => JPath, Paths}
-import java.util.UUID
-
 import argonaut._, Argonaut._
-import cats.effect.{Effect, IO, Sync, Timer}
+import cats.effect._
+import cats.effect.concurrent.Deferred
 import eu.timepit.refined.auto._
-import fs2.{io, text, Stream}
-import fs2.async.Promise
+import fs2.{Stream, io, text}
 import matryoshka._
 import org.specs2.execute
 import org.specs2.specification.core.Fragment
@@ -70,6 +71,9 @@ final class Sql2QueryRegressionSpec extends Qspec {
   implicit val streamQuasarError: MonadError_[Stream[IO, ?], QuasarError] =
     MonadError_.facet[Stream[IO, ?]](QuasarError.throwableP)
 
+  implicit val cs = IO.contextShift(global)
+  implicit val tmr = IO.timer(global)
+
   def DataDir(id: UUID) =
     rootDir[Sandboxed] </> dir("datasource") </> dir(id.toString)
 
@@ -79,7 +83,6 @@ final class Sql2QueryRegressionSpec extends Qspec {
   def Q(testsDir: JPath) = for {
     tmpPath <-
       Stream.bracket(IO(Files.createTempDirectory("quasar-test-")))(
-        Stream.emit(_),
         contribFile.deleteRecursively[IO](_))
 
     precog <- Precog.stream(tmpPath.toFile)
@@ -109,11 +112,11 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   val buildSuite =
     for {
-      tdef <- Promise.empty[IO, (Quasar[IO], UUID)]
-      sdown <- Promise.empty[IO, Unit]
+      tdef <- Deferred[IO, (Quasar[IO], UUID)]
+      sdown <- Deferred[IO, Unit]
 
       testsDir <- IO(TestsRoot(Paths.get("")).toAbsolutePath)
-      tests <- regressionTests[IO](testsDir)
+      tests <- regressionTests[IO](testsDir, global)
 
       _ <- Q(testsDir).evalMap(t => tdef.complete(t) *> sdown.get).compile.drain.start
       t <- tdef.get
@@ -122,7 +125,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
       f = (squery: UUID => SqlQuery) =>
         (Stream.force {
           q.queryEvaluator.evaluate(squery(i)).map(_.map(mimir.tableToData))
-        }).flatMap(s => s)
+        }).join
     } yield {
       suiteName >> {
         tests.toList foreach { case (loc, test) =>
@@ -199,11 +202,9 @@ final class Sql2QueryRegressionSpec extends Qspec {
             OrderIgnored
         } | OrderPreserved
 
-    // TODO{fs2}: Chunkiness
     val actNormal =
       act.mapChunks(
-        _.map(deleteFields <<< (_.asJson))
-          .toSegment)
+        _.map(deleteFields <<< (_.asJson)))
 
     exp.predicate(
       exp.rows,
@@ -215,17 +216,17 @@ final class Sql2QueryRegressionSpec extends Qspec {
   /** Returns all the `RegressionTest`s found in the given directory, keyed by
     * file path.
     */
-  def regressionTests[F[_]: Effect: Timer](testDir: JPath)
+  def regressionTests[F[_]: ContextShift: Effect: Timer](testDir: JPath, ec: ExecutionContext)
       : F[Map[RFile, RegressionTest]] =
     descendantsMatching[F](testDir, TestPattern)
-      .flatMap(f => loadRegressionTest[F](f) strengthL asRFile(testDir relativize f))
+      .flatMap(f => loadRegressionTest[F](f, ec) strengthL asRFile(testDir relativize f))
       .compile
       .fold(Map[RFile, RegressionTest]())(_ + _)
 
   /** Loads a `RegressionTest` from the given file. */
-  def loadRegressionTest[F[_]: Effect: Timer](file: JPath): Stream[F, RegressionTest] =
+  def loadRegressionTest[F[_]: ContextShift: Effect: Timer](file: JPath, ec: ExecutionContext): Stream[F, RegressionTest] =
     // all test files right now fit into 8K, which is a reasonable chunk size anyway
-    io.file.readAllAsync[F](file, 8192)
+    io.file.readAll[F](file, ec, 8192)
       .through(text.utf8Decode)
       .reduce(_ + _)
       .flatMap(txt =>

@@ -28,7 +28,7 @@ import quasar.qscript._, PlannerError.InternalError
 import quasar.yggdrasil.{MonadFinalizers, TransSpecModule}
 
 import cats.effect.{IO, LiftIO}
-import fs2.{Segment, Stream}
+import fs2.{Chunk, Stream}
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -132,7 +132,7 @@ final class FederatedShiftedReadPlanner[
         case None => rvalues
         case Some(shiftInfo) =>
           rvalues.mapChunks(chunk =>
-            Segment.seq(chunk.foldLeft(List[RValue]()) {
+            Chunk.seq(chunk.foldLeft(List[RValue]()) {
               case (acc, rv) => Shifting.shiftRValue(rv, shiftInfo) ::: acc
             }))
       }
