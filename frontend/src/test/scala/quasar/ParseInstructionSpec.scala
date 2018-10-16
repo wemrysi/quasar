@@ -139,6 +139,30 @@ object ParseInstructionSpec {
         input must wrapInto(".a.b", "foo")(expected)
       }
 
+      "nest scalars at .a.b keeping rows excluding the target" in {
+        val input = ldjson("""
+          { "a": { "b": 1 } }
+          { "a": { "c": 2 } }
+          { "a": { "b": "hi" } }
+          { "a": { "d": "bye" } }
+          {}
+          []
+          42
+          """)
+
+        val expected = ldjson("""
+          { "a": { "b": { "foo": 1 } } }
+          { "a": { "c": 2 } }
+          { "a": { "b": { "foo": "hi" } } }
+          { "a": { "d": "bye" } }
+          {}
+          []
+          42
+          """)
+
+        input must wrapInto(".a.b", "foo")(expected)
+      }
+
       "nest scalars at .a[1] with surrounding structure" in {
         val input = ldjson("""
           { "a": [null, 1, "nada"] }
@@ -153,6 +177,30 @@ object ParseInstructionSpec {
           """)
 
         input must wrapInto(".a[1]", "bin")(expected)
+      }
+
+      "nest scalars at .a[2] with surrounding structure keeping rows excluding the target" in {
+        val input = ldjson("""
+          { "a": [null, 1, "nada"] }
+          { "a": [[], "hi"] }
+          { "a": [null, true, "nada", "nix", "nil"] }
+          { "a": [] }
+          {}
+          []
+          42
+          """)
+
+        val expected = ldjson("""
+          { "a": [null, 1, { "bin": "nada" }] }
+          { "a": [[], "hi"] }
+          { "a": [null, true, { "bin": "nada" }, "nix", "nil"] }
+          { "a": [] }
+          {}
+          []
+          42
+          """)
+
+        input must wrapInto(".a[2]", "bin")(expected)
       }
 
       "nest vectors at .a.b" in {
@@ -182,6 +230,30 @@ object ParseInstructionSpec {
           { "z": null, "a": { "b": { "qux": 1 } }, "d": false, "b": [] }
           { "z": [], "a": { "b": { "qux": "hi" } }, "d": "to be or not to be", "b": { "a": 321} }
           { "z": { "a": { "b": 3.14 } }, "a": { "b": { "qux": true } }, "d": {} }
+          """)
+
+        input must wrapInto(".a.b", "qux")(expected)
+      }
+
+      "retain surrounding structure with scalars at .a.b keeping rows excluding the target" in {
+        val input = ldjson("""
+          { "z": null, "a": { "b": 1 }, "d": false, "b": [] }
+          { "z": [], "a": { "b": "hi" }, "d": "to be or not to be", "b": { "a": 321} }
+          { "z": { "a": { "b": 3.14 } }, "a": { "c": null }, "d": {} }
+          { "z": { "a": { "b": 3.14 } }, "a": { "b": true }, "d": {} }
+          {}
+          []
+          42
+          """)
+
+        val expected = ldjson("""
+          { "z": null, "a": { "b": { "qux": 1 } }, "d": false, "b": [] }
+          { "z": [], "a": { "b": { "qux": "hi" } }, "d": "to be or not to be", "b": { "a": 321} }
+          { "z": { "a": { "b": 3.14 } }, "a": { "c": null }, "d": {} }
+          { "z": { "a": { "b": 3.14 } }, "a": { "b": { "qux": true } }, "d": {} }
+          {}
+          []
+          42
           """)
 
         input must wrapInto(".a.b", "qux")(expected)
