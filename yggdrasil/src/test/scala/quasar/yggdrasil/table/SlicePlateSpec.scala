@@ -23,7 +23,7 @@ import quasar.precog.JsonTestSupport
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 
-import tectonic.AsyncParser
+import tectonic.json.Parser
 
 object SlicePlateSpec extends Specification with ScalaCheck {
   import JsonTestSupport._
@@ -32,7 +32,7 @@ object SlicePlateSpec extends Specification with ScalaCheck {
     "round trip" in prop { values: List[JValue] =>
       val input = values.mkString("\n")
       val plate = new SlicePlate
-      val parser = AsyncParser(plate, AsyncParser.ValueStream)
+      val parser = Parser(plate, Parser.ValueStream)
 
       (parser.absorb(input), parser.finish()) must beLike {
         case (Right(slices1), Right(slices2)) =>

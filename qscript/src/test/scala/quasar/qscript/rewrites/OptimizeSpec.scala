@@ -158,11 +158,11 @@ object OptimizeSpec extends Qspec {
 
   "ExtraLeftShift rewrite" >> {
 
-    val extraShiftFunc: QSExtra[Fix[QSExtra]] => QSExtra[Fix[QSExtra]] =
-      liftFG[QScriptCore[Fix, ?], QSExtra, Fix[QSExtra]](optimize.extraShift[QSExtra, AFile])
+    val rewriteLeftShiftFunc: QSExtra[Fix[QSExtra]] => QSExtra[Fix[QSExtra]] =
+      liftFG[QScriptCore[Fix, ?], QSExtra, Fix[QSExtra]](optimize.rewriteLeftShift[QSExtra, AFile])
 
-    def extraShift(expr: Fix[QSExtra]): Fix[QSExtra] =
-      expr.transCata[Fix[QSExtra]](extraShiftFunc)
+    def rewriteLeftShift(expr: Fix[QSExtra]): Fix[QSExtra] =
+      expr.transCata[Fix[QSExtra]](rewriteLeftShiftFunc)
 
     "rewrite when the read is shifted at the top-level and only the shifted values are referenced" >> {
       "with IncludeId" >> {
@@ -191,7 +191,7 @@ object OptimizeSpec extends Qspec {
               recFuncE.MakeMapS("v1",
                 recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 1))))
 
-        extraShift(initial) must equal(expected)
+        rewriteLeftShift(initial) must equal(expected)
       }
 
       "with IdOnly" >> {
@@ -215,7 +215,7 @@ object OptimizeSpec extends Qspec {
             recFuncE.MakeMapS("k1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
 
-        extraShift(initial) must equal(expected)
+        rewriteLeftShift(initial) must equal(expected)
       }
 
       "with ExcludeId" >> {
@@ -239,7 +239,7 @@ object OptimizeSpec extends Qspec {
             recFuncE.MakeMapS("v1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
 
-        extraShift(initial) must equal(expected)
+        rewriteLeftShift(initial) must equal(expected)
       }
     }
 
@@ -268,7 +268,7 @@ object OptimizeSpec extends Qspec {
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey))),
           recFuncE.Constant(ejs.bool(true)))
 
-      extraShift(initial) must equal(expected)
+      rewriteLeftShift(initial) must equal(expected)
     }
 
     "rewrite when the shift source is a single projection" >> {
@@ -297,7 +297,7 @@ object OptimizeSpec extends Qspec {
               recFuncE.MakeMapS("v1",
                 recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 1))))
 
-      extraShift(initial) must equal(expected)
+      rewriteLeftShift(initial) must equal(expected)
     }
 
     "rewrite when the shift source is three projections" >> {
@@ -331,7 +331,7 @@ object OptimizeSpec extends Qspec {
               recFuncE.MakeMapS("v1",
                 recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 1))))
 
-      extraShift(initial) must equal(expected)
+      rewriteLeftShift(initial) must equal(expected)
     }
 
     "not rewrite when the shift struct is a (nonsensical) constant" >> {
@@ -346,7 +346,7 @@ object OptimizeSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
 
-      extraShift(initial) must equal(initial)
+      rewriteLeftShift(initial) must equal(initial)
     }
 
     // we can support projection through arrays in the future.
@@ -368,7 +368,7 @@ object OptimizeSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
 
-      extraShift(initial) must equal(initial)
+      rewriteLeftShift(initial) must equal(initial)
     }
 
     // we will need to allow certain static mapfuncs as structs in the future.
@@ -389,7 +389,7 @@ object OptimizeSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
 
-      extraShift(initial) must equal(initial)
+      rewriteLeftShift(initial) must equal(initial)
     }
 
     "not rewrite when the non-shifted data is referenced (via LeftSide)" >> {
@@ -404,7 +404,7 @@ object OptimizeSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.LeftSide))) // LeftSide is referenced
 
-      extraShift(initial) must equal(initial)
+      rewriteLeftShift(initial) must equal(initial)
     }
 
     "not rewrite when the ShiftedRead has IncludeId" >> {
@@ -417,7 +417,7 @@ object OptimizeSpec extends Qspec {
           OnUndefined.Emit,
           funcE.RightSide)
 
-      extraShift(initial) must equal(initial)
+      rewriteLeftShift(initial) must equal(initial)
     }
 
     "not rewrite when the ShiftedRead has IdOnly" >> {
@@ -430,7 +430,7 @@ object OptimizeSpec extends Qspec {
           OnUndefined.Emit,
           funcE.RightSide)
 
-      extraShift(initial) must equal(initial)
+      rewriteLeftShift(initial) must equal(initial)
     }
   }
 

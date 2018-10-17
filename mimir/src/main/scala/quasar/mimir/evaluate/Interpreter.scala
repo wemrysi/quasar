@@ -23,7 +23,7 @@ import quasar.qscript._
 import scalaz.syntax.equal._
 import scalaz.syntax.std.option._
 
-object Shifting {
+object Interpreter {
 
   final case class ShiftInfo(
     shiftPath: ShiftPath,
@@ -62,7 +62,7 @@ object Shifting {
    * The empty list is returned when the input row is not required
    * to evaluate the query.
    */
-  def shiftRValue(rvalue: RValue, shiftInfo: ShiftInfo): List[RValue] = {
+  def interpret(rvalue: RValue, shiftInfo: ShiftInfo): List[RValue] = {
     val shiftKey: String = shiftInfo.shiftKey.key
 
     val target: Option[RValue] =

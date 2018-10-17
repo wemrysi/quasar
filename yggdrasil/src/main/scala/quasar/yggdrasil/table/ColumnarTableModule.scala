@@ -375,11 +375,11 @@ trait ColumnarTableModule
         : M[Table] = {
 
       import fs2.{Chunk, Stream}
-      import tectonic.AsyncParser
+      import tectonic.json.Parser
 
       implicit val cs = IO.contextShift(ec)
 
-      val parser = AsyncParser(new SlicePlate, AsyncParser.ValueStream)
+      val parser = Parser(new SlicePlate, Parser.ValueStream)
 
       val absorbed: Stream[IO, Chunk[Slice]] =
         bytes.chunks evalMap { bc =>

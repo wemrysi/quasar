@@ -44,7 +44,7 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     case qc => QC.inj(qc)
   }
 
-  def extraShift[F[a] <: ACopK[a]: Functor, A](
+  def rewriteLeftShift[F[a] <: ACopK[a]: Functor, A](
       implicit
         ER: Const[InterpretedRead[A], ?] :<<: F,
         SR: Const[ShiftedRead[A], ?] :<<: F,
@@ -148,7 +148,7 @@ object Optimize {
       gtf => QCG.prj(gtf).fold(GF.inject(gtf))(opt.elideNoopMap[F])
 
     val rewrite2: F[T[F]] => F[T[F]] =
-      liftFG[QScriptCore[T, ?], F, T[F]](opt.extraShift[F, A])
+      liftFG[QScriptCore[T, ?], F, T[F]](opt.rewriteLeftShift[F, A])
 
     rewrite1 andThen rewrite2
   }

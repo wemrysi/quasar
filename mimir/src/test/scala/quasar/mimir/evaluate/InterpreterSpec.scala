@@ -24,9 +24,9 @@ import quasar.qscript._
 import scalaz.std.list._
 import scalaz.std.option._
 
-object ShiftingSpec extends Qspec {
+object InterpreterSpec extends Qspec {
 
-  import Shifting.{compositeValueAtPath, shiftRValue, ShiftInfo}
+  import Interpreter.{compositeValueAtPath, interpret, ShiftInfo}
 
   "rvalue shifting" >> {
 
@@ -58,7 +58,7 @@ object ShiftingSpec extends Qspec {
 
       compositeValueAtPath(shiftPath.path, shiftInfo.shiftType, rvalue) must equal(None)
 
-      shiftRValue(rvalue, shiftInfo) must equal(List())
+      interpret(rvalue, shiftInfo) must equal(List())
     }
 
     "return no results when the provided rvalue is an array" >> {
@@ -158,13 +158,13 @@ object ShiftingSpec extends Qspec {
 
       compositeValueAtPath(shiftPath.path, ShiftType.Map, rvalue) must equal(Some(target))
 
-      shiftRValue(rvalue, shiftInfoIncludeId) must equal(
+      interpret(rvalue, shiftInfoIncludeId) must equal(
         List(RObject((shiftKey.key, RArray(CString("target"), CDouble(1.2))))))
 
-      shiftRValue(rvalue, shiftInfoExcludeId) must equal(
+      interpret(rvalue, shiftInfoExcludeId) must equal(
         List(RObject((shiftKey.key, CDouble(1.2)))))
 
-      shiftRValue(rvalue, shiftInfoIdOnly) must equal(
+      interpret(rvalue, shiftInfoIdOnly) must equal(
         List(RObject((shiftKey.key, CString("target")))))
     }
 
@@ -187,17 +187,17 @@ object ShiftingSpec extends Qspec {
 
       compositeValueAtPath(shiftPath.path, ShiftType.Array, rvalue) must equal(Some(target))
 
-      shiftRValue(rvalue, shiftInfoIncludeId) must equal(
+      interpret(rvalue, shiftInfoIncludeId) must equal(
         List(
           RObject((shiftKey.key, RArray(CLong(0), CString("target")))),
           RObject((shiftKey.key, RArray(CLong(1), CDouble(1.2))))))
 
-      shiftRValue(rvalue, shiftInfoExcludeId) must equal(
+      interpret(rvalue, shiftInfoExcludeId) must equal(
         List(
           RObject((shiftKey.key, CString("target"))),
           RObject((shiftKey.key, CDouble(1.2)))))
 
-      shiftRValue(rvalue, shiftInfoIdOnly) must equal(
+      interpret(rvalue, shiftInfoIdOnly) must equal(
         List(
           RObject((shiftKey.key, CLong(0))),
           RObject((shiftKey.key, CLong(1)))))
@@ -225,19 +225,19 @@ object ShiftingSpec extends Qspec {
 
       compositeValueAtPath(shiftPath.path, ShiftType.Map, rvalue) must equal(Some(target))
 
-      shiftRValue(rvalue, shiftInfoIncludeId) must equal(
+      interpret(rvalue, shiftInfoIncludeId) must equal(
         List(
           RObject((shiftKey.key, RArray(CString("target2"), CDouble(1.2)))),
           RObject((shiftKey.key, RArray(CString("target1"), CDouble(1.1)))),
           RObject((shiftKey.key, RArray(CString("target0"), CDouble(1.0))))))
 
-      shiftRValue(rvalue, shiftInfoExcludeId) must equal(
+      interpret(rvalue, shiftInfoExcludeId) must equal(
         List(
           RObject((shiftKey.key, CDouble(1.2))),
           RObject((shiftKey.key, CDouble(1.1))),
           RObject((shiftKey.key, CDouble(1.0)))))
 
-      shiftRValue(rvalue, shiftInfoIdOnly) must equal(
+      interpret(rvalue, shiftInfoIdOnly) must equal(
         List(
           RObject((shiftKey.key, CString("target2"))),
           RObject((shiftKey.key, CString("target1"))),

@@ -20,10 +20,10 @@ import slamdata.Predef._
 
 import quasar.common.CPath
 
-import scalaz.{Cord, Equal, Order, Show}
+import scalaz.{Cord, Equal, Show}
+import scalaz.std.map._
 import scalaz.std.set._
 import scalaz.std.string._
-import scalaz.std.tuple._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
 
@@ -31,29 +31,28 @@ sealed abstract class ParseInstruction extends Product with Serializable
 
 object ParseInstruction {
 
-  /* Generates one unique identity per row. Creates a top-level object with
-   * `idName` providing the unique identity and `valueName` providing the
-   * original value.
+  /**
+   * Generates one unique identity per row. Creates a top-level array with
+   * the identities in the first component, the original values in the second.
+   * Just like `Pivot` with `IdStatus.IncludeId`.
    */
-  final case class Ids(idName: String, valueName: String) extends ParseInstruction
-  
-  /* Wraps the provided `path` into an object with key `name`, thus adding
+  case object Ids extends ParseInstruction
+
+  /**
+   * Wraps the provided `path` into an object with key `name`, thus adding
    * another layer of structure. All other paths are retained.
    */
   final case class Wrap(path: CPath, name: String) extends ParseInstruction
-  
-  /* Removes all values that are not both at the path `path` and of the type `tpe`.
-   *
-   * A `Mask` is not a `ParseInstruction` and must be constructed with `Masks`.
-   */
-  final case class Mask(path: CPath, tpe: ParseType)
 
-  /* `Masks` represents the disjunction of the provided `masks`. An empty set indicates
-   * that all values should be dropped.
+  /**
+   *`Masks` represents the disjunction of the provided `masks`. An empty map indicates
+   * that all values should be dropped. Removes all values which are not in one of the
+   * path/type designations. The inner set is assumed to be non-empty.
    */
-  final case class Masks(masks: Set[Mask]) extends ParseInstruction
-  
-  /* Pivots the indices and keys out of arrays and objects, respectively,
+  final case class Mask(masks: Map[CPath, Set[ParseType]]) extends ParseInstruction
+
+  /**
+   * Pivots the indices and keys out of arrays and objects, respectively,
    * according to the `structure`, maintaining their association with the original
    * corresponding value.
    *
@@ -73,25 +72,20 @@ object ParseInstruction {
 
   ////
 
-  implicit val maskShow: Show[Mask] = Show.show(m =>
-    Cord("Mask(") ++ m.path.show ++ Cord(", ") ++ m.tpe.show ++ Cord(")"))
-
-  implicit val maskOrder: Order[Mask] = Order.orderBy(m => (m.path, m.tpe))
-
   implicit val parseInstructionEqual: Equal[ParseInstruction] =
     Equal.equal {
-      case (Ids(i1, v1), Ids(i2, v2)) => i1 === i2 && v1 === v2
+      case (Ids, Ids) => true
       case (Wrap(p1, n1), Wrap(p2, n2)) => p1 === p2 && n1 === n2
-      case (Masks(m1), Masks(m2)) => m1 === m2
+      case (Mask(m1), Mask(m2)) => m1 === m2
       case (Pivot(p1, i1, s1), Pivot(p2, i2, s2)) => p1 === p2 && i1 === i2 && s1 === s2
       case (_, _) => false
     }
 
   implicit val parseInstructionShow: Show[ParseInstruction] =
     Show.show {
-      case Ids(i, v) => Cord("Ids(") ++ i.show ++ Cord(", ") ++ v.show ++ Cord(")")
+      case Ids => Cord("Ids")
       case Wrap(p, n) => Cord("Wrap(") ++ p.show ++ Cord(", ") ++ n.show ++ Cord(")")
-      case Masks(m) => Cord("Masks(") ++ m.show ++ Cord(")")
+      case Mask(m) => Cord("Mask(") ++ m.show ++ Cord(")")
       case Pivot(p, i, s) =>
         Cord("Pivot(") ++ p.show ++ Cord(", ") ++ i.show ++ Cord(", ") ++ s.show ++ Cord(")")
     }

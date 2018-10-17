@@ -40,7 +40,7 @@ final class FederatedShiftedReadPlanner[
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]](
     val P: Cake) {
 
-  import Shifting.ShiftInfo
+  import Interpreter.ShiftInfo
 
   type Assocs = Associates[T, IO]
   type M[A] = AssociatesT[T, F, IO, A]
@@ -127,17 +127,17 @@ final class FederatedShiftedReadPlanner[
       implicit ec: ExecutionContext)
       : F[P.Table] = {
 
-    val shiftedRValues: Stream[IO, RValue] =
+    val interpretedRValues: Stream[IO, RValue] =
       shift match {
         case None => rvalues
         case Some(shiftInfo) =>
           rvalues.mapChunks(chunk =>
             Chunk.seq(chunk.foldLeft(List[RValue]()) {
-              case (acc, rv) => Shifting.shiftRValue(rv, shiftInfo) ::: acc
+              case (acc, rv) => Interpreter.interpret(rv, shiftInfo) ::: acc
             }))
       }
 
-    P.Table.fromQDataStream[F, RValue](shiftedRValues) map { table =>
+    P.Table.fromQDataStream[F, RValue](interpretedRValues) map { table =>
       import P.trans._
 
       // TODO depending on the id status we may not need to wrap the table
