@@ -79,15 +79,15 @@ package object vfs {
 
   implicit def contextShiftForS[S[a] <: ACopK[a]](
     implicit
-    ec: ExecutionContext,
+    cs: ContextShift[IO],
     I: IO :<<: S)
       : ContextShift[Free[S, ?]] =
     new ContextShift[Free[S, ?]] {
-      def shift: Free[S, Unit] = Free.liftF(I(IO.contextShift(ec).shift))
+      def shift: Free[S, Unit] = Free.liftF(I(cs.shift))
 
       def evalOn[A](ctx: ExecutionContext)(fa: Free[S, A]): Free[S, A] = {
         fa.mapSuspension(
-          λ[S ~> S](ga => I.prj(ga).fold(ga)(ioa => I(IO.contextShift(ec).evalOn(ctx)(ioa)))))
+          λ[S ~> S](ga => I.prj(ga).fold(ga)(ioa => I(cs.evalOn(ctx)(ioa)))))
       }
     }
 }
