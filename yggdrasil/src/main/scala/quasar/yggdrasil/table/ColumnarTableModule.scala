@@ -377,7 +377,7 @@ trait ColumnarTableModule
       import fs2.{Chunk, Stream}
       import tectonic.json.Parser
 
-      val parser = Parser(new SlicePlate, Parser.ValueStream)
+      val parser = Parser(new SlicePlate(precise), Parser.ValueStream)
 
       val absorbed: Stream[IO, Chunk[Slice]] =
         bytes.chunks evalMap { bc =>
