@@ -21,7 +21,6 @@ import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.fp.free
 
 import scala.concurrent.ExecutionContext
-import scala.util.control.NonFatal
 
 import cats.StackSafeMonad
 import cats.effect.{ContextShift, ExitCase, IO, Sync}
@@ -86,17 +85,9 @@ package object vfs {
     new ContextShift[Free[S, ?]] {
       def shift: Free[S, Unit] = Free.liftF(I(IO.contextShift(ec).shift))
 
-      def evalOn[A](ctx: ExecutionContext)(fa: Free[S, A]): Free[S, A] =
-        IO.async[Free[S, A]] { cb =>
-          ctx.execute(new Runnable {
-            override def run(): Unit =
-              try {
-                cb(Right(fa))
-              } catch {
-                case NonFatal(t) => cb(Left(t))
-              }
-          })
-        }.unsafeRunSync()
-
+      def evalOn[A](ctx: ExecutionContext)(fa: Free[S, A]): Free[S, A] = {
+        fa.mapSuspension(
+          λ[S ~> S](ga => I.prj(ga).fold(ga)(ioa => I(IO.contextShift(ec).evalOn(ctx)(ioa)))))
+      }
     }
 }
