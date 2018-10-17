@@ -380,9 +380,6 @@ object PreparationsManagerSpec extends Specification {
             case PreparationEvent.PreparationErrored((), _, _, EvalException) => ok
           }
         })
-
-        status <- Stream.eval(manager.preparationStatus(()))
-        _ <- Stream.eval(IO(status mustEqual Status.Unknown))
       } yield ()
 
       results.compile.drain.unsafeRunTimed(1.second) must beSome
