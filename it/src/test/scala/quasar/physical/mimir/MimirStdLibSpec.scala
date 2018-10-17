@@ -225,9 +225,9 @@ trait PrecogCake extends Scope with AfterAll {
 
   val blockingPool: ExecutionContext
 
-  private val caked = Precog(Files.createTempDirectory("mimir").toFile(), blockingPool).unsafeRunSync
+  private lazy val caked = Precog(Files.createTempDirectory("mimir").toFile(), blockingPool).unsafeRunSync
 
-  val cake = caked.unsafeValue
+  lazy val cake = caked.unsafeValue
 
   def afterAll(): Unit = caked.dispose.unsafeRunSync
 }
