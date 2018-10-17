@@ -18,7 +18,7 @@ package quasar.impl.storage
 
 import slamdata.Predef.{Int, String}
 import quasar.contrib.cats.stateT._
-import quasar.contrib.cats.effect.catsStateTEffect
+import quasar.contrib.cats.effect.stateT.catsStateTEffect
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
