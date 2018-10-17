@@ -75,13 +75,13 @@ final class Precog private (
 
 object Precog extends Logging {
 
-  def apply(dataDir: File)(implicit ec: ExecutionContext): IO[Disposable[IO, Precog]] = {
+  def apply(dataDir: File, blockingPool: ExecutionContext)(implicit ec: ExecutionContext): IO[Disposable[IO, Precog]] = {
 
     implicit val cs = IO.contextShift(ec)
     implicit val csPwIO: ContextShift[POSIXWithIO] = vfs.contextShiftForS
 
     for {
-      vfsd <- SerialVFS[IO](dataDir, ec)
+      vfsd <- SerialVFS[IO](dataDir, blockingPool)
 
       sysd <- IO {
         val sys = ActorSystem(
@@ -97,6 +97,6 @@ object Precog extends Logging {
     } yield pcd
   }
 
-  def stream(dataDir: File)(implicit ec: ExecutionContext): Stream[IO, Precog] =
-    Stream.bracket(apply(dataDir))(_.dispose).flatMap(d => Stream.emit(d.unsafeValue))
+  def stream(dataDir: File, blockingPool: ExecutionContext)(implicit ec: ExecutionContext): Stream[IO, Precog] =
+    Stream.bracket(apply(dataDir, blockingPool))(_.dispose).flatMap(d => Stream.emit(d.unsafeValue))
 }

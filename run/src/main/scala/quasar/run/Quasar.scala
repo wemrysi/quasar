@@ -84,12 +84,13 @@ object Quasar {
   def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer](
       precog: Precog,
       extConfig: ExternalConfig,
-      sstEvalConfig: SstEvalConfig)(
+      sstEvalConfig: SstEvalConfig,
+      blockingPool: ExecutionContext)(
       implicit ec: ExecutionContext)
       : Stream[F, Quasar[F]] = {
 
     for {
-      extMods <- ExternalDatasources[F](extConfig, ec)
+      extMods <- ExternalDatasources[F](extConfig, blockingPool)
 
       modules = extMods.insert(
         LocalDatasourceModule.kind,

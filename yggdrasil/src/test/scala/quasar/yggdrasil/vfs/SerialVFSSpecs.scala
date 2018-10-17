@@ -18,6 +18,8 @@ package quasar.yggdrasil.vfs
 
 import java.io.File
 import java.nio.file.Files
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.IO
@@ -29,12 +31,13 @@ import shims._
 object SerialVFSSpecs extends Specification {
 
   implicit val cs = IO.contextShift(global)
+  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
 
   "serial vfs facade" should {
     "create a scratch directory, assign a path, work with real files, and list" in {
       val base = Files.createTempDirectory("SerialVFSSpecs").toFile
 
-      val test = SerialVFS[IO](base, global).flatMap(_(vfs => for {
+      val test = SerialVFS[IO](base, blockingPool).flatMap(_(vfs => for {
         blob <- vfs.scratch
         version <- vfs.fresh(blob)
         dir <- vfs.underlyingDir(blob, version)
@@ -49,7 +52,7 @@ object SerialVFSSpecs extends Specification {
         _ <- vfs.link(blob, Path.rootDir </> Path.file("foo"))
       } yield ()))
 
-      val test2 = SerialVFS[IO](base, global).flatMap(_(vfs => for {
+      val test2 = SerialVFS[IO](base, blockingPool).flatMap(_(vfs => for {
         ob <- vfs.readPath(Path.rootDir </> Path.file("foo"))
 
         blob <- IO {
@@ -73,7 +76,7 @@ object SerialVFSSpecs extends Specification {
       } yield ()))
 
       val test3 =
-        SerialVFS[IO](base, global).flatMap(_(_.ls(Path.rootDir)))
+        SerialVFS[IO](base, blockingPool).flatMap(_(_.ls(Path.rootDir)))
 
       val result =
         test >> test2 >> test3

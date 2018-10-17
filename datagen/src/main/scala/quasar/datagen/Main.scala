@@ -24,8 +24,9 @@ import quasar.sst._
 import quasar.contrib.iota.copkTraverse
 
 import java.io.File
+import java.util.concurrent.Executors
 import scala.Console, Console.{RED, RESET}
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 
 import cats.effect.{ContextShift, ExitCode, IO, IOApp, Sync}
 import cats.syntax.functor._
@@ -42,19 +43,23 @@ import spire.std.double._
 
 object Main extends IOApp {
 
-  def run(args: List[String]) =
+  def run(args: List[String]) = {
+
+    val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+
     Stream.eval(CliOptions.parse[IO](args))
       .unNone
       .flatMap(opts =>
-        sstsFromFile[IO](opts.sstFile, opts.sstSource)
+        sstsFromFile[IO](opts.sstFile, opts.sstSource, blockingPool)
           .flatMap(generatedJson[IO])
           .take(opts.outSize.value)
           .intersperse("\n")
           .through(text.utf8Encode)
-          .through(file.writeAll[IO](opts.outFile.toPath, global, opts.writeOptions)))
+          .through(file.writeAll[IO](opts.outFile.toPath, blockingPool, opts.writeOptions)))
       .compile
       .drain
       .redeemWith(printErrors, _ => IO.pure(ExitCode.Success))
+  }
 
   ////
 
@@ -71,11 +76,11 @@ object Main extends IOApp {
       .through(codec.ejsonEncodePreciseData[F, EJ])
 
   /** A stream of `SSTS` decoded from the given file. */
-  def sstsFromFile[F[_]: RaiseThrowable: Sync: ContextShift](src: File, kind: SstSource): Stream[F, SSTS] = {
+  def sstsFromFile[F[_]: RaiseThrowable: Sync: ContextShift](src: File, kind: SstSource, blockingPool: ExecutionContext): Stream[F, SSTS] = {
     def decodingErr[A](t: RenderedTree, msg: String): Stream[F, A] =
       failedStream[F, A](s"Failed to decode SST: ${msg}\n\n${t.shows}")
 
-    file.readAll[F](src.toPath, global, 4096)
+    file.readAll[F](src.toPath, blockingPool, 4096)
       .through(text.utf8Decode)
       .through(text.lines)
       .take(1)

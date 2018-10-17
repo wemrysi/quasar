@@ -56,7 +56,7 @@ object ExternalDatasources extends Logging {
   val PluginChunkSize = 8192
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def apply[F[_]: ContextShift: Timer](config: ExternalConfig, ec: ExecutionContext)(
+  def apply[F[_]: ContextShift: Timer](config: ExternalConfig, blockingPool: ExecutionContext)(
       implicit F: ConcurrentEffect[F])
       : Stream[F, IMap[DatasourceType, DatasourceModule]] = {
 
@@ -64,7 +64,7 @@ object ExternalDatasources extends Logging {
       case PluginDirectory(directory) =>
         convert.fromJavaStream(F.delay(Files.list(directory)))
           .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
-          .flatMap(loadPlugin[F](_, ec))
+          .flatMap(loadPlugin[F](_, blockingPool))
 
       case ExplodedDirs(modules) =>
         for {
@@ -130,13 +130,13 @@ object ExternalDatasources extends Logging {
   }
 
   private def loadPlugin[F[_]: ContextShift: Effect: Timer](
-      pluginFile: Path,
-      ec: ExecutionContext)
+    pluginFile: Path,
+    blockingPool: ExecutionContext)
       : Stream[F, DatasourceModule] = {
 
     for {
       js <-
-        file.readAll[F](pluginFile, ec, PluginChunkSize)
+        file.readAll[F](pluginFile, blockingPool, PluginChunkSize)
           .chunks
           .map(_.toByteBuffer)
           .parseJson[Json](AsyncParser.SingleValue)

@@ -39,10 +39,9 @@ import quasar.sql.Query
 import java.math.{MathContext, RoundingMode}
 import java.nio.file.{Files, Paths, Path => JPath}
 import java.util.UUID
-
+import java.util.concurrent.Executors
 import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.matching.Regex
 
@@ -73,6 +72,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   implicit val cs = IO.contextShift(global)
   implicit val tmr = IO.timer(global)
+  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
 
   def DataDir(id: UUID) =
     rootDir[Sandboxed] </> dir("datasource") </> dir(id.toString)
@@ -85,11 +85,11 @@ final class Sql2QueryRegressionSpec extends Qspec {
       Stream.bracket(IO(Files.createTempDirectory("quasar-test-")))(
         contribFile.deleteRecursively[IO](_))
 
-    precog <- Precog.stream(tmpPath.toFile)
+    precog <- Precog.stream(tmpPath.toFile, blockingPool)
 
     evalCfg = SstEvalConfig(1L, 1L, 1L)
 
-    q <- Quasar[IO](precog, ExternalConfig.Empty, SstEvalConfig.single)
+    q <- Quasar[IO](precog, ExternalConfig.Empty, SstEvalConfig.single, blockingPool)
 
     localCfg =
       ("rootDir" := testsDir.toString) ->:
@@ -116,7 +116,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
       sdown <- Deferred[IO, Unit]
 
       testsDir <- IO(TestsRoot(Paths.get("")).toAbsolutePath)
-      tests <- regressionTests[IO](testsDir, global)
+      tests <- regressionTests[IO](testsDir, blockingPool)
 
       _ <- Q(testsDir).evalMap(t => tdef.complete(t) *> sdown.get).compile.drain.start
       t <- tdef.get
@@ -216,17 +216,17 @@ final class Sql2QueryRegressionSpec extends Qspec {
   /** Returns all the `RegressionTest`s found in the given directory, keyed by
     * file path.
     */
-  def regressionTests[F[_]: ContextShift: Effect: Timer](testDir: JPath, ec: ExecutionContext)
+  def regressionTests[F[_]: ContextShift: Effect: Timer](testDir: JPath, blockingPool: ExecutionContext)
       : F[Map[RFile, RegressionTest]] =
     descendantsMatching[F](testDir, TestPattern)
-      .flatMap(f => loadRegressionTest[F](f, ec) strengthL asRFile(testDir relativize f))
+      .flatMap(f => loadRegressionTest[F](f, blockingPool) strengthL asRFile(testDir relativize f))
       .compile
       .fold(Map[RFile, RegressionTest]())(_ + _)
 
   /** Loads a `RegressionTest` from the given file. */
-  def loadRegressionTest[F[_]: ContextShift: Effect: Timer](file: JPath, ec: ExecutionContext): Stream[F, RegressionTest] =
+  def loadRegressionTest[F[_]: ContextShift: Effect: Timer](file: JPath, blockingPool: ExecutionContext): Stream[F, RegressionTest] =
     // all test files right now fit into 8K, which is a reasonable chunk size anyway
-    io.file.readAll[F](file, ec, 8192)
+    io.file.readAll[F](file, blockingPool, 8192)
       .through(text.utf8Decode)
       .reduce(_ + _)
       .flatMap(txt =>

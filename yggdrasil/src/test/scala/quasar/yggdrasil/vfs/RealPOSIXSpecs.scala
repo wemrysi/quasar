@@ -20,6 +20,8 @@ import quasar.precog.util.IOUtils
 
 import java.nio.file.Files
 import java.io.{File, FileInputStream, FileOutputStream}
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
 
 import cats.arrow.FunctionK
@@ -37,6 +39,7 @@ object RealPOSIXSpecs extends Specification {
 
   implicit val ec = global
   implicit val cs = IO.contextShift(global)
+  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
 
   def ioPOSIX(root: File): IO[POSIXOp ~> IO] =
     RealPOSIX[IO](root, global)

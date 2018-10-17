@@ -52,7 +52,7 @@ import shims._
 final class LocalDatasource[F[_]: ContextShift: Timer] private (
     root: JPath,
     readChunkSizeBytes: Int,
-    pool: ExecutionContext)(
+    blockingPool: ExecutionContext)(
     implicit F: Effect[F], RE: MonadResourceErr[F])
     extends LightweightDatasource[F, Stream[F, ?]] {
 
@@ -70,7 +70,7 @@ final class LocalDatasource[F[_]: ContextShift: Timer] private (
           isFile <- F.delay(Files.isRegularFile(jp))
           _ <- isFile.unlessM(RE.raiseError(notAResource(path)))
         } yield {
-          io.file.readAll[F](jp, pool, readChunkSizeBytes)
+          io.file.readAll[F](jp, blockingPool, readChunkSizeBytes)
             .chunks
             .map(_.toByteBuffer)
             .parseJsonStream[R]
@@ -119,7 +119,7 @@ object LocalDatasource {
   def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer](
       root: JPath,
       readChunkSizeBytes: Int,
-      pool: ExecutionContext)
+      blockingPool: ExecutionContext)
       : Datasource[F, Stream[F, ?], ResourcePath] =
-    new LocalDatasource[F](root, readChunkSizeBytes, pool)
+    new LocalDatasource[F](root, readChunkSizeBytes, blockingPool)
 }

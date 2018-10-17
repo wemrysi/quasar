@@ -27,7 +27,8 @@ import quasar.mimir.Precog
 import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
 
 import java.nio.file.Path
-import scala.concurrent.ExecutionContext.Implicits.global
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 
 import cats.arrow.FunctionK
 import cats.effect._
@@ -55,13 +56,13 @@ object Main extends IOApp {
       _ <- Stream.eval(Paths.mkdirs[F](pluginDir))
     } yield (dataDir, pluginDir)
 
-  def quasarStream[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer]
+  def quasarStream[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer](blockingPool: ExecutionContext)
       : Stream[F, Quasar[F]] =
     for {
       (dataPath, pluginPath) <- paths[F]
-      precog <- Precog.stream(dataPath.toFile).translate(λ[FunctionK[IO, F]](_.to[F]))
+      precog <- Precog.stream(dataPath.toFile, blockingPool).translate(λ[FunctionK[IO, F]](_.to[F]))
       evalCfg = SstEvalConfig(1000L, 2L, 250L)
-      q <- Quasar[F](precog, ExternalConfig.PluginDirectory(pluginPath), evalCfg)
+      q <- Quasar[F](precog, ExternalConfig.PluginDirectory(pluginPath), evalCfg, blockingPool)
     } yield q
 
   def repl[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
@@ -74,8 +75,9 @@ object Main extends IOApp {
     } yield l
 
   override def run(args: List[String]): IO[ExitCode] = {
+    val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
     val s: Stream[IOT, ExitCode] =
-      quasarStream[IOT] >>= { q: Quasar[IOT] =>
+      quasarStream[IOT](blockingPool) >>= { q: Quasar[IOT] =>
         Stream.eval(repl(q))
       }
     s.compile.last.run.map(_._2.getOrElse(ExitCode.Success))

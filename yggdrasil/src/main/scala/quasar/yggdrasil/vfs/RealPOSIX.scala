@@ -35,7 +35,7 @@ import scala.concurrent.ExecutionContext
 object RealPOSIX {
   import POSIXOp._
 
-  def apply[F[_]](root: File, ec: ExecutionContext)(implicit F: Sync[F], cs: ContextShift[POSIXWithIO]): F[POSIXOp ~> F] = {
+  def apply[F[_]](root: File, blockingPool: ExecutionContext)(implicit F: Sync[F], cs: ContextShift[POSIXWithIO]): F[POSIXOp ~> F] = {
     def canonicalize(path: APath): File =
       new File(root, Path.posixCodec.printPath(path))
 
@@ -48,7 +48,7 @@ object RealPOSIX {
           val ptarget = canonicalize(target).toPath()
 
           val stream =
-            readAll[POSIXWithIO](ptarget, ec, 4096).chunks.map(c => ByteVector(c.toArray))
+            readAll[POSIXWithIO](ptarget, blockingPool, 4096).chunks.map(c => ByteVector(c.toArray))
 
           F.pure(stream)
 
@@ -58,7 +58,7 @@ object RealPOSIX {
           val cmap: Stream[POSIXWithIO, ByteVector] => Stream[POSIXWithIO, Byte] =
             _.map(_.toArray).map(Chunk.bytes).flatMap(Stream.chunk(_).covary[POSIXWithIO])
 
-          val sink = writeAll[POSIXWithIO](ptarget, ec).compose(cmap)
+          val sink = writeAll[POSIXWithIO](ptarget, blockingPool).compose(cmap)
           F.pure(sink)
 
         case Ls(target) =>

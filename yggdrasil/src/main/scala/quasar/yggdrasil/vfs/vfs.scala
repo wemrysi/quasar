@@ -606,7 +606,7 @@ object SerialVFS {
    * TODO: Return a `Stream[F, SerialVFS[F]]` to allow for better resource
    *       handling once we're rid of `BackendModule`.
    */
-  def apply[F[_]: Concurrent](root: File, pool: ExecutionContext)(implicit cs: ContextShift[POSIXWithIO])
+  def apply[F[_]: Concurrent](root: File, blockingPool: ExecutionContext)(implicit cs: ContextShift[POSIXWithIO])
       : F[Disposable[F, SerialVFS[F]]] = {
 
     import shims.monadToScalaz
@@ -614,7 +614,7 @@ object SerialVFS {
     val ioToF = λ[IO ~> F](LiftIO[F].liftIO(_))
 
     for {
-      pint <- RealPOSIX[F](root, pool)
+      pint <- RealPOSIX[F](root, blockingPool)
       interp = CopK.NaturalTransformation.of[S, F](pint, ioToF)
       vfs <- FreeVFS.init[S](Path.rootDir).foldMap(interp)
 
