@@ -46,50 +46,49 @@ object convert {
       .flatMap(s => Stream.unfoldEval(s.iterator)(getNext))
   }
 
-
   // scalaz.StreamT
 
-   def fromChunkedStreamT[F[_]: Functor, A](chunks: StreamT[F, Chunk[A]]): Stream[F, A] =
-     Stream.unfoldChunkEval(chunks)(_.step.map(_(
-       yieldd = (c, st) => Some((c, st))
-     , skip = st => Some((Chunk.empty, st))
-     , done = None)))
+  def fromChunkedStreamT[F[_]: Functor, A](chunks: StreamT[F, Chunk[A]]): Stream[F, A] =
+    Stream.unfoldChunkEval(chunks)(_.step.map(_(
+      yieldd = (c, st) => Some((c, st))
+    , skip = st => Some((Chunk.empty, st))
+    , done = None)))
 
-   def fromStreamT[F[_]: Functor, A](st: StreamT[F, A]): Stream[F, A] =
-     fromChunkedStreamT(st.map(a => Chunk.singleton(a): Chunk[A]))
+  def fromStreamT[F[_]: Functor, A](st: StreamT[F, A]): Stream[F, A] =
+    fromChunkedStreamT(st.map(a => Chunk.singleton(a): Chunk[A]))
 
-   def toStreamT[F[_]: Concurrent, A](
-       s: Stream[F, A])
-       : F[Disposable[F, StreamT[F, A]]] =
-     chunkQ(s) map { case (startQ, close) =>
-       Disposable(
-         StreamT.wrapEffect(startQ.map(q =>
-           for {
-             c <- StreamT.unfoldM(q)(_.dequeue1.map(_.flatMap(_.toOption).strengthR(q)))
-             a <- StreamT.unfoldM(0)(i => (i < c.size).option((c(i), i + 1)).point[F])
-           } yield a)),
-         close)
-     }
+  def toStreamT[F[_]: Concurrent, A](
+    s: Stream[F, A])
+      : F[Disposable[F, StreamT[F, A]]] =
+    chunkQ(s) map { case (startQ, close) =>
+      Disposable(
+        StreamT.wrapEffect(startQ.map(q =>
+          for {
+            c <- StreamT.unfoldM(q)(_.dequeue1.map(_.flatMap(_.toOption).strengthR(q)))
+            a <- StreamT.unfoldM(0)(i => (i < c.size).option((c(i), i + 1)).point[F])
+          } yield a)),
+        close)
+    }
 
   ////
 
-   private def chunkQ[F[_], A](s: Stream[F, A])(implicit F: Concurrent[F])
-       : F[(F[Queue[F, Option[Either[Throwable, Chunk[A]]]]], F[Unit])] =
-     SignallingRef[F, Boolean](false) map { i =>
-       val startQ = for {
-         q <- Queue.bounded[F, Option[Either[Throwable, Chunk[A]]]](1)
+  private def chunkQ[F[_], A](s: Stream[F, A])(implicit F: Concurrent[F])
+      : F[(F[Queue[F, Option[Either[Throwable, Chunk[A]]]]], F[Unit])] =
+    SignallingRef[F, Boolean](false) map { i =>
+      val startQ = for {
+        q <- Queue.bounded[F, Option[Either[Throwable, Chunk[A]]]](1)
 
-         enqueue =
-           s.chunks
-             .attempt
-             .noneTerminate
-             .interruptWhen(i)
-             .to(q.enqueue)
-             .handleErrorWith(t => Stream.eval(q.enqueue1(Some(Left(t)))))
+        enqueue =
+          s.chunks
+            .attempt
+            .noneTerminate
+            .interruptWhen(i)
+            .to(q.enqueue)
+            .handleErrorWith(t => Stream.eval(q.enqueue1(Some(Left(t)))))
 
-         _ <- F.start(enqueue.compile.drain)
-       } yield q
+        _ <- F.start(enqueue.compile.drain)
+      } yield q
 
-       (startQ, i.set(true))
-     }
+      (startQ, i.set(true))
+    }
 }
