@@ -42,7 +42,7 @@ object RealPOSIXSpecs extends Specification {
   val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
 
   def ioPOSIX(root: File): IO[POSIXOp ~> IO] =
-    RealPOSIX[IO](root, global)
+    RealPOSIX[IO](root, blockingPool)
 
   "real posix interpreter" should {
     "mkdir on root if non-existent" in {
