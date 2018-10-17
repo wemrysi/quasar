@@ -54,7 +54,12 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, Strin
 
   val lookupSchema: UUID => IO[Option[String]] =
     uuid => {
-      IO(Some(uuid.toString))
+      for {
+        l <- pTableStore.lookup(uuid)
+      } yield l match {
+        case Some(s) => Some(s)
+        case _ => None
+      }
     }
 
   val evaluator: QueryEvaluator[IO, String, String] =

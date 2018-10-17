@@ -134,7 +134,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D, 
       }
     }
 
-    "error when requesting schema of nonexistant talbe" >>* {
+    "error when requesting schema of nonexistent talbe" >>* {
       for {
         id <- uniqueId.point[F]
         result <- tables.preparedSchema(id)
@@ -149,13 +149,11 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D, 
       for {
         errorOrId <- tables.createTable(table1)
         id <- isSuccess(errorOrId)
-        //statusId <- tables.preparationStatus(id)
         result <- tables.preparedSchema(id)
       } yield {
         result must beLike {
-          case \/-(PreparationResult.Unavailable(i)) => {
+          case \/-(PreparationResult.Unavailable(i)) =>
             i must_= id
-          }
         }
       }
     }

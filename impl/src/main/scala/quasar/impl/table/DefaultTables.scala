@@ -151,14 +151,11 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
   def preparedSchema(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, S]] =
     tableStore.lookup(tableId).flatMap {
       case Some(_) =>
-        lookupFromPTableStore(tableId).flatMap {
-          case Some(_) => lookupTableSchema(tableId).map {
-            case Some(s) =>
-              PreparationResult.Available[I, S](tableId, s).right
-            case None =>
-              PreparationResult.Unavailable[I, S](tableId).right
-          }
-          case None => (PreparationResult.Unavailable[I, S](tableId): PreparationResult[I, S]).right.pure[F]
+        lookupTableSchema(tableId).map {
+          case Some(s) =>
+            PreparationResult.Available[I, S](tableId, s).right
+          case None =>
+            PreparationResult.Unavailable[I, S](tableId).right
         }
       case None =>
         (TableNotFound(tableId): ExistenceError[I]).left.pure[F]

@@ -34,10 +34,9 @@ import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.table.{DefaultTables, PreparationsManager}
 import quasar.mimir.{MimirRepr, Precog}
 import quasar.mimir.evaluate.MimirQueryFederation
-import quasar.mimir.storage.{MimirIndexedStore, MimirPTableStore, StoreKey}
+import quasar.mimir.storage.{MimirIndexedStore, MimirPTableStore, PTableSchema, StoreKey}
 import quasar.run.implicits._
 import quasar.run.optics._
-import quasar.yggdrasil.PTableSchema
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext

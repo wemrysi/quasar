@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
+package quasar.mimir.storage
 
 import quasar.precog.common.ColumnRef
 import slamdata.Predef.Set

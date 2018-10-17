@@ -23,10 +23,11 @@ import quasar.contrib.fs2.convert._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz.MonadError_
 import quasar.mimir.MimirCake.Cake
-import quasar.yggdrasil.{Config, ExactSize, PTableSchema}
+import quasar.niflheim.NIHDB
+import quasar.precog.common.ColumnRef
+import quasar.yggdrasil.{Config, ExactSize}
 import quasar.yggdrasil.nihdb.SegmentsWrapper
 import quasar.yggdrasil.vfs.ResourceError
-import quasar.niflheim.NIHDB
 import quasar.yggdrasil.nihdb.NIHDBProjection
 
 import cats.arrow.FunctionK
@@ -133,9 +134,14 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
       }
 
       cols <- LiftIO[F].liftIO(IO.fromFutureShift(IO(db.structure))).liftM[OptionT]
-    } yield PTableSchema(cols)
+    } yield {
+      cols match {
+        case (s: Set[ColumnRef]) if !s.isEmpty => Some(PTableSchema(s))
+        case (s: Set[ColumnRef]) if s.isEmpty => None
+      }
+    }
 
-    optColRef.run
+    optColRef.run.flatMap(x => x.getOrElse(None).pure[F])
   }
 
 
