@@ -538,6 +538,44 @@ object ParseInstructionSpec {
       "compact surrounding array" in {
         ldjson("[1, 2, 3]") must maskInto("[1]" -> Set(Number))(ldjson("[2]"))
       }
+
+      "compact surrounding array with multiple values retained" in {
+        val input = ldjson("""
+          [1, 2, 3, 4, 5]
+          """)
+
+        val expected = ldjson("""
+          [1, 3, 4]
+          """)
+
+        input must maskInto(
+          "[0]" -> Set(Number),
+          "[2]" -> Set(Number),
+          "[3]" -> Set(Number))(expected)
+      }
+
+      "compact surrounding nested array with multiple values retained" in {
+        val input = ldjson("""
+          { "a": { "b": [1, 2, 3, 4, 5], "c" : null } }
+          """)
+
+        val expected = ldjson("""
+          { "a": { "b": [1, 3, 4] } }
+          """)
+
+        input must maskInto(
+          ".a.b[0]" -> Set(Number),
+          ".a.b[2]" -> Set(Number),
+          ".a.b[3]" -> Set(Number))(expected)
+      }
+
+      "remove object entirely when no values are retained" in {
+        ldjson("""{ "a": 42 }""") must maskInto(".a" -> Set(Boolean))(ldjson(""))
+      }
+
+      "remove array entirely when no values are retained" in {
+        ldjson("[42]") must maskInto("[0]" -> Set(Boolean))(ldjson(""))
+      }
     }
 
     def evalMask(mask: Mask, stream: JsonStream): JsonStream
