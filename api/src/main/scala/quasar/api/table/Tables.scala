@@ -26,8 +26,9 @@ import scalaz.\/
 /** @tparam I identity
   * @tparam Q query type
   * @tparam D materialized table data
+  * @tparam S table schema
   */
-trait Tables[F[_], I, Q, D] {
+trait Tables[F[_], I, Q, D, S] {
   import TableError.{
     ExistenceError,
     ModificationError,
@@ -55,4 +56,6 @@ trait Tables[F[_], I, Q, D] {
   def cancelAllPreparations: F[Unit]
 
   def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, D]]
+
+  def preparedSchema(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, S]]
 }

@@ -31,7 +31,7 @@ import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 
 final class MockTables[F[_]: Monad: MockTables.TablesMockState]
-  extends Tables[F, UUID, String, String] {
+  extends Tables[F, UUID, String, String, String] {
 
   import MockTables._
   import TableError._
@@ -144,7 +144,13 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
         PreparationResult.Unavailable[UUID, String](tableId)
     }.toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID]))
 
-  ////
+  def preparedSchema(tableId: UUID): F[ExistenceError[UUID] \/ PreparationResult[UUID, String]] =
+    store.gets(_.lookup(tableId).map { s =>
+      if (isPrepared(s.status))
+        PreparationResult.Available[UUID, String](tableId, tableId.toString)
+      else
+        PreparationResult.Unavailable[UUID, String](tableId)
+    }.toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID]))
 
   private def isPrepared(status: PreparationStatus): Boolean =
     status match {
