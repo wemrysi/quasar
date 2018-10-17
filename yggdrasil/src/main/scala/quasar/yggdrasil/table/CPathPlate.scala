@@ -21,7 +21,7 @@ import quasar.common.{CPathField, CPathIndex, CPathMeta, CPathNode}
 
 import tectonic.{DelegatingPlate, Plate, Signal}
 
-trait CPathPlate[A] extends Plate[A] {
+private[table] trait CPathPlate[A] extends Plate[A] {
   protected var cursor: List[CPathNode] = Nil
   protected var nextIndex: List[Int] = 0 :: Nil
 
