@@ -379,7 +379,7 @@ trait ColumnarTableModule
 
       implicit val cs = IO.contextShift(ec)
 
-      val parser = Parser(new SlicePlate, Parser.ValueStream)
+      val parser = Parser(new SlicePlate(precise), Parser.ValueStream)
 
       val absorbed: Stream[IO, Chunk[Slice]] =
         bytes.chunks evalMap { bc =>

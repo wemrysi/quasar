@@ -17,8 +17,11 @@
 package quasar.yggdrasil
 package table
 
-import quasar.common.CPath
+import qdata.json.PreciseKeys
+
+import quasar.common.{CPath, CPathField, CPathNode}
 import quasar.precog.common._
+import quasar.time.DateTimeUtil
 
 import tectonic.{Plate, Signal}
 
@@ -28,12 +31,25 @@ private[table] abstract class EmptyFinishRowPlate[A] extends Plate[A] {
   def finishRow() = ()
 }
 
-private[table] final class SlicePlate
+private[table] final class SlicePlate(precise: Boolean)
     extends EmptyFinishRowPlate[List[Slice]]    // <3 Scala
     with ContinuingNestPlate[List[Slice]]
     with CPathPlate[List[Slice]] {
 
+  import PreciseKeys._
+
   private val MaxLongStrLength = Long.MinValue.toString.length
+
+  private val PreciseKeySet = Set[CPathNode](
+    CPathField(LocalDateTimeKey),
+    CPathField(LocalDateKey),
+    CPathField(LocalTimeKey),
+    CPathField(OffsetDateTimeKey),
+    CPathField(OffsetDateKey),
+    CPathField(OffsetTimeKey),
+    CPathField(IntervalKey))
+
+  private val Nil = scala.Nil
 
   private var nextThreshold = Config.defaultMinRows
 
@@ -121,8 +137,53 @@ private[table] final class SlicePlate
   def str(s: CharSequence): Signal = {
     growArrays()
 
-    val col = checkGet(ColumnRef(CPath(cursor.reverse), CString)).asInstanceOf[ArrayStrColumn]
-    col(size) = s.toString
+    val str = s.toString
+    var value: AnyRef = null
+
+    val ref = if (precise && !(cursor eq Nil) && PreciseKeySet.contains(cursor.head)) {
+      import DateTimeUtil._
+
+      val tpe = cursor.head match {
+        case CPathField(LocalDateTimeKey) =>
+          value = parseLocalDateTime(str)
+          CLocalDateTime
+
+        case CPathField(LocalDateKey) =>
+          value = parseLocalDate(str)
+          CLocalDate
+
+        case CPathField(LocalTimeKey) =>
+          value = parseLocalTime(str)
+          CLocalTime
+
+        case CPathField(OffsetDateTimeKey) =>
+          value = parseOffsetDateTime(str)
+          COffsetDateTime
+
+        case CPathField(OffsetDateKey) =>
+          value = parseOffsetDate(str)
+          COffsetDate
+
+        case CPathField(OffsetTimeKey) =>
+          value = parseOffsetTime(str)
+          COffsetTime
+
+        case CPathField(IntervalKey) =>
+          value = parseInterval(str)
+          CInterval
+
+        case _ =>
+          sys.error("impossible")
+      }
+
+      ColumnRef(CPath(cursor.tail.reverse), tpe)
+    } else {
+      value = str
+      ColumnRef(CPath(cursor.reverse), CString)
+    }
+
+    val col = checkGet(ref).asInstanceOf[ArrayColumn[AnyRef]]
+    col(size) = value
 
     Signal.Continue
   }
@@ -160,6 +221,16 @@ private[table] final class SlicePlate
         case CNull => MutableNullColumn.empty()
         case CEmptyArray => MutableEmptyArrayColumn.empty()
         case CEmptyObject => MutableEmptyObjectColumn.empty()
+
+        // precise types
+        case CLocalDateTime => ArrayLocalDateTimeColumn.empty(nextThreshold)
+        case CLocalDate => ArrayLocalDateColumn.empty(nextThreshold)
+        case CLocalTime => ArrayLocalTimeColumn.empty(nextThreshold)
+        case COffsetDateTime => ArrayOffsetDateTimeColumn.empty(nextThreshold)
+        case COffsetDate => ArrayOffsetDateColumn.empty(nextThreshold)
+        case COffsetTime => ArrayOffsetTimeColumn.empty(nextThreshold)
+        case CInterval => ArrayIntervalColumn.empty(nextThreshold)
+
         case tpe => sys.error(s"should be impossible to create a column of $tpe")
       }
 
