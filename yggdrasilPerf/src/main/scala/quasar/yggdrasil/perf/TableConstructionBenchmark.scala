@@ -102,7 +102,7 @@ class TableConstructionBenchmark {
     } else if (mode == "old") {
       parseWithJawn.compile.to[Stream].map(P.Table.fromRValues(_, None)).liftM[WriterT[?[_], List[IO[Unit]], ?]]
     } else if (mode == "tectonic") {
-      P.Table.parseJson[WriterT[IO, List[IO[Unit]], ?]](data)
+      P.Table.parseJson[WriterT[IO, List[IO[Unit]], ?]](data, Nil)
     } else {
       sys.error("invalid mode")
     }
