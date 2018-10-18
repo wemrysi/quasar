@@ -22,7 +22,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage.IndexedStoreSpec
 import quasar.mimir.Precog
 import quasar.precog.common.RValue
-import quasar.yggdrasil.vfs.ResourceError
+import quasar.yggdrasil.vfs.{contextShiftForS, ResourceError}
 
 import java.nio.file.Files
 import java.util.concurrent.Executors

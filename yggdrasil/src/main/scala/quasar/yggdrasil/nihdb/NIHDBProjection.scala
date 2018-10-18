@@ -26,7 +26,7 @@ import quasar.yggdrasil.table.Slice
 import scala.concurrent.ExecutionContext
 
 import org.slf4s.Logging
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import scala.util.control.NonFatal
 
 final class NIHDBProjection(snapshot: NIHDBSnapshot, projectionId: Int) extends ProjectionLike[Slice] with Logging {
@@ -69,9 +69,7 @@ final class NIHDBProjection(snapshot: NIHDBSnapshot, projectionId: Int) extends 
 }
 
 object NIHDBProjection {
-  def wrap(nihdb: NIHDB)(implicit ec: ExecutionContext): IO[NIHDBProjection] = {
-
-    implicit val cs = IO.contextShift(ec)
+  def wrap(nihdb: NIHDB)(implicit cs: ContextShift[IO], ec: ExecutionContext): IO[NIHDBProjection] = {
 
     IO.fromFutureShift(IO(nihdb.getSnapshot map { snap =>
       new NIHDBProjection(snap, nihdb.projectionId)

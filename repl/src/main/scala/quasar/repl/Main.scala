@@ -25,6 +25,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.impl.schema.SstEvalConfig
 import quasar.mimir.Precog
 import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
+import quasar.yggdrasil.vfs.contextShiftForS
 
 import java.nio.file.Path
 import java.util.concurrent.Executors
@@ -56,7 +57,8 @@ object Main extends IOApp {
       _ <- Stream.eval(Paths.mkdirs[F](pluginDir))
     } yield (dataDir, pluginDir)
 
-  def quasarStream[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer](blockingPool: ExecutionContext)
+  def quasarStream[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer](
+    blockingPool: ExecutionContext)
       : Stream[F, Quasar[F]] =
     for {
       (dataPath, pluginPath) <- paths[F]

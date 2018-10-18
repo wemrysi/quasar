@@ -30,7 +30,7 @@ import quasar.niflheim.NIHDB
 import quasar.yggdrasil.nihdb.NIHDBProjection
 
 import cats.arrow.FunctionK
-import cats.effect.{IO, LiftIO}
+import cats.effect.{ContextShift, IO, LiftIO}
 
 import fs2.Stream
 import fs2.concurrent.SignallingRef
@@ -53,11 +53,10 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
     val cake: Cake,
     tablesPrefix: ADir)(
     implicit ME: MonadError_[F, ResourceError],
+    cs: ContextShift[IO],
     ec: ExecutionContext) {
 
   import cake.{Table => PTable}
-
-  implicit val cs = IO.contextShift(ec)
 
   // has overwrite semantics
   def write(key: StoreKey, table: PTable): Stream[F, Unit] = {
@@ -133,7 +132,9 @@ object MimirPTableStore {
   def apply[F[_]: Monad: LiftIO: MonadError_[?[_], ResourceError]](
       cake: Cake,
       tablesPrefix: ADir)(
-      implicit ec: ExecutionContext)
+      implicit
+      cs: ContextShift[IO],
+      ec: ExecutionContext)
       : MimirPTableStore[F] =
     new MimirPTableStore[F](cake, tablesPrefix)
 }

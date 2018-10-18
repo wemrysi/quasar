@@ -21,7 +21,7 @@ import quasar.EffectfulQSpec
 import quasar.contrib.nio.file.deleteRecursively
 import quasar.contrib.scalaz.MonadError_
 import quasar.precog.common.{CDouble, CLong, CString, RObject}
-import quasar.yggdrasil.vfs.ResourceError
+import quasar.yggdrasil.vfs.{contextShiftForS, ResourceError}
 
 import java.nio.file.Files
 import java.util.concurrent.Executors

@@ -35,6 +35,7 @@ import quasar.mimir.Precog
 import quasar.run.{Quasar, QuasarError, SqlQuery}
 import quasar.run.implicits._
 import quasar.sql.Query
+import quasar.yggdrasil.vfs.contextShiftForS
 
 import java.math.{MathContext, RoundingMode}
 import java.nio.file.{Files, Paths, Path => JPath}

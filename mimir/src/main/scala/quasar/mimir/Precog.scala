@@ -20,7 +20,6 @@ import quasar.Disposable
 import quasar.contrib.cats.effect._
 import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedCookedBlockFormat, VersionedSegmentFormat}
 import quasar.yggdrasil.table.VFSColumnarTableModule
-import quasar.yggdrasil.vfs
 import quasar.yggdrasil.vfs.{POSIXWithIO, SerialVFS}
 
 import java.io.File
@@ -75,10 +74,14 @@ final class Precog private (
 
 object Precog extends Logging {
 
-  def apply(dataDir: File, blockingPool: ExecutionContext)(implicit ec: ExecutionContext): IO[Disposable[IO, Precog]] = {
-
-    implicit val cs = IO.contextShift(ec)
-    implicit val csPwIO: ContextShift[POSIXWithIO] = vfs.contextShiftForS
+  def apply(
+    dataDir: File,
+    blockingPool: ExecutionContext)(
+    implicit
+    cs: ContextShift[IO],
+    csPwIO: ContextShift[POSIXWithIO],
+    ec: ExecutionContext)
+      : IO[Disposable[IO, Precog]] = {
 
     for {
       vfsd <- SerialVFS[IO](dataDir, blockingPool)
@@ -97,6 +100,13 @@ object Precog extends Logging {
     } yield pcd
   }
 
-  def stream(dataDir: File, blockingPool: ExecutionContext)(implicit ec: ExecutionContext): Stream[IO, Precog] =
+  def stream(
+    dataDir: File,
+    blockingPool: ExecutionContext)(
+    implicit
+    cs: ContextShift[IO],
+    csPwIO: ContextShift[POSIXWithIO],
+    ec: ExecutionContext)
+      : Stream[IO, Precog] =
     Stream.bracket(apply(dataDir, blockingPool))(_.dispose).flatMap(d => Stream.emit(d.unsafeValue))
 }

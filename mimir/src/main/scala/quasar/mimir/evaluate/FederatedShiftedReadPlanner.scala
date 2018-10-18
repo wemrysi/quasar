@@ -27,7 +27,7 @@ import quasar.precog.common.RValue
 import quasar.qscript._, PlannerError.InternalError
 import quasar.yggdrasil.{MonadFinalizers, TransSpecModule}
 
-import cats.effect.{IO, LiftIO}
+import cats.effect.{ContextShift, IO, LiftIO}
 import fs2.{Chunk, Stream}
 import matryoshka._
 import pathy.Path._
@@ -38,7 +38,10 @@ import scala.concurrent.ExecutionContext
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]](
-    val P: Cake) {
+    val P: Cake)(
+    implicit
+    cs: ContextShift[IO],
+    ec: ExecutionContext) {
 
   import Interpreter.ShiftInfo
 
@@ -47,8 +50,7 @@ final class FederatedShiftedReadPlanner[
 
   type Read[A] = Const[ShiftedRead[AFile], A] \/ Const[InterpretedRead[AFile], A]
 
-  def plan(implicit ec: ExecutionContext)
-      : AlgebraM[M, Read, MimirRepr] = {
+  def plan: AlgebraM[M, Read, MimirRepr] = {
     case -\/(Const(ShiftedRead(file, status))) =>
       planRead(file, status, None)
 
@@ -62,9 +64,7 @@ final class FederatedShiftedReadPlanner[
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
 
-  private def planRead(file: AFile, readStatus: IdStatus, shiftInfo: Option[ShiftInfo])(
-      implicit ec: ExecutionContext)
-      : M[MimirRepr] =
+  private def planRead(file: AFile, readStatus: IdStatus, shiftInfo: Option[ShiftInfo]): M[MimirRepr] =
     Kleisli.ask[F, Assocs].map(_(file)) andThenK { maybeSource =>
       for {
         source <- MonadPlannerErr[F].unattempt_(
@@ -95,8 +95,7 @@ final class FederatedShiftedReadPlanner[
 
   private def sourceTable(
       source: EvalSource[QueryAssociate[T, IO]],
-      shiftInfo: Option[ShiftInfo])(
-      implicit ec: ExecutionContext)
+      shiftInfo: Option[ShiftInfo])
       : F[P.Table] = {
     val queryResult =
       source.src match {
@@ -123,8 +122,7 @@ final class FederatedShiftedReadPlanner[
   // we do not preserve the order of shifted results
   private def tableFromStream(
       rvalues: Stream[IO, RValue],
-      shift: Option[ShiftInfo])(
-      implicit ec: ExecutionContext)
+      shift: Option[ShiftInfo])
       : F[P.Table] = {
 
     val interpretedRValues: Stream[IO, RValue] =

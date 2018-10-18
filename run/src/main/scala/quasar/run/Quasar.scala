@@ -86,7 +86,9 @@ object Quasar {
       extConfig: ExternalConfig,
       sstEvalConfig: SstEvalConfig,
       blockingPool: ExecutionContext)(
-      implicit ec: ExecutionContext)
+      implicit
+      cs: ContextShift[IO],
+      ec: ExecutionContext)
       : Stream[F, Quasar[F]] = {
 
     for {

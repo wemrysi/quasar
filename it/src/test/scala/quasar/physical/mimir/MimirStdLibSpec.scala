@@ -25,18 +25,18 @@ import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
 import quasar.precog.common.RValue
 import quasar.qscript._
 import quasar.std.StdLibSpec
+import quasar.yggdrasil.vfs.contextShiftForS
 
 import qdata.time.{DateTimeInterval, TimeGenerators}
-
 import java.nio.file.Files
 import java.time.{Duration => _, _}
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 
+import cats.effect.IO
 import org.scalacheck.{Arbitrary, Gen}
 import org.specs2.execute.{Result, Skipped}
 import org.specs2.specification.{AfterAll, Scope}
-
 import matryoshka.AlgebraM
 import matryoshka.data.{Fix, freeRecursive}
 import matryoshka.implicits._
@@ -224,6 +224,8 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
 trait PrecogCake extends Scope with AfterAll {
 
   val blockingPool: ExecutionContext
+
+  implicit lazy val cs = IO.contextShift(global)
 
   private lazy val caked = Precog(Files.createTempDirectory("mimir").toFile(), blockingPool).unsafeRunSync
 
