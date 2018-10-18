@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.mimir.evaluate
+package quasar.yggdrasil.table
 
 import quasar.{ParseInstruction, ParseType}
 import quasar.common.{CPathField, CPathIndex, CPathMeta, CPathNode}
-import quasar.yggdrasil.table.CPathPlate
 
 import tectonic.{DelegatingPlate, Plate, Signal}
 
-final class MaskPlate[A](
+private[table] final class MaskPlate[A](
     mask: ParseInstruction.Mask,
     delegate: Plate[A])
     extends DelegatingPlate(delegate)

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.mimir.evaluate
+package quasar.yggdrasil.table
 
 import quasar.ParseInstructionSpec
 

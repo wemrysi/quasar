@@ -14,18 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.mimir.evaluate
+package quasar.yggdrasil.table
 
 import quasar.{IdStatus, ParseInstruction, ParseType}
 import quasar.common.{CPathField, CPathIndex, CPathMeta, CPathNode}
-import quasar.yggdrasil.table.CPathPlate
 
 import tectonic.{DelegatingPlate, Plate, Signal}
 
 import scala.annotation.tailrec
 
 // currently assumes retain = false, meaning you *cannot* have any non-shifted stuff in the row
-final class PivotPlate[A](
+private[table] final class PivotPlate[A](
     pivot: ParseInstruction.Pivot,
     delegate: Plate[A])
     extends DelegatingPlate(delegate)
