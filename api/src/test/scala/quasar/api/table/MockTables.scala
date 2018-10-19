@@ -125,14 +125,24 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
       store.put(updatedMap)
     } >> ().point[F]
 
-  // the prepared data is the table id
+  // the live data is the query
+  def liveData(tableId: UUID): F[ExistenceError[UUID] \/ String] =
+    store.gets(_.lookup(tableId)
+      .map(_.table.query)
+      .toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID]))
+
+  // the prepared data is the query
   def preparedData(tableId: UUID): F[ExistenceError[UUID] \/ PreparationResult[UUID, String]] =
-    store.gets(_.lookup(tableId).map { s =>
-      if (isPrepared(s.status))
-        PreparationResult.Available[UUID, String](tableId, tableId.toString)
-      else
-        PreparationResult.Unavailable[UUID, String](tableId)
-    }.toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID]))
+    store gets { t =>
+      val result = t.lookup(tableId) map { mock =>
+        if (isPrepared(mock.status))
+          PreparationResult.Available[UUID, String](tableId, mock.table.query)
+        else
+          PreparationResult.Unavailable[UUID, String](tableId)
+      }
+
+      result.toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID])
+    }
 
   def preparedSchema(tableId: UUID): F[ExistenceError[UUID] \/ PreparationResult[UUID, String]] =
     store.gets(_.lookup(tableId).map { s =>

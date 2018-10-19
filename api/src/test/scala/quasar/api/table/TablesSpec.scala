@@ -25,10 +25,10 @@ import org.specs2.execute.AsResult
 import org.specs2.specification.BeforeEach
 import org.specs2.specification.core.Fragment
 import scalaz.{~>, \/, \/-, -\/, Equal, Id, Monad, Show}, Id.Id
-import scalaz.syntax.monad._
 import scalaz.std.list._
+import scalaz.syntax.monad._
 
-abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D, S]
+abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D: Equal: Show, S]
     extends Qspec
     with ConditionMatchers
     with BeforeEach {
@@ -115,6 +115,17 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D, 
       for {
         id <- uniqueId.point[F]
         result <- tables.preparedData(id)
+      } yield {
+        result must beLike {
+          case -\/(TableError.TableNotFound(i)) => i must_= id
+        }
+      }
+    }
+
+    "error when requesting live data for a nonexistent table" >>* {
+      for {
+        id <- uniqueId.point[F]
+        result <- tables.liveData(id)
       } yield {
         result must beLike {
           case -\/(TableError.TableNotFound(i)) => i must_= id
@@ -232,6 +243,24 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D, 
 
         replacedResult must beLike {
           case \/-(t) => t must_= table2
+        }
+      }
+    }
+
+    "get live data for a table" >>* {
+      for {
+        errorOrId <- tables.createTable(table1)
+        id <- isSuccess(errorOrId)
+
+        tableResult <- tables.table(id)
+        liveResult <- tables.liveData(id)
+      } yield {
+        tableResult must beLike {
+          case \/-(t) => t must_= table1
+        }
+
+        liveResult must beLike {
+          case \/-(data) => data must_= preparation1
         }
       }
     }

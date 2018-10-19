@@ -19,6 +19,7 @@ package quasar.impl.table
 import slamdata.Predef._
 
 import quasar.Condition
+import quasar.api.QueryEvaluator
 import quasar.api.table.{
   OngoingStatus,
   PreparationEvent,
@@ -46,6 +47,7 @@ import shims._
 final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     freshId: F[I],
     tableStore: IndexedStore[F, I, TableRef[Q]],
+    evaluator: QueryEvaluator[F, Q, D],
     manager: PreparationsManager[F, I, Q, D],
     lookupFromPTableStore: I => F[Option[D]],
     lookupTableSchema: I => F[Option[S]])
@@ -114,6 +116,11 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
   def preparationEvents: Stream[F, PreparationEvent[I]] =
     manager.notifications
 
+  def liveData(tableId: I): F[ExistenceError[I] \/ D] =
+    table(tableId) flatMap {
+      _.traverse(ref => evaluator.evaluate(ref.query))
+    }
+
   def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, D]] =
     tableStore.lookup(tableId).flatMap {
       case Some(_) =>
@@ -176,6 +183,7 @@ object DefaultTables {
   def apply[F[_]: Effect, I: Equal, Q, D, S](
       freshId: F[I],
       tableStore: IndexedStore[F, I, TableRef[Q]],
+      evaluator: QueryEvaluator[F, Q, D],
       manager: PreparationsManager[F, I, Q, D],
       lookupFromPTableStore: I => F[Option[D]],
       lookupTableSchema: I => F[Option[S]])
@@ -183,6 +191,7 @@ object DefaultTables {
       new DefaultTables[F, I, Q, D, S](
         freshId,
         tableStore,
+        evaluator,
         manager,
         lookupFromPTableStore,
         lookupTableSchema)
