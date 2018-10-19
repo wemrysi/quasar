@@ -55,7 +55,6 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     ExistenceError,
     ModificationError,
     NameConflict,
-    PreparationExists,
     PreparationInProgress,
     PreparationNotInProgress,
     PrePreparationError,
@@ -131,16 +130,7 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
   def replaceTable(tableId: I, table: TableRef[Q]): F[Condition[ModificationError[I]]] =
     tableStore.lookup(tableId).flatMap {
       case Some(_) =>
-        liveStatus(tableId).flatMap {
-          case PreparationStatus(PreparedStatus.Prepared, _) =>
-            Condition.abnormal(
-              PreparationExists(tableId): ModificationError[I]).point[F]
-          case PreparationStatus(_, OngoingStatus.Preparing) =>
-            Condition.abnormal(
-              PreparationInProgress(tableId): ModificationError[I]).point[F]
-          case PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.NotPreparing) =>
-            tableStore.insert(tableId, table).map(_ => Condition.normal())
-        }
+        tableStore.insert(tableId, table).map(_ => Condition.normal())
       case None =>
         Condition.abnormal(TableNotFound(tableId): ModificationError[I]).pure[F]
     }

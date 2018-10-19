@@ -186,12 +186,50 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D, 
         errorOrId <- tables.createTable(table1)
         id <- isSuccess(errorOrId)
         originalResult <- tables.table(id)
-        errorOrId <- tables.replaceTable(id, table2)
+        _ <- tables.replaceTable(id, table2)
         replacedResult <- tables.table(id)
       } yield {
         originalResult must beLike {
           case \/-(t) => t must_= table1
         }
+        replacedResult must beLike {
+          case \/-(t) => t must_= table2
+        }
+      }
+    }
+
+    "successfully prepare a table" >>* {
+      for {
+        errorOrId <- tables.createTable(table1)
+        id <- isSuccess(errorOrId)
+        tableResult <- tables.table(id)
+        prepareResult <- tables.prepareTable(id)
+      } yield {
+        tableResult must beLike {
+          case \/-(t) => t must_= table1
+        }
+
+        prepareResult must beNormal
+      }
+    }
+
+    "successfully replace a prepared table" >>* {
+      for {
+        errorOrId <- tables.createTable(table1)
+        id <- isSuccess(errorOrId)
+
+        originalResult <- tables.table(id)
+        prepareResult <- tables.prepareTable(id)
+
+        _ <- tables.replaceTable(id, table2)
+        replacedResult <- tables.table(id)
+      } yield {
+        originalResult must beLike {
+          case \/-(t) => t must_= table1
+        }
+
+        prepareResult must beNormal
+
         replacedResult must beLike {
           case \/-(t) => t must_= table2
         }
