@@ -138,7 +138,7 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
     transformed flatMap {
       case -\/(_) => none
-      case \/-(path) => path.reverse.some
+      case \/-(path) => CPath(path.nodes.reverse).some
     }
   }
 }

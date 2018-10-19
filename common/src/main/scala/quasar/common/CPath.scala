@@ -75,8 +75,6 @@ sealed trait CPath { self =>
 
   def tail: CPath = CPath(nodes.drop(1): _*)
 
-  def reverse: CPath = CPath(nodes.reverse)
-
   def path: String = nodes.mkString("")
 
   def length: Int = nodes.length
