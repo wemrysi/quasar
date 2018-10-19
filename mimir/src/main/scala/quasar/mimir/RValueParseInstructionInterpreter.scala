@@ -24,7 +24,7 @@ import quasar.ParseInstruction.{Ids, Mask, Pivot, Wrap}
 import quasar.common.{CPathField, CPathIndex, CPathNode}
 import quasar.precog.common._
 
-object Interpreter {
+object RValueParseInstructionInterpreter {
 
   def interpret(instructions: List[ParseInstruction], rvalue: RValue): List[RValue] =
     instructions.reverse.foldRight(List[RValue](rvalue)) {

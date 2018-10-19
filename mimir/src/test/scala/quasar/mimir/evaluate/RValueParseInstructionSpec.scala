@@ -33,13 +33,13 @@ object RValueParseInstructionSpec
   type JsonStream = List[RValue]
 
   def evalMask(mask: Mask, stream: JsonStream): JsonStream =
-    stream.flatMap(Interpreter.interpretMask(mask, _).toList)
+    stream.flatMap(RValueParseInstructionInterpreter.interpretMask(mask, _).toList)
 
   def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream =
-    stream.flatMap(Interpreter.interpretPivot(pivot, _))
+    stream.flatMap(RValueParseInstructionInterpreter.interpretPivot(pivot, _))
 
   def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream =
-    stream.map(Interpreter.interpretWrap(wrap, _))
+    stream.map(RValueParseInstructionInterpreter.interpretWrap(wrap, _))
 
   protected def ldjson(str: String): JsonStream = {
     implicit val facade: Facade[RValue] = QDataFacade.qdata[RValue]

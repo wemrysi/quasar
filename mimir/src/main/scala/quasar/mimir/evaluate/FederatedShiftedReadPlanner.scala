@@ -132,7 +132,8 @@ final class FederatedShiftedReadPlanner[
         case instrs =>
           rvalues.mapChunks(chunk =>
             Segment.seq(chunk.foldLeft(List[RValue]()) {
-              case (acc, rv) => Interpreter.interpret(instrs, rv) ::: acc
+              case (acc, rv) =>
+                RValueParseInstructionInterpreter.interpret(instrs, rv) ::: acc
             }))
       }
 
