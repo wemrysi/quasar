@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.mimir.evaluate
+package quasar.yggdrasil.table
 
 import quasar.{ParseInstruction, ParseType}
 import quasar.common.{CPathField, CPathIndex, CPathMeta, CPathNode}
-import quasar.yggdrasil.table.CPathPlate
 
 import tectonic.{DelegatingPlate, Plate, Signal}
 
-final class MaskPlate[A](
+private[table] final class MaskPlate[A](
     mask: ParseInstruction.Mask,
     delegate: Plate[A])
     extends DelegatingPlate(delegate)
@@ -32,23 +31,25 @@ final class MaskPlate[A](
 
   private val Nil = scala.Nil
 
-  private val revIdx = masks map {
-    case (path, tpes) => path.nodes.reverse -> tpes
-  }
+  private val revIdx: Map[List[CPathNode], Set[ParseType]] =
+    masks map {
+     case (path, tpes) => path.nodes.reverse -> tpes
+   }
 
-  private val foci = revIdx.keys.toSet
-  private val prefixes = foci.flatMap(_.tails.toSet)
+  private val foci: Set[List[CPathNode]] = revIdx.keys.toSet
+  private val prefixes: Set[List[CPathNode]] = foci.flatMap(_.tails.toSet)
 
-  private val vectorLoci = revIdx filter {
-    case (path, tpes) =>
-      tpes.contains(ParseType.Object) ||
-        tpes.contains(ParseType.Array) ||
-        tpes.contains(ParseType.Meta)
-  }
+  private val vectorLoci: Map[List[CPathNode], Set[ParseType]] =
+    revIdx filter {
+      case (path, tpes) =>
+        tpes.contains(ParseType.Object) ||
+          tpes.contains(ParseType.Array) ||
+          tpes.contains(ParseType.Meta)
+    }
 
   private var extraCursor: List[CPathNode] = Nil    // TODO this can be an Int
-  private var sawSomething = false
-  private var underValidVector = false
+  private var sawSomething: Boolean = false
+  private var underValidVector: Boolean = false
 
   override def nul(): Signal = {
     val tpes = revIdx.getOrElse(cursor, null)

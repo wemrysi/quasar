@@ -39,8 +39,8 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
   val store = MonadState_[F, IMap[UUID, MockTable]]
 
   def allTables: Stream[F, (UUID, TableRef[String], PreparationStatus)] =
-    Stream.force(store.get.map { s =>
-      Stream.emits(s.toList.map {
+    Stream.force(store.get map { s =>
+      Stream.emits(s.toList map {
         case (uuid, MockTable(table, status)) => (uuid, table, status)
       }).covary[F]
     })
@@ -51,7 +51,7 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
       .toRightDisjunction(TableNotFound(tableId)))
 
   def createTable(table: TableRef[String]): F[NameConflict \/ UUID] =
-    store.get.map { store => 
+    store.get map { store =>
         (store, store.values.map(_.table.name).contains(table.name))
     } flatMap { case (s, exists) =>
       if (exists)
@@ -66,23 +66,13 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
 
   def replaceTable(tableId: UUID, table: TableRef[String])
       : F[Condition[ModificationError[UUID]]] =
-    store.gets(_.lookup(tableId)).flatMap {
-      _.map(_.status match {
-        case PreparationStatus(PreparedStatus.Prepared, _) =>
-          Condition.abnormal[ModificationError[UUID]](
-            PreparationExists(tableId)).point[F]
-
-        case PreparationStatus(_, OngoingStatus.Preparing) =>
-          Condition.abnormal[ModificationError[UUID]](
-            PreparationInProgress(tableId)).point[F]
-
-        case s @ PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.NotPreparing) =>
-          store.modify(_.insert(tableId, MockTable(table, s)))
-            .as(Condition.normal[ModificationError[UUID]]())
-      }).getOrElse {
-        Condition.abnormal[ModificationError[UUID]](
-          TableNotFound(tableId)).point[F]
+    store.gets(_.lookup(tableId)) flatMap { res =>
+      val modified = res map { s =>
+        store.modify(_.insert(tableId, MockTable(table, s.status)))
+          .as(Condition.normal[ModificationError[UUID]]())
       }
+      modified.getOrElse(Condition.abnormal[ModificationError[UUID]](
+        TableNotFound(tableId)).point[F])
     }
 
   // mock tables prepare immediately
@@ -113,10 +103,11 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
   def cancelPreparation(tableId: UUID): F[Condition[PreparationNotInProgress[UUID]]] =
     store.get.flatMap(stateMap => stateMap.lookup(tableId) match {
       case Some(MockTable(table, PreparationStatus(prep, OngoingStatus.Preparing))) =>
-        store.put {
+        val inserted = store put {
           stateMap.insert(tableId,
             MockTable(table, PreparationStatus(prep, OngoingStatus.NotPreparing)))
-        }.as(Condition.normal())
+        }
+        inserted.as(Condition.normal())
 
       case Some(MockTable(_, PreparationStatus(_, OngoingStatus.NotPreparing))) =>
         Condition.abnormal[PreparationNotInProgress[UUID]](
@@ -126,31 +117,48 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
         Condition.normal().point[F]
     })
 
-  def cancelAllPreparations: F[Unit] =
-    store.get.flatMap { stateMap =>
-      val updatedMap = stateMap.map {
+  def cancelAllPreparations: F[Unit] = {
+    val cancelled = store.get flatMap { stateMap =>
+      val updatedMap = stateMap map {
         case MockTable(ref, PreparationStatus(prep, _)) =>
           MockTable(ref, PreparationStatus(prep, OngoingStatus.NotPreparing))
       }
       store.put(updatedMap)
-    } >> ().point[F]
+    }
 
-  // the prepared data is the table id
+    cancelled >> ().point[F]
+  }
+
+  // the live data is the query
+  def liveData(tableId: UUID): F[ExistenceError[UUID] \/ String] =
+    store.gets(_.lookup(tableId)
+      .map(_.table.query)
+      .toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID]))
+
+  // the prepared data is the query
   def preparedData(tableId: UUID): F[ExistenceError[UUID] \/ PreparationResult[UUID, String]] =
-    store.gets(_.lookup(tableId).map { s =>
-      if (isPrepared(s.status))
-        PreparationResult.Available[UUID, String](tableId, tableId.toString)
-      else
-        PreparationResult.Unavailable[UUID, String](tableId)
-    }.toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID]))
+    store gets { t =>
+      val result = t.lookup(tableId) map { mock =>
+        if (isPrepared(mock.status))
+          PreparationResult.Available[UUID, String](tableId, mock.table.query)
+        else
+          PreparationResult.Unavailable[UUID, String](tableId)
+      }
+
+      result.toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID])
+    }
 
   def preparedSchema(tableId: UUID): F[ExistenceError[UUID] \/ PreparationResult[UUID, String]] =
-    store.gets(_.lookup(tableId).map { s =>
-      if (isPrepared(s.status))
-        PreparationResult.Available[UUID, String](tableId, tableId.toString)
-      else
-        PreparationResult.Unavailable[UUID, String](tableId)
-    }.toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID]))
+    store gets { t =>
+      val result = t.lookup(tableId) map { s =>
+        if (isPrepared(s.status))
+          PreparationResult.Available[UUID, String](tableId, tableId.toString)
+        else
+          PreparationResult.Unavailable[UUID, String](tableId)
+      }
+
+      result.toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID])
+    }
 
   private def isPrepared(status: PreparationStatus): Boolean =
     status match {

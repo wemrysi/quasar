@@ -16,8 +16,11 @@
 
 package quasar.qscript.rewrites
 
-import slamdata.Predef.{Map => _, _}
+import slamdata.Predef.{Map => SMap, _}
 import quasar.IdStatus.ExcludeId
+import quasar.ParseInstruction
+import quasar.ParseInstruction.{Mask, Pivot, Wrap}
+import quasar.common.CPath
 import quasar.contrib.iota._
 import quasar.ejson
 import quasar.fp.{liftFG, Injectable}
@@ -53,15 +56,15 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
     // LeftShift(ShiftedRead(_, ExcludeId), /foo/bar/, _, _, Omit, f(RightSide))
     case qc @ LeftShift(Embed(src), struct, shiftStatus, shiftType, OnUndefined.Omit, repair) => {
+      import construction.Func
 
-      val key: ShiftKey = ShiftKey(ShiftedKey)
-
-      val pathOpt: Option[ShiftPath] = findPath(struct.linearize)
+      val linearStruct: FreeMap = struct.linearize
+      val pathOpt: Option[CPath] = findPath(linearStruct)
 
       val mfOpt: Option[FreeMap] =
         repair.traverseM[Option, Hole] {
           case LeftSide => None  // repair must not contain LeftSide
-          case RightSide => construction.Func[T].ProjectKeyS(HoleF, key.key).some
+          case RightSide => Func[T].ProjectKeyS(linearStruct, ShiftedKey).some
         }
 
       val srOpt: Option[ShiftedRead[A]] = SR.prj(src) flatMap { srConst =>
@@ -75,8 +78,15 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
       val rewritten: Option[F[T[F]]] = (mfOpt |@| srOpt |@| pathOpt) {
         case (mf, sr, path) =>
+          val tpe = ShiftType.toParseType(shiftType)
+
+          val instructions: List[ParseInstruction] = List(
+            Mask(SMap((path, Set(tpe)))),
+            Wrap(path, ShiftedKey),
+            Pivot(path \ ShiftedKey, shiftStatus, tpe))
+
           val src: T[F] = ER.inj(Const[InterpretedRead[A], T[F]](
-            InterpretedRead[A](sr.path, path, shiftStatus, shiftType, key))).embed
+            InterpretedRead[A](sr.path, instructions))).embed
 
           QC.inj(Map(src, mf.asRec))
       }
@@ -91,29 +101,29 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
    * ```
    * ProjectKey(ProjectKey(...(ProjectKey(Hole, Const(Str))), Const(Str)), Const(Str))
    * ```
-   * returning the `ShiftPath` when that form is matched.
+   * returning the `CPath` when that form is matched.
    */
-  def findPath(fm: FreeMap): Option[ShiftPath] = {
+  def findPath(fm: FreeMap): Option[CPath] = {
     import MapFuncsCore.{Constant, ProjectKey}
 
     // A `FreeMap` effectively has two leaf types: `Constant` and `Hole`.
     // When we hit a `Constant` we need to keep searching even though
     // we haven't found a path to shift, and so we encode this as `Unit`.
-    type Acc = Unit \/ ShiftPath
+    type Acc = Unit \/ CPath
 
     type CoFreeMap = CoEnv[Hole, MapFunc, (FreeMap, Acc)]
 
     def transformHole(hole: Hole): Option[Acc] =
-      ShiftPath(List[String]()).right.some
+      CPath.Identity.right.some
 
     def transformFunc(func: MapFunc[(FreeMap, Acc)]): Option[Acc] =
       func match {
         case MFC(Constant(Embed(EC(ejson.Str(_))))) =>
           ().left.some // this is awkward but we have to keep going
 
-        // the source of a `ProjectKey` must have encoded as a `ShiftPath`
+        // the source of a `ProjectKey` must have encoded as a `CPath`
         case MFC(ProjectKey((_, \/-(srcPath)), (ExtractFunc(Constant(Embed(EC(ejson.Str(str))))), _))) =>
-          ShiftPath(str :: srcPath.path).right.some
+          (str \: srcPath).right.some
 
         case _ => none
       }
@@ -128,7 +138,7 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
     transformed flatMap {
       case -\/(_) => none
-      case \/-(path) => ShiftPath(path.path.reverse).some
+      case \/-(path) => CPath(path.nodes.reverse).some
     }
   }
 }

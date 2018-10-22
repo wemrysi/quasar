@@ -26,7 +26,7 @@ object Dependencies {
   private val specsVersion        = "4.3.3"
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
-  private val fs2Version          = "0.10.5"
+  private val fs2Version          = "0.10.6"
   private val qdataVersion        = IO.read(file("./qdata-version")).trim
   private val tectonicVersion     = IO.read(file("./tectonic-version")).trim
   private val slf4sVersion        = "1.7.25"

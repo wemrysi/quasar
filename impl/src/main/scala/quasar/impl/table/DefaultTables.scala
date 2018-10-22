@@ -19,6 +19,7 @@ package quasar.impl.table
 import slamdata.Predef._
 
 import quasar.Condition
+import quasar.api.QueryEvaluator
 import quasar.api.table.{
   OngoingStatus,
   PreparationEvent,
@@ -46,6 +47,7 @@ import shims._
 final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     freshId: F[I],
     tableStore: IndexedStore[F, I, TableRef[Q]],
+    evaluator: QueryEvaluator[F, Q, D],
     manager: PreparationsManager[F, I, Q, D],
     lookupFromPTableStore: I => F[Option[D]],
     lookupTableSchema: I => F[Option[S]])
@@ -55,7 +57,6 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     ExistenceError,
     ModificationError,
     NameConflict,
-    PreparationExists,
     PreparationInProgress,
     PreparationNotInProgress,
     PrePreparationError,
@@ -72,7 +73,7 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     manager.cancelAll
 
   def cancelPreparation(tableId: I): F[Condition[PreparationNotInProgress[I]]] =
-    manager.cancelPreparation(tableId).map(_.map {
+    manager.cancelPreparation(tableId).map(_ map {
       case PreparationsManager.NotInProgressError(i) =>
         PreparationNotInProgress(i)
     })
@@ -103,7 +104,7 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
       case -\/(err) =>
         Condition.abnormal(err).point[F]
       case \/-(query) =>
-        manager.prepareTable(tableId, query).map {
+        manager.prepareTable(tableId, query) map {
           _.map {
             case PreparationsManager.InProgressError(id) =>
               PreparationInProgress(id)
@@ -115,10 +116,15 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
   def preparationEvents: Stream[F, PreparationEvent[I]] =
     manager.notifications
 
+  def liveData(tableId: I): F[ExistenceError[I] \/ D] =
+    table(tableId) flatMap {
+      _.traverse(ref => evaluator.evaluate(ref.query))
+    }
+
   def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, D]] =
-    tableStore.lookup(tableId).flatMap {
+    tableStore.lookup(tableId) flatMap {
       case Some(_) =>
-        lookupFromPTableStore(tableId).map {
+        lookupFromPTableStore(tableId) map {
           case Some(dataset) =>
             PreparationResult.Available[I, D](tableId, dataset).right
           case None =>
@@ -129,18 +135,9 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     }
 
   def replaceTable(tableId: I, table: TableRef[Q]): F[Condition[ModificationError[I]]] =
-    tableStore.lookup(tableId).flatMap {
+    tableStore.lookup(tableId) flatMap {
       case Some(_) =>
-        liveStatus(tableId).flatMap {
-          case PreparationStatus(PreparedStatus.Prepared, _) =>
-            Condition.abnormal(
-              PreparationExists(tableId): ModificationError[I]).point[F]
-          case PreparationStatus(_, OngoingStatus.Preparing) =>
-            Condition.abnormal(
-              PreparationInProgress(tableId): ModificationError[I]).point[F]
-          case PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.NotPreparing) =>
-            tableStore.insert(tableId, table).map(_ => Condition.normal())
-        }
+        tableStore.insert(tableId, table).map(_ => Condition.normal())
       case None =>
         Condition.abnormal(TableNotFound(tableId): ModificationError[I]).pure[F]
     }
@@ -149,9 +146,9 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     tableStore.lookup(tableId).map(option.toRight(_)(TableNotFound(tableId)))
 
   def preparedSchema(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, S]] =
-    tableStore.lookup(tableId).flatMap {
+    tableStore.lookup(tableId) flatMap {
       case Some(_) =>
-        lookupTableSchema(tableId).map {
+        lookupTableSchema(tableId) map {
           case Some(s) =>
             PreparationResult.Available[I, S](tableId, s).right
           case None =>
@@ -167,13 +164,13 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     import PreparationsManager.Status
 
     val prepared: F[PreparedStatus] =
-      lookupFromPTableStore(tableId).map { t =>
+      lookupFromPTableStore(tableId) map { t =>
         if (t.isDefined) PreparedStatus.Prepared
         else PreparedStatus.Unprepared
       }
 
     val ongoing: F[OngoingStatus] =
-      manager.preparationStatus(tableId).map {
+      manager.preparationStatus(tableId) map {
         case Status.Started(_) | Status.Pending => OngoingStatus.Preparing
         case Status.Unknown => OngoingStatus.NotPreparing
       }
@@ -186,6 +183,7 @@ object DefaultTables {
   def apply[F[_]: Effect, I: Equal, Q, D, S](
       freshId: F[I],
       tableStore: IndexedStore[F, I, TableRef[Q]],
+      evaluator: QueryEvaluator[F, Q, D],
       manager: PreparationsManager[F, I, Q, D],
       lookupFromPTableStore: I => F[Option[D]],
       lookupTableSchema: I => F[Option[S]])
@@ -193,6 +191,7 @@ object DefaultTables {
       new DefaultTables[F, I, Q, D, S](
         freshId,
         tableStore,
+        evaluator,
         manager,
         lookupFromPTableStore,
         lookupTableSchema)

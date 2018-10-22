@@ -17,17 +17,16 @@
 package quasar.qscript
 
 import slamdata.Predef._
-import quasar.IdStatus
+import quasar.{ejson, qscript, IdStatus, ParseInstruction}
 import quasar.common.{JoinType, SortDir}
-import quasar.{ejson, qscript}
-import quasar.ejson.EJson
-import quasar.time.TemporalPart
 import quasar.contrib.iota.copkTraverse
+import quasar.ejson.EJson
 import quasar.fp.Injectable
+import quasar.time.TemporalPart
 
 import matryoshka._
 import matryoshka.data.Fix
-import scalaz._
+import scalaz.{\/, Const, Free, Functor, NonEmptyList}
 import scalaz.Leibniz.===
 import scalaz.std.tuple._
 import scalaz.syntax.bifunctor._
@@ -793,12 +792,9 @@ object construction {
       embed(F.inject(Const(qscript.ShiftedRead(path, idStatus))))
 
     def InterpretedRead[A](path: A,
-                       shiftPath: ShiftPath,
-                       shiftStatus: IdStatus,
-                       shiftType: ShiftType,
-                       shiftKey: ShiftKey)
-                      (implicit F: Injectable[Const[InterpretedRead[A], ?], F]): R =
-      embed(F.inject(Const(qscript.InterpretedRead(path, shiftPath, shiftStatus, shiftType, shiftKey))))
+                           instructions: List[ParseInstruction])
+                           (implicit F: Injectable[Const[InterpretedRead[A], ?], F]): R =
+      embed(F.inject(Const(qscript.InterpretedRead(path, instructions))))
 
     def Read[A](path: A)
                (implicit F: Injectable[Const[Read[A], ?], F]): R =

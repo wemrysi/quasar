@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.mimir.evaluate
+package quasar.yggdrasil.table
 
 import tectonic.{Plate, Signal}
 
-final class IdsPlate[A](delegate: Plate[A]) extends Plate[A] {
+private[table] final class IdsPlate[A](delegate: Plate[A]) extends Plate[A] {
   private var sawSomething = false
   private var id = 0L   // 450 exabytes is enough for anyone
 
