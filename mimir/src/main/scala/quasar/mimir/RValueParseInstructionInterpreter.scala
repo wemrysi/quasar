@@ -223,8 +223,8 @@ object RValueParseInstructionInterpreter {
         case (Nil, rv) => RObject((wrap.name, rv))
 
         case (CPathField(field) :: tail, obj @ RObject(fields)) =>
-          fields.get(field).map(target =>
-            RObject(fields.updated(field, inner(tail, target)))).getOrElse(obj)
+          fields.get(field).fold(obj)(target =>
+            RObject(fields.updated(field, inner(tail, target))))
 
         case (CPathIndex(idx) :: tail, arr @ RArray(elems)) =>
           if ((idx < elems.length) && (idx >= 0))
