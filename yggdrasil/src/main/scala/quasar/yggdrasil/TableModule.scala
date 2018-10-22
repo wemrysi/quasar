@@ -16,6 +16,7 @@
 
 package quasar.yggdrasil
 
+import quasar.ParseInstruction
 import quasar.common.CPath
 import quasar.precog.common._
 import quasar.yggdrasil.vfs.ResourceError
@@ -158,6 +159,7 @@ trait TableModule extends TransSpecModule {
 
     def parseJson[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](
         bytes: fs2.Stream[IO, Byte],
+        instructions: List[ParseInstruction],
         precise: Boolean = false)(
         implicit
         cs: ContextShift[IO],

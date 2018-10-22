@@ -26,15 +26,15 @@ import java.util.UUID
 
 import cats.data.StateT
 import cats.effect.{IO, Sync}
-import scalaz.{~>, Id, IMap}, Id.Id
+import scalaz.{~>, Id, IMap, \/-}, Id.Id
 import scalaz.std.string._
 import shims._
 
 import MockTablesSpec.MockM
 
-final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String] {
+final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String, String] {
 
-  val tables: Tables[MockM, UUID, String, String] =
+  val tables: Tables[MockM, UUID, String, String, String] =
     MockTables[MockM]
 
   val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1")
@@ -131,6 +131,19 @@ final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String] {
         status1 must be_\/-(PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing))
         status2 must be_\/-(PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.NotPreparing))
         status3 must be_\/-(PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing))
+      }
+    }
+  }
+
+  "schema" >> {
+    "successfully request schema for prepared table" >>* {
+      for {
+        id <- init(MockTables.MockTable(
+          TableRef(TableName("foo"), "bar"),
+          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
+        result <- tables.preparedSchema(id)
+      } yield {
+        result must_== \/-(PreparationResult.Available(id, id.toString))
       }
     }
   }

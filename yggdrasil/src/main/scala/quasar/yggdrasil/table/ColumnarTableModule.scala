@@ -17,6 +17,7 @@
 package quasar.yggdrasil
 package table
 
+import quasar.ParseInstruction
 import quasar.blueeyes._
 import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta, CPathNode}
 import quasar.contrib.fs2.convert
@@ -368,6 +369,7 @@ trait ColumnarTableModule
           : MonadFinalizers[?[_], IO]
           : LiftIO](
         bytes: fs2.Stream[IO, Byte],
+        instructions: List[ParseInstruction],
         precise: Boolean = false)(
         implicit
         cs: ContextShift[IO],
@@ -375,9 +377,24 @@ trait ColumnarTableModule
         : M[Table] = {
 
       import fs2.{Chunk, Stream}
+      import tectonic.Plate
       import tectonic.json.Parser
 
-      val parser = Parser(new SlicePlate(precise), Parser.ValueStream)
+      val plate = instructions.foldRight(new SlicePlate(precise): Plate[List[Slice]]) {
+        case (ParseInstruction.Ids, plate) =>
+          new IdsPlate(plate)
+
+        case (instr @ ParseInstruction.Wrap(_, _), plate) =>
+          new WrapPlate(instr, plate)
+
+        case (instr @ ParseInstruction.Mask(_), plate) =>
+          new MaskPlate(instr, plate)
+
+        case (instr @ ParseInstruction.Pivot(_, _, _), plate) =>
+          new PivotPlate(instr, plate)
+      }
+
+      val parser = Parser(plate, Parser.ValueStream)
 
       val absorbed: Stream[IO, Chunk[Slice]] =
         bytes.chunks evalMap { bc =>

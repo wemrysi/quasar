@@ -43,18 +43,18 @@ import scalaz.syntax.monad._
 
 import shims._
 
-final class DefaultTables[F[_]: Effect, I: Equal, Q, D](
+final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     freshId: F[I],
     tableStore: IndexedStore[F, I, TableRef[Q]],
     manager: PreparationsManager[F, I, Q, D],
-    lookupFromPTableStore: I => F[Option[D]])
-    extends Tables[F, I, Q, D] {
+    lookupFromPTableStore: I => F[Option[D]],
+    lookupTableSchema: I => F[Option[S]])
+    extends Tables[F, I, Q, D, S] {
 
   import TableError.{
     ExistenceError,
     ModificationError,
     NameConflict,
-    PreparationExists,
     PreparationInProgress,
     PreparationNotInProgress,
     PrePreparationError,
@@ -130,22 +130,26 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D](
   def replaceTable(tableId: I, table: TableRef[Q]): F[Condition[ModificationError[I]]] =
     tableStore.lookup(tableId).flatMap {
       case Some(_) =>
-        liveStatus(tableId).flatMap {
-          case PreparationStatus(PreparedStatus.Prepared, _) =>
-            Condition.abnormal(
-              PreparationExists(tableId): ModificationError[I]).point[F]
-          case PreparationStatus(_, OngoingStatus.Preparing) =>
-            Condition.abnormal(
-              PreparationInProgress(tableId): ModificationError[I]).point[F]
-          case PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.NotPreparing) =>
-            tableStore.insert(tableId, table).map(_ => Condition.normal())
-        }
+        tableStore.insert(tableId, table).map(_ => Condition.normal())
       case None =>
         Condition.abnormal(TableNotFound(tableId): ModificationError[I]).pure[F]
     }
 
   def table(tableId: I): F[ExistenceError[I] \/ TableRef[Q]] =
     tableStore.lookup(tableId).map(option.toRight(_)(TableNotFound(tableId)))
+
+  def preparedSchema(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, S]] =
+    tableStore.lookup(tableId).flatMap {
+      case Some(_) =>
+        lookupTableSchema(tableId).map {
+          case Some(s) =>
+            PreparationResult.Available[I, S](tableId, s).right
+          case None =>
+            PreparationResult.Unavailable[I, S](tableId).right
+        }
+      case None =>
+        (TableNotFound(tableId): ExistenceError[I]).left.pure[F]
+    }
 
   ////
 
@@ -169,15 +173,17 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D](
 }
 
 object DefaultTables {
-  def apply[F[_]: Effect, I: Equal, Q, D](
+  def apply[F[_]: Effect, I: Equal, Q, D, S](
       freshId: F[I],
       tableStore: IndexedStore[F, I, TableRef[Q]],
       manager: PreparationsManager[F, I, Q, D],
-      lookupFromPTableStore: I => F[Option[D]])
-      : Tables[F, I, Q, D] =
-      new DefaultTables[F, I, Q, D](
+      lookupFromPTableStore: I => F[Option[D]],
+      lookupTableSchema: I => F[Option[S]])
+      : Tables[F, I, Q, D, S] =
+      new DefaultTables[F, I, Q, D, S](
         freshId,
         tableStore,
         manager,
-        lookupFromPTableStore)
+        lookupFromPTableStore,
+        lookupTableSchema)
 }

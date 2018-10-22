@@ -51,6 +51,7 @@ after_failure: scripts/discordTravisPost failure https://discordapp.com/api/webh
 branches:
   except:
     - /^v\d+\.\d+\.\d+$/ # don't redundantly build tags
+    - /^.*-version-bump-.*$/
 
 cache:
   directories:

@@ -33,7 +33,7 @@ import scalaz.{~>, IMap, Id}
 import scalaz.std.string._
 import shims._
 
-final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String] {
+final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, String] {
   import DefaultTablesSpec._
 
   sequential
@@ -54,6 +54,16 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String] {
   val lookup: UUID => IO[Option[String]] =
     pTableStore.lookup(_)
 
+  val lookupSchema: UUID => IO[Option[String]] =
+    uuid => {
+      for {
+        l <- pTableStore.lookup(uuid)
+      } yield l match {
+        case Some(s) => Some(s)
+        case _ => None
+      }
+    }
+
   val evaluator: QueryEvaluator[IO, String, String] =
     new QueryEvaluator[IO, String, String] {
       def evaluate(query: String): IO[String] = IO(query)
@@ -63,8 +73,8 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String] {
     PreparationsManager[IO, UUID, String, String](evaluator)(runToStore)
       .compile.toList.unsafeRunSync
 
-  val tables: Tables[IO, UUID, String, String] =
-    DefaultTables[IO, UUID, String, String](freshId, tableStore, manager(0), lookup)
+  val tables: Tables[IO, UUID, String, String, String] =
+    DefaultTables[IO, UUID, String, String, String](freshId, tableStore, manager(0), lookup, lookupSchema)
 
   val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1")
   val table2: TableRef[String] = TableRef(TableName("table2"), "select * from table2")

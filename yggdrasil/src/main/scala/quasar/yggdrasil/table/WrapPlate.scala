@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.mimir.evaluate
+package quasar.yggdrasil.table
 
 import quasar.ParseInstruction
 import quasar.common.CPathField
-import quasar.yggdrasil.table.CPathPlate
 
 import tectonic.{DelegatingPlate, Plate, Signal}
 
-final class WrapPlate[A](
+private[table] final class WrapPlate[A](
     wrap: ParseInstruction.Wrap,
     delegate: Plate[A])
     extends DelegatingPlate(delegate)

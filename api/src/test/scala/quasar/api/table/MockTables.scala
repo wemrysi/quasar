@@ -31,7 +31,7 @@ import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 
 final class MockTables[F[_]: Monad: MockTables.TablesMockState]
-  extends Tables[F, UUID, String, String] {
+  extends Tables[F, UUID, String, String, String] {
 
   import MockTables._
   import TableError._
@@ -66,23 +66,13 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
 
   def replaceTable(tableId: UUID, table: TableRef[String])
       : F[Condition[ModificationError[UUID]]] =
-    store.gets(_.lookup(tableId)).flatMap {
-      _.map(_.status match {
-        case PreparationStatus(PreparedStatus.Prepared, _) =>
-          Condition.abnormal[ModificationError[UUID]](
-            PreparationExists(tableId)).point[F]
-
-        case PreparationStatus(_, OngoingStatus.Preparing) =>
-          Condition.abnormal[ModificationError[UUID]](
-            PreparationInProgress(tableId)).point[F]
-
-        case s @ PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.NotPreparing) =>
-          store.modify(_.insert(tableId, MockTable(table, s)))
-            .as(Condition.normal[ModificationError[UUID]]())
-      }).getOrElse {
-        Condition.abnormal[ModificationError[UUID]](
-          TableNotFound(tableId)).point[F]
+    store.gets(_.lookup(tableId)) flatMap { res =>
+      val modified = res map { s =>
+        store.modify(_.insert(tableId, MockTable(table, s.status)))
+          .as(Condition.normal[ModificationError[UUID]]())
       }
+      modified.getOrElse(Condition.abnormal[ModificationError[UUID]](
+        TableNotFound(tableId)).point[F])
     }
 
   // mock tables prepare immediately
@@ -144,7 +134,13 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
         PreparationResult.Unavailable[UUID, String](tableId)
     }.toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID]))
 
-  ////
+  def preparedSchema(tableId: UUID): F[ExistenceError[UUID] \/ PreparationResult[UUID, String]] =
+    store.gets(_.lookup(tableId).map { s =>
+      if (isPrepared(s.status))
+        PreparationResult.Available[UUID, String](tableId, tableId.toString)
+      else
+        PreparationResult.Unavailable[UUID, String](tableId)
+    }.toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID]))
 
   private def isPrepared(status: PreparationStatus): Boolean =
     status match {
