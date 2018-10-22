@@ -29,12 +29,13 @@ import quasar.qscript._, PlannerError.InternalError
 import quasar.yggdrasil.{MonadFinalizers, TransSpecModule}
 
 import cats.effect.{IO, LiftIO}
-import fs2.{Segment, Stream}
+import fs2.{Chunk, Segment, Stream}
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
 import scala.concurrent.ExecutionContext
+import scala.collection.mutable.ArrayBuffer
 
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
@@ -130,11 +131,11 @@ final class FederatedShiftedReadPlanner[
       instructions match {
         case Nil => rvalues
         case instrs =>
-          rvalues.mapChunks(chunk =>
-            Segment.seq(chunk.foldLeft(List[RValue]()) {
-              case (acc, rv) =>
-                RValueParseInstructionInterpreter.interpret(instrs, rv) ::: acc
-            }))
+          rvalues mapChunks { chunk =>
+            val buf = ArrayBuffer.empty[RValue]
+            chunk.foreach(rv => buf ++= RValueParseInstructionInterpreter.interpret(instrs, rv))
+            Segment.chunk(Chunk.buffer(buf))
+          }
       }
 
     P.Table.fromQDataStream[F, RValue](interpretedRValues) map { table =>
