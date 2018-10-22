@@ -18,6 +18,7 @@ package quasar.mimir.evaluate
 
 import slamdata.Predef.{Stream => _, _}
 
+import quasar.ParseInstruction
 import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
@@ -34,6 +35,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 import scala.concurrent.ExecutionContext
+import scala.collection.mutable.ArrayBuffer
 
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
@@ -43,8 +45,6 @@ final class FederatedShiftedReadPlanner[
     cs: ContextShift[IO],
     ec: ExecutionContext) {
 
-  import Interpreter.ShiftInfo
-
   type Assocs = Associates[T, IO]
   type M[A] = AssociatesT[T, F, IO, A]
 
@@ -52,10 +52,10 @@ final class FederatedShiftedReadPlanner[
 
   def plan: AlgebraM[M, Read, MimirRepr] = {
     case -\/(Const(ShiftedRead(file, status))) =>
-      planRead(file, status, None)
+      planRead(file, status, List())
 
-    case \/-(Const(InterpretedRead(file, shiftPath, shiftStatus, shiftType, shiftKey))) =>
-      planRead(file, ExcludeId, Some(ShiftInfo(shiftPath, shiftStatus, shiftType, shiftKey)))
+    case \/-(Const(InterpretedRead(file, instructions))) =>
+      planRead(file, ExcludeId, instructions)
   }
 
   ////
@@ -64,13 +64,14 @@ final class FederatedShiftedReadPlanner[
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
 
-  private def planRead(file: AFile, readStatus: IdStatus, shiftInfo: Option[ShiftInfo]): M[MimirRepr] =
+  private def planRead(file: AFile, readStatus: IdStatus, instructions: List[ParseInstruction])
+      : M[MimirRepr] =
     Kleisli.ask[F, Assocs].map(_(file)) andThenK { maybeSource =>
       for {
         source <- MonadPlannerErr[F].unattempt_(
           maybeSource \/> InternalError.fromMsg(s"No source for '${posixCodec.printPath(file)}'."))
 
-        tbl <- sourceTable(source, shiftInfo)
+        tbl <- sourceTable(source, instructions)
 
         repr = MimirRepr(P)(tbl)
       } yield {
@@ -95,7 +96,7 @@ final class FederatedShiftedReadPlanner[
 
   private def sourceTable(
       source: EvalSource[QueryAssociate[T, IO]],
-      shiftInfo: Option[ShiftInfo])
+      instructions: List[ParseInstruction])
       : F[P.Table] = {
     val queryResult =
       source.src match {
@@ -116,29 +117,31 @@ final class FederatedShiftedReadPlanner[
           f(shiftedRead)
       }
 
-    queryResult.to[F].flatMap(tableFromStream(_, shiftInfo))
+    queryResult.to[F].flatMap(tableFromStream(_, instructions))
   }
 
   // we do not preserve the order of shifted results
   private def tableFromStream(
       rvalues: Stream[IO, RValue],
-      shift: Option[ShiftInfo])
+      instructions: List[ParseInstruction])
       : F[P.Table] = {
 
     val interpretedRValues: Stream[IO, RValue] =
-      shift match {
-        case None => rvalues
-        case Some(shiftInfo) =>
-          rvalues.mapChunks(chunk =>
-            Chunk.seq(chunk.foldLeft(List[RValue]()) {
-              case (acc, rv) => Interpreter.interpret(rv, shiftInfo) ::: acc
-            }))
+      instructions match {
+        case Nil => rvalues
+        case instrs =>
+          rvalues mapChunks { chunk =>
+            val buf = ArrayBuffer.empty[RValue]
+            chunk.foreach(rv => buf ++= RValueParseInstructionInterpreter.interpret(instrs, rv))
+            Chunk.buffer(buf)
+          }
       }
 
     P.Table.fromQDataStream[F, RValue](interpretedRValues) map { table =>
       import P.trans._
 
       // TODO depending on the id status we may not need to wrap the table
+      // Also, we will need to handle this using ParseInstruction
       table.transform(OuterObjectConcat(
         WrapObject(
           Scan(Leaf(Source), P.freshIdScanner),

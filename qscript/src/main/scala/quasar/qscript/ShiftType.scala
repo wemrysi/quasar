@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import quasar.RenderTree
+import quasar.{CompositeParseType, ParseType, RenderTree}
 
 import scala.{Product, Serializable}
 import scalaz.{Equal, Show}
@@ -26,6 +26,12 @@ sealed trait ShiftType extends Product with Serializable
 object ShiftType {
   case object Array extends ShiftType
   case object Map extends ShiftType
+
+  def toParseType(shiftType: ShiftType): CompositeParseType =
+    shiftType match {
+      case Array => ParseType.Array
+      case Map => ParseType.Object
+    }
 
   implicit def equal: Equal[ShiftType] = Equal.equalA
 

@@ -16,10 +16,12 @@
 
 package quasar.qscript.rewrites
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => SMap, _}
 
-import quasar.Qspec
+import quasar.{ParseType, Qspec}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
+import quasar.ParseInstruction.{Mask, Pivot, Wrap}
+import quasar.common.{CPath, CPathField}
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.ejson.{EJson, Fixed}
@@ -71,12 +73,12 @@ object OptimizeSpec extends Qspec {
 
     "find the path of Hole" >> {
       optimize.findPath(funcE.Hole) must equal(
-        Some(ShiftPath(List[String]())))
+        Some(CPath.Identity))
     }
 
     "find the path of a single object projection" >> {
       optimize.findPath(funcE.ProjectKeyS(funcE.Hole, "xyz")) must equal(
-        Some(ShiftPath(List[String]("xyz"))))
+        Some(CPath(CPathField("xyz"))))
     }
 
     "find the path of a triple object projection" >> {
@@ -90,7 +92,7 @@ object OptimizeSpec extends Qspec {
           "ccc")
 
       optimize.findPath(fm) must equal(
-        Some(ShiftPath(List[String]("aaa", "bbb", "ccc"))))
+        Some(CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc"))))
     }
 
     "fail find the path of an object projection with a non-string key" >> {
@@ -156,7 +158,7 @@ object OptimizeSpec extends Qspec {
     }
   }
 
-  "ExtraLeftShift rewrite" >> {
+  "InterpretedRead rewrite" >> {
 
     val rewriteLeftShiftFunc: QSExtra[Fix[QSExtra]] => QSExtra[Fix[QSExtra]] =
       liftFG[QScriptCore[Fix, ?], QSExtra, Fix[QSExtra]](optimize.rewriteLeftShift[QSExtra, AFile])
@@ -181,10 +183,10 @@ object OptimizeSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
-              ShiftPath(List()),
-              IncludeId,
-              ShiftType.Map,
-              ShiftKey(ShiftedKey)),
+              List(
+                Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
+                Wrap(CPath.Identity, ShiftedKey),
+                Pivot(CPath(CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
                 recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 0)),
@@ -208,10 +210,10 @@ object OptimizeSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
-              ShiftPath(List()),
-              IdOnly,
-              ShiftType.Map,
-              ShiftKey(ShiftedKey)),
+              List(
+                Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
+                Wrap(CPath.Identity, ShiftedKey),
+                Pivot(CPath(CPathField(ShiftedKey)), IdOnly, ParseType.Object))),
             recFuncE.MakeMapS("k1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
 
@@ -232,10 +234,10 @@ object OptimizeSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
-              ShiftPath(List()),
-              ExcludeId,
-              ShiftType.Map,
-              ShiftKey(ShiftedKey)),
+              List(
+                Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
+                Wrap(CPath.Identity, ShiftedKey),
+                Pivot(CPath(CPathField(ShiftedKey)), ExcludeId, ParseType.Object))),
             recFuncE.MakeMapS("v1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
 
@@ -260,10 +262,10 @@ object OptimizeSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
-              ShiftPath(List()),
-              ExcludeId,
-              ShiftType.Map,
-              ShiftKey(ShiftedKey)),
+              List(
+                Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
+                Wrap(CPath.Identity, ShiftedKey),
+                Pivot(CPath(CPathField(ShiftedKey)), ExcludeId, ParseType.Object))),
             recFuncE.MakeMapS("v1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey))),
           recFuncE.Constant(ejs.bool(true)))
@@ -287,15 +289,23 @@ object OptimizeSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
-              ShiftPath(List("xyz")),
-              IncludeId,
-              ShiftType.Map,
-              ShiftKey(ShiftedKey)),
+              List(
+                Mask(SMap((CPath(CPathField("xyz")), Set(ParseType.Object)))),
+                Wrap(CPath(CPathField("xyz")), ShiftedKey),
+                Pivot(CPath(CPathField("xyz"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
-                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 0)),
+                recFuncE.ProjectIndexI(
+                  recFuncE.ProjectKeyS(
+                    recFuncE.ProjectKeyS(recFuncE.Hole, "xyz"),
+                    ShiftedKey),
+                  0)),
               recFuncE.MakeMapS("v1",
-                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 1))))
+                recFuncE.ProjectIndexI(
+                  recFuncE.ProjectKeyS(
+                    recFuncE.ProjectKeyS(recFuncE.Hole, "xyz"),
+                    ShiftedKey),
+                  1))))
 
       rewriteLeftShift(initial) must equal(expected)
     }
@@ -321,15 +331,23 @@ object OptimizeSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
-              ShiftPath(List("aaa", "bbb", "ccc")),
-              IncludeId,
-              ShiftType.Map,
-              ShiftKey(ShiftedKey)),
+              List(
+                Mask(SMap((CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc")), Set(ParseType.Object)))),
+                Wrap(CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc")), ShiftedKey),
+                Pivot(CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
-                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 0)),
+                recFuncE.ProjectIndexI(
+                  recFuncE.ProjectKeyS(
+                    recFuncE.ProjectKeyS(recFuncE.ProjectKeyS(recFuncE.ProjectKeyS(recFuncE.Hole, "aaa"), "bbb"), "ccc"),
+                    ShiftedKey),
+                  0)),
               recFuncE.MakeMapS("v1",
-                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 1))))
+                recFuncE.ProjectIndexI(
+                  recFuncE.ProjectKeyS(
+                    recFuncE.ProjectKeyS(recFuncE.ProjectKeyS(recFuncE.ProjectKeyS(recFuncE.Hole, "aaa"), "bbb"), "ccc"),
+                    ShiftedKey),
+                  1))))
 
       rewriteLeftShift(initial) must equal(expected)
     }

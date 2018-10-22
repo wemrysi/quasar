@@ -7,7 +7,6 @@
     "data": "deep-giraffe-plus.data",
     "query": "select first.second{_}.testField as testField from `deep-giraffe-plus.data`",
     "predicate": "exactly",
-    "ignoreResultOrder": true,
     "expected": [
       {"testField":"A"},
       {"testField":"B"},

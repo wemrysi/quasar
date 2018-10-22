@@ -154,6 +154,7 @@ object Quasar {
       tables = DefaultTables[F, UUID, SqlQuery, Stream[F, MimirRepr], PTableSchema](
         freshUUID,
         tableRefs,
+        queryEvaluator,
         preparationsManager,
         key => pTableStore.read(storeKeyUuidP.reverseGet(key))
           .map(_.map(t =>
