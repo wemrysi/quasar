@@ -16,77 +16,32 @@
 
 package quasar.qscript
 
-import slamdata.Predef.{List, String}
-import quasar.{IdStatus, RenderTree}
+import slamdata.Predef.List
+import quasar.{ParseInstruction, RenderTree}
 import quasar.contrib.pathy.APath
 
 import monocle.macros.Lenses
 import pathy.Path.posixCodec
 import scalaz.{Equal, Show}
 import scalaz.std.list._
-import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 
-/* LeftShift(
- *   ShiftedRead(path, ExcludeId),
- *   ProjectKey(ProjectKey(Hole, foo), bar),
- *   shiftStatus,
- *   shiftType,
- *   OnUndefined.Omit,
- *   repair) where `repair` does not reference `LeftSide`
- *
- * is equivalent to
- *
- * InterpretedRead(path, List(foo, bar), shiftStatus, shiftType, _)
- */
 @Lenses final case class InterpretedRead[A](
   path: A,
-  shiftPath: ShiftPath,
-  shiftStatus: IdStatus,
-  shiftType: ShiftType,
-  shiftKey: ShiftKey)
+  instructions: List[ParseInstruction])
 
 object InterpretedRead {
 
   implicit def equal[A: Equal]: Equal[InterpretedRead[A]] =
-    Equal.equalBy(r =>
-      (r.path,
-      r.shiftPath,
-      r.shiftStatus,
-      r.shiftType,
-      r.shiftKey))
+    Equal.equalBy(r => (r.path, r.instructions))
 
   implicit def show[A <: APath]: Show[InterpretedRead[A]] =
     RenderTree.toShow
 
   implicit def renderTree[A <: APath]: RenderTree[InterpretedRead[A]] =
-    RenderTree.simple(List("InterpretedRead"), r => {
-      (posixCodec.printPath(r.path) + ", " +
-        r.shiftPath.shows + ", " +
-        r.shiftStatus.shows + ", " +
-        r.shiftType.shows + ", " +
-        r.shiftKey.shows).some
-    })
-}
-
-final case class ShiftKey(key: String)
-
-object ShiftKey {
-  implicit val equal: Equal[ShiftKey] =
-    Equal.equalBy(_.key)
-
-  implicit val show: Show[ShiftKey] =
-    Show.showFromToString
-}
-
-final case class ShiftPath(path: List[String])
-
-object ShiftPath {
-  implicit val equal: Equal[ShiftPath] =
-    Equal.equalBy(_.path)
-
-  implicit val show: Show[ShiftPath] =
-    Show.showFromToString
+    RenderTree.simple(
+      List("InterpretedRead"),
+      r => (posixCodec.printPath(r.path) + ", " + r.instructions.shows).some)
 }
