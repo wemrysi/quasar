@@ -169,13 +169,12 @@ object RValueParseInstructionInterpreter {
             case (RArray(elems), ParseType.Array) =>
               status match {
                 case IdOnly =>
-                  0.until(elems.length).toList.map(CLong(_))
+                  elems.iterator.zipWithIndex.map(t => CLong(t._2)).toList
                 case IncludeId => // the qscript expects the results to be returned in an array
-                  val (_, res) = elems.foldLeft((0, List[RValue]())) {
-                    case ((idx, acc), elem) =>
-                      (idx + 1, RArray(CLong(idx), elem) :: acc)
+                  val shifted: Iterator[RValue] = elems.iterator.zipWithIndex map {
+                    case (elem, idx) => RArray(CLong(idx), elem)
                   }
-                  res.reverse
+                  shifted.toList
                 case ExcludeId => elems
               }
 
