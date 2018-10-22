@@ -24,6 +24,8 @@ import quasar.ParseInstruction.{Ids, Mask, Pivot, Wrap}
 import quasar.common.{CPathField, CPathIndex, CPathNode}
 import quasar.precog.common._
 
+import scalaz.syntax.std.stream._
+
 object RValueParseInstructionInterpreter {
 
   def interpret(instructions: List[ParseInstruction], rvalue: RValue): List[RValue] =
@@ -227,10 +229,15 @@ object RValueParseInstructionInterpreter {
             RObject(fields.updated(field, inner(tail, target))))
 
         case (CPathIndex(idx) :: tail, arr @ RArray(elems)) =>
-          if ((idx < elems.length) && (idx >= 0))
-            RArray(elems.updated(idx, inner(tail, elems(idx))))
-          else
+          if (idx < 0) {
             arr
+          } else {
+            val result: Option[RValue] = elems.toStream.toZipper flatMap { orig =>
+              orig.move(idx).map(moved =>
+                RArray(moved.update(inner(tail, moved.focus)).toStream.toList))
+            }
+            result.getOrElse(arr)
+          }
 
         case (_, rv) => rv
       }
