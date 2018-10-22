@@ -25,10 +25,10 @@ import org.specs2.execute.AsResult
 import org.specs2.specification.BeforeEach
 import org.specs2.specification.core.Fragment
 import scalaz.{~>, \/, \/-, -\/, Equal, Id, Monad, Show}, Id.Id
-import scalaz.syntax.monad._
 import scalaz.std.list._
+import scalaz.syntax.monad._
 
-abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D, S]
+abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D: Equal: Show, S]
     extends Qspec
     with ConditionMatchers
     with BeforeEach {
@@ -122,6 +122,17 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D, 
       }
     }
 
+    "error when requesting live data for a nonexistent table" >>* {
+      for {
+        id <- uniqueId.point[F]
+        result <- tables.liveData(id)
+      } yield {
+        result must beLike {
+          case -\/(TableError.TableNotFound(i)) => i must_= id
+        }
+      }
+    }
+
     "error when requesting prepared data for an unprepared table" >>* {
       for {
         errorOrId <- tables.createTable(table1)
@@ -186,7 +197,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D, 
         errorOrId <- tables.createTable(table1)
         id <- isSuccess(errorOrId)
         originalResult <- tables.table(id)
-        errorOrId <- tables.replaceTable(id, table2)
+        _ <- tables.replaceTable(id, table2)
         replacedResult <- tables.table(id)
       } yield {
         originalResult must beLike {
@@ -194,6 +205,62 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D, 
         }
         replacedResult must beLike {
           case \/-(t) => t must_= table2
+        }
+      }
+    }
+
+    "successfully prepare a table" >>* {
+      for {
+        errorOrId <- tables.createTable(table1)
+        id <- isSuccess(errorOrId)
+        tableResult <- tables.table(id)
+        prepareResult <- tables.prepareTable(id)
+      } yield {
+        tableResult must beLike {
+          case \/-(t) => t must_= table1
+        }
+
+        prepareResult must beNormal
+      }
+    }
+
+    "successfully replace a prepared table" >>* {
+      for {
+        errorOrId <- tables.createTable(table1)
+        id <- isSuccess(errorOrId)
+
+        originalResult <- tables.table(id)
+        prepareResult <- tables.prepareTable(id)
+
+        _ <- tables.replaceTable(id, table2)
+        replacedResult <- tables.table(id)
+      } yield {
+        originalResult must beLike {
+          case \/-(t) => t must_= table1
+        }
+
+        prepareResult must beNormal
+
+        replacedResult must beLike {
+          case \/-(t) => t must_= table2
+        }
+      }
+    }
+
+    "get live data for a table" >>* {
+      for {
+        errorOrId <- tables.createTable(table1)
+        id <- isSuccess(errorOrId)
+
+        tableResult <- tables.table(id)
+        liveResult <- tables.liveData(id)
+      } yield {
+        tableResult must beLike {
+          case \/-(t) => t must_= table1
+        }
+
+        liveResult must beLike {
+          case \/-(data) => data must_= preparation1
         }
       }
     }

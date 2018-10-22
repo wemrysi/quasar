@@ -329,6 +329,14 @@ class SQLParserSpec extends quasar.Qspec {
       parse("select 1, 2.0, 3000000, 2.998e8, -1.602E-19, 1e+6") should be_\/-
     }
 
+    "parse addition of interpreted integer and integer" in {
+      parse("""select INTEGER("17") + 25 from zips""") must be_\/-
+    }
+
+    "parse addition of sums" in {
+      parse("""SELECT sum(SleepingRooms) + sum(MeetingRoom) FROM zips""") must be_\/-
+    }
+
     "parse date, time, timestamp, and id literals" in {
       val q = """select * from foo
                   where dt < date("2014-11-16")
