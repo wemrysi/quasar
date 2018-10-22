@@ -72,7 +72,7 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, Strin
       .compile.toList.unsafeRunSync
 
   val tables: Tables[IO, UUID, String, String, String] =
-    DefaultTables[IO, UUID, String, String, String](freshId, tableStore, manager(0), lookup, lookupSchema)
+    DefaultTables[IO, UUID, String, String, String](freshId, tableStore, evaluator, manager(0), lookup, lookupSchema)
 
   val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1")
   val table2: TableRef[String] = TableRef(TableName("table2"), "select * from table2")
