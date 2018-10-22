@@ -35,7 +35,8 @@ import shims._
 object LocalDatasourceModule extends LightweightDatasourceModule {
 
   // FIXME this is side effecting
-  val blockingPool: ExecutionContext = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+  private lazy val blockingPool: ExecutionContext =
+    ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
 
   val kind: DatasourceType = LocalType
 
