@@ -19,12 +19,7 @@ package quasar.impl.datasources
 import slamdata.Predef._
 import quasar.{Condition, Disposable, IdStatus, RenderTreeT}
 import quasar.api.datasource.{DatasourceError, DatasourceRef, DatasourceType}
-import quasar.api.datasource.DatasourceError.{
-  CreateError,
-  DatasourceUnsupported,
-  DiscoveryError,
-  ExistentialError
-}
+import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported, DiscoveryError, ExistentialError}
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.connector.{Datasource, MonadResourceErr}
 import quasar.contrib.iota._
@@ -39,6 +34,7 @@ import quasar.impl.schema._
 import quasar.qscript._
 import quasar.sst._
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
 import argonaut.Json
@@ -50,7 +46,7 @@ import fs2.Stream
 import fs2.concurrent.{Signal, SignallingRef}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import pathy.Path
-import scalaz.{\/, EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz}, Scalaz._
+import scalaz.{EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz, \/}, Scalaz._
 import shims._
 import spire.algebra.Field
 import spire.math.ConvertableTo
@@ -64,7 +60,8 @@ final class DatasourceManagement[
     errors: Ref[F, IMap[I, Exception]],
     running: SignallingRef[F, DatasourceManagement.Running[I, T, F]],
     sstEvalConfig: SstEvalConfig)(
-    implicit tmr: Timer[F])
+    implicit tmr: Timer[F],
+    ec: ExecutionContext)
     extends DatasourceControl[F, Stream[F, ?], I, Json, SstConfig[T[EJson], N]]
     with DatasourceErrors[F, I] {
 
@@ -247,7 +244,8 @@ object DatasourceManagement {
       N: ConvertableTo: Field: Order](
       modules: Modules,
       configured: IMap[I, DatasourceRef[Json]],
-      sstEvalConfig: SstEvalConfig)
+      sstEvalConfig: SstEvalConfig)(
+      implicit ec: ExecutionContext)
       : F[(MgmtControl[T, F, I, N] with DatasourceErrors[F, I], Signal[F, Running[I, T, F]])] = {
 
     for {
@@ -294,7 +292,8 @@ object DatasourceManagement {
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: MonadError_[?[_], CreateError[Json]]: Timer](
       module: DatasourceModule,
-      ref: DatasourceRef[Json])
+      ref: DatasourceRef[Json])(
+      implicit ec: ExecutionContext)
       : F[Disposable[F, DS[T, F]]] =
     module match {
       case DatasourceModule.Lightweight(lw) =>

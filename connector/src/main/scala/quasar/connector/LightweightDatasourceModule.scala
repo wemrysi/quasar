@@ -21,6 +21,8 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource.ResourcePath
 
+import scala.concurrent.ExecutionContext
+
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Timer}
 import fs2.Stream
@@ -29,6 +31,8 @@ import scalaz.\/
 trait LightweightDatasourceModule {
   def kind: DatasourceType
   def sanitizeConfig(config: Json): Json
-  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](config: Json)
+  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
+    config: Json)(
+    implicit ec: ExecutionContext)
       : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath]]]
 }

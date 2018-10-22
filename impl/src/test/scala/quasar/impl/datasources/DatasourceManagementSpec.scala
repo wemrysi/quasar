@@ -29,41 +29,36 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.impl.DatasourceModule
-import quasar.impl.schema.{SstConfig, SstSchema, SstEvalConfig}
+import quasar.impl.schema.{SstConfig, SstEvalConfig, SstSchema}
 import quasar.qscript.{MonadPlannerErr, PlannerError, QScriptEducated}
 import quasar.sst._, StructuralType.TypeST
 import quasar.tpe._
 
 import java.lang.IllegalArgumentException
+import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 import argonaut.Json
 import argonaut.JsonScalaz._
-import argonaut.Argonaut.{jString, jEmptyObject}
-
+import argonaut.Argonaut.{jEmptyObject, jString}
 import cats.{Applicative, ApplicativeError, MonadError}
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
-
 import eu.timepit.refined.auto._
 import fs2.Stream
-
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
 import matryoshka.implicits._
-
 import qdata.QDataEncode
-
-import scalaz.{\/, -\/, IMap, Show}
+import scalaz.{-\/, IMap, Show, \/}
 import scalaz.syntax.bind._
 import scalaz.syntax.either._
 import scalaz.syntax.show._
 import scalaz.std.anyVal._
 import scalaz.std.option._
-
-import shims.{orderToScalaz => _, eqToScalaz => _, _}
+import shims.{eqToScalaz => _, orderToScalaz => _, _}
 import spire.std.double._
 
 final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers {
@@ -111,7 +106,9 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
     def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-    def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](config: Json)
+    def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
+      config: Json)(
+      implicit ec: ExecutionContext)
         : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath]]] =
       mkDatasource[ResourcePath, F](kind, evalDelay).right.pure[F]
   }
