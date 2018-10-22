@@ -27,17 +27,17 @@ import quasar.precog.common._
 object RValueParseInstructionInterpreter {
 
   def interpret(instructions: List[ParseInstruction], rvalue: RValue): List[RValue] =
-    instructions.reverse.foldRight(List[RValue](rvalue)) {
-      case (instr @ Mask(_), prev) =>
+    instructions.foldLeft(List[RValue](rvalue)) {
+      case (prev, instr @ Mask(_)) =>
         prev.flatMap(interpretMask(instr, _).toList)
 
-      case (instr @ Pivot(_, _, _), prev) =>
+      case (prev, instr @ Pivot(_, _, _)) =>
         prev.flatMap(interpretPivot(instr, _))
 
-      case (instr @ Wrap(_, _), prev) =>
+      case (prev, instr @ Wrap(_, _)) =>
         prev.flatMap(interpretWrap(instr, _) :: Nil)
 
-      case (Ids, _) =>
+      case (_, Ids) =>
         scala.sys.error("ParseInstruction.Ids not supported for RValue interpretation")
     }
 
