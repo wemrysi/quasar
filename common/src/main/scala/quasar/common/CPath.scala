@@ -130,9 +130,6 @@ object CPath {
 
   private[this] final case class CompositeCPath(nodes: List[CPathNode]) extends CPath
 
-  private val PathPattern = """\.|(?=\[\d+\])|(?=\[\*\])""".r
-  private val IndexPattern = """^\[(\d+)\]$""".r
-
   val Identity = apply()
 
   def apply(n: CPathNode*): CPath = CompositeCPath(n.toList)
@@ -144,6 +141,9 @@ object CPath {
   def unapplySeq(path: String): Option[List[CPathNode]] = Some(parse(path).nodes)
 
   def parse(path: String): CPath = {
+    val PathPattern = """\.|(?=\[\d+\])|(?=\[\*\])""".r
+    val IndexPattern = """^\[(\d+)\]$""".r
+
     @SuppressWarnings(Array(
       "org.wartremover.warts.Equals",
       "org.wartremover.warts.Recursion"))
