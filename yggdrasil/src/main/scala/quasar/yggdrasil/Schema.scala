@@ -53,20 +53,6 @@ object Schema {
     case _                => Set.empty
   }
 
-  def cpath(jtype: JType): List[CPath] = {
-    val cpaths = jtype match {
-      case JArrayFixedT(indices) =>
-        indices.toList flatMap { case (idx, tpe) => CPath(CPathIndex(idx)) combine cpath(tpe) }
-      case JObjectFixedT(fields) =>
-        fields.toList flatMap { case (name, tpe) => CPath(CPathField(name)) combine cpath(tpe) }
-      case JArrayHomogeneousT(elemType) =>
-        List(CPath(CPathArray))
-      case _ => Nil
-    }
-
-    cpaths.sorted
-  }
-
   def sample(jtype: JType, size: Int): Option[JType] = {
     val paths                        = flatten(jtype, Nil) groupBy { _.selector } toSeq
     val sampledPaths: Seq[ColumnRef] = scala.util.Random.shuffle(paths).take(size) flatMap { _._2 }

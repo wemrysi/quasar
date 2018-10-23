@@ -29,14 +29,6 @@ import scalaz.syntax.show._
 sealed trait CPath { self =>
   def nodes: List[CPathNode]
 
-  def combine(paths: List[CPath]): List[CPath] =
-    if (paths.isEmpty)
-      List(this)
-    else
-      paths map { path =>
-        CPath(this.nodes ++ path.nodes)
-      }
-
   def \(that: CPath): CPath = CPath(self.nodes ++ that.nodes)
   def \(that: String): CPath = CPath(self.nodes :+ CPathField(that))
   def \(that: Int): CPath = CPath(self.nodes :+ CPathIndex(that))
