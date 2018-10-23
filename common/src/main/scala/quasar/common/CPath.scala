@@ -63,7 +63,7 @@ sealed trait CPath { self =>
   def head: Option[CPathNode] = nodes.headOption
   def tail: CPath = CPath(nodes.drop(1): _*)
 
-  // TODO we'd like to remove this but a few tests in niflheim depend on it
+  // this is required by a few tests in niflheim
   override def toString = if (nodes.isEmpty) "." else nodes.mkString("")
 }
 
