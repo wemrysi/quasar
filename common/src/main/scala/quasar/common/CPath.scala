@@ -38,10 +38,7 @@ sealed trait CPath { self =>
   def \:(that: Int): CPath = CPath(CPathIndex(that) +: self.nodes)
 
   def hasPrefixComponent(p: CPathNode): Boolean = nodes.startsWith(p :: Nil)
-  def hasSuffixComponent(p: CPathNode): Boolean = nodes.endsWith(p :: Nil)
-
   def hasPrefix(p: CPath): Boolean = nodes.startsWith(p.nodes)
-  def hasSuffix(p: CPath): Boolean = nodes.endsWith(p.nodes)
 
   def dropPrefix(p: CPath): Option[CPath] = {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -64,14 +61,10 @@ sealed trait CPath { self =>
   }
 
   def head: Option[CPathNode] = nodes.headOption
-
   def tail: CPath = CPath(nodes.drop(1): _*)
 
-  def path: String = nodes.mkString("")
-
-  def length: Int = nodes.length
-
-  override def toString = if (nodes.isEmpty) "." else path
+  // TODO we'd like to remove this but a few tests in niflheim depend on it
+  override def toString = if (nodes.isEmpty) "." else nodes.mkString("")
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
@@ -132,6 +125,7 @@ object CPath {
 
   def unapplySeq(path: String): Option[List[CPathNode]] = Some(parse(path).nodes)
 
+  // TODO parse CPathMeta
   def parse(path: String): CPath = {
     val PathPattern = """\.|(?=\[\d+\])|(?=\[\*\])""".r
     val IndexPattern = """^\[(\d+)\]$""".r
