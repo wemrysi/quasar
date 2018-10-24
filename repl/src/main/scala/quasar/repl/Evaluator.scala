@@ -171,6 +171,10 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         stateRef.modify(state => state.copy(variables = state.variables - n)) *>
           liftS1(s"Unset variable ${n.value}")
 
+      case SetPushdown(pd) =>
+        q.pushdown.set(pd) *>
+          liftS1(s"Set pushdown: $pd")
+
       case ListVars =>
         stateRef.get.map(_.variables.value).map(
           _.toList.map { case (VarName(name), VarValue(value)) => s"$name = $value" }
@@ -580,6 +584,7 @@ object Evaluator {
       |  set format = table | precise | readable | csv | homogeneouscsv
       |  set mode = console | file
       |  set summaryCount = [rows]
+      |  set pushdown = true | false
       |  set [var] = [value]
       |  unset [var]
       |  env

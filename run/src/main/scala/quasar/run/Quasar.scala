@@ -33,7 +33,7 @@ import quasar.impl.external.{ExternalConfig, ExternalDatasources}
 import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.table.{DefaultTables, PreparationsManager}
 import quasar.mimir.{MimirRepr, Precog}
-import quasar.mimir.evaluate.MimirQueryFederation
+import quasar.mimir.evaluate.{MimirQueryFederation, Pushdown, PushdownControl}
 import quasar.mimir.storage.{MimirIndexedStore, MimirPTableStore, PTableSchema, StoreKey}
 import quasar.run.implicits._
 import quasar.run.optics._
@@ -47,6 +47,7 @@ import cats.~>
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.flatMap._
 import fs2.{Scheduler, Stream}
+import fs2.async.Ref
 import matryoshka.data.Fix
 import pathy.Path._
 import scalaz.IMap
@@ -58,7 +59,8 @@ import spire.std.double._
 final class Quasar[F[_]](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
     val tables: Tables[F, UUID, SqlQuery, Stream[F, MimirRepr], PTableSchema],
-    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])
+    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]],
+    val pushdown: PushdownControl[F])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 object Quasar {
@@ -90,6 +92,9 @@ object Quasar {
       : Stream[F, Quasar[F]] = {
 
     for {
+      pushdownRef <- Stream.eval(Ref[F, Pushdown](Pushdown.EnablePushdown))
+      pushdown = new PushdownControl(pushdownRef)
+
       extMods <- ExternalDatasources[F](extConfig)
 
       modules = extMods.insert(
@@ -134,7 +139,7 @@ object Quasar {
       datasources = DefaultDatasources[F, UUID, Json, SstConfig[Fix[EJson], Double]](
         freshUUID, datasourceRefs, mgmt, mgmt)
 
-      federation = MimirQueryFederation[Fix, F](precog)
+      federation = MimirQueryFederation[Fix, F](precog, pushdown)
 
       pTableStore = MimirPTableStore[F](precog, PreparationLocation)
 
@@ -164,6 +169,6 @@ object Quasar {
               t.asInstanceOf[pTableStore.cake.Table])).covary[F])), // yolo x2
         i => pTableStore.schema(storeKeyUuidP.reverseGet(i)))
 
-    } yield new Quasar(datasources, tables, queryEvaluator)
+    } yield new Quasar(datasources, tables, queryEvaluator, pushdown)
   }
 }

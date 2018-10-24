@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.mimir
+package quasar.mimir.evaluate
 
 import slamdata.Predef.Option
 import quasar.contrib.pathy.AFile
@@ -22,7 +22,11 @@ import quasar.impl.evaluate.Source
 
 import scalaz.Kleisli
 
-package object evaluate {
+object Config {
   type Associates[T[_[_]], F[_]] = AFile => Option[Source[QueryAssociate[T, F]]]
-  type AssociatesT[T[_[_]], F[_], G[_], A] = Kleisli[F, Associates[T, G], A]
+  type AssociatesT[T[_[_]], F[_], G[_], A] = Kleisli[F, EvaluatorConfig[T, G], A]
+
+  final case class EvaluatorConfig[T[_[_]], F[_]](
+    associates: Associates[T, F],
+    pushdown: Pushdown)
 }
