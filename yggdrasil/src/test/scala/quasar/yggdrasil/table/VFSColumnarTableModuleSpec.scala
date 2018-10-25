@@ -17,27 +17,23 @@
 package quasar.yggdrasil
 package table
 
-import java.nio.file.Files
+import quasar.contrib.cats.effect._
+import quasar.contrib.pathy.AFile
+import quasar.precog.common.CLong
+import quasar.niflheim.NIHDB
+import quasar.yggdrasil.vfs.{Blob, Version}
+
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-import quasar.precog.common.CLong
+import scala.concurrent.ExecutionContext.Implicits.global
+
 import cats.effect.IO
 import org.specs2.mutable.Specification
+import pathy.Path.{file, rootDir}
 import scalaz.{-\/, StreamT, \/-}
 import shims._
-import java.util.concurrent.atomic.AtomicInteger
-
-import quasar.yggdrasil.vfs.SerialVFS
-
-import scala.concurrent.duration.FiniteDuration
-import pathy.Path.{file, rootDir}
-import quasar.contrib.pathy.AFile
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import quasar.niflheim.NIHDB
-import quasar.yggdrasil.vfs.{Blob, Version}
-import quasar.contrib.cats.effect._
 
 import scala.language.reflectiveCalls
 
@@ -76,17 +72,9 @@ object VFSColumnarTableModuleSpec
         _ <- IO.fromFutureShift(IO(db.close))
         _ <- IO.fromFutureShift(IO(db2.close))
 
-        // with db's closed delete up the hot cache
+        // clear the hot cache
         xx = this.asInstanceOf[{ val quasar$yggdrasil$table$VFSColumnarTableModule$$dbs: ConcurrentHashMap[(Blob, Version), NIHDB] }]
         _ = xx.quasar$yggdrasil$table$VFSColumnarTableModule$$dbs.clear()
-
-//        db3 <- openDB(path).run
-//        snap <- db3 match {
-//          case Some(\/-(n)) => IO.fromFutureShift(IO(n.getSnapshot))
-//        }
-//        _ = println(snap.structure)
-//        _ = println(snap.readers.length)
-//        _ = println(snap.blockIds.length)
 
         finalHead <- vfs.headOfBlob(blob)
         actualHead = finalHead match {
@@ -185,9 +173,8 @@ object VFSColumnarTableModuleSpec
 
   }
 
-  val base = Files.createTempDirectory("VFSColumnarTableModuleSpec").toFile
-  def vfs: SerialVFS[IO] = SerialVFS[IO](base, global).unsafeRunSync.unsafeValue //FIXME: don't use unsafeValue
-  def StorageTimeout: FiniteDuration = Timeout
+  def vfs = ???
+  def StorageTimeout = Timeout
 
   sealed trait TableCompanion extends VFSColumnarTableCompanion
   object Table extends TableCompanion
