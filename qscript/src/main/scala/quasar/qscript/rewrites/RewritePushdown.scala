@@ -36,7 +36,7 @@ import matryoshka.patterns.{ginterpretM, CoEnv}
 import scalaz.{\/, -\/, \/-, Const, Functor}
 import scalaz.Scalaz._ // apply-traverse syntax conflict
 
-final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
+final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
   import MapFuncsCore.{Constant, IntLit, ProjectIndex, ProjectKey}
 
@@ -178,7 +178,7 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   }
 }
 
-object Optimize {
+object RewritePushdown {
   def apply[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, G[a] <: ACopK[a], A](
       implicit GF: Injectable[G, F],
                ESRF: Const[InterpretedRead[A], ?] :<<: F,
@@ -187,13 +187,13 @@ object Optimize {
                QCG: QScriptCore[T, ?] :<<: G)
       : G[T[F]] => F[T[F]] = {
 
-    val opt = new Optimize[T]
+    val pushdown = new RewritePushdown[T]
 
     val rewrite1: G[T[F]] => F[T[F]] =
-      gtf => QCG.prj(gtf).fold(GF.inject(gtf))(opt.elideNoopMap[F])
+      gtf => QCG.prj(gtf).fold(GF.inject(gtf))(pushdown.elideNoopMap[F])
 
     val rewrite2: F[T[F]] => F[T[F]] =
-      liftFG[QScriptCore[T, ?], F, T[F]](opt.rewriteLeftShift[F, A])
+      liftFG[QScriptCore[T, ?], F, T[F]](pushdown.rewriteLeftShift[F, A])
 
     rewrite1 andThen rewrite2
   }

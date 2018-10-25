@@ -30,7 +30,7 @@ import quasar.mimir.MimirRepr
 import quasar.mimir.MimirCake._
 import quasar.mimir.evaluate.Config.{AssociatesT, EvaluatorConfig}
 import quasar.qscript._
-import quasar.qscript.rewrites.{Optimize, Unirewrite}
+import quasar.qscript.rewrites.{RewritePushdown, Unirewrite}
 import quasar.yggdrasil.MonadFinalizers
 
 import scala.Predef.implicitly
@@ -79,10 +79,10 @@ final class MimirQScriptEvaluator[
   def UnirewriteT: Unirewrite[T, QSRewrite[T]] =
     implicitly[Unirewrite[T, QSRewrite[T]]]
 
-  def optimize: M[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
+  def rewritePushdown: M[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
     Kleisli.ask[F, EvaluatorConfig[T, IO]] map {
       _.pushdown match {
-        case Pushdown.EnablePushdown => Optimize[T, QSM, QSMRewrite, AFile]
+        case Pushdown.EnablePushdown => RewritePushdown[T, QSM, QSMRewrite, AFile]
         case Pushdown.DisablePushdown => QSMRewriteToQSM.inject(_)  // no-op
       }
     }
