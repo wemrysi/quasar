@@ -36,7 +36,7 @@ import quasar.yggdrasil.MonadFinalizers
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext
 
-import cats.effect.{IO, LiftIO}
+import cats.effect.{ContextShift, IO, LiftIO}
 import iotaz.CopK
 import iotaz.TListK.:::
 import iotaz.TNilK
@@ -51,7 +51,7 @@ final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]: PhaseResultTell] private (
     cake: Cake)(
-    implicit ec: ExecutionContext)
+    implicit cs: ContextShift[IO], ec: ExecutionContext)
     extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] {
 
   type MT[X[_], A] = AssociatesT[T, X, IO, A]
@@ -110,7 +110,7 @@ final class MimirQScriptEvaluator[
       _ match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value.left)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(value.left)
         case _ => errorImpossible
       }
     }
@@ -124,8 +124,8 @@ final class MimirQScriptEvaluator[
       in match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value.left)
-        case InterpretedRead(value) => shiftedReadPlanner.plan(ec)(value.right)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(value.left)
+        case InterpretedRead(value) => shiftedReadPlanner.plan(value.right)
       }
     }
 
@@ -138,7 +138,7 @@ object MimirQScriptEvaluator {
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]: PhaseResultTell](
       cake: Cake)(
-      implicit ec: ExecutionContext)
+      implicit cs: ContextShift[IO], ec: ExecutionContext)
       : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] =
     new MimirQScriptEvaluator[T, F](cake)
 }

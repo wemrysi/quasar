@@ -17,7 +17,7 @@
 package quasar.mimir.evaluate
 
 import cats.effect.Sync
-import fs2.async.Ref
+import cats.effect.concurrent.Ref
 
 import scala.{Product, Serializable}
 
@@ -28,8 +28,7 @@ object Pushdown {
   final case object DisablePushdown extends Pushdown
 }
 
-// TODO use cats.effect.concurrent.Ref after cats-effect 1.0.0 upgrade
 final class PushdownControl[F[_]: Sync](ref: Ref[F, Pushdown]) {
-  def set(pushdown: Pushdown): F[Unit] = ref.setSync(pushdown)
+  def set(pushdown: Pushdown): F[Unit] = ref.set(pushdown)
   def get: F[Pushdown] = ref.get
 }

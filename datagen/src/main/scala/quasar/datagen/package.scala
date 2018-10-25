@@ -18,10 +18,11 @@ package quasar
 
 import slamdata.Predef.{RuntimeException, String}
 
-import fs2.Stream
+import fs2.{RaiseThrowable, Stream}
 
 package object datagen {
   /** A stream that is failed with the given reason. */
-  def failedStream[F[_], A](reason: String): Stream[F, A] =
-    Stream.raiseError(new RuntimeException(reason)).covary[F]
+  def failedStream[F[_]: RaiseThrowable, A](reason: String): Stream[F, A] = {
+    Stream.raiseError[F](new RuntimeException(reason)).covaryOutput[A]
+  }
 }

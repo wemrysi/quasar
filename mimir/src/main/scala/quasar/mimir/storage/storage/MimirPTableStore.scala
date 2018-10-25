@@ -31,10 +31,10 @@ import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.nihdb.NIHDBProjection
 
 import cats.arrow.FunctionK
-import cats.effect.{IO, LiftIO}
+import cats.effect.{ContextShift, IO, LiftIO}
 
 import fs2.Stream
-import fs2.async.mutable.Signal
+import fs2.concurrent.SignallingRef
 
 import pathy.Path
 
@@ -54,6 +54,7 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
     val cake: Cake,
     tablesPrefix: ADir)(
     implicit ME: MonadError_[F, ResourceError],
+    cs: ContextShift[IO],
     ec: ExecutionContext) {
 
   import cake.{Table => PTable}
@@ -61,8 +62,19 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
   // has overwrite semantics
   def write(key: StoreKey, table: PTable): Stream[F, Unit] = {
 
-    def doWrite(completed: Signal[IO, Boolean]) =
+    def doWrite(completed: SignallingRef[IO, Boolean]) =
       Stream.bracket(cake.createDB(keyToFile(key)).map(_.toOption))({
+        case Some((blob, version, db)) =>
+          completed.get.flatMap { c =>
+            if (c)
+              cake.commitDB(blob, version, db)
+            else
+              IO.fromFutureShift(IO(db.close))  // TODO cleanup the orphaned version (ch1962)
+          }
+
+        case None =>
+          IO.pure(())
+      }).flatMap {
         case Some((_, _, db)) =>
           val can = table.compact(cake.trans.TransSpec1.Id).canonicalize(Config.maxSliceRows)
 
@@ -75,21 +87,10 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
 
         case None =>
           Stream.empty
-      }, {
-        case Some((blob, version, db)) =>
-          completed.get.flatMap { c =>
-            if (c)
-              cake.commitDB(blob, version, db)
-            else
-              IO.fromFutureShift(IO(db.close))  // TODO cleanup the orphaned version (ch1962)
-          }
-
-        case None =>
-          IO.pure(())
-      })
+      }
 
     val ios = for {
-      completed <- Stream.eval(fs2.async.signalOf[IO, Boolean](false))
+      completed <- Stream.eval(SignallingRef[IO, Boolean](false))
       res <- doWrite(completed)
     } yield res
 
@@ -154,7 +155,9 @@ object MimirPTableStore {
   def apply[F[_]: Monad: LiftIO: MonadError_[?[_], ResourceError]](
       cake: Cake,
       tablesPrefix: ADir)(
-      implicit ec: ExecutionContext)
+      implicit
+      cs: ContextShift[IO],
+      ec: ExecutionContext)
       : MimirPTableStore[F] =
     new MimirPTableStore[F](cake, tablesPrefix)
 }

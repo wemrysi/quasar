@@ -17,7 +17,6 @@
 package quasar.run
 
 import slamdata.Predef.{Array, Double, SuppressWarnings}
-
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
 import quasar.api.table.Tables
@@ -44,10 +43,10 @@ import scala.concurrent.ExecutionContext
 import argonaut.Json
 import argonaut.JsonScalaz._
 import cats.~>
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.concurrent.Ref
 import cats.syntax.flatMap._
-import fs2.{Scheduler, Stream}
-import fs2.async.Ref
+import fs2.Stream
 import matryoshka.data.Fix
 import pathy.Path._
 import scalaz.IMap
@@ -84,18 +83,21 @@ object Quasar {
     * @param sstSampleSize the number of records to sample when generating SST schemas
     * @param sstParallelism the number of chunks to process in parallel when generating SST schemas
     */
-  def apply[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultTell: Timer](
+  def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer](
       precog: Precog,
       extConfig: ExternalConfig,
-      sstEvalConfig: SstEvalConfig)(
-      implicit ec: ExecutionContext)
+      sstEvalConfig: SstEvalConfig,
+      blockingPool: ExecutionContext)(
+      implicit
+      cs: ContextShift[IO],
+      ec: ExecutionContext)
       : Stream[F, Quasar[F]] = {
 
     for {
-      pushdownRef <- Stream.eval(Ref[F, Pushdown](Pushdown.EnablePushdown))
+      pushdownRef <- Stream.eval(Ref.of[F, Pushdown](Pushdown.EnablePushdown))
       pushdown = new PushdownControl(pushdownRef)
 
-      extMods <- ExternalDatasources[F](extConfig)
+      extMods <- ExternalDatasources[F](extConfig, blockingPool)
 
       modules = extMods.insert(
         LocalDatasourceModule.kind,
@@ -121,15 +123,11 @@ object Quasar {
 
       configured <- datasourceRefs.entries.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _)
 
-      scheduler <- Scheduler(corePoolSize = 1, threadPrefix = "quasar-scheduler")
-
       mr <- Stream.bracket(
         DatasourceManagement[Fix, F, UUID, Double](
           modules,
           configured,
-          sstEvalConfig,
-          scheduler))(
-        Stream.emit(_),
+          sstEvalConfig))(
         { case (_, r) => r.get.flatMap(_.traverse_(_.dispose)) })
 
       (mgmt, running) = mr

@@ -23,20 +23,20 @@ import quasar.impl.evaluate.{FederatedQuery, QueryFederation}
 import quasar.mimir._, MimirCake._
 import quasar.qscript.MonadPlannerErr
 
-import cats.effect.{IO, LiftIO}
+import scala.concurrent.ExecutionContext
+
+import cats.effect.{ContextShift, IO, LiftIO}
 import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import scalaz.{Monad, WriterT}
 import scalaz.Scalaz._
 import shims._
 
-import scala.concurrent.ExecutionContext
-
 final class MimirQueryFederation[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: LiftIO: Monad: MonadPlannerErr: PhaseResultTell] private (
     P: Cake, pushdown: PushdownControl[F])(
-    implicit ec: ExecutionContext)
+    implicit cs: ContextShift[IO], ec: ExecutionContext)
     extends QueryFederation[T, F, QueryAssociate[T, IO], Stream[IO, MimirRepr]] {
 
   type FinalizersT[X[_], A] = WriterT[X, List[IO[Unit]], A]
@@ -65,7 +65,7 @@ object MimirQueryFederation {
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: LiftIO: Monad: MonadPlannerErr: PhaseResultTell](
       P: Cake, pushdown: PushdownControl[F])(
-      implicit ec: ExecutionContext)
+      implicit cs: ContextShift[IO], ec: ExecutionContext)
       : QueryFederation[T, F, QueryAssociate[T, IO], Stream[IO, MimirRepr]] =
     new MimirQueryFederation[T, F](P, pushdown)
 }
