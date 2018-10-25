@@ -24,6 +24,7 @@ import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.impl.evaluate.{Source => EvalSource}
 import quasar.mimir._, MimirCake._
+import quasar.mimir.evaluate.Config.{Associates, AssociatesT, EvaluatorConfig}
 import quasar.precog.common.RValue
 import quasar.qscript._, PlannerError.InternalError
 import quasar.yggdrasil.{MonadFinalizers, TransSpecModule}
@@ -65,8 +66,12 @@ final class FederatedShiftedReadPlanner[
   private val recFunc = construction.RecFunc[T]
 
   private def planRead(file: AFile, readStatus: IdStatus, instructions: List[ParseInstruction])
-      : M[MimirRepr] =
-    Kleisli.ask[F, Assocs].map(_(file)) andThenK { maybeSource =>
+      : M[MimirRepr] = {
+
+    val sourceM: M[Option[EvalSource[QueryAssociate[T, IO]]]] =
+      Kleisli.ask[F, EvaluatorConfig[T, IO]].map(_.associates(file))
+
+    sourceM andThenK { maybeSource =>
       for {
         source <- MonadPlannerErr[F].unattempt_(
           maybeSource \/> InternalError.fromMsg(s"No source for '${posixCodec.printPath(file)}'."))
@@ -93,6 +98,7 @@ final class FederatedShiftedReadPlanner[
         }
       }
     }
+  }
 
   private def sourceTable(
       source: EvalSource[QueryAssociate[T, IO]],
