@@ -16,11 +16,11 @@
 
 package quasar.yggdrasil.vfs
 
+import quasar.concurrent.BlockingContext
 import quasar.precog.util.IOUtils
 
 import java.nio.file.Files
 import java.io.{File, FileInputStream, FileOutputStream}
-import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
 
@@ -39,7 +39,7 @@ object RealPOSIXSpecs extends Specification {
 
   implicit val ec = global
   implicit val cs = IO.contextShift(global)
-  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+  val blockingPool = BlockingContext.cached("real-posix-spec")
 
   def ioPOSIX(root: File): IO[POSIXOp ~> IO] =
     RealPOSIX[IO](root, blockingPool)
