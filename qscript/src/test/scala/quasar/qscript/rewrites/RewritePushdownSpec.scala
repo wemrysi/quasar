@@ -36,7 +36,7 @@ import pathy.Path._
 import scalaz.Const
 import scalaz.std.option._
 
-object OptimizeSpec extends Qspec {
+object RewritePushdownSpec extends Qspec {
 
   type QSBase =
     QScriptCore[Fix, ?]          :::
@@ -67,22 +67,22 @@ object OptimizeSpec extends Qspec {
 
   val ejs = Fixed[Fix[EJson]]
 
-  val optimize = new Optimize[Fix]
+  val pushdown = new RewritePushdown[Fix]
 
   "path-finding" >> {
 
     "find the path of Hole" >> {
-      optimize.findPath(funcE.Hole) must equal(
+      pushdown.findPath(funcE.Hole) must equal(
         Some(CPath.Identity))
     }
 
     "find the path of a single object projection" >> {
-      optimize.findPath(funcE.ProjectKeyS(funcE.Hole, "xyz")) must equal(
+      pushdown.findPath(funcE.ProjectKeyS(funcE.Hole, "xyz")) must equal(
         Some(CPath(CPathField("xyz"))))
     }
 
     "find the path of a single array projection" >> {
-      optimize.findPath(funcE.ProjectIndexI(funcE.Hole, 7)) must equal(
+      pushdown.findPath(funcE.ProjectIndexI(funcE.Hole, 7)) must equal(
         Some(CPath(CPathIndex(7))))
     }
 
@@ -96,7 +96,7 @@ object OptimizeSpec extends Qspec {
             "bbb"),
           "ccc")
 
-      optimize.findPath(fm) must equal(
+      pushdown.findPath(fm) must equal(
         Some(CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc"))))
     }
 
@@ -110,7 +110,7 @@ object OptimizeSpec extends Qspec {
             6),
           0)
 
-      optimize.findPath(fm) must equal(
+      pushdown.findPath(fm) must equal(
         Some(CPath(CPathIndex(2), CPathIndex(6), CPathIndex(0))))
     }
 
@@ -124,7 +124,7 @@ object OptimizeSpec extends Qspec {
             42),
           "ccc")
 
-      optimize.findPath(fm) must equal(
+      pushdown.findPath(fm) must equal(
         Some(CPath(CPathField("aaa"), CPathIndex(42), CPathField("ccc"))))
     }
 
@@ -132,7 +132,7 @@ object OptimizeSpec extends Qspec {
       val fm =
         funcE.ProjectKey(funcE.Hole, funcE.Constant(ejs.bool(true)))
 
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
     }
 
     "fail find the path of an object projection with a dynamic key" >> {
@@ -141,7 +141,7 @@ object OptimizeSpec extends Qspec {
           funcE.Hole,
           funcE.ToString(funcE.ProjectKeyS(funcE.Hole, "foobar")))
 
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
     }
 
     "fail find the path of an array projection with a dynamic key" >> {
@@ -150,7 +150,7 @@ object OptimizeSpec extends Qspec {
           funcE.Hole,
           funcE.Integer(funcE.ProjectIndexI(funcE.Hole, 42)))
 
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
     }
 
     "fail find the path of an object projection with a dynamic key that is itself a projection" >> {
@@ -159,7 +159,7 @@ object OptimizeSpec extends Qspec {
           funcE.Hole,
           funcE.ProjectKeyS(funcE.Hole, "foobar"))
 
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
     }
 
     "fail find the path of an array projection with a dynamic key that is itself a projection" >> {
@@ -168,7 +168,7 @@ object OptimizeSpec extends Qspec {
           funcE.Hole,
           funcE.ProjectIndexI(funcE.Hole, 42))
 
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
     }
 
     "fail to find the path of non-projection" >> {
@@ -179,7 +179,7 @@ object OptimizeSpec extends Qspec {
             funcE.ProjectKeyS(funcE.Hole, "aaa")),
           "ccc")
 
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
     }
 
     "fail to find the path of a projection whose source is not Hole" >> {
@@ -192,14 +192,14 @@ object OptimizeSpec extends Qspec {
             "bbb"),
           "ccc")
 
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
     }
   }
 
   "InterpretedRead rewrite" >> {
 
     val rewriteLeftShiftFunc: QSExtra[Fix[QSExtra]] => QSExtra[Fix[QSExtra]] =
-      liftFG[QScriptCore[Fix, ?], QSExtra, Fix[QSExtra]](optimize.rewriteLeftShift[QSExtra, AFile])
+      liftFG[QScriptCore[Fix, ?], QSExtra, Fix[QSExtra]](pushdown.rewriteLeftShift[QSExtra, AFile])
 
     def rewriteLeftShift(expr: Fix[QSExtra]): Fix[QSExtra] =
       expr.transCata[Fix[QSExtra]](rewriteLeftShiftFunc)
@@ -556,7 +556,7 @@ object OptimizeSpec extends Qspec {
   "no-op Map rewrite" >> {
 
     val elideNoopMapFunc: QS[Fix[QS]] => QS[Fix[QS]] =
-      liftFG[QScriptCore[Fix, ?], QS, Fix[QS]](optimize.elideNoopMap[QS])
+      liftFG[QScriptCore[Fix, ?], QS, Fix[QS]](pushdown.elideNoopMap[QS])
 
     def elideNoopMap(expr: Fix[QS]): Fix[QS] =
       expr.transCata[Fix[QS]](elideNoopMapFunc)
