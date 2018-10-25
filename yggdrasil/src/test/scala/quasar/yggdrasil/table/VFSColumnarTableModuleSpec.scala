@@ -21,21 +21,20 @@ import quasar.contrib.cats.effect._
 import quasar.contrib.pathy.AFile
 import quasar.precog.common.CLong
 import quasar.niflheim.NIHDB
-import quasar.yggdrasil.vfs.{Blob, Version}
+import quasar.yggdrasil.vfs.{Blob, SerialVFS, Version}
 
+import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.language.reflectiveCalls
 
 import cats.effect.IO
 import org.specs2.mutable.Specification
 import pathy.Path.{file, rootDir}
 import scalaz.{-\/, StreamT, \/-}
 import shims._
-
-import scala.language.reflectiveCalls
 
 object VFSColumnarTableModuleSpec
     extends Specification
@@ -49,10 +48,10 @@ object VFSColumnarTableModuleSpec
 
     "check db commits persistence head after clearing hotcache" in {
 
+
       val path: AFile =  rootDir </> file("foo")
 
       val test = for {
-
         created <- createDB(path) map {
           case \/-(t) => t
           case -\/(_) => true must_== false
@@ -78,7 +77,7 @@ object VFSColumnarTableModuleSpec
 
         finalHead <- vfs.headOfBlob(blob)
         actualHead = finalHead match {
-          case Some(h) => h
+          case Some(h: Version) => h
           case _ => Version(UUID.fromString("00000000-0000-0000-0000-000000000000"))
         }
       } yield {
@@ -88,7 +87,6 @@ object VFSColumnarTableModuleSpec
       }
 
       test.unsafeRunSync
-
     }
 
 
@@ -168,12 +166,10 @@ object VFSColumnarTableModuleSpec
 
       eff.unsafeRunSync
     }
-
-
-
   }
 
-  def vfs = ???
+  val base = Files.createTempDirectory("VFSColumnarTableModuleSpec").toFile
+  def vfs = SerialVFS[IO](base, global).unsafeRunSync.unsafeValue
   def StorageTimeout = Timeout
 
   sealed trait TableCompanion extends VFSColumnarTableCompanion
