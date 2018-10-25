@@ -28,8 +28,8 @@ import quasar.precog.common.RValue
 import quasar.qscript._, PlannerError.InternalError
 import quasar.yggdrasil.{MonadFinalizers, TransSpecModule}
 
-import cats.effect.{IO, LiftIO}
-import fs2.{Chunk, Segment, Stream}
+import cats.effect.{ContextShift, IO, LiftIO}
+import fs2.{Chunk, Stream}
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -40,15 +40,17 @@ import scala.collection.mutable.ArrayBuffer
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]](
-    val P: Cake) {
+    val P: Cake)(
+    implicit
+    cs: ContextShift[IO],
+    ec: ExecutionContext) {
 
   type Assocs = Associates[T, IO]
   type M[A] = AssociatesT[T, F, IO, A]
 
   type Read[A] = Const[ShiftedRead[AFile], A] \/ Const[InterpretedRead[AFile], A]
 
-  def plan(implicit ec: ExecutionContext)
-      : AlgebraM[M, Read, MimirRepr] = {
+  def plan: AlgebraM[M, Read, MimirRepr] = {
     case -\/(Const(ShiftedRead(file, status))) =>
       planRead(file, status, List())
 
@@ -62,8 +64,7 @@ final class FederatedShiftedReadPlanner[
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
 
-  private def planRead(file: AFile, readStatus: IdStatus, instructions: List[ParseInstruction])(
-      implicit ec: ExecutionContext)
+  private def planRead(file: AFile, readStatus: IdStatus, instructions: List[ParseInstruction])
       : M[MimirRepr] =
     Kleisli.ask[F, Assocs].map(_(file)) andThenK { maybeSource =>
       for {
@@ -95,8 +96,7 @@ final class FederatedShiftedReadPlanner[
 
   private def sourceTable(
       source: EvalSource[QueryAssociate[T, IO]],
-      instructions: List[ParseInstruction])(
-      implicit ec: ExecutionContext)
+      instructions: List[ParseInstruction])
       : F[P.Table] = {
     val queryResult =
       source.src match {
@@ -123,8 +123,7 @@ final class FederatedShiftedReadPlanner[
   // we do not preserve the order of shifted results
   private def tableFromStream(
       rvalues: Stream[IO, RValue],
-      instructions: List[ParseInstruction])(
-      implicit ec: ExecutionContext)
+      instructions: List[ParseInstruction])
       : F[P.Table] = {
 
     val interpretedRValues: Stream[IO, RValue] =
@@ -134,7 +133,7 @@ final class FederatedShiftedReadPlanner[
           rvalues mapChunks { chunk =>
             val buf = ArrayBuffer.empty[RValue]
             chunk.foreach(rv => buf ++= RValueParseInstructionInterpreter.interpret(instrs, rv))
-            Segment.chunk(Chunk.buffer(buf))
+            Chunk.buffer(buf)
           }
       }
 
