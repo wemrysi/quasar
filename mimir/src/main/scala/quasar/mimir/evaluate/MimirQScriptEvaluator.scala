@@ -28,7 +28,7 @@ import quasar.fp.numeric._
 import quasar.mimir
 import quasar.mimir.MimirRepr
 import quasar.mimir.MimirCake._
-import quasar.mimir.evaluate.Config.{AssociatesT, EvaluatorConfig}
+import quasar.mimir.evaluate.Config.{EvalConfigT, EvaluatorConfig}
 import quasar.qscript._
 import quasar.qscript.rewrites.{RewritePushdown, Unirewrite}
 import quasar.yggdrasil.{Config => YggConfig, MonadFinalizers}
@@ -52,9 +52,9 @@ final class MimirQScriptEvaluator[
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]: PhaseResultTell] private (
     cake: Cake)(
     implicit cs: ContextShift[IO], ec: ExecutionContext)
-    extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] {
+    extends QScriptEvaluator[T, EvalConfigT[T, F, IO, ?], MimirRepr] {
 
-  type MT[X[_], A] = AssociatesT[T, X, IO, A]
+  type MT[X[_], A] = EvalConfigT[T, X, IO, A]
   type M[A] = MT[F, A]
 
   type QSRewrite[U[_[_]]] =
@@ -140,6 +140,6 @@ object MimirQScriptEvaluator {
       F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]: PhaseResultTell](
       cake: Cake)(
       implicit cs: ContextShift[IO], ec: ExecutionContext)
-      : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] =
+      : QScriptEvaluator[T, EvalConfigT[T, F, IO, ?], MimirRepr] =
     new MimirQScriptEvaluator[T, F](cake)
 }
