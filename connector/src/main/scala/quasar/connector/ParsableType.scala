@@ -30,7 +30,7 @@ sealed trait ParsableType extends Product with Serializable
 object ParsableType extends ParsableTypeInstances {
   final case class Json(variant: JsonVariant, isPrecise: Boolean) extends ParsableType
 
-  sealed trait JsonVariant
+  sealed trait JsonVariant extends Product with Serializable
 
   object JsonVariant {
     case object ArrayWrapped extends JsonVariant
