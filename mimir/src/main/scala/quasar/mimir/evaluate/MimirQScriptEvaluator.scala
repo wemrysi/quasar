@@ -31,7 +31,7 @@ import quasar.mimir.MimirCake._
 import quasar.mimir.evaluate.Config.{AssociatesT, EvaluatorConfig}
 import quasar.qscript._
 import quasar.qscript.rewrites.{RewritePushdown, Unirewrite}
-import quasar.yggdrasil.MonadFinalizers
+import quasar.yggdrasil.{Config => YggConfig, MonadFinalizers}
 
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext
@@ -91,7 +91,8 @@ final class MimirQScriptEvaluator[
     _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]].inject(_).embed)
 
   def execute(repr: Repr): M[Repr] =
-    repr.map(_.materialized).asInstanceOf[Repr].point[M]    // stupid dependent types...
+    repr.map(_.compact(repr.P.trans.TransSpec1.Id).canonicalize(YggConfig.maxSliceRows).materialized)
+      .asInstanceOf[Repr].point[M]    // stupid dependent types...
 
   def plan(cp: T[QSM]): M[Repr] = {
     def qScriptCorePlanner =
