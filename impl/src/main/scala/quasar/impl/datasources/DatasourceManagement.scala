@@ -47,7 +47,7 @@ import scala.concurrent.duration.FiniteDuration
 import argonaut.Json
 import argonaut.Argonaut.jEmptyObject
 import cats.ApplicativeError
-import cats.effect.{ConcurrentEffect, ContextShift, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.effect.concurrent.Ref
 import fs2.{Chunk, Stream}
 import fs2.concurrent.{Signal, SignallingRef}
@@ -187,7 +187,7 @@ final class DatasourceManagement[
             val plate =
               QDataPlate[S, ArrayBuffer[S]](isPrecise).mapDelegate(Chunk.buffer)
 
-            data.through(StreamParser((TParser(plate, mode): GenericParser[Chunk[S]]).point[F]))
+            data.through(StreamParser(Sync[F].delay[GenericParser[Chunk[S]]](TParser(plate, mode))))
         }
 
       val k: N = ConvertableTo[N].fromLong(sstEvalConfig.sampleSize.value)
