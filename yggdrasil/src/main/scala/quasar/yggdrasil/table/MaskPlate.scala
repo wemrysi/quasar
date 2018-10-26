@@ -127,12 +127,14 @@ private[table] final class MaskPlate[A](
       super.nestMap(pathComponent)
     } else if (!(extraCursor eq Nil)) {
       extraCursor ::= c
+      nextIndex ::= 0
       Signal.SkipColumn
     } else if (vectorLoci.contains(cursor) && vectorLoci(cursor).contains(ParseType.Object)) {
       underValidVector = true
       super.nestMap(pathComponent)
     } else if (!prefixes.contains(c :: cursor)) {
       extraCursor ::= c
+      nextIndex ::= 0
       Signal.SkipColumn
     } else {
       super.nestMap(pathComponent)
@@ -145,6 +147,7 @@ private[table] final class MaskPlate[A](
       super.nestArr()
     } else if (!(extraCursor eq Nil)) {
       incrementIndex()
+      nextIndex ::= 0
       extraCursor ::= c
       Signal.SkipColumn
     } else if (vectorLoci.contains(cursor) && vectorLoci(cursor).contains(ParseType.Array)) {
@@ -152,6 +155,7 @@ private[table] final class MaskPlate[A](
       super.nestArr()
     } else if (!prefixes.contains(c :: cursor)) {
       incrementIndex()
+      nextIndex ::= 0
       extraCursor ::= c
       Signal.SkipColumn
     } else {
@@ -165,12 +169,14 @@ private[table] final class MaskPlate[A](
       super.nestMeta(pathComponent)
     } else if (!(extraCursor eq Nil)) {
       extraCursor ::= c
+      nextIndex ::= 0
       Signal.SkipColumn
     } else if (vectorLoci.contains(cursor) && vectorLoci(cursor).contains(ParseType.Meta)) {
       underValidVector = true
       super.nestMeta(pathComponent)
     } else if (!prefixes.contains(c :: cursor)) {
       extraCursor ::= c
+      nextIndex ::= 0
       Signal.SkipColumn
     } else {
       super.nestMeta(pathComponent)
@@ -178,8 +184,9 @@ private[table] final class MaskPlate[A](
   }
 
   override def unnest(): Signal = {
-    if (!extraCursor.isEmpty) {
+    if (!(extraCursor eq Nil)) {
       extraCursor = extraCursor.tail
+      nextIndex = nextIndex.tail
       Signal.Continue
     } else {
       val back = super.unnest()

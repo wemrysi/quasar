@@ -31,4 +31,4 @@ abstract class HeavyweightDatasource[
     G[_],
     R]
     extends QScriptEvaluator[T, F, R]
-    with Datasource[F, G, T[QScriptEducated[T, ?]]]
+    with Datasource[F, G, T[QScriptEducated[T, ?]], R]
