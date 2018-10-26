@@ -21,7 +21,13 @@ import quasar.{Condition, Disposable, IdStatus, RenderTreeT}
 import quasar.api.datasource.{DatasourceError, DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported, DiscoveryError, ExistentialError}
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
-import quasar.connector.{Datasource, MonadResourceErr}
+import quasar.connector.{
+  Datasource,
+  MonadResourceErr,
+  ParsableType,
+  QueryResult
+}
+import quasar.connector.ParsableType.JsonVariant
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.EJson
@@ -34,22 +40,28 @@ import quasar.impl.schema._
 import quasar.qscript._
 import quasar.sst._
 
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
 import argonaut.Json
 import argonaut.Argonaut.jEmptyObject
 import cats.ApplicativeError
-import cats.effect.{ConcurrentEffect, ContextShift, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.effect.concurrent.Ref
-import fs2.Stream
+import fs2.{Chunk, Stream}
 import fs2.concurrent.{Signal, SignallingRef}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import pathy.Path
+import qdata.{QData, QDataEncode}
+import qdata.tectonic.QDataPlate
 import scalaz.{EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz, \/}, Scalaz._
 import shims._
 import spire.algebra.Field
 import spire.math.ConvertableTo
+import tectonic.GenericParser
+import tectonic.fs2.StreamParser
+import tectonic.json.{Parser => TParser}
 
 final class DatasourceManagement[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
@@ -138,6 +150,8 @@ final class DatasourceManagement[
       timeLimit: FiniteDuration)
       : F[DiscoveryError[I] \/ Option[sstConfig.Schema]] = {
 
+    type S = SST[T[EJson], N]
+
     def sampleQuery =
       dsl.Subset(
         dsl.Unreferenced,
@@ -156,13 +170,30 @@ final class DatasourceManagement[
 
     withDs[DiscoveryError[I], Option[sstConfig.Schema]](datasourceId) { ds =>
 
-      val sstStream: F[Stream[F, SST[T[EJson], N]]] = ds.fold(
-        lw => lw.evaluator[SST[T[EJson], N]].evaluate(path).map(_.take(sstEvalConfig.sampleSize.value)),
-        hw => hw.evaluator[SST[T[EJson], N]].evaluate(sampleQuery))
+      val queryResult: F[QueryResult[F]] =
+        ds.fold(_.evaluate(path), _.evaluate(sampleQuery))
+
+      val sstStream: F[Stream[F, S]] =
+        queryResult map {
+          case QueryResult.Parsed(qdd, data) =>
+            data.map(QData.convert(_)(qdd, QDataEncode[S]))
+
+          case QueryResult.Typed(ParsableType.Json(vnt, isPrecise), data) =>
+            val mode: TParser.Mode = vnt match {
+              case JsonVariant.ArrayWrapped => TParser.UnwrapArray
+              case JsonVariant.LineDelimited => TParser.ValueStream
+            }
+
+            val plate =
+              QDataPlate[S, ArrayBuffer[S]](isPrecise).mapDelegate(Chunk.buffer)
+
+            data.through(StreamParser(Sync[F].delay[GenericParser[Chunk[S]]](TParser(plate, mode))))
+        }
 
       val k: N = ConvertableTo[N].fromLong(sstEvalConfig.sampleSize.value)
 
       Stream.force(sstStream)
+        .take(sstEvalConfig.sampleSize.value)
         .chunkLimit(sstEvalConfig.chunkSize.value.toInt)
         .through(progressiveSstAsync(sstConfig, sstEvalConfig.parallelism.value.toInt))
         .interruptWhen(ConcurrentEffect[F].attempt(tmr.sleep(timeLimit)))
@@ -207,7 +238,7 @@ final class DatasourceManagement[
 
   private def withDatasource[E >: ExistentialError[I] <: DatasourceError[I, Json], A](
       datasourceId: I)(
-      f: Datasource[F, Stream[F, ?], _] => F[A])
+      f: Datasource[F, Stream[F, ?], _, _] => F[A])
       : F[E \/ A] =
     withDs[E, A](datasourceId)(ds => f(ds.merge))
 
@@ -225,8 +256,8 @@ final class DatasourceManagement[
 
 object DatasourceManagement {
   type Modules = IMap[DatasourceType, DatasourceModule]
-  type LDS[F[_]] = Datasource[F, Stream[F, ?], ResourcePath]
-  type HDS[T[_[_]], F[_]] = Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]]]
+  type LDS[F[_]] = Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]]
+  type HDS[T[_[_]], F[_]] = Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F]]
   type DS[T[_[_]], F[_]] = LDS[F] \/ HDS[T, F]
   type Running[I, T[_[_]], F[_]] = IMap[I, Disposable[F, DS[T, F]]]
 
@@ -255,7 +286,7 @@ object DatasourceManagement {
         case (id, ref @ DatasourceRef(kind, _, _)) =>
           modules.lookup(kind) match {
             case None =>
-              val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], ResourcePath](
+              val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], ResourcePath, QueryResult[F]](
                 kind,
                 DatasourceUnsupported(kind, modules.keySet))
 
@@ -278,12 +309,12 @@ object DatasourceManagement {
     } yield (mgmt, runningS)
   }
 
-  def withErrorReporting[F[_]: Monad: MonadError_[?[_], Exception], I: Order, G[_], Q](
+  def withErrorReporting[F[_]: Monad: MonadError_[?[_], Exception], I: Order, G[_], Q, R](
       errors: Ref[F, IMap[I, Exception]],
       datasourceId: I,
-      ds: Datasource[F, G, Q])
-      : Datasource[F, G, Q] =
-    ConditionReportingDatasource[Exception, F, G, Q](
+      ds: Datasource[F, G, Q, R])
+      : Datasource[F, G, Q, R] =
+    ConditionReportingDatasource[Exception, F, G, Q, R](
       c => errors.update(_.alter(datasourceId, κ(Condition.optionIso.get(c)))), ds)
 
   ////

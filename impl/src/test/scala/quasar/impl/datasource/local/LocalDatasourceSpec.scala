@@ -42,4 +42,17 @@ final class LocalDatasourceSpec
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")
 
   def gatherMultiple[A](g: Stream[IO, A]) = g.compile.toList
+
+  "listing a file path returns none" >>* {
+    datasource
+      .prefixedChildPaths(ResourcePath.root() / ResourceName("smallZips.data"))
+      .map(_ must beNone)
+  }
+
+  "returns data from a nonempty file" >>* {
+    datasource
+      .evaluate(ResourcePath.root() / ResourceName("smallZips.data"))
+      .flatMap(_.data.compile.fold(0)((c, _) => c + 1))
+      .map(_ must be_>(0))
+  }
 }

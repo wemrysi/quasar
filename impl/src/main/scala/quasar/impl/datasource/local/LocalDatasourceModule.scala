@@ -19,7 +19,7 @@ package quasar.impl.datasource.local
 import quasar.Disposable
 import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
 import quasar.api.resource.ResourcePath
-import quasar.connector.{Datasource, LightweightDatasourceModule, MonadResourceErr}
+import quasar.connector.{Datasource, LightweightDatasourceModule, MonadResourceErr, QueryResult}
 
 import java.nio.file.Paths
 import java.util.concurrent.Executors
@@ -45,7 +45,7 @@ object LocalDatasourceModule extends LightweightDatasourceModule {
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json)(
       implicit ec: ExecutionContext)
-      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath]]] = {
+      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]]]] = {
 
     val F = ConcurrentEffect[F]
 

@@ -18,22 +18,20 @@ package quasar.run
 
 import slamdata.Predef._
 import quasar.api.resource._
+import quasar.connector.QueryResult
 import quasar.contrib.cats.effect._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.std.uuid._
 import quasar.impl.datasources.DatasourceManagement.Running
 import quasar.impl.evaluate.Source
 import quasar.mimir.evaluate.QueryAssociate
-import quasar.precog.common.RValue
 import quasar.run.optics.{stringUuidP => UuidString}
 
 import java.util.UUID
 
-import cats.arrow.FunctionK
 import cats.effect.{Effect, IO}
 import cats.syntax.applicative._
 import cats.syntax.functor._
-import fs2.Stream
 import scalaz.~>
 import scalaz.std.option._
 import scalaz.syntax.foldable._
@@ -47,20 +45,15 @@ object ResourceRouter {
       file: AFile)
       : F[Option[Source[QueryAssociate[T, IO]]]] = {
 
-    val resultsToIO =
-      new (λ[a => F[Stream[F, a]]] ~> λ[a => IO[Stream[IO, a]]]) {
-        def apply[A](fa: F[Stream[F, A]]): IO[Stream[IO, A]] =
-          fa.to[IO].map(_.translate(λ[FunctionK[F, IO]](_.to[IO])))
-      }
+    def resultsToIO(fa: F[QueryResult[F]]): IO[QueryResult[IO]] =
+      fa.to[IO].map(_.hmap(λ[F ~> IO](_.to[IO])))
 
     ResourcePath.leaf(file) match {
       case DatasourceResourcePrefix /: UuidString(id) /: qaPath =>
         datasources.map(_.lookup(id) map { d =>
           val qa = d.unsafeValue.fold[QueryAssociate[T, IO]](
-            lw => QueryAssociate.lightweight(f =>
-              resultsToIO(lw.evaluator[RValue].evaluate(f))),
-            hw => QueryAssociate.heavyweight(q =>
-              resultsToIO(hw.evaluator[RValue].evaluate(q))))
+            lw => QueryAssociate.lightweight(f => resultsToIO(lw.evaluate(f))),
+            hw => QueryAssociate.heavyweight(q => resultsToIO(hw.evaluate(q))))
 
           Source(qaPath, qa)
         })

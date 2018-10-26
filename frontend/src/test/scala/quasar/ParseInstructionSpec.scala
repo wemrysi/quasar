@@ -569,6 +569,18 @@ object ParseInstructionSpec {
           ".a.b[3]" -> Set(Number))(expected)
       }
 
+      "compact array containing nested arrays with single nested value retained" in {
+        val input = ldjson("""
+          { "a": [[[1, 3, 5], "k"], "foo", { "b": [5, 6, 7], "c": [] }], "d": "x" }
+          """)
+
+        val expected = ldjson("""
+          { "a": [{"b": [5, 6, 7] }] }
+          """)
+
+        input must maskInto(".a[2].b" -> Set(Array))(expected)
+      }
+
       "remove object entirely when no values are retained" in {
         ldjson("""{ "a": 42 }""") must maskInto(".a" -> Set(Boolean))(ldjson(""))
       }

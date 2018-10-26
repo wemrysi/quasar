@@ -24,12 +24,10 @@ import java.util.stream.{Stream => JStream}
 import scala.util.{Either, Left}
 
 import cats.effect.{Concurrent, Sync}
+import cats.syntax.monadError._
 import fs2.concurrent.{Queue, SignallingRef}
 import fs2.{Chunk, Stream}
-import scalaz.{Functor, StreamT}
-import scalaz.std.option._
-import scalaz.syntax.monad._
-import scalaz.syntax.std.boolean._
+import scalaz.{Functor, StreamT, Scalaz}, Scalaz._
 import shims._
 
 object convert {
@@ -64,7 +62,7 @@ object convert {
       Disposable(
         StreamT.wrapEffect(startQ.map(q =>
           for {
-            c <- StreamT.unfoldM(q)(_.dequeue1.map(_.flatMap(_.toOption).strengthR(q)))
+            c <- StreamT.unfoldM(q)(_.dequeue1.map(_.sequence).rethrow.map(_.strengthR(q)))
             a <- StreamT.unfoldM(0)(i => (i < c.size).option((c(i), i + 1)).point[F])
           } yield a)),
         close)
