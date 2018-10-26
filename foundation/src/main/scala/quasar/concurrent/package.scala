@@ -16,6 +16,7 @@
 
 package quasar
 
+import slamdata.Predef.String
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 
@@ -32,6 +33,6 @@ package object concurrent {
       Blocking(ec)
 
     def cached(name: String): BlockingContext =
-      apply(ExecutionContext.fromExecutor(Executors.newCachedThreadPool(NamedDaemonThreadFactory(name)))
+      apply(ExecutionContext.fromExecutor(Executors.newCachedThreadPool(NamedDaemonThreadFactory(name))))
   }
 }

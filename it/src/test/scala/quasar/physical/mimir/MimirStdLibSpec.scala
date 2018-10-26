@@ -31,7 +31,6 @@ import quasar.yggdrasil.vfs.contextShiftForS
 import qdata.time.{DateTimeInterval, TimeGenerators}
 import java.nio.file.Files
 import java.time.{Duration => _, _}
-import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 
 import cats.effect.IO

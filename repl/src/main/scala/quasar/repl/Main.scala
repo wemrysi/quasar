@@ -80,7 +80,7 @@ object Main extends IOApp {
     val blockingPool = BlockingContext.cached("quasar-repl-blocking")
 
     quasarStream[IOT](blockingPool)
-      .evalMap(repl)
+      .evalMap(repl[IOT])
       .compile
       .last
       .run.map(_._2.getOrElse(ExitCode.Success))

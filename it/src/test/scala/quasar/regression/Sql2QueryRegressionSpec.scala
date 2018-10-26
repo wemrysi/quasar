@@ -42,7 +42,6 @@ import quasar.yggdrasil.vfs.contextShiftForS
 import java.math.{MathContext, RoundingMode}
 import java.nio.file.{Files, Paths, Path => JPath}
 import java.util.UUID
-import java.util.concurrent.Executors
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 import scala.concurrent.duration._

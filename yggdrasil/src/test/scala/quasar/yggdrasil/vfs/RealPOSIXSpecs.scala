@@ -21,7 +21,6 @@ import quasar.precog.util.IOUtils
 
 import java.nio.file.Files
 import java.io.{File, FileInputStream, FileOutputStream}
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
 
 import cats.arrow.FunctionK

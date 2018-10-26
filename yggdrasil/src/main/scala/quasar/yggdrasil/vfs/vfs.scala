@@ -27,7 +27,6 @@ import quasar.fp.free._
 import java.io.File
 import java.util.UUID
 import scala.util.Either
-import scala.concurrent.ExecutionContext
 
 import argonaut.{Argonaut, Parse}
 import cats.effect._

@@ -26,7 +26,6 @@ import quasar.sst._
 
 import java.io.File
 import scala.Console, Console.{RED, RESET}
-import scala.concurrent.ExecutionContext
 
 import cats.effect.{ContextShift, ExitCode, IO, IOApp, Sync}
 import cats.syntax.functor._

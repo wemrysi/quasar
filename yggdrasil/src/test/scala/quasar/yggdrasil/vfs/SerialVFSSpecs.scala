@@ -20,7 +20,6 @@ import quasar.concurrent.BlockingContext
 
 import java.io.File
 import java.nio.file.Files
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.IO
