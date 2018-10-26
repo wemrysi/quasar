@@ -26,7 +26,7 @@ import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.impl.evaluate.{Source => EvalSource}
 import quasar.mimir._, MimirCake._
-import quasar.mimir.evaluate.Config.{Associates, AssociatesT, EvaluatorConfig}
+import quasar.mimir.evaluate.Config.{Associates, EvalConfigT, EvaluatorConfig}
 import quasar.precog.common.RValue
 import quasar.qscript._, PlannerError.InternalError
 import quasar.yggdrasil.MonadFinalizers
@@ -50,7 +50,7 @@ final class FederatedShiftedReadPlanner[
     ec: ExecutionContext) {
 
   type Assocs = Associates[T, IO]
-  type M[A] = AssociatesT[T, F, IO, A]
+  type M[A] = EvalConfigT[T, F, IO, A]
 
   type Read[A] = Const[ShiftedRead[AFile], A] \/ Const[InterpretedRead[AFile], A]
 

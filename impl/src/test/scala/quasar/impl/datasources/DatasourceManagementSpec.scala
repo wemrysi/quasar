@@ -121,8 +121,9 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
     def heavyweightDatasource[
         T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-        F[_]: ConcurrentEffect: MonadPlannerErr: Timer](
-        config: Json)
+        F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
+        config: Json)(
+        implicit ec: ExecutionContext)
         : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F]]]] =
       mkDatasource[T[QScriptEducated[T, ?]], F](kind, evalDelay).right.pure[F]
   }

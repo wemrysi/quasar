@@ -24,7 +24,7 @@ import scalaz.Kleisli
 
 object Config {
   type Associates[T[_[_]], F[_]] = AFile => Option[Source[QueryAssociate[T, F]]]
-  type AssociatesT[T[_[_]], F[_], G[_], A] = Kleisli[F, EvaluatorConfig[T, G], A]
+  type EvalConfigT[T[_[_]], F[_], G[_], A] = Kleisli[F, EvaluatorConfig[T, G], A]
 
   final case class EvaluatorConfig[T[_[_]], F[_]](
     associates: Associates[T, F],
