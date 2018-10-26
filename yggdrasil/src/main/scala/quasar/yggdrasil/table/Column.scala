@@ -43,8 +43,28 @@ sealed trait Column {
   def toString(row: Int): String     = if (isDefinedAt(row)) strValue(row) else "(undefined)"
   def toString(range: Range): String = range.map(toString(_: Int)).mkString("(", ",", ")")
 
+  /* Sets all values not within [from, to) to 0.
+   * Sets values within [from, to) to the definedness of this column.
+   */
   def definedAt(from: Int, to: Int): BitSet =
-    BitSetUtil.filteredRange(from, to)(isDefinedAt)
+    this match {
+      case col: BitsetColumn =>
+        val bs = col.definedAt.copy()
+        val max = bs.length << 6
+
+        if (from == 0 && to > max) {
+          bs
+        } else if (from == 0) {
+          bs.clear(to, max) // clears [to, max)
+          bs
+        } else {
+          bs.clear(0, from) // clears [0, from)
+          bs.clear(to, max) // clears [to, max)
+          bs
+        }
+
+      case _ => BitSetUtil.filteredRange(from, to)(isDefinedAt)
+    }
 
   def rowEq(row1: Int, row2: Int): Boolean
   def rowCompare(row1: Int, row2: Int): Int
