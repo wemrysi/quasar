@@ -25,7 +25,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.mimir.MimirCake.Cake
 import quasar.niflheim.NIHDB
 import quasar.precog.common.ColumnRef
-import quasar.yggdrasil.{Config, ExactSize}
+import quasar.yggdrasil.ExactSize
 import quasar.yggdrasil.nihdb.SegmentsWrapper
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.nihdb.NIHDBProjection
@@ -76,9 +76,8 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
           IO.pure(())
       }).flatMap {
         case Some((_, _, db)) =>
-          val can = table.compact(cake.trans.TransSpec1.Id).canonicalize(Config.maxSliceRows)
-
-          (fromStreamT(can.slices).zipWithIndex evalMap {
+          // we assume the table will be compacted/canonicalized before storage, if desired
+          (fromStreamT(table.slices).zipWithIndex evalMap {
             case (slice, offset) =>
               val segments = SegmentsWrapper.sliceToSegments(offset.toLong, slice)
               IO.fromFutureShift(
