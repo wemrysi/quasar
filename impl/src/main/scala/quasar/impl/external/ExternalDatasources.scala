@@ -18,6 +18,7 @@ package quasar.impl.external
 
 import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
+import quasar.concurrent.BlockingContext
 import quasar.connector.{HeavyweightDatasourceModule, LightweightDatasourceModule}
 import quasar.contrib.fs2.convert
 import quasar.fp.ski.κ
@@ -37,7 +38,6 @@ import java.lang.{
 }
 import java.nio.file.{Files, Path}
 import java.util.jar.JarFile
-import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Effect, Sync, Timer}
@@ -49,6 +49,7 @@ import jawn.support.argonaut.Parser._
 import jawnfs2._
 import org.slf4s.Logging
 import scalaz.IMap
+import scalaz.syntax.tag._
 
 object ExternalDatasources extends Logging {
   import ExternalConfig._
@@ -58,7 +59,7 @@ object ExternalDatasources extends Logging {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def apply[F[_]: ContextShift: Timer](
       config: ExternalConfig,
-      blockingPool: ExecutionContext)(
+      blockingPool: BlockingContext)(
       implicit F: ConcurrentEffect[F])
       : Stream[F, IMap[DatasourceType, DatasourceModule]] = {
 
@@ -136,12 +137,12 @@ object ExternalDatasources extends Logging {
 
   private def loadPlugin[F[_]: ContextShift: Effect: Timer](
     pluginFile: Path,
-    blockingPool: ExecutionContext)
+    blockingPool: BlockingContext)
       : Stream[F, DatasourceModule] = {
 
     for {
       js <-
-        file.readAll[F](pluginFile, blockingPool, PluginChunkSize)
+        file.readAll[F](pluginFile, blockingPool.unwrap, PluginChunkSize)
           .chunks
           .map(_.toByteBuffer)
           .parseJson[Json](AsyncParser.SingleValue)

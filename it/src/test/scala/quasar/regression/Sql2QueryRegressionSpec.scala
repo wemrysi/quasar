@@ -22,6 +22,7 @@ import quasar.api.datasource._
 import quasar.build.BuildInfo
 import quasar.common.PhaseResults
 import quasar.common.data.Data
+import quasar.concurrent.BlockingContext
 import quasar.contrib.fs2.convert
 import quasar.contrib.nio.{file => contribFile}
 import quasar.contrib.pathy._
@@ -41,7 +42,6 @@ import quasar.yggdrasil.vfs.contextShiftForS
 import java.math.{MathContext, RoundingMode}
 import java.nio.file.{Files, Paths, Path => JPath}
 import java.util.UUID
-import java.util.concurrent.Executors
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -57,6 +57,7 @@ import org.specs2.execute
 import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
 import scalaz._, Scalaz._
+import scalaz.syntax.tag._
 // import shims._ causes compilation to not terminate in any reasonable amount of time.
 import shims.{monadErrorToScalaz, monadToScalaz}
 
@@ -76,7 +77,7 @@ abstract class Sql2QueryRegressionSpec extends Qspec {
 
   implicit val cs = IO.contextShift(global)
   implicit val tmr = IO.timer(global)
-  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+  val blockingPool = BlockingContext.cached("sql2-query-regression-spec")
 
   def DataDir(id: UUID) =
     rootDir[Sandboxed] </> dir("datasource") </> dir(id.toString)
@@ -222,7 +223,7 @@ abstract class Sql2QueryRegressionSpec extends Qspec {
   /** Returns all the `RegressionTest`s found in the given directory, keyed by
     * file path.
     */
-  def regressionTests[F[_]: ContextShift: Effect: Timer](testDir: JPath, blockingPool: ExecutionContext)
+  def regressionTests[F[_]: ContextShift: Effect: Timer](testDir: JPath, blockingPool: BlockingContext)
       : F[Map[RFile, RegressionTest]] =
     descendantsMatching[F](testDir, TestPattern)
       .flatMap(f => loadRegressionTest[F](f, blockingPool) strengthL asRFile(testDir relativize f))
@@ -230,9 +231,9 @@ abstract class Sql2QueryRegressionSpec extends Qspec {
       .fold(Map[RFile, RegressionTest]())(_ + _)
 
   /** Loads a `RegressionTest` from the given file. */
-  def loadRegressionTest[F[_]: ContextShift: Effect: Timer](file: JPath, blockingPool: ExecutionContext): Stream[F, RegressionTest] =
+  def loadRegressionTest[F[_]: ContextShift: Effect: Timer](file: JPath, blockingPool: BlockingContext): Stream[F, RegressionTest] =
     // all test files right now fit into 8K, which is a reasonable chunk size anyway
-    io.file.readAll[F](file, blockingPool, 8192)
+    io.file.readAll[F](file, blockingPool.unwrap, 8192)
       .through(text.utf8Decode)
       .reduce(_ + _)
       .flatMap(txt =>

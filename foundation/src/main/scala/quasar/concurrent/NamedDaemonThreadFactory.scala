@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * where threadNo is an integer starting from one.
  */
 final case class NamedDaemonThreadFactory(name: String) extends ThreadFactory {
-  val threadNo = new AtomicInteger()
+  val threadNo = new AtomicInteger(0)
   val backingThreadFactory = Executors.defaultThreadFactory()
 
   def newThread(r: java.lang.Runnable) = {

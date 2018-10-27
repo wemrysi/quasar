@@ -16,10 +16,10 @@
 
 package quasar.yggdrasil.vfs
 
+import quasar.concurrent.BlockingContext
+
 import java.io.File
 import java.nio.file.Files
-import java.util.concurrent.Executors
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.IO
@@ -31,7 +31,7 @@ import shims._
 object SerialVFSSpecs extends Specification {
 
   implicit val cs = IO.contextShift(global)
-  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+  val blockingPool = BlockingContext.cached("serial-vfs-spec")
 
   "serial vfs facade" should {
     "create a scratch directory, assign a path, work with real files, and list" in {

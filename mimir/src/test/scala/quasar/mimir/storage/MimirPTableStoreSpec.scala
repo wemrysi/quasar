@@ -18,6 +18,7 @@ package quasar.mimir
 package storage
 
 import quasar.EffectfulQSpec
+import quasar.concurrent.BlockingContext
 import quasar.contrib.nio.file.deleteRecursively
 import quasar.contrib.scalaz.MonadError_
 import quasar.precog.common.{CDouble, CLong, CString, RObject}
@@ -37,7 +38,7 @@ import shims._
 
 object MimirPTableStoreSpec extends EffectfulQSpec[IO] {
 
-  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+  val blockingPool = BlockingContext.cached("mimir-ptable-store-spec")
 
   implicit val ioMonadResourceError: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](Prism.partial[Throwable, ResourceError] {
