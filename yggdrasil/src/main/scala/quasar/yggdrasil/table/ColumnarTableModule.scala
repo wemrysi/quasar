@@ -377,8 +377,8 @@ trait ColumnarTableModule
         ec: ExecutionContext)
         : M[Table] = {
 
-      import fs2.{Chunk, Stream}
-      import tectonic.Plate
+      import tectonic.{BaseParser, Plate}
+      import tectonic.fs2.StreamParser
       import tectonic.json.Parser
 
       val plate = instructions.foldRight(new SlicePlate(precise): Plate[List[Slice]]) {
@@ -395,24 +395,14 @@ trait ColumnarTableModule
           new PivotPlate(instr, plate)
       }
 
-      val parser = Parser(plate, if (arrayWrapped) Parser.UnwrapArray else Parser.ValueStream)
+      val jsonMode =
+        if (arrayWrapped) Parser.UnwrapArray else Parser.ValueStream
 
-      val absorbed: Stream[IO, Chunk[Slice]] =
-        bytes.chunks evalMap { bc =>
-          parser.absorb(bc.toByteBuffer).fold(
-            pe => IO.raiseError[Chunk[Slice]](pe),
-            slices => IO.pure(Chunk.seq(slices)))
-        }
+      val parser =
+        IO[BaseParser[List[Slice]]](Parser(plate, jsonMode))
 
-      val tail = Stream suspend {
-        val eff = parser.finish().fold(
-          pe => IO.raiseError[Chunk[Slice]](pe),
-          slices => IO.pure(Chunk.seq(slices)))
-
-        Stream.eval(eff)
-      }
-
-      val slices = (absorbed ++ tail).flatMap(Stream.chunk(_))
+      val slices =
+        bytes.through(StreamParser.foldable(parser))
 
       for {
         d <- LiftIO[M].liftIO(convert.toStreamT(slices))
