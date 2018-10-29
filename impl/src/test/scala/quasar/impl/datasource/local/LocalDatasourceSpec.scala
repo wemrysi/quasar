@@ -17,11 +17,12 @@
 package quasar.impl.datasource.local
 
 import quasar.api.resource.{ResourceName, ResourcePath}
+import quasar.concurrent.BlockingContext
 import quasar.connector.{DatasourceSpec, ResourceError}
 import quasar.contrib.scalaz.MonadError_
 
 import java.nio.file.Paths
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 
 import cats.effect.IO
 import fs2.Stream
@@ -33,10 +34,12 @@ final class LocalDatasourceSpec
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
-  implicit val tmr = IO.timer(global)
+  implicit val tmr = IO.timer(ExecutionContext.Implicits.global)
+
+  val blockingPool = BlockingContext.cached("local-datasource-spec")
 
   val datasource =
-    LocalDatasource[IO](Paths.get("./it/src/main/resources/tests"), 1024, global)
+    LocalDatasource[IO](Paths.get("./it/src/main/resources/tests"), 1024, blockingPool)
 
   val nonExistentPath =
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")

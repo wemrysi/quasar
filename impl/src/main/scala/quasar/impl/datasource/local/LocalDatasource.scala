@@ -19,6 +19,7 @@ package quasar.impl.datasource.local
 import slamdata.Predef.{Stream => _, Seq => _, _}
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
+import quasar.concurrent.BlockingContext
 import quasar.connector._
 import quasar.connector.ResourceError._
 import quasar.connector.datasource.LightweightDatasource
@@ -28,12 +29,11 @@ import quasar.fp.ski.ι
 
 import java.nio.file.{Files, Path => JPath}
 
-import scala.concurrent.ExecutionContext
-
 import cats.effect.{ContextShift, Effect, Timer}
 import fs2.{io, Stream}
 import pathy.Path
 import scalaz.{\/, Scalaz}, Scalaz._
+import scalaz.syntax.tag._
 import shims._
 
 /** A Datasource backed by the underlying filesystem local to Quasar.
@@ -48,7 +48,7 @@ import shims._
 final class LocalDatasource[F[_]: ContextShift: Timer] private (
     root: JPath,
     readChunkSizeBytes: Int,
-    blockingPool: ExecutionContext)(
+    blockingPool: BlockingContext)(
     implicit F: Effect[F], RE: MonadResourceErr[F])
     extends LightweightDatasource[F, Stream[F, ?], QueryResult[F]] {
 
@@ -68,7 +68,7 @@ final class LocalDatasource[F[_]: ContextShift: Timer] private (
     } yield {
       QueryResult.typed(
         ParsableType.json(JsonVariant.LineDelimited, true),
-        io.file.readAll[F](jp, blockingPool, readChunkSizeBytes))
+        io.file.readAll[F](jp, blockingPool.unwrap, readChunkSizeBytes))
     }
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
@@ -110,7 +110,7 @@ object LocalDatasource {
   def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer](
       root: JPath,
       readChunkSizeBytes: Int,
-      blockingPool: ExecutionContext)
+      blockingPool: BlockingContext)
       : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]] =
     new LocalDatasource[F](root, readChunkSizeBytes, blockingPool)
 }

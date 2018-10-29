@@ -18,15 +18,14 @@ package quasar.datagen
 
 import slamdata.Predef.{Stream => _, _}
 import quasar.RenderedTree
+import quasar.concurrent.BlockingContext
+import quasar.contrib.iota.copkTraverse
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.sst._
-import quasar.contrib.iota.copkTraverse
 
 import java.io.File
-import java.util.concurrent.Executors
 import scala.Console, Console.{RED, RESET}
-import scala.concurrent.ExecutionContext
 
 import cats.effect.{ContextShift, ExitCode, IO, IOApp, Sync}
 import cats.syntax.functor._
@@ -39,13 +38,14 @@ import scalaz.std.anyVal._
 import scalaz.std.list._
 import scalaz.syntax.either._
 import scalaz.syntax.show._
+import scalaz.syntax.tag._
 import spire.std.double._
 
 object Main extends IOApp {
 
   def run(args: List[String]) = {
 
-    val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+    val blockingPool = BlockingContext.cached("quasar-datagen-blocking")
 
     Stream.eval(CliOptions.parse[IO](args))
       .unNone
@@ -55,7 +55,7 @@ object Main extends IOApp {
           .take(opts.outSize.value)
           .intersperse("\n")
           .through(text.utf8Encode)
-          .through(file.writeAll[IO](opts.outFile.toPath, blockingPool, opts.writeOptions)))
+          .through(file.writeAll[IO](opts.outFile.toPath, blockingPool.unwrap, opts.writeOptions)))
       .compile
       .drain
       .redeemWith(printErrors, _ => IO.pure(ExitCode.Success))
@@ -76,11 +76,16 @@ object Main extends IOApp {
       .through(codec.ejsonEncodePreciseData[F, EJ])
 
   /** A stream of `SSTS` decoded from the given file. */
-  def sstsFromFile[F[_]: RaiseThrowable: Sync: ContextShift](src: File, kind: SstSource, blockingPool: ExecutionContext): Stream[F, SSTS] = {
+  def sstsFromFile[F[_]: RaiseThrowable: Sync: ContextShift](
+      src: File,
+      kind: SstSource,
+      blockingPool: BlockingContext)
+      : Stream[F, SSTS] = {
+
     def decodingErr[A](t: RenderedTree, msg: String): Stream[F, A] =
       failedStream[F, A](s"Failed to decode SST: ${msg}\n\n${t.shows}")
 
-    file.readAll[F](src.toPath, blockingPool, 4096)
+    file.readAll[F](src.toPath, blockingPool.unwrap, 4096)
       .through(text.utf8Decode)
       .through(text.lines)
       .take(1)

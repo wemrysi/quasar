@@ -18,6 +18,7 @@ package quasar.mimir
 
 import slamdata.Predef._
 import quasar.common.data.Data
+import quasar.concurrent.BlockingContext
 import quasar.contrib.scalacheck.gen
 import quasar.fp.ski.κ
 import quasar.contrib.iota.copkTraverse
@@ -30,7 +31,6 @@ import quasar.yggdrasil.vfs.contextShiftForS
 import qdata.time.{DateTimeInterval, TimeGenerators}
 import java.nio.file.Files
 import java.time.{Duration => _, _}
-import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 
 import cats.effect.IO
@@ -47,7 +47,7 @@ import scalaz.syntax.either._
 
 class MimirStdLibSpec extends StdLibSpec with PrecogCake {
 
-  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+  val blockingPool = BlockingContext.cached("mimir-stdlib-spec")
 
   private val notImplemented: Result = Skipped("TODO")
 
@@ -223,7 +223,7 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
 
 trait PrecogCake extends Scope with AfterAll {
 
-  val blockingPool: ExecutionContext
+  val blockingPool: BlockingContext
 
   implicit lazy val cs = IO.contextShift(global)
 
