@@ -21,7 +21,7 @@ import quasar.contrib.cats.effect._
 import quasar.contrib.pathy.AFile
 import quasar.precog.common.CLong
 import quasar.niflheim.NIHDB
-import quasar.yggdrasil.vfs.{Blob, SerialVFS, Version}
+import quasar.yggdrasil.vfs.{Blob, contextShiftForS, SerialVFS, Version}
 
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
