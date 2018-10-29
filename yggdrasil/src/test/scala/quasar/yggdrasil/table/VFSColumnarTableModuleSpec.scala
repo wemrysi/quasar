@@ -17,6 +17,7 @@
 package quasar.yggdrasil
 package table
 
+import quasar.concurrent.BlockingContext
 import quasar.contrib.cats.effect._
 import quasar.contrib.pathy.AFile
 import quasar.precog.common.CLong
@@ -167,7 +168,7 @@ object VFSColumnarTableModuleSpecblockingEC
 
   val base = Files.createTempDirectory("VFSColumnarTableModuleSpec").toFile
   val (vfs, vfsCleanup) = {
-    val d = SerialVFS[IO](base, blockingEC).unsafeRunSync()
+    val d = SerialVFS[IO](base, BlockingContext(blockingEC)).unsafeRunSync()
     (d.unsafeValue, d.dispose)
   }
 
