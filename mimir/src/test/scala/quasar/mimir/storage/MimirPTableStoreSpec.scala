@@ -25,7 +25,6 @@ import quasar.precog.common.{CDouble, CLong, CString, RObject}
 import quasar.yggdrasil.vfs.{contextShiftForS, ResourceError}
 
 import java.nio.file.Files
-import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 import scala.util.Random
 

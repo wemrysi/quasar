@@ -982,10 +982,7 @@ abstract class Slice { source =>
       case (ref, col: ArrayColumn[_]) =>
         val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          if (col.size == size)
-            Some(ref -> col): Option[(ColumnRef, Column)]
-          else
-            Some(ref -> col.resize(size))
+          Some(ref -> col.resize(size)): Option[(ColumnRef, Column)]
         } else {
           None
         }
