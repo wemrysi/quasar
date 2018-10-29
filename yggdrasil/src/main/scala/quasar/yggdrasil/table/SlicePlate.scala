@@ -259,7 +259,6 @@ private[table] final class SlicePlate(
       val slice = Slice(size, columns.to[λ[α => Map[ColumnRef, Column]]])
       completed += slice
 
-      nextThreshold = defaultMinRows
       size = 0
       columns.clear()
     }
