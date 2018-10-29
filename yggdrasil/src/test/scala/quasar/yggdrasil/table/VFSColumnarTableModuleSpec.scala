@@ -26,8 +26,7 @@ import quasar.yggdrasil.vfs.{Blob, contextShiftForS, SerialVFS, Version}
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.ExecutionContext.Implicits.global
+import java.util.concurrent.{ConcurrentHashMap, Executors}
 import scala.language.reflectiveCalls
 
 import cats.effect.IO
@@ -36,19 +35,17 @@ import pathy.Path.{file, rootDir}
 import scalaz.{-\/, StreamT, \/-}
 import shims._
 
-object VFSColumnarTableModuleSpec
+object VFSColumnarTableModuleSpecblockingEC
     extends Specification
     with VFSColumnarTableModule
     with nihdb.NIHDBAkkaSetup {
 
-  implicit val ExecutionContext = scala.concurrent.ExecutionContext.global
-
+  val ExecutionContext = scala.concurrent.ExecutionContext.global
+  val blockingEC = scala.concurrent.ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
 
   "table tempfile caching" should {
 
     "check db commits persistence head after clearing hotcache" in {
-
-
       val path: AFile =  rootDir </> file("foo")
 
       val test = for {
@@ -88,8 +85,6 @@ object VFSColumnarTableModuleSpec
 
       test.unsafeRunSync
     }
-
-
 
     "evaluate effects exactly once (sequencing lazily)" in {
       val ctr = new AtomicInteger(0)
@@ -166,10 +161,16 @@ object VFSColumnarTableModuleSpec
 
       eff.unsafeRunSync
     }
+
+    step(vfsCleanup.unsafeRunSync())
   }
 
   val base = Files.createTempDirectory("VFSColumnarTableModuleSpec").toFile
-  def vfs = SerialVFS[IO](base, global).unsafeRunSync.unsafeValue
+  val (vfs, vfsCleanup) = {
+    val d = SerialVFS[IO](base, blockingEC).unsafeRunSync()
+    (d.unsafeValue, d.dispose)
+  }
+
   def StorageTimeout = Timeout
 
   sealed trait TableCompanion extends VFSColumnarTableCompanion
