@@ -52,7 +52,7 @@ sealed trait Column {
         val bs = col.definedAt.copy()
         val max = bs.length << 6
 
-        if (from == 0 && to > max) {
+        if (from == 0 && to >= max) {
           bs
         } else if (from == 0) {
           bs.clear(to, max) // clears [to, max)
