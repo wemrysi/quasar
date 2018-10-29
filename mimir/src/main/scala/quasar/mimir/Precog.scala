@@ -17,6 +17,7 @@
 package quasar.mimir
 
 import quasar.Disposable
+import quasar.concurrent.BlockingContext
 import quasar.contrib.cats.effect._
 import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedCookedBlockFormat, VersionedSegmentFormat}
 import quasar.yggdrasil.table.VFSColumnarTableModule
@@ -76,7 +77,7 @@ object Precog extends Logging {
 
   def apply(
     dataDir: File,
-    blockingPool: ExecutionContext)(
+    blockingPool: BlockingContext)(
     implicit
     cs: ContextShift[IO],
     csPwIO: ContextShift[POSIXWithIO],
@@ -102,7 +103,7 @@ object Precog extends Logging {
 
   def stream(
     dataDir: File,
-    blockingPool: ExecutionContext)(
+    blockingPool: BlockingContext)(
     implicit
     cs: ContextShift[IO],
     csPwIO: ContextShift[POSIXWithIO],

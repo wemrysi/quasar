@@ -17,6 +17,7 @@
 package quasar.mimir.storage
 
 import slamdata.Predef.Map
+import quasar.concurrent.BlockingContext
 import quasar.contrib.nio.file.deleteRecursively
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage.IndexedStoreSpec
@@ -25,7 +26,6 @@ import quasar.precog.common.RValue
 import quasar.yggdrasil.vfs.{contextShiftForS, ResourceError}
 
 import java.nio.file.Files
-import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 import scala.util.Random
 
@@ -36,7 +36,7 @@ import shims._
 
 final class MimirIndexedStoreSpec extends IndexedStoreSpec[IO, StoreKey, RValue] {
 
-  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+  val blockingPool = BlockingContext.cached("mimir-indexed-store-spec")
 
   implicit val ioMonadResourceError: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](Prism.partial[Throwable, ResourceError] {

@@ -57,6 +57,13 @@ object ExternalConfig {
   final case class PluginDirectory(dir: Path) extends ExternalConfig
 
   /**
+   * Similar to PluginDirectory, but explicitly referencing files. This
+   * makes it possible to specify plugin files that are in different
+   * directories, rather than forcing them all to be gathered in one location
+   */
+  final case class PluginFiles(files: List[Path]) extends ExternalConfig
+
+  /**
    * Any files in the classpath will be loaded as jars; any directories
    * will be assumed to contain class files (e.g. the target output of
    * SBT compile).  The class name should be the fully qualified Java

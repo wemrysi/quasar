@@ -18,6 +18,7 @@ package quasar.yggdrasil.vfs
 
 import slamdata.Predef.{Array, SuppressWarnings}
 import quasar.Disposable
+import quasar.concurrent.BlockingContext
 import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.contrib.pathy.{ADir, AFile, APath, RPath, unsafeSandboxAbs}
 import quasar.contrib.scalaz.stateT._
@@ -26,7 +27,6 @@ import quasar.fp.free._
 import java.io.File
 import java.util.UUID
 import scala.util.Either
-import scala.concurrent.ExecutionContext
 
 import argonaut.{Argonaut, Parse}
 import cats.effect._
@@ -606,7 +606,10 @@ object SerialVFS {
    * TODO: Return a `Stream[F, SerialVFS[F]]` to allow for better resource
    *       handling once we're rid of `BackendModule`.
    */
-  def apply[F[_]: Concurrent](root: File, blockingPool: ExecutionContext)(implicit cs: ContextShift[POSIXWithIO])
+  def apply[F[_]: Concurrent](
+      root: File,
+      blockingPool: BlockingContext)(
+      implicit cs: ContextShift[POSIXWithIO])
       : F[Disposable[F, SerialVFS[F]]] = {
 
     import shims.monadToScalaz

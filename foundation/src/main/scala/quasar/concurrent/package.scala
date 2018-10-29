@@ -14,19 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.mimir.evaluate
+package quasar
 
-import slamdata.Predef.Option
-import quasar.contrib.pathy.AFile
-import quasar.impl.evaluate.Source
+import slamdata.Predef.String
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext
 
-import scalaz.Kleisli
+import scalaz.{@@, Tag}
 
-object Config {
-  type Associates[T[_[_]], F[_]] = AFile => Option[Source[QueryAssociate[T, F]]]
-  type EvalConfigT[T[_[_]], F[_], G[_], A] = Kleisli[F, EvaluatorConfig[T, G], A]
+package object concurrent {
+  sealed trait Blocking
+  val Blocking = Tag.of[Blocking]
 
-  final case class EvaluatorConfig[T[_[_]], F[_]](
-    associates: Associates[T, F],
-    pushdown: Pushdown)
+  type BlockingContext = ExecutionContext @@ Blocking
+
+  object BlockingContext {
+    def apply(ec: ExecutionContext): BlockingContext =
+      Blocking(ec)
+
+    def cached(name: String): BlockingContext =
+      apply(ExecutionContext.fromExecutor(Executors.newCachedThreadPool(NamedDaemonThreadFactory(name))))
+  }
 }

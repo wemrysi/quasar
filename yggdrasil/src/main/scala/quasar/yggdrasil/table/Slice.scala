@@ -977,11 +977,20 @@ abstract class Slice { source =>
     */
   def materialized: Slice = {
     val size = source.size
-    val columns = source.columns flatMap {
-      case (ref, col: BoolColumn) =>
-        val defined = col.definedAt(0, source.size)
+
+    val columns: Map[ColumnRef, Column] = source.columns flatMap {
+      case (ref, col: ArrayColumn[_]) =>
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values = BitSetUtil.filteredRange(0, source.size) { row =>
+          Some(ref -> col.resize(size)): Option[(ColumnRef, Column)]
+        } else {
+          None
+        }
+
+      case (ref, col: BoolColumn) =>
+        val defined = col.definedAt(0, size)
+        if (defined.nonEmpty) {
+          val values = BitSetUtil.filteredRange(0, size) { row =>
             defined(row) && col(row)
           }
           Some(ref -> ArrayBoolColumn(defined, values))
@@ -990,10 +999,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: LongColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values  = new Array[Long](source.size)
-          Loop.range(0, source.size) { row =>
+          val values  = new Array[Long](size)
+          Loop.range(0, size) { row =>
             if (defined(row)) values(row) = col(row)
           }
           Some(ref -> ArrayLongColumn(defined, values))
@@ -1002,10 +1011,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: DoubleColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values  = new Array[Double](source.size)
-          Loop.range(0, source.size) { row =>
+          val values  = new Array[Double](size)
+          Loop.range(0, size) { row =>
             if (defined(row)) values(row) = col(row)
           }
           Some(ref -> ArrayDoubleColumn(defined, values))
@@ -1014,10 +1023,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: NumColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values  = new Array[BigDecimal](source.size)
-          Loop.range(0, source.size) { row =>
+          val values  = new Array[BigDecimal](size)
+          Loop.range(0, size) { row =>
             if (defined(row)) values(row) = col(row)
           }
           Some(ref -> ArrayNumColumn(defined, values))
@@ -1026,10 +1035,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: StrColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values  = new Array[String](source.size)
-          Loop.range(0, source.size) { row =>
+          val values  = new Array[String](size)
+          Loop.range(0, size) { row =>
             if (defined(row)) values(row) = col(row)
           }
           Some(ref -> ArrayStrColumn(defined, values))
@@ -1038,10 +1047,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: OffsetDateTimeColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values  = new Array[OffsetDateTime](source.size)
-          Loop.range(0, source.size) { row =>
+          val values  = new Array[OffsetDateTime](size)
+          Loop.range(0, size) { row =>
             if (defined(row)) values(row) = col(row)
           }
           Some(ref -> ArrayOffsetDateTimeColumn(defined, values))
@@ -1050,10 +1059,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: OffsetTimeColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values  = new Array[OffsetTime](source.size)
-          Loop.range(0, source.size) { row =>
+          val values  = new Array[OffsetTime](size)
+          Loop.range(0, size) { row =>
             if (defined(row)) values(row) = col(row)
           }
           Some(ref -> ArrayOffsetTimeColumn(defined, values))
@@ -1062,10 +1071,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: OffsetDateColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values  = new Array[OffsetDate](source.size)
-          Loop.range(0, source.size) { row =>
+          val values  = new Array[OffsetDate](size)
+          Loop.range(0, size) { row =>
             if (defined(row)) values(row) = col(row)
           }
           Some(ref -> ArrayOffsetDateColumn(defined, values))
@@ -1074,10 +1083,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: LocalDateTimeColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values  = new Array[LocalDateTime](source.size)
-          Loop.range(0, source.size) { row =>
+          val values  = new Array[LocalDateTime](size)
+          Loop.range(0, size) { row =>
             if (defined(row)) values(row) = col(row)
           }
           Some(ref -> ArrayLocalDateTimeColumn(defined, values))
@@ -1086,10 +1095,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: LocalTimeColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values  = new Array[LocalTime](source.size)
-          Loop.range(0, source.size) { row =>
+          val values  = new Array[LocalTime](size)
+          Loop.range(0, size) { row =>
             if (defined(row)) values(row) = col(row)
           }
           Some(ref -> ArrayLocalTimeColumn(defined, values))
@@ -1098,10 +1107,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: LocalDateColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values  = new Array[LocalDate](source.size)
-          Loop.range(0, source.size) { row =>
+          val values  = new Array[LocalDate](size)
+          Loop.range(0, size) { row =>
             if (defined(row)) values(row) = col(row)
           }
           Some(ref -> ArrayLocalDateColumn(defined, values))
@@ -1110,10 +1119,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: IntervalColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
-          val values  = new Array[DateTimeInterval](source.size)
-          Loop.range(0, source.size) { row =>
+          val values  = new Array[DateTimeInterval](size)
+          Loop.range(0, size) { row =>
             if (defined(row)) values(row) = col(row)
           }
           Some(ref -> ArrayIntervalColumn(defined, values))
@@ -1122,10 +1131,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: EmptyArrayColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
           val ncol = MutableEmptyArrayColumn.empty()
-          Loop.range(0, source.size) { row =>
+          Loop.range(0, size) { row =>
             ncol.update(row, defined(row))
           }
           Some(ref -> ncol)
@@ -1134,10 +1143,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: EmptyObjectColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
           val ncol = MutableEmptyObjectColumn.empty()
-          Loop.range(0, source.size) { row =>
+          Loop.range(0, size) { row =>
             ncol.update(row, defined(row))
           }
           Some(ref -> ncol)
@@ -1146,10 +1155,10 @@ abstract class Slice { source =>
         }
 
       case (ref, col: NullColumn) =>
-        val defined = col.definedAt(0, source.size)
+        val defined = col.definedAt(0, size)
         if (defined.nonEmpty) {
           val ncol = MutableNullColumn.empty()
-          Loop.range(0, source.size) { row =>
+          Loop.range(0, size) { row =>
             ncol.update(row, defined(row))
           }
           Some(ref -> ncol)

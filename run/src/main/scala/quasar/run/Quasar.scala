@@ -21,6 +21,7 @@ import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
 import quasar.api.table.Tables
 import quasar.common.PhaseResultTell
+import quasar.concurrent.BlockingContext
 import quasar.contrib.pathy.ADir
 import quasar.contrib.std.uuid._
 import quasar.ejson.EJson
@@ -87,7 +88,7 @@ object Quasar {
       precog: Precog,
       extConfig: ExternalConfig,
       sstEvalConfig: SstEvalConfig,
-      blockingPool: ExecutionContext)(
+      blockingPool: BlockingContext)(
       implicit
       cs: ContextShift[IO],
       ec: ExecutionContext)

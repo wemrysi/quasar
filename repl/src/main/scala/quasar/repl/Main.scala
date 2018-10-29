@@ -18,17 +18,17 @@ package quasar
 package repl
 
 import slamdata.Predef._
-import quasar.impl.external.ExternalConfig
+import quasar.concurrent.BlockingContext
 import quasar.common.{PhaseResultCatsT, PhaseResultListen, PhaseResultTell}
 import quasar.contrib.cats.writerT.{catsWriterTMonadListen_, catsWriterTMonadTell_}
 import quasar.contrib.scalaz.MonadError_
+import quasar.impl.external.ExternalConfig
 import quasar.impl.schema.SstEvalConfig
 import quasar.mimir.Precog
 import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
 import quasar.yggdrasil.vfs.contextShiftForS
 
 import java.nio.file.Path
-import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 
 import cats.arrow.FunctionK
@@ -58,7 +58,7 @@ object Main extends IOApp {
     } yield (dataDir, pluginDir)
 
   def quasarStream[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer](
-    blockingPool: ExecutionContext)
+      blockingPool: BlockingContext)
       : Stream[F, Quasar[F]] =
     for {
       (dataPath, pluginPath) <- paths[F]
@@ -77,12 +77,13 @@ object Main extends IOApp {
     } yield l
 
   override def run(args: List[String]): IO[ExitCode] = {
-    val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
-    val s: Stream[IOT, ExitCode] =
-      quasarStream[IOT](blockingPool) >>= { q: Quasar[IOT] =>
-        Stream.eval(repl(q))
-      }
-    s.compile.last.run.map(_._2.getOrElse(ExitCode.Success))
+    val blockingPool = BlockingContext.cached("quasar-repl-blocking")
+
+    quasarStream[IOT](blockingPool)
+      .evalMap(repl[IOT])
+      .compile
+      .last
+      .run.map(_._2.getOrElse(ExitCode.Success))
   }
 
 }

@@ -43,8 +43,28 @@ sealed trait Column {
   def toString(row: Int): String     = if (isDefinedAt(row)) strValue(row) else "(undefined)"
   def toString(range: Range): String = range.map(toString(_: Int)).mkString("(", ",", ")")
 
+  /* Sets all values not within [from, to) to 0.
+   * Sets values within [from, to) to the definedness of this column.
+   */
   def definedAt(from: Int, to: Int): BitSet =
-    BitSetUtil.filteredRange(from, to)(isDefinedAt)
+    this match {
+      case col: BitsetColumn =>
+        val bs = col.definedAt.copy()
+        val max = bs.length << 6
+
+        if (from == 0 && to >= max) {
+          bs
+        } else if (from == 0) {
+          bs.clear(to, max) // clears [to, max)
+          bs
+        } else {
+          bs.clear(0, from) // clears [0, from)
+          bs.clear(to, max) // clears [to, max)
+          bs
+        }
+
+      case _ => BitSetUtil.filteredRange(from, to)(isDefinedAt)
+    }
 
   def rowEq(row1: Int, row2: Int): Boolean
   def rowCompare(row1: Int, row2: Int): Int
@@ -633,12 +653,15 @@ class ArrayHomogeneousArrayColumn[@specialized(Boolean, Long, Double) A](val def
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[Array[A]] = {
-    implicit val ct: ClassTag[Array[A]] = tpe.classTag
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayHomogeneousArrayColumn(newDefined, newValues)
-  }
+  def resize(size: Int): ArrayColumn[Array[A]] =
+    if (values.size == size) {
+      this
+    } else {
+      implicit val ct: ClassTag[Array[A]] = tpe.classTag
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayHomogeneousArrayColumn(newDefined, newValues)
+    }
 }
 
 object ArrayHomogeneousArrayColumn {
@@ -673,7 +696,6 @@ class ArrayBoolColumn(val defined: BitSet, val values: BitSet) extends BitsetCol
     val newDefined = defined.resizeBits(size)
     new ArrayBoolColumn(newDefined, newValues)
   }
-
 }
 
 object ArrayBoolColumn {
@@ -702,12 +724,14 @@ class ArrayLongColumn(val defined: BitSet, val values: Array[Long]) extends Bits
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[Long] = {
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayLongColumn(newDefined, newValues)
-  }
-
+  def resize(size: Int): ArrayColumn[Long] =
+    if (values.size == size) {
+      this
+    } else {
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayLongColumn(newDefined, newValues)
+    }
 }
 
 object ArrayLongColumn {
@@ -730,12 +754,14 @@ class ArrayDoubleColumn(val defined: BitSet, val values: Array[Double]) extends 
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[Double] = {
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayDoubleColumn(newDefined, newValues)
-  }
-
+  def resize(size: Int): ArrayColumn[Double] =
+    if (values.size == size) {
+      this
+    } else {
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayDoubleColumn(newDefined, newValues)
+   }
 }
 
 object ArrayDoubleColumn {
@@ -758,12 +784,14 @@ class ArrayNumColumn(val defined: BitSet, val values: Array[BigDecimal]) extends
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[BigDecimal] = {
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayNumColumn(newDefined, newValues)
-  }
-
+  def resize(size: Int): ArrayColumn[BigDecimal] =
+    if (values.size == size) {
+      this
+    } else {
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayNumColumn(newDefined, newValues)
+    }
 }
 
 object ArrayNumColumn {
@@ -786,12 +814,14 @@ class ArrayStrColumn(val defined: BitSet, val values: Array[String]) extends Bit
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[String] = {
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayStrColumn(newDefined, newValues)
-  }
-
+  def resize(size: Int): ArrayColumn[String] =
+    if (values.size == size) {
+      this
+    } else {
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayStrColumn(newDefined, newValues)
+    }
 }
 
 object ArrayStrColumn {
@@ -814,12 +844,14 @@ class ArrayOffsetDateTimeColumn(val defined: BitSet, val values: Array[OffsetDat
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[OffsetDateTime] = {
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayOffsetDateTimeColumn(newDefined, newValues)
-  }
-
+  def resize(size: Int): ArrayColumn[OffsetDateTime] =
+    if (values.size == size) {
+      this
+    } else {
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayOffsetDateTimeColumn(newDefined, newValues)
+    }
 }
 
 object ArrayOffsetDateTimeColumn {
@@ -842,12 +874,14 @@ class ArrayOffsetTimeColumn(val defined: BitSet, val values: Array[OffsetTime]) 
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[OffsetTime] = {
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayOffsetTimeColumn(newDefined, newValues)
-  }
-
+  def resize(size: Int): ArrayColumn[OffsetTime] =
+    if (values.size == size) {
+      this
+    } else {
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayOffsetTimeColumn(newDefined, newValues)
+    }
 }
 
 object ArrayOffsetTimeColumn {
@@ -870,12 +904,14 @@ class ArrayOffsetDateColumn(val defined: BitSet, val values: Array[OffsetDate]) 
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[OffsetDate] = {
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayOffsetDateColumn(newDefined, newValues)
-  }
-
+  def resize(size: Int): ArrayColumn[OffsetDate] =
+    if (values.size == size) {
+      this
+    } else {
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayOffsetDateColumn(newDefined, newValues)
+    }
 }
 
 object ArrayOffsetDateColumn {
@@ -898,12 +934,14 @@ class ArrayLocalDateTimeColumn(val defined: BitSet, val values: Array[LocalDateT
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[LocalDateTime] = {
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayLocalDateTimeColumn(newDefined, newValues)
-  }
-
+  def resize(size: Int): ArrayColumn[LocalDateTime] =
+    if (values.size == size) {
+      this
+    } else {
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayLocalDateTimeColumn(newDefined, newValues)
+    }
 }
 
 object ArrayLocalDateTimeColumn {
@@ -926,12 +964,14 @@ class ArrayLocalTimeColumn(val defined: BitSet, val values: Array[LocalTime]) ex
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[LocalTime] = {
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayLocalTimeColumn(newDefined, newValues)
-  }
-
+  def resize(size: Int): ArrayColumn[LocalTime] =
+    if (values.size == size) {
+      this
+    } else {
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayLocalTimeColumn(newDefined, newValues)
+    }
 }
 
 object ArrayLocalTimeColumn {
@@ -954,12 +994,14 @@ class ArrayLocalDateColumn(val defined: BitSet, val values: Array[LocalDate]) ex
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[LocalDate] = {
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayLocalDateColumn(newDefined, newValues)
-  }
-
+  def resize(size: Int): ArrayColumn[LocalDate] =
+    if (values.size == size) {
+      this
+    } else {
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayLocalDateColumn(newDefined, newValues)
+    }
 }
 
 object ArrayLocalDateColumn {
@@ -982,12 +1024,14 @@ class ArrayIntervalColumn(val defined: BitSet, val values: Array[DateTimeInterva
 
   def clear(row: Int): Unit = defined.clear(row)
 
-  def resize(size: Int): ArrayColumn[DateTimeInterval] = {
-    val newValues = ArrayColumn.resizeArray(values, size)
-    val newDefined = defined.resizeBits(size)
-    new ArrayIntervalColumn(newDefined, newValues)
-  }
-
+  def resize(size: Int): ArrayColumn[DateTimeInterval] =
+    if (values.size == size) {
+      this
+    } else {
+      val newValues = ArrayColumn.resizeArray(values, size)
+      val newDefined = defined.resizeBits(size)
+      new ArrayIntervalColumn(newDefined, newValues)
+    }
 }
 
 object ArrayIntervalColumn {
@@ -1047,22 +1091,17 @@ class MutableNullColumn(val defined: BitSet) extends BitsetColumn(defined) with 
     val newDefined = defined.resizeBits(size)
     new MutableNullColumn(newDefined)
   }
-
 }
 
 object MutableNullColumn {
   def empty(): MutableNullColumn = new MutableNullColumn(new BitSet)
 }
 
-/* help for ctags
-type ArrayColumn */
-
 abstract class SingletonColumn[A] extends Column {
 
   override def isDefinedAt(row: Int) = row == 0
 
   override def definedAt(from: Int, to: Int): BitSet = SingletonColumn.Defined.copy
-
 }
 
 final class SingletonBoolColumn(val value: Boolean)

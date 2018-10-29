@@ -19,10 +19,10 @@ package quasar.impl.datasource.local
 import quasar.Disposable
 import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
 import quasar.api.resource.ResourcePath
+import quasar.concurrent.BlockingContext
 import quasar.connector.{Datasource, LightweightDatasourceModule, MonadResourceErr, QueryResult}
 
 import java.nio.file.Paths
-import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
@@ -35,8 +35,8 @@ import shims._
 object LocalDatasourceModule extends LightweightDatasourceModule {
 
   // FIXME this is side effecting
-  private lazy val blockingPool: ExecutionContext =
-    ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+  private lazy val blockingPool: BlockingContext =
+    BlockingContext.cached("local-datasource")
 
   val kind: DatasourceType = LocalType
 

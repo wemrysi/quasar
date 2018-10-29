@@ -59,7 +59,7 @@ import scalaz.{EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz, \/}, Scalaz._
 import shims._
 import spire.algebra.Field
 import spire.math.ConvertableTo
-import tectonic.GenericParser
+import tectonic.BaseParser
 import tectonic.fs2.StreamParser
 import tectonic.json.{Parser => TParser}
 
@@ -168,6 +168,11 @@ final class DatasourceManagement[
           freeDsl.Unreferenced,
           recFunc.Constant(EJson.int(sstEvalConfig.sampleSize.value))))
 
+    def concatArrayBufs(bufs: List[ArrayBuffer[S]]): ArrayBuffer[S] = {
+      val totalSize = bufs.foldLeft(0)(_ + _.length)
+      bufs.foldLeft(new ArrayBuffer[S](totalSize))(_ ++= _)
+    }
+
     withDs[DiscoveryError[I], Option[sstConfig.Schema]](datasourceId) { ds =>
 
       val queryResult: F[QueryResult[F]] =
@@ -184,10 +189,14 @@ final class DatasourceManagement[
               case JsonVariant.LineDelimited => TParser.ValueStream
             }
 
-            val plate =
-              QDataPlate[S, ArrayBuffer[S]](isPrecise).mapDelegate(Chunk.buffer)
+            val parser =
+              Sync[F].delay[BaseParser[ArrayBuffer[S]]](
+                TParser(QDataPlate[S, ArrayBuffer[S]](isPrecise), mode))
 
-            data.through(StreamParser(Sync[F].delay[GenericParser[Chunk[S]]](TParser(plate, mode))))
+            data.through(
+              StreamParser(parser)(
+                Chunk.buffer,
+                bufs => Chunk.buffer(concatArrayBufs(bufs))))
         }
 
       val k: N = ConvertableTo[N].fromLong(sstEvalConfig.sampleSize.value)
