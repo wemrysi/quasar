@@ -18,9 +18,9 @@ package quasar.precog.util
 
 import org.slf4s.Logging
 import scalaz.effect.IO
-
 import java.io.File
-import java.nio.file.Files
+import java.nio.file.{Files, StandardCopyOption}
+import scalaz.syntax.functor._
 
 object IOUtils extends Logging {
 
@@ -37,7 +37,11 @@ object IOUtils extends Logging {
     val tmpFile = new File(f.getParentFile, f.getName + "-" + System.nanoTime + ".tmp")
 
     overwriteFile(s, tmpFile) flatMap { _ =>
-      IO(tmpFile.renameTo(f)) // TODO: This is only atomic on POSIX systems
+      IO(Files.move(
+        tmpFile.toPath,
+        f.toPath,
+        StandardCopyOption.ATOMIC_MOVE,
+        StandardCopyOption.REPLACE_EXISTING)).as(true) // TODO: This is only atomic on POSIX systems
     }
   }
 
