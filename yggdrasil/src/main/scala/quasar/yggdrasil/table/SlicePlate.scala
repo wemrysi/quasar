@@ -31,7 +31,11 @@ private[table] abstract class EmptyFinishRowPlate[A] extends Plate[A] {
   def finishRow() = ()
 }
 
-private[table] final class SlicePlate(precise: Boolean)
+private[table] final class SlicePlate(
+    precise: Boolean,
+    defaultMinRows: Int = Config.defaultMinRows,
+    maxSliceRows: Int = Config.maxSliceRows,
+    maxSliceColumns: Int = Config.maxSliceColumns)
     extends EmptyFinishRowPlate[List[Slice]]    // <3 Scala
     with ContinuingNestPlate[List[Slice]]
     with CPathPlate[List[Slice]] {
@@ -49,7 +53,7 @@ private[table] final class SlicePlate(precise: Boolean)
 
   private val Nil = scala.Nil
 
-  private var nextThreshold = Config.defaultMinRows
+  private var nextThreshold = defaultMinRows
 
   private var size = 0    // rows in process don't count toward size
   private val columns = mutable.Map[ColumnRef, ArrayColumn[_]]()
@@ -192,7 +196,7 @@ private[table] final class SlicePlate(precise: Boolean)
     super.finishRow()
     size += 1
 
-    if (size > Config.maxSliceRows || columns.size > Config.maxSliceColumns) {
+    if (size >= maxSliceRows || columns.size > maxSliceColumns) {
       finishSlice()
     }
   }
@@ -255,7 +259,6 @@ private[table] final class SlicePlate(precise: Boolean)
       val slice = Slice(size, columns.to[λ[α => Map[ColumnRef, Column]]])
       completed += slice
 
-      nextThreshold = Config.defaultMinRows
       size = 0
       columns.clear()
     }

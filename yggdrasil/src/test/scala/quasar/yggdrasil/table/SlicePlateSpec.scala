@@ -21,7 +21,7 @@ import quasar.blueeyes.json.JValue
 import quasar.common.data.{Data, DataGenerators}
 import quasar.frontend.data.DataCodec
 import quasar.precog.JsonTestSupport
-import quasar.precog.common.{CLong, CNum, RValue}
+import quasar.precog.common.{CBoolean, CLong, CNum, CString, RObject, RValue}
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
@@ -82,6 +82,55 @@ object SlicePlateSpec extends Specification with ScalaCheck with DataGenerators 
         case (Right(slices1), Right(slices2)) =>
           val results = (slices1 ++ slices2).flatMap(_.toRValues)
           results mustEqual List(CLong(Long.MinValue))
+      }
+    }
+
+    "produce slices that are exactly max rows, ideally" in {
+      val input = """
+        42
+        12
+        10
+        """
+
+      val plate = new SlicePlate(true, defaultMinRows = 2, maxSliceRows = 2)
+      val parser = Parser(plate, Parser.ValueStream)
+
+      (parser.absorb(input), parser.finish()) must beLike {
+        case (Right(slices1), Right(slices2)) =>
+          val combined = slices1 ++ slices2
+          combined must haveSize(2)
+          combined(0).size mustEqual 2
+          combined(1).size mustEqual 1
+
+          val results = combined.flatMap(_.toRValues)
+          results mustEqual List(CLong(42), CLong(12), CLong(10))
+      }
+    }
+
+    "produce slices that are just over max columns, ideally" in {
+      val input = """
+        { "a": 42, "b": true }
+        { "a": 84, "b": true }
+        { "a": 12, "c": "baz" }
+        { "a": 10, "b": false, "c": "qux" }
+        """
+
+      val plate = new SlicePlate(true, maxSliceColumns = 2)
+      val parser = Parser(plate, Parser.ValueStream)
+
+      (parser.absorb(input), parser.finish()) must beLike {
+        case (Right(slices1), Right(slices2)) =>
+          val combined = slices1 ++ slices2
+          combined must haveSize(2)
+          combined(0).size mustEqual 3
+          combined(1).size mustEqual 1
+
+          val results = combined.flatMap(_.toRValues)
+          results mustEqual List(
+            RObject("a" -> CLong(42), "b" -> CBoolean(true)),
+            RObject("a" -> CLong(84), "b" -> CBoolean(true)),
+            RObject("a" -> CLong(12), "c" -> CString("baz")),
+            RObject("a" -> CLong(10), "b" -> CBoolean(false), "c" -> CString("qux")))
       }
     }
   }
