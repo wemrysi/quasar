@@ -224,7 +224,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
-                Pivot(CPath(CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+                Pivot(SMap((CPath(CPathField(ShiftedKey)), (IncludeId, ParseType.Object)))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
                 recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 0)),
@@ -251,7 +251,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
-                Pivot(CPath(CPathField(ShiftedKey)), IdOnly, ParseType.Object))),
+                Pivot(SMap((CPath(CPathField(ShiftedKey)), (IdOnly, ParseType.Object)))))),
             recFuncE.MakeMapS("k1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
 
@@ -275,7 +275,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
-                Pivot(CPath(CPathField(ShiftedKey)), ExcludeId, ParseType.Object))),
+                Pivot(SMap((CPath(CPathField(ShiftedKey)), (ExcludeId, ParseType.Object)))))),
             recFuncE.MakeMapS("v1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
 
@@ -303,7 +303,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
-                Pivot(CPath(CPathField(ShiftedKey)), ExcludeId, ParseType.Object))),
+                Pivot(SMap((CPath(CPathField(ShiftedKey)), (ExcludeId, ParseType.Object)))))),
             recFuncE.MakeMapS("v1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey))),
           recFuncE.Constant(ejs.bool(true)))
@@ -330,7 +330,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath(CPathField("xyz")), Set(ParseType.Object)))),
                 Wrap(CPath(CPathField("xyz")), ShiftedKey),
-                Pivot(CPath(CPathField("xyz"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+                Pivot(SMap((CPath(CPathField("xyz"), CPathField(ShiftedKey)), (IncludeId, ParseType.Object)))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
                 recFuncE.ProjectIndexI(
@@ -372,7 +372,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc")), Set(ParseType.Object)))),
                 Wrap(CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc")), ShiftedKey),
-                Pivot(CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+                Pivot(SMap((CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc"), CPathField(ShiftedKey)), (IncludeId, ParseType.Object)))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
                 recFuncE.ProjectIndexI(
@@ -415,7 +415,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath(CPathField("aaa"), CPathIndex(42), CPathField("ccc")), Set(ParseType.Object)))),
                 Wrap(CPath(CPathField("aaa"), CPathIndex(0), CPathField("ccc")), ShiftedKey),
-                Pivot(CPath(CPathField("aaa"), CPathIndex(0), CPathField("ccc"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+                Pivot(SMap((CPath(CPathField("aaa"), CPathIndex(0), CPathField("ccc"), CPathField(ShiftedKey)), (IncludeId, ParseType.Object)))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
                 recFuncE.ProjectIndexI(
@@ -457,7 +457,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath(CPathIndex(17), CPathIndex(42), CPathField("ccc")), Set(ParseType.Object)))),
                 Wrap(CPath(CPathIndex(0), CPathIndex(0), CPathField("ccc")), ShiftedKey),
-                Pivot(CPath(CPathIndex(0), CPathIndex(0), CPathField("ccc"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+                Pivot(SMap((CPath(CPathIndex(0), CPathIndex(0), CPathField("ccc"), CPathField(ShiftedKey)), (IncludeId, ParseType.Object)))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
                 recFuncE.ProjectIndexI(
