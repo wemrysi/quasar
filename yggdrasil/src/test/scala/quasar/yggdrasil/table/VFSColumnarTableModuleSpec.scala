@@ -17,26 +17,76 @@
 package quasar.yggdrasil
 package table
 
+import quasar.concurrent.BlockingContext
+import quasar.contrib.cats.effect._
+import quasar.contrib.pathy.AFile
 import quasar.precog.common.CLong
+import quasar.niflheim.NIHDB
+import quasar.yggdrasil.vfs.{Blob, contextShiftForS, SerialVFS, Version}
+
+import java.nio.file.Files
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.UUID
+import java.util.concurrent.{ConcurrentHashMap, Executors}
+import scala.language.reflectiveCalls
 
 import cats.effect.IO
-
 import org.specs2.mutable.Specification
-
-import scalaz.StreamT
-
+import pathy.Path.{file, rootDir}
+import scalaz.{-\/, StreamT, \/-}
 import shims._
 
-import java.util.concurrent.atomic.AtomicInteger
-
-object VFSColumnarTableModuleSpec
+object VFSColumnarTableModuleSpecblockingEC
     extends Specification
     with VFSColumnarTableModule
     with nihdb.NIHDBAkkaSetup {
 
-  implicit val ExecutionContext = scala.concurrent.ExecutionContext.global
+  val ExecutionContext = scala.concurrent.ExecutionContext.global
+  val blockingEC = scala.concurrent.ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
 
   "table tempfile caching" should {
+
+    "check db commits persistence head after clearing hotcache" in {
+      val path: AFile =  rootDir </> file("foo")
+
+      val test = for {
+        created <- createDB(path) map {
+          case \/-(t) => t
+          case -\/(_) => ko
+        }
+        (blob: Blob, version: Version, db: NIHDB) = created
+
+        commit1 <- commitDB(blob, version, db)
+
+        created2 <- createDB(path) map {
+          case \/-(t) => t
+          case -\/(_) => ko
+        }
+        (_, version2: Version, db2: NIHDB) = created2
+
+        commit2 <- commitDB(blob, version2, db2)
+
+        _ <- IO.fromFutureShift(IO(db.close))
+        _ <- IO.fromFutureShift(IO(db2.close))
+
+        // clear the hot cache
+        xx = this.asInstanceOf[{ val quasar$yggdrasil$table$VFSColumnarTableModule$$dbs: ConcurrentHashMap[(Blob, Version), NIHDB] }]
+        _ = xx.quasar$yggdrasil$table$VFSColumnarTableModule$$dbs.clear()
+
+        finalHead <- vfs.headOfBlob(blob)
+        actualHead = finalHead match {
+          case Some(h: Version) => h
+          case _ => Version(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+        }
+      } yield {
+        commit1 must_=== true
+        commit2 must_=== true
+        actualHead must_=== version2
+      }
+
+      test.unsafeRunSync
+    }
+
     "evaluate effects exactly once (sequencing lazily)" in {
       val ctr = new AtomicInteger(0)
       val cget = IO(ctr.get())
@@ -112,9 +162,16 @@ object VFSColumnarTableModuleSpec
 
       eff.unsafeRunSync
     }
+
+    step(vfsCleanup.unsafeRunSync())
   }
 
-  def vfs = ???
+  val base = Files.createTempDirectory("VFSColumnarTableModuleSpec").toFile
+  val (vfs, vfsCleanup) = {
+    val d = SerialVFS[IO](base, BlockingContext(blockingEC)).unsafeRunSync()
+    (d.unsafeValue, d.dispose)
+  }
+
   def StorageTimeout = Timeout
 
   sealed trait TableCompanion extends VFSColumnarTableCompanion

@@ -163,33 +163,29 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
     back.run.map(_ => ())
   }
 
-  def commitDB(blob: Blob, version: Version, db: NIHDB): IO[Unit] = {
-    // last-wins semantics
-    lazy val replaceM: OptionT[IO, Unit] = for {
+  /**
+    * Commits the new version and closes (if exists) the old version of the database.
+    */
+  def commitDB(blob: Blob, version: Version, db: NIHDB): IO[Boolean] = {
+    val closeOldM = for {
       oldHead <- OptionT(vfs.headOfBlob(blob))
       oldDB <- OptionT(IO(Option(dbs.get((blob, oldHead)))))
-
-      check <- IO(dbs.replace((blob, oldHead), oldDB, db)).liftM[OptionT]
-
-      _ <- if (check)
-        IO.fromFutureShift(IO(oldDB.close)).liftM[OptionT]
-      else
-        replaceM
-    } yield ()
-
-    val insert = for {
-      check <- IO(dbs.putIfAbsent((blob, version), db))
-
-      _ <- if (check == null)
-        vfs.commit(blob, version)
-      else
-        commitDB(blob, version, db)
-    } yield ()
+      _ <- IO(log.trace(s"closing old database for blob $blob and version $oldHead")).liftM[OptionT]
+      _ <- IO.fromFutureShift(IO(oldDB.close)).liftM[OptionT]
+      check <- IO(dbs.remove((blob, oldHead), oldDB)).liftM[OptionT]
+    } yield check
 
     for {
-      _ <- IO(log.trace(s"attempting to commit blob/version: $blob/$version"))
-      _ <- replaceM.getOrElseF(insert)
-    } yield ()
+      check <- IO(dbs.putIfAbsent((blob, version), db))
+      _ <- if (check == null)
+        for {
+          _ <- IO(log.trace(s"committing blob $blob and version $version"))
+          _ <- vfs.commit(blob, version)
+          _ <- closeOldM.run      // just run this for the effect; we don't really care if it passes or fails
+        } yield ()
+      else
+        IO(log.trace(s"commit on blob $blob and version $version failed due to race condition (should be impossible?)"))
+    } yield check == null;
   }
 
   def ingest(path: PrecogPath, ingestion: Stream[IO, JValue]): EitherT[IO, ResourceError, Unit] = {
