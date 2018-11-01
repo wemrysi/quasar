@@ -49,12 +49,6 @@ trait Coalesce[IN[_]] {
     (implicit QC: QScriptCore[IT, ?] :<<: OUT)
       : IN[IT[F]] => Option[IN[IT[F]]]
 
-  def coalesceQCNormalize[F[_]: Functor]
-    (FToOut: PrismNT[F, OUT])
-    (implicit QC: QScriptCore[IT, ?] :<<: OUT)
-      : IN[IT[F]] => Option[IN[IT[F]]] =
-    coalesceQC[F](FToOut)
-
   /** Coalesce for types containing ShiftedRead.
    *  We don't coalesce InterpretedRead.
    */
@@ -63,25 +57,11 @@ trait Coalesce[IN[_]] {
     (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT)
       : IN[IT[F]] => Option[IN[IT[F]]]
 
-  // FOOBAR 3
-  def coalesceSRNormalize[F[_]: Functor, A]
-    (FToOut: PrismNT[F, OUT])
-    (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT)
-      : IN[IT[F]] => Option[IN[IT[F]]] =
-    coalesceSR[F, A](FToOut)
-
   /** Coalesce for types containing EquiJoin. */
   protected[qscript] def coalesceEJ[F[_]: Functor]
     (FToOut: F ~> λ[α => Option[OUT[α]]])
     (implicit EJ: EquiJoin[IT, ?] :<<: OUT)
       : IN[IT[F]] => Option[OUT[IT[F]]]
-
-  def coalesceEJNormalize[F[_]: Functor]
-    (FToOut: F ~> λ[α => Option[OUT[α]]])
-    (implicit EJ: EquiJoin[IT, ?] :<<: OUT)
-      : IN[IT[F]] => Option[OUT[IT[F]]] = in => {
-    coalesceEJ[F](FToOut).apply(in)
-  }
 
   /** Coalesce for types containing ThetaJoin. */
   // FOOBAR 5
@@ -89,13 +69,6 @@ trait Coalesce[IN[_]] {
     (FToOut: F ~> λ[α => Option[OUT[α]]])
     (implicit TJ: ThetaJoin[IT, ?] :<<: OUT)
       : IN[IT[F]] => Option[OUT[IT[F]]]
-
-  def coalesceTJNormalize[F[_]: Functor]
-    (FToOut: F ~> λ[α => Option[OUT[α]]])
-    (implicit TJ: ThetaJoin[IT, ?] :<<: OUT)
-      : IN[IT[F]] => Option[OUT[IT[F]]] = in => {
-    coalesceTJ[F](FToOut).apply(in)
-  }
 }
 
 trait CoalesceInstances {
@@ -254,20 +227,20 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
   }
 
   private def freeQC(branch: FreeQS): FreeQS =
-    freeTotal(branch)(CoalesceTotal.coalesceQCNormalize(coenvPrism[QScriptTotal, Hole]))
+    freeTotal(branch)(CoalesceTotal.coalesceQC(coenvPrism[QScriptTotal, Hole]))
 
   private def freeSR(branch: FreeQS): FreeQS = {
     def freeSR0[A](b: FreeQS)(implicit SR: Const[ShiftedRead[A], ?] :<<: QScriptTotal): FreeQS =
-      freeTotal(b)(CoalesceTotal.coalesceSRNormalize[CoEnvQS, A](coenvPrism[QScriptTotal, Hole]))
+      freeTotal(b)(CoalesceTotal.coalesceSR[CoEnvQS, A](coenvPrism[QScriptTotal, Hole]))
 
     freeSR0[AFile](freeSR0[ADir](branch))
   }
 
   private def freeEJ(branch: FreeQS): FreeQS =
-    freeTotal(branch)(CoalesceTotal.coalesceEJNormalize(coenvPrism[QScriptTotal, Hole].get))
+    freeTotal(branch)(CoalesceTotal.coalesceEJ(coenvPrism[QScriptTotal, Hole].get))
 
   private def freeTJ(branch: FreeQS): FreeQS =
-    freeTotal(branch)(CoalesceTotal.coalesceTJNormalize(coenvPrism[QScriptTotal, Hole].get))
+    freeTotal(branch)(CoalesceTotal.coalesceTJ(coenvPrism[QScriptTotal, Hole].get))
 
   private def ifNeq(f: FreeQS => FreeQS): FreeQS => Option[FreeQS] =
     branch => {
