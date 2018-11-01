@@ -346,8 +346,7 @@ object MapFuncCore {
               (c1 ≟ c && t1 ≟ t) option e1
 
             case _ => none
-          }
-        ))
+          }))
 
       case MFC(Guard(c, t, ExtractFunc(Undefined()), f)) =>
         c.traverse(test) ∘ (h => (
@@ -358,18 +357,9 @@ object MapFuncCore {
               (c1 ≟ c && t1 ≟ t) option f1
 
             case _ => none
-          }
-        ))
+          }))
       case _ => none
     }
-
-  // normalize but don't rewrite
-  def transform[T[_[_]]: BirecursiveT: EqualT, A: Equal]
-      : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
-    orOriginal(DedupeGuards[T, A]) <<<
-    repeatedly(applyTransforms(
-      foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](MFC(Constant(const)))),
-      ExtractFiltering[T, A]))
 
   def normalize[T[_[_]]: BirecursiveT: EqualT, A: Equal]
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
@@ -378,6 +368,10 @@ object MapFuncCore {
       foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](MFC(Constant(const)))),
       rewrite[T, A],
       ExtractFiltering[T, A]))
+
+  def freeMF[T[_[_]]: BirecursiveT: EqualT, A: Equal: Show](fm: Free[MapFunc[T, ?], A])
+      : Free[MapFunc[T, ?], A] =
+    fm.transCata[Free[MapFunc[T, ?], A]](MapFuncCore.normalize[T, A])
 
   def replaceJoinSides[T[_[_]]: BirecursiveT](left: Symbol, right: Symbol)
       : CoMapFuncR[T, JoinSide] => CoMapFuncR[T, JoinSide] =

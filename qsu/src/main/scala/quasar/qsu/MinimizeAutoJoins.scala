@@ -32,6 +32,7 @@ import quasar.qscript.{
   JoinSide3,
   LeftSide,
   LeftSide3,
+  MapFuncCore,
   MonadPlannerErr,
   RightSide,
   RightSide3,
@@ -39,7 +40,6 @@ import quasar.qscript.{
 }
 import quasar.qscript.RecFreeS._
 import quasar.qscript.provenance.Dimensions
-import quasar.qscript.rewrites.NormalizableT
 import quasar.qsu.{QScriptUniform => QSU}
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
 
@@ -64,8 +64,6 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
   private val J = Fixed[T[EJson]]
   private val QP = QProv[T]
-
-  private val N = new NormalizableT[T]
 
   def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
     type G[A] = StateT[StateT[F, RevIdx, ?], MinimizationState[T], A]
@@ -235,7 +233,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                 candidates2 <- exRebuilds.zipWithIndex traverse {
                   case (rebuild, i) =>
                     val rebuiltFM = recFunc.ProjectKeyS(simplifiedFM, i.toString)
-                    val normalized = N.freeMF(rebuiltFM.linearize)
+                    val normalized = MapFuncCore.freeMF(rebuiltFM.linearize)
 
                     rebuild(
                       simplifiedSource,

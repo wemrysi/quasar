@@ -41,9 +41,9 @@ private[qscript] trait UnirewriteLowPriorityImplicits {
       TC0: Traverse[C0[L, ?]],
       J: SimplifyJoin.Aux[T, QScriptShiftRead[T, ?], C0[L, ?]],
       C: Coalesce.Aux[T, QScriptShiftRead[T, ?], QScriptShiftRead[T, ?]],
-      N: Normalizable[QScriptShiftRead[T, ?]],
       E: ExpandDirs.Aux[T, C0[L, ?], CopK[L, ?]]): Unirewrite[T, L] = new Unirewrite[T, L] {
 
+    // FOOBAR 0
     def apply[F[_]: Monad: MonadPlannerErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F])
         : T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]] = { qs =>
       r.simplifyJoinOnShiftRead[QScriptRead[T, ?], QScriptShiftRead[T, ?], C0[L, ?]]
@@ -62,8 +62,8 @@ object Unirewrite extends UnirewriteLowPriorityImplicits {
       QC: QScriptCore[T, ?] :<<: CopK[L, ?],
       TJ: ThetaJoin[T, ?] :<<: CopK[L, ?],
       S: ShiftReadDir.Aux[T, QScriptRead[T, ?], CopK[L, ?]],
-      C: Coalesce.Aux[T, CopK[L, ?], CopK[L, ?]],
-      N: Normalizable[CopK[L, ?]]): Unirewrite[T, L] = new Unirewrite[T, L] {
+      C: Coalesce.Aux[T, CopK[L, ?], CopK[L, ?]])
+      : Unirewrite[T, L] = new Unirewrite[T, L] {
 
     def apply[F[_]: Monad: MonadPlannerErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F]): T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]] =
       r.shiftReadDir[QScriptRead[T, ?], CopK[L, ?]] andThen (_.point[F])
