@@ -51,9 +51,9 @@ trait Coalesce[IN[_]] {
 
   def coalesceQCNormalize[F[_]: Functor]
     (FToOut: PrismNT[F, OUT])
-    (implicit QC: QScriptCore[IT, ?] :<<: OUT, N: Normalizable[IN])
+    (implicit QC: QScriptCore[IT, ?] :<<: OUT)
       : IN[IT[F]] => Option[IN[IT[F]]] =
-    applyTransforms(coalesceQC[F](FToOut), N.normalizeF(_: IN[IT[F]]))
+    coalesceQC[F](FToOut)
 
   /** Coalesce for types containing ShiftedRead.
    *  We don't coalesce InterpretedRead.
@@ -63,11 +63,12 @@ trait Coalesce[IN[_]] {
     (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT)
       : IN[IT[F]] => Option[IN[IT[F]]]
 
+  // FOOBAR 3
   def coalesceSRNormalize[F[_]: Functor, A]
     (FToOut: PrismNT[F, OUT])
-    (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT, N: Normalizable[IN])
+    (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT)
       : IN[IT[F]] => Option[IN[IT[F]]] =
-    applyTransforms(coalesceSR[F, A](FToOut), N.normalizeF(_: IN[IT[F]]))
+    coalesceSR[F, A](FToOut)
 
   /** Coalesce for types containing EquiJoin. */
   protected[qscript] def coalesceEJ[F[_]: Functor]
@@ -77,12 +78,13 @@ trait Coalesce[IN[_]] {
 
   def coalesceEJNormalize[F[_]: Functor]
     (FToOut: F ~> λ[α => Option[OUT[α]]])
-    (implicit EJ: EquiJoin[IT, ?] :<<: OUT, N: Normalizable[OUT])
+    (implicit EJ: EquiJoin[IT, ?] :<<: OUT)
       : IN[IT[F]] => Option[OUT[IT[F]]] = in => {
-    coalesceEJ[F](FToOut).apply(in).flatMap(N.normalizeF(_: OUT[IT[F]]))
+    coalesceEJ[F](FToOut).apply(in)
   }
 
   /** Coalesce for types containing ThetaJoin. */
+  // FOOBAR 5
   protected[qscript] def coalesceTJ[F[_]: Functor]
     (FToOut: F ~> λ[α => Option[OUT[α]]])
     (implicit TJ: ThetaJoin[IT, ?] :<<: OUT)
@@ -90,9 +92,9 @@ trait Coalesce[IN[_]] {
 
   def coalesceTJNormalize[F[_]: Functor]
     (FToOut: F ~> λ[α => Option[OUT[α]]])
-    (implicit TJ: ThetaJoin[IT, ?] :<<: OUT, N: Normalizable[OUT])
+    (implicit TJ: ThetaJoin[IT, ?] :<<: OUT)
       : IN[IT[F]] => Option[OUT[IT[F]]] = in => {
-    coalesceTJ[F](FToOut).apply(in).flatMap(N.normalizeF(_: OUT[IT[F]]))
+    coalesceTJ[F](FToOut).apply(in)
   }
 }
 

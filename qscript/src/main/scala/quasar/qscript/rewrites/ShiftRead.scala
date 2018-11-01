@@ -42,6 +42,7 @@ trait ShiftRead[F[_]] {
 
   // NB: This could be either a futumorphism (as it is) or an apomorphism. Not
   //     sure if one is clearly better.
+  // FOOBAR 3
   def shiftRead[H[_]](GtoH: G ~> H): F ~> FixFreeH[H, ?]
 }
 

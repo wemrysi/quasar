@@ -20,14 +20,13 @@ import slamdata.Predef._
 import quasar._
 import quasar.common.JoinType
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.ejson.EJson
-import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.contrib.iota.SubInject
 import quasar.qscript._
 
 import scala.Predef.implicitly
+
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -41,9 +40,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
   import IdStatus.{ExcludeId, IncludeId}
 
   val rewrite = new Rewrite[Fix]
-
-  def normalizeFExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](orOriginal(Normalizable[QS].normalizeF(_: QS[Fix[QS]])))
 
   def normalizeExpr(expr: Fix[QS]): Fix[QS] =
     expr.transCata[Fix[QS]](rewrite.normalizeTJ[QS])
@@ -170,70 +166,25 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
                   func.ProjectKeyS(func.RightSide, "l_max"),
                   func.ProjectKeyS(func.RightSide, "l_min")))),
             func.Lt(
-              func.ProjectKeyS(func.LeftSide, "lat"),
-              func.ProjectKeyS(func.LeftSide, "lon"))),
+              func.ProjectKeyS(
+                func.ProjectKeyS(
+                  func.StaticMapS(
+                    "l" -> func.LeftSide,
+                    "r" -> func.RightSide),
+                  "l"),
+                "lat"),
+              func.ProjectKeyS(
+                func.ProjectKeyS(
+                  func.StaticMapS(
+                    "l" -> func.LeftSide,
+                    "r" -> func.RightSide),
+                  "l"),
+                "lon"))),
           JoinType.Inner,
           func.StaticMapS(
             "l" -> func.LeftSide,
             "r" -> func.RightSide)).unFix.some)
 
-    }
-
-    "fold a constant array value" in {
-      import qsdsl._
-      val value: Fix[EJson] =
-        json.int(7)
-
-      val exp: Fix[QS] =
-        fix.Map(
-          fix.Root,
-          recFunc.MakeArray(recFunc.Constant(json.int(7))))
-
-      val expected: Fix[QS] =
-        fix.Map(
-          fix.Root,
-          recFunc.Constant(json.arr(List(value))))
-
-      normalizeFExpr(exp) must equal(expected)
-    }
-
-    "fold a constant doubly-nested array value" in {
-      import qsdsl._
-      val value: Fix[EJson] =
-        json.int(7)
-
-      val exp: Fix[QS] =
-        fix.Map(
-          fix.Root,
-          recFunc.MakeArray(recFunc.MakeArray(recFunc.Constant(json.int(7)))))
-
-      val expected: Fix[QS] =
-        fix.Map(
-          fix.Root,
-          recFunc.Constant(json.arr(List(json.arr(List(value))))))
-
-      normalizeFExpr(exp) must equal(expected)
-    }
-
-    "fold nested boolean values" in {
-      import qsdsl._
-      val exp: Fix[QS] =
-        fix.Map(
-          fix.Root,
-          recFunc.MakeArray(
-            // !false && (false || !true)
-            recFunc.And(
-              recFunc.Not(recFunc.Constant(json.bool(false))),
-              recFunc.Or(
-                recFunc.Constant(json.bool(false)),
-                recFunc.Not(recFunc.Constant(json.bool(true)))))))
-
-      val expected: Fix[QS] =
-        fix.Map(
-          fix.Root,
-          recFunc.Constant(json.arr(List(json.bool(false)))))
-
-      normalizeFExpr(exp) must equal(expected)
     }
 
     "simplify an outer ThetaJoin with a statically known condition" in {
@@ -430,168 +381,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
             "left" -> recFunc.Hole))
 
       compactLeftShiftExpr(original) must equal(expected)
-    }
-
-    "extract filter from join condition" >> {
-      "when guard is undefined in true branch" >> {
-        import qsdsl._
-        val original =
-          fix.ThetaJoin(
-            fix.Unreferenced,
-            free.Read[AFile](rootDir </> file("foo")),
-            free.Read[AFile](rootDir </> file("bar")),
-            func.Guard(
-              func.LeftSide,
-              Type.AnyObject,
-              func.Undefined,
-              func.Eq(
-                func.ProjectKey(func.RightSide, func.Constant(json.str("r_id"))),
-                func.ProjectKey(func.LeftSide, func.Constant(json.str("l_id"))))),
-            JoinType.Inner,
-            func.ConcatMaps(
-              func.Guard(
-                func.LeftSide,
-                Type.AnyObject,
-                func.Undefined,
-                func.LeftSide),
-              func.RightSide))
-
-        val expected =
-          fix.ThetaJoin(
-            fix.Unreferenced,
-            free.Filter(
-              free.Read[AFile](rootDir </> file("foo")),
-              recFunc.Guard(
-                recFunc.Hole,
-                Type.AnyObject,
-                recFunc.Constant(json.bool(false)),
-                recFunc.Constant(json.bool(true)))),
-            free.Read[AFile](rootDir </> file("bar")),
-            func.Eq(
-              func.ProjectKeyS(func.RightSide, "r_id"),
-              func.ProjectKeyS(func.LeftSide, "l_id")),
-            JoinType.Inner,
-            func.ConcatMaps(func.LeftSide, func.RightSide))
-
-        normalizeExpr(original) must equal(expected)
-      }
-
-      "when guard is undefined in false branch" >> {
-        import qsdsl._
-        val original =
-          fix.ThetaJoin(
-            fix.Unreferenced,
-            free.Read[AFile](rootDir </> file("foo")),
-            free.Read[AFile](rootDir </> file("bar")),
-            func.Guard(
-              func.LeftSide,
-              Type.AnyObject,
-              func.Eq(
-                func.ProjectKeyS(func.RightSide, "r_id"),
-                func.ProjectKeyS(func.LeftSide, "l_id")),
-              func.Undefined),
-            JoinType.Inner,
-            func.ConcatMaps(
-              func.Guard(
-                func.LeftSide,
-                Type.AnyObject,
-                func.LeftSide,
-                func.Undefined),
-              func.RightSide))
-
-        val expected =
-          fix.ThetaJoin(
-            fix.Unreferenced,
-            free.Filter(
-              free.Read[AFile](rootDir </> file("foo")),
-              recFunc.Guard(
-                recFunc.Hole,
-                Type.AnyObject,
-                recFunc.Constant(json.bool(true)),
-                recFunc.Constant(json.bool(false)))),
-            free.Read[AFile](rootDir </> file("bar")),
-            func.Eq(
-              func.ProjectKeyS(func.RightSide, "r_id"),
-              func.ProjectKeyS(func.LeftSide, "l_id")),
-            JoinType.Inner,
-            func.ConcatMaps(func.LeftSide, func.RightSide))
-
-        normalizeExpr(original) must equal(expected)
-      }
-
-      "when cond is undefined in true branch" >> {
-        import qsdsl._
-        val original =
-          fix.ThetaJoin(
-            fix.Unreferenced,
-            free.Read[AFile](rootDir </> file("foo")),
-            free.Read[AFile](rootDir </> file("bar")),
-            func.Cond(
-              func.Lt(func.ProjectKeyS(func.LeftSide, "x"), func.Constant(json.int(7))),
-              func.Undefined,
-              func.Eq(
-                func.ProjectKeyS(func.RightSide, "r_id"),
-                func.ProjectKeyS(func.LeftSide, "l_id"))),
-            JoinType.Inner,
-            func.ConcatMaps(
-              func.Cond(
-                func.Lt(func.ProjectKeyS(func.LeftSide, "x"), func.Constant(json.int(7))),
-                func.Undefined,
-                func.LeftSide),
-              func.RightSide))
-
-        val expected =
-          fix.ThetaJoin(
-            fix.Unreferenced,
-            free.Filter(
-              free.Read[AFile](rootDir </> file("foo")),
-              recFunc.Not(recFunc.Lt(recFunc.ProjectKeyS(recFunc.Hole, "x"), recFunc.Constant(json.int(7))))),
-            free.Read[AFile](rootDir </> file("bar")),
-            func.Eq(
-              func.ProjectKeyS(func.RightSide, "r_id"),
-              func.ProjectKeyS(func.LeftSide, "l_id")),
-            JoinType.Inner,
-            func.ConcatMaps(func.LeftSide, func.RightSide))
-
-        normalizeExpr(original) must equal(expected)
-      }
-
-      "when cond is undefined in false branch" >> {
-        import qsdsl._
-        val original =
-          fix.ThetaJoin(
-            fix.Unreferenced,
-            free.Read[AFile](rootDir </> file("foo")),
-            free.Read[AFile](rootDir </> file("bar")),
-            func.Cond(
-              func.Lt(func.ProjectKeyS(func.LeftSide, "x"), func.Constant(json.int(7))),
-              func.Eq(
-                func.ProjectKeyS(func.RightSide, "r_id"),
-                func.ProjectKeyS(func.LeftSide, "l_id")),
-              func.Undefined),
-            JoinType.Inner,
-            func.ConcatMaps(
-              func.Cond(
-                func.Lt(func.ProjectKeyS(func.LeftSide, "x"), func.Constant(json.int(7))),
-                func.LeftSide,
-                func.Undefined),
-              func.RightSide))
-
-        val expected =
-          fix.ThetaJoin(
-            fix.Unreferenced,
-            free.Filter(
-              free.Read[AFile](rootDir </> file("foo")),
-              recFunc.Lt(recFunc.ProjectKeyS(recFunc.Hole, "x"), recFunc.Constant(json.int(7)))),
-            free.Read[AFile](rootDir </> file("bar")),
-            func.Eq(
-              func.ProjectKeyS(func.RightSide, "r_id"),
-              func.ProjectKeyS(func.LeftSide, "l_id")),
-            JoinType.Inner,
-            func.ConcatMaps(func.LeftSide, func.RightSide))
-
-        normalizeExpr(original) must equal(expected)
-      }
     }
   }
 }
