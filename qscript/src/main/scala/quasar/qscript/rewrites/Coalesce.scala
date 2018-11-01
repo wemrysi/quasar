@@ -308,7 +308,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         }
 
       val rewrite = new Rewrite[T]
-      val nm = new NormalizableT[T]
 
       // TODO: Use this. It seems like a valid normalization, but it breaks
       //       autojoins. Maybe it can be applied as part of optimization, or as
@@ -405,10 +404,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
               LeftShift(innerSrc, struct >> mf, id, stpe, OnUndefined.omit, shiftRepair).some
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
-                if nm.freeMF(struct.linearize >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
+                if MapFuncCore.freeMF(struct.linearize >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
               rightOnly(elem)(shiftRepair) ∘ (RecFreeS.fromFree(_)) ∘ (Map(srcInner, _))
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(k, elem)), redRepair)
-                if nm.freeMF(struct.linearize >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
+                if MapFuncCore.freeMF(struct.linearize >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
               rightOnly(id match {
                 case ExcludeId => elem
                 case IdOnly    => k
@@ -420,17 +419,17 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
           FToOut.get(src) >>= QC.prj.apply >>= {
             case LeftShift(innerSrc, struct, id, stpe, _, shiftRepair)
                 if shiftRepair =/= RightSideF =>
-              (bucket.traverse(b => rightOnly(HoleF)(nm.freeMF(b >> shiftRepair))) ⊛
-                reducers.traverse(_.traverse(mf => rightOnly(HoleF)(nm.freeMF(mf >> shiftRepair)))))((sb, sr) =>
+              (bucket.traverse(b => rightOnly(HoleF)(MapFuncCore.freeMF(b >> shiftRepair))) ⊛
+                reducers.traverse(_.traverse(mf => rightOnly(HoleF)(MapFuncCore.freeMF(mf >> shiftRepair)))))((sb, sr) =>
                 Reduce(
                   FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, id, stpe, OnUndefined.omit, RightSideF))).embed,
                   sb,
                   sr,
                   redRepair))
             case LeftShift(innerSrc, struct, id, stpe, _, shiftRepair) =>
-              (bucket.traverse(b => rewrite.rewriteShift(id, nm.freeMF(b >> shiftRepair))).flatMap(sequenceBucket[IdStatus, JoinFunc]) ⊛
+              (bucket.traverse(b => rewrite.rewriteShift(id, MapFuncCore.freeMF(b >> shiftRepair))).flatMap(sequenceBucket[IdStatus, JoinFunc]) ⊛
                 reducers.traverse(_.traverse(mf =>
-                  rewrite.rewriteShift(id, nm.freeMF(mf >> shiftRepair)))).flatMap(_.traverse(sequenceReduce[IdStatus, JoinFunc]) >>= sequenceBucket[IdStatus, ReduceFunc[JoinFunc]])) {
+                  rewrite.rewriteShift(id, MapFuncCore.freeMF(mf >> shiftRepair)))).flatMap(_.traverse(sequenceReduce[IdStatus, JoinFunc]) >>= sequenceBucket[IdStatus, ReduceFunc[JoinFunc]])) {
                 case ((bId, bucket), (rId, reducers)) =>
                   val newId = bId.fold(rId.getOrElse(ExcludeId).some)(b => rId.fold(b.some)(r => (b ≟ r).option(b)))
                   newId strengthR ((bucket, reducers))
