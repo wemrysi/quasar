@@ -16,7 +16,8 @@
 
 package quasar.yggdrasil.table
 
-import quasar.ParseInstructionSpec
+import quasar.{CompositeParseType, IdStatus, ParseInstructionSpec}
+import quasar.common.CPath
 
 import tectonic.Plate
 import tectonic.json.Parser
@@ -35,14 +36,9 @@ object TectonicParseInstructionSpec extends ParseInstructionSpec {
   def evalIds(stream: JsonStream): JsonStream =
     evalPlate(stream)(new IdsPlate(_))
 
-  def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream =
-    if (pivot.pivots.size == 1)
-      pivot.pivots.head match {
-        case (path, (idStatus, structure)) =>
-          evalPlate(stream)(new PivotPlate(path, idStatus, structure, _))
-      }
-    else
-      sys.error(s"Cannot evaluate mutiple pivots")
+  def evalSinglePivot(path: CPath, idStatus: IdStatus, structure: CompositeParseType, stream: JsonStream)
+      : JsonStream =
+    evalPlate(stream)(new SinglePivotPlate(path, idStatus, structure, _))
 
   private def evalPlate(stream: JsonStream)(f: Plate[List[Event]] => Plate[List[Event]]): JsonStream = {
     val plate = f(new ReifiedTerminalPlate)

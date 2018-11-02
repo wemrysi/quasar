@@ -17,7 +17,8 @@
 package quasar.mimir.evaluate
 
 import slamdata.Predef._
-import quasar.{JsonSpec, ParseInstructionSpec}
+import quasar.{CompositeParseType, IdStatus, JsonSpec, ParseInstructionSpec}
+import quasar.common.CPath
 import quasar.precog.common.RValue
 
 import jawn.{AsyncParser, Facade}
@@ -28,21 +29,16 @@ object RValueParseInstructionSpec
     extends JsonSpec
     with ParseInstructionSpec.WrapSpec
     with ParseInstructionSpec.MaskSpec
-    with ParseInstructionSpec.PivotSpec {
+    with ParseInstructionSpec.SinglePivotSpec {
 
   type JsonStream = List[RValue]
 
   def evalMask(mask: Mask, stream: JsonStream): JsonStream =
     stream.flatMap(RValueParseInstructionInterpreter.interpretMask(mask, _).toList)
 
-  def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream =
-    if (pivot.pivots.size == 1)
-      pivot.pivots.head match {
-        case (path, (status, structure)) =>
-          stream.flatMap(RValueParseInstructionInterpreter.interpretPivot(path, status, structure, _))
-      }
-    else
-      scala.sys.error(s"Multiple pivots not supported")
+  def evalSinglePivot(path: CPath, idStatus: IdStatus, structure: CompositeParseType, stream: JsonStream)
+      : JsonStream =
+    stream.flatMap(RValueParseInstructionInterpreter.interpretSinglePivot(path, idStatus, structure, _))
 
   def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream =
     stream.map(RValueParseInstructionInterpreter.interpretWrap(wrap, _))

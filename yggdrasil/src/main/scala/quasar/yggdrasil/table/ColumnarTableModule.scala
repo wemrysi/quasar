@@ -395,7 +395,7 @@ trait ColumnarTableModule
           if (pivots.size == 1)
             pivots.head match {
               case (path, (idStatus, structure)) =>
-                new PivotPlate(path, idStatus, structure, plate)
+                new SinglePivotPlate(path, idStatus, structure, plate)
             }
           else
             sys.error("Multiple pivots not supported")

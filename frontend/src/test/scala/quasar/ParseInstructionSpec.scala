@@ -31,7 +31,7 @@ abstract class ParseInstructionSpec
     with ParseInstructionSpec.IdsSpec
     with ParseInstructionSpec.WrapSpec
     with ParseInstructionSpec.MaskSpec
-    with ParseInstructionSpec.PivotSpec
+    with ParseInstructionSpec.SinglePivotSpec
 
 object ParseInstructionSpec {
 
@@ -601,9 +601,7 @@ object ParseInstructionSpec {
       }
   }
 
-  trait PivotSpec extends JsonSpec {
-    protected final type Pivot = ParseInstruction.Pivot
-    protected final val Pivot = ParseInstruction.Pivot
+  trait SinglePivotSpec extends JsonSpec {
 
     "pivot" should {
       "shift an array at identity" >> {
@@ -1046,7 +1044,8 @@ object ParseInstructionSpec {
       }
     }
 
-    def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream
+    def evalSinglePivot(path: CPath, idStatus: IdStatus, structure: CompositeParseType, stream: JsonStream)
+      : JsonStream
 
     def pivotInto(
         path: String,
@@ -1055,7 +1054,7 @@ object ParseInstructionSpec {
         expected: JsonStream)
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>
-        evalPivot(Pivot(Map((CPath.parse(path), (idStatus, structure)))), str)
+        evalSinglePivot(CPath.parse(path), idStatus, structure, str)
       }
   }
 }
