@@ -37,7 +37,7 @@ object RValueParseInstructionInterpreter {
         if (pivots.size == 1)
           pivots.head match {
             case (path, (idStatus, structure)) =>
-              prev.flatMap(interpretPivot(path, idStatus, structure, _))
+              prev.flatMap(interpretSinglePivot(path, idStatus, structure, _))
           }
         else
           scala.sys.error("Multiple pivots not supported for RValue interpretation")
@@ -142,7 +142,7 @@ object RValueParseInstructionInterpreter {
     inner(input, rvalue)
   }
 
-  def interpretPivot(path: CPath, status: IdStatus, structure: CompositeParseType, rvalue: RValue)
+  def interpretSinglePivot(path: CPath, status: IdStatus, structure: CompositeParseType, rvalue: RValue)
       : List[RValue] = {
     def inner(remaining: List[CPathNode], rvalue: RValue): List[RValue] =
       remaining match {

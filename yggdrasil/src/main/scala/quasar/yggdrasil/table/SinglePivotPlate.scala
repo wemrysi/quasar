@@ -16,7 +16,7 @@
 
 package quasar.yggdrasil.table
 
-import quasar.{CompositeParseType, IdStatus, ParseInstruction, ParseType}
+import quasar.{CompositeParseType, IdStatus, ParseType}
 import quasar.common.{CPath, CPathField, CPathIndex, CPathMeta, CPathNode}
 
 import tectonic.{DelegatingPlate, Plate, Signal}
@@ -24,7 +24,7 @@ import tectonic.{DelegatingPlate, Plate, Signal}
 import scala.annotation.tailrec
 
 // currently assumes retain = false, meaning you *cannot* have any non-shifted stuff in the row
-private[table] final class PivotPlate[A](
+private[table] final class SinglePivotPlate[A](
     path: CPath,
     idStatus: IdStatus,
     structure: CompositeParseType,
