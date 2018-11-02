@@ -37,7 +37,6 @@ trait SimplifyJoin[F[_]] {
   type IT[F[_]]
   type G[A]
 
-  // FOOBAR 2
   def simplifyJoin[H[_]: Functor](GtoH: G ~> H): F[IT[H]] => H[IT[H]]
 }
 
