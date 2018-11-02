@@ -79,7 +79,7 @@ final class MimirQScriptEvaluator[
   def UnirewriteT: Unirewrite[T, QSRewrite[T]] =
     implicitly[Unirewrite[T, QSRewrite[T]]]
 
-  def rewritePushdown: M[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
+  def optimize: M[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
     Kleisli.ask[F, EvaluatorConfig[T, IO]] map {
       _.pushdown match {
         case Pushdown.EnablePushdown => RewritePushdown[T, QSM, QSMRewrite, AFile]
