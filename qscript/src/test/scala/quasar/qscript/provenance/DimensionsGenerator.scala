@@ -23,13 +23,13 @@ import scalaz.{Equal, IList, NonEmptyList}
 trait DimensionsGenerator {
   implicit def arbitraryDimensions[A: Arbitrary: Equal]: Arbitrary[Dimensions[A]] =
     Arbitrary(for {
-      unionSize <- Gen.choose(0, 10)
+      unionSize <- Gen.choose(0, 5)
       union <- Gen.listOfN(unionSize, genJoin[A])
     } yield Dimensions.normalize(Dimensions(IList.fromList(union))))
 
   private def genJoin[A: Arbitrary]: Gen[NonEmptyList[A]] =
     for {
-      size <- Gen.choose(0, 9)
+      size <- Gen.choose(0, 4)
       h <- arbitrary[A]
       t <- Gen.listOfN(size, arbitrary[A])
     } yield NonEmptyList.nel(h, IList.fromList(t))
