@@ -97,7 +97,9 @@ object Disposable extends DisposableInstances {
       case Resource.Bind(s, f) =>
         for {
           ds <- fromResource(s)
-          da <- F.ensuring(fromResource(f(ds.unsafeValue)))(κ(ds.dispose))
+          da <- F.handleError(fromResource(f(ds.unsafeValue))) { t =>
+            ds.dispose *> F.raiseError(t)
+          }
         } yield ds *> da
 
       case Resource.Suspend(fr) =>
