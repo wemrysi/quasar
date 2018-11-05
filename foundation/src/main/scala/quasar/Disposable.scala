@@ -16,10 +16,11 @@
 
 package quasar
 
-import slamdata.Predef.{Throwable, Unit}
+import slamdata.Predef.{Array, SuppressWarnings, Throwable, Unit}
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.κ
 
+import cats.effect.{ExitCase, Resource}
 import fs2.Stream
 import scalaz.{~>, Functor, Monad, Monoid, Semigroup, Zip}
 import scalaz.syntax.monad._
@@ -81,6 +82,29 @@ final class Disposable[F[_], A](val unsafeValue: A, val dispose: F[Unit]) {
 object Disposable extends DisposableInstances {
   def apply[F[_], A](a: A, release: F[Unit]): Disposable[F, A] =
     new Disposable(a, release)
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def fromResource[F[_]: Monad, A](
+      r: Resource[F, A])(
+      implicit F: MonadError_[F, Throwable])
+      : F[Disposable[F, A]] =
+    r match {
+      case Resource.Allocate(fa) =>
+        fa map {
+          case (a, dispose) => Disposable(a, dispose(ExitCase.Completed))
+        }
+
+      case Resource.Bind(s, f) =>
+        for {
+          ds <- fromResource(s)
+          da <- F.handleError(fromResource(f(ds.unsafeValue))) { t =>
+            ds.dispose *> F.raiseError(t)
+          }
+        } yield ds *> da
+
+      case Resource.Suspend(fr) =>
+        fr.flatMap(fromResource[F, A])
+    }
 }
 
 sealed abstract class DisposableInstances extends DisposableInstances0 {
