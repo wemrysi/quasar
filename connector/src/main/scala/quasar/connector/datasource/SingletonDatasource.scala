@@ -55,6 +55,7 @@ final class SingletonDatasource[F[_]: MonadResourceErr, G[_]: Applicative, R] pr
   def prefixedChildPaths(prefixPath: ResourcePath)
       : F[Option[G[(ResourceName, ResourcePathType)]]] =
     F.point(location.relativeTo(prefixPath) collect {
+      case h /: ResourcePath.Root => (ResourceName(h), ResourcePathType.leafResource).point[G]
       case h /: _ => (ResourceName(h), ResourcePathType.prefix).point[G]
     })
 }
