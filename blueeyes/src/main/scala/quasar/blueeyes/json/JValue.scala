@@ -18,6 +18,7 @@ package quasar.blueeyes.json
 
 import quasar.blueeyes._
 import quasar.common.data.Data
+import quasar.precog.common._
 
 import scalaz._, Scalaz._
 
@@ -27,6 +28,7 @@ import scala.util.Sorting.quickSort
 import scala.util.Try
 
 import java.lang.Double.isInfinite
+import java.math.MathContext.UNLIMITED
 
 /**
   * Data type for Json AST.
@@ -105,6 +107,163 @@ object JValue {
     case JString(value) => Data.Str(value)
     case JObject(fields) => Data.Obj(ListMap(fields.mapValues(toData).toSeq: _*))
     case JArray(values) => Data.Arr(values.map(toData))
+  }
+
+  def toCType(jval: JValue): Option[CType] = jval match {
+    case JBool(_) => Some(CBoolean)
+
+    case JNum(d) => {
+      lazy val isLong = try {
+        d.toLongExact
+        true
+      } catch {
+        case _: ArithmeticException => false
+      }
+
+      lazy val isDouble = (try decimal(d.toDouble.toString) == d
+      catch { case _: NumberFormatException | _: ArithmeticException => false })
+
+      if (isLong)
+        Some(CLong)
+      else if (isDouble)
+        Some(CDouble)
+      else
+        Some(CNum)
+    }
+
+    case JString(_)    => Some(CString)
+    case JNull         => Some(CNull)
+    case JArray(Nil)   => Some(CEmptyArray)
+    case JObject.empty => Some(CEmptyObject)
+    case JArray.empty  => None // TODO Allow homogeneous JArrays -> CType
+    case _             => None
+  }
+
+  def toCTypeRaw(jval: JValue): Option[CType] = jval match {
+    case JBool(_) => Some(CBoolean)
+    case JNumLong(_) => Some(CLong)
+    case JNumDouble(_) => Some(CDouble)
+    case JNumBigDec(_) | JNumStr(_) => Some(CNum)
+    case JString(_)    => Some(CString)
+    case JNull         => Some(CNull)
+    case JArray(Nil)   => Some(CEmptyArray)
+    case JObject.empty => Some(CEmptyObject)
+    case JArray.empty  => None // TODO Allow homogeneous JArrays -> CType
+    case _             => None
+  }
+
+  def toRValue(jv: JValue): Option[RValue] = jv match {
+    case JObject.empty => Some(CEmptyObject)
+    case JArray.empty => Some(CEmptyArray)
+
+    case JObject(fields) =>
+      val transformed: Map[String, RValue] = fields.flatMap({
+        case (key, value) => toRValue(value).map(key -> _).toList
+      })(collection.breakOut)
+
+      Some(RObject(transformed))
+
+    case JArray(elements) =>
+      Some(RArray(elements.flatMap(toRValue(_).toList)))
+
+    case JString(s) => Some(CString(s))
+    case JBool(b) => Some(CBoolean(b))
+    case JNull => Some(CNull)
+
+    case JNum(d) =>
+      toCType(jv) match {
+        case Some(CLong) => Some(CLong(d.toLong))
+        case Some(CDouble) => Some(CDouble(d.toDouble))
+        case _ => Some(CNum(d))
+      }
+
+    case JUndefined => None
+  }
+
+  def toRValueRaw(jv: JValue): RValue = {
+    def loop(jv: JValue): Option[RValue] = jv match {
+      case JObject.empty => Some(CEmptyObject)
+      case JArray.empty => Some(CEmptyArray)
+
+      case JObject(fields) =>
+        val transformed: Map[String, RValue] = fields.flatMap({
+          case (key, value) => loop(value).map(key -> _).toList
+        })(collection.breakOut)
+
+        Some(RObject(transformed))
+
+      case JArray(elements) =>
+        Some(RArray(elements.flatMap(loop(_).toList)))
+
+      case JString(s) => Some(CString(s))
+      case JBool(b) => Some(CBoolean(b))
+      case JNull => Some(CNull)
+
+      case JNumLong(d) => Some(CLong(d))
+      case JNumDouble(d) => Some(CDouble(d))
+      case JNumStr(d) => Some(CNum(BigDecimal(d)))
+      case JNumBigDec(d) => Some(CNum(d))
+
+      case JUndefined => None
+    }
+
+    loop(jv).getOrElse(CUndefined)
+  }
+
+  def fromRValue(rvalue: RValue): JValue = rvalue match {
+    case CEmptyObject => JObject.empty
+    case CEmptyArray => JArray.empty
+
+    case RObject(fields) => JObject(fields.mapValues(fromRValue).toMap)
+    case RArray(elements) => JArray(elements.map(fromRValue))
+
+    case CBoolean(v) => JBool(v)
+    case CString(v) => JString(v)
+    case CNull => JNull
+
+    case CLong(v) => JNum(BigDecimal(v, UNLIMITED))
+    case CDouble(v) => JNum(BigDecimal(v.toString, UNLIMITED))
+    case CNum(v) => JNum(v)
+
+    case COffsetDateTime(v) => JString(v.toString)
+    case COffsetDate(v) => JString(v.toString)
+    case COffsetTime(v) => JString(v.toString)
+    case CLocalDateTime(v) => JString(v.toString)
+    case CLocalDate(v) => JString(v.toString)
+    case CLocalTime(v) => JString(v.toString)
+    case CInterval(v) => JString(v.toString)
+
+    case CArray(_, _) => scala.sys.error("CArray not supported")
+
+    case CUndefined => JUndefined
+  }
+
+  def fromRValueRaw(rvalue: RValue): JValue = rvalue match {
+    case CEmptyObject => JObject.empty
+    case CEmptyArray => JArray.empty
+
+    case RObject(fields) => JObject(fields.mapValues(fromRValueRaw).toMap)
+    case RArray(elements) => JArray(elements.map(fromRValueRaw))
+
+    case CBoolean(v) => JBool(v)
+    case CString(v) => JString(v)
+    case CNull => JNull
+
+    case CLong(v) => JNumLong(v)
+    case CDouble(v) => JNumDouble(v)
+    case CNum(v) => JNumBigDec(v)
+
+    case COffsetDateTime(v) => JString(v.toString)
+    case COffsetDate(v) => JString(v.toString)
+    case COffsetTime(v) => JString(v.toString)
+    case CLocalDateTime(v) => JString(v.toString)
+    case CLocalDate(v) => JString(v.toString)
+    case CLocalTime(v) => JString(v.toString)
+    case CInterval(v) => JString(v.toString)
+
+    case CArray(_, _) => scala.sys.error("CArray not supported")
+
+    case CUndefined => JUndefined
   }
 
   private def unflattenArray(elements: Seq[(JPath, JValue)]): JArray = {

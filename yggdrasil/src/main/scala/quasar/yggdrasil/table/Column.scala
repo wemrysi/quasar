@@ -105,7 +105,7 @@ trait HomogeneousArrayColumn[@specialized(Boolean, Long, Double) A] extends Colu
     loop(tpe)
   }
 
-  override def jValue(row: Int)   = tpe.jValueFor(this(row))
+  override def jValue(row: Int)   = scala.sys.error("HOMOGENEOUS ARRAY ESCAPING! ALERT! ALERT!")
   override def cValue(row: Int)   = tpe(this(row))
   override def strValue(row: Int) = this(row) mkString ("[", ",", "]")
 

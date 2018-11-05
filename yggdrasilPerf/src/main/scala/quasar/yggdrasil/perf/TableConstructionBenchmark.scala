@@ -18,6 +18,7 @@ package quasar
 package yggdrasil
 package perf
 
+import quasar.blueeyes.json.JValue
 import quasar.contrib.cats.effect.liftio._
 import quasar.precog.common.{CValue, CLong, RArray, RObject, RValue}
 import quasar.yggdrasil.table.TestColumnarTableModule
@@ -122,7 +123,7 @@ class TableConstructionBenchmark {
   }
 
   def rvaluesToGiantStrings(data: Stream[List[RValue]]): fs2.Stream[IO, Byte] =
-    chunkStringsToGiantStrings(data.map(_.map(_.toJValue.renderCompact)).toList)
+    chunkStringsToGiantStrings(data.map(_.map(JValue.fromRValue(_).renderCompact)).toList)
 
   val longsData = rvaluesToGiantStrings(scalars(10, 50000, CLong(100)))
 

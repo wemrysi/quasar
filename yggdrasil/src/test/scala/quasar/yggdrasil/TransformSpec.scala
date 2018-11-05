@@ -122,7 +122,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
           cf.math.Add.applyr(CLong(2)) andThen cf.std.Eq.applyr(CLong(2)))
       })
 
-      val expected = sample.data.map(_.toJValue) flatMap { jv =>
+      val expected = sample.data.map(JValue.fromRValue(_)) flatMap { jv =>
         (jv \ "value") match {
           case JNum(x) => if (x + 2 == 2) Some(JBool(true)) else Some(JBool(false))
           case _ => None
@@ -162,7 +162,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         )
       })
 
-      val expected = sample.data.map(_.toJValue) flatMap { jv =>
+      val expected = sample.data.map(JValue.fromRValue(_)) flatMap { jv =>
         (jv \ "value") match {
           case JNum(x) => if (x + 2 == 2) Some(jv) else None
           case _ => None
@@ -237,7 +237,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         })
       })
 
-      val expected = sample.data.map { jv => jv.toJValue(JPath(fieldHead)) } flatMap {
+      val expected = sample.data.map { jv => JValue.fromRValue(jv)(JPath(fieldHead)) } flatMap {
         case JUndefined => None
         case jv       => Some(jv)
       }
@@ -259,7 +259,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         })
       })
 
-      val expected = sample.data.map { jv => jv.toJValue(JPath(fieldHead)) } flatMap {
+      val expected = sample.data.map { jv => JValue.fromRValue(jv)(JPath(fieldHead)) } flatMap {
         case JUndefined => None
         case jv       => Some(jv)
       }
@@ -279,7 +279,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
           cf.std.Eq)
       })
 
-      val expected = sample.data.map(_.toJValue) flatMap { jv =>
+      val expected = sample.data.map(JValue.fromRValue(_)) flatMap { jv =>
         ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
           case (JNum(x), JNum(y)) if x == y => Some(JBool(true))
           case (JNum(x), JNum(y)) => Some(JBool(false))
@@ -302,7 +302,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
           cf.math.Add)
       })
 
-      val expected = sample.data.map(_.toJValue) flatMap { jv =>
+      val expected = sample.data.map(JValue.fromRValue(_)) flatMap { jv =>
         ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
           case (JNum(x), JNum(y)) => Some(JNum(x + y))
           case _ => None
@@ -583,7 +583,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
       )
     })
 
-    val expected = sample.data.map(_.toJValue) flatMap { jv =>
+    val expected = sample.data.map(JValue.fromRValue(_)) flatMap { jv =>
       ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
         case (JUndefined, JUndefined) =>
           None
@@ -602,7 +602,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     implicit val gen: Arbitrary[SampleData] = Arbitrary {
       genBase map { sd =>
         SampleData(
-          sd.data.map(_.toJValue).zipWithIndex map {
+          sd.data.map(JValue.fromRValue(_)).zipWithIndex map {
             case (jv, i) if i%2 == 0 =>
               if (hasVal1Val2(jv)) {
                 jv.set(JPath(JPathField("value"), JPathField("value1")), jv(JPath(JPathField("value"), JPathField("value2"))))
@@ -663,7 +663,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     implicit val gen: Arbitrary[SampleData] = Arbitrary {
       genBase map { sd =>
         SampleData(
-          sd.data.map(_.toJValue).zipWithIndex map {
+          sd.data.map(JValue.fromRValue(_)).zipWithIndex map {
             case (jv, i) if i%2 == 0 =>
               if ((jv \? ".value.value1").nonEmpty) {
                 jv.set(JPath(JPathField("value"), JPathField("value1")), JNum(0))
@@ -693,7 +693,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
           false)
       })
 
-      val expected = sample.data.map(_.toJValue) flatMap { jv =>
+      val expected = sample.data.map(JValue.fromRValue(_)) flatMap { jv =>
         jv \ "value" \ "value1" match {
           case JUndefined => None
           case x => Some(JBool(x == JNum(0)))
@@ -708,7 +708,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     implicit val gen: Arbitrary[SampleData] = Arbitrary {
       genBase map { sd =>
         SampleData(
-          sd.data.map(_.toJValue).zipWithIndex map {
+          sd.data.map(JValue.fromRValue(_)).zipWithIndex map {
             case (jv, i) if i%2 == 0 =>
               if ((jv \? ".value.value1").nonEmpty) {
                 jv.set(JPath(JPathField("value"), JPathField("value1")), JNum(0))
@@ -738,7 +738,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
           true)
       })
 
-      val expected = sample.data.map(_.toJValue) flatMap { jv =>
+      val expected = sample.data.map(JValue.fromRValue(_)) flatMap { jv =>
         jv \ "value" \ "value1" match {
           case JUndefined => None
           case x => Some(JBool(x != JNum(0)))
@@ -834,7 +834,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         WrapObject(Leaf(Source), "foo")
       })
 
-      val expected = sample.data map { rv => JObject(JField("foo", rv.toJValue) :: Nil) }
+      val expected = sample.data map { rv => JObject(JField("foo", JValue.fromRValue(rv)) :: Nil) }
 
       results.getJValues must_== expected
     }
@@ -1095,7 +1095,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         )
       })
 
-      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data.map(_.toJValue) flatMap {
+      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data.map(JValue.fromRValue(_)) flatMap {
         case obj @ JObject(_) =>
           if (obj \ "value" == JUndefined)
             None
@@ -1132,7 +1132,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         )
       })
 
-      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data map { _.toJValue \ "value" } collect {
+      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data map { JValue.fromRValue(_) \ "value" } collect {
         case v if (v \ "value1") != JUndefined && (v \ "value2") != JUndefined =>
           JObject(JField("value1", v \ "value2") :: Nil)
       })
@@ -1160,7 +1160,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         )
       })
 
-      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data map { _.toJValue \ "value" } collect {
+      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data map { JValue.fromRValue(_) \ "value" } collect {
         case v if (v \ "value1") != JUndefined && (v \ "value2") != JUndefined =>
           JObject(JField("value1", v \ "value2") :: Nil)
       })
@@ -1225,7 +1225,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
       */
 
       val sample = SampleData(sample0.data flatMap { rv =>
-        (rv.toJValue \ "value") match {
+        (JValue.fromRValue(rv) \ "value") match {
           case JArray(_ :: Nil) => None
           case z => Some(z)
         }
@@ -1252,7 +1252,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         )
       })
 
-      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data.map(_.toJValue) flatMap {
+      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data.map(JValue.fromRValue(_)) flatMap {
         case obj @ JObject(fields) => {
           (obj \ "value") match {
             case JArray(inner) if inner.length >= 2 =>
@@ -1479,7 +1479,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
           ObjectDelete(DerefObjectStatic(Leaf(Source), CPathField("value")), Set(CPathField(field.name)))
         })
 
-        val expected = sample.data.flatMap { rv => (rv.toJValueRaw \ "value").delete(JPath(field)) }
+        val expected = sample.data.flatMap { rv => (JValue.fromRValueRaw(rv) \ "value").delete(JPath(field)) }
 
         result.getJValues must_== expected
       }
@@ -1732,7 +1732,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
       {"key":[2,2,2],"value":{"dx":[8.342062585288287E+307]}}]
     """)
 
-    val sample = SampleData(elements.toStream.map(RValue.fromJValueRaw), Some((3, Seq((NoJPath, CEmptyArray)))))
+    val sample = SampleData(elements.toStream.map(JValue.toRValueRaw), Some((3, Seq((NoJPath, CEmptyArray)))))
 
     testIsType(sample)
   }
@@ -1750,7 +1750,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
 
     val table                           = fromSample(sample)
     val results                         = toJson(table.transform(IsType(Leaf(Source), jtpe)))
-    val schemasSeq: Stream[Seq[JValue]] = toJson(table).unsafeRunSync.map(rv => Seq(rv.toJValueRaw))
+    val schemasSeq: Stream[Seq[JValue]] = toJson(table).unsafeRunSync.map(rv => Seq(JValue.fromRValueRaw(rv)))
     val schemas0                        = schemasSeq map { inferSchema(_) }
     val schemas                         = schemas0 map { _ map { case (jpath, ctype) => (CPathUtils.jPathToCPath(jpath), ctype) } }
     val expected                        = schemas map (schema => JBool(Schema.subsumes(schema, jtpe)))
@@ -1775,7 +1775,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         )
       })
 
-      val expected = sample.data.map(_.toJValueRaw) flatMap { jv =>
+      val expected = sample.data.map(JValue.fromRValueRaw(_)) flatMap { jv =>
         val value1 = jv \ "value" \ "value1"
         val value3 = jv \ "value" \ "value3"
 
@@ -1810,7 +1810,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     val table    = fromSample(sample)
     val results  = toJson(table.transform(Typed(Leaf(Source), jtpe)))
     val included = schema.groupBy(_._1).mapValues(_.map(_._2).toSet)
-    val expected = expectedResult(sample.data.map(_.toJValueRaw), included)
+    val expected = expectedResult(sample.data.map(JValue.fromRValueRaw(_)), included)
 
     results.getJValues must_== expected
   }
@@ -1835,7 +1835,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         { "value":{ "lvf":-1, "vbeu":true, "dAc":0 }, "key":[4,3,4] }
       ]""")
 
-      val sample = SampleData(data.toStream.map(RValue.fromJValueRaw), Some((3,List((JPath(".n"),CEmptyObject)))))
+      val sample = SampleData(data.toStream.map(JValue.toRValueRaw), Some((3,List((JPath(".n"),CEmptyObject)))))
 
       testTyped(sample)
   }
@@ -1910,7 +1910,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     })
 
     val resultStream = results.unsafeRunSync
-    resultStream.map(_.toJValueRaw) must_== data
+    resultStream.map(JValue.fromRValueRaw(_)) must_== data
   }
 
   def testTypedArray = {
@@ -2069,7 +2069,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
 
     val (_, expected) = sample.data.foldLeft((BigDecimal(0), Vector.empty[JValue])) {
       case ((a, s), jv) => {
-        (jv.toJValue \ "value") match {
+        (JValue.fromRValue(jv) \ "value") match {
           case JNum(i) => (a + i, s :+ JNum(a + i))
           case _ => (a, s)
         }
@@ -2093,7 +2093,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
 
     val (_, expected) = sample.data.foldLeft((BigDecimal(0), Vector.empty[JValue])) {
       case ((a, s), jv) => {
-        (jv.toJValue \ "value") match {
+        (JValue.fromRValue(jv) \ "value") match {
           case JNum(i) => (a + i, s :+ JNum(a + i))
           case _ => (a, s)
         }
@@ -2113,7 +2113,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
 
       val (_, expected) = sample.data.foldLeft((BigDecimal(0), Vector.empty[JValue])) {
         case ((a, s), jv) => {
-          (jv.toJValue \ "value") match {
+          (JValue.fromRValue(jv) \ "value") match {
             case JNum(i) => (a + i, s :+ JNum(a + i))
             case _ => (a, s)
           }
@@ -2154,7 +2154,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
       so the test ignores this case
       */
       val sample = SampleData(sample0.data flatMap { jv =>
-        (jv.toJValue \ "value") match {
+        (JValue.fromRValue(jv) \ "value") match {
           case JArray(x :: Nil) => None
           case JArray(x :: y :: Nil) => None
           case z => Some(z)
@@ -2166,7 +2166,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
       })
 
       val expected = sample.data flatMap { jv =>
-        (jv.toJValue \ "value") match {
+        (JValue.fromRValue(jv) \ "value") match {
           case JArray(x :: y :: z :: xs) => Some(JArray(z :: y :: x :: xs))
           case _ => None
         }
@@ -2194,7 +2194,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
                 CPathField("value")),
               CPathField("field")))))
 
-      val expected = sample.data.map(_.toJValue) flatMap {
+      val expected = sample.data.map(JValue.fromRValue(_)) flatMap {
         case jv if jv \ "value" \ "field" == JUndefined => None
         case _ => Some(JString("foo"))
       }
@@ -2216,7 +2216,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
           ConstLiteral(CBoolean(false), Leaf(Source)))
       })
 
-      val expected = sample.data.map(_.toJValue) flatMap { jv =>
+      val expected = sample.data.map(JValue.fromRValue(_)) flatMap { jv =>
         (jv \ "value") match {
           case jv @ JNum(x) => if (x + 2 == 2) Some(jv) else Some(JBool(false))
           case _ => None

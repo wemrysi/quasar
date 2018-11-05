@@ -16,6 +16,7 @@
 
 package quasar.mimir.storage
 
+import quasar.blueeyes.json.JValue
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage.IndexedStore
@@ -87,7 +88,7 @@ final class MimirIndexedStore[F[_]: LiftIO: Monad] private (
   def insert(k: StoreKey, v: RValue): F[Unit] =
     ME.unattempt(precog.ingest(
       PrecogPath(keyFileStr(k)),
-      Stream.emit(v.toJValue)).run.to[F])
+      Stream.emit(JValue.fromRValue(v))).run.to[F])
 
   def delete(k: StoreKey): F[Boolean] =
     precog.vfs.delete(keyFile(k)).to[F]

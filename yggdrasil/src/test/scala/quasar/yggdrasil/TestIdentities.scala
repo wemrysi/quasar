@@ -51,10 +51,10 @@ object TestIdentities {
     idOrder.contramap((_: (Identities, A))._1)
 
   implicit class ioJValuesStreamOps(val results: IO[Stream[RValue]]) extends AnyVal {
-    def getJValues: Stream[JValue] = results.unsafeRunSync.map(_.toJValueRaw)
+    def getJValues: Stream[JValue] = results.unsafeRunSync.map(JValue.fromRValueRaw(_))
   }
 
   implicit class ioJValuesIterableOps(val results: IO[Iterable[RValue]]) extends AnyVal {
-    def getJValues: Iterable[JValue] = results.unsafeRunSync.map(_.toJValueRaw)
+    def getJValues: Iterable[JValue] = results.unsafeRunSync.map(JValue.fromRValueRaw(_))
   }
 }

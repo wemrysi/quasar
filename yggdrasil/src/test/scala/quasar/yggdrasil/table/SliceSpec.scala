@@ -188,7 +188,7 @@ class SliceSpec extends Specification with ScalaCheck {
 
   def testFromQDataTemplate(input: JValue, maxRows: Int, maxCols: Int, expectedNrRows: List[Int], expectedNrCols: List[Int]) = {
     val data: List[RValue] = input match {
-      case JArray(rows) => rows.toList.flatMap(RValue.fromJValue)
+      case JArray(rows) => rows.toList.flatMap(JValue.toRValue)
       case _ => ???
     }
 

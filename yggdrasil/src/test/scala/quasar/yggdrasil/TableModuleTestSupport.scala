@@ -31,7 +31,8 @@ trait TableModuleTestSupport extends FNModule with TestLib {
   def fromJson(data: Stream[JValue], maxBlockSize: Option[Int] = None): Table
   def toJson(dataset: Table): IO[Stream[RValue]] = dataset.toJson.map(_.toStream)
 
-  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int] = None): Table = fromJson(sampleData.data.map(_.toJValueRaw), maxBlockSize)
+  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int] = None): Table =
+    fromJson(sampleData.data.map(JValue.fromRValueRaw(_)), maxBlockSize)
 }
 
 trait TableModuleSpec extends SpecificationLike with ScalaCheck {

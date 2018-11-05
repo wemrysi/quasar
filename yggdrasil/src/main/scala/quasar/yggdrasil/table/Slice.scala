@@ -1815,7 +1815,7 @@ abstract class Slice { source =>
     columns.foldLeft[JValue](JUndefined) {
       case (jv, (ColumnRef(selector, _), col)) if col.isDefinedAt(row) =>
         CPathUtils.cPathToJPaths(selector, col.cValue(row)).foldLeft(jv) {
-          case (jv, (path, value)) => jv.unsafeInsert(path, value.toJValueRaw)
+          case (jv, (path, value)) => jv.unsafeInsert(path, JValue.fromRValueRaw(value))
         }
 
       case (jv, _) => jv
@@ -2111,7 +2111,7 @@ object Slice {
 
   @deprecated("Use allFromQData", "52.0.2")
   def fromJValues(values: Stream[JValue]): Slice =
-    fromRValues(values.map(RValue.fromJValueRaw))
+    fromRValues(values.map(JValue.toRValueRaw))
 
   // This doesn't limit slice size properly.
   @deprecated("Use allFromQData", "52.0.2")
@@ -2179,8 +2179,8 @@ object Slice {
     jv.flattenWithPath.foldLeft(into) {
       case (acc, (jpath, JUndefined)) => acc
       case (acc, (jpath, v)) =>
-        val ctype = CType.forJValueRaw(v) getOrElse { sys.error("Cannot determine ctype for " + v + " at " + jpath + " in " + jv) }
-        val ref   = ColumnRef(remapPath.map(_ (jpath)).getOrElse(CPathUtils.jPathToCPath(jpath)), ctype)
+        val ctype = JValue.toCTypeRaw(v) getOrElse { sys.error("Cannot determine ctype for " + v + " at " + jpath + " in " + jv) }
+        val ref = ColumnRef(remapPath.map(_ (jpath)).getOrElse(CPathUtils.jPathToCPath(jpath)), ctype)
 
         val updatedColumn: ArrayColumn[_] = v match {
           case JBool(b) =>

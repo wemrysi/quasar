@@ -53,7 +53,7 @@ trait EvaluatorTestSupport extends StdLibEvaluatorStack
   trait TableCompanion extends BaseBlockStoreTestTableCompanion {
     override def load(table: Table, jtpe: JType) = EitherT {
       table.toJson map { events =>
-        val eventsV = events.toStream.map(_.toJValue).traverse[Validation[ResourceError, ?], Stream[JValue]] {
+        val eventsV = events.toStream.map(JValue.fromRValue(_)).traverse[Validation[ResourceError, ?], Stream[JValue]] {
           case JString(pathStr) => Validation.success {
             indexLock synchronized {      // block the WHOLE WORLD
               val path = Path(pathStr)
