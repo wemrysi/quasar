@@ -16,7 +16,7 @@
 
 package quasar.connector.datasource
 
-import slamdata.Predef.{Left, List, String}
+import slamdata.Predef.{Left, List, Some, String}
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
@@ -26,6 +26,8 @@ import quasar.contrib.scalaz.MonadError_
 import cats.effect.IO
 import eu.timepit.refined.auto._
 import scalaz.std.list._
+import scalaz.std.option._
+import scalaz.std.tuple._
 import shims._
 
 object SingletonDatasourceSpec extends DatasourceSpec[IO, List] {
@@ -40,6 +42,11 @@ object SingletonDatasourceSpec extends DatasourceSpec[IO, List] {
   val nonExistentPath = path / ResourceName("baz")
   def gatherMultiple[A](xs: List[A]) = IO.pure(xs)
 
+  "listing the parent of the resource should return the resource" >>* {
+    datasource.prefixedChildPaths(ResourcePath.root() / ResourceName("foo")) map { paths =>
+      paths must_= Some(List((ResourceName("bar"), ResourcePathType.leafResource)))
+    }
+  }
 
   "evaluating resource path returns resource" >>* {
     datasource.evaluate(path).map(_ must_=== "data")
