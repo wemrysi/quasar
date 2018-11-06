@@ -14,23 +14,28 @@
  * limitations under the License.
  */
 
-package quasar.precog
-package common
+package quasar.common.data
 
+import slamdata.Predef._
 import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta}
-import quasar.common.data.Data
-import qdata.time.{DateTimeInterval, OffsetDate}
 
 import monocle.{Optional, Prism, Traversal}
 import monocle.function.{At, Each, Index}
 import qdata.{QDataDecode, QDataEncode}
+import qdata.time.{DateTimeInterval, OffsetDate}
 import scalaz._, Scalaz._, Ordering._
 
 import java.math.MathContext.UNLIMITED
 import java.time._
 
+import scala.Predef.implicitly
 import scala.reflect.ClassTag
+import scala.sys
 
+@SuppressWarnings(Array(
+  "org.wartremover.warts.Recursion",
+  "org.wartremover.warts.While",
+  "org.wartremover.warts.Var"))
 sealed trait RValue { self =>
 
   def unsafeInsert(path: CPath, value: RValue): RValue = {
@@ -70,6 +75,14 @@ sealed trait RValue { self =>
   }
 }
 
+@SuppressWarnings(Array(
+  "org.wartremover.warts.Recursion",
+  "org.wartremover.warts.Equals",
+  "org.wartremover.warts.Product",
+  "org.wartremover.warts.Serializable",
+  "org.wartremover.warts.While",
+  "org.wartremover.warts.StringPlusAny",
+  "org.wartremover.warts.Var"))
 object RValue extends RValueInstances {
 
   val rObject: Prism[RValue, Map[String, RValue]] =
@@ -242,8 +255,8 @@ object RValue extends RValueInstances {
   }
 
   def fromData(data: Data): Option[RValue] = data match {
-    case Data.Arr(d) => RArray(d.flatMap(fromData)).some
-    case Data.Obj(o) => RObject(o.flatMap { case (k, v) => fromData(v).strengthL(k) }).some
+    case Data.Arr(d) => RArray(d.flatMap(fromData(_).toList)).some
+    case Data.Obj(o) => RObject(o.flatMap { case (k, v) => fromData(v).toList.strengthL(k) }).some
     case Data.Null => CNull.some
     case Data.Bool(b) => CBoolean(b).some
     case Data.Str(s) => CString(s).some
@@ -305,15 +318,17 @@ sealed abstract class RValueInstances {
   implicit val qdataDecode: QDataDecode[RValue] = QDataRValue
 }
 
-case class RObject(fields: Map[String, RValue]) extends RValue
+final case class RObject(fields: Map[String, RValue]) extends RValue
 
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object RObject {
   val empty = new RObject(Map.empty)
   def apply(fields: (String, RValue)*): RValue = new RObject(Map(fields: _*))
 }
 
-case class RArray(elements: List[RValue]) extends RValue
+final case class RArray(elements: List[RValue]) extends RValue
 
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object RArray {
   val empty = new RArray(Nil)
   def apply(elements: RValue*): RValue = new RArray(elements.toList)
@@ -338,6 +353,7 @@ sealed trait CNumericValue[A] extends CWrappedValue[A] {
   def toCNum: CNum = CNum(cType.bigDecimalFor(value))
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.Equals"))
 object CValue {
   implicit val CValueOrder: scalaz.Order[CValue] = Order order {
     case (CString(as), CString(bs))                                                   => as ?|? bs
@@ -357,6 +373,7 @@ object CValue {
   }
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.Recursion"))
 sealed trait CType extends Serializable {
   def readResolve(): CType
   def isNumeric: Boolean = false
@@ -397,6 +414,9 @@ sealed trait CNumericType[A] extends CValueType[A] {
   def bigDecimalFor(a: A): BigDecimal
 }
 
+@SuppressWarnings(Array(
+  "org.wartremover.warts.Recursion",
+  "org.wartremover.warts.Equals"))
 object CType {
   def nameOf(c: CType): String = c match {
     case CString              => "String"
@@ -460,6 +480,7 @@ object CType {
   }
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object CValueType {
   def apply[A](implicit A: CValueType[A]): CValueType[A] = A
   def apply[A](a: A)(implicit A: CValueType[A]): CWrappedValue[A] = A(a)
@@ -483,7 +504,13 @@ object CValueType {
 //
 // Homogeneous arrays
 //
-case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValue[Array[A]] {
+@SuppressWarnings(Array(
+  "org.wartremover.warts.Recursion",
+  "org.wartremover.warts.AsInstanceOf",
+  "org.wartremover.warts.While",
+  "org.wartremover.warts.Equals",
+  "org.wartremover.warts.Var"))
+final case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValue[Array[A]] {
   private final def leafEquiv[X](as: Array[X], bs: Array[X]): Boolean = {
     var i      = 0
     var result = as.length == bs.length
@@ -526,15 +553,18 @@ case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValu
     case _ => false
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   override def toString: String = value.mkString("CArray(Array(", ", ", "), " + cType.toString + ")")
 }
 
-case object CArray {
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
+final case object CArray {
   def apply[A](as: Array[A])(implicit elemType: CValueType[A]): CArray[A] =
     CArray(as, CArrayType(elemType))
 }
 
-case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]] {
+@SuppressWarnings(Array("org.wartremover.warts.Equals"))
+final case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]] {
   // Spec. bug: Leave lazy here.
   lazy val classTag: ClassTag[Array[A]] = elemType.classTag.wrap //elemType.classTag.arrayClassTag
 
@@ -554,11 +584,11 @@ case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]] {
 //
 // Strings
 //
-case class CString(value: String) extends CWrappedValue[String] {
+final case class CString(value: String) extends CWrappedValue[String] {
   val cType = CString
 }
 
-case object CString extends CValueType[String] {
+final case object CString extends CValueType[String] {
   val classTag: ClassTag[String] = implicitly[ClassTag[String]]
   def readResolve()                 = CString
   def order(s1: String, s2: String) = stringInstance.order(s1, s2)
@@ -571,10 +601,10 @@ sealed abstract class CBoolean(val value: Boolean) extends CWrappedValue[Boolean
   val cType = CBoolean
 }
 
-case object CTrue  extends CBoolean(true)
-case object CFalse extends CBoolean(false)
+final case object CTrue  extends CBoolean(true)
+final case object CFalse extends CBoolean(false)
 
-case object CBoolean extends CValueType[Boolean] {
+final case object CBoolean extends CValueType[Boolean] {
   def apply(value: Boolean)    = if (value) CTrue else CFalse
   def unapply(cbool: CBoolean) = Some(cbool.value)
   val classTag: ClassTag[Boolean] = implicitly[ClassTag[Boolean]]
@@ -585,33 +615,33 @@ case object CBoolean extends CValueType[Boolean] {
 //
 // Numerics
 //
-case class CLong(value: Long) extends CNumericValue[Long] {
+final case class CLong(value: Long) extends CNumericValue[Long] {
   val cType = CLong
 }
 
-case object CLong extends CNumericType[Long] {
+final case object CLong extends CNumericType[Long] {
   val classTag: ClassTag[Long] = implicitly[ClassTag[Long]]
   def readResolve()                          = CLong
   def order(v1: Long, v2: Long)              = longInstance.order(v1, v2)
   def bigDecimalFor(v: Long)                 = BigDecimal(v, UNLIMITED)
 }
 
-case class CDouble(value: Double) extends CNumericValue[Double] {
+final case class CDouble(value: Double) extends CNumericValue[Double] {
   val cType = CDouble
 }
 
-case object CDouble extends CNumericType[Double] {
+final case object CDouble extends CNumericType[Double] {
   val classTag: ClassTag[Double] = implicitly[ClassTag[Double]]
   def readResolve()                    = CDouble
   def order(v1: Double, v2: Double)    = doubleInstance.order(v1, v2)
   def bigDecimalFor(v: Double)         = BigDecimal(v.toString, UNLIMITED)
 }
 
-case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal] {
+final case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal] {
   val cType = CNum
 }
 
-case object CNum extends CNumericType[BigDecimal] {
+final case object CNum extends CNumericType[BigDecimal] {
   val bigDecimalOrder: scalaz.Order[BigDecimal] =
     scalaz.Order.order((x, y) => Ordering.fromInt(x compare y))
 
@@ -624,71 +654,71 @@ case object CNum extends CNumericType[BigDecimal] {
 //
 // Dates, Times, and Periods
 //
-case class COffsetDateTime(value: OffsetDateTime) extends CWrappedValue[OffsetDateTime] {
+final case class COffsetDateTime(value: OffsetDateTime) extends CWrappedValue[OffsetDateTime] {
   val cType = COffsetDateTime
 }
 
-case object COffsetDateTime extends CValueType[OffsetDateTime] {
+final case object COffsetDateTime extends CValueType[OffsetDateTime] {
   val classTag: ClassTag[OffsetDateTime]            = implicitly[ClassTag[OffsetDateTime]]
   def readResolve()                                 = COffsetDateTime
   def order(v1: OffsetDateTime, v2: OffsetDateTime) = sys.error("todo")
 }
 
-case class COffsetDate(value: OffsetDate) extends CWrappedValue[OffsetDate] {
+final case class COffsetDate(value: OffsetDate) extends CWrappedValue[OffsetDate] {
   val cType = COffsetDate
 }
 
-case object COffsetDate extends CValueType[OffsetDate] {
+final case object COffsetDate extends CValueType[OffsetDate] {
   val classTag: ClassTag[OffsetDate]        = implicitly[ClassTag[OffsetDate]]
   def readResolve()                         = COffsetDate
   def order(v1: OffsetDate, v2: OffsetDate) = sys.error("todo")
 }
 
-case class COffsetTime(value: OffsetTime) extends CWrappedValue[OffsetTime] {
+final case class COffsetTime(value: OffsetTime) extends CWrappedValue[OffsetTime] {
   val cType = COffsetTime
 }
 
-case object COffsetTime extends CValueType[OffsetTime] {
+final case object COffsetTime extends CValueType[OffsetTime] {
   val classTag: ClassTag[OffsetTime]        = implicitly[ClassTag[OffsetTime]]
   def readResolve()                         = COffsetTime
   def order(v1: OffsetTime, v2: OffsetTime) = sys.error("todo")
 }
 
-case class CLocalDateTime(value: LocalDateTime) extends CWrappedValue[LocalDateTime] {
+final case class CLocalDateTime(value: LocalDateTime) extends CWrappedValue[LocalDateTime] {
   val cType = CLocalDateTime
 }
 
-case object CLocalDateTime extends CValueType[LocalDateTime] {
+final case object CLocalDateTime extends CValueType[LocalDateTime] {
   val classTag: ClassTag[LocalDateTime]           = implicitly[ClassTag[LocalDateTime]]
   def readResolve()                               = CLocalDateTime
   def order(v1: LocalDateTime, v2: LocalDateTime) = sys.error("todo")
 }
 
-case class CLocalTime(value: LocalTime) extends CWrappedValue[LocalTime] {
+final case class CLocalTime(value: LocalTime) extends CWrappedValue[LocalTime] {
   val cType = CLocalTime
 }
 
-case object CLocalTime extends CValueType[LocalTime] {
+final case object CLocalTime extends CValueType[LocalTime] {
   val classTag: ClassTag[LocalTime]       = implicitly[ClassTag[LocalTime]]
   def readResolve()                       = CLocalTime
   def order(v1: LocalTime, v2: LocalTime) = sys.error("todo")
 }
 
-case class CLocalDate(value: LocalDate) extends CWrappedValue[LocalDate] {
+final case class CLocalDate(value: LocalDate) extends CWrappedValue[LocalDate] {
   val cType = CLocalDate
 }
 
-case object CLocalDate extends CValueType[LocalDate] {
+final case object CLocalDate extends CValueType[LocalDate] {
   val classTag: ClassTag[LocalDate]       = implicitly[ClassTag[LocalDate]]
   def readResolve()                       = CLocalDate
   def order(v1: LocalDate, v2: LocalDate) = sys.error("todo")
 }
 
-case class CInterval(value: DateTimeInterval) extends CWrappedValue[DateTimeInterval] {
+final case class CInterval(value: DateTimeInterval) extends CWrappedValue[DateTimeInterval] {
   val cType = CInterval
 }
 
-case object CInterval extends CValueType[DateTimeInterval] {
+final case object CInterval extends CValueType[DateTimeInterval] {
   val classTag: ClassTag[DateTimeInterval]              = implicitly[ClassTag[DateTimeInterval]]
   def readResolve()                                     = CInterval
   def order(v1: DateTimeInterval, v2: DateTimeInterval) = sys.error("todo")
@@ -697,21 +727,21 @@ case object CInterval extends CValueType[DateTimeInterval] {
 //
 // Nulls
 //
-case object CNull extends CNullType with CNullValue {
+final case object CNull extends CNullType with CNullValue {
   def readResolve() = CNull
 }
 
-case object CEmptyObject extends CNullType with CNullValue {
+final case object CEmptyObject extends CNullType with CNullValue {
   def readResolve() = CEmptyObject
 }
 
-case object CEmptyArray extends CNullType with CNullValue {
+final case object CEmptyArray extends CNullType with CNullValue {
   def readResolve() = CEmptyArray
 }
 
 //
 // Undefined
 //
-case object CUndefined extends CNullType with CNullValue {
+final case object CUndefined extends CNullType with CNullValue {
   def readResolve() = CUndefined
 }

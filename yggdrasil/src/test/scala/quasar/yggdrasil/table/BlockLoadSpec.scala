@@ -18,6 +18,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._, json._
+import quasar.common.data._
 import quasar.pkg.tests._, Gen._
 import quasar.precog.common._
 import SampleData._

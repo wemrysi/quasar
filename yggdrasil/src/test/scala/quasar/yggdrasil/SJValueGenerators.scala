@@ -18,8 +18,8 @@ package quasar.yggdrasil
 
 import quasar.RCValueGenerators
 import quasar.blueeyes.json._
+import quasar.common.data._
 import quasar.pkg.tests._
-import quasar.precog.common._
 import quasar.yggdrasil.TestIdentities._
 
 object SJValueGenerators {

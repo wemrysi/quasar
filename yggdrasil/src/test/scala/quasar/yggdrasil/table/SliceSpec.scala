@@ -18,6 +18,7 @@ package quasar.yggdrasil.table
 
 import quasar.RCValueGenerators
 import quasar.common.{CPath, CPathField}
+import quasar.common.data._
 import quasar.blueeyes._
 import quasar.blueeyes.json._
 import quasar.pkg.tests._

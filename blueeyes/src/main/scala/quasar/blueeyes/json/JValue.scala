@@ -17,8 +17,7 @@
 package quasar.blueeyes.json
 
 import quasar.blueeyes._
-import quasar.common.data.Data
-import quasar.precog.common._
+import quasar.common.data._
 
 import scalaz._, Scalaz._
 
@@ -133,22 +132,20 @@ object JValue {
 
     case JString(_)    => Some(CString)
     case JNull         => Some(CNull)
-    case JArray(Nil)   => Some(CEmptyArray)
+    case JArray.empty  => Some(CEmptyArray)
     case JObject.empty => Some(CEmptyObject)
-    case JArray.empty  => None // TODO Allow homogeneous JArrays -> CType
     case _             => None
   }
 
   def toCTypeRaw(jval: JValue): Option[CType] = jval match {
-    case JBool(_) => Some(CBoolean)
-    case JNumLong(_) => Some(CLong)
+    case JBool(_)      => Some(CBoolean)
+    case JNumLong(_)   => Some(CLong)
     case JNumDouble(_) => Some(CDouble)
     case JNumBigDec(_) | JNumStr(_) => Some(CNum)
     case JString(_)    => Some(CString)
     case JNull         => Some(CNull)
-    case JArray(Nil)   => Some(CEmptyArray)
+    case JArray.empty  => Some(CEmptyArray)
     case JObject.empty => Some(CEmptyObject)
-    case JArray.empty  => None // TODO Allow homogeneous JArrays -> CType
     case _             => None
   }
 

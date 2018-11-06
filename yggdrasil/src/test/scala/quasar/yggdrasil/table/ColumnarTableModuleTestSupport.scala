@@ -20,6 +20,7 @@ package table
 import quasar.blueeyes._
 import quasar.blueeyes.json._
 import quasar.common.CPath
+import quasar.common.data.CNum
 import quasar.precog.common._
 import quasar.precog.util._
 

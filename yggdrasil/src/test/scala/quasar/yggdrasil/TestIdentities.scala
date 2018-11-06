@@ -17,7 +17,7 @@
 package quasar.yggdrasil
 
 import quasar.blueeyes.json.JValue
-import quasar.precog.common._
+import quasar.common.data.RValue
 
 import cats.effect.IO
 import scalaz._, Scalaz._, Ordering._

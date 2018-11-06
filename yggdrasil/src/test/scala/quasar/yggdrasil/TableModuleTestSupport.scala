@@ -17,8 +17,8 @@
 package quasar.yggdrasil
 
 import quasar.blueeyes._, json._
+import quasar.common.data.RValue
 import quasar.pkg.tests._
-import quasar.precog.common.RValue
 import quasar.yggdrasil.table.CScanner
 
 import cats.effect.IO

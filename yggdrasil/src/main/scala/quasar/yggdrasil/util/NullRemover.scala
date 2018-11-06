@@ -16,7 +16,8 @@
 
 package quasar.yggdrasil.util
 
-import quasar.precog.common.{ColumnRef, CNull}
+import quasar.common.data.CNull
+import quasar.precog.common.ColumnRef
 import quasar.yggdrasil.table.{Column, CScanner}
 
 object NullRemover extends CScanner {

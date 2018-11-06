@@ -20,6 +20,7 @@ package table
 import qdata.json.PreciseKeys
 
 import quasar.common.{CPath, CPathField, CPathNode}
+import quasar.common.data._
 import quasar.precog.common._
 import quasar.time.DateTimeUtil
 

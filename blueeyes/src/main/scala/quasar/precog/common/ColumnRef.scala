@@ -18,6 +18,7 @@ package quasar.precog
 package common
 
 import quasar.common.CPath
+import quasar.common.data.CType
 
 import scalaz.syntax.semigroup._
 import scalaz.syntax.order._

@@ -17,13 +17,12 @@
 package quasar.mimir
 
 import slamdata.Predef._
-import quasar.common.data.Data
+import quasar.common.data.{Data, RValue}
 import quasar.concurrent.BlockingContext
 import quasar.contrib.scalacheck.gen
 import quasar.fp.ski.κ
 import quasar.contrib.iota.copkTraverse
 import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
-import quasar.precog.common.RValue
 import quasar.qscript._
 import quasar.std.StdLibSpec
 import quasar.yggdrasil.vfs.contextShiftForS

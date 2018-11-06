@@ -19,7 +19,7 @@ package table
 
 import quasar.blueeyes._, json._
 import quasar.common.{CPathField, CPathIndex}
-import quasar.precog.common._
+import quasar.common.data._
 import quasar.pkg.tests._
 
 import shims._

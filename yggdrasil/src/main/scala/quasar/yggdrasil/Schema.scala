@@ -18,6 +18,7 @@ package quasar.yggdrasil
 
 import quasar.blueeyes._
 import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathNode}
+import quasar.common.data._
 import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode._

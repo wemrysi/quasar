@@ -16,9 +16,8 @@
 
 package quasar
 
-import quasar.common.data.Data
+import quasar.common.data.{CUndefined, Data, RValue}
 import quasar.contrib.fs2.convert
-import quasar.precog.common.{CUndefined, RValue}
 import quasar.yggdrasil.table.Slice
 
 import cats.effect.IO

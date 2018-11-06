@@ -17,6 +17,7 @@
 package quasar.yggdrasil.nihdb
 
 import quasar.common.CPath
+import quasar.common.data._
 import quasar.niflheim._
 import quasar.precog.BitSet
 import quasar.precog.common._

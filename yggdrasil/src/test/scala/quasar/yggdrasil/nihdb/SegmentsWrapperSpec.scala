@@ -18,9 +18,10 @@ package quasar.yggdrasil
 package nihdb
 
 import quasar.common.{CPath, CPathField}
+import quasar.common.data._
 import quasar.contrib.cats.effect._
 import quasar.niflheim.NIHDB
-import quasar.precog.common._
+import quasar.precog.common.ColumnRef
 import quasar.precog.util.IOUtils
 import quasar.yggdrasil.table._
 

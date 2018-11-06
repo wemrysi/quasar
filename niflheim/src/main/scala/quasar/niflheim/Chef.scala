@@ -16,7 +16,7 @@
 
 package quasar.niflheim
 
-import quasar.precog.common._
+import quasar.common.data.CType
 
 import java.io._
 import java.nio.channels.WritableByteChannel

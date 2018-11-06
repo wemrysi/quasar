@@ -19,6 +19,7 @@ package table
 
 import quasar.blueeyes._
 import quasar.common.{CPath, CPathIndex, CPathField}
+import quasar.common.data._
 import quasar.contrib.std.errorImpossible
 import quasar.precog.BitSet
 import quasar.precog.common._

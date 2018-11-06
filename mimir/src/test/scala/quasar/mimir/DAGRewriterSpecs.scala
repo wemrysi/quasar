@@ -16,7 +16,7 @@
 
 package quasar.mimir
 
-import quasar.precog.common._
+import quasar.common.data._
 
 import scalaz._
 import scalaz.std.anyVal.booleanInstance.disjunction

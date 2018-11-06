@@ -18,10 +18,9 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes.json.JValue
-import quasar.common.data.{Data, DataGenerators}
+import quasar.common.data.{CBoolean, CLong, CNum, CString, Data, DataGenerators, RObject, RValue}
 import quasar.frontend.data.DataCodec
 import quasar.precog.JsonTestSupport
-import quasar.precog.common.{CBoolean, CLong, CNum, CString, RObject, RValue}
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification

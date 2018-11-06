@@ -16,14 +16,16 @@
 
 package quasar
 
-import quasar.precog.common._
+import slamdata.Predef._
+import quasar.common.data._
 import quasar.pkg.tests._, Gen._
+
 import qdata.time.TimeGenerators._
+
+import scala.sys
 
 trait RCValueGenerators {
   def maxArrayDepth = 3
-
-  def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[Seq[CValue]]] = containerOfN[List,Seq[CValue]](size, values.map(_.toSeq))
 
   def genCValueType: Gen[CValueType[_]] =
     Gen.oneOf[CValueType[_]](CString, CBoolean, CLong, CDouble, CNum,

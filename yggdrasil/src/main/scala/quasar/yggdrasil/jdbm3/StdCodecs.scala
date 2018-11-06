@@ -17,12 +17,13 @@
 package quasar.yggdrasil
 package jdbm3
 
-import java.time._
-
+import quasar.common.data._
 import quasar.precog._
 import quasar.precog.common._
+
 import qdata.time.{DateTimeInterval, OffsetDate}
 
+import java.time._
 import scala.reflect.ClassTag
 
 /**

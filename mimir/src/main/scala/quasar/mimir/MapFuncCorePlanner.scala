@@ -17,10 +17,9 @@
 package quasar.mimir
 
 import quasar.common.{CPathField, CPathIndex}
-import quasar.common.data.Data
+import quasar.common.data._
 import quasar.contrib.iota.copkTraverse
 import quasar.contrib.std.{errorImpossible, errorNotImplemented}
-import quasar.precog.common._
 import quasar.qscript.{MapFuncCore, MapFuncsCore}
 import quasar.yggdrasil.bytecode._
 

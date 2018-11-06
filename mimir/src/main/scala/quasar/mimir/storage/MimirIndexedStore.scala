@@ -17,11 +17,12 @@
 package quasar.mimir.storage
 
 import quasar.blueeyes.json.JValue
+import quasar.common.data.RValue
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage.IndexedStore
 import quasar.mimir.MimirCake.Cake
-import quasar.precog.common.{Path => PrecogPath, RValue}
+import quasar.precog.common.{Path => PrecogPath}
 import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.vfs.ResourceError
 

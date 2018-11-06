@@ -18,7 +18,7 @@ package quasar.yggdrasil
 package util
 
 import quasar.common.{CPath, CPathArray, CPathIndex}
-import quasar.precog.common._
+import quasar.common.data._
 import quasar.yggdrasil.table._
 
 import qdata.time.OffsetDate

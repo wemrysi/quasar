@@ -20,6 +20,7 @@ package table
 import quasar.ParseInstruction
 import quasar.blueeyes._
 import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta, CPathNode}
+import quasar.common.data._
 import quasar.contrib.fs2.convert
 import quasar.contrib.std.errorImpossible
 import quasar.precog.BitSet

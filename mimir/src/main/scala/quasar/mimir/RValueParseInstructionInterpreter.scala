@@ -22,7 +22,7 @@ import quasar.{CompositeParseType, IdStatus, ParseInstruction, ParseType}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.ParseInstruction.{Ids, Mask, Pivot, Wrap}
 import quasar.common.{CPath, CPathField, CPathIndex, CPathNode}
-import quasar.precog.common._
+import quasar.common.data._
 
 import scalaz.syntax.std.stream._
 

@@ -18,10 +18,10 @@ package quasar.mimir
 package storage
 
 import quasar.EffectfulQSpec
+import quasar.common.data.{CDouble, CLong, CString, RObject}
 import quasar.concurrent.BlockingContext
 import quasar.contrib.nio.file.deleteRecursively
 import quasar.contrib.scalaz.MonadError_
-import quasar.precog.common.{CDouble, CLong, CString, RObject}
 import quasar.yggdrasil.vfs.{contextShiftForS, ResourceError}
 
 import java.nio.file.Files

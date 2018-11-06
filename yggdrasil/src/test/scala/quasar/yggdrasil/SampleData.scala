@@ -18,7 +18,7 @@ package quasar.yggdrasil
 
 import quasar.RCValueGenerators
 import quasar.blueeyes._, json._
-import quasar.precog.common._
+import quasar.common.data.{CUndefined, RValue}
 import quasar.yggdrasil.TestIdentities._
 
 import scalaz._, Scalaz._

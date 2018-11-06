@@ -17,8 +17,8 @@
 package quasar.yggdrasil.table
 
 import quasar.blueeyes._, json._
+import quasar.common.data._
 import quasar.precog._
-import quasar.precog.common._
 import quasar.precog.util._
 import qdata.time.{DateTimeInterval, OffsetDate}
 

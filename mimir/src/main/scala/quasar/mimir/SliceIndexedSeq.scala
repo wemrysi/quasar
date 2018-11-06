@@ -17,7 +17,7 @@
 package quasar.mimir
 
 import slamdata.Predef.{IndexedSeq, Int}
-import quasar.precog.common.RValue
+import quasar.common.data.RValue
 import quasar.yggdrasil.table.Slice
 
 import scalaz.syntax.bifunctor._

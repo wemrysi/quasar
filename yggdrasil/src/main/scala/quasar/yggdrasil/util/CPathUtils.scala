@@ -17,8 +17,8 @@
 package quasar.yggdrasil.util
 
 import quasar.common.{CPath, CPathArray, CPathIndex, CPathField, CPathNode}
+import quasar.common.data._
 import quasar.blueeyes.json._
-import quasar.precog.common._
 
 object CPathUtils {
 

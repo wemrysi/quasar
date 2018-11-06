@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
+package quasar.common.data
 
 import quasar.pkg.tests._
 

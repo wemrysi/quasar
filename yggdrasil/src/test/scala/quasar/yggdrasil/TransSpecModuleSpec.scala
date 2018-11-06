@@ -18,8 +18,8 @@ package quasar.yggdrasil
 
 import quasar.ScalazSpecs2Instances
 import quasar.common._
+import quasar.common.data.CLong
 import quasar.pkg.tests._
-import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JNumberT
 import quasar.yggdrasil.table.{CF1, CF2, CFN}
 

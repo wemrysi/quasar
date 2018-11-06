@@ -19,9 +19,9 @@ package yggdrasil
 package perf
 
 import quasar.common.CPath
+import quasar.common.data.{CLong, RArray, RObject, RValue}
 import quasar.contrib.cats.effect.liftio._
 import quasar.fp.ski.κ
-import quasar.precog.common.{CLong, RArray, RObject, RValue}
 import quasar.yggdrasil.table.TestColumnarTableModule
 
 import cats.effect.IO

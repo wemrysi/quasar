@@ -17,10 +17,10 @@
 package quasar.yggdrasil
 package table
 
+import quasar.common.data.CLong
 import quasar.concurrent.BlockingContext
 import quasar.contrib.cats.effect._
 import quasar.contrib.pathy.AFile
-import quasar.precog.common.CLong
 import quasar.niflheim.NIHDB
 import quasar.yggdrasil.vfs.{Blob, contextShiftForS, SerialVFS, Version}
 
