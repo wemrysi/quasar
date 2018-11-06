@@ -125,7 +125,7 @@ object QScriptRegressionSpec extends Qspec {
       }
     }
 
-    "have multiple LeftShift" >> {
+    "have correct number of LeftShift" >> {
       val q1 = "select a{_}, b[_], c{_:} from foo"
       q1 in {
         val result = count(q1)
@@ -141,6 +141,27 @@ object QScriptRegressionSpec extends Qspec {
 
         result must countShiftedReadAs(2)
         result must countInterpretedReadAs(0)
+        result must countLeftShiftAs(2)
+      }
+
+      // ch2128
+      val q3 = """select (SELECT * FROM (SELECT t{_}.testField FROM `real-giraffe.json` AS t) AS t2 WHERE type_of(t2) = "string") AS testField, (SELECT kv{_} FROM `real-giraffe.json` AS kv) AS S"""
+      q3 in {
+        val result = count(q3)
+
+        result must countShiftedReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(0)
+      }
+
+      // ch1473
+      // FIXME this should plan as two LeftShift before optimization, not three
+      val q4 = "select first[_].second{_}.third as value, first[_].second{_:} as key from mydata"
+      q4 in {
+        val result = count(q4)
+
+        result must countShiftedReadAs(0)
+        result must countInterpretedReadAs(1)
         result must countLeftShiftAs(2)
       }
     }
