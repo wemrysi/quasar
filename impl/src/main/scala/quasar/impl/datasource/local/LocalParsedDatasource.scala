@@ -20,31 +20,38 @@ import slamdata.Predef._
 
 import quasar.api.resource.ResourcePath
 import quasar.concurrent.BlockingContext
-import quasar.connector.{Datasource, MonadResourceErr, ParsableType, QueryResult}
+import quasar.connector.{Datasource, MonadResourceErr, QueryResult}
 
 import java.nio.file.{Path => JPath}
 
 import cats.effect.{ContextShift, Effect, Timer}
 import fs2.{io, Stream}
+import jawn.Facade
+import jawnfs2._
+import qdata.{QDataDecode, QDataEncode}
+import qdata.json.QDataFacade
 import scalaz.syntax.tag._
 
-object LocalDatasource {
+object LocalParsedDatasource {
 
   /* @param readChunkSizeBytes the number of bytes per chunk to use when reading files.
   */
-  def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer](
+  def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer, A: QDataDecode: QDataEncode](
       root: JPath,
       readChunkSizeBytes: Int,
       blockingPool: BlockingContext)
       : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]] = {
 
-    import ParsableType.JsonVariant
+    implicit val facade: Facade[A] = QDataFacade(isPrecise = true)
 
     val queryResult: JPath => QueryResult[F] = path =>
-      QueryResult.typed(
-        ParsableType.json(JsonVariant.LineDelimited, true),
-        io.file.readAll[F](path, blockingPool.unwrap, readChunkSizeBytes))
+        QueryResult.parsed[F, A](
+          QDataDecode[A],
+          io.file.readAll[F](path, blockingPool.unwrap, readChunkSizeBytes)
+            .chunks
+            .map(_.toByteBuffer)
+            .parseJsonStream[A])
 
-    new EvaluableLocalDatasource[F](LocalType, root, queryResult)
+    new EvaluableLocalDatasource[F](LocalParsedType, root, queryResult)
   }
 }

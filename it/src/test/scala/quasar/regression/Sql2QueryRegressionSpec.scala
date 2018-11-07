@@ -30,7 +30,12 @@ import quasar.contrib.scalaz.{MonadError_, MonadTell_}
 import quasar.fp._
 import quasar.frontend.data.DataCodec
 import quasar.impl.DatasourceModule
-import quasar.impl.datasource.local.{LocalDatasourceModule, LocalType}
+import quasar.impl.datasource.local.{
+  LocalDatasourceModule,
+  LocalParsedDatasourceModule,
+  LocalParsedType,
+  LocalType
+}
 import quasar.impl.schema.SstEvalConfig
 import quasar.mimir.Precog
 import quasar.mimir.evaluate.Pushdown
@@ -65,6 +70,7 @@ abstract class Sql2QueryRegressionSpec extends Qspec {
   import Sql2QueryRegressionSpec._
 
   def pushdown: Pushdown
+  def ref(testDir: JPath): DatasourceRef[Json]
 
   implicit val ignorePhaseResults: MonadTell_[IO, PhaseResults] =
     MonadTell_.ignore[IO, PhaseResults]
@@ -96,21 +102,14 @@ abstract class Sql2QueryRegressionSpec extends Qspec {
 
     q <- Quasar[IO](
       precog,
-      List(DatasourceModule.Lightweight(LocalDatasourceModule)),
+      List(
+        DatasourceModule.Lightweight(LocalDatasourceModule),
+        DatasourceModule.Lightweight(LocalParsedDatasourceModule)),
       SstEvalConfig.single)
 
     _ <- Stream.eval(q.pushdown.set(pushdown))
 
-    localCfg =
-      ("rootDir" := testsDir.toString) ->:
-      // 64 KB chunks, chosen mostly arbitrarily.
-      ("readChunkSizeBytes" := 65535) ->:
-      jEmptyObject
-
-    localRef =
-      DatasourceRef(LocalType, DatasourceName("local"), localCfg)
-
-    r <- Stream.eval(q.datasources.addDatasource(localRef))
+    r <- Stream.eval(q.datasources.addDatasource(ref(testsDir)))
 
     i <- r.fold(
       e => MonadError_[Stream[IO, ?], DatasourceError.CreateError[Json]].raiseError(e),
@@ -285,14 +284,33 @@ object Sql2QueryRegressionSpec {
   val TestContext: MathContext =
     new MathContext(13, RoundingMode.DOWN)
 
+  def cfg(testsDir: JPath): Json =
+      ("rootDir" := testsDir.toString) ->:
+      // 64 KB chunks, chosen mostly arbitrarily.
+      ("readChunkSizeBytes" := 65535) ->:
+      jEmptyObject
+
   implicit val dataEncodeJson: EncodeJson[Data] =
     EncodeJson(DataCodec.Precise.encode(_).getOrElse(jString("Undefined")))
 }
 
 object Sql2QueryPushdownRegressionSpec extends Sql2QueryRegressionSpec {
   def pushdown: Pushdown = Pushdown.EnablePushdown
+
+  def ref(testsDir: JPath): DatasourceRef[Json] =
+    DatasourceRef(LocalType, DatasourceName("local"), Sql2QueryRegressionSpec.cfg(testsDir))
 }
 
 object Sql2QueryNoPushdownRegressionSpec extends Sql2QueryRegressionSpec {
   def pushdown: Pushdown = Pushdown.DisablePushdown
+
+  def ref(testsDir: JPath): DatasourceRef[Json] =
+    DatasourceRef(LocalType, DatasourceName("local"), Sql2QueryRegressionSpec.cfg(testsDir))
+}
+
+object Sql2QueryParsedPushdownRegressionSpec extends Sql2QueryRegressionSpec {
+  def pushdown: Pushdown = Pushdown.EnablePushdown
+
+  def ref(testsDir: JPath): DatasourceRef[Json] =
+    DatasourceRef(LocalParsedType, DatasourceName("local-parsed"), Sql2QueryRegressionSpec.cfg(testsDir))
 }
