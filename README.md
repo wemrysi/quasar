@@ -4,7 +4,7 @@
 
 # Quasar
 
-Quasar is an open source NoSQL analytics engine that can be used as a library or through a REST API to power advanced analytics across a growing range of data sources and databases, including MongoDB.
+Quasar is an open source NoSQL analytics engine that can be used as a library or through a REST API to power advanced analytics across a range of datasources and databases.
 
 ## SQL²
 
