@@ -29,8 +29,8 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.{MonadError_, MonadTell_}
 import quasar.fp._
 import quasar.frontend.data.DataCodec
-import quasar.impl.datasource.local.LocalType
-import quasar.impl.external.ExternalConfig
+import quasar.impl.DatasourceModule
+import quasar.impl.datasource.local.{LocalDatasourceModule, LocalType}
 import quasar.impl.schema.SstEvalConfig
 import quasar.mimir.Precog
 import quasar.mimir.evaluate.Pushdown
@@ -94,7 +94,10 @@ abstract class Sql2QueryRegressionSpec extends Qspec {
 
     evalCfg = SstEvalConfig(1L, 1L, 1L)
 
-    q <- Quasar[IO](precog, ExternalConfig.Empty, SstEvalConfig.single, blockingPool)
+    q <- Quasar[IO](
+      precog,
+      List(DatasourceModule.Lightweight(LocalDatasourceModule)),
+      SstEvalConfig.single)
 
     _ <- Stream.eval(q.pushdown.set(pushdown))
 

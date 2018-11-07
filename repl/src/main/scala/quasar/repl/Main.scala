@@ -22,7 +22,9 @@ import quasar.concurrent.BlockingContext
 import quasar.common.{PhaseResultCatsT, PhaseResultListen, PhaseResultTell}
 import quasar.contrib.cats.writerT.{catsWriterTMonadListen_, catsWriterTMonadTell_}
 import quasar.contrib.scalaz.MonadError_
-import quasar.impl.external.ExternalConfig
+import quasar.impl.DatasourceModule
+import quasar.impl.external.{ExternalConfig, ExternalDatasources}
+import quasar.impl.datasource.local.{LocalDatasourceModule}
 import quasar.impl.schema.SstEvalConfig
 import quasar.mimir.Precog
 import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
@@ -64,7 +66,9 @@ object Main extends IOApp {
       (dataPath, pluginPath) <- paths[F]
       precog <- Precog.stream(dataPath.toFile, blockingPool).translate(λ[FunctionK[IO, F]](_.to[F]))
       evalCfg = SstEvalConfig(1000L, 2L, 250L)
-      q <- Quasar[F](precog, ExternalConfig.PluginDirectory(pluginPath), evalCfg, blockingPool)
+      extMods <- ExternalDatasources[F](ExternalConfig.PluginDirectory(pluginPath), blockingPool)
+      mods = DatasourceModule.Lightweight(LocalDatasourceModule) :: extMods
+      q <- Quasar[F](precog, mods, evalCfg)
     } yield q
 
   def repl[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
