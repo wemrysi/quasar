@@ -322,8 +322,6 @@ Schema documents represent an estimate of the structure of the given dataset and
 
 When two documents differ in structure, their differences are accumulated in a union. Basic frequency information is available for the union and more specific annotations are preserved as much as possible for the various members.
 
-The `arrayMaxLength`, `mapMaxSize`, `stringMaxLength` and `unionMaxSize` parameters allow for control over the amount of information contained in the returned schema by limiting the size of various structures in the result. Structures that exceed the various size thresholds are compressed using various heuristics depending on the structure involved.
-
 ## Data Formats
 
 Quasar produces and accepts data in two JSON-based formats or CSV (`text/csv`). Each JSON-based format can
