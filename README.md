@@ -4,7 +4,7 @@
 
 # Quasar
 
-Quasar is an open source NoSQL analytics engine that can be used as a library or through a REST API to power advanced analytics across a growing range of data sources and databases, including MongoDB.
+Quasar is an open source NoSQL analytics engine that can be used as a library or through a REST API to power advanced analytics across a range of datasources and databases.
 
 ## SQL²
 
@@ -16,7 +16,7 @@ SQL² supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values
 
 ## Building from Source
 
-**Note**: This requires Java 8 and Bash (Linux, Mac).  Bash is not required on Windows, but the non-SBT infrastructure (e.g. the docker scripts) currently only works on Unix platforms.
+**Note**: This requires Java 8 and Bash (Linux, Mac).
 
 ### Build
 
@@ -31,56 +31,6 @@ To compile the project and run tests, first clone the quasar repo and then execu
 ```
 
 Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
-
-Running the full test suite can be done using docker containers for various backends:
-
-##### Full Testing (prerequisite: docker and docker-compose)
-
-In order to run integration tests for various backends the `docker/scripts` are provided to easily create dockerized backend data stores.
-
-Of particular interest are the following two scripts:
-
-  1. `docker/scripts/setupContainers`
-  2. `docker/scripts/assembleTestingConf`
-
-
-Quasar supports the following datastores:
-
-```
-quasar_mongodb_3_4_13
-quasar_metastore
-```
-
-Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example
-if you wanted to run integration tests with mongo you would use:
-
-```
-./setupContainers -u quasar_metastore,quasar_mongodb_3_4_13
-```
-
-Note: `quasar_metastore` is always needed to run integration tests.
-
-This command will pull docker images, create containers running the specified backends, and configure them appropriately for Quasar testing.
-
-Once backends are ready we need to configure the integrations tests in order to inform Quasar about where to find the backends to test.
-This information is conveyed to Quasar using the file `it/testing.conf`. Using the `assembleTestingConf` script you can generate a `testing.conf`
-file based on the currently running containerizd backends using the following command:
-
-```
-./assembleTestingConf -a
-```
-
-After running this command your `testing.conf` file should look similar to this:
-
-```
-> cat it/testing.conf
-postgresql_metastore="{\"host\":\"192.168.99.101\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"
-mongodb_3_4_13="mongodb://192.168.99.101:27022"
-```
-
-IP's will vary depending on your docker environment. In addition the scripts assume you have docker and docker-compose installed.
-You can find information about installing docker [here](https://www.docker.com/products/docker-toolbox).
-
 
 #### REPL JAR
 
@@ -98,199 +48,16 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
-As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker.
-
-The `<mountPath>` specifies the path of your mount point and the remaining parameters are listed below:
-
-| mountKey            | protocol         | uri                                   |
-|---------------------|------------------|---------------------------------------|
-| `mimir`             |                  | "\<path-to-mimir-storage-directory\>" |
-| `lwc_local`         |                  | "\<path-to-mimir-storage-directory\>" |
-| `mongodb`           | `mongodb://`     | [MongoDB](#database-mounts)           |
-
-
-You will also need the metadata store. See [here](#full-testing-prerequisite-docker-and-docker-compose) for getting up and running with one using docker.
-
 ### Backends
 
-By default, the REPL assembly contains only `mimir` and `lwc_local`. In order to use other mounts – such as mongodb – you will need to build the relevant backend and place the JAR in a directory where quasar can find it.  This can be done in one of two ways
-
-#### Plugins Directory
-
-Create a directory where you will place individual backend JARs:
-
-```bash
-$ mkdir plugins/
-```
-
-Now run the `assembly` task for the relevant backend:
-
-```bash
-$ ./sbt mongodb/assembly
-```
-
-The path to the JAR will be something like `mongodb/target/scala-2.12/quasar-mongodb-internal-assembly-23.1.5.jar`, though the exact name of the JAR (and the directory path in question) will of course depend on the backend built (for example, `mongodb/assembly` will produce a very different JAR from `mongodb/assembly`).
-
-For each backend that you wish to support, run that backend's `assembly`. See the [launcher](https://github.com/slamdata/launcher) for further instructions.
-
-#### Individual Backend Configuration
-
-This technique is designed for local development use, where the backend implementation is changing frequently.  Under certain circumstances though, it may be useful for the pre-built JAR case.
-
-As with the plugins directory approach, you will need to run the `assembly` task for each backend that you want to use.  But instead of copying the JAR files into a directory, you will be referencing each JAR file individually using the `--backend` switch on the REPL JAR invocation:
-
-```bash
-java -jar [<path to jar>] [-c <config file>] --backend:quasar.physical.mongodb.MongoDb\target/mongodb/scala-2.12/quasar-mongodb-internal-assembly-23.1.5.jar
-```
-
-Replace the JAR file in the above with the path to the backend whose `assembly` you ran.  The `--backend` switch may be repeated as many times as necessary: once for each backend you wish to add.  The value to the left of the `=` is the `BackendModule` object *class name* which defines the backend in question.  Note that we need to escape the `$` character which will be present in each class name, solely because of bash syntax. If you are invoking the `--backend` option within `sbt` (for example running `repl/run`) you do not need to escape the `$`.
-
-What follows is a list of class names for each supported backend:
-
-| mountKey          | class name                                               |
-|-------------------|----------------------------------------------------------|
-| `mongodb`         | `quasar.physical.mongodb.MongoDb$`                       |
-
-Mimir is not included in the above, since it is already built into the core of quasar.
-
-The value to the *right* of the `=` is a *comma*-separated list of paths which will be used as the classpath for the backend in question.  You can include as many JARs or directories (containing classes) as you need, just as with any classpath configuration.
-
-### Configure
-
-The various REPL JARs can be configured by using a command-line argument to indicate the location of a JSON configuration file. If no config file is specified, it is assumed to be `quasar-config.json`, from a standard location in the user's home directory.
-
-The JSON configuration file must have the following format:
-
-```json
-{
-  "server": {
-    "port": 8080
-  },
-  "metastore": {
-    "database": {
-      <metastore_config>
-    }
-  }
-}
-```
-
-#### Metadata Store
-
-Configuration for the metadata store consists of providing connection information for a supported database. Currently the [H2](http://www.h2database.com/) and [PostgreSQL](https://www.postgresql.org/) (9.5+) databases are supported.
-
-To easily get up and running with a PostgreSQL metastore backend using docker see [Full Testing](#Full) section.
-
-If no metastore configuration is specified, the default configuration will use an H2 database located in the default quasar configuration directory for your operating system.
-
-An example H2 configuration would look something like
-```json
-"h2": {
-  "location": "`database_url`"
-}
-```
-
-Where `database_url` can be any h2 url as described [here](http://www.h2database.com/html/features.html#database_url).
-
-A PostgreSQL configuration looks something like
-```json
-"postgresql": {
-  "host": "localhost",
-  "port": 8087,
-  "database": "<database name>",
-  "userName": "<database user>",
-  "password": "<password for database user>",
-  "parameters": <an optional JSON object of parameter key:value pairs>
-}
-```
-
-The contents of the optional `parameters` object correspond to the various driver configuration parameters available for PostgreSQL. One example for a value of the `parameters` object may be a `loglevel`:
-
-```json
-"parameters": {
-  "loglevel": 1
-}
-```
-
-#### Initializing and updating Schema
-
-Before the server can be started, the metadata store schema must be initialized. To do so utilize the "initUpdateMetaStore" command with a repl quasar jar.
-
-If mounts are already defined in the config file, initialization will migrate those to the metadata store.
-
-### Database mounts
-
-If the mount's key is "mongodb", then the `connectionUri` is a standard [MongoDB connection string](http://docs.mongodb.org/manual/reference/connection-string/). Only the primary host is required to be present, however in most cases a database name should be specified as well. Additional hosts and options may be included as specified in the linked documentation.
-
-For example, say a MongoDB instance is running on the default port on the same machine as Quasar, and contains databases `test` and `students`, the `students` database contains a collection `cs101`, and the `connectionUri` is `mongodb://localhost/test`. Then the filesystem will contain the paths `/local/test/` and `/local/students/cs101`, among others.
-
-A database can be mounted at any directory path, but database mount paths must not be nested inside each other.
-
-#### MongoDB
-
-To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection string, and also provide the following via system properties when launching either JAR (i.e. `java -Djavax.net.ssl.trustStore=/home/quasar/ssl/certs.ts`):
-- `javax.net.ssl.trustStore`: path specifying a file containing the certificate chain for verifying the server.
-- `javax.net.ssl.trustStorePassword`: password for the trust store.
-- `javax.net.ssl.keyStore`: path specifying a file containing the client's private key.
-- `javax.net.ssl.keyStorePassword`: password for the key store.
-- `javax.net.debug`: (optional) use `all` for very verbose but sometimes helpful output.
-- `invalidHostNameAllowed`: (optional) use `true` to disable host name checking, which is less secure but may be needed in test environments using self-signed certificates.
-
-### View mounts
-
-If the mount's key is "view" then the mount represents a "virtual" file, defined by a SQL² query. When the file's contents are read or referred to, the query is executed to generate the current result on-demand. A view can be used to create dynamic data that combines analysis and formatting of existing files without creating temporary results that need to be manually regenerated when sources are updated.
-
-For example, given the above MongoDB mount, an additional view could be defined with a `connectionUri` of `sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%60%2Flocal%2Ftest%2Fzips%60%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000`
-
-A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
-
-#### Caching
-
-View mounts can optionally be cached. When cached a view is refreshed periodically in the background with respect to its associated `max-age`.
-
-A cached view is created by adding the `Cache-Control: max-age=<seconds>`  header to a `/mount/fs/` request.
-
-Like ordinary views, cached views appear as a file in the filesystem.
-
-### Module mounts
-
-If the mount's key is "module" then the mount represents a "virtual" directory which contains a collection of SQL Statements. The Quasar Filesystem surfaces each SQL function definition as a file despite the fact that it is not possible to read from that file. Instead one needs to use the `invoke` endpoint in order to pass arguments to a particular function and get the result.
-
-A module function can be thought of as a parameterized view, i.e. a view with "holes" that can be filled dynamically.
-
-The value of a module mount is simply the SQL string which will be parsed into a list of SQL Statements.
-
-To create a new module one would send a json blob similar to this one to the mount endpoint:
-
-```json
-{ "module": "CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END; CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END" }
-```
-
-Similar to views, modules can be mounted at any directory path. If a module's path is nested inside the path of a database mount, it will appear alongside the other directory and files in the database. A module will "shadow" any actual directory that would otherwise be mapped to the same path. Any attempt to write data to a module will result in an error.
+By default, the REPL assembly contains only the local datasource. In order to use other datasources you will need to add them. See the repl `help` command for more information.
 
 ## REPL Usage
 
 The interactive REPL accepts SQL `SELECT` queries.
 
-First, choose the database to be used. Here, a MongoDB instance is mounted at
-the root, and it contains a database called `test`:
-
-```
-💪 $ cd test
-```
-
-The "tables" in SQL queries refer to collections in the database by name:
-
 ```
 💪 $ select * from zips where state="CO" limit 3
-Mongo
-db.zips.aggregate(
-  [
-    { "$match": { "state": "CO" } },
-    { "$limit": NumberLong(3) },
-    { "$out": "tmp.gen_0" }],
-  { "allowDiskUse": true });
-db.tmp.gen_0.find();
-
 
 Query time: 0.1s
  city    | loc[0]       | loc[1]     | pop    | state |
@@ -555,43 +322,6 @@ Schema documents represent an estimate of the structure of the given dataset and
 
 When two documents differ in structure, their differences are accumulated in a union. Basic frequency information is available for the union and more specific annotations are preserved as much as possible for the various members.
 
-The `arrayMaxLength`, `mapMaxSize`, `stringMaxLength` and `unionMaxSize` parameters allow for control over the amount of information contained in the returned schema by limiting the size of various structures in the result. Structures that exceed the various size thresholds are compressed using various heuristics depending on the structure involved.
-
-## Paths
-
-Paths identify files and directories in Quasar's virtual file system. File and directory paths are distinct, so `/foo` and `/foo/` represent a file and a directory, respectively.
-
-Depending on the backend, some restrictions may apply:
-- it may be possible for a file and directory with the same name to exist side by side.
-- it may _not_ be possible for an empty directory to exist. That is, deleting the only descendant file from a directory may cause the directory to disappear as well.
-- there may be limits on the overall length of paths, and/or the length of particular path segments. Any request that exceeds these limits will result in an error.
-
-_Any_ character can appear in a path, but when paths are embedded in character strings and byte-streams they are encoded in the following ways:
-
-When a path appears in a request URI, or in a header such as `Destination` or `X-FileName`, it must be URL-encoded. Note: `/` characters that appear _within_ path segments are encoded.
-
-When a path appears in a JSON string value, `/` characters that appear _within_ path segments are encoded as `$sep$`.
-
-In both cases, the special names `.` and `..` are encoded as `$dot$` and $dotdot$`, but only if they appear as an _entire_ segment.
-
-When only a single path segment is shown, as in the response body of a `/metadata` request, no special encoding is done (beyond the normal JSON encoding of `"` and non-ASCII characters).
-
-For example, a file called `Plan 1/2 笑` in a directory `mydata` would appear in the following ways:
-- in a URL: `http://<host>:<port>/data/fs/mydata/Plan%201%2F2%20%E7%AC%91`
-- in a header: `Destination: /mydata/Plan%201%2F2%20%E7%AC%91`
-- in the response body of `/metadata/fs/mydata/`: `{ "type": "file", "name": "Plan 1/2 \u7b11" }`
-- in an error:
-```json
-{
-  "error": {
-    "status": "Path not found.",
-    "detail": {
-      "path": "/local/quasar-test/mydata/Plan 1$sep$2 \u7b11"
-    }
-  }
-}
-```
-
 ## Data Formats
 
 Quasar produces and accepts data in two JSON-based formats or CSV (`text/csv`). Each JSON-based format can
@@ -599,10 +329,6 @@ represent all the types of data that Quasar supports. The two formats are approp
 different purposes.
 
 Json can either be line delimited (`application/ldjson`/`application/x-ldjson`) or a single json value (`application/json`).
-
-In the case of an HTTP request, it is possible to add the `disposition` extension to any media-type specified in an `Accept` header in order to receive a response with that value in the `Content-Disposition` header field.
-
-Choosing between the two json formats is done using the "mode" content-type extension and by supplying either the "precise" or "readable" values. If no `mode` is supplied, `quasar` will default to the `readable` mode. If neither json nor csv is supplied, quasar will default to returning the results in `json` format. In the case of an upload request, the client MUST supply a media-type and requests without any media-type will result in an HTTP 415 error response.
 
 ### Precise JSON
 
