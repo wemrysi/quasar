@@ -19,7 +19,7 @@ package quasar.mimir.evaluate
 import slamdata.Predef._
 import quasar.{CompositeParseType, IdStatus, JsonSpec, ParseInstructionSpec}
 import quasar.common.CPath
-import quasar.precog.common.RValue
+import quasar.common.data.RValue
 
 import jawn.{AsyncParser, Facade}
 import qdata.json.QDataFacade

@@ -16,8 +16,8 @@
 
 package quasar.mimir
 
+import quasar.common.data._
 import quasar.precog.BitSet
-import quasar.precog.common._
 import quasar.std.StringLib
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._

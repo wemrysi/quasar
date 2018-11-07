@@ -221,7 +221,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
 
       val dataset = fromJson(sample.toStream)
       val results = dataset.toJson
-      results.unsafeRunSync.toList.map(_.toJValue) must_== sample
+      results.unsafeRunSync.toList.map(JValue.fromRValue(_)) must_== sample
     }
 
     "verify bijection from JSON" in checkMappings(this)
@@ -230,7 +230,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       implicit val gen = sample(schema)
 
       prop { data: SampleData =>
-        testRenderJson(data.data.map(_.toJValueRaw))
+        testRenderJson(data.data.map(JValue.fromRValueRaw(_)))
       }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
     }
 

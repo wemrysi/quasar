@@ -17,7 +17,7 @@
 package quasar.niflheim
 
 import quasar.common.CPath
-import quasar.precog.common._
+import quasar.common.data._
 import quasar.precog.util._
 
 import org.scalacheck._, Prop._

@@ -16,7 +16,7 @@
 
 package quasar.niflheim
 
-import quasar.precog.common._
+import quasar.common.data._
 
 import scalaz.{ Validation, Success, Failure }
 

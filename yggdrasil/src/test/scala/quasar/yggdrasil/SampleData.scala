@@ -18,7 +18,7 @@ package quasar.yggdrasil
 
 import quasar.RCValueGenerators
 import quasar.blueeyes._, json._
-import quasar.precog.common._
+import quasar.common.data.{CUndefined, RValue}
 import quasar.yggdrasil.TestIdentities._
 
 import scalaz._, Scalaz._
@@ -39,12 +39,12 @@ case class SampleData(data: Stream[RValue], schema: Option[(Int, JSchema)] = Non
   }
 
   def sortBy[B: scala.math.Ordering](f: JValue => B) =
-    copy(data = data.sortBy(f compose (_.toJValue)))
+    copy(data = data.sortBy(f compose (JValue.fromRValue(_))))
 }
 
 object SampleData extends SJValueGenerators with RCValueGenerators {
   def apply(data: Stream[JValue]): SampleData =
-    new SampleData(data.flatMap(RValue.fromJValue), None)
+    new SampleData(data.flatMap(JValue.toRValue), None)
 
   def toRecord(ids: Array[Long], jv: JValue): JValue =
     JObject(Nil).set(JPath(".key"), JArray(ids.map(JNum(_)).toList)).set(JPath(".value"), jv)
@@ -63,7 +63,11 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
           // Sometimes the assembly process will generate overlapping values which will
           // cause RuntimeExceptions in JValue.unsafeInsert. It's easier to filter these
           // out here than prevent it from happening in the first place.
-          case (ids, jv) => try { Some(RValue.fromJValueRaw(toRecord(ids, assemble(jv)))) } catch { case _ : RuntimeException => None }
+          case (ids, jv) => try {
+            Some(JValue.toRValueRaw(toRecord(ids, assemble(jv))))
+          } catch {
+            case _ : RuntimeException => None
+          }
         },
         Some((idCount, jschema)))
     })
@@ -83,7 +87,7 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
       for {
         sampleData <- arbitrary(sample)
       } yield {
-        SampleData(sampleData.data.sortBy(_.toJValue), sampleData.schema)
+        SampleData(sampleData.data.sortBy(JValue.fromRValue(_)), sampleData.schema)
       })
   }
 
@@ -127,7 +131,7 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
       sampleData <- arbitrary(sample)
     } yield {
       val rows = for (row <- sampleData.data) yield {
-        val rowj = row.toJValue
+        val rowj = JValue.fromRValue(row)
         val rp = rowj.get(path)
         if (rp != null && rp != JUndefined) {
           rowj.set(path, JUndefined)
@@ -135,7 +139,7 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
           rowj
         }
       }
-      SampleData(rows.flatMap(RValue.fromJValue), sampleData.schema)
+      SampleData(rows.flatMap(JValue.toRValue), sampleData.schema)
     }
 
     Arbitrary(gen)

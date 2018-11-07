@@ -18,7 +18,6 @@ package quasar.yggdrasil
 
 import quasar.blueeyes.json._
 import quasar.common.CPathField
-import quasar.precog.common._
 import quasar.yggdrasil.TestIdentities._
 
 import scalaz._
@@ -88,7 +87,7 @@ trait CogroupSpec extends TableModuleTestSupport with SpecificationLike with Sca
 
     val keyOrder = Order[JValue].contramap((_: JValue) \ "key")
 
-    val expected = computeCogroup(l.data.map(_.toJValueRaw), r.data.map(_.toJValueRaw), Stream())(keyOrder) map {
+    val expected = computeCogroup(l.data.map(JValue.fromRValueRaw(_)), r.data.map(JValue.fromRValueRaw(_)), Stream())(keyOrder) map {
       case Left3(jv) => jv
       case Middle3((jv1, jv2)) =>
         JObject(
@@ -124,7 +123,7 @@ trait CogroupSpec extends TableModuleTestSupport with SpecificationLike with Sca
     )
 
     val jsonResult = toJson(f(result))
-    jsonResult.unsafeRunSync must_== expected.map(RValue.fromJValueRaw)
+    jsonResult.unsafeRunSync must_== expected.map(JValue.toRValueRaw)
   }
 
   def testTrivialNoRecordCogroup(f: Table => Table = identity[Table]) = {

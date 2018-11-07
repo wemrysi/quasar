@@ -18,12 +18,12 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
+import quasar.common.data._
 import quasar.precog.BitSet
-import quasar.precog.common._
+
 import qdata.time.{DateTimeInterval, OffsetDate}
 
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
-
 import scala.annotation.tailrec
 
 class BitsetColumn(val definedAt: BitSet) {

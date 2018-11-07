@@ -20,6 +20,7 @@ import slamdata.Predef.{Stream => _, _}
 
 import quasar.ParseInstruction
 import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
+import quasar.common.data.RValue
 import quasar.connector.{QueryResult, ParsableType}
 import quasar.connector.ParsableType.JsonVariant
 import quasar.contrib.iota._
@@ -27,7 +28,6 @@ import quasar.contrib.pathy._
 import quasar.impl.evaluate.{Source => EvalSource}
 import quasar.mimir._, MimirCake._
 import quasar.mimir.evaluate.Config.{Associates, EvalConfigT, EvaluatorConfig}
-import quasar.precog.common.RValue
 import quasar.qscript._, PlannerError.InternalError
 import quasar.yggdrasil.MonadFinalizers
 

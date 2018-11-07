@@ -18,8 +18,8 @@ package quasar.niflheim
 
 import quasar.RCValueGenerators
 import quasar.common.CPath
+import quasar.common.data._
 import quasar.precog.BitSet
-import quasar.precog.common._
 import quasar.precog.util._
 import quasar.precog.util.BitSetUtil.Implicits._
 

@@ -18,8 +18,8 @@ package quasar
 package yggdrasil
 package perf
 
+import quasar.common.data._
 import quasar.contrib.cats.effect.liftio._
-import quasar.precog.common._
 import quasar.yggdrasil.table.TestColumnarTableModule
 
 // Must not be in default package

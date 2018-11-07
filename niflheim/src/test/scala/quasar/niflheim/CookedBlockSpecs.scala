@@ -17,7 +17,7 @@
 package quasar.niflheim
 
 import quasar.common.CPath
-import quasar.precog.common._
+import quasar.common.data.CLong
 
 import org.scalacheck._
 import org.specs2.mutable.Specification

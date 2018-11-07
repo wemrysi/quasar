@@ -17,7 +17,7 @@
 package quasar.mimir
 
 import quasar.blueeyes.json._
-import quasar.precog.common._
+import quasar.common.data._
 
 import scalaz._
 

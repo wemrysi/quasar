@@ -17,12 +17,12 @@
 package quasar.mimir.storage
 
 import slamdata.Predef.Map
+import quasar.common.data.RValue
 import quasar.concurrent.BlockingContext
 import quasar.contrib.nio.file.deleteRecursively
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage.IndexedStoreSpec
 import quasar.mimir.Precog
-import quasar.precog.common.RValue
 import quasar.yggdrasil.vfs.{contextShiftForS, ResourceError}
 
 import java.nio.file.Files

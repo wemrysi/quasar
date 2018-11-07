@@ -16,13 +16,13 @@
 
 package quasar.mimir
 
-import scalaz._
-
-import quasar.precog.common._
+import quasar.common.data._
 import quasar.yggdrasil._
 import quasar.yggdrasil.execution.EvaluationContext
 
 import scala.collection.mutable
+
+import scalaz._
 
 trait ReductionFinderModule extends DAG with EvaluatorMethodsModule with TransSpecableModule {
   type TS1 = trans.TransSpec1

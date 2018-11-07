@@ -18,6 +18,7 @@ package quasar.yggdrasil.table
 
 import quasar.RCValueGenerators
 import quasar.common.{CPath, CPathField}
+import quasar.common.data._
 import quasar.blueeyes._
 import quasar.blueeyes.json._
 import quasar.pkg.tests._
@@ -188,7 +189,7 @@ class SliceSpec extends Specification with ScalaCheck {
 
   def testFromQDataTemplate(input: JValue, maxRows: Int, maxCols: Int, expectedNrRows: List[Int], expectedNrCols: List[Int]) = {
     val data: List[RValue] = input match {
-      case JArray(rows) => rows.toList.flatMap(RValue.fromJValue)
+      case JArray(rows) => rows.toList.flatMap(JValue.toRValue)
       case _ => ???
     }
 

@@ -18,6 +18,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.common.{CPath, CPathIndex}
+import quasar.common.data._
 import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JType

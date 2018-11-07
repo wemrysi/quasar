@@ -16,11 +16,10 @@
 
 package quasar.mimir
 
-import quasar.yggdrasil.bytecode._
-
-import quasar.precog.common._
+import quasar.common.data._
 import quasar.precog.util.{ IdGen, Identifier }
 import quasar.yggdrasil._
+import quasar.yggdrasil.bytecode._
 
 import scala.collection.mutable
 

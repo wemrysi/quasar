@@ -407,7 +407,9 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
 
     def load(table: Table, tpe: JType): EitherT[IO, ResourceError, Table] = {
       for {
-        _ <- EitherT.rightT(table.toJson.map(json => log.trace("Starting load from " + json.toList.map(_.toJValue.renderCompact))))
+        _ <- EitherT.rightT(table.toJson.map(json =>
+            log.trace("Starting load from " + json.toList.map(JValue.fromRValue(_).renderCompact))))
+
         paths <- EitherT.rightT(pathsM(table))
 
         projections <- paths.toList traverse { path =>

@@ -20,13 +20,14 @@ import slamdata.Predef._
 
 import quasar._
 import quasar.common._
+import quasar.common.data.CNumericValue
 import quasar.contrib.iota._
 import quasar.contrib.scalaz._
 import quasar.contrib.std.{errorImpossible, errorNotImplemented}
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.ski.κ
-import quasar.precog.common.{CNumericValue, ColumnRef}
+import quasar.precog.common.ColumnRef
 import quasar.mimir.MimirCake._
 import quasar.qscript._, MapFuncCore._
 import quasar.yggdrasil.{MonadFinalizers, TableModule}

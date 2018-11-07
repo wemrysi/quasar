@@ -38,9 +38,6 @@ package object blueeyes extends precog.PackageTime {
   @inline implicit def ValidationFlatMapRequested[E, A](d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
     scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
 
-  implicit def bigDecimalOrder: scalaz.Order[BigDecimal] =
-    scalaz.Order.order((x, y) => Ordering.fromInt(x compare y))
-
   implicit class ScalaSeqOps[A](xs: scala.collection.Seq[A]) {
     def sortMe(implicit z: scalaz.Order[A]): Vector[A] =
       xs sortWith ((a, b) => z.order(a, b) == Ordering.LT) toVector

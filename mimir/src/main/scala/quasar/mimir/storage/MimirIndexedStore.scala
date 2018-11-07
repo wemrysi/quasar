@@ -16,11 +16,13 @@
 
 package quasar.mimir.storage
 
+import quasar.blueeyes.json.JValue
+import quasar.common.data.RValue
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage.IndexedStore
 import quasar.mimir.MimirCake.Cake
-import quasar.precog.common.{Path => PrecogPath, RValue}
+import quasar.precog.common.{Path => PrecogPath}
 import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.vfs.ResourceError
 
@@ -87,7 +89,7 @@ final class MimirIndexedStore[F[_]: LiftIO: Monad] private (
   def insert(k: StoreKey, v: RValue): F[Unit] =
     ME.unattempt(precog.ingest(
       PrecogPath(keyFileStr(k)),
-      Stream.emit(v.toJValue)).run.to[F])
+      Stream.emit(JValue.fromRValue(v))).run.to[F])
 
   def delete(k: StoreKey): F[Boolean] =
     precog.vfs.delete(keyFile(k)).to[F]

@@ -17,6 +17,7 @@
 package quasar.precog.common
 
 import quasar.blueeyes._
+import quasar.common.data.{CValueType, CWrappedValue}
 import quasar.precog._
 import quasar.precog.util.{BitSetUtil, ByteBufferMonad, ByteBufferPool, RawBitSet}
 import qdata.time.{DateTimeInterval, OffsetDate}

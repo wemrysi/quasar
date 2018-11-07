@@ -17,7 +17,7 @@
 package quasar.mimir
 
 import quasar.common.{CPathField, CPathIndex, CPathMeta}
-import quasar.precog.common._
+import quasar.common.data._
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.execution.EvaluationContext

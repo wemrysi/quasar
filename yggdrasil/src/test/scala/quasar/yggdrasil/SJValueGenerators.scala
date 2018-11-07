@@ -18,8 +18,8 @@ package quasar.yggdrasil
 
 import quasar.RCValueGenerators
 import quasar.blueeyes.json._
+import quasar.common.data._
 import quasar.pkg.tests._
-import quasar.precog.common._
 import quasar.yggdrasil.TestIdentities._
 
 object SJValueGenerators {
@@ -31,7 +31,7 @@ object SJValueGenerators {
     } else {
       val current = data.head.flattenWithPath flatMap {
         case (path, jv) =>
-          CType.forJValue(jv) map { ct => (path, ct) }
+          JValue.toCType(jv) map { ct => (path, ct) }
       }
 
       (current ++ inferSchema(data.tail)).distinct
@@ -100,7 +100,7 @@ trait SJValueGenerators extends ArbitraryBigDecimal with RCValueGenerators {
     CLocalDate
   )
 
-  def jvalue(ctype: CType): Gen[JValue] = genTypedCValue(ctype).map(_.toJValue)
+  def jvalue(ctype: CType): Gen[JValue] = genTypedCValue(ctype).map(JValue.fromRValue(_))
 
   def jvalue(schema: Seq[(JPath, CType)]): Gen[JValue] = {
     schema.foldLeft(Gen.const[JValue](JUndefined)) {

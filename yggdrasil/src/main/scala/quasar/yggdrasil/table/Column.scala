@@ -17,8 +17,8 @@
 package quasar.yggdrasil.table
 
 import quasar.blueeyes._, json._
+import quasar.common.data._
 import quasar.precog._
-import quasar.precog.common._
 import quasar.precog.util._
 import qdata.time.{DateTimeInterval, OffsetDate}
 
@@ -105,7 +105,7 @@ trait HomogeneousArrayColumn[@specialized(Boolean, Long, Double) A] extends Colu
     loop(tpe)
   }
 
-  override def jValue(row: Int)   = tpe.jValueFor(this(row))
+  override def jValue(row: Int)   = scala.sys.error("HOMOGENEOUS ARRAY ESCAPING! ALERT! ALERT!")
   override def cValue(row: Int)   = tpe(this(row))
   override def strValue(row: Int) = this(row) mkString ("[", ",", "]")
 

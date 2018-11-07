@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
+package quasar.common.data
 
 import slamdata.Predef._
 
@@ -33,6 +33,7 @@ import java.time.{
 }
 import scala.sys.error
 
+@SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
 object QDataRValue extends QDataEncode[RValue] with QDataDecode[RValue] {
   import QType._
 

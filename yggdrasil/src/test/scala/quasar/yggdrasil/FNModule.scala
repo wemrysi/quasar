@@ -16,7 +16,7 @@
 
 package quasar.yggdrasil
 
-import quasar.precog.common.CValue
+import quasar.common.data.CValue
 import quasar.yggdrasil.table.{CF1, CF2}
 
 trait FNModule {

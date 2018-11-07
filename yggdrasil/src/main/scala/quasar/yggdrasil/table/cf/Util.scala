@@ -17,9 +17,9 @@
 package quasar.yggdrasil.table.cf
 
 import quasar.blueeyes._
+import quasar.common.data._
 import quasar.contrib.std.errorImpossible
 import quasar.precog.BitSet
-import quasar.precog.common._
 import quasar.time.DateTimeUtil
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._

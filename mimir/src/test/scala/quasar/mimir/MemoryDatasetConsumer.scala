@@ -37,11 +37,13 @@ trait MemoryDatasetConsumer extends EvaluatorModule {
       val evaluator = Evaluator
       val result = evaluator.eval(graph, ctx, optimize)
       val json = result.flatMap(_.toJson).unsafeRunSync filterNot { rvalue =>
-        (rvalue.toJValue \ "value") == JUndefined
+        (JValue.fromRValue(rvalue) \ "value") == JUndefined
       }
 
       val events: Iterable[SEvent] = json map { rvalue =>
-        (Vector(extractIds(rvalue.toJValue \ "key"): _*), rvalue.toJValue \ "value")
+        val jv = JValue.fromRValue(rvalue)
+
+        (Vector(extractIds(jv \ "key"): _*), jv \ "value")
       }
 
       val back = events.toSet

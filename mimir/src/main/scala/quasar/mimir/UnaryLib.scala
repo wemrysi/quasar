@@ -17,7 +17,8 @@
 package quasar.mimir
 
 import quasar.common.CPath
-import quasar.precog.common._
+import quasar.common.data._
+import quasar.precog.common.ColumnRef
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
 

@@ -17,6 +17,7 @@
 package quasar.niflheim
 
 import quasar.common.CPath
+import quasar.common.data.CType
 import quasar.precog.common._
 import quasar.precog.util._
 
