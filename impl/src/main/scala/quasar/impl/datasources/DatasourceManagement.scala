@@ -25,11 +25,12 @@ import quasar.connector.{
   Datasource,
   MonadResourceErr,
   ParsableType,
-  QueryResult
+  QueryResult,
+  ResourceError
 }
 import quasar.connector.ParsableType.JsonVariant
 import quasar.contrib.iota._
-import quasar.contrib.scalaz.MonadError_
+import quasar.contrib.scalaz._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp.ski.{κ, κ2}
@@ -59,7 +60,7 @@ import scalaz.{EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz, \/}, Scalaz._
 import shims._
 import spire.algebra.Field
 import spire.math.ConvertableTo
-import tectonic.BaseParser
+import tectonic.{BaseParser, IncompleteParseException, ParseException}
 import tectonic.fs2.StreamParser
 import tectonic.json.{Parser => TParser}
 
@@ -193,10 +194,20 @@ final class DatasourceManagement[
               Sync[F].delay[BaseParser[ArrayBuffer[S]]](
                 TParser(QDataPlate[S, ArrayBuffer[S]](isPrecise), mode))
 
-            data.through(
+            val parserPipe =
               StreamParser(parser)(
                 Chunk.buffer,
-                bufs => Chunk.buffer(concatArrayBufs(bufs))))
+                bufs => Chunk.buffer(concatArrayBufs(bufs)))
+
+            data.through(parserPipe) handleWith {
+              case ParseException(msg, _, _, _) =>
+                Stream.eval(MonadResourceErr[F].raiseError[S](
+                  ResourceError.malformedResource(path, JsonVariant.stringP(vnt), msg)))
+
+              case IncompleteParseException(msg) =>
+                Stream.eval(MonadResourceErr[F].raiseError[S](
+                  ResourceError.malformedResource(path, JsonVariant.stringP(vnt), msg)))
+            }
         }
 
       val k: N = ConvertableTo[N].fromLong(sstEvalConfig.sampleSize.value)
