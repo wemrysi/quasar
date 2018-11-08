@@ -17,7 +17,6 @@
 package quasar.impl.external
 
 import slamdata.Predef._
-import quasar.api.datasource.DatasourceType
 import quasar.concurrent.BlockingContext
 import quasar.connector.{HeavyweightDatasourceModule, LightweightDatasourceModule}
 import quasar.contrib.fs2.convert
@@ -48,7 +47,6 @@ import jawn.AsyncParser
 import jawn.support.argonaut.Parser._
 import jawnfs2._
 import org.slf4s.Logging
-import scalaz.IMap
 import scalaz.syntax.tag._
 
 object ExternalDatasources extends Logging {
@@ -61,9 +59,9 @@ object ExternalDatasources extends Logging {
       config: ExternalConfig,
       blockingPool: BlockingContext)(
       implicit F: ConcurrentEffect[F])
-      : Stream[F, IMap[DatasourceType, DatasourceModule]] = {
+      : Stream[F, List[DatasourceModule]] = {
 
-    val moduleStream = config match {
+    val moduleStream: Stream[F, DatasourceModule] = config match {
       case PluginDirectory(directory) =>
         convert.fromJavaStream(F.delay(Files.list(directory)))
           .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
@@ -84,8 +82,7 @@ object ExternalDatasources extends Logging {
         } yield module
     }
 
-    moduleStream.fold(IMap.empty[DatasourceType, DatasourceModule])(
-      (m, d) => m.insert(d.kind, d))
+    moduleStream.fold(List.empty[DatasourceModule])((m, d) => d :: m)
   }
 
   ////

@@ -16,20 +16,17 @@
 
 package quasar.run
 
-import slamdata.Predef.{Array, Double, SuppressWarnings}
+import slamdata.Predef.{Array, Double, List, StringContext, SuppressWarnings}
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
 import quasar.api.table.Tables
 import quasar.common.PhaseResultTell
-import quasar.concurrent.BlockingContext
 import quasar.contrib.pathy.ADir
 import quasar.contrib.std.uuid._
 import quasar.ejson.EJson
 import quasar.impl.DatasourceModule
-import quasar.impl.datasource.local.LocalDatasourceModule
 import quasar.impl.datasources.{DatasourceManagement, DefaultDatasources}
 import quasar.impl.evaluate.FederatingQueryEvaluator
-import quasar.impl.external.{ExternalConfig, ExternalDatasources}
 import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.table.{DefaultTables, PreparationsManager}
 import quasar.mimir.{MimirRepr, Precog}
@@ -44,15 +41,17 @@ import scala.concurrent.ExecutionContext
 import argonaut.Json
 import argonaut.JsonScalaz._
 import cats.~>
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.effect.concurrent.Ref
 import cats.syntax.flatMap._
 import fs2.Stream
 import matryoshka.data.Fix
+import org.slf4s.Logging
 import pathy.Path._
 import scalaz.IMap
 import scalaz.syntax.foldable._
 import scalaz.syntax.functor._
+import scalaz.syntax.show._
 import shims._
 import spire.std.double._
 
@@ -63,7 +62,7 @@ final class Quasar[F[_]](
     val pushdown: PushdownControl[F])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-object Quasar {
+object Quasar extends Logging {
   // The location of the datasource refs tables within `mimir`.
   val DatasourceRefsLocation: ADir =
     rootDir </> dir("quasar") </> dir("datasource-refs")
@@ -80,15 +79,14 @@ object Quasar {
     *       all the abstractions that use it into arguments to this constructor.
     *
     * @param precog Precog instance to use by Quasar
-    * @param extConfig datasource plugin configuration
+    * @param datasourceModules datasource modules to load
     * @param sstSampleSize the number of records to sample when generating SST schemas
     * @param sstParallelism the number of chunks to process in parallel when generating SST schemas
     */
   def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer](
       precog: Precog,
-      extConfig: ExternalConfig,
-      sstEvalConfig: SstEvalConfig,
-      blockingPool: BlockingContext)(
+      datasourceModules: List[DatasourceModule],
+      sstEvalConfig: SstEvalConfig)(
       implicit
       cs: ContextShift[IO],
       ec: ExecutionContext)
@@ -97,12 +95,6 @@ object Quasar {
     for {
       pushdownRef <- Stream.eval(Ref.of[F, Pushdown](Pushdown.EnablePushdown))
       pushdown = new PushdownControl(pushdownRef)
-
-      extMods <- ExternalDatasources[F](extConfig, blockingPool)
-
-      modules = extMods.insert(
-        LocalDatasourceModule.kind,
-        DatasourceModule.Lightweight(LocalDatasourceModule))
 
       datasourceRefs =
         MimirIndexedStore.transformValue(
@@ -124,9 +116,19 @@ object Quasar {
 
       configured <- datasourceRefs.entries.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _)
 
+      _ <- Stream.eval(Sync[F] delay {
+        datasourceModules.groupBy(_.kind) foreach {
+          case (kind, sources) =>
+            if (sources.length > 1)
+              log.warn(s"Found duplicate modules for type ${kind.shows}")
+            else
+              ()
+        }
+      })
+
       mr <- Stream.bracket(
         DatasourceManagement[Fix, F, UUID, Double](
-          modules,
+          IMap.fromList(datasourceModules.map(ds => (ds.kind, ds))),
           configured,
           sstEvalConfig))(
         { case (_, r) => r.get.flatMap(_.traverse_(_.dispose)) })
