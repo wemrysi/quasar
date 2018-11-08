@@ -16,7 +16,7 @@
 
 package quasar.run
 
-import slamdata.Predef.{Array, Double, List, SuppressWarnings}
+import slamdata.Predef.{Array, Double, List, StringContext, SuppressWarnings}
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
 import quasar.api.table.Tables
@@ -41,15 +41,17 @@ import scala.concurrent.ExecutionContext
 import argonaut.Json
 import argonaut.JsonScalaz._
 import cats.~>
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.effect.concurrent.Ref
 import cats.syntax.flatMap._
 import fs2.Stream
 import matryoshka.data.Fix
+import org.slf4s.Logging
 import pathy.Path._
 import scalaz.IMap
 import scalaz.syntax.foldable._
 import scalaz.syntax.functor._
+import scalaz.syntax.show._
 import shims._
 import spire.std.double._
 
@@ -60,7 +62,7 @@ final class Quasar[F[_]](
     val pushdown: PushdownControl[F])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-object Quasar {
+object Quasar extends Logging {
   // The location of the datasource refs tables within `mimir`.
   val DatasourceRefsLocation: ADir =
     rootDir </> dir("quasar") </> dir("datasource-refs")
@@ -113,6 +115,16 @@ object Quasar {
           rValueTableRefP(rValueSqlQueryP))
 
       configured <- datasourceRefs.entries.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _)
+
+      _ <- Stream.eval(Sync[F] delay {
+        datasourceModules.groupBy(_.kind) foreach {
+          case (kind, sources) =>
+            if (sources.length > 1)
+              log.warn(s"Found duplicate modules for type ${kind.shows}")
+            else
+              ()
+        }
+      })
 
       mr <- Stream.bracket(
         DatasourceManagement[Fix, F, UUID, Double](
