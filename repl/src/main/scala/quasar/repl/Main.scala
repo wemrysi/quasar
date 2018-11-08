@@ -24,7 +24,7 @@ import quasar.contrib.cats.writerT.{catsWriterTMonadListen_, catsWriterTMonadTel
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.DatasourceModule
 import quasar.impl.external.{ExternalConfig, ExternalDatasources}
-import quasar.impl.datasource.local.{LocalDatasourceModule}
+import quasar.impl.datasource.local.{LocalDatasourceModule, LocalParsedDatasourceModule}
 import quasar.impl.schema.SstEvalConfig
 import quasar.mimir.Precog
 import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
@@ -67,7 +67,10 @@ object Main extends IOApp {
       precog <- Precog.stream(dataPath.toFile, blockingPool).translate(λ[FunctionK[IO, F]](_.to[F]))
       evalCfg = SstEvalConfig(1000L, 2L, 250L)
       extMods <- ExternalDatasources[F](ExternalConfig.PluginDirectory(pluginPath), blockingPool)
-      mods = DatasourceModule.Lightweight(LocalDatasourceModule) :: extMods
+      mods =
+        DatasourceModule.Lightweight(LocalParsedDatasourceModule) ::
+        DatasourceModule.Lightweight(LocalDatasourceModule) ::
+        extMods
       q <- Quasar[F](precog, mods, evalCfg)
     } yield q
 

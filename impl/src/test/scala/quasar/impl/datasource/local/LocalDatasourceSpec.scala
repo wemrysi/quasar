@@ -17,6 +17,7 @@
 package quasar.impl.datasource.local
 
 import quasar.api.resource.{ResourceName, ResourcePath}
+import quasar.common.data.RValue
 import quasar.concurrent.BlockingContext
 import quasar.connector.{DatasourceSpec, ResourceError}
 import quasar.contrib.scalaz.MonadError_
@@ -28,7 +29,7 @@ import cats.effect.IO
 import fs2.Stream
 import shims._
 
-final class LocalDatasourceSpec
+abstract class LocalDatasourceSpec
     extends DatasourceSpec[IO, Stream[IO, ?]] {
 
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
@@ -36,10 +37,7 @@ final class LocalDatasourceSpec
 
   implicit val tmr = IO.timer(ExecutionContext.Implicits.global)
 
-  val blockingPool = BlockingContext.cached("local-datasource-spec")
-
-  val datasource =
-    LocalDatasource[IO](Paths.get("./it/src/main/resources/tests"), 1024, blockingPool)
+  override def datasource: quasar.connector.Datasource[IO, Stream[IO, ?], ResourcePath, quasar.connector.QueryResult[IO]]
 
   val nonExistentPath =
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")
@@ -58,4 +56,18 @@ final class LocalDatasourceSpec
       .flatMap(_.data.compile.fold(0)((c, _) => c + 1))
       .map(_ must be_>(0))
   }
+}
+
+object LocalDatasourceSpec extends LocalDatasourceSpec {
+  val blockingPool = BlockingContext.cached("local-datasource-spec")
+
+  def datasource =
+    LocalDatasource[IO](Paths.get("./it/src/main/resources/tests"), 1024, blockingPool)
+}
+
+object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
+  val blockingPool = BlockingContext.cached("local-parsed-datasource-spec")
+
+  def datasource =
+    LocalParsedDatasource[IO, RValue](Paths.get("./it/src/main/resources/tests"), 1024, blockingPool)
 }

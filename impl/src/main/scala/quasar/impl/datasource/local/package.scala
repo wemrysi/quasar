@@ -22,4 +22,5 @@ import eu.timepit.refined.auto._
 
 package object local {
   val LocalType = DatasourceType("local", 1L)
+  val LocalParsedType = DatasourceType("local-parsed", 1L)
 }
