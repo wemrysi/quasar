@@ -16,7 +16,7 @@
 
 package quasar.connector
 
-import slamdata.Predef.{Boolean, Int, Product, Serializable}
+import slamdata.Predef.{Boolean, Int, Product, Serializable, String}
 
 import monocle.Prism
 import scalaz.{Enum, Equal, Show}
@@ -35,6 +35,15 @@ object ParsableType extends ParsableTypeInstances {
   object JsonVariant {
     case object ArrayWrapped extends JsonVariant
     case object LineDelimited extends JsonVariant
+
+    val stringP: Prism[String, JsonVariant] =
+      Prism.partial[String, JsonVariant] {
+        case "json" => ArrayWrapped
+        case "ldjson" => LineDelimited
+      } {
+        case ArrayWrapped => "json"
+        case LineDelimited => "ldjson"
+      }
 
     implicit val enum: Enum[JsonVariant] =
       new Enum[JsonVariant] {

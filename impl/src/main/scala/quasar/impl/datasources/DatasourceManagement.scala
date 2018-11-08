@@ -29,13 +29,14 @@ import quasar.connector.{
 }
 import quasar.connector.ParsableType.JsonVariant
 import quasar.contrib.iota._
-import quasar.contrib.scalaz.MonadError_
+import quasar.contrib.scalaz._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp.ski.{κ, κ2}
 import quasar.impl.DatasourceModule
 import quasar.impl.DatasourceModule.{Heavyweight, Lightweight}
 import quasar.impl.datasource.{ByNeedDatasource, ConditionReportingDatasource, FailedDatasource}
+import quasar.impl.parsing.TectonicResourceError
 import quasar.impl.schema._
 import quasar.qscript._
 import quasar.sst._
@@ -183,7 +184,7 @@ final class DatasourceManagement[
           case QueryResult.Parsed(qdd, data) =>
             data.map(QData.convert(_)(qdd, QDataEncode[S]))
 
-          case QueryResult.Typed(ParsableType.Json(vnt, isPrecise), data) =>
+          case QueryResult.Typed(js @ ParsableType.Json(vnt, isPrecise), data) =>
             val mode: TParser.Mode = vnt match {
               case JsonVariant.ArrayWrapped => TParser.UnwrapArray
               case JsonVariant.LineDelimited => TParser.ValueStream
@@ -193,10 +194,20 @@ final class DatasourceManagement[
               Sync[F].delay[BaseParser[ArrayBuffer[S]]](
                 TParser(QDataPlate[S, ArrayBuffer[S]](isPrecise), mode))
 
-            data.through(
+            val parserPipe =
               StreamParser(parser)(
                 Chunk.buffer,
-                bufs => Chunk.buffer(concatArrayBufs(bufs))))
+                bufs => Chunk.buffer(concatArrayBufs(bufs)))
+
+            data.through(parserPipe) handleErrorWith { t =>
+              TectonicResourceError(path, js, t) match {
+                case Some(re) =>
+                  Stream.eval(MonadResourceErr[F].raiseError[S](re))
+
+                case None =>
+                  Stream.raiseError(t)
+              }
+            }
         }
 
       val k: N = ConvertableTo[N].fromLong(sstEvalConfig.sampleSize.value)
