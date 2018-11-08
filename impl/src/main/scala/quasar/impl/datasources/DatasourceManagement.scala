@@ -25,8 +25,7 @@ import quasar.connector.{
   Datasource,
   MonadResourceErr,
   ParsableType,
-  QueryResult,
-  ResourceError
+  QueryResult
 }
 import quasar.connector.ParsableType.JsonVariant
 import quasar.contrib.iota._
@@ -37,6 +36,7 @@ import quasar.fp.ski.{κ, κ2}
 import quasar.impl.DatasourceModule
 import quasar.impl.DatasourceModule.{Heavyweight, Lightweight}
 import quasar.impl.datasource.{ByNeedDatasource, ConditionReportingDatasource, FailedDatasource}
+import quasar.impl.parsing.TectonicResourceError
 import quasar.impl.schema._
 import quasar.qscript._
 import quasar.sst._
@@ -60,7 +60,7 @@ import scalaz.{EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz, \/}, Scalaz._
 import shims._
 import spire.algebra.Field
 import spire.math.ConvertableTo
-import tectonic.{BaseParser, IncompleteParseException, ParseException}
+import tectonic.BaseParser
 import tectonic.fs2.StreamParser
 import tectonic.json.{Parser => TParser}
 
@@ -184,7 +184,7 @@ final class DatasourceManagement[
           case QueryResult.Parsed(qdd, data) =>
             data.map(QData.convert(_)(qdd, QDataEncode[S]))
 
-          case QueryResult.Typed(ParsableType.Json(vnt, isPrecise), data) =>
+          case QueryResult.Typed(js @ ParsableType.Json(vnt, isPrecise), data) =>
             val mode: TParser.Mode = vnt match {
               case JsonVariant.ArrayWrapped => TParser.UnwrapArray
               case JsonVariant.LineDelimited => TParser.ValueStream
@@ -199,14 +199,14 @@ final class DatasourceManagement[
                 Chunk.buffer,
                 bufs => Chunk.buffer(concatArrayBufs(bufs)))
 
-            data.through(parserPipe) handleWith {
-              case ParseException(msg, _, _, _) =>
-                Stream.eval(MonadResourceErr[F].raiseError[S](
-                  ResourceError.malformedResource(path, JsonVariant.stringP(vnt), msg)))
+            data.through(parserPipe) handleErrorWith { t =>
+              TectonicResourceError(path, js, t) match {
+                case Some(re) =>
+                  Stream.eval(MonadResourceErr[F].raiseError[S](re))
 
-              case IncompleteParseException(msg) =>
-                Stream.eval(MonadResourceErr[F].raiseError[S](
-                  ResourceError.malformedResource(path, JsonVariant.stringP(vnt), msg)))
+                case None =>
+                  Stream.raiseError(t)
+              }
             }
         }
 

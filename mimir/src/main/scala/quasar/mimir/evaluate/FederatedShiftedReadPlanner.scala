@@ -20,12 +20,14 @@ import slamdata.Predef.{Stream => _, _}
 
 import quasar.ParseInstruction
 import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
+import quasar.api.resource.ResourcePath
 import quasar.common.data.RValue
-import quasar.connector.{QueryResult, ParsableType}
+import quasar.connector.{ParsableType, QueryResult, ResourceError}
 import quasar.connector.ParsableType.JsonVariant
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.impl.evaluate.{Source => EvalSource}
+import quasar.impl.parsing.TectonicResourceError
 import quasar.mimir._, MimirCake._
 import quasar.mimir.evaluate.Config.{Associates, EvalConfigT, EvaluatorConfig}
 import quasar.qscript._, PlannerError.InternalError
@@ -37,6 +39,7 @@ import matryoshka._
 import pathy.Path._
 import qdata.{QData, QDataDecode}
 import scalaz._, Scalaz._
+import shims._
 
 import scala.concurrent.ExecutionContext
 import scala.collection.mutable.ArrayBuffer
@@ -96,13 +99,14 @@ final class FederatedShiftedReadPlanner[
         source <- MonadPlannerErr[F].unattempt_(
           maybeSource \/> InternalError.fromMsg(s"No source for '${posixCodec.printPath(file)}'."))
 
-        tbl <- sourceTable(source, instructions)
+        tbl <- sourceTable(file, source, instructions)
 
       } yield MimirRepr(P)(tbl)
     }
   }
 
   private def sourceTable(
+      path: AFile,
       source: EvalSource[QueryAssociate[T, IO]],
       instructions: List[ParseInstruction])
       : F[P.Table] =
@@ -130,7 +134,7 @@ final class FederatedShiftedReadPlanner[
           tableFromParsed(data, instructions)(qd)
 
         case QueryResult.Typed(tpe, data) =>
-          tableFromTyped(tpe, data, instructions)
+          tableFromTyped(path, tpe, data, instructions)
       }
     } yield table
 
@@ -163,6 +167,7 @@ final class FederatedShiftedReadPlanner[
   }
 
   private def tableFromTyped(
+      path: AFile,
       tpe: ParsableType,
       data: Stream[IO, Byte],
       instructions: List[ParseInstruction])
@@ -170,6 +175,14 @@ final class FederatedShiftedReadPlanner[
     tpe match {
       case ParsableType.Json(vnt, isPrecise) =>
         val isArrayWrapped = vnt === JsonVariant.ArrayWrapped
-        P.Table.parseJson[F](data, instructions, isPrecise, isArrayWrapped)
+        P.Table.parseJson[F](data, instructions, isPrecise, isArrayWrapped) map { tbl =>
+          val handledSlices = tbl.slices.trans(λ[IO ~> IO](_ handleErrorWith { t =>
+            IO.raiseError(
+              TectonicResourceError(ResourcePath.leaf(path), tpe, t)
+                .fold(t)(ResourceError.throwableP(_)))
+          }))
+
+          P.Table(handledSlices, tbl.size)
+        }
     }
 }
