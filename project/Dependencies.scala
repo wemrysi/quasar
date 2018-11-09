@@ -111,6 +111,7 @@ object Dependencies {
   )
 
   def impl = Seq(
+    "com.slamdata"   %% "fs2-gzip"       % "1.0.1",
     "com.slamdata"   %% "qdata-tectonic" % qdataVersion,
     "com.slamdata"   %% "tectonic-fs2"   % tectonicVersion,
     "org.http4s"     %% "jawn-fs2"       % jawnfs2Version,

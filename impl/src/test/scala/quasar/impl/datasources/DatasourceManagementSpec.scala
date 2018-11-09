@@ -22,6 +22,7 @@ import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.connector._
+import quasar.connector.ParsableType.JsonVariant
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka.envT
 import quasar.contrib.scalaz.MonadError_
@@ -46,7 +47,7 @@ import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 import eu.timepit.refined.auto._
-import fs2.Stream
+import fs2.{gzip, Stream}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -100,6 +101,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
   val evalDelay = 250.millis
 
   val LightT = DatasourceType("light", 1L)
+  val LightGzipT = DatasourceType("light-gzip", 1L)
   val HeavyT = DatasourceType("heavy", 2L)
 
   val lightMod = new LightweightDatasourceModule {
@@ -112,6 +114,27 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
         implicit ec: ExecutionContext)
         : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]]]] =
       mkDatasource[ResourcePath, F](kind, evalDelay).right.pure[F]
+  }
+
+  val lightGzipMod = new LightweightDatasourceModule {
+    val kind = LightGzipT
+
+    def sanitizeConfig(config: Json): Json = jString("sanitized")
+
+    def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
+        config: Json)(
+        implicit ec: ExecutionContext)
+        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]]]] =
+      mkDatasource[ResourcePath, F](kind, evalDelay)
+        .map(Datasource.evaluator[F, Stream[F, ?], ResourcePath, QueryResult[F]] modify { qe =>
+          qe.as(QueryResult.compressed(
+            CompressionScheme.Gzip,
+            QueryResult.typed(
+              ParsableType.json(JsonVariant.ArrayWrapped, false),
+              Stream.emits(BoolsData.mkString("[", "      ,      ", "]").getBytes("UTF-8"))
+                .through(gzip.compress[F](1024)))))
+        })
+        .right.pure[F]
   }
 
   val heavyMod = new HeavyweightDatasourceModule {
@@ -131,6 +154,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
   val modules: DatasourceManagement.Modules =
     IMap(
       lightMod.kind -> DatasourceModule.Lightweight(lightMod),
+      lightGzipMod.kind -> DatasourceModule.Lightweight(lightGzipMod),
       heavyMod.kind -> DatasourceModule.Heavyweight(heavyMod))
 
   def withInitialMgmt[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgmt, IO[Running]) => IO[A]): A =
@@ -295,6 +319,16 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
         }
       }
 
+      "computes an SST of gzipped data" >> withMgmt { (mgmt, _) =>
+        for {
+          c <- mgmt.initDatasource(1, DatasourceRef(LightGzipT, DatasourceName("z"), Json.jNull))
+          b <- mgmt.resourceSchema(1, ResourcePath.root() / ResourceName("data"), defaultCfg, 1.hour)
+        } yield {
+          c must beNormal
+          b.toOption.join must_= Some(schema)
+        }
+      }
+
       "halts computation after time limit" >> withMgmt { (mgmt, _) =>
         for {
           c <- mgmt.initDatasource(1, DatasourceRef(LightT, DatasourceName("b"), Json.jNull))
@@ -396,6 +430,9 @@ object DatasourceManagementSpec {
   final case class CreateErrorException(ce: CreateError[Json])
       extends Exception(Show[DatasourceError[Int, Json]].shows(ce))
 
+  val BoolsData: List[Boolean] =
+    List(true, true, false, true, false)
+
   def mkDatasource[Q, F[_]: MonadError[?[_], Throwable]](
       kind0: DatasourceType,
       produceDelay: FiniteDuration)(
@@ -407,7 +444,7 @@ object DatasourceManagementSpec {
       def evaluate(query: Q): F[QueryResult[F]] =
         QueryResult.parsed(
           QDataDecode[Fix[EJson]],
-          Stream.emits(List(true, true, false, true, false))
+          Stream.emits(BoolsData)
             .map(EJson.bool[Fix[EJson]](_))
             .evalMap(r => tmr.sleep(produceDelay).as(r))
             .covary[F]).pure[F]

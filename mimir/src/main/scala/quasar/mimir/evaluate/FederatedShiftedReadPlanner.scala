@@ -22,7 +22,7 @@ import quasar.ParseInstruction
 import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.api.resource.ResourcePath
 import quasar.common.data.RValue
-import quasar.connector.{ParsableType, QueryResult, ResourceError}
+import quasar.connector.{CompressionScheme, ParsableType, QueryResult, ResourceError}
 import quasar.connector.ParsableType.JsonVariant
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
@@ -34,7 +34,7 @@ import quasar.qscript._, PlannerError.InternalError
 import quasar.yggdrasil.MonadFinalizers
 
 import cats.effect.{ContextShift, IO, LiftIO}
-import fs2.{Chunk, Stream}
+import fs2.{gzip, Chunk, Stream}
 import matryoshka._
 import pathy.Path._
 import qdata.{QData, QDataDecode}
@@ -51,6 +51,8 @@ final class FederatedShiftedReadPlanner[
     implicit
     cs: ContextShift[IO],
     ec: ExecutionContext) {
+
+  import FederatedShiftedReadPlanner.DefaultDecompressionBufferSize
 
   type Assocs = Associates[T, IO]
   type M[A] = EvalConfigT[T, F, IO, A]
@@ -128,14 +130,28 @@ final class FederatedShiftedReadPlanner[
           f(shiftedRead).to[F]
       }
 
-      table <- queryResult match {
-        case QueryResult.Parsed(qd, data) =>
-          tableFromParsed(data, instructions)(qd)
-
-        case QueryResult.Typed(tpe, data) =>
-          tableFromTyped(path, tpe, data, instructions)
-      }
+      table <- tableFromQueryResult(path, queryResult, instructions)
     } yield table
+
+  @tailrec
+  private def tableFromQueryResult(
+      path: AFile,
+      qr: QueryResult[IO],
+      instructions: List[ParseInstruction])
+      : F[P.Table] =
+    qr match {
+      case QueryResult.Parsed(qd, data) =>
+        tableFromParsed(data, instructions)(qd)
+
+      case QueryResult.Compressed(CompressionScheme.Gzip, content) =>
+        tableFromQueryResult(
+          path,
+          content.modifyBytes(gzip.decompress[IO](DefaultDecompressionBufferSize)),
+          instructions)
+
+      case QueryResult.Typed(tpe, data) =>
+        tableFromTyped(path, tpe, data, instructions)
+    }
 
   // we do not preserve the order of shifted results
   private def tableFromParsed[A: QDataDecode](
@@ -184,4 +200,9 @@ final class FederatedShiftedReadPlanner[
           P.Table(handledSlices, tbl.size)
         }
     }
+}
+
+object FederatedShiftedReadPlanner {
+  // 32k buffer, anything less would be uncivilized.
+  val DefaultDecompressionBufferSize: Int = 32768
 }

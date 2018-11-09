@@ -22,6 +22,7 @@ import quasar.api.datasource.{DatasourceError, DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported, DiscoveryError, ExistentialError}
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.connector.{
+  CompressionScheme,
   Datasource,
   MonadResourceErr,
   ParsableType,
@@ -50,7 +51,7 @@ import argonaut.Argonaut.jEmptyObject
 import cats.ApplicativeError
 import cats.effect.{ConcurrentEffect, ContextShift, Timer}
 import cats.effect.concurrent.Ref
-import fs2.{Chunk, Stream}
+import fs2.{gzip, Chunk, Stream}
 import fs2.concurrent.{Signal, SignallingRef}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import qdata.{QData, QDataEncode}
@@ -171,43 +172,49 @@ final class DatasourceManagement[
       bufs.foldLeft(new ArrayBuffer[S](totalSize))(_ ++= _)
     }
 
+    @tailrec
+    def sstStream(qr: QueryResult[F]): Stream[F, S] =
+      qr match {
+        case QueryResult.Parsed(qdd, data) =>
+          data.map(QData.convert(_)(qdd, QDataEncode[S]))
+
+        case QueryResult.Compressed(CompressionScheme.Gzip, content) =>
+          sstStream(content.modifyBytes(gzip.decompress[F](DefaultDecompressionBufferSize)))
+
+        case QueryResult.Typed(js @ ParsableType.Json(vnt, isPrecise), data) =>
+          val mode: TParser.Mode = vnt match {
+            case JsonVariant.ArrayWrapped => TParser.UnwrapArray
+            case JsonVariant.LineDelimited => TParser.ValueStream
+          }
+
+          val parser =
+            TParser(QDataPlate[F, S, ArrayBuffer[S]](isPrecise), mode)
+
+          val parserPipe =
+            StreamParser(parser)(
+              Chunk.buffer,
+              bufs => Chunk.buffer(concatArrayBufs(bufs)))
+
+          data.through(parserPipe) handleErrorWith { t =>
+            TectonicResourceError(path, js, t) match {
+              case Some(re) =>
+                Stream.eval(MonadResourceErr[F].raiseError[S](re))
+
+              case None =>
+                Stream.raiseError(t)
+            }
+          }
+      }
+
     withDs[DiscoveryError[I], Option[sstConfig.Schema]](datasourceId) { ds =>
 
       val queryResult: F[QueryResult[F]] =
         ds.fold(_.evaluate(path), _.evaluate(sampleQuery))
 
-      val sstStream: F[Stream[F, S]] =
-        queryResult map {
-          case QueryResult.Parsed(qdd, data) =>
-            data.map(QData.convert(_)(qdd, QDataEncode[S]))
-
-          case QueryResult.Typed(js @ ParsableType.Json(vnt, isPrecise), data) =>
-            val mode: TParser.Mode = vnt match {
-              case JsonVariant.ArrayWrapped => TParser.UnwrapArray
-              case JsonVariant.LineDelimited => TParser.ValueStream
-            }
-
-            val parser = TParser(QDataPlate[F, S, ArrayBuffer[S]](isPrecise), mode)
-
-            val parserPipe =
-              StreamParser[F, ArrayBuffer[S], S](parser)(
-                Chunk.buffer,
-                bufs => Chunk.buffer(concatArrayBufs(bufs)))
-
-            data.through(parserPipe) handleErrorWith { t =>
-              TectonicResourceError(path, js, t) match {
-                case Some(re) =>
-                  Stream.eval(MonadResourceErr[F].raiseError[S](re))
-
-                case None =>
-                  Stream.raiseError(t)
-              }
-            }
-        }
-
       val k: N = ConvertableTo[N].fromLong(sstEvalConfig.sampleSize.value)
 
-      Stream.force(sstStream)
+      Stream.eval(queryResult)
+        .flatMap(sstStream)
         .take(sstEvalConfig.sampleSize.value)
         .chunkLimit(sstEvalConfig.chunkSize.value.toInt)
         .through(progressiveSstAsync(sstConfig, sstEvalConfig.parallelism.value.toInt))
@@ -278,6 +285,9 @@ object DatasourceManagement {
 
   type MgmtControl[T[_[_]], F[_], I, N] =
       DatasourceControl[F, Stream[F, ?], I, Json, SstConfig[T[EJson], N]]
+
+  // 32k buffer, anything less would be uncivilized.
+  val DefaultDecompressionBufferSize: Int = 32768
 
   final case class IncompatibleDatasourceException(kind: DatasourceType) extends java.lang.RuntimeException {
     override def getMessage = s"Loaded datasource implementation with type $kind is incompatible with quasar"
