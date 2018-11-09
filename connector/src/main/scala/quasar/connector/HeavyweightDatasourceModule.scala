@@ -39,5 +39,5 @@ trait HeavyweightDatasourceModule {
       F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
       config: Json)(
       implicit ec: ExecutionContext)
-      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F]]]]
+      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F, _]]]]
 }

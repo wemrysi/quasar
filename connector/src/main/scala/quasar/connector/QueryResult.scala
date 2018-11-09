@@ -17,59 +17,67 @@
 package quasar.connector
 
 import slamdata.Predef.{Byte, Product, Serializable}
-import quasar.fp.EndoK
 import quasar.higher.HFunctor
 
 import fs2.Stream
 import qdata.QDataDecode
-import monocle.Prism
-import scalaz.{~>, Cord, Show}
+import scalaz.{~>, Const, Cord, Show}
 import scalaz.syntax.show._
 import shims._
 
-sealed trait QueryResult[F[_]] extends Product with Serializable {
-  import QueryResult._
+sealed trait QueryResult[F[_], A] extends Product with Serializable {
+  def data: Stream[F, A]
 
-  def data: Stream[F, _]
+  def hmap[G[_]](f: F ~> G): QueryResult[G, A] =
+    modifyData(λ[Stream[F, ?] ~> Stream[G, ?]](_.translate[F, G](f.asCats)))
 
-  def hmap[G[_]](f: F ~> G): QueryResult[G] =
-    this match {
-      case Parsed(q, d) => Parsed(q, d.translate[F, G](f.asCats))
-      case Typed(t, d) => Typed(t, d.translate[F, G](f.asCats))
-    }
-
-  def modifyData(f: EndoK[Stream[F, ?]]): QueryResult[F] =
-    this match {
-      case Parsed(q, d) => Parsed(q, f(d))
-      case Typed(t, d) => Typed(t, f(d))
-    }
+  def modifyData[G[_]](f: Stream[F, ?] ~> Stream[G, ?]): QueryResult[G, A] =
+    (new QueryResult.ModifyData[F, G](f))(this)
 }
 
 object QueryResult extends QueryResultInstances {
-  final case class Parsed[F[_], A](decode: QDataDecode[A], data: Stream[F, A]) extends QueryResult[F]
-  final case class Typed[F[_]](tpe: ParsableType, data: Stream[F, Byte]) extends QueryResult[F]
+  final case class Parsed[F[_], A](decode: QDataDecode[A], data: Stream[F, A]) extends QueryResult[F, A]
+  final case class Typed[F[_]](tpe: ParsableType, data: Stream[F, Byte]) extends QueryResult[F, Byte]
 
-  def parsed[F[_], A](q: QDataDecode[A], d: Stream[F, A]): QueryResult[F] =
+  def parsed[F[_], A](q: QDataDecode[A], d: Stream[F, A]): QueryResult[F, A] =
     Parsed(q, d)
 
-  def typed[F[_]]: Prism[QueryResult[F], (ParsableType, Stream[F, Byte])] =
-    Prism.partial[QueryResult[F], (ParsableType, Stream[F, Byte])] {
-      case Typed(t, d) => (t, d)
-    } ((Typed[F](_, _)).tupled)
+  def typed[F[_]](tpe: ParsableType, data: Stream[F, Byte]): QueryResult[F, Byte] =
+    Typed(tpe, data)
+
+  ////
+
+  // Courtesy of https://issues.scala-lang.org/browse/SI-10208, thanks scalac!
+  private final class ModifyData[F[_], G[_]](f: Stream[F, ?] ~> Stream[G, ?])
+      extends (QueryResult[F, ?] ~> QueryResult[G, ?]) {
+
+    def apply[A](qr: QueryResult[F, A]) =
+      qr match {
+        case Parsed(q, d) => Parsed(q, f(d))
+        case Typed(t, d) => Typed(t, f(d))
+      }
+  }
 }
 
 sealed abstract class QueryResultInstances {
   import QueryResult._
 
-  implicit val hfunctor: HFunctor[QueryResult] =
-    new HFunctor[QueryResult] {
-      def hmap[A[_], B[_]](fa: QueryResult[A])(f: A ~> B) =
+  implicit def hfunctor[D]: HFunctor[QueryResult[?[_], D]] =
+    new HFunctor[QueryResult[?[_], D]] {
+      def hmap[A[_], B[_]](fa: QueryResult[A, D])(f: A ~> B) =
         fa hmap f
     }
 
-  implicit def show[F[_]]: Show[QueryResult[F]] =
-    Show.show {
-      case Parsed(_, _) => Cord("Parsed")
-      case Typed(t, _) => Cord("Typed(") ++ t.show ++ Cord(")")
-    }
+  implicit def show[F[_], A]: Show[QueryResult[F, A]] =
+    Show.show(qr => (new ShowImpl[F])(qr).getConst)
+
+  ////
+
+  private final class ShowImpl[F[_]] extends (QueryResult[F, ?] ~> Const[Cord, ?]) {
+    def apply[A](qr: QueryResult[F, A]) =
+      qr match {
+        case Parsed(_, _) => Const(Cord("Parsed"))
+        case Typed(t, _) => Const(Cord("Typed(") ++ t.show ++ Cord(")"))
+      }
+  }
 }
