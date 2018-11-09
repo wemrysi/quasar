@@ -16,6 +16,8 @@
 
 package quasar.yggdrasil.table
 
+import cats.effect.IO
+
 import quasar.{CompositeParseType, IdStatus, ParseInstructionSpec}
 import quasar.common.CPath
 
@@ -28,20 +30,20 @@ object TectonicParseInstructionSpec extends ParseInstructionSpec {
   type JsonStream = List[Event]
 
   def evalMask(mask: Mask, stream: JsonStream): JsonStream =
-    evalPlate(stream)(new MaskPlate(mask, _))
+    evalPlate(stream)(MaskPlate[IO, List[Event]](mask, _))
 
   def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream =
-    evalPlate(stream)(new WrapPlate(wrap, _))
+    evalPlate(stream)(WrapPlate[IO, List[Event]](wrap, _))
 
   def evalIds(stream: JsonStream): JsonStream =
-    evalPlate(stream)(new IdsPlate(_))
+    evalPlate(stream)(IdsPlate[IO, List[Event]](_))
 
   def evalSinglePivot(path: CPath, idStatus: IdStatus, structure: CompositeParseType, stream: JsonStream)
       : JsonStream =
-    evalPlate(stream)(new SinglePivotPlate(path, idStatus, structure, _))
+    evalPlate(stream)(SinglePivotPlate[IO, List[Event]](path, idStatus, structure, _))
 
-  private def evalPlate(stream: JsonStream)(f: Plate[List[Event]] => Plate[List[Event]]): JsonStream = {
-    val plate = f(new ReifiedTerminalPlate)
+  private def evalPlate(stream: JsonStream)(f: Plate[List[Event]] => IO[Plate[List[Event]]]): JsonStream = {
+    val plate = ReifiedTerminalPlate[IO].flatMap(f).unsafeRunSync()
     stripNoOps(ReifiedTerminalPlate.visit(stream, plate))
   }
 
@@ -65,12 +67,13 @@ object TectonicParseInstructionSpec extends ParseInstructionSpec {
   }
 
   protected def ldjson(str: String): JsonStream = {
-    val plate = new ReifiedTerminalPlate
-    val parser = Parser(plate, Parser.ValueStream)
+    val eff = for {
+      parser <- Parser(ReifiedTerminalPlate[IO], Parser.ValueStream)
 
-    val events1 = parser.absorb(str).right.get
-    val events2 = parser.finish().right.get
+      events1 <- parser.absorb(str)
+      events2 <- parser.finish
+    } yield events1.right.get ::: events2.right.get
 
-    events1 ::: events2
+    eff.unsafeRunSync()
   }
 }

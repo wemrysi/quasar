@@ -378,38 +378,37 @@ trait ColumnarTableModule
         ec: ExecutionContext)
         : M[Table] = {
 
-      import tectonic.{BaseParser, Plate}
+      import tectonic.Plate
       import tectonic.fs2.StreamParser
       import tectonic.json.Parser
 
-      val plate = instructions.foldRight(new SlicePlate(precise): Plate[List[Slice]]) {
-        case (ParseInstruction.Ids, plate) =>
-          new IdsPlate(plate)
+      val plate = SlicePlate[IO](precise) flatMap { root =>
+        instructions.foldRightM[IO, Plate[List[Slice]]](root) {
+          case (ParseInstruction.Ids, plate) =>
+            IdsPlate[IO, List[Slice]](plate)
 
-        case (instr @ ParseInstruction.Wrap(_, _), plate) =>
-          new WrapPlate(instr, plate)
+          case (instr @ ParseInstruction.Wrap(_, _), plate) =>
+            WrapPlate[IO, List[Slice]](instr, plate)
 
-        case (instr @ ParseInstruction.Mask(_), plate) =>
-          new MaskPlate(instr, plate)
+          case (instr @ ParseInstruction.Mask(_), plate) =>
+            MaskPlate[IO, List[Slice]](instr, plate)
 
-        case (instr @ ParseInstruction.Pivot(pivots), plate) =>
-          if (pivots.size == 1)
-            pivots.head match {
-              case (path, (idStatus, structure)) =>
-                new SinglePivotPlate(path, idStatus, structure, plate)
-            }
-          else
-            sys.error("Multiple pivots not supported")
+          case (instr @ ParseInstruction.Pivot(pivots), plate) =>
+            if (pivots.size == 1)
+              pivots.head match {
+                case (path, (idStatus, structure)) =>
+                  SinglePivotPlate[IO, List[Slice]](path, idStatus, structure, plate)
+              }
+            else
+              sys.error("Multiple pivots not supported")
+        }
       }
 
       val jsonMode =
         if (arrayWrapped) Parser.UnwrapArray else Parser.ValueStream
 
-      val parser =
-        IO[BaseParser[List[Slice]]](Parser(plate, jsonMode))
-
       val slices =
-        bytes.through(StreamParser.foldable(parser))
+        bytes.through(StreamParser.foldable(Parser(plate, jsonMode)))
 
       for {
         d <- LiftIO[M].liftIO(convert.toStreamT(slices))

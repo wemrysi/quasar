@@ -17,6 +17,8 @@
 package quasar.yggdrasil
 package table
 
+import cats.effect.IO
+
 import quasar.blueeyes.json.JValue
 import quasar.common.data.{CBoolean, CLong, CNum, CString, Data, DataGenerators, RObject, RValue}
 import quasar.frontend.data.DataCodec
@@ -36,10 +38,15 @@ object SlicePlateSpec extends Specification with ScalaCheck with DataGenerators 
   "slice plate parsing through tectonic" should {
     "round trip readable" in prop { values: List[JValue] =>
       val input = values.mkString("\n")
-      val plate = new SlicePlate(false)
-      val parser = Parser(plate, Parser.ValueStream)
+      val plate = SlicePlate[IO](false)
 
-      (parser.absorb(input), parser.finish()) must beLike {
+      val eff = for {
+        parser <- Parser(plate, Parser.ValueStream)
+        first <- parser.absorb(input)
+        second <- parser.finish
+      } yield (first, second)
+
+      eff.unsafeRunSync() must beLike {
         case (Right(slices1), Right(slices2)) =>
           val results = (slices1 ++ slices2).flatMap(_.toJsonElements)
           results mustEqual values
@@ -50,10 +57,15 @@ object SlicePlateSpec extends Specification with ScalaCheck with DataGenerators 
       val values = values0.map(sortFields(_)).flatMap(stripNA(_))
 
       val input = values.flatMap(DataCodec.Precise.encode(_)).map(_.nospaces).mkString("\n")
-      val plate = new SlicePlate(true)
-      val parser = Parser(plate, Parser.ValueStream)
+      val plate = SlicePlate[IO](true)
 
-      (parser.absorb(input), parser.finish()) must beLike {
+      val eff = for {
+        parser <- Parser(plate, Parser.ValueStream)
+        first <- parser.absorb(input)
+        second <- parser.finish
+      } yield (first, second)
+
+      eff.unsafeRunSync() must beLike {
         case (Right(slices1), Right(slices2)) =>
           val results = (slices1 ++ slices2).flatMap(_.toRValues).map(RValue.toData(_)).map(sortFields(_))
           results mustEqual values
@@ -62,10 +74,15 @@ object SlicePlateSpec extends Specification with ScalaCheck with DataGenerators 
 
     "parse Long.MaxValue + 1" in {
       val input = "9223372036854775808"
-      val plate = new SlicePlate(true)
-      val parser = Parser(plate, Parser.ValueStream)
+      val plate = SlicePlate[IO](true)
 
-      (parser.absorb(input), parser.finish()) must beLike {
+      val eff = for {
+        parser <- Parser(plate, Parser.ValueStream)
+        first <- parser.absorb(input)
+        second <- parser.finish
+      } yield (first, second)
+
+      eff.unsafeRunSync() must beLike {
         case (Right(slices1), Right(slices2)) =>
           val results = (slices1 ++ slices2).flatMap(_.toRValues)
           results mustEqual List(CNum(BigDecimal("9223372036854775808")))
@@ -74,10 +91,15 @@ object SlicePlateSpec extends Specification with ScalaCheck with DataGenerators 
 
     "parse Long.MinValue" in {
       val input = Long.MinValue.toString
-      val plate = new SlicePlate(true)
-      val parser = Parser(plate, Parser.ValueStream)
+      val plate = SlicePlate[IO](true)
 
-      (parser.absorb(input), parser.finish()) must beLike {
+      val eff = for {
+        parser <- Parser(plate, Parser.ValueStream)
+        first <- parser.absorb(input)
+        second <- parser.finish
+      } yield (first, second)
+
+      eff.unsafeRunSync() must beLike {
         case (Right(slices1), Right(slices2)) =>
           val results = (slices1 ++ slices2).flatMap(_.toRValues)
           results mustEqual List(CLong(Long.MinValue))
@@ -91,10 +113,15 @@ object SlicePlateSpec extends Specification with ScalaCheck with DataGenerators 
         10
         """
 
-      val plate = new SlicePlate(true, defaultMinRows = 2, maxSliceRows = 2)
-      val parser = Parser(plate, Parser.ValueStream)
+      val plate = SlicePlate[IO](true, defaultMinRows = 2, maxSliceRows = 2)
 
-      (parser.absorb(input), parser.finish()) must beLike {
+      val eff = for {
+        parser <- Parser(plate, Parser.ValueStream)
+        first <- parser.absorb(input)
+        second <- parser.finish
+      } yield (first, second)
+
+      eff.unsafeRunSync() must beLike {
         case (Right(slices1), Right(slices2)) =>
           val combined = slices1 ++ slices2
           combined must haveSize(2)
@@ -114,10 +141,15 @@ object SlicePlateSpec extends Specification with ScalaCheck with DataGenerators 
         { "a": 10, "b": false, "c": "qux" }
         """
 
-      val plate = new SlicePlate(true, maxSliceColumns = 2)
-      val parser = Parser(plate, Parser.ValueStream)
+      val plate = SlicePlate[IO](true, maxSliceColumns = 2)
 
-      (parser.absorb(input), parser.finish()) must beLike {
+      val eff = for {
+        parser <- Parser(plate, Parser.ValueStream)
+        first <- parser.absorb(input)
+        second <- parser.finish
+      } yield (first, second)
+
+      eff.unsafeRunSync() must beLike {
         case (Right(slices1), Right(slices2)) =>
           val combined = slices1 ++ slices2
           combined must haveSize(2)

@@ -60,7 +60,6 @@ import scalaz.{EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz, \/}, Scalaz._
 import shims._
 import spire.algebra.Field
 import spire.math.ConvertableTo
-import tectonic.BaseParser
 import tectonic.fs2.StreamParser
 import tectonic.json.{Parser => TParser}
 
@@ -191,11 +190,10 @@ final class DatasourceManagement[
             }
 
             val parser =
-              Sync[F].delay[BaseParser[ArrayBuffer[S]]](
-                TParser(QDataPlate[S, ArrayBuffer[S]](isPrecise), mode))
+              TParser(Sync[F].delay(QDataPlate[S, ArrayBuffer[S]](isPrecise)), mode)
 
             val parserPipe =
-              StreamParser(parser)(
+              StreamParser[F, ArrayBuffer[S], S](parser)(
                 Chunk.buffer,
                 bufs => Chunk.buffer(concatArrayBufs(bufs)))
 
