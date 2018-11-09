@@ -43,7 +43,7 @@ import shims._
   * @param root the scope of this datasource, all paths will be considered relative to this one.
   * @param queryResult the evaluation strategy
   */
-final class EvaluableLocalDatasource[F[_]: ContextShift: Timer](
+final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
     dsType: DatasourceType,
     root: JPath,
     queryResult: JPath => QueryResult[F])(
@@ -94,4 +94,13 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer](
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private def toResourceName(jp: JPath): ResourceName =
     ResourceName(jp.getFileName.toString)
+}
+
+object EvaluableLocalDatasource {
+  def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer](
+      dsType: DatasourceType,
+      root: JPath)(
+      queryResult: JPath => QueryResult[F])
+      : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]] =
+    new EvaluableLocalDatasource[F](dsType, root, queryResult)
 }

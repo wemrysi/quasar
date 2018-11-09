@@ -40,11 +40,10 @@ object LocalDatasource {
 
     import ParsableType.JsonVariant
 
-    val queryResult: JPath => QueryResult[F] = path =>
+    EvaluableLocalDatasource[F](LocalType, root) { path =>
       QueryResult.typed(
         ParsableType.json(JsonVariant.LineDelimited, true),
         io.file.readAll[F](path, blockingPool.unwrap, readChunkSizeBytes))
-
-    new EvaluableLocalDatasource[F](LocalType, root, queryResult)
+    }
   }
 }

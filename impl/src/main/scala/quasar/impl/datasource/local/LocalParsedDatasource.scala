@@ -44,14 +44,13 @@ object LocalParsedDatasource {
 
     implicit val facade: Facade[A] = QDataFacade(isPrecise = true)
 
-    val queryResult: JPath => QueryResult[F] = path =>
-        QueryResult.parsed[F, A](
-          QDataDecode[A],
-          io.file.readAll[F](path, blockingPool.unwrap, readChunkSizeBytes)
-            .chunks
-            .map(_.toByteBuffer)
-            .parseJsonStream[A])
-
-    new EvaluableLocalDatasource[F](LocalParsedType, root, queryResult)
+    EvaluableLocalDatasource[F](LocalParsedType, root) { path =>
+      QueryResult.parsed[F, A](
+        QDataDecode[A],
+        io.file.readAll[F](path, blockingPool.unwrap, readChunkSizeBytes)
+          .chunks
+          .map(_.toByteBuffer)
+          .parseJsonStream[A])
+    }
   }
 }
