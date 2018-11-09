@@ -62,14 +62,25 @@ final class RegressionQScriptEvaluator[
   implicit def QSMRewriteToQSM: Injectable[QSMRewrite, QSM] =
     SubInject[CopK[QSRewrite[T], ?], CopK[QS[T], ?]]
 
+  def RenderTQSMRewrite: RenderTree[T[QSMRewrite]] = {
+    val toTotal: T[QSMRewrite] => T[QScriptTotal[T, ?]] =
+      _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QSRewrite[T], ?], QScriptTotal[T, ?]].inject(_).embed)
+
+    RenderTree.contramap(toTotal)
+  }
+
+  def RenderTQSM: RenderTree[T[QSM]] = {
+    val toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
+      _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]].inject(_).embed)
+
+    RenderTree.contramap(toTotal)
+  }
+
   def QSMRewriteFunctor: Functor[QSMRewrite] = Functor[QSMRewrite]
   def QSMFunctor: Functor[QSM] = Functor[QSM]
 
   def UnirewriteT: Unirewrite[T, QSRewrite[T]] =
     implicitly[Unirewrite[T, QSRewrite[T]]]
-
-  def toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
-    _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]].inject(_).embed)
 
   def optimize: F[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
     RewritePushdown[T, QSM, QSMRewrite, AFile].point[F]
