@@ -40,11 +40,11 @@ object LocalParsedDatasource {
       root: JPath,
       readChunkSizeBytes: Int,
       blockingPool: BlockingContext)
-      : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]] = {
+      : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F, A]] = {
 
     implicit val facade: Facade[A] = QDataFacade(isPrecise = true)
 
-    EvaluableLocalDatasource[F](LocalParsedType, root) { path =>
+    EvaluableLocalDatasource[F, A](LocalParsedType, root) { path =>
       QueryResult.parsed[F, A](
         QDataDecode[A],
         io.file.readAll[F](path, blockingPool.unwrap, readChunkSizeBytes)

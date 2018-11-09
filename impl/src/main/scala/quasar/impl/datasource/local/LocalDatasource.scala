@@ -36,11 +36,11 @@ object LocalDatasource {
       root: JPath,
       readChunkSizeBytes: Int,
       blockingPool: BlockingContext)
-      : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]] = {
+      : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F, Byte]] = {
 
     import ParsableType.JsonVariant
 
-    EvaluableLocalDatasource[F](LocalType, root) { path =>
+    EvaluableLocalDatasource[F, Byte](LocalType, root) { path =>
       QueryResult.typed(
         ParsableType.json(JsonVariant.LineDelimited, true),
         io.file.readAll[F](path, blockingPool.unwrap, readChunkSizeBytes))

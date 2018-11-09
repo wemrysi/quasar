@@ -43,16 +43,16 @@ import shims._
   * @param root the scope of this datasource, all paths will be considered relative to this one.
   * @param queryResult the evaluation strategy
   */
-final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
+final class EvaluableLocalDatasource[F[_]: ContextShift: Timer, A] private (
     dsType: DatasourceType,
     root: JPath,
-    queryResult: JPath => QueryResult[F])(
+    queryResult: JPath => QueryResult[F, A])(
     implicit F: Effect[F], RE: MonadResourceErr[F])
-    extends LightweightDatasource[F, Stream[F, ?], QueryResult[F]] {
+    extends LightweightDatasource[F, Stream[F, ?], QueryResult[F, A]] {
 
   val kind: DatasourceType = dsType
 
-  def evaluate(path: ResourcePath): F[QueryResult[F]] =
+  def evaluate(path: ResourcePath): F[QueryResult[F, A]] =
     for {
       jp <- toNio[F](path)
 
@@ -97,10 +97,10 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
 }
 
 object EvaluableLocalDatasource {
-  def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer](
+  def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer, A](
       dsType: DatasourceType,
       root: JPath)(
-      queryResult: JPath => QueryResult[F])
-      : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]] =
-    new EvaluableLocalDatasource[F](dsType, root, queryResult)
+      queryResult: JPath => QueryResult[F, A])
+      : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F, A]] =
+    new EvaluableLocalDatasource[F, A](dsType, root, queryResult)
 }
