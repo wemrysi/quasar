@@ -16,9 +16,11 @@
 
 package quasar.yggdrasil.table
 
+import cats.effect.Sync
+
 import tectonic.{Plate, Signal}
 
-private[table] final class IdsPlate[A](delegate: Plate[A]) extends Plate[A] {
+private[table] final class IdsPlate[A] private (delegate: Plate[A]) extends Plate[A] {
   private var sawSomething = false
   private var id = 0L   // 450 exabytes is enough for anyone
 
@@ -101,4 +103,9 @@ private[table] final class IdsPlate[A](delegate: Plate[A]) extends Plate[A] {
       id += 1L
     }
   }
+}
+
+private[table] object IdsPlate {
+  def apply[F[_]: Sync, A](delegate: Plate[A]): F[Plate[A]] =
+    Sync[F].delay(new IdsPlate(delegate))
 }

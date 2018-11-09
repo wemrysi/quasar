@@ -16,6 +16,8 @@
 
 package quasar.yggdrasil.table
 
+import cats.effect.Sync
+
 import quasar.{CompositeParseType, IdStatus, ParseType}
 import quasar.common.{CPath, CPathField, CPathIndex, CPathMeta, CPathNode}
 
@@ -24,7 +26,7 @@ import tectonic.{DelegatingPlate, Plate, Signal}
 import scala.annotation.tailrec
 
 // currently assumes retain = false, meaning you *cannot* have any non-shifted stuff in the row
-private[table] final class SinglePivotPlate[A](
+private[table] final class SinglePivotPlate[A] private (
     path: CPath,
     idStatus: IdStatus,
     structure: CompositeParseType,
@@ -273,4 +275,15 @@ private[table] final class SinglePivotPlate[A](
   private def atFocus(): Boolean = cursor == rfocus
 
   private def atFocusPlus1(): Boolean = cursor == rfocusPlus1
+}
+
+private[table] object SinglePivotPlate {
+
+  def apply[F[_]: Sync, A](
+      path: CPath,
+      idStatus: IdStatus,
+      structure: CompositeParseType,
+      delegate: Plate[A])
+      : F[Plate[A]] =
+    Sync[F].delay(new SinglePivotPlate(path, idStatus, structure, delegate))
 }

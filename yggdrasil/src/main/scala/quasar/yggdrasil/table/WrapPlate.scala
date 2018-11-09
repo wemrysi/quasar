@@ -16,12 +16,14 @@
 
 package quasar.yggdrasil.table
 
+import cats.effect.Sync
+
 import quasar.ParseInstruction
 import quasar.common.CPathField
 
 import tectonic.{DelegatingPlate, Plate, Signal}
 
-private[table] final class WrapPlate[A](
+private[table] final class WrapPlate[A] private (
     wrap: ParseInstruction.Wrap,
     delegate: Plate[A])
     extends DelegatingPlate(delegate)
@@ -106,4 +108,13 @@ private[table] final class WrapPlate[A](
 
   private def atFocus() = cursor == rfocus
   private def atFocusPlusWrap() = cursor == rfocusPlusWrap
+}
+
+private[table] object WrapPlate {
+
+  def apply[F[_]: Sync, A](
+      wrap: ParseInstruction.Wrap,
+      delegate: Plate[A])
+      : F[Plate[A]] =
+    Sync[F].delay(new WrapPlate(wrap, delegate))
 }

@@ -16,12 +16,14 @@
 
 package quasar.yggdrasil.table
 
+import cats.effect.Sync
+
 import quasar.{ParseInstruction, ParseType}
 import quasar.common.{CPathField, CPathIndex, CPathMeta, CPathNode}
 
 import tectonic.{DelegatingPlate, Plate, Signal}
 
-private[table] final class MaskPlate[A](
+private[table] final class MaskPlate[A] private (
     mask: ParseInstruction.Mask,
     delegate: Plate[A])
     extends DelegatingPlate(delegate)
@@ -205,4 +207,13 @@ private[table] final class MaskPlate[A](
       sawSomething = false
     }
   }
+}
+
+private[table] object MaskPlate {
+
+  def apply[F[_]: Sync, A](
+      mask: ParseInstruction.Mask,
+      delegate: Plate[A])
+      : F[Plate[A]] =
+    Sync[F].delay(new MaskPlate(mask, delegate))
 }

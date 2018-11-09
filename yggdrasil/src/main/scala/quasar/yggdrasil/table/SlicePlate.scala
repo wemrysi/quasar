@@ -17,6 +17,8 @@
 package quasar.yggdrasil
 package table
 
+import cats.effect.Sync
+
 import qdata.json.PreciseKeys
 
 import quasar.common.{CPath, CPathField, CPathNode}
@@ -32,11 +34,11 @@ private[table] abstract class EmptyFinishRowPlate[A] extends Plate[A] {
   def finishRow() = ()
 }
 
-private[table] final class SlicePlate(
+private[table] final class SlicePlate private (
     precise: Boolean,
-    defaultMinRows: Int = Config.defaultMinRows,
-    maxSliceRows: Int = Config.maxSliceRows,
-    maxSliceColumns: Int = Config.maxSliceColumns)
+    defaultMinRows: Int,
+    maxSliceRows: Int,
+    maxSliceColumns: Int)
     extends EmptyFinishRowPlate[List[Slice]]    // <3 Scala
     with ContinuingNestPlate[List[Slice]]
     with CPathPlate[List[Slice]] {
@@ -264,4 +266,15 @@ private[table] final class SlicePlate(
       columns.clear()
     }
   }
+}
+
+private[table] object SlicePlate {
+
+  def apply[F[_]: Sync](
+      precise: Boolean,
+      defaultMinRows: Int = Config.defaultMinRows,
+      maxSliceRows: Int = Config.maxSliceRows,
+      maxSliceColumns: Int = Config.maxSliceColumns)
+      : F[Plate[List[Slice]]] =
+    Sync[F].delay(new SlicePlate(precise, defaultMinRows, maxSliceRows, maxSliceColumns))
 }

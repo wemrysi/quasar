@@ -48,7 +48,7 @@ import scala.concurrent.duration.FiniteDuration
 import argonaut.Json
 import argonaut.Argonaut.jEmptyObject
 import cats.ApplicativeError
-import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, Timer}
 import cats.effect.concurrent.Ref
 import fs2.{Chunk, Stream}
 import fs2.concurrent.{Signal, SignallingRef}
@@ -60,7 +60,6 @@ import scalaz.{EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz, \/}, Scalaz._
 import shims._
 import spire.algebra.Field
 import spire.math.ConvertableTo
-import tectonic.BaseParser
 import tectonic.fs2.StreamParser
 import tectonic.json.{Parser => TParser}
 
@@ -190,12 +189,10 @@ final class DatasourceManagement[
               case JsonVariant.LineDelimited => TParser.ValueStream
             }
 
-            val parser =
-              Sync[F].delay[BaseParser[ArrayBuffer[S]]](
-                TParser(QDataPlate[S, ArrayBuffer[S]](isPrecise), mode))
+            val parser = TParser(QDataPlate[F, S, ArrayBuffer[S]](isPrecise), mode)
 
             val parserPipe =
-              StreamParser(parser)(
+              StreamParser[F, ArrayBuffer[S], S](parser)(
                 Chunk.buffer,
                 bufs => Chunk.buffer(concatArrayBufs(bufs)))
 
