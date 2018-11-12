@@ -53,6 +53,9 @@ abstract class QScriptEvaluator[
   def QSMFunctor: Functor[QSM]
   def UnirewriteT: Unirewrite[T, QSRewrite[T]]
 
+  def RenderTQSMRewrite: RenderTree[T[QSMRewrite]]
+  def RenderTQSM: RenderTree[T[QSM]]
+
   /** Returns the result of executing the `Repr`. */
   def execute(repr: Repr): F[R]
 
@@ -62,18 +65,18 @@ abstract class QScriptEvaluator[
   /** Rewrites the qscript for optimal evaluation. */
   def optimize: F[QSMRewrite[T[QSM]] => QSM[T[QSM]]]
 
-  def toTotal: T[QSM] => T[QScriptTotal[T, ?]]
-
   ////
-
-  private implicit def renderTQSM: RenderTree[T[QSM]] = RenderTree.contramap(toTotal)
 
   def evaluate(qsr: T[QScriptEducated[T, ?]]): F[R] =
     for {
-      shifted <- Unirewrite[T, QSRewrite[T], F](
+      rewritten <- Unirewrite[T, QSRewrite[T], F](
         new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
+
+      _ <- phase[F][T[QSMRewrite]]("QScript (Rewritten)", rewritten)
+
       optimized <- optimize
-      interpreted <- phase[F][T[QSM]]("QScript (Optimized)", shifted.transCata[T[QSM]](optimized))
+      interpreted <- phase[F][T[QSM]]("QScript (Optimized)", rewritten.transCata[T[QSM]](optimized))
+
       repr <- plan(interpreted)
       result <- execute(repr)
     } yield result
@@ -81,4 +84,6 @@ abstract class QScriptEvaluator[
   private final implicit def _QSMRewriteFunctor: Functor[QSMRewrite] = QSMRewriteFunctor
   private final implicit def _QSMFunctor: Functor[QSM] = QSMFunctor
   private final implicit def _UnirewriteT: Unirewrite[T, QSRewrite[T]] = UnirewriteT
+  private final implicit def _RenderTQSMRewrite: RenderTree[T[QSMRewrite]] = RenderTQSMRewrite
+  private final implicit def _RenderTQSM: RenderTree[T[QSM]] = RenderTQSM
 }

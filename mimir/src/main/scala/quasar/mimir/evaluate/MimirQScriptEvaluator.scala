@@ -73,6 +73,20 @@ final class MimirQScriptEvaluator[
   implicit def QSMRewriteToQSM: Injectable[QSMRewrite, QSM] =
     SubInject[CopK[QSRewrite[T], ?], CopK[QS[T], ?]]
 
+  def RenderTQSMRewrite: RenderTree[T[QSMRewrite]] = {
+    val toTotal: T[QSMRewrite] => T[QScriptTotal[T, ?]] =
+      _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QSRewrite[T], ?], QScriptTotal[T, ?]].inject(_).embed)
+
+    RenderTree.contramap(toTotal)
+  }
+
+  def RenderTQSM: RenderTree[T[QSM]] = {
+    val toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
+      _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]].inject(_).embed)
+
+    RenderTree.contramap(toTotal)
+  }
+
   def QSMRewriteFunctor: Functor[QSMRewrite] = Functor[QSMRewrite]
   def QSMFunctor: Functor[QSM] = Functor[QSM]
 
@@ -86,9 +100,6 @@ final class MimirQScriptEvaluator[
         case Pushdown.DisablePushdown => QSMRewriteToQSM.inject(_)  // no-op
       }
     }
-
-  def toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
-    _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]].inject(_).embed)
 
   def execute(repr: Repr): M[Repr] =
     repr.map(_.compact(repr.P.trans.TransSpec1.Id).canonicalize(YggConfig.maxSliceRows).materialized)
