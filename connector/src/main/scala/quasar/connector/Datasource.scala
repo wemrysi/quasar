@@ -21,6 +21,8 @@ import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 
+import monocle.{Lens, PLens}
+
 /** @tparam F effects
   * @tparam G multiple results
   * @tparam Q query
@@ -40,4 +42,20 @@ trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, Q, R] {
     */
   def prefixedChildPaths(prefixPath: ResourcePath)
       : F[Option[G[(ResourceName, ResourcePathType)]]]
+}
+
+object Datasource {
+  def evaluator[F[_], G[_], Q, R]: Lens[Datasource[F, G, Q, R], QueryEvaluator[F, Q, R]] =
+    pevaluator[F, G, Q, R, Q, R]
+
+  def pevaluator[F[_], G[_], Q1, R1, Q2, R2]
+      : PLens[Datasource[F, G, Q1, R1], Datasource[F, G, Q2, R2], QueryEvaluator[F, Q1, R1], QueryEvaluator[F, Q2, R2]] =
+    PLens((ds: Datasource[F, G, Q1, R1]) => ds: QueryEvaluator[F, Q1, R1]) { qe: QueryEvaluator[F, Q2, R2] => ds =>
+      new Datasource[F, G, Q2, R2] {
+        val kind = ds.kind
+        def evaluate(q: Q2) = qe.evaluate(q)
+        def pathIsResource(p: ResourcePath) = ds.pathIsResource(p)
+        def prefixedChildPaths(pfx: ResourcePath) = ds.prefixedChildPaths(pfx)
+      }
+    }
 }

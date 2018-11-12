@@ -30,6 +30,9 @@ trait QueryEvaluator[F[_], Q, R] {
 }
 
 object QueryEvaluator extends QueryEvaluatorInstances {
+  def apply[F[_], Q, R](f: Q => F[R]): QueryEvaluator[F, Q, R] =
+    new QueryEvaluator[F, Q, R] { def evaluate(q: Q) = f(q) }
+
   /** A `QueryEvaluator` derived from `underlying` by transforming its
     * `evaluate` function.
     */
