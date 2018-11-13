@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers}
 import quasar.api.resource._
 import quasar.connector.ResourceError
-import quasar.contrib.pathy.{ADir, AFile}
+import quasar.contrib.pathy.AFile
 import quasar.contrib.iota.{copkTraverse, copkEqual}
 import quasar.fp.constEqual
 import quasar.qscript._
@@ -60,7 +60,7 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
     "returns NAR for root" >> {
       val query =
         qs.fix.Map(
-          qs.fix.Read[ADir](rootDir),
+          qs.fix.Read[ResourcePath](ResourcePath.Root),
           qs.recFunc.MakeMapS("value", qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "value")))
 
       fqe.evaluate(query).swap.toOption must_= Some(notAResource(ResourcePath.root()))
@@ -69,7 +69,7 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
     "returns PNF when no source" >> {
       val query =
         qs.fix.Map(
-          qs.fix.Read[AFile](rootDir </> dir("foo") </> file("bar")),
+          qs.fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> dir("foo") </> file("bar"))),
           qs.recFunc.MakeMapS("value", qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "value")))
 
       val rp =
@@ -82,8 +82,8 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
       val query =
         qs.fix.Union(
           qs.fix.Unreferenced,
-          qs.free.Read[AFile](rootDir </> dir("abs") </> file("a")),
-          qs.free.Read[AFile](rootDir </> dir("foo") </> file("bar")))
+          qs.free.Read[ResourcePath](ResourcePath.leaf(rootDir </> dir("abs") </> file("a"))),
+          qs.free.Read[ResourcePath](ResourcePath.leaf(rootDir </> dir("foo") </> file("bar"))))
 
       val rp =
         ResourcePath.root() / ResourceName("abs") / ResourceName("a")
@@ -102,8 +102,8 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
         qs.fix.Filter(
           qs.fix.Union(
             qs.fix.Unreferenced,
-            qs.free.Read[AFile](absf),
-            qs.free.Read[AFile](xysf)),
+            qs.free.Read[ResourcePath](ResourcePath.leaf(absf)),
+            qs.free.Read[ResourcePath](ResourcePath.leaf(xysf))),
           qs.recFunc.Gt(
             qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
             qs.recFunc.Now))
@@ -112,42 +112,6 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
         fq.query must beTreeEqual(query)
         fq.sources(absf) must_= Some(Source(ResourcePath.leaf(absf), 1))
         fq.sources(xysf) must_= Some(Source(ResourcePath.leaf(xysf), 2))
-      } getOrElse ko("Unexpected evaluate failure.")
-    }
-
-    "converts any directory paths to files" >> {
-      val absd: ADir =
-        rootDir </> dir("resource") </> dir("abs")
-
-      val absf: AFile =
-        rootDir </> dir("resource") </> file("abs")
-
-      val xysf: AFile =
-        rootDir </> dir("resource") </> file("xys")
-
-      val query =
-        qs.fix.Filter(
-          qs.fix.Union(
-            qs.fix.Unreferenced,
-            qs.free.Read[ADir](absd),
-            qs.free.Read[AFile](xysf)),
-          qs.recFunc.Gt(
-            qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
-            qs.recFunc.Now))
-
-      val expected =
-        qs.fix.Filter(
-          qs.fix.Union(
-            qs.fix.Unreferenced,
-            qs.free.Read[AFile](absf),
-            qs.free.Read[AFile](xysf)),
-          qs.recFunc.Gt(
-            qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
-            qs.recFunc.Now))
-
-      fqe.evaluate(query) map { fq =>
-        fq.query must beTreeEqual(expected)
-        fq.sources(absf) must_= Some(Source(ResourcePath.leaf(absf), 1))
       } getOrElse ko("Unexpected evaluate failure.")
     }
   }

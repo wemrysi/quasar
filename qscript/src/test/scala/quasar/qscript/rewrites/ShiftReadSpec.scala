@@ -19,7 +19,7 @@ package quasar.qscript.rewrites
 import slamdata.Predef.{List, Nil}
 
 import quasar.{IdStatus, TreeMatchers}
-import quasar.contrib.pathy.AFile
+import quasar.api.resource.ResourcePath
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.qscript._
@@ -37,11 +37,11 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
 
   "shiftRead" should {
     "eliminate Read nodes from a simple query" in {
-      val sampleFile = rootDir </> file("bar")
+      val sampleFile = ResourcePath.leaf(rootDir </> file("bar"))
 
       val qScript: Fix[QS] =
         chainQS(
-          qsdsl.fix.Read[AFile](sampleFile),
+          qsdsl.fix.Read[ResourcePath](sampleFile),
           qsdsl.fix.LeftShift(_, qsdsl.recFunc.Hole, ExcludeId, ShiftType.Array, OnUndefined.Omit, qsdsl.func.RightSide))
 
       val newQScript: Fix[QST] =
@@ -52,14 +52,14 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
       newQScript must
         beTreeEqual(
           qstdsl.fix.Map(
-            qstdsl.fix.ShiftedRead[AFile](sampleFile, IncludeId),
+            qstdsl.fix.ShiftedRead[ResourcePath](sampleFile, IncludeId),
             qstdsl.recFunc.ProjectIndexI(qstdsl.recFunc.Hole, 1)))
     }
 
     "shift a simple aggregated read" in {
       val qScript: Fix[QS] = qsdsl.fix.Reduce(
         qsdsl.fix.LeftShift(
-          qsdsl.fix.Read[AFile](rootDir </> dir("foo") </> file("bar")),
+          qsdsl.fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> dir("foo") </> file("bar"))),
           qsdsl.recFunc.Hole,
           ExcludeId,
           ShiftType.Array,
@@ -77,7 +77,9 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
       newQScript must
         beTreeEqual(
           qstdsl.fix.Reduce(
-            qstdsl.fix.ShiftedRead[AFile](rootDir </> dir("foo") </> file("bar"), IncludeId),
+            qstdsl.fix.ShiftedRead[ResourcePath](
+              ResourcePath.leaf(rootDir </> dir("foo") </> file("bar")),
+              IncludeId),
             Nil,
             List(ReduceFuncs.Count(qstdsl.func.ProjectIndexI(qstdsl.func.Hole, 1))),
             qstdsl.func.MakeMapS("0", qstdsl.func.ReduceIndex(0.right))))

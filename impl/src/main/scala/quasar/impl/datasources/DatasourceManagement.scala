@@ -53,7 +53,6 @@ import cats.effect.concurrent.Ref
 import fs2.{Chunk, Stream}
 import fs2.concurrent.{Signal, SignallingRef}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import pathy.Path
 import qdata.{QData, QDataEncode}
 import qdata.tectonic.QDataPlate
 import scalaz.{EitherT, IMap, ISet, Monad, OptionT, Order, Scalaz, \/}, Scalaz._
@@ -156,8 +155,7 @@ final class DatasourceManagement[
       dsl.Subset(
         dsl.Unreferenced,
         freeDsl.LeftShift(
-          Path.refineType(path.toPath)
-            .fold(freeDsl.Read(_), freeDsl.Read(_)),
+          freeDsl.Read(path),
           recFunc.Hole,
           IdStatus.ExcludeId,
           ShiftType.Map,

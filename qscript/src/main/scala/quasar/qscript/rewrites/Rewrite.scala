@@ -19,8 +19,8 @@ package quasar.qscript.rewrites
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
 import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
+import quasar.api.resource.ResourcePath
 import quasar.contrib.matryoshka._
-import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski._
@@ -66,47 +66,28 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   def shiftRead[F[_]: Functor, G[a] <: ACopK[a]: Traverse]
     (implicit QC: QScriptCore :<<: G,
               TJ: ThetaJoin :<<: G,
-              SD: Const[ShiftedRead[ADir], ?] :<<: G,
-              SF: Const[ShiftedRead[AFile], ?] :<<: G,
+              SD: Const[ShiftedRead[ResourcePath], ?] :<<: G,
               S: ShiftRead.Aux[T, F, G],
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
       : T[F] => T[G] = {
     _.codyna[G, T[G]](
       normalizeTJ[G] >>>
-      repeatedly(C.coalesceSRNormalize[G, ADir](idPrism)) >>>
-      repeatedly(C.coalesceSRNormalize[G, AFile](idPrism)) >>>
+      repeatedly(C.coalesceSRNormalize[G, ResourcePath](idPrism)) >>>
       (_.embed),
       ((_: T[F]).project) >>> (S.shiftRead[G](idPrism.reverseGet)(_)))
   }
 
-  def shiftReadDir[F[_]: Functor, G[a] <: ACopK[a]: Traverse](
-    implicit
-    QC: QScriptCore :<<: G,
-    TJ: ThetaJoin :<<: G,
-    SD: Const[ShiftedRead[ADir], ?] :<<: G,
-    S: ShiftReadDir.Aux[T, F, G],
-    C: Coalesce.Aux[T, G, G],
-    N: Normalizable[G]
-  ): T[F] => T[G] =
-    _.codyna[G, T[G]](
-      normalizeTJ[G] >>>
-      repeatedly(C.coalesceSRNormalize[G, ADir](idPrism)) >>>
-      (_.embed),
-      ((_: T[F]).project) >>> (S.shiftReadDir[G](idPrism.reverseGet)(_)))
-
   def simplifyJoinOnShiftRead[F[_]: Functor, G[a] <: ACopK[a]: Traverse, H[_]: Functor]
     (implicit QC: QScriptCore :<<: G,
               TJ: ThetaJoin :<<: G,
-              SD: Const[ShiftedRead[ADir], ?] :<<: G,
-              SF: Const[ShiftedRead[AFile], ?] :<<: G,
+              SF: Const[ShiftedRead[ResourcePath], ?] :<<: G,
               S: ShiftRead.Aux[T, F, G],
               J: SimplifyJoin.Aux[T, G, H],
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
       : T[F] => T[H] =
     shiftRead[F, G].apply(_).transCata[T[H]](J.simplifyJoin[J.G](idPrism.reverseGet))
-
 
   // TODO: These optimizations should give rise to various property tests:
   //       • elideNopMap ⇒ no `Map(???, HoleF)`

@@ -18,10 +18,8 @@ package quasar.qscript
 
 import slamdata.Predef.List
 import quasar.{ParseInstruction, RenderTree}
-import quasar.contrib.pathy.APath
 
 import monocle.macros.Lenses
-import pathy.Path.posixCodec
 import scalaz.{Equal, Show}
 import scalaz.std.list._
 import scalaz.std.tuple._
@@ -37,11 +35,11 @@ object InterpretedRead {
   implicit def equal[A: Equal]: Equal[InterpretedRead[A]] =
     Equal.equalBy(r => (r.path, r.instructions))
 
-  implicit def show[A <: APath]: Show[InterpretedRead[A]] =
+  implicit def show[A: Show]: Show[InterpretedRead[A]] =
     RenderTree.toShow
 
-  implicit def renderTree[A <: APath]: RenderTree[InterpretedRead[A]] =
+  implicit def renderTree[A: Show]: RenderTree[InterpretedRead[A]] =
     RenderTree.simple(
       List("InterpretedRead"),
-      r => (posixCodec.printPath(r.path) + ", " + r.instructions.shows).some)
+      r => (r.path.shows + ", " + r.instructions.shows).some)
 }

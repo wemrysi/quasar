@@ -17,9 +17,9 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.api.resource.ResourcePath
 import quasar.contrib.iota._
 import quasar.contrib.iota.SubInject
-import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp._
 
@@ -74,11 +74,9 @@ package object qscript {
      ::: ProjectBucket[T, ?]
      ::: ThetaJoin[T, ?]
      ::: EquiJoin[T, ?]
-     ::: Const[ShiftedRead[ADir], ?]
-     ::: Const[ShiftedRead[AFile], ?]
-     ::: Const[InterpretedRead[AFile], ?]
-     ::: Const[Read[ADir], ?]
-     ::: Const[Read[AFile], ?]
+     ::: Const[ShiftedRead[ResourcePath], ?]
+     ::: Const[InterpretedRead[ResourcePath], ?]
+     ::: Const[Read[ResourcePath], ?]
      ::: Const[DeadEnd, ?]
      ::: TNilK, A]
 
@@ -91,9 +89,8 @@ package object qscript {
   }
 
   /** Initial QScript. */
-  // FIXME should not include `Read[ADir]`
   type QScriptEducated[T[_[_]], A] =
-    CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[Read[ADir], ?] ::: Const[Read[AFile], ?] ::: TNilK, A]
+    CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[Read[ResourcePath], ?] ::: TNilK, A]
 
   def educatedToTotal[T[_[_]]]: Injectable[QScriptEducated[T, ?], QScriptTotal[T, ?]] =
     SubInject[QScriptEducated[T, ?], QScriptTotal[T, ?]]
@@ -111,7 +108,7 @@ package object qscript {
     * NB: Once QScriptTotal goes away, this could become parametric in the path type.
     */
   type QScriptRead[T[_[_]], A] =
-    CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[Read[ADir], ?] ::: Const[Read[AFile], ?] ::: TNilK, A]
+    CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[Read[ResourcePath], ?] ::: TNilK, A]
 
   implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable[QScriptRead[T, ?], QScriptTotal[T, ?]] =
     SubInject[QScriptRead[T, ?], QScriptTotal[T, ?]]
@@ -121,7 +118,7 @@ package object qscript {
     * NB: Once QScriptTotal goes away, this could become parametric in the path type.
     */
   type QScriptShiftRead[T[_[_]], A] =
-    CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[ShiftedRead[ADir], ?] ::: Const[ShiftedRead[AFile], ?] ::: TNilK, A]
+    CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[ShiftedRead[ResourcePath], ?] ::: TNilK, A]
 
   implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]: Injectable[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
     SubInject[QScriptShiftRead[T, ?], QScriptTotal[T, ?]]

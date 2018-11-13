@@ -21,9 +21,9 @@ import slamdata.Predef.{Map => SMap, _}
 import quasar.{ParseType, Qspec}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.ParseInstruction.{Mask, Pivot, Wrap}
+import quasar.api.resource.ResourcePath
 import quasar.common.CPath
 import quasar.contrib.iota._
-import quasar.contrib.pathy._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.qscript._
@@ -39,9 +39,9 @@ import scalaz.std.option._
 object RewritePushdownSpec extends Qspec {
 
   type QSBase =
-    QScriptCore[Fix, ?]          :::
-    EquiJoin[Fix, ?]             :::
-    Const[ShiftedRead[AFile], ?] :::
+    QScriptCore[Fix, ?] :::
+    EquiJoin[Fix, ?] :::
+    Const[ShiftedRead[ResourcePath], ?] :::
     TNilK
 
   // initial QScript
@@ -55,7 +55,7 @@ object RewritePushdownSpec extends Qspec {
   val recFunc = qsDsl.recFunc
 
   // initial QScript with InterpretedRead
-  type QSExtra[A] = CopK[Const[InterpretedRead[AFile], ?] ::: QSBase, A]
+  type QSExtra[A] = CopK[Const[InterpretedRead[ResourcePath], ?] ::: QSBase, A]
 
   implicit val QSExtra: Injectable[QSExtra, QScriptTotal[Fix, ?]] =
     SubInject[QSExtra, QScriptTotal[Fix, ?]]
@@ -199,16 +199,18 @@ object RewritePushdownSpec extends Qspec {
   "InterpretedRead rewrite" >> {
 
     val rewriteLeftShiftFunc: QSExtra[Fix[QSExtra]] => QSExtra[Fix[QSExtra]] =
-      liftFG[QScriptCore[Fix, ?], QSExtra, Fix[QSExtra]](pushdown.rewriteLeftShift[QSExtra, AFile])
+      liftFG[QScriptCore[Fix, ?], QSExtra, Fix[QSExtra]](pushdown.rewriteLeftShift[QSExtra, ResourcePath])
 
     def rewriteLeftShift(expr: Fix[QSExtra]): Fix[QSExtra] =
       expr.transCata[Fix[QSExtra]](rewriteLeftShiftFunc)
+
+    val path = ResourcePath.leaf(rootDir </> file("foo"))
 
     "rewrite when the read is shifted at the top-level and only the shifted values are referenced" >> {
       "with IncludeId" >> {
         val initial: Fix[QSExtra] =
           fixE.LeftShift(
-            fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+            fixE.ShiftedRead[ResourcePath](path, ExcludeId),
             recFuncE.Hole,
             IncludeId, // IncludeId
             ShiftType.Map,
@@ -219,8 +221,8 @@ object RewritePushdownSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.InterpretedRead[AFile](
-              rootDir </> file("foo"),
+            fixE.InterpretedRead[ResourcePath](
+              path,
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
@@ -237,7 +239,7 @@ object RewritePushdownSpec extends Qspec {
       "with IdOnly" >> {
         val initial: Fix[QSExtra] =
           fixE.LeftShift(
-            fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+            fixE.ShiftedRead[ResourcePath](path, ExcludeId),
             recFuncE.Hole,
             IdOnly, // IdOnly
             ShiftType.Map,
@@ -246,8 +248,8 @@ object RewritePushdownSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.InterpretedRead[AFile](
-              rootDir </> file("foo"),
+            fixE.InterpretedRead[ResourcePath](
+              path,
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
@@ -261,7 +263,7 @@ object RewritePushdownSpec extends Qspec {
       "with ExcludeId" >> {
         val initial: Fix[QSExtra] =
           fixE.LeftShift(
-            fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+            fixE.ShiftedRead[ResourcePath](path, ExcludeId),
             recFuncE.Hole,
             ExcludeId, // ExcludeId
             ShiftType.Map,
@@ -270,8 +272,8 @@ object RewritePushdownSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.InterpretedRead[AFile](
-              rootDir </> file("foo"),
+            fixE.InterpretedRead[ResourcePath](
+              path,
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
@@ -287,7 +289,7 @@ object RewritePushdownSpec extends Qspec {
       val initial: Fix[QSExtra] =
         fixE.Filter(
           fixE.LeftShift(
-            fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+            fixE.ShiftedRead[ResourcePath](path, ExcludeId),
             recFuncE.Hole,
             ExcludeId, // ExcludeId
             ShiftType.Map,
@@ -298,8 +300,8 @@ object RewritePushdownSpec extends Qspec {
       val expected: Fix[QSExtra] =
         fixE.Filter(
           fixE.Map(
-            fixE.InterpretedRead[AFile](
-              rootDir </> file("foo"),
+            fixE.InterpretedRead[ResourcePath](
+              path,
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
@@ -314,7 +316,7 @@ object RewritePushdownSpec extends Qspec {
     "rewrite when the shift source is a single object projection" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
           recFuncE.ProjectKeyS(recFunc.Hole, "xyz"), // shift source is a single projection
           IncludeId,
           ShiftType.Map,
@@ -325,8 +327,8 @@ object RewritePushdownSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.InterpretedRead[AFile](
-              rootDir </> file("foo"),
+            fixE.InterpretedRead[ResourcePath](
+              path,
               List(
                 Mask(SMap((CPath.parse(".xyz"), Set(ParseType.Object)))),
                 Wrap(CPath.parse(".xyz"), ShiftedKey),
@@ -351,7 +353,7 @@ object RewritePushdownSpec extends Qspec {
     "rewrite when the shift source is three object projections" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
           recFuncE.ProjectKeyS( // shift source is three projections
             recFuncE.ProjectKeyS(
               recFuncE.ProjectKeyS(recFunc.Hole,
@@ -367,8 +369,8 @@ object RewritePushdownSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.InterpretedRead[AFile](
-              rootDir </> file("foo"),
+            fixE.InterpretedRead[ResourcePath](
+              path,
               List(
                 Mask(SMap((CPath.parse(".aaa.bbb.ccc"), Set(ParseType.Object)))),
                 Wrap(CPath.parse(".aaa.bbb.ccc"), ShiftedKey),
@@ -394,7 +396,7 @@ object RewritePushdownSpec extends Qspec {
     "rewrite when the shift struct contains static array and object projections" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
           recFuncE.ProjectKeyS(
             recFuncE.ProjectIndexI( // shift source contains an array projection
               recFuncE.ProjectKeyS(recFunc.Hole,
@@ -410,8 +412,8 @@ object RewritePushdownSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.InterpretedRead[AFile](
-              rootDir </> file("foo"),
+            fixE.InterpretedRead[ResourcePath](
+              path,
               List(
                 Mask(SMap((CPath.parse(".aaa[42].ccc"), Set(ParseType.Object)))),
                 Wrap(CPath.parse(".aaa[0].ccc"), ShiftedKey),
@@ -436,7 +438,7 @@ object RewritePushdownSpec extends Qspec {
     "rewrite when the shift struct contains two static array projections" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
           recFuncE.ProjectKeyS(
             recFuncE.ProjectIndexI( // shift source contains an array projection
               recFuncE.ProjectIndexI(recFunc.Hole,
@@ -452,8 +454,8 @@ object RewritePushdownSpec extends Qspec {
 
         val expected: Fix[QSExtra] =
           fixE.Map(
-            fixE.InterpretedRead[AFile](
-              rootDir </> file("foo"),
+            fixE.InterpretedRead[ResourcePath](
+              path,
               List(
                 Mask(SMap((CPath.parse("[17][42].ccc"), Set(ParseType.Object)))),
                 Wrap(CPath.parse("[0][0].ccc"), ShiftedKey),
@@ -480,7 +482,7 @@ object RewritePushdownSpec extends Qspec {
     "not rewrite when the shift struct is not a projection and not Hole" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
           recFuncE.ProjectKeyS(
             recFuncE.MakeMapS( // shift source is not a projection
               "i am a key",
@@ -499,7 +501,7 @@ object RewritePushdownSpec extends Qspec {
     "not rewrite when the non-shifted data is referenced (via LeftSide)" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
           recFunc.Hole,
           IncludeId,
           ShiftType.Map,
@@ -514,7 +516,7 @@ object RewritePushdownSpec extends Qspec {
     "not rewrite when the ShiftedRead has IncludeId" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[AFile](rootDir </> file("foo"), IncludeId), // IncludeId
+          fixE.ShiftedRead[ResourcePath](path, IncludeId), // IncludeId
           recFunc.Hole,
           IncludeId,
           ShiftType.Map,
@@ -527,7 +529,7 @@ object RewritePushdownSpec extends Qspec {
     "not rewrite when the ShiftedRead has IdOnly" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[AFile](rootDir </> file("foo"), IdOnly), // IdOnly
+          fixE.ShiftedRead[ResourcePath](path, IdOnly), // IdOnly
           recFunc.Hole,
           IncludeId,
           ShiftType.Map,
@@ -540,7 +542,7 @@ object RewritePushdownSpec extends Qspec {
     "not rewrite when the shift struct is a (nonsensical) constant" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
           recFuncE.Constant(ejs.str("string!")), // constant string
           IncludeId,
           ShiftType.Map,
@@ -561,9 +563,11 @@ object RewritePushdownSpec extends Qspec {
     def elideNoopMap(expr: Fix[QS]): Fix[QS] =
       expr.transCata[Fix[QS]](elideNoopMapFunc)
 
+    val path = ResourcePath.leaf(rootDir </> file("foo"))
+
     "elide outer no-op Map" >> {
       val src: Fix[QS] =
-        fix.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId)
+        fix.ShiftedRead[ResourcePath](path, ExcludeId)
 
       elideNoopMap(fix.Map(src, recFunc.Hole)) must equal(src)
     }
@@ -571,7 +575,7 @@ object RewritePushdownSpec extends Qspec {
     "elide nested no-op Map" >> {
       val src: Fix[QS] =
         fix.Map(
-          fix.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          fix.ShiftedRead[ResourcePath](path, ExcludeId),
           recFunc.ProjectKeyS(recFunc.Hole, "bar"))
 
       val qs: Fix[QS] =
@@ -589,7 +593,7 @@ object RewritePushdownSpec extends Qspec {
 
     "elide double no-op Map" >> {
       val src: Fix[QS] =
-        fix.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId)
+        fix.ShiftedRead[ResourcePath](path, ExcludeId)
 
       elideNoopMap(fix.Map(fix.Map(src, recFunc.Hole), recFunc.Hole)) must equal(src)
     }

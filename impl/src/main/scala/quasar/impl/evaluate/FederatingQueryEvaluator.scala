@@ -27,7 +27,6 @@ import quasar.fp.PrismNT
 import quasar.qscript.{Read => QRead, _}
 
 import matryoshka._
-import pathy.Path.refineType
 import scalaz._, Scalaz._
 import iotaz.CopK
 
@@ -61,47 +60,37 @@ final class FederatingQueryEvaluator[
   private type SrcsT[X[_], A] = WriterT[X, DList[(AFile, Source[S])], A]
   private type M[A] = SrcsT[F, A]
 
-  private val IRD = CopK.Inject[Const[QRead[ADir], ?], QScriptEducated[T, ?]]
-  private val IRF = CopK.Inject[Const[QRead[AFile], ?], QScriptEducated[T, ?]]
+  private val QR = CopK.Inject[Const[QRead[ResourcePath], ?], QScriptEducated[T, ?]]
 
-  private val ReadPath: PrismNT[QScriptEducated[T, ?], Const[QRead[APath], ?]] =
-    PrismNT[QScriptEducated[T, ?], Const[QRead[APath], ?]](
-      λ[QScriptEducated[T, ?] ~> (Option ∘ Const[QRead[APath], ?])#λ](qr =>
-        IRD.prj(qr).map(_.getConst.path)
-          .orElse(IRF.prj(qr).map(_.getConst.path))
-          .map(p => Const(QRead(p)))),
+  private val ReadPath: PrismNT[QScriptEducated[T, ?], Const[QRead[ResourcePath], ?]] =
+    PrismNT[QScriptEducated[T, ?], Const[QRead[ResourcePath], ?]](
+      λ[QScriptEducated[T, ?] ~> (Option ∘ Const[QRead[ResourcePath], ?])#λ](
+        qr => QR.prj(qr)),
 
-      λ[Const[QRead[APath], ?] ~> QScriptEducated[T, ?]](rp =>
-        refineType(rp.getConst.path).fold(
-          d => IRD.inj(Const(QRead(d))),
-          f => IRF.inj(Const(QRead(f))))))
+      λ[Const[QRead[ResourcePath], ?] ~> QScriptEducated[T, ?]](
+        rp => QR.inj(rp)))
 
   // Record all sources in the query, erroring unless all are known.
-  private val federate: Trans[Const[QRead[APath], ?], M] =
-    new Trans[Const[QRead[APath], ?], M] {
+  private val federate: Trans[Const[QRead[ResourcePath], ?], M] =
+    new Trans[Const[QRead[ResourcePath], ?], M] {
       def trans[U, G[_]: Functor]
-          (GtoF: PrismNT[G, Const[QRead[APath], ?]])
+          (GtoF: PrismNT[G, Const[QRead[ResourcePath], ?]])
           (implicit UC: Corecursive.Aux[U, G], UR: Recursive.Aux[U, G])
-          : Const[QRead[APath], U] => M[G[U]] = {
+          : Const[QRead[ResourcePath], U] => M[G[U]] = {
 
-        case Const(QRead(p)) =>
-          val file =
-            ResourcePath.leaf.getOption(ResourcePath.fromPath(p)) match {
-              case Some(f) =>
-                f.point[M]
-
-              case None =>
-                MonadResourceErr[M].raiseError(
-                  ResourceError.notAResource(ResourcePath.root()))
-            }
+        case Const(QRead(path)) =>
+          val sourceM: M[(AFile, Source[S])] = path match {
+            case ResourcePath.Leaf(file) =>
+              lookupLeaf(file).map(s => (file, s))
+            case root @ ResourcePath.Root =>
+              MonadResourceErr[M].raiseError(
+                ResourceError.notAResource(root))
+          }
 
           for {
-            f <- file
-
-            s <- lookupLeaf(f)
-
-            _ <- MonadTell_[M, DList[(AFile, Source[S])]].tell(DList((f, s)))
-          } yield GtoF(Const(QRead(f)))
+            source <- sourceM
+            _ <- MonadTell_[M, DList[(AFile, Source[S])]].tell(DList(source))
+          } yield GtoF(Const(QRead(path)))
       }
     }
 

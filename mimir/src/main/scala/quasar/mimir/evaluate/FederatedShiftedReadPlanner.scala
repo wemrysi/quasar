@@ -118,8 +118,7 @@ final class FederatedShiftedReadPlanner[
         case QueryAssociate.Heavyweight(f) =>
           val shiftedRead =
             dsl.LeftShift(
-              refineType(source.path.toPath)
-                .fold(dsl.Read(_), dsl.Read(_)),
+              dsl.Read(ResourcePath.leaf(path): ResourcePath),
               recFunc.Hole,
               ExcludeId,
               ShiftType.Map,

@@ -18,10 +18,8 @@ package quasar.qscript
 
 import slamdata.Predef.List
 import quasar.{IdStatus, RenderTree}
-import quasar.contrib.pathy.APath
 
 import monocle.macros.Lenses
-import pathy.Path.posixCodec
 import scalaz.{Equal, Show}
 import scalaz.std.tuple._
 import scalaz.syntax.show._
@@ -38,10 +36,10 @@ object ShiftedRead {
   implicit def equal[A: Equal]: Equal[ShiftedRead[A]] =
     Equal.equalBy((sr => (sr.path, sr.idStatus)))
 
-  implicit def show[A <: APath]: Show[ShiftedRead[A]] = RenderTree.toShow
+  implicit def show[A: Show]: Show[ShiftedRead[A]] = RenderTree.toShow
 
-  implicit def renderTree[A <: APath]: RenderTree[ShiftedRead[A]] =
+  implicit def renderTree[A: Show]: RenderTree[ShiftedRead[A]] =
     RenderTree.simple(List("ShiftedRead"), r => {
-      (posixCodec.printPath(r.path) + ", " + r.idStatus.shows).some
+      (r.path.shows + ", " + r.idStatus.shows).some
     })
 }

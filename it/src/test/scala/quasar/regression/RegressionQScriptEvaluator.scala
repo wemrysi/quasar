@@ -17,10 +17,10 @@
 package quasar.regression
 
 import quasar._
+import quasar.api.resource.ResourcePath
 import quasar.common.PhaseResultTell
 import quasar.connector.QScriptEvaluator
 import quasar.contrib.iota._
-import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.qscript._
 import quasar.qscript.rewrites.{RewritePushdown, Unirewrite}
@@ -49,10 +49,10 @@ final class RegressionQScriptEvaluator[
   type QSRewrite[U[_[_]]] =
     QScriptCore[U, ?]            :::
     EquiJoin[U, ?]               :::
-    Const[ShiftedRead[AFile], ?] :::
+    Const[ShiftedRead[ResourcePath], ?] :::
     TNilK
 
-  type QS[U[_[_]]] = Const[InterpretedRead[AFile], ?] ::: QSRewrite[U]
+  type QS[U[_[_]]] = Const[InterpretedRead[ResourcePath], ?] ::: QSRewrite[U]
 
   type Repr = QScriptCount
 
@@ -83,15 +83,15 @@ final class RegressionQScriptEvaluator[
     implicitly[Unirewrite[T, QSRewrite[T]]]
 
   def optimize: F[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
-    RewritePushdown[T, QSM, QSMRewrite, AFile].point[F]
+    RewritePushdown[T, QSM, QSMRewrite, ResourcePath].point[F]
 
   def execute(repr: Repr): F[QScriptCount] = repr.point[F]
 
   def plan(cp: T[QSM]): F[Repr] = {
     val QScriptCore = CopK.Inject[QScriptCore[T, ?], QSM]
     val EquiJoin = CopK.Inject[EquiJoin[T, ?], QSM]
-    val ShiftedRead = CopK.Inject[Const[ShiftedRead[AFile], ?], QSM]
-    val InterpretedRead = CopK.Inject[Const[InterpretedRead[AFile], ?], QSM]
+    val ShiftedRead = CopK.Inject[Const[ShiftedRead[ResourcePath], ?], QSM]
+    val InterpretedRead = CopK.Inject[Const[InterpretedRead[ResourcePath], ?], QSM]
 
     def count: QSM[QScriptCount] => QScriptCount = {
       case InterpretedRead(_) => QScriptCount.incrementInterpretedRead

@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef._
 import quasar.Qspec
 import quasar.IdStatus.IncludeId
+import quasar.api.resource.ResourcePath
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
@@ -74,13 +75,14 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
   val root = Path.rootDir[Sandboxed]
   val afile: AFile = root </> file("foobar")
+  val path: ResourcePath = ResourcePath.leaf(afile)
 
   "graduating QSU to QScript" should {
 
     "convert the QScript-ish nodes" >> {
       "convert Read" in {
         val qgraph: Fix[QSU] = qsu.read(afile)
-        val qscript: Fix[QSE] = qse.Read[AFile](afile)
+        val qscript: Fix[QSE] = qse.Read[ResourcePath](path)
 
         qgraph must graduateAs(qscript)
       }
@@ -89,7 +91,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
         val fm: RecFreeMap = recFunc.Add(recFunc.Hole, RecIntLit(17))
 
         val qgraph: Fix[QSU] = qsu.map(qsu.read(afile), fm)
-        val qscript: Fix[QSE] = qse.Map(qse.Read[AFile](afile), fm)
+        val qscript: Fix[QSE] = qse.Map(qse.Read[ResourcePath](path), fm)
 
         qgraph must graduateAs(qscript)
       }
@@ -98,7 +100,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
         val fm: RecFreeMap = recFunc.Add(recFunc.Hole, RecIntLit(17))
 
         val qgraph: Fix[QSU] = qsu.qsFilter(qsu.read(afile), fm)
-        val qscript: Fix[QSE] = qse.Filter(qse.Read[AFile](afile), fm)
+        val qscript: Fix[QSE] = qse.Filter(qse.Read[ResourcePath](path), fm)
 
         qgraph must graduateAs(qscript)
       }
@@ -110,7 +112,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
         val repair: FreeMapA[ReduceIndex] = ReduceIndexF(\/-(0))
 
         val qgraph: Fix[QSU] = qsu.qsReduce(qsu.read(afile), abuckets, reducers, repair)
-        val qscript: Fix[QSE] = qse.Reduce(qse.Read[AFile](afile), buckets, reducers, repair)
+        val qscript: Fix[QSE] = qse.Reduce(qse.Read[ResourcePath](path), buckets, reducers, repair)
 
         qgraph must graduateAs(qscript)
       }
@@ -130,7 +132,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
             func.MakeArray(func.RightSide)))
 
         val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, OnUndefined.Omit, arepair, Rotation.ShiftArray)
-        val qscript: Fix[QSE] = qse.LeftShift(qse.Read[AFile](afile), struct, IncludeId, ShiftType.Array, OnUndefined.Omit, repair)
+        val qscript: Fix[QSE] = qse.LeftShift(qse.Read[ResourcePath](path), struct, IncludeId, ShiftType.Array, OnUndefined.Omit, repair)
 
         qgraph must graduateAs(qscript)
       }
@@ -141,7 +143,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
         val order: NEL[(FreeMap, SortDir)] = NEL(HoleF -> SortDir.Descending)
 
         val qgraph: Fix[QSU] = qsu.qsSort(qsu.read(afile), abuckets, order)
-        val qscript: Fix[QSE] = qse.Sort(qse.Read[AFile](afile), buckets, order)
+        val qscript: Fix[QSE] = qse.Sort(qse.Read[ResourcePath](path), buckets, order)
 
         qgraph must graduateAs(qscript)
       }
@@ -151,7 +153,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
         val qscript: Fix[QSE] =
           qse.Reduce(
-            qse.Read[AFile](afile),
+            qse.Read[ResourcePath](path),
             List(HoleF),
             List(ReduceFuncs.Arbitrary(HoleF)),
             ReduceIndexF(\/-(0)))
@@ -206,7 +208,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       val lhs: Free[QSE, Hole] =
         fqse.LeftShift(
-          fqse.Read(root </> file("zips")),
+          fqse.Read(ResourcePath.leaf(root </> file("zips"))),
           recFunc.Hole,
           IncludeId,
           ShiftType.Array,
