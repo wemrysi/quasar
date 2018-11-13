@@ -16,7 +16,7 @@
 
 package quasar.run
 
-import slamdata.Predef.{Exception, Product, Serializable, String, StringContext, Throwable}
+import slamdata.Predef.{Exception, Product, Serializable, Throwable}
 import quasar.api.datasource.DatasourceError.CreateError
 import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
@@ -25,7 +25,10 @@ import quasar.sql.ParsingError
 import quasar.yggdrasil.vfs.{ResourceError => MimirResourceError}
 
 import argonaut.Json
+import argonaut.JsonScalaz._
 import monocle.Prism
+import scalaz.Show
+import scalaz.syntax.show._
 
 sealed abstract trait QuasarError extends Product with Serializable
 
@@ -72,9 +75,18 @@ object QuasarError {
       case QuasarException(qe) => qe
     } (QuasarException(_))
 
+
+  implicit val show: Show[QuasarError] =
+    Show show {
+      case Compiling(e) => e.show
+      case Connecting(e) => e.show
+      case Evaluating(e) => e.show
+      case Parsing(e) => e.show
+      case Planning(e) => e.show
+      case Storing(e) => e.show
+    }
+
   ////
 
-  private final case class QuasarException(qe: QuasarError) extends Exception {
-    override def toString: String = s"QuasarException: $qe"
-  }
+  private final case class QuasarException(qe: QuasarError) extends Exception(qe.shows)
 }
