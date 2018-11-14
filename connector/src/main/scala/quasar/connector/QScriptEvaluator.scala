@@ -16,12 +16,9 @@
 
 package quasar.connector
 
-import slamdata.Predef.Set
 import quasar.{RenderTree, RenderTreeT}
 import quasar.common.PhaseResultTell
 import quasar.common.phase
-import quasar.contrib.pathy._
-import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.rewrites._
 import quasar.contrib.iota._
@@ -69,9 +66,7 @@ abstract class QScriptEvaluator[
 
   def evaluate(qsr: T[QScriptEducated[T, ?]]): F[R] =
     for {
-      rewritten <- Unirewrite[T, QSRewrite[T], F](
-        new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
-
+      rewritten <- Unirewrite[T, QSRewrite[T], F](new Rewrite[T]).apply(qsr)
       _ <- phase[F][T[QSMRewrite]]("QScript (Rewritten)", rewritten)
 
       optimized <- optimize

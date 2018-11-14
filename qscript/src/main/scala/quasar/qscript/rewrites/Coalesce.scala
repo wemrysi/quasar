@@ -19,7 +19,7 @@ package quasar.qscript.rewrites
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
 import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
-import quasar.contrib.pathy.{ADir, AFile}
+import quasar.api.resource.ResourcePath
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
 import quasar.fp._
@@ -258,7 +258,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
     def freeSR0[A](b: FreeQS)(implicit SR: Const[ShiftedRead[A], ?] :<<: QScriptTotal): FreeQS =
       freeTotal(b)(CoalesceTotal.coalesceSRNormalize[CoEnvQS, A](coenvPrism[QScriptTotal, Hole]))
 
-    freeSR0[AFile](freeSR0[ADir](branch))
+    freeSR0[ResourcePath](branch)
   }
 
   private def freeEJ(branch: FreeQS): FreeQS =

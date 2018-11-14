@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import quasar.{Qspec, RenderTree}, RenderTree.ops._
 import quasar.IdStatus.ExcludeId
+import quasar.api.resource.ResourcePath
 import quasar.common.PhaseResults
 import quasar.common.data.Data
 import quasar.contrib.matryoshka._
@@ -78,7 +79,7 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
       val lp = read("foo")
 
       val expected = qs.LeftShift(
-        qs.Read(afoo),
+        qs.Read(ResourcePath.leaf(afoo)),
         recFunc.Hole,
         ExcludeId,
         ShiftType.Map,
@@ -97,7 +98,7 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
 
       val expected = qs.Reduce(
         qs.LeftShift(
-          qs.Read(afoo),
+          qs.Read(ResourcePath.leaf(afoo)),
           recFunc.Hole,
           ExcludeId,
           ShiftType.Map,

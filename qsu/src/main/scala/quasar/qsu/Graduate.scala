@@ -18,9 +18,9 @@ package quasar.qsu
 
 import slamdata.Predef._
 
+import quasar.api.resource.ResourcePath
 import quasar.common.effect.NameGenerator
 import quasar.common.JoinType
-import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.MonadReader_
 import quasar.ejson.EJson
 import quasar.fp._
@@ -177,7 +177,8 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
 
       qsu match {
         case QSU.Read(path) =>
-          CopK.Inject[Const[Read[AFile], ?], QSE].inj(Const(Read(path))).point[F]
+          CopK.Inject[Const[Read[ResourcePath], ?], QSE].inj(
+            Const(Read(ResourcePath.leaf(path)))).point[F]
 
         case QSU.Map(source, fm) =>
           QCE(Map[T, QSUGraph](source, fm)).point[F]

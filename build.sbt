@@ -242,7 +242,9 @@ lazy val sql = project
 
 lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
-  .dependsOn(frontend % BothScopes)
+  .dependsOn(
+    frontend % BothScopes,
+    api)
   .settings(commonSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
@@ -264,7 +266,6 @@ lazy val qsu = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
-    api,
     foundation % "test->test",
     qscript)
   .settings(commonSettings)

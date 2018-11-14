@@ -18,11 +18,10 @@ package quasar.qscript
 
 import slamdata.Predef.List
 import quasar.RenderTree
-import quasar.contrib.pathy.APath
 
 import monocle.macros.Lenses
-import pathy.Path.posixCodec
 import scalaz.{Equal, Show}
+import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 
 /** A backend-resolved `Root`, which is now a path. */
@@ -31,8 +30,8 @@ import scalaz.syntax.std.option._
 object Read {
   implicit def equal[A: Equal]: Equal[Read[A]] = Equal.equalBy(_.path)
 
-  implicit def show[A <: APath]: Show[Read[A]] = RenderTree.toShow
+  implicit def show[A: Show]: Show[Read[A]] = RenderTree.toShow
 
-  implicit def renderTree[A <: APath]: RenderTree[Read[A]] =
-    RenderTree.simple(List("Read"), r => posixCodec.printPath(r.path).some)
+  implicit def renderTree[A: Show]: RenderTree[Read[A]] =
+    RenderTree.simple(List("Read"), _.path.shows.some)
 }

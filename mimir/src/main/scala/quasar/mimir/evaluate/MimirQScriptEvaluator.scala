@@ -17,6 +17,7 @@
 package quasar.mimir.evaluate
 
 import quasar._
+import quasar.api.resource.ResourcePath
 import quasar.common.PhaseResultTell
 import quasar.connector.QScriptEvaluator
 import quasar.contrib.cats.effect.liftio._
@@ -60,10 +61,10 @@ final class MimirQScriptEvaluator[
   type QSRewrite[U[_[_]]] =
     QScriptCore[U, ?]            :::
     EquiJoin[U, ?]               :::
-    Const[ShiftedRead[AFile], ?] :::
+    Const[ShiftedRead[ResourcePath], ?] :::
     TNilK
 
-  type QS[U[_[_]]] = Const[InterpretedRead[AFile], ?] ::: QSRewrite[U]
+  type QS[U[_[_]]] = Const[InterpretedRead[ResourcePath], ?] ::: QSRewrite[U]
 
   type Repr = MimirRepr
 
@@ -96,7 +97,7 @@ final class MimirQScriptEvaluator[
   def optimize: M[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
     Kleisli.ask[F, EvaluatorConfig[T, IO]] map {
       _.pushdown match {
-        case Pushdown.EnablePushdown => RewritePushdown[T, QSM, QSMRewrite, AFile]
+        case Pushdown.EnablePushdown => RewritePushdown[T, QSM, QSMRewrite, ResourcePath]
         case Pushdown.DisablePushdown => QSMRewriteToQSM.inject(_)  // no-op
       }
     }
@@ -116,28 +117,68 @@ final class MimirQScriptEvaluator[
       new FederatedShiftedReadPlanner[T, F](cake)
 
     lazy val planQST: AlgebraM[M, QScriptTotal[T, ?], Repr] = {
-      val QScriptCore = CopK.Inject[QScriptCore[T, ?],            QScriptTotal[T, ?]]
-      val EquiJoin    = CopK.Inject[EquiJoin[T, ?],               QScriptTotal[T, ?]]
-      val ShiftedRead = CopK.Inject[Const[ShiftedRead[AFile], ?], QScriptTotal[T, ?]]
+      val QScriptCore = CopK.Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
+      val EquiJoin = CopK.Inject[EquiJoin[T, ?], QScriptTotal[T, ?]]
+      val ShiftedRead = CopK.Inject[Const[ShiftedRead[ResourcePath], ?], QScriptTotal[T, ?]]
+
       _ match {
-        case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
-        case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(value.left)
+        case QScriptCore(value) =>
+          qScriptCorePlanner.plan(planQST)(value)
+
+        case EquiJoin(value) =>
+          equiJoinPlanner.plan(planQST)(value)
+
+        case ShiftedRead(value) =>
+          val sr = value.getConst
+
+          sr.path match {
+            case ResourcePath.Leaf(file) =>
+              shiftedReadPlanner.plan(Const(
+                quasar.qscript.ShiftedRead[AFile](file, sr.idStatus)).left)
+            case ResourcePath.Root =>
+              errorImpossible
+          }
+
         case _ => errorImpossible
       }
     }
 
     def planQSM(in: QSM[Repr]): M[Repr] = {
-      val QScriptCore = CopK.Inject[QScriptCore[T, ?],            QSM]
-      val EquiJoin    = CopK.Inject[EquiJoin[T, ?],               QSM]
-      val ShiftedRead = CopK.Inject[Const[ShiftedRead[AFile], ?], QSM]
-      val InterpretedRead = CopK.Inject[Const[InterpretedRead[AFile], ?], QSM]
+      val QScriptCore = CopK.Inject[QScriptCore[T, ?], QSM]
+      val EquiJoin = CopK.Inject[EquiJoin[T, ?], QSM]
+      val ShiftedRead = CopK.Inject[Const[ShiftedRead[ResourcePath], ?], QSM]
+      val InterpretedRead = CopK.Inject[Const[InterpretedRead[ResourcePath], ?], QSM]
 
       in match {
-        case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
-        case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(value.left)
-        case InterpretedRead(value) => shiftedReadPlanner.plan(value.right)
+        case QScriptCore(value) =>
+          qScriptCorePlanner.plan(planQST)(value)
+
+        case EquiJoin(value) =>
+          equiJoinPlanner.plan(planQST)(value)
+
+        case ShiftedRead(value) =>
+          val sr = value.getConst
+
+          sr.path match {
+            case ResourcePath.Leaf(file) =>
+              shiftedReadPlanner.plan(Const(
+                quasar.qscript.ShiftedRead[AFile](file, sr.idStatus)).left)
+            case ResourcePath.Root =>
+              errorImpossible
+          }
+
+        case InterpretedRead(value) =>
+          val ir = value.getConst
+
+          ir.path match {
+            case ResourcePath.Leaf(file) =>
+              shiftedReadPlanner.plan(Const(
+                quasar.qscript.InterpretedRead[AFile](file, ir.instructions)).right)
+            case ResourcePath.Root =>
+              errorImpossible
+          }
+
+        case _ => errorImpossible
       }
     }
 
