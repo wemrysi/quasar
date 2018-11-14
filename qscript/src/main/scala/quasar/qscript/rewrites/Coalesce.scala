@@ -19,7 +19,6 @@ package quasar.qscript.rewrites
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
 import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
-import quasar.api.resource.ResourcePath
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
 import quasar.fp._
@@ -54,20 +53,6 @@ trait Coalesce[IN[_]] {
     (implicit QC: QScriptCore[IT, ?] :<<: OUT, N: Normalizable[IN])
       : IN[IT[F]] => Option[IN[IT[F]]] =
     applyTransforms(coalesceQC[F](FToOut), N.normalizeF(_: IN[IT[F]]))
-
-  /** Coalesce for types containing ShiftedRead.
-   *  We don't coalesce InterpretedRead.
-   */
-  protected[qscript] def coalesceSR[F[_]: Functor, A]
-    (FToOut: PrismNT[F, OUT])
-    (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT)
-      : IN[IT[F]] => Option[IN[IT[F]]]
-
-  def coalesceSRNormalize[F[_]: Functor, A]
-    (FToOut: PrismNT[F, OUT])
-    (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT, N: Normalizable[IN])
-      : IN[IT[F]] => Option[IN[IT[F]]] =
-    applyTransforms(coalesceSR[F, A](FToOut), N.normalizeF(_: IN[IT[F]]))
 
   /** Coalesce for types containing EquiJoin. */
   protected[qscript] def coalesceEJ[F[_]: Functor]
@@ -141,11 +126,6 @@ trait CoalesceInstances {
             case I(ca) => C.coalesceQC(FToOut).apply(ca).map(I(_))
           }
 
-          def coalesceSR[F[_]: Functor, A](FToOut: PrismNT[F, OUT])
-            (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT) = {
-            case I(ca) => C.coalesceSR(FToOut).apply(ca).map(I(_))
-          }
-
           def coalesceEJ[F[_]: Functor](FToOut: F ~> λ[α => Option[OUT[α]]])(implicit EJ: EquiJoin[IT, ?] :<<: OUT) = {
             case I(ca) => C.coalesceEJ(FToOut).apply(ca)
           }
@@ -175,13 +155,6 @@ trait CoalesceInstances {
               .apply(other.asInstanceOf[CopK[LL, T[F]]]).asInstanceOf[Option[CopK[C ::: LL, T[F]]]]
           }
 
-          def coalesceSR[F[_]: Functor, A](FToOut: PrismNT[F, OUT])
-            (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT) = {
-            case I(ca) => C.coalesceSR(FToOut).apply(ca).map(I(_))
-            case other => LL.materialize(offset + 1).coalesceSR(FToOut)
-              .apply(other.asInstanceOf[CopK[LL, T[F]]]).asInstanceOf[Option[CopK[C ::: LL, T[F]]]]
-          }
-
           def coalesceEJ[F[_]: Functor](FToOut: F ~> λ[α => Option[OUT[α]]])(implicit EJ: EquiJoin[IT, ?] :<<: OUT) = {
             case I(ca) => C.coalesceEJ(FToOut).apply(ca)
             case other => LL.materialize(offset + 1).coalesceEJ(FToOut).apply(other.asInstanceOf[CopK[LL, T[F]]])
@@ -206,11 +179,6 @@ trait CoalesceInstances {
         (implicit QC: QScriptCore[IT, ?] :<<: OUT) =
         κ(None)
 
-      def coalesceSR[F[_]: Functor, A]
-        (FToOut: PrismNT[F, OUT])
-        (implicit QC: QScriptCore[IT, ?] :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT) =
-        κ(None)
-
       def coalesceEJ[F[_]: Functor]
         (FToOut: F ~> λ[α => Option[OUT[α]]])
         (implicit EJ: EquiJoin[IT, ?] :<<: OUT) =
@@ -228,10 +196,7 @@ trait CoalesceInstances {
   implicit def read[T[_[_]], OUT[a] <: ACopK[a], A]: Coalesce.Aux[T, Const[Read[A], ?], OUT] =
     default
 
-  implicit def shiftedRead[T[_[_]], OUT[a] <: ACopK[a], A]: Coalesce.Aux[T, Const[ShiftedRead[A], ?], OUT] =
-    default
-
-  implicit def extraShiftedRead[T[_[_]], OUT[a] <: ACopK[a], A]: Coalesce.Aux[T, Const[InterpretedRead[A], ?], OUT] =
+  implicit def interpretedRead[T[_[_]], OUT[a] <: ACopK[a], A]: Coalesce.Aux[T, Const[InterpretedRead[A], ?], OUT] =
     default
 }
 
@@ -253,13 +218,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
 
   private def freeQC(branch: FreeQS): FreeQS =
     freeTotal(branch)(CoalesceTotal.coalesceQCNormalize(coenvPrism[QScriptTotal, Hole]))
-
-  private def freeSR(branch: FreeQS): FreeQS = {
-    def freeSR0[A](b: FreeQS)(implicit SR: Const[ShiftedRead[A], ?] :<<: QScriptTotal): FreeQS =
-      freeTotal(b)(CoalesceTotal.coalesceSRNormalize[CoEnvQS, A](coenvPrism[QScriptTotal, Hole]))
-
-    freeSR0[ResourcePath](branch)
-  }
 
   private def freeEJ(branch: FreeQS): FreeQS =
     freeTotal(branch)(CoalesceTotal.coalesceEJNormalize(coenvPrism[QScriptTotal, Hole].get))
@@ -492,84 +450,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         case _ => None
       }
 
-      def coalesceSR[F[_]: Functor, A]
-        (FToOut: PrismNT[F, OUT])
-        (implicit QC: QScriptCore :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT) = {
-
-        case Filter(Embed(src), mf) =>
-          (FToOut.get(src) >>= QC.prj.apply) match {
-            case Some(Map(Embed(innerSrc), innermf)) =>
-              (FToOut.get(innerSrc) >>= SR.prj.apply) match {
-                case Some(sr) =>
-                  Map(
-                    FToOut.reverseGet(QC.inj(
-                      Filter(
-                        FToOut.reverseGet(SR.inj(sr)).embed,
-                        mf >> innermf))).embed,
-                    innermf).some
-                case _ => None
-              }
-            case _ => None
-          }
-
-        case Map(Embed(src), mf) =>
-          ((FToOut.get(src) >>= SR.prj.apply) ⊛ eliminateRightSideProjUnary(mf.linearize))((const, newMF) =>
-            Map(
-              FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
-              RecFreeS.fromFree(newMF))) <+>
-          (((FToOut.get(src) >>= QC.prj.apply) match {
-
-            case Some(Filter(Embed(innerSrc), cond)) =>
-              ((FToOut.get(innerSrc) >>= SR.prj.apply) ⊛ eliminateRightSideProjUnary(cond.linearize))((const, newCond) =>
-                Filter(
-                  FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
-                  newCond.asRec))
-
-            case Some(Sort(Embed(innerSrc), bucket, ord)) =>
-              ((FToOut.get(innerSrc) >>= SR.prj.apply) ⊛
-                bucket.traverse(eliminateRightSideProjUnary) ⊛
-                ord.traverse(Bitraverse[(?, ?)].leftTraverse.traverse(_)(eliminateRightSideProjUnary)))(
-                (const, newBucket, newOrd) =>
-                Sort(
-                  FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
-                  newBucket,
-                  newOrd))
-
-            case _ => None
-          }) ⊛ eliminateRightSideProjUnary(mf.linearize))((newFilter, newMF) =>
-            Map(
-              FToOut.reverseGet(QC.inj(newFilter)).embed,
-              RecFreeS.fromFree(newMF)))
-
-        case Reduce(Embed(src), bucket, reducers, repair) =>
-          ((FToOut.get(src) >>= SR.prj.apply) ⊛ bucket.traverse(eliminateRightSideProjUnary) ⊛ reducers.traverse(_.traverse(eliminateRightSideProjUnary)))(
-            (const, newBuck, newRed) =>
-            Reduce(
-              FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
-              newBuck,
-              newRed,
-              repair))
-
-        case LeftShift(Embed(src), struct, idStatus, shiftType, undef, repair) =>
-          ((FToOut.get(src) >>= SR.prj.apply) ⊛ eliminateRightSideProjUnary(struct.linearize) ⊛ eliminateRightSideProj(repair, LeftSide))(
-            (sr, newStruct, newRepair) =>
-            LeftShift(
-              FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(sr.getConst.path, ExcludeId)))).embed,
-              RecFreeS.fromFree(newStruct),
-              idStatus,
-              shiftType,
-              undef,
-              newRepair))
-
-        case Subset(src, from, sel, count) =>
-          makeBranched(from, count)(ifNeq(freeSR))(Subset(src, _, sel, _))
-
-        case Union(src, from, count) =>
-          makeBranched(from, count)(ifNeq(freeSR))(Union(src, _, _))
-
-        case _ => None
-      }
-
       def coalesceEJ[F[_]: Functor]
         (FToOut: F ~> λ[α => Option[OUT[α]]])
         (implicit EJ: EquiJoin :<<: OUT) = {
@@ -620,11 +500,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         }
       }
 
-      def coalesceSR[F[_]: Functor, A]
-        (FToOut: PrismNT[F, OUT])
-        (implicit QC: QScriptCore :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT) =
-        κ(None)
-
       def coalesceEJ[F[_]: Functor]
         (FToOut: F ~> λ[α => Option[OUT[α]]])
         (implicit EJ: EquiJoin :<<: OUT) =
@@ -647,14 +522,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         tj => makeBranched(
           tj.lBranch, tj.rBranch)(
           ifNeq(freeQC))(
-          ThetaJoin(tj.src, _, _, tj.on, tj.f, tj.combine))
-
-      def coalesceSR[F[_]: Functor, A]
-        (FToOut: PrismNT[F, OUT])
-        (implicit QC: QScriptCore :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT) =
-        tj => makeBranched(
-          tj.lBranch, tj.rBranch)(
-          ifNeq(freeSR))(
           ThetaJoin(tj.src, _, _, tj.on, tj.f, tj.combine))
 
       def coalesceEJ[F[_]: Functor]
@@ -709,14 +576,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
           }
           coalesceBranchMaps(branched.getOrElse(ej)) orElse branched
         }
-
-      def coalesceSR[F[_]: Functor, A]
-        (FToOut: PrismNT[F, OUT])
-        (implicit QC: QScriptCore :<<: OUT, SR: Const[ShiftedRead[A], ?] :<<: OUT) =
-        ej => makeBranched(
-          ej.lBranch, ej.rBranch)(
-          ifNeq(freeSR))(
-          EquiJoin(ej.src, _, _, ej.key, ej.f, ej.combine))
 
       def coalesceEJ[F[_]: Functor]
         (FToOut: F ~> λ[α => Option[OUT[α]]])

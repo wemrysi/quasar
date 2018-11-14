@@ -62,32 +62,27 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
         None
     }.join
 
-  // TODO: make this simply a transform itself, rather than a full traversal.
-  def shiftRead[F[_]: Functor, G[a] <: ACopK[a]: Traverse]
+  def normTJ[G[a] <: ACopK[a]: Traverse]
     (implicit QC: QScriptCore :<<: G,
               TJ: ThetaJoin :<<: G,
-              SD: Const[ShiftedRead[ResourcePath], ?] :<<: G,
-              S: ShiftRead.Aux[T, F, G],
+              SD: Const[Read[ResourcePath], ?] :<<: G,
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
-      : T[F] => T[G] = {
-    _.codyna[G, T[G]](
-      normalizeTJ[G] >>>
-      repeatedly(C.coalesceSRNormalize[G, ResourcePath](idPrism)) >>>
-      (_.embed),
-      ((_: T[F]).project) >>> (S.shiftRead[G](idPrism.reverseGet)(_)))
-  }
+      : T[G] => T[G] =
+        _.cata[T[G]](
+          normalizeTJ[G] >>>
+          repeatedly(N.normalizeF(_: G[T[G]])) >>>
+          (_.embed))
 
-  def simplifyJoinOnShiftRead[F[_]: Functor, G[a] <: ACopK[a]: Traverse, H[_]: Functor]
+  def simplifyJoinOnNorm[G[a] <: ACopK[a]: Traverse, H[_]: Functor]
     (implicit QC: QScriptCore :<<: G,
               TJ: ThetaJoin :<<: G,
-              SF: Const[ShiftedRead[ResourcePath], ?] :<<: G,
-              S: ShiftRead.Aux[T, F, G],
+              SF: Const[Read[ResourcePath], ?] :<<: G,
               J: SimplifyJoin.Aux[T, G, H],
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
-      : T[F] => T[H] =
-    shiftRead[F, G].apply(_).transCata[T[H]](J.simplifyJoin[J.G](idPrism.reverseGet))
+      : T[G] => T[H] =
+    normTJ[G].apply(_).transCata[T[H]](J.simplifyJoin[J.G](idPrism.reverseGet))
 
   // TODO: These optimizations should give rise to various property tests:
   //       • elideNopMap ⇒ no `Map(???, HoleF)`

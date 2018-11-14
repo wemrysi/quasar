@@ -644,7 +644,7 @@ object QSUGraph extends QSUGraphInstances {
       def unapply[T[_[_]]: BirecursiveT](qgraph: QSUGraph[T])(
           implicit IC: MapFuncCore[T, ?] :<<: MapFunc[T, ?]): Option[String] = qgraph match {
 
-        case Transpose(Read(path), QSU.Retain.Values, QSU.Rotation.ShiftMap) =>
+        case Read(path, _) =>
           for {
             (front, end) <- Path.peel(path)
             file <- end.toOption
