@@ -28,6 +28,7 @@ object Dependencies {
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
   private val fs2Version          = "1.0.0"
+  private val fs2GzipVersion      = IO.read(file("./fs2-gzip-version")).trim
   private val qdataVersion        = IO.read(file("./qdata-version")).trim
   private val tectonicVersion     = IO.read(file("./tectonic-version")).trim
   private val slf4sVersion        = "1.7.25"
@@ -111,7 +112,7 @@ object Dependencies {
   )
 
   def impl = Seq(
-    "com.slamdata"   %% "fs2-gzip"       % "1.0.1",
+    "com.slamdata"   %% "fs2-gzip"       % fs2GzipVersion,
     "com.slamdata"   %% "qdata-tectonic" % qdataVersion,
     "com.slamdata"   %% "tectonic-fs2"   % tectonicVersion,
     "org.http4s"     %% "jawn-fs2"       % jawnfs2Version,
