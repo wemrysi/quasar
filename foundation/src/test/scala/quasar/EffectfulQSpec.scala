@@ -27,7 +27,7 @@ import org.specs2.specification.core.Fragment
 
 abstract class EffectfulQSpec[F[_]: Effect](implicit ec: ExecutionContext) extends Qspec {
 
-  implicit val cs = IO.contextShift(ec)
+  implicit lazy val cs = IO.contextShift(ec)
 
   /** Provides syntax for defining effectful examples:
     *
