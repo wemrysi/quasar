@@ -34,8 +34,8 @@ import scalaz.\/
 import shims._
 
 /** A local datasource that gzips all resources. */
-object GzippedLocalDatasourceModule extends LightweightDatasourceModule {
-  val kind = DatasourceType("local-gzipped", 1L)
+object TestGzippedLocalDatasourceModule extends LightweightDatasourceModule {
+  val kind = DatasourceType("test-local-gzipped", 1L)
 
   def sanitizeConfig(config: Json) =
     LocalDatasourceModule.sanitizeConfig(config)

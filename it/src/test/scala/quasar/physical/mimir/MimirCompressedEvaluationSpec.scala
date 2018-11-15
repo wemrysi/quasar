@@ -64,7 +64,7 @@ object MimirCompressedEvaluationSpec extends EffectfulQSpec[IO] with PrecogCake 
     val results = for {
       q <- Quasar[IO](
         cake,
-        List(DatasourceModule.Lightweight(GzippedLocalDatasourceModule)),
+        List(DatasourceModule.Lightweight(TestGzippedLocalDatasourceModule)),
         SstEvalConfig.single)
 
       currentDir <- Stream.eval(IO(Paths.get("").toAbsolutePath))
@@ -72,7 +72,7 @@ object MimirCompressedEvaluationSpec extends EffectfulQSpec[IO] with PrecogCake 
       testsDir = TestsRoot(currentDir)
 
       dsRef = DatasourceRef(
-        GzippedLocalDatasourceModule.kind,
+        TestGzippedLocalDatasourceModule.kind,
         DatasourceName("test"),
         Json(
           "rootDir" := testsDir.toString,
