@@ -23,7 +23,7 @@ import scalaz.{Equal, Show}
 sealed trait CompressionScheme extends Product with Serializable
 
 object CompressionScheme {
-  final case object Gzip extends CompressionScheme
+  case object Gzip extends CompressionScheme
 
   implicit val equal: Equal[CompressionScheme] =
     Equal.equalA
