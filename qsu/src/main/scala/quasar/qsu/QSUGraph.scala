@@ -149,7 +149,7 @@ final case class QSUGraph[T[_[_]]](
               bare = pattern.map(_.root)
               renamed <- withName(bare)
               verts2 = pattern.foldLeft(SMap[Symbol, QScriptUniform[T, Symbol]]())(_ ++ _.vertices)
-            } yield renamed.copy(vertices = verts2 ++ renamed.vertices)
+            } yield this ++: renamed
         }
       }
     } else {

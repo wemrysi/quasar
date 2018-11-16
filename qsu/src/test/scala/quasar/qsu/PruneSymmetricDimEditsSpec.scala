@@ -144,6 +144,31 @@ object PruneSymmetricDimEditsSpec extends Qspec with QSUTTypes[Fix] {
         case AutoJoin2(Read(_), Unreferenced(), _) => ok
       }
     }
+
+    "retain pointers to vertices with multiple inbound edges" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.autojoin2((
+            qsu.dimEdit((
+              qsu.map(
+                qsu.read(afile),
+                recFunc.ProjectKeyS(recFunc.Hole, "bar")),
+              QSU.DTrans.Squash())),
+            qsu.dimEdit((
+              qsu.map(
+                qsu.read(afile),
+                recFunc.ProjectKeyS(recFunc.Hole, "baz")),
+              QSU.DTrans.Squash())),
+            _(MapFuncsCore.Add(_, _)))),
+          qsu.dimEdit((
+            qsu.map(
+              qsu.read(afile),
+              recFunc.ProjectKeyS(recFunc.Hole, "bar")),
+            QSU.DTrans.Squash())),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must not(throwA[Exception])
+    }
   }
 
   private def runOn(g: QSUGraph): QSUGraph = {
