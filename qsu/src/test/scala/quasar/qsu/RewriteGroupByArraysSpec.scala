@@ -18,7 +18,7 @@ package quasar.qsu
 
 import quasar.{ejson, Qspec}
 import quasar.common.data.Data
-import quasar.qscript.{Hole, LeftSide, MapFuncsCore, MFC, RightSide, SrcHole}
+import quasar.qscript.{construction, Hole, LeftSide, MapFuncsCore, MFC, RightSide, SrcHole}
 import slamdata.Predef._
 
 import matryoshka.data.Fix
@@ -32,6 +32,7 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
 
   val qsu = QScriptUniform.DslT[Fix]
   val json = ejson.Fixed[Fix[ejson.EJson]]
+  val func = construction.Func[Fix]
   val rw = RewriteGroupByArrays[Fix, F] _
 
   val afile = Path.rootDir[Sandboxed] </> Path.file("afile")
@@ -260,6 +261,23 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
               MapFuncsCore.ProjectKey(LeftSide, RightSide))),
           DataConstant(Data.Arr(List(Data.Null)))) => ok
       }
+    }
+
+    "not produce an invalid graph" in {
+      val rlp2 = qsu.unreferenced()
+      val rlp8 = qsu.unary(rlp2, MFC(MapFuncsCore.Constant[Fix, Hole](json.int(0))))
+      val rlp3 = qsu.unary(rlp2, MFC(MapFuncsCore.Constant[Fix, Hole](json.str("a"))))
+      val rlp0 = qsu.read(afile)
+      val rlp4 = qsu.autojoin2((rlp0, rlp3, _(MapFuncsCore.ProjectKey(_, _))))
+      val rlp9 = qsu.autojoin2((rlp4, rlp8, _(MapFuncsCore.ProjectIndex(_, _))))
+      val rlp10 = qsu.unary(rlp9, MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole)))
+      val rlp7 = qsu.unary(rlp4, MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole)))
+      val rlp11 = qsu.autojoin2((rlp7, rlp10, _(MapFuncsCore.ConcatArrays(_, _))))
+      val rlp12 = qsu.groupBy(rlp0, rlp11)
+
+      val qgraph = QSUGraph.fromTree[Fix](rlp12)
+
+      eval(rw(qgraph)).foldMapUp(_ => 0) mustEqual 0
     }
   }
 

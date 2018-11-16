@@ -148,8 +148,9 @@ final case class QSUGraph[T[_[_]]](
               pattern <- unfold.traverse(_.replaceWithRename[F](prefix, src, target))
               bare = pattern.map(_.root)
               renamed <- withName(bare)
-              verts2 = pattern.foldLeft(SMap[Symbol, QScriptUniform[T, Symbol]]())(_ ++ _.vertices)
-            } yield this ++: renamed
+              patternVerts = pattern.foldLeft(SMap[Symbol, QScriptUniform[T, Symbol]]())(_ ++ _.vertices)
+              back = this ++: renamed
+            } yield back.copy(vertices = back.vertices ++ patternVerts)
         }
       }
     } else {
