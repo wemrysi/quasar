@@ -126,11 +126,13 @@ final case class QSUGraph[T[_[_]]](
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def replaceWithRename[
       F[_]: Monad: NameGenerator: MonadState_[?[_], QSUGraph.RevIdx[T]]](
-      src: Symbol, target: Symbol): F[QSUGraph[T]] = {
+      prefix: String,
+      src: Symbol,
+      target: Symbol): F[QSUGraph[T]] = {
 
     import QScriptUniform._
 
-    val withName = QSUGraph.withName[T, F]("qsu")_
+    val withName = QSUGraph.withName[T, F](prefix) _
 
     if (src =/= target) {
 
@@ -143,7 +145,7 @@ final case class QSUGraph[T[_[_]]](
 
           case _ =>
             for {
-              pattern <- unfold.traverse(_.replaceWithRename[F](src, target))
+              pattern <- unfold.traverse(_.replaceWithRename[F](prefix, src, target))
               bare = pattern.map(_.root)
               renamed <- withName(bare)
               verts2 = pattern.foldLeft(SMap[Symbol, QScriptUniform[T, Symbol]]())(_ ++ _.vertices)
