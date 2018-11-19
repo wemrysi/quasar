@@ -53,10 +53,6 @@ trait NormalizableInstances {
       : Normalizable[QScriptCore[T, ?]] =
     normalizable[T].QScriptCore
 
-  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
-      : Normalizable[ProjectBucket[T, ?]] =
-    normalizable[T].ProjectBucket
-
   implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       : Normalizable[ThetaJoin[T, ?]] =
     normalizable[T].ThetaJoin
@@ -289,13 +285,6 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
       case Unreferenced()                => None
     })
   }
-
-  def ProjectBucket = make(
-    λ[ProjectBucket ~> (Option ∘ ProjectBucket)#λ] {
-      case BucketKey(a, v, k) => makeNorm(v, k)(freeMFEq(_), freeMFEq(_))(BucketKey(a, _, _))
-      case BucketIndex(a, v, i) => makeNorm(v, i)(freeMFEq(_), freeMFEq(_))(BucketIndex(a, _, _))
-    }
-  )
 }
 
 object Normalizable extends NormalizableInstances {

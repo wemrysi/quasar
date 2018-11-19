@@ -71,7 +71,6 @@ package object qscript {
     */
   type QScriptTotal[T[_[_]], A] = CopK[
          QScriptCore[T, ?]
-     ::: ProjectBucket[T, ?]
      ::: ThetaJoin[T, ?]
      ::: EquiJoin[T, ?]
      ::: Const[InterpretedRead[ResourcePath], ?]
