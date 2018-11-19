@@ -116,7 +116,7 @@ final class FederatedReadPlanner[
           f(source.path).to[F]
 
         case QueryAssociate.Heavyweight(f) =>
-          val read = dsl.Read(ResourcePath.leaf(path): ResourcePath, ExcludeId)
+          val read = dsl.Read(ResourcePath.leaf(path), ExcludeId)
 
           f(read).to[F]
       }
