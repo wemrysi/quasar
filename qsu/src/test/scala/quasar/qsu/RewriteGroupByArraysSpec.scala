@@ -16,7 +16,7 @@
 
 package quasar.qsu
 
-import quasar.{ejson, Qspec}
+import quasar.{ejson, IdStatus, Qspec}
 import quasar.common.data.Data
 import quasar.qscript.{construction, Hole, LeftSide, MapFuncsCore, MFC, RightSide, SrcHole}
 import slamdata.Predef._
@@ -27,6 +27,7 @@ import scalaz.{Need, StateT}
 
 object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
+  import IdStatus.ExcludeId
 
   type F[A] = StateT[Need, Long, A]
 
@@ -62,17 +63,17 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
     "rewrite a pair of group keys" in {
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
-          qsu.read(afile),
+          qsu.read(afile, ExcludeId),
           qsu.autojoin2((
             qsu.unary(
               qsu.autojoin2((
-                qsu.read(afile),
+                qsu.read(afile, ExcludeId),
                 qsu.cstr("foo"),
                 _(MapFuncsCore.ProjectKey(_, _)))),
               MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
             qsu.unary(
               qsu.autojoin2((
-                qsu.read(afile),
+                qsu.read(afile, ExcludeId),
                 qsu.cstr("bar"),
                 _(MapFuncsCore.ProjectKey(_, _)))),
               MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
@@ -81,16 +82,16 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
       eval(rw(qgraph)) must beLike {
         case GroupBy(
           GroupBy(
-            Read(`afile`),
+            Read(`afile`, ExcludeId),
             AutoJoin2C(
-              Read(`afile`),
+              Read(`afile`, ExcludeId),
               DataConstantMapped(Data.Str("foo")),
               MapFuncsCore.ProjectKey(LeftSide, RightSide))),
           AutoJoin2C(
             GroupBy(
-              Read(`afile`),
+              Read(`afile`, ExcludeId),
               AutoJoin2C(
-                Read(`afile`),
+                Read(`afile`, ExcludeId),
                 DataConstantMapped(Data.Str("foo")),
                 MapFuncsCore.ProjectKey(LeftSide, RightSide))),
             DataConstantMapped(Data.Str("bar")),
@@ -101,25 +102,25 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
     "rewrite a triple of group keys" in {
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
-          qsu.read(afile),
+          qsu.read(afile, ExcludeId),
           qsu.autojoin2((
             qsu.autojoin2((
               qsu.unary(
                 qsu.autojoin2((
-                  qsu.read(afile),
+                  qsu.read(afile, ExcludeId),
                   qsu.cstr("foo"),
                   _(MapFuncsCore.ProjectKey(_, _)))),
                 MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
               qsu.unary(
                 qsu.autojoin2((
-                  qsu.read(afile),
+                  qsu.read(afile, ExcludeId),
                   qsu.cstr("bar"),
                   _(MapFuncsCore.ProjectKey(_, _)))),
                 MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
               _(MapFuncsCore.ConcatArrays(_, _)))),
             qsu.unary(
               qsu.autojoin2((
-                qsu.read(afile),
+                qsu.read(afile, ExcludeId),
                 qsu.cstr("baz"),
                 _(MapFuncsCore.ProjectKey(_, _)))),
               MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
@@ -129,16 +130,16 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
         case GroupBy(
           GroupBy(    // s2
             GroupBy(   // s1
-              Read(`afile`),
+              Read(`afile`, ExcludeId),
               AutoJoin2C(
-                Read(`afile`),
+                Read(`afile`, ExcludeId),
                 DataConstantMapped(Data.Str("foo")),
                 MapFuncsCore.ProjectKey(LeftSide, RightSide))),
             AutoJoin2C(
               GroupBy(  // s1
-                Read(`afile`),
+                Read(`afile`, ExcludeId),
                 AutoJoin2C(
-                  Read(`afile`),
+                  Read(`afile`, ExcludeId),
                   DataConstantMapped(Data.Str("foo")),
                   MapFuncsCore.ProjectKey(LeftSide, RightSide))),
               DataConstantMapped(Data.Str("bar")),
@@ -146,16 +147,16 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
           AutoJoin2C(
             GroupBy(    // s2
               GroupBy(
-                Read(`afile`),
+                Read(`afile`, ExcludeId),
                 AutoJoin2C(
-                  Read(`afile`),
+                  Read(`afile`, ExcludeId),
                   DataConstantMapped(Data.Str("foo")),
                   MapFuncsCore.ProjectKey(LeftSide, RightSide))),
               AutoJoin2C(
                 GroupBy(    // s1
-                  Read(`afile`),
+                  Read(`afile`, ExcludeId),
                   AutoJoin2C(
-                    Read(`afile`),
+                    Read(`afile`, ExcludeId),
                     DataConstantMapped(Data.Str("foo")),
                     MapFuncsCore.ProjectKey(LeftSide, RightSide))),
                 DataConstantMapped(Data.Str("bar")),
@@ -168,7 +169,7 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
     "rewrite a triple of group keys, the first of which is constant" in {
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
-          qsu.read(afile),
+          qsu.read(afile, ExcludeId),
           qsu.autojoin2((
             qsu.autojoin2((
               qsu.unary(
@@ -176,14 +177,14 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
                 MFC(MapFuncsCore.Constant[Fix, Hole](json.arr(List(json.nul()))))),
               qsu.unary(
                 qsu.autojoin2((
-                  qsu.read(afile),
+                  qsu.read(afile, ExcludeId),
                   qsu.cstr("bar"),
                   _(MapFuncsCore.ProjectKey(_, _)))),
                 MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
               _(MapFuncsCore.ConcatArrays(_, _)))),
             qsu.unary(
               qsu.autojoin2((
-                qsu.read(afile),
+                qsu.read(afile, ExcludeId),
                 qsu.cstr("baz"),
                 _(MapFuncsCore.ProjectKey(_, _)))),
               MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
@@ -193,22 +194,22 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
         case GroupBy(
           GroupBy(    // s2
             GroupBy(   // s1
-              Read(`afile`),
+              Read(`afile`, ExcludeId),
               DataConstant(Data.Arr(List(Data.Null)))),
             AutoJoin2C(
               GroupBy(  // s1
-                Read(`afile`),
+                Read(`afile`, ExcludeId),
                 DataConstant(Data.Arr(List(Data.Null)))),
               DataConstantMapped(Data.Str("bar")),
               MapFuncsCore.ProjectKey(LeftSide, RightSide))),
           AutoJoin2C(
             GroupBy(    // s2
               GroupBy(
-                Read(`afile`),
+                Read(`afile`, ExcludeId),
                 DataConstant(Data.Arr(List(Data.Null)))),
               AutoJoin2C(
                 GroupBy(    // s1
-                  Read(`afile`),
+                  Read(`afile`, ExcludeId),
                   DataConstant(Data.Arr(List(Data.Null)))),
                 DataConstantMapped(Data.Str("bar")),
                 MapFuncsCore.ProjectKey(LeftSide, RightSide))),
@@ -220,18 +221,18 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
     "rewrite a triple of group keys, the last of which is constant" in {
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
-          qsu.read(afile),
+          qsu.read(afile, ExcludeId),
           qsu.autojoin2((
             qsu.autojoin2((
               qsu.unary(
                 qsu.autojoin2((
-                  qsu.read(afile),
+                  qsu.read(afile, ExcludeId),
                   qsu.cstr("foo"),
                   _(MapFuncsCore.ProjectKey(_, _)))),
                 MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
               qsu.unary(
                 qsu.autojoin2((
-                  qsu.read(afile),
+                  qsu.read(afile, ExcludeId),
                   qsu.cstr("bar"),
                   _(MapFuncsCore.ProjectKey(_, _)))),
                 MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
@@ -245,16 +246,16 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
         case GroupBy(
           GroupBy(    // s2
             GroupBy(   // s1
-              Read(`afile`),
+              Read(`afile`, ExcludeId),
               AutoJoin2C(
-                Read(`afile`),
+                Read(`afile`, ExcludeId),
                 DataConstantMapped(Data.Str("foo")),
                 MapFuncsCore.ProjectKey(LeftSide, RightSide))),
             AutoJoin2C(
               GroupBy(  // s1
-                Read(`afile`),
+                Read(`afile`, ExcludeId),
                 AutoJoin2C(
-                  Read(`afile`),
+                  Read(`afile`, ExcludeId),
                   DataConstantMapped(Data.Str("foo")),
                   MapFuncsCore.ProjectKey(LeftSide, RightSide))),
               DataConstantMapped(Data.Str("bar")),
@@ -267,7 +268,7 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
       val rlp2 = qsu.unreferenced()
       val rlp8 = qsu.unary(rlp2, MFC(MapFuncsCore.Constant[Fix, Hole](json.int(0))))
       val rlp3 = qsu.unary(rlp2, MFC(MapFuncsCore.Constant[Fix, Hole](json.str("a"))))
-      val rlp0 = qsu.read(afile)
+      val rlp0 = qsu.read(afile, ExcludeId)
       val rlp4 = qsu.autojoin2((rlp0, rlp3, _(MapFuncsCore.ProjectKey(_, _))))
       val rlp9 = qsu.autojoin2((rlp4, rlp8, _(MapFuncsCore.ProjectIndex(_, _))))
       val rlp10 = qsu.unary(rlp9, MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole)))

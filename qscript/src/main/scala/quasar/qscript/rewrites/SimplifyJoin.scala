@@ -225,12 +225,7 @@ object SimplifyJoin {
       : SimplifyJoin.Aux[T, Const[Read[A], ?], F] =
     default
 
-  implicit def shiftedRead[T[_[_]], F[a] <: ACopK[a], A]
-    (implicit SR: Const[ShiftedRead[A], ?] :<<: F)
-      : SimplifyJoin.Aux[T, Const[ShiftedRead[A], ?], F] =
-    default
-
-  implicit def extraShiftedRead[T[_[_]], F[a] <: ACopK[a], A]
+  implicit def interpretedRead[T[_[_]], F[a] <: ACopK[a], A]
     (implicit SR: Const[InterpretedRead[A], ?] :<<: F)
       : SimplifyJoin.Aux[T, Const[InterpretedRead[A], ?], F] =
     default

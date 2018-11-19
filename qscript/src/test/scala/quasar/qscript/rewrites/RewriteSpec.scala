@@ -56,11 +56,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
       injectRepeatedly[QScriptCore, QS, Fix[QS]](
         rewrite.compactLeftShift[QS](PrismNT.injectCopK).apply(_: QScriptCore[Fix[QS]]))))
 
-  def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
-    expr.transCata[Fix[QST]](
-      (qst => repeatedly[QST[Fix[QST]]](
-        Coalesce[Fix, QST, QST].coalesceSR[QST, ResourcePath](idPrism))(qst)))
-
   type QSI[A] = CopK[QScriptCore ::: ProjectBucket ::: ThetaJoin ::: Const[DeadEnd, ?] ::: TNilK, A]
 
   implicit val qsc: Injectable[QScriptCore, QSI] = Injectable.inject[QScriptCore, QSI]
@@ -111,8 +106,8 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
         fix.Filter(
           fix.ThetaJoin(
             fix.Unreferenced,
-            free.ShiftedRead[ResourcePath](sampleFile, IncludeId),
-            free.ShiftedRead[ResourcePath](sampleFile, IncludeId),
+            free.Read[ResourcePath](sampleFile, IncludeId),
+            free.Read[ResourcePath](sampleFile, IncludeId),
             func.And(
               func.Eq(func.ProjectKeyS(func.LeftSide, "l_id"), func.ProjectKeyS(func.RightSide, "r_id")),
               func.Eq(
@@ -138,8 +133,8 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
       equal(
         fix.ThetaJoin(
           fix.Unreferenced,
-          free.ShiftedRead[ResourcePath](sampleFile, IncludeId),
-          free.ShiftedRead[ResourcePath](sampleFile, IncludeId),
+          free.Read[ResourcePath](sampleFile, IncludeId),
+          free.Read[ResourcePath](sampleFile, IncludeId),
           func.And(
             func.And(
               func.Eq(func.ProjectKeyS(func.LeftSide, "l_id"), func.ProjectKeyS(func.RightSide, "r_id")),
@@ -222,8 +217,8 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
         import qsdsl._
         fix.ThetaJoin(
           fix.Unreferenced,
-          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
-          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
+          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
           func.Eq(
             func.Constant(json.int(0)),
             func.Constant(json.int(1))),
@@ -236,8 +231,8 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
         fix.Map(
           fix.EquiJoin(
             fix.Unreferenced,
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
             List((
               func.Constant(json.int(0)),
               func.Constant(json.int(1)))),
@@ -256,8 +251,8 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
         import qsdsl._
         fix.ThetaJoin(
           fix.Unreferenced,
-          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
-          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
+          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
           func.And(func.And(
             // reversed equality
             func.Eq(
@@ -285,8 +280,8 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
           fix.Filter(
             fix.EquiJoin(
               fix.Unreferenced,
-              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
-              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
+              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
               List(
                 (func.ProjectKeyS(func.Hole, "l_id"),
                   func.ProjectKeyS(func.Hole, "r_id")),
@@ -311,54 +306,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
             recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.LeftK),
             recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.RightK)))
       }
-    }
-
-    "transform a ShiftedRead with IncludeId to ExcludeId when possible" in {
-      import qstdsl._
-      val sampleFile = ResourcePath.leaf(rootDir </> file("bar"))
-
-      val originalQScript =
-        fix.Map(
-          fix.ShiftedRead[ResourcePath](sampleFile, IncludeId),
-          recFunc.Add(
-            recFunc.ProjectIndexI(recFunc.Hole, 1),
-            recFunc.ProjectIndexI(recFunc.Hole, 1)))
-
-      val expectedQScript =
-        fix.Map(
-          fix.ShiftedRead[ResourcePath](sampleFile, ExcludeId),
-          recFunc.Add(recFunc.Hole, recFunc.Hole))
-
-      includeToExcludeExpr(originalQScript) must_= expectedQScript
-    }
-
-    "transform a ShiftedRead inside a LeftShift to ExcludeId when possible" in {
-      import qstdsl._
-      val sampleFile = ResourcePath.leaf(rootDir </> file("bar"))
-
-      val originalQScript =
-        fix.LeftShift(
-          fix.ShiftedRead[ResourcePath](sampleFile, IncludeId),
-          recFunc.ProjectKeyS(recFunc.ProjectIndexI(recFunc.Hole, 1), "foo"),
-          ExcludeId,
-          ShiftType.Map,
-          OnUndefined.Omit,
-          func.StaticMapS(
-            "a" -> func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 1), "quux"),
-            "b" -> func.RightSide))
-
-      val expectedQScript =
-        fix.LeftShift(
-          fix.ShiftedRead[ResourcePath](sampleFile, ExcludeId),
-          recFunc.ProjectKeyS(recFunc.Hole, "foo"),
-          ExcludeId,
-          ShiftType.Map,
-          OnUndefined.Omit,
-          func.StaticMapS(
-            "a" -> func.ProjectKeyS(func.LeftSide, "quux"),
-            "b" -> func.RightSide))
-
-      includeToExcludeExpr(originalQScript) must_= expectedQScript
     }
 
     "transform a left shift with a static array as the source" in {
@@ -419,8 +366,8 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
         val original =
           fix.ThetaJoin(
             fix.Unreferenced,
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
             func.Guard(
               func.LeftSide,
               Type.AnyObject,
@@ -441,13 +388,13 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
           fix.ThetaJoin(
             fix.Unreferenced,
             free.Filter(
-              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
+              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
               recFunc.Guard(
                 recFunc.Hole,
                 Type.AnyObject,
                 recFunc.Constant(json.bool(false)),
                 recFunc.Constant(json.bool(true)))),
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
             func.Eq(
               func.ProjectKeyS(func.RightSide, "r_id"),
               func.ProjectKeyS(func.LeftSide, "l_id")),
@@ -462,8 +409,8 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
         val original =
           fix.ThetaJoin(
             fix.Unreferenced,
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
             func.Guard(
               func.LeftSide,
               Type.AnyObject,
@@ -484,13 +431,13 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
           fix.ThetaJoin(
             fix.Unreferenced,
             free.Filter(
-              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
+              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
               recFunc.Guard(
                 recFunc.Hole,
                 Type.AnyObject,
                 recFunc.Constant(json.bool(true)),
                 recFunc.Constant(json.bool(false)))),
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
             func.Eq(
               func.ProjectKeyS(func.RightSide, "r_id"),
               func.ProjectKeyS(func.LeftSide, "l_id")),
@@ -505,8 +452,8 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
         val original =
           fix.ThetaJoin(
             fix.Unreferenced,
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
             func.Cond(
               func.Lt(func.ProjectKeyS(func.LeftSide, "x"), func.Constant(json.int(7))),
               func.Undefined,
@@ -525,9 +472,9 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
           fix.ThetaJoin(
             fix.Unreferenced,
             free.Filter(
-              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
+              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
               recFunc.Not(recFunc.Lt(recFunc.ProjectKeyS(recFunc.Hole, "x"), recFunc.Constant(json.int(7))))),
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
             func.Eq(
               func.ProjectKeyS(func.RightSide, "r_id"),
               func.ProjectKeyS(func.LeftSide, "l_id")),
@@ -542,8 +489,8 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
         val original =
           fix.ThetaJoin(
             fix.Unreferenced,
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
             func.Cond(
               func.Lt(func.ProjectKeyS(func.LeftSide, "x"), func.Constant(json.int(7))),
               func.Eq(
@@ -562,9 +509,9 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
           fix.ThetaJoin(
             fix.Unreferenced,
             free.Filter(
-              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo"))),
+              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
               recFunc.Lt(recFunc.ProjectKeyS(recFunc.Hole, "x"), recFunc.Constant(json.int(7)))),
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar"))),
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
             func.Eq(
               func.ProjectKeyS(func.RightSide, "r_id"),
               func.ProjectKeyS(func.LeftSide, "l_id")),
