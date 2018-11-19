@@ -217,10 +217,6 @@ object SimplifyJoin {
         fa => GtoH(F.inj(fa))
     }
 
-  implicit def deadEnd[T[_[_]], F[a] <: ACopK[a]](implicit DE: Const[DeadEnd, ?] :<<: F)
-      : SimplifyJoin.Aux[T, Const[DeadEnd, ?], F] =
-    default
-
   implicit def read[T[_[_]], F[a] <: ACopK[a], A](implicit R: Const[Read[A], ?] :<<: F)
       : SimplifyJoin.Aux[T, Const[Read[A], ?], F] =
     default

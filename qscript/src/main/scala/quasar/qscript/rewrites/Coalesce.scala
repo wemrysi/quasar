@@ -186,9 +186,6 @@ trait CoalesceInstances {
         κ(None)
     }
 
-  implicit def deadEnd[T[_[_]], OUT[a] <: ACopK[a]]: Coalesce.Aux[T, Const[DeadEnd, ?], OUT] =
-    default
-
   implicit def read[T[_[_]], OUT[a] <: ACopK[a], A]: Coalesce.Aux[T, Const[Read[A], ?], OUT] =
     default
 

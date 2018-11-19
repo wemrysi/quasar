@@ -27,7 +27,6 @@ import quasar.contrib.iota._
 import quasar.contrib.iota.SubInject
 import quasar.qscript._
 
-import scala.Predef.implicitly
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -56,16 +55,12 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
       injectRepeatedly[QScriptCore, QS, Fix[QS]](
         rewrite.compactLeftShift[QS](PrismNT.injectCopK).apply(_: QScriptCore[Fix[QS]]))))
 
-  type QSI[A] = CopK[QScriptCore ::: ThetaJoin ::: Const[DeadEnd, ?] ::: TNilK, A]
+  type QSI[A] = CopK[QScriptCore ::: ThetaJoin ::: TNilK, A]
 
   implicit val qsc: Injectable[QScriptCore, QSI] = Injectable.inject[QScriptCore, QSI]
   implicit val tj: Injectable[ThetaJoin, QSI] = Injectable.inject[ThetaJoin, QSI]
-  implicit val de: Injectable[Const[DeadEnd, ?], QSI] = Injectable.inject[Const[DeadEnd, ?], QSI]
 
   val qsidsl = construction.mkDefaults[Fix, QSI]
-
-  val DEI = implicitly[Const[DeadEnd, ?] :<<: QSI]
-  val QCI = implicitly[QScriptCore :<<: QSI]
 
   implicit def qsiToQscriptTotal: Injectable[QSI, QST] = SubInject[QSI, QST]
 
@@ -161,12 +156,12 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
 
       val exp: Fix[QS] =
         fix.Map(
-          fix.Root,
+          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
           recFunc.MakeArray(recFunc.Constant(json.int(7))))
 
       val expected: Fix[QS] =
         fix.Map(
-          fix.Root,
+          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
           recFunc.Constant(json.arr(List(value))))
 
       normalizeFExpr(exp) must equal(expected)
@@ -179,12 +174,12 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
 
       val exp: Fix[QS] =
         fix.Map(
-          fix.Root,
+          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
           recFunc.MakeArray(recFunc.MakeArray(recFunc.Constant(json.int(7)))))
 
       val expected: Fix[QS] =
         fix.Map(
-          fix.Root,
+          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
           recFunc.Constant(json.arr(List(json.arr(List(value))))))
 
       normalizeFExpr(exp) must equal(expected)
@@ -194,7 +189,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
       import qsdsl._
       val exp: Fix[QS] =
         fix.Map(
-          fix.Root,
+          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
           recFunc.MakeArray(
             // !false && (false || !true)
             recFunc.And(
@@ -205,7 +200,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
 
       val expected: Fix[QS] =
         fix.Map(
-          fix.Root,
+          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
           recFunc.Constant(json.arr(List(json.bool(false)))))
 
       normalizeFExpr(exp) must equal(expected)
@@ -312,7 +307,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
       val original: Fix[QS] =
         fix.LeftShift(
           fix.Map(
-            fix.Root,
+            fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
             recFunc.MakeArray(recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))))),
           recFunc.Hole,
           ExcludeId,
@@ -324,7 +319,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
 
       val expected: Fix[QS] =
         fix.Map(
-          fix.Root,
+          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
           recFunc.StaticMapS(
             "right" -> recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))),
             "left" -> recFunc.MakeArray(recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))))))
@@ -337,7 +332,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
       val original: Fix[QS] =
         fix.LeftShift(
           fix.Map(
-            fix.Root,
+            fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
             recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3)))),
           recFunc.MakeArray(recFunc.Subtract(recFunc.Hole, recFunc.Constant(json.int(5)))),
           ExcludeId,
@@ -350,7 +345,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
       val expected: Fix[QS] =
         fix.Map(
           fix.Map(
-            fix.Root,
+            fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
             recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3)))),
           recFunc.StaticMapS(
             "right" -> recFunc.Subtract(recFunc.Hole, recFunc.Constant(json.int(5))),
