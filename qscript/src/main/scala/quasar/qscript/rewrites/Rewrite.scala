@@ -18,18 +18,13 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
-import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.api.resource.ResourcePath
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.qscript._
-import quasar.qscript.RecFreeS._
-import quasar.qscript.MapFuncCore._
-import quasar.qscript.MapFuncsCore._
 
 import matryoshka.{Hole => _, _}
-import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _},
@@ -38,26 +33,6 @@ import scalaz.{:+: => _, Divide => _, _},
   Scalaz._
 
 class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T] {
-
-  def rewriteShift(idStatus: IdStatus, repair: JoinFunc)
-      : Option[(IdStatus, JoinFunc)] =
-    (idStatus === IncludeId).option[Option[(IdStatus, JoinFunc)]] {
-      def makeRef(idx: Int): JoinFunc =
-        Free.roll[MapFunc, JoinSide](MFC(ProjectIndex(RightSideF, IntLit(idx))))
-
-      val zeroRef: JoinFunc = makeRef(0)
-      val oneRef: JoinFunc = makeRef(1)
-      val rightCount: Int = repair.elgotPara[Int](count(RightSideF))
-
-      if (repair.elgotPara[Int](count(oneRef)) === rightCount)
-        // all `RightSide` access is through `oneRef`
-        (ExcludeId, repair.transApoT(substitute[JoinFunc](oneRef, RightSideF))).some
-      else if (repair.elgotPara[Int](count(zeroRef)) ≟ rightCount)
-        // all `RightSide` access is through `zeroRef`
-        (IdOnly, repair.transApoT(substitute[JoinFunc](zeroRef, RightSideF))).some
-      else
-        None
-    }.join
 
   def normTJ[G[a] <: ACopK[a]: Traverse]
     (implicit QC: QScriptCore :<<: G,
