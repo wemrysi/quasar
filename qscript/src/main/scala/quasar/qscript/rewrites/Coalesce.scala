@@ -186,9 +186,6 @@ trait CoalesceInstances {
         κ(None)
     }
 
-  implicit def deadEnd[T[_[_]], OUT[a] <: ACopK[a]]: Coalesce.Aux[T, Const[DeadEnd, ?], OUT] =
-    default
-
   implicit def read[T[_[_]], OUT[a] <: ACopK[a], A]: Coalesce.Aux[T, Const[Read[A], ?], OUT] =
     default
 
@@ -289,24 +286,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
       val rewrite = new Rewrite[T]
       val nm = new NormalizableT[T]
 
-      // TODO: Use this. It seems like a valid normalization, but it breaks
-      //       autojoins. Maybe it can be applied as part of optimization, or as
-      //       a connector-specific transformation.
-      private def extractFilterFromQC[F[_]: Functor]
-        (FToOut: OUT ~> F)
-        (implicit QC: QScriptCore :<<: OUT)
-          : QScriptCore[IT[F]] => Option[QScriptCore[IT[F]]] = {
-        case LeftShift(src, struct, id, stpe, undef, repair) =>
-          MapFuncCore.extractFilter(struct.linearize)(_.some) ∘ { case (f, m, _) =>
-            LeftShift(FToOut(QC.inj(Filter(src, f.asRec))).embed, m.asRec, id, stpe, undef, repair)
-          }
-        case Map(src, mf) =>
-          MapFuncCore.extractFilter(mf.linearize)(_.some) ∘ { case (f, m, _) =>
-            Map(FToOut(QC.inj(Filter(src, f.asRec))).embed, m.asRec)
-          }
-        case _ => none
-      }
-
       def fmIsCondUndef(jf: JoinFunc): Boolean = {
         jf.resumeTwice.fold({
           case MFC(MapFuncsCore.Cond(_, _, -\/(MFC(MapFuncsCore.Undefined())))) => true
@@ -353,13 +332,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
                   mf >> mfInner).some
               case _ => None
             }
-/* FIXME: Investigate why this causes the 'convert union' test to fail.
-            case Union(innerSrc, lBranch, rBranch) =>
-              Union(
-                innerSrc,
-                Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(lBranch, mf))),
-                Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(rBranch, mf)))).some
-*/
             case _ => None
           })
         case LeftShift(Embed(src), struct, id, stpe, undef, shiftRepair) =>

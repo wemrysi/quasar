@@ -75,7 +75,6 @@ package object qscript {
      ::: EquiJoin[T, ?]
      ::: Const[InterpretedRead[ResourcePath], ?]
      ::: Const[Read[ResourcePath], ?]
-     ::: Const[DeadEnd, ?]
      ::: TNilK, A]
 
   object QCT {

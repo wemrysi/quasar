@@ -790,9 +790,6 @@ object construction {
                (implicit F: Injectable[Const[Read[A], ?], F]): R =
       embed(F.inject(Const(qscript.Read(path, idStatus))))
 
-    def Root(implicit F: Injectable[Const[DeadEnd, ?], F]): R =
-      embed(F.inject(Const(qscript.Root)))
-
     def Hole(implicit ev: Free[F, Hole] === R): R =
       ev(Free.pure(SrcHole))
   }
