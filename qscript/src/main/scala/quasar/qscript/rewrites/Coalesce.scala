@@ -89,10 +89,6 @@ trait CoalesceInstances {
       : Coalesce.Aux[T, QScriptCore[T, ?], G] =
     coalesce[T].qscriptCore[G]
 
-  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, F[a] <: ACopK[a]]
-      : Coalesce.Aux[T, ProjectBucket[T, ?], F] =
-    coalesce[T].projectBucket[F]
-
   implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, G[a] <: ACopK[a]]
     (implicit TJ: ThetaJoin[T, ?] :<<: G)
       : Coalesce.Aux[T, ThetaJoin[T, ?], G] =
@@ -478,37 +474,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
           makeBranched(from, count)(ifNeq(freeTJ))((l, r) => QC.inj(Union(src, l, r)))
         case _ => None
       }
-    }
-
-  def projectBucket[F[a] <: ACopK[a]]: Coalesce.Aux[T, ProjectBucket, F] =
-    new Coalesce[ProjectBucket] {
-      type IT[F[_]] = T[F]
-      type OUT[A] = F[A]
-
-      def coalesceQC[F[_]: Functor]
-        (FToOut: PrismNT[F, OUT])
-        (implicit QC: QScriptCore :<<: OUT) = {
-        case BucketKey(Embed(src), value, key) => FToOut.get(src) >>= QC.prj.apply >>= {
-          case Map(srcInner, mf) =>
-            BucketKey(srcInner, value >> mf.linearize, key >> mf.linearize).some
-          case _ => None
-        }
-        case BucketIndex(Embed(src), value, index) => FToOut.get(src) >>= QC.prj.apply >>= {
-          case Map(srcInner, mf) =>
-            BucketIndex(srcInner, value >> mf.linearize, index >> mf.linearize).some
-          case _ => None
-        }
-      }
-
-      def coalesceEJ[F[_]: Functor]
-        (FToOut: F ~> λ[α => Option[OUT[α]]])
-        (implicit EJ: EquiJoin :<<: OUT) =
-        κ(None)
-
-      def coalesceTJ[F[_]: Functor]
-        (FToOut: F ~> λ[α => Option[OUT[α]]])
-        (implicit TJ: ThetaJoin :<<: OUT) =
-        κ(None)
     }
 
   def thetaJoin[G[a] <: ACopK[a]](implicit TJ: ThetaJoin :<<: G): Coalesce.Aux[T, ThetaJoin, G] =

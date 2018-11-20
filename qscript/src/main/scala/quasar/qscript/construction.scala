@@ -752,12 +752,6 @@ object construction {
     def Unreferenced: R =
       core(qscript.Unreferenced())
 
-    def BucketKey(src: R, value: FreeMap[T], name: FreeMap[T])(implicit F: Injectable[ProjectBucket[T, ?], F]): R =
-      embed(F.inject(qscript.BucketKey(src, value, name)))
-
-    def BucketIndex(src: R, value: FreeMap[T], index: FreeMap[T])(implicit F: Injectable[ProjectBucket[T, ?], F]): R =
-      embed(F.inject(qscript.BucketIndex(src, value, index)))
-
     def ThetaJoin(src: R,
                   lBranch: Free[F, Hole],
                   rBranch: Free[F, Hole],

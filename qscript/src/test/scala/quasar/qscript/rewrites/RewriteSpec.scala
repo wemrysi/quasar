@@ -56,10 +56,9 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
       injectRepeatedly[QScriptCore, QS, Fix[QS]](
         rewrite.compactLeftShift[QS](PrismNT.injectCopK).apply(_: QScriptCore[Fix[QS]]))))
 
-  type QSI[A] = CopK[QScriptCore ::: ProjectBucket ::: ThetaJoin ::: Const[DeadEnd, ?] ::: TNilK, A]
+  type QSI[A] = CopK[QScriptCore ::: ThetaJoin ::: Const[DeadEnd, ?] ::: TNilK, A]
 
   implicit val qsc: Injectable[QScriptCore, QSI] = Injectable.inject[QScriptCore, QSI]
-  implicit val pb: Injectable[ProjectBucket, QSI] = Injectable.inject[ProjectBucket, QSI]
   implicit val tj: Injectable[ThetaJoin, QSI] = Injectable.inject[ThetaJoin, QSI]
   implicit val de: Injectable[Const[DeadEnd, ?], QSI] = Injectable.inject[Const[DeadEnd, ?], QSI]
 

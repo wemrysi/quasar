@@ -54,7 +54,6 @@ trait QScriptHelpers extends TTypes[Fix] {
   val QCT = implicitly[QScriptCore :<<: QST]
   val TJT = implicitly[ThetaJoin :<<: QST]
   val EJT = implicitly[EquiJoin :<<: QST]
-  val PBT = implicitly[ProjectBucket :<<: QST]
 
   val qsdsl = construction.mkDefaults[Fix, QS]
   val qstdsl = construction.mkDefaults[Fix, QST]
