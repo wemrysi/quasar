@@ -20,8 +20,6 @@ import slamdata.Predef._
 import quasar._
 import quasar.api.resource.ResourcePath
 import quasar.common.JoinType
-import quasar.ejson.EJson
-import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.contrib.iota.SubInject
@@ -40,9 +38,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
   import IdStatus.{ExcludeId, IncludeId}
 
   val rewrite = new Rewrite[Fix]
-
-  def normalizeFExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](orOriginal(Normalizable[QS].normalizeF(_: QS[Fix[QS]])))
 
   def normalizeExpr(expr: Fix[QS]): Fix[QS] =
     expr.transCata[Fix[QS]](rewrite.normalizeTJ[QS])
@@ -147,63 +142,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
             "l" -> func.LeftSide,
             "r" -> func.RightSide)).unFix.some)
 
-    }
-
-    "fold a constant array value" in {
-      import qsdsl._
-      val value: Fix[EJson] =
-        json.int(7)
-
-      val exp: Fix[QS] =
-        fix.Map(
-          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-          recFunc.MakeArray(recFunc.Constant(json.int(7))))
-
-      val expected: Fix[QS] =
-        fix.Map(
-          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-          recFunc.Constant(json.arr(List(value))))
-
-      normalizeFExpr(exp) must equal(expected)
-    }
-
-    "fold a constant doubly-nested array value" in {
-      import qsdsl._
-      val value: Fix[EJson] =
-        json.int(7)
-
-      val exp: Fix[QS] =
-        fix.Map(
-          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-          recFunc.MakeArray(recFunc.MakeArray(recFunc.Constant(json.int(7)))))
-
-      val expected: Fix[QS] =
-        fix.Map(
-          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-          recFunc.Constant(json.arr(List(json.arr(List(value))))))
-
-      normalizeFExpr(exp) must equal(expected)
-    }
-
-    "fold nested boolean values" in {
-      import qsdsl._
-      val exp: Fix[QS] =
-        fix.Map(
-          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-          recFunc.MakeArray(
-            // !false && (false || !true)
-            recFunc.And(
-              recFunc.Not(recFunc.Constant(json.bool(false))),
-              recFunc.Or(
-                recFunc.Constant(json.bool(false)),
-                recFunc.Not(recFunc.Constant(json.bool(true)))))))
-
-      val expected: Fix[QS] =
-        fix.Map(
-          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-          recFunc.Constant(json.arr(List(json.bool(false)))))
-
-      normalizeFExpr(exp) must equal(expected)
     }
 
     "simplify an outer ThetaJoin with a statically known condition" in {
