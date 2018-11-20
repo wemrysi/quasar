@@ -81,11 +81,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       : T[G] => T[H] =
     normTJ[G].apply(_).transCata[T[H]](J.simplifyJoin[J.G](idPrism.reverseGet))
 
-  // TODO: These optimizations should give rise to various property tests:
-  //       • elideNopMap ⇒ no `Map(???, HoleF)`
-  //       • normalize ⇒ a whole bunch, based on MapFuncsCore
-  //       • coalesceMaps ⇒ no `Map(Map(???, ???), ???)`
-  //       • coalesceMapJoin ⇒ no `Map(ThetaJoin(???, …), ???)`
 
   def elideNopQC[F[_]: Functor]: QScriptCore[T[F]] => Option[F[T[F]]] = {
     case Filter(Embed(src), RecBoolLit(true)) => some(src)
@@ -154,34 +149,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       F[A] => G[A] =
     fa => applyNormalizations[F, G](prism, normalizeJoins)
       .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
-
-  private def normalizeEJBijection[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor, A](
-    bij: Bijection[A, T[G]])(
-    prism: PrismNT[G, F])(
-    implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F,
-             EJ: EquiJoin :<<: F):
-      F[A] => G[A] = {
-
-    val normEJ: G[T[G]] => Option[G[T[G]]] =
-      liftFFTrans[F, G, T[G]](prism)(C.coalesceEJ[G](prism.get))
-
-    normalizeWithBijection[F, G, A](bij)(prism, normEJ compose (prism apply _))
-  }
-
-  def normalizeEJ[F[a] <: ACopK[a]: Functor: Normalizable](
-    implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F,
-             EJ: EquiJoin :<<: F):
-      F[T[F]] => F[T[F]] =
-    normalizeEJBijection[F, F, T[F]](bijectionId)(idPrism)
-
-  def normalizeEJCoEnv[F[a] <: ACopK[a]: Functor: Normalizable](
-    implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F,
-             EJ: EquiJoin :<<: F):
-      F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
-    normalizeEJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism)
 
   private def normalizeTJBijection[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor, A](
     bij: Bijection[A, T[G]])(
