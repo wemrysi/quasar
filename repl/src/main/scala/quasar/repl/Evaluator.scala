@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.api._, datasource._, resource._, table._
 import quasar.common.{PhaseResultListen, PhaseResultTell, PhaseResults}
 import quasar.common.data.Data
+import quasar.concurrent.BlockingContext
 import quasar.contrib.fs2.convert.fromStreamT
 import quasar.contrib.fs2.pipe
 import quasar.contrib.iota._
@@ -41,7 +42,6 @@ import quasar.yggdrasil.util.NullRemover
 import java.lang.Exception
 import java.nio.CharBuffer
 import java.nio.file.{Path => JPath}
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
@@ -64,8 +64,8 @@ import spire.std.double._
 
 final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
     stateRef: Ref[F, ReplState],
-    q: Quasar[F])(
-    implicit ec: ExecutionContext) {
+    q: Quasar[F],
+    blockingPool: BlockingContext) {
 
   import Command._
   import DatasourceError._
@@ -541,7 +541,7 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
 
     private def writeToPath(path: JPath, s: Stream[F, CharBuffer]): F[Unit] =
       s.through(pipe.charBufferToByteUtf8(true))
-        .through(fs2.io.file.writeAll(path, ec))
+        .through(fs2.io.file.writeAll(path, blockingPool))
         .compile.drain
 }
 
@@ -552,10 +552,10 @@ object Evaluator {
 
   def apply[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       stateRef: Ref[F, ReplState],
-      quasar: Quasar[F])(
-      implicit ec: ExecutionContext)
+      quasar: Quasar[F],
+      blockingPool: BlockingContext)
       : Evaluator[F] =
-    new Evaluator[F](stateRef, quasar)
+    new Evaluator[F](stateRef, quasar, blockingPool)
 
   val helpMsg =
     """Quasar REPL, Copyright © 2014–2018 SlamData Inc.

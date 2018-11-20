@@ -32,7 +32,7 @@ import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
 import quasar.yggdrasil.vfs.contextShiftForS
 
 import java.nio.file.Path
-import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 
 import cats.arrow.FunctionK
 import cats.effect._
@@ -65,8 +65,13 @@ object Main extends IOApp {
     } yield (dataDir, pluginDir)
 
   def quasarStream[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer](
-      pluginFiles: Option[PluginFiles], blockingPool: BlockingContext)
-      : Stream[F, Quasar[F]] =
+      pluginFiles: Option[PluginFiles],
+      blockingPool: BlockingContext)
+      : Stream[F, Quasar[F]] = {
+
+    // we probably shouldn't use global, but this is fine for now
+    implicit val cpuEC = ExecutionContext.global
+
     for {
       (dataPath, pluginPath) <- paths[F]
       precog <- Precog.stream(dataPath.toFile, blockingPool).translate(λ[FunctionK[IO, F]](_.to[F]))
@@ -79,13 +84,15 @@ object Main extends IOApp {
         extMods
       q <- Quasar[F](precog, mods, evalCfg)
     } yield q
+  }
 
   def repl[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
-      q: Quasar[F])
+      q: Quasar[F],
+      blockingPool: BlockingContext)
       : F[ExitCode] =
     for {
       ref <- Ref.of[F, ReplState](ReplState.mk)
-      repl <- Repl.mk[F](ref, q)
+      repl <- Repl.mk[F](ref, q, blockingPool)
       l <- repl.loop
     } yield l
 
@@ -112,11 +119,12 @@ object Main extends IOApp {
         for {
           files <- opts.pluginFiles
           qs <- quasarStream[IOT](files, blockingPool)
-                  .evalMap(repl[IOT])
-                  .compile
-                  .last
-                  .run.map(_._2.getOrElse(ExitCode.Success))
+            .evalMap(repl[IOT](_, blockingPool))
+            .compile
+            .last
+            .run.map(_._2.getOrElse(ExitCode.Success))
         } yield qs
+
       case Failure(f) =>
         val (s, exitCode) = renderFailure(f, "repl")
         IO.delay(println(s)).as(ExitCode(exitCode.toInt))
