@@ -18,7 +18,6 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
-import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
 import quasar.fp._
@@ -260,23 +259,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
             as.fold[Option[Option[A]]](Some(a.some))(oldA => (oldA ≟ a).option(as)) strengthR (b :: bs)
         }
 
-      // TODO: I feel like this must be some standard fold.
-      def sequenceReduce[A: Equal, B](rf: ReduceFunc[(A, B)])
-          : Option[(A, ReduceFunc[B])] =
-        rf match {
-          case ReduceFuncs.Count(a)           => (a._1, ReduceFuncs.Count(a._2)).some
-          case ReduceFuncs.Sum(a)             => (a._1, ReduceFuncs.Sum(a._2)).some
-          case ReduceFuncs.Min(a)             => (a._1, ReduceFuncs.Min(a._2)).some
-          case ReduceFuncs.Max(a)             => (a._1, ReduceFuncs.Max(a._2)).some
-          case ReduceFuncs.Avg(a)             => (a._1, ReduceFuncs.Avg(a._2)).some
-          case ReduceFuncs.Arbitrary(a)       => (a._1, ReduceFuncs.Arbitrary(a._2)).some
-          case ReduceFuncs.First(a)           => (a._1, ReduceFuncs.First(a._2)).some
-          case ReduceFuncs.Last(a)            => (a._1, ReduceFuncs.Last(a._2)).some
-          case ReduceFuncs.UnshiftArray(a)    => (a._1, ReduceFuncs.UnshiftArray(a._2)).some
-          case ReduceFuncs.UnshiftMap(a1, a2) =>
-            (a1._1 ≟ a2._1).option((a1._1, ReduceFuncs.UnshiftMap(a1._2, a2._2)))
-        }
-
       def rightOnly(replacement: FreeMap): JoinFunc => Option[FreeMap] =
         _.traverseM[Option, Hole] {
           case LeftSide  => None
@@ -355,55 +337,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
             //       reference, but currently that breaks merging.
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
               LeftShift(innerSrc, struct >> mf, id, stpe, OnUndefined.omit, shiftRepair).some
-            case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
-                if nm.freeMF(struct.linearize >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
-              rightOnly(elem)(shiftRepair) ∘ (RecFreeS.fromFree(_)) ∘ (Map(srcInner, _))
-            case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(k, elem)), redRepair)
-                if nm.freeMF(struct.linearize >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
-              rightOnly(id match {
-                case ExcludeId => elem
-                case IdOnly    => k
-                case IncludeId => StaticArray(List(k, elem))
-              })(shiftRepair) ∘ (RecFreeS.fromFree(_)) ∘ (Map(srcInner, _))
-            case _ => None
-          }
-        case Reduce(Embed(src), bucket, reducers, redRepair) =>
-          FToOut.get(src) >>= QC.prj.apply >>= {
-            case LeftShift(innerSrc, struct, id, stpe, _, shiftRepair)
-                if shiftRepair =/= RightSideF =>
-              (bucket.traverse(b => rightOnly(HoleF)(nm.freeMF(b >> shiftRepair))) ⊛
-                reducers.traverse(_.traverse(mf => rightOnly(HoleF)(nm.freeMF(mf >> shiftRepair)))))((sb, sr) =>
-                Reduce(
-                  FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, id, stpe, OnUndefined.omit, RightSideF))).embed,
-                  sb,
-                  sr,
-                  redRepair))
-            case LeftShift(innerSrc, struct, id, stpe, _, shiftRepair) =>
-              (bucket.traverse(b => rewrite.rewriteShift(id, nm.freeMF(b >> shiftRepair))).flatMap(sequenceBucket[IdStatus, JoinFunc]) ⊛
-                reducers.traverse(_.traverse(mf =>
-                  rewrite.rewriteShift(id, nm.freeMF(mf >> shiftRepair)))).flatMap(_.traverse(sequenceReduce[IdStatus, JoinFunc]) >>= sequenceBucket[IdStatus, ReduceFunc[JoinFunc]])) {
-                case ((bId, bucket), (rId, reducers)) =>
-                  val newId = bId.fold(rId.getOrElse(ExcludeId).some)(b => rId.fold(b.some)(r => (b ≟ r).option(b)))
-                  newId strengthR ((bucket, reducers))
-              }.join >>= {
-                case (newId, (bucket, reducers)) =>
-                  (bucket.traverse(rightOnly(HoleF)) ⊛
-                    (reducers.traverse(_.traverse(rightOnly(HoleF)))))((sb, sr) =>
-                    Reduce(
-                      FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, newId, stpe, OnUndefined.omit, RightSideF))).embed,
-                      sb,
-                      sr,
-                      redRepair))
-              }
-            case Map(innerSrc, mf) =>
-              Reduce(
-                innerSrc,
-                bucket ∘ (_ >> mf.linearize),
-                reducers.map(_.map(_ >> mf.linearize)),
-                redRepair).some
-            case Sort(innerSrc, _, _)
-                if !reducers.exists(ReduceFunc.isOrderDependent) =>
-              Reduce(innerSrc, bucket, reducers, redRepair).some
             case _ => None
           }
         case Filter(Embed(src), cond) => FToOut.get(src) >>= QC.prj.apply >>= {

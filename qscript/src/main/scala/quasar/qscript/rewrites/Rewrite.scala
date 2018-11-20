@@ -18,18 +18,13 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
-import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.api.resource.ResourcePath
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.qscript._
-import quasar.qscript.RecFreeS._
-import quasar.qscript.MapFuncCore._
-import quasar.qscript.MapFuncsCore._
 
 import matryoshka.{Hole => _, _}
-import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _},
@@ -38,26 +33,6 @@ import scalaz.{:+: => _, Divide => _, _},
   Scalaz._
 
 class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T] {
-
-  def rewriteShift(idStatus: IdStatus, repair: JoinFunc)
-      : Option[(IdStatus, JoinFunc)] =
-    (idStatus === IncludeId).option[Option[(IdStatus, JoinFunc)]] {
-      def makeRef(idx: Int): JoinFunc =
-        Free.roll[MapFunc, JoinSide](MFC(ProjectIndex(RightSideF, IntLit(idx))))
-
-      val zeroRef: JoinFunc = makeRef(0)
-      val oneRef: JoinFunc = makeRef(1)
-      val rightCount: Int = repair.elgotPara[Int](count(RightSideF))
-
-      if (repair.elgotPara[Int](count(oneRef)) === rightCount)
-        // all `RightSide` access is through `oneRef`
-        (ExcludeId, repair.transApoT(substitute[JoinFunc](oneRef, RightSideF))).some
-      else if (repair.elgotPara[Int](count(zeroRef)) ≟ rightCount)
-        // all `RightSide` access is through `zeroRef`
-        (IdOnly, repair.transApoT(substitute[JoinFunc](zeroRef, RightSideF))).some
-      else
-        None
-    }.join
 
   def normTJ[G[a] <: ACopK[a]: Traverse]
     (implicit QC: QScriptCore :<<: G,
@@ -87,45 +62,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   //       • coalesceMaps ⇒ no `Map(Map(???, ???), ???)`
   //       • coalesceMapJoin ⇒ no `Map(ThetaJoin(???, …), ???)`
 
-  def elideNopQC[F[_]: Functor]: QScriptCore[T[F]] => Option[F[T[F]]] = {
-    case Filter(Embed(src), RecBoolLit(true)) => some(src)
-    case Map(Embed(src), mf) if mf ≟ HoleR    => some(src)
-    case _                                    => none
-  }
-
-  def compactLeftShift[F[_]: Functor]
-      (QCToF: PrismNT[F, QScriptCore])
-      : QScriptCore[T[F]] => Option[F[T[F]]] = {
-    case qs @ LeftShift(Embed(src), struct, ExcludeId, shiftType, OnUndefined.Emit, joinFunc) =>
-      (QCToF.get(src), struct.resume) match {
-        // LeftShift(Map(_, MakeArray(_)), Hole, ExcludeId, _)
-        case (Some(Map(innerSrc, fm)), \/-(SrcHole)) =>
-          fm.resume match {
-            case -\/(Suspend(MFC(MakeArray(value)))) =>
-              QCToF(Map(innerSrc, (joinFunc.asRec >>= {
-                case LeftSide => fm
-                case RightSide => value
-              }))).some
-            case _ => None
-          }
-        // LeftShift(_, MakeArray(_), ExcludeId, _)
-        case (_, -\/(Suspend(MFC(MakeArray(value))))) =>
-          QCToF(Map(src.embed, (joinFunc.asRec >>= {
-            case LeftSide => HoleR
-            case RightSide => value
-          }))).some
-        case (_, _) => None
-      }
-    case qs => None
-  }
-
-  val compactQC = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
-    case LeftShift(src, struct, id, stpe, undef, repair) =>
-      rewriteShift(id, repair) ∘ (xy => LeftShift(src, struct, xy._1, stpe, undef, xy._2))
-
-    case _ => None
-  }
-
   private def applyNormalizations[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor](
     prism: PrismNT[G, F],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
@@ -137,11 +73,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
     ftf => repeatedly[G[T[G]]](applyTransforms[G[T[G]]](
       liftFFTrans[F, G, T[G]](prism)(Normalizable[F].normalizeF(_: F[T[G]])),
-      liftFFTrans[QScriptCore, G, T[G]](qcPrism)(compactQC(_: QScriptCore[T[G]])),
-      liftFGTrans[QScriptCore, G, T[G]](qcPrism)(compactLeftShift[G](qcPrism)),
       liftFFTrans[F, G, T[G]](prism)(C.coalesceQC[G](prism)),
       liftFGTrans[F, G, T[G]](prism)(normalizeJoins),
-      liftFGTrans[QScriptCore, G, T[G]](qcPrism)(elideNopQC[G])
     ))(prism(ftf))
   }
 
