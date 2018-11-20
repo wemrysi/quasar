@@ -47,7 +47,7 @@ object Unirewrite {
     new Unirewrite[T, L] {
       def apply[F[_]: Monad: MonadPlannerErr](r: Rewrite[T])
           : T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]] = { qs =>
-        r.simplifyJoinOnNorm[QScriptRead[T, ?], CopK[L, ?]]
+        r.normalize[QScriptRead[T, ?], CopK[L, ?]]
           .apply(qs).point[F]
       }
   }

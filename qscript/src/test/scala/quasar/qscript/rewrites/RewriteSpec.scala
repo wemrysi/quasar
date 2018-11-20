@@ -40,7 +40,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
   val rewrite = new Rewrite[Fix]
 
   def normalizeExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](rewrite.normalizeTJ[QS])
+    expr.transCata[Fix[QS]](rewrite.normalizeT[QS])
 
   def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
     expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
