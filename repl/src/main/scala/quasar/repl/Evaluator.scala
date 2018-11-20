@@ -256,14 +256,15 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
                 printQueryResults(maxLines, rendered.map(_.toString))
               }
             case OutputMode.File =>
-              Paths.createTempFile("tableResults", ".txt").map { tmpFile =>
-                Stream.emit(s"Writing table results to ${tmpFile.toFile.getAbsolutePath}") ++
-                  Stream.eval {
-                    for {
-                      rendered <- renderTableData(id, state.format)
-                      _ <- writeToPath(tmpFile, rendered)
-                    } yield "Done"
-                  }
+              Paths.createTempFile("tableResults", ".txt") map { tmpFile =>
+                val body  = for {
+                  rendered <- Stream.eval(renderTableData(id, state.format))
+                  _ <- writeToPath(tmpFile, rendered)
+                } yield ()
+
+                Stream(s"Writing table results to ${tmpFile.toFile.getAbsolutePath}") ++
+                  body.drain ++
+                  Stream("Done")
             }
           }
         } yield res
@@ -329,15 +330,17 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
                   .map(_.value + OutputFormat.headerLines(state.format))
                 Stream.emit(log) ++ printQueryResults(maxLines, rendered.map(_.toString))
               }
+
             case OutputMode.File =>
-              Paths.createTempFile("results", ".txt").map { tmpFile =>
-                Stream.emit(s"Writing results to ${tmpFile.toFile.getAbsolutePath}") ++
-                  Stream.eval {
-                    for {
-                      (log, rendered) <- doSelect(sql, state)
-                      _ <- writeToPath(tmpFile, Stream(CharBuffer.wrap(log)).covary[F] ++ rendered)
-                    } yield "Done"
-                  }
+              Paths.createTempFile("results", ".txt") map { tmpFile =>
+                val body = for {
+                  (log, rendered) <- Stream.eval(doSelect(sql, state))
+                  _ <- writeToPath(tmpFile, Stream(CharBuffer.wrap(log)).covary[F] ++ rendered)
+                } yield ()
+
+                Stream(s"Writing results to ${tmpFile.toFile.getAbsolutePath}") ++
+                  body.drain ++
+                  Stream("Done")
               }
           }
         } yield res
@@ -539,10 +542,9 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
     private def toADir(path: ResourcePath): ADir =
       path.fold(f => fileParent(f) </> dir(fileName(f).value), rootDir)
 
-    private def writeToPath(path: JPath, s: Stream[F, CharBuffer]): F[Unit] =
+    private def writeToPath(path: JPath, s: Stream[F, CharBuffer]): Stream[F, Unit] =
       s.through(pipe.charBufferToByteUtf8(true))
         .through(fs2.io.file.writeAll(path, blockingPool))
-        .compile.drain
 }
 
 object Evaluator {
