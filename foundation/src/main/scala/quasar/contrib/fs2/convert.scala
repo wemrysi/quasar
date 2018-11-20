@@ -25,7 +25,7 @@ import scala.util.{Either, Left}
 
 import cats.effect.{Concurrent, Sync}
 import cats.syntax.monadError._
-import fs2.concurrent.{Queue, SignallingRef}
+import fs2.concurrent.{NoneTerminatedQueue, Queue, SignallingRef}
 import fs2.{Chunk, Stream}
 import scalaz.{Functor, StreamT, Scalaz}, Scalaz._
 import shims._
@@ -53,7 +53,7 @@ object convert {
     , done = None)))
 
   def fromStreamT[F[_]: Functor, A](st: StreamT[F, A]): Stream[F, A] =
-    fromChunkedStreamT(st.map(a => Chunk.singleton(a): Chunk[A]))
+    fromChunkedStreamT(st.map(Chunk.singleton(_)))
 
   def toStreamT[F[_]: Concurrent, A](
     s: Stream[F, A])
@@ -71,16 +71,16 @@ object convert {
   ////
 
   private def chunkQ[F[_], A](s: Stream[F, A])(implicit F: Concurrent[F])
-      : F[(F[Queue[F, Option[Either[Throwable, Chunk[A]]]]], F[Unit])] =
+      : F[(F[NoneTerminatedQueue[F, Either[Throwable, Chunk[A]]]], F[Unit])] =
     SignallingRef[F, Boolean](false) map { i =>
       val startQ = for {
-        q <- Queue.bounded[F, Option[Either[Throwable, Chunk[A]]]](1)
+        q <- Queue.synchronousNoneTerminated[F, Either[Throwable, Chunk[A]]]
 
         enqueue =
           s.chunks
             .attempt
-            .noneTerminate
             .interruptWhen(i)
+            .noneTerminate
             .to(q.enqueue)
             .handleErrorWith(t => Stream.eval(q.enqueue1(Some(Left(t)))))
 
