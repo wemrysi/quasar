@@ -16,7 +16,7 @@
 
 package quasar.qscript.rewrites
 
-import slamdata.Predef.{Map => _, _}
+import slamdata.Predef.{Map => _}
 import quasar.RenderTreeT
 import quasar.api.resource.ResourcePath
 import quasar.contrib.matryoshka._
@@ -58,8 +58,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
 
   private def applyNormalizations[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor](
-    prism: PrismNT[G, F],
-    normalizeJoins: F[T[G]] => Option[G[T[G]]])(
+    prism: PrismNT[G, F])(
     implicit C: Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F):
       F[T[G]] => G[T[G]] = {
@@ -69,45 +68,29 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     ftf => repeatedly[G[T[G]]](applyTransforms[G[T[G]]](
       liftFFTrans[F, G, T[G]](prism)(Normalizable[F].normalizeF(_: F[T[G]])),
       liftFFTrans[F, G, T[G]](prism)(C.coalesceQC[G](prism)),
-      liftFGTrans[F, G, T[G]](prism)(normalizeJoins),
     ))(prism(ftf))
   }
 
   private def normalizeWithBijection[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor, A](
     bij: Bijection[A, T[G]])(
-    prism: PrismNT[G, F],
-    normalizeJoins: F[T[G]] => Option[G[T[G]]])(
+    prism: PrismNT[G, F])(
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F):
       F[A] => G[A] =
-    fa => applyNormalizations[F, G](prism, normalizeJoins)
+    fa => applyNormalizations[F, G](prism)
       .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
-
-  private def normalizeTJBijection[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor, A](
-    bij: Bijection[A, T[G]])(
-    prism: PrismNT[G, F])(
-    implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F,
-             TJ: ThetaJoin :<<: F):
-      F[A] => G[A] = {
-
-    val normTJ = applyTransforms(
-      liftFFTrans[F, G, T[G]](prism)(C.coalesceTJ[G](prism.get)))
-
-    normalizeWithBijection[F, G, A](bij)(prism, normTJ compose (prism apply _))
-  }
 
   def normalizeTJ[F[a] <: ACopK[a]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
              TJ: ThetaJoin :<<: F):
       F[T[F]] => F[T[F]] =
-    normalizeTJBijection[F, F, T[F]](bijectionId)(idPrism)
+    normalizeWithBijection[F, F, T[F]](bijectionId)(idPrism)
 
   def normalizeTJCoEnv[F[a] <: ACopK[a]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
              TJ: ThetaJoin :<<: F):
       F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
-    normalizeTJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism)
+    normalizeWithBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism)
 }
