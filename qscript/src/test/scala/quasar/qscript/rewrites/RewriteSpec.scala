@@ -35,7 +35,7 @@ import iotaz.{CopK, TNilK}
 import iotaz.TListK.:::
 
 class RewriteSpec extends quasar.Qspec with QScriptHelpers {
-  import IdStatus.{ExcludeId, IncludeId}
+  import IdStatus.ExcludeId
 
   val rewrite = new Rewrite[Fix]
 
@@ -44,11 +44,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
 
   def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
     expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
-
-  def compactLeftShiftExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](liftFG[QScriptCore, QS, Fix[QS]](
-      injectRepeatedly[QScriptCore, QS, Fix[QS]](
-        rewrite.compactLeftShift[QS](PrismNT.injectCopK).apply(_: QScriptCore[Fix[QS]]))))
 
   type QSI[A] = CopK[QScriptCore ::: ThetaJoin ::: TNilK, A]
 
@@ -85,63 +80,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
           ShiftType.Array,
           OnUndefined.Omit,
           func.RightSide).unFix.some)
-    }
-
-    "coalesce a Filter into a preceding ThetaJoin" in {
-      import qstdsl._
-      val sampleFile = ResourcePath.leaf(rootDir </> file("bar"))
-
-      val exp =
-        fix.Filter(
-          fix.ThetaJoin(
-            fix.Unreferenced,
-            free.Read[ResourcePath](sampleFile, IncludeId),
-            free.Read[ResourcePath](sampleFile, IncludeId),
-            func.And(
-              func.Eq(func.ProjectKeyS(func.LeftSide, "l_id"), func.ProjectKeyS(func.RightSide, "r_id")),
-              func.Eq(
-                func.Add(
-                  func.ProjectKeyS(func.LeftSide, "l_min"),
-                  func.ProjectKeyS(func.LeftSide, "l_max")),
-                func.Subtract(
-                  func.ProjectKeyS(func.RightSide, "l_max"),
-                  func.ProjectKeyS(func.RightSide, "l_min")))),
-            JoinType.Inner,
-            func.StaticMapS(
-              "l" -> func.LeftSide,
-              "r" -> func.RightSide)),
-          recFunc.Lt(
-            recFunc.ProjectKeyS(
-              recFunc.ProjectKeyS(recFunc.Hole, "l"),
-              "lat"),
-            recFunc.ProjectKeyS(
-              recFunc.ProjectKeyS(recFunc.Hole, "l"),
-              "lon"))).unFix
-
-      Coalesce[Fix, QST, QST].coalesceTJ(idPrism[QST].get).apply(exp).map(rewrite.normalizeTJ[QST]) must
-      equal(
-        fix.ThetaJoin(
-          fix.Unreferenced,
-          free.Read[ResourcePath](sampleFile, IncludeId),
-          free.Read[ResourcePath](sampleFile, IncludeId),
-          func.And(
-            func.And(
-              func.Eq(func.ProjectKeyS(func.LeftSide, "l_id"), func.ProjectKeyS(func.RightSide, "r_id")),
-              func.Eq(
-                func.Add(
-                  func.ProjectKeyS(func.LeftSide, "l_min"),
-                  func.ProjectKeyS(func.LeftSide, "l_max")),
-                func.Subtract(
-                  func.ProjectKeyS(func.RightSide, "l_max"),
-                  func.ProjectKeyS(func.RightSide, "l_min")))),
-            func.Lt(
-              func.ProjectKeyS(func.LeftSide, "lat"),
-              func.ProjectKeyS(func.LeftSide, "lon"))),
-          JoinType.Inner,
-          func.StaticMapS(
-            "l" -> func.LeftSide,
-            "r" -> func.RightSide)).unFix.some)
-
     }
 
     "simplify an outer ThetaJoin with a statically known condition" in {
@@ -238,58 +176,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
             recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.LeftK),
             recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.RightK)))
       }
-    }
-
-    "transform a left shift with a static array as the source" in {
-      import qsdsl._
-      val original: Fix[QS] =
-        fix.LeftShift(
-          fix.Map(
-            fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-            recFunc.MakeArray(recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))))),
-          recFunc.Hole,
-          ExcludeId,
-          ShiftType.Array,
-          OnUndefined.Emit,
-          func.StaticMapS(
-            "right" -> func.RightSide,
-            "left" -> func.LeftSide))
-
-      val expected: Fix[QS] =
-        fix.Map(
-          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-          recFunc.StaticMapS(
-            "right" -> recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))),
-            "left" -> recFunc.MakeArray(recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))))))
-
-      compactLeftShiftExpr(original) must equal(expected)
-    }
-
-    "transform a left shift with a static array as the struct" in {
-      import qsdsl._
-      val original: Fix[QS] =
-        fix.LeftShift(
-          fix.Map(
-            fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-            recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3)))),
-          recFunc.MakeArray(recFunc.Subtract(recFunc.Hole, recFunc.Constant(json.int(5)))),
-          ExcludeId,
-          ShiftType.Array,
-          OnUndefined.Emit,
-          func.StaticMapS(
-            "right" -> func.RightSide,
-            "left" -> func.LeftSide))
-
-      val expected: Fix[QS] =
-        fix.Map(
-          fix.Map(
-            fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-            recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3)))),
-          recFunc.StaticMapS(
-            "right" -> recFunc.Subtract(recFunc.Hole, recFunc.Constant(json.int(5))),
-            "left" -> recFunc.Hole))
-
-      compactLeftShiftExpr(original) must equal(expected)
     }
 
     "extract filter from join condition" >> {
