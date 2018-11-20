@@ -544,7 +544,7 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
 
     private def writeToPath(path: JPath, s: Stream[F, CharBuffer]): Stream[F, Unit] =
       s.through(pipe.charBufferToByteUtf8(true))
-        .through(fs2.io.file.writeAll(path, blockingPool))
+        .to(fs2.io.file.writeAll(path, blockingPool))
 }
 
 object Evaluator {
