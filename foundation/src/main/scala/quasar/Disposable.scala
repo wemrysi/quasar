@@ -16,8 +16,8 @@
 
 package quasar
 
-import slamdata.Predef.{Array, SuppressWarnings, Throwable, Unit}
-import quasar.contrib.scalaz.MonadError_
+import slamdata.Predef.{Array, List, SuppressWarnings, Throwable, Unit}
+import quasar.contrib.scalaz.{MonadError_, MonadTell_}
 import quasar.fp.ski.κ
 
 import cats.effect.{ExitCase, Resource}
@@ -77,6 +77,9 @@ final class Disposable[F[_], A](val unsafeValue: A, val dispose: F[Unit]) {
       F1: MonadError_[F, Throwable])
       : Disposable[F, (A, B)] =
     Disposable((unsafeValue, b.unsafeValue), F1.ensuring(dispose)(κ(b.dispose)))
+
+  def unwrap[G[_]: Functor](implicit G: MonadTell_[G, List[F[Unit]]]): G[A] =
+    G.tell(List(dispose)).as(unsafeValue)
 }
 
 object Disposable extends DisposableInstances {
