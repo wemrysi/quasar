@@ -40,7 +40,7 @@ object Unirewrite {
     implicit
       FC: Functor[CopK[L, ?]],
       TC0: Traverse[CopK[L, ?]],
-      J: SimplifyJoin.Aux[T, QScriptRead[T, ?], CopK[L, ?]],
+      J: ThetaToEquiJoin.Aux[T, QScriptRead[T, ?], CopK[L, ?]],
       C: Coalesce.Aux[T, QScriptRead[T, ?], QScriptRead[T, ?]],
       N: Normalizable[QScriptRead[T, ?]])
       : Unirewrite[T, L] =

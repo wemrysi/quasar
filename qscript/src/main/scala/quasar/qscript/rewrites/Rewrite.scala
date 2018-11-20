@@ -34,11 +34,11 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
   def normalize[G[a] <: ACopK[a]: Traverse, H[_]: Functor]
     (implicit QC: QScriptCore :<<: G,
-              J: SimplifyJoin.Aux[T, G, H],
+              J: ThetaToEquiJoin.Aux[T, G, H],
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
       : T[G] => T[H] =
-    normalizeAll[G].apply(_).transCata[T[H]](J.simplifyJoin[J.G](idPrism.reverseGet))
+    normalizeAll[G].apply(_).transCata[T[H]](J.rewrite[J.G](idPrism.reverseGet))
 
   private def normalizeAll[G[a] <: ACopK[a]: Traverse]
     (implicit QC: QScriptCore :<<: G,
