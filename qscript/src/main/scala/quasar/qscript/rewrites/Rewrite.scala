@@ -119,13 +119,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     case qs => None
   }
 
-  val compactQC = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
-    case LeftShift(src, struct, id, stpe, undef, repair) =>
-      rewriteShift(id, repair) ∘ (xy => LeftShift(src, struct, xy._1, stpe, undef, xy._2))
-
-    case _ => None
-  }
-
   private def applyNormalizations[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor](
     prism: PrismNT[G, F],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
@@ -137,7 +130,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
     ftf => repeatedly[G[T[G]]](applyTransforms[G[T[G]]](
       liftFFTrans[F, G, T[G]](prism)(Normalizable[F].normalizeF(_: F[T[G]])),
-      liftFFTrans[QScriptCore, G, T[G]](qcPrism)(compactQC(_: QScriptCore[T[G]])),
       liftFGTrans[QScriptCore, G, T[G]](qcPrism)(compactLeftShift[G](qcPrism)),
       liftFFTrans[F, G, T[G]](prism)(C.coalesceQC[G](prism)),
       liftFGTrans[F, G, T[G]](prism)(normalizeJoins),
