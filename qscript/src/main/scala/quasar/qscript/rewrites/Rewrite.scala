@@ -87,12 +87,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   //       • coalesceMaps ⇒ no `Map(Map(???, ???), ???)`
   //       • coalesceMapJoin ⇒ no `Map(ThetaJoin(???, …), ???)`
 
-  def elideNopQC[F[_]: Functor]: QScriptCore[T[F]] => Option[F[T[F]]] = {
-    case Filter(Embed(src), RecBoolLit(true)) => some(src)
-    case Map(Embed(src), mf) if mf ≟ HoleR    => some(src)
-    case _                                    => none
-  }
-
   private def applyNormalizations[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor](
     prism: PrismNT[G, F],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
@@ -106,7 +100,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       liftFFTrans[F, G, T[G]](prism)(Normalizable[F].normalizeF(_: F[T[G]])),
       liftFFTrans[F, G, T[G]](prism)(C.coalesceQC[G](prism)),
       liftFGTrans[F, G, T[G]](prism)(normalizeJoins),
-      liftFGTrans[QScriptCore, G, T[G]](qcPrism)(elideNopQC[G])
     ))(prism(ftf))
   }
 
