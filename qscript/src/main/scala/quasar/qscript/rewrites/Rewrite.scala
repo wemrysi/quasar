@@ -93,32 +93,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     case _                                    => none
   }
 
-  def compactLeftShift[F[_]: Functor]
-      (QCToF: PrismNT[F, QScriptCore])
-      : QScriptCore[T[F]] => Option[F[T[F]]] = {
-    case qs @ LeftShift(Embed(src), struct, ExcludeId, shiftType, OnUndefined.Emit, joinFunc) =>
-      (QCToF.get(src), struct.resume) match {
-        // LeftShift(Map(_, MakeArray(_)), Hole, ExcludeId, _)
-        case (Some(Map(innerSrc, fm)), \/-(SrcHole)) =>
-          fm.resume match {
-            case -\/(Suspend(MFC(MakeArray(value)))) =>
-              QCToF(Map(innerSrc, (joinFunc.asRec >>= {
-                case LeftSide => fm
-                case RightSide => value
-              }))).some
-            case _ => None
-          }
-        // LeftShift(_, MakeArray(_), ExcludeId, _)
-        case (_, -\/(Suspend(MFC(MakeArray(value))))) =>
-          QCToF(Map(src.embed, (joinFunc.asRec >>= {
-            case LeftSide => HoleR
-            case RightSide => value
-          }))).some
-        case (_, _) => None
-      }
-    case qs => None
-  }
-
   private def applyNormalizations[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor](
     prism: PrismNT[G, F],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
@@ -130,7 +104,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
     ftf => repeatedly[G[T[G]]](applyTransforms[G[T[G]]](
       liftFFTrans[F, G, T[G]](prism)(Normalizable[F].normalizeF(_: F[T[G]])),
-      liftFGTrans[QScriptCore, G, T[G]](qcPrism)(compactLeftShift[G](qcPrism)),
       liftFFTrans[F, G, T[G]](prism)(C.coalesceQC[G](prism)),
       liftFGTrans[F, G, T[G]](prism)(normalizeJoins),
       liftFGTrans[QScriptCore, G, T[G]](qcPrism)(elideNopQC[G])
