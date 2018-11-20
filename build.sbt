@@ -319,6 +319,7 @@ lazy val repl = project
   .settings(libraryDependencies ++= Dependencies.repl)
   .settings(
     mainClass in Compile := Some("quasar.repl.Main"),
+    javaOptions += "-XX:+HeapDumpOnOutOfMemoryError",
     fork in run := true,
     connectInput in run := true,
     outputStrategy := Some(StdoutOutput))
