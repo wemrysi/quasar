@@ -178,6 +178,7 @@ object QDataCompressedSst {
           TemporalKeys.second -> makeLong(l.duration.getSeconds),
           TemporalKeys.nanosecond -> makeInt(l.duration.getNano))
 
+      // (length, retained indices, additional indices), corresponds to TypeF.Arr
       type NascentArray = (Long, IList[SST[J, A]], Option[SST[J, A]])
 
       val prepArray: NascentArray = (0L, IList.empty, none)
@@ -203,6 +204,7 @@ object QDataCompressedSst {
           TypeST(TypeF.arr[J, SST[J, A]](na._2.reverse, na._3))).embed
       }
 
+      // (retained entries, additional entries), corresponds to TypeF.Map
       type NascentObject = (IMap[String, SST[J, A]], Option[(SST[J, A], SST[J, A])])
 
       val prepObject: NascentObject = (IMap.empty, none)
