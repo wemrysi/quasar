@@ -38,10 +38,10 @@ object RewriteSpec extends quasar.Qspec with QScriptHelpers {
   val rewrite = new Rewrite[Fix]
 
   def normalizeTExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](rewrite.normalizeT[QS])
+    expr.transCata[Fix[QS]](rewrite.normalizeT)
 
   def normalizeExpr(expr: Fix[QS]): Fix[QST] =
-    rewrite.normalize[QS, QST].apply(expr)
+    rewrite.normalize[QST].apply(expr)
 
   type QSI[A] = CopK[QScriptCore ::: ThetaJoin ::: TNilK, A]
 
