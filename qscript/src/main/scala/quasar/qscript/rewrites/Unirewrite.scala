@@ -40,14 +40,14 @@ object Unirewrite {
     implicit
       FC: Functor[CopK[L, ?]],
       TC0: Traverse[CopK[L, ?]],
-      J: SimplifyJoin.Aux[T, QScriptEducated[T, ?], CopK[L, ?]],
+      J: ThetaToEquiJoin.Aux[T, QScriptEducated[T, ?], CopK[L, ?]],
       C: Coalesce.Aux[T, QScriptEducated[T, ?], QScriptEducated[T, ?]],
       N: Normalizable[QScriptEducated[T, ?]])
       : Unirewrite[T, L] =
     new Unirewrite[T, L] {
       def apply[F[_]: Monad: MonadPlannerErr](r: Rewrite[T])
           : T[QScriptEducated[T, ?]] => F[T[CopK[L, ?]]] = { qs =>
-        r.simplifyJoinOnNorm[QScriptEducated[T, ?], CopK[L, ?]]
+        r.normalize[QScriptEducated[T, ?], CopK[L, ?]]
           .apply(qs).point[F]
       }
   }

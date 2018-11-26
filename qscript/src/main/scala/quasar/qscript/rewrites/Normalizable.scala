@@ -112,7 +112,7 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
   lazy val rewrite = new Rewrite[T]
 
   def freeTC(free: FreeQS): FreeQS =
-    free.transCata[FreeQS](liftCo(rewrite.normalizeTJCoEnv[QScriptTotal]))
+    free.transCata[FreeQS](liftCo(rewrite.normalizeCoEnv[QScriptTotal]))
 
   def freeTCEq(free: FreeQS): Option[FreeQS] = {
     val freeNormalized = freeTC(free)

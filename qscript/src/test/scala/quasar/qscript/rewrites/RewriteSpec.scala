@@ -16,7 +16,6 @@
 
 package quasar.qscript.rewrites
 
-import slamdata.Predef._
 import quasar._
 import quasar.api.resource.ResourcePath
 import quasar.common.JoinType
@@ -25,7 +24,6 @@ import quasar.contrib.iota._
 import quasar.contrib.iota.SubInject
 import quasar.qscript._
 
-import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
@@ -34,16 +32,16 @@ import scalaz._, Scalaz._
 import iotaz.{CopK, TNilK}
 import iotaz.TListK.:::
 
-class RewriteSpec extends quasar.Qspec with QScriptHelpers {
+object RewriteSpec extends quasar.Qspec with QScriptHelpers {
   import IdStatus.ExcludeId
 
   val rewrite = new Rewrite[Fix]
 
-  def normalizeExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](rewrite.normalizeTJ[QS])
+  def normalizeTExpr(expr: Fix[QS]): Fix[QS] =
+    expr.transCata[Fix[QS]](rewrite.normalizeT[QS])
 
-  def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
-    expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
+  def normalizeExpr(expr: Fix[QS]): Fix[QST] =
+    rewrite.normalize[QS, QST].apply(expr)
 
   type QSI[A] = CopK[QScriptCore ::: ThetaJoin ::: TNilK, A]
 
@@ -57,6 +55,86 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "rewriter" should {
+
+    // select b[*] + c[*] from intArrays.data
+    "normalize static projections in shift coalescing" in {
+      import qsdsl._
+      import qstdsl.{fix => fixt, func => funct, recFunc => recFunct}
+
+      val educated =
+        fix.Map(
+          fix.Map(
+            fix.LeftShift(
+              fix.LeftShift(
+                fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("intArrays")), ExcludeId),
+                recFunc.ProjectKeyS(recFunc.Hole, "b"),
+                ExcludeId,
+                ShiftType.Array,
+                OnUndefined.Emit,
+                func.ConcatMaps(
+                  func.MakeMapS("original", func.LeftSide),
+                  func.MakeMapS("0", func.RightSide))),
+              recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "original"), "c"),
+              ExcludeId,
+              ShiftType.Array,
+              OnUndefined.Emit,
+              func.ConcatMaps(
+                func.LeftSide,
+                func.MakeMapS("1", func.RightSide))),
+            recFunc.ConcatMaps(
+              recFunc.MakeMapS("0", recFunc.ProjectKeyS(recFunc.Hole, "0")),
+              recFunc.MakeMapS("1", recFunc.ProjectKeyS(recFunc.Hole, "1")))),
+          recFunc.Add(
+            recFunc.ProjectKeyS(recFunc.Hole, "0"),
+            recFunc.ProjectKeyS(recFunc.Hole, "1")))
+
+      val normalized =
+        fixt.LeftShift(
+          fixt.LeftShift(
+            fixt.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("intArrays")), ExcludeId),
+            recFunct.ProjectKeyS(recFunct.Hole, "b"),
+            ExcludeId,
+            ShiftType.Array,
+            OnUndefined.Emit,
+            funct.ConcatMaps(
+              funct.MakeMapS("original", funct.LeftSide),
+              funct.MakeMapS("0", funct.RightSide))),
+          recFunct.ProjectKeyS(recFunct.ProjectKeyS(recFunct.Hole, "original"), "c"),
+          ExcludeId,
+          ShiftType.Array,
+          OnUndefined.Emit,
+          funct.Add(
+            funct.ProjectKeyS(funct.LeftSide, "0"),
+            funct.RightSide))
+
+      normalizeExpr(educated) must equal(normalized)
+    }
+
+    // select (select a, b from zips).a + (select a, b from zips).b
+    "normalize static projections in a contrived example" in {
+      import qsdsl._
+      import qstdsl.{fix => fixt, recFunc => recFunct}
+
+      val educated =
+        fix.Map(
+          fix.Map(
+            fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("zips")), ExcludeId),
+            recFunc.ConcatMaps(
+              recFunc.MakeMapS("a", recFunc.ProjectKeyS(recFunc.Hole, "a")),
+              recFunc.MakeMapS("b", recFunc.ProjectKeyS(recFunc.Hole, "b")))),
+          recFunc.Add(
+            recFunc.ProjectKeyS(recFunc.Hole, "a"),
+            recFunc.ProjectKeyS(recFunc.Hole, "b")))
+
+      val normalized =
+        fixt.Map(
+          fixt.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("zips")), ExcludeId),
+            recFunct.Add(
+              recFunct.ProjectKeyS(recFunct.Hole, "a"),
+              recFunct.ProjectKeyS(recFunct.Hole, "b")))
+
+      normalizeExpr(educated) must equal(normalized)
+    }
 
     "coalesce a Map into a subsequent LeftShift" in {
       import qsidsl._
@@ -80,102 +158,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
           ShiftType.Array,
           OnUndefined.Omit,
           func.RightSide).unFix.some)
-    }
-
-    "simplify an outer ThetaJoin with a statically known condition" in {
-      val exp: Fix[QS] = {
-        import qsdsl._
-        fix.ThetaJoin(
-          fix.Unreferenced,
-          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
-          func.Eq(
-            func.Constant(json.int(0)),
-            func.Constant(json.int(1))),
-          JoinType.FullOuter,
-          func.ConcatMaps(func.LeftSide, func.RightSide))
-      }
-
-      simplifyJoinExpr(exp) must equal {
-        import qstdsl._
-        fix.Map(
-          fix.EquiJoin(
-            fix.Unreferenced,
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
-            List((
-              func.Constant(json.int(0)),
-              func.Constant(json.int(1)))),
-            JoinType.FullOuter,
-            func.StaticMapS(
-              SimplifyJoin.LeftK -> func.LeftSide,
-              SimplifyJoin.RightK -> func.RightSide)),
-          recFunc.ConcatMaps(
-            recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.LeftK),
-            recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.RightK)))
-      }
-    }
-
-    "simplify a ThetaJoin" in {
-      val exp: Fix[QS] = {
-        import qsdsl._
-        fix.ThetaJoin(
-          fix.Unreferenced,
-          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-          free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
-          func.And(func.And(
-            // reversed equality
-            func.Eq(
-              func.ProjectKeyS(func.RightSide, "r_id"),
-              func.ProjectKeyS(func.LeftSide, "l_id")),
-            // more complicated expression, duplicated refs
-            func.Eq(
-              func.Add(
-                func.ProjectKeyS(func.LeftSide, "l_min"),
-                func.ProjectKeyS(func.LeftSide, "l_max")),
-              func.Subtract(
-                func.ProjectKeyS(func.RightSide, "l_max"),
-                func.ProjectKeyS(func.RightSide, "l_min")))),
-            // inequality
-            func.Lt(
-              func.ProjectKeyS(func.LeftSide, "l_lat"),
-              func.ProjectKeyS(func.RightSide, "r_lat"))),
-          JoinType.Inner,
-          func.ConcatMaps(func.LeftSide, func.RightSide))
-      }
-
-      simplifyJoinExpr(exp) must equal {
-        import qstdsl._
-        fix.Map(
-          fix.Filter(
-            fix.EquiJoin(
-              fix.Unreferenced,
-              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("foo")), ExcludeId),
-              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("bar")), ExcludeId),
-              List(
-                (func.ProjectKeyS(func.Hole, "l_id"),
-                  func.ProjectKeyS(func.Hole, "r_id")),
-                (func.Add(
-                  func.ProjectKeyS(func.Hole, "l_min"),
-                  func.ProjectKeyS(func.Hole, "l_max")),
-                  func.Subtract(
-                    func.ProjectKeyS(func.Hole, "l_max"),
-                    func.ProjectKeyS(func.Hole, "l_min")))),
-              JoinType.Inner,
-              func.StaticMapS(
-                SimplifyJoin.LeftK -> func.LeftSide,
-                SimplifyJoin.RightK -> func.RightSide)),
-            recFunc.Lt(
-              recFunc.ProjectKeyS(
-                recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.LeftK),
-                "l_lat"),
-              recFunc.ProjectKeyS(
-                recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.RightK),
-                "r_lat"))),
-          recFunc.ConcatMaps(
-            recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.LeftK),
-            recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.RightK)))
-      }
     }
 
     "extract filter from join condition" >> {
@@ -219,7 +201,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
             JoinType.Inner,
             func.ConcatMaps(func.LeftSide, func.RightSide))
 
-        normalizeExpr(original) must equal(expected)
+        normalizeTExpr(original) must equal(expected)
       }
 
       "when guard is undefined in false branch" >> {
@@ -262,7 +244,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
             JoinType.Inner,
             func.ConcatMaps(func.LeftSide, func.RightSide))
 
-        normalizeExpr(original) must equal(expected)
+        normalizeTExpr(original) must equal(expected)
       }
 
       "when cond is undefined in true branch" >> {
@@ -299,7 +281,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
             JoinType.Inner,
             func.ConcatMaps(func.LeftSide, func.RightSide))
 
-        normalizeExpr(original) must equal(expected)
+        normalizeTExpr(original) must equal(expected)
       }
 
       "when cond is undefined in false branch" >> {
@@ -336,7 +318,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
             JoinType.Inner,
             func.ConcatMaps(func.LeftSide, func.RightSide))
 
-        normalizeExpr(original) must equal(expected)
+        normalizeTExpr(original) must equal(expected)
       }
     }
   }
