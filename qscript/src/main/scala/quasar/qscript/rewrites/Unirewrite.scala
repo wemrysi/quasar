@@ -26,7 +26,7 @@ import scalaz.syntax.applicative._
 
 sealed trait Unirewrite[T[_[_]], L <: TListK] {
   def apply[F[_]: Monad: MonadPlannerErr](r: Rewrite[T])
-      : T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]]
+      : T[QScriptEducated[T, ?]] => F[T[CopK[L, ?]]]
 }
 
 object Unirewrite {
@@ -40,14 +40,14 @@ object Unirewrite {
     implicit
       FC: Functor[CopK[L, ?]],
       TC0: Traverse[CopK[L, ?]],
-      J: ThetaToEquiJoin.Aux[T, QScriptRead[T, ?], CopK[L, ?]],
-      C: Coalesce.Aux[T, QScriptRead[T, ?], QScriptRead[T, ?]],
-      N: Normalizable[QScriptRead[T, ?]])
+      J: ThetaToEquiJoin.Aux[T, QScriptEducated[T, ?], CopK[L, ?]],
+      C: Coalesce.Aux[T, QScriptEducated[T, ?], QScriptEducated[T, ?]],
+      N: Normalizable[QScriptEducated[T, ?]])
       : Unirewrite[T, L] =
     new Unirewrite[T, L] {
       def apply[F[_]: Monad: MonadPlannerErr](r: Rewrite[T])
-          : T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]] = { qs =>
-        r.normalize[QScriptRead[T, ?], CopK[L, ?]]
+          : T[QScriptEducated[T, ?]] => F[T[CopK[L, ?]]] = { qs =>
+        r.normalize[QScriptEducated[T, ?], CopK[L, ?]]
           .apply(qs).point[F]
       }
   }
