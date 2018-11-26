@@ -27,5 +27,4 @@ trait QSUTTypes[T[_[_]]] extends TTypes[T] {
   type RevIdxM[F[_]] = quasar.qsu.RevIdxM[T, F]
   type References = quasar.qsu.References[T]
   type QScriptUniform[A] = quasar.qsu.QScriptUniform[T, A]
-  type QScriptEducated[A] = quasar.qscript.QScriptEducated[T, A]
 }
