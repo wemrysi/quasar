@@ -20,14 +20,17 @@ import slamdata.Predef._
 
 import quasar.{CompositeParseType, IdStatus, ParseInstruction, ParseType}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
-import quasar.ParseInstruction.{Ids, Mask, Pivot, Wrap}
+import quasar.ParseInstruction.{Ids, Mask, Pivot, Project, Wrap}
 import quasar.common.{CPath, CPathField, CPathIndex, CPathNode}
 import quasar.common.data._
 
 import scala.collection.Iterator
 
 import scalaz.std.anyVal._
+import scalaz.std.list._
+import scalaz.std.option._
 import scalaz.syntax.equal._
+import scalaz.syntax.foldable._
 import scalaz.syntax.std.stream._
 
 object RValueParseInstructionInterpreter {
@@ -49,6 +52,9 @@ object RValueParseInstructionInterpreter {
 
       case (prev, instr @ Wrap(_, _)) =>
         prev.flatMap(interpretWrap(instr, _) :: Nil)
+
+      case (prev, Project(p)) =>
+        prev.flatMap(interpretProject(p, _))
 
       case (_, Ids) =>
         scala.sys.error("ParseInstruction.Ids not supported for RValue interpretation")
@@ -147,6 +153,13 @@ object RValueParseInstructionInterpreter {
 
     inner(input, rvalue)
   }
+
+  def interpretProject(path: CPath, rvalue: RValue): List[RValue] =
+    path.nodes.foldLeftM(rvalue) {
+      case (rv, CPathField(name)) => RValue.rField1(name).getOption(rv)
+      case (rv, CPathIndex(idx)) => RValue.rElement(idx).getOption(rv)
+      case _ => None
+    }.toList
 
   def interpretSinglePivot(path: CPath, status: IdStatus, structure: CompositeParseType, rvalue: RValue)
       : List[RValue] = {

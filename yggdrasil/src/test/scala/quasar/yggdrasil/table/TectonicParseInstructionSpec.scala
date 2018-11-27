@@ -57,6 +57,9 @@ object TectonicParseInstructionSpec extends ParseInstructionSpec {
   def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream =
     evalPlate(stream)(WrapPlate[IO, List[Event]](wrap, _))
 
+  def evalProject(project: Project, stream: JsonStream): JsonStream =
+    evalPlate(stream)(ProjectPlate[IO, List[Event]](project.path, _))
+
   def evalIds(stream: JsonStream): JsonStream =
     evalPlate(stream)(IdsPlate[IO, List[Event]](_))
 

@@ -24,4 +24,5 @@ private[table] trait ContinuingNestPlate[A] { self: Plate[A] =>
   def nestArr(): Signal = Signal.Continue
   def nestMeta(pathComponent: CharSequence): Signal = Signal.Continue
   def unnest(): Signal = Signal.Continue
+  def finishRow(): Unit = ()
 }
