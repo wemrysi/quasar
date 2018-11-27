@@ -31,7 +31,9 @@ import quasar.mimir.Precog
 import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
 import quasar.yggdrasil.vfs.contextShiftForS
 
+import java.lang.Runtime
 import java.nio.file.Path
+import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 
 import cats.arrow.FunctionK
@@ -69,8 +71,10 @@ object Main extends IOApp {
       blockingPool: BlockingContext)
       : Stream[F, Quasar[F]] = {
 
-    // we probably shouldn't use global, but this is fine for now
-    implicit val cpuEC = ExecutionContext.global
+    implicit val cpuEC =
+      ExecutionContext.fromExecutor(
+        Executors.newFixedThreadPool(
+          Runtime.getRuntime.availableProcessors))
 
     for {
       (dataPath, pluginPath) <- paths[F]

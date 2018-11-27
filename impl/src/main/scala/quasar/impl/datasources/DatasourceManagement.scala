@@ -251,7 +251,7 @@ final class DatasourceManagement[
       t <- running.modify(f)
 
       _  <- t.traverse_ {
-        case (id, ds) => errors.update(_ - id) *> ds.dispose
+        case (id, ds) => errors.update(_ - id) >> ds.dispose
       }
     } yield ()
 

@@ -101,9 +101,9 @@ object Disposable extends DisposableInstances {
         for {
           ds <- fromResource(s)
           da <- F.handleError(fromResource(f(ds.unsafeValue))) { t =>
-            ds.dispose *> F.raiseError(t)
+            ds.dispose >> F.raiseError(t)
           }
-        } yield ds *> da
+        } yield ds >> da
 
       case Resource.Suspend(fr) =>
         fr.flatMap(fromResource[F, A])

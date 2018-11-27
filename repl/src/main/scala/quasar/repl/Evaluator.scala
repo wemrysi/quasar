@@ -130,7 +130,7 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
         liftS1(helpMsg)
 
       case Debug(level) =>
-        stateRef.update(_.copy(debugLevel = level)) *>
+        stateRef.update(_.copy(debugLevel = level)) >>
           liftS1(s"Set debug level: $level")
 
       case SummaryCount(rows) =>
@@ -139,7 +139,7 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
           else refineV[Positive](rows).fold(κ(None), p => Some(Some(p)))
         count match {
           case None => liftS1("Rows must be a positive integer or 0 to indicate no limit")
-          case Some(c) => stateRef.update(_.copy(summaryCount = c)) *>
+          case Some(c) => stateRef.update(_.copy(summaryCount = c)) >>
             liftS1 {
               val r = c.map(_.toString).getOrElse("unlimited")
               s"Set rows to show in result: $r"
@@ -147,31 +147,31 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
         }
 
       case Format(fmt) =>
-        stateRef.update(_.copy(format = fmt)) *>
+        stateRef.update(_.copy(format = fmt)) >>
           liftS1(s"Set output format: $fmt")
 
       case Mode(mode) =>
-        stateRef.update(_.copy(mode = mode)) *>
+        stateRef.update(_.copy(mode = mode)) >>
           liftS1(s"Set output mode: $mode")
 
       case SetPhaseFormat(fmt) =>
-        stateRef.update(_.copy(phaseFormat = fmt)) *>
+        stateRef.update(_.copy(phaseFormat = fmt)) >>
           liftS1(s"Set phase format: $fmt")
 
       case SetTimingFormat(fmt) =>
-        stateRef.update(_.copy(timingFormat = fmt)) *>
+        stateRef.update(_.copy(timingFormat = fmt)) >>
           liftS1(s"Set timing format: $fmt")
 
       case SetVar(n, v) =>
-        stateRef.update(state => state.copy(variables = state.variables + (n -> v))) *>
+        stateRef.update(state => state.copy(variables = state.variables + (n -> v))) >>
           liftS1(s"Set variable ${n.value} = ${v.value}")
 
       case UnsetVar(n) =>
-        stateRef.update(state => state.copy(variables = state.variables - n)) *>
+        stateRef.update(state => state.copy(variables = state.variables - n)) >>
           liftS1(s"Unset variable ${n.value}")
 
       case SetPushdown(pd) =>
-        q.pushdown.set(pd) *>
+        q.pushdown.set(pd) >>
           liftS1(s"Set pushdown: $pd")
 
       case ListVars =>

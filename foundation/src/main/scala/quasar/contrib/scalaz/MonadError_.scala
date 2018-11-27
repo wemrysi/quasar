@@ -39,7 +39,7 @@ trait MonadError_[F[_], E] {
     */
   def ensuring[A](fa: F[A])(f: Option[E] => F[Unit])(implicit F: Monad[F]): F[A] =
     attempt(fa) flatMap {
-      case -\/(e) => f(some(e)) *> raiseError(e)
+      case -\/(e) => f(some(e)) >> raiseError(e)
       case \/-(a) => f(none)    as a
     }
 
