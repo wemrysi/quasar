@@ -26,7 +26,6 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski._
-import quasar.qscript.rewrites.{DedupeGuards, ExtractFiltering}
 import quasar.time.TemporalPart
 
 import matryoshka._
@@ -263,20 +262,9 @@ object MapFuncCore {
         })
   }
 
-  // normalize but don't rewrite
-  def transform[T[_[_]]: BirecursiveT: EqualT, A: Equal]
-      : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
-    orOriginal(DedupeGuards[T, A]) <<<
-    repeatedly(applyTransforms(
-      ExtractFiltering[T, A]))
-
   def normalize[T[_[_]]: BirecursiveT: EqualT, A: Equal]
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
-    orOriginal(DedupeGuards[T, A]) <<<
-    repeatedly(applyTransforms(
-      rewrite[T, A],
-      ExtractFiltering[T, A]))
-
+    repeatedly(rewrite[T, A])
 
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
