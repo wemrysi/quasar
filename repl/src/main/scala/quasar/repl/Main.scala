@@ -25,6 +25,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.impl.DatasourceModule
 import quasar.impl.external.{ExternalConfig, ExternalDatasources}
 import quasar.impl.datasource.local.{LocalDatasourceModule, LocalParsedDatasourceModule}
+import quasar.impl.external.ExternalConfig.PluginFiles
 import quasar.impl.schema.SstEvalConfig
 import quasar.mimir.Precog
 import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
@@ -38,10 +39,14 @@ import cats.effect._
 import cats.effect.concurrent.Ref
 import eu.timepit.refined.auto._
 import fs2.Stream
+import optparse_applicative._
+import optparse_applicative.types.{Failure, ParserPrefs, Success}
 import scalaz._, Scalaz._
 import shims._
 
 object Main extends IOApp {
+
+  final case class Args[F[_]](pluginFiles: F[Option[PluginFiles]])
 
   type IOT[A] = PhaseResultCatsT[IO, A]
 
@@ -60,13 +65,14 @@ object Main extends IOApp {
     } yield (dataDir, pluginDir)
 
   def quasarStream[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer](
-      blockingPool: BlockingContext)
+      pluginFiles: Option[PluginFiles], blockingPool: BlockingContext)
       : Stream[F, Quasar[F]] =
     for {
       (dataPath, pluginPath) <- paths[F]
       precog <- Precog.stream(dataPath.toFile, blockingPool).translate(λ[FunctionK[IO, F]](_.to[F]))
       evalCfg = SstEvalConfig(1000L, 2L, 250L)
-      extMods <- ExternalDatasources[F](ExternalConfig.PluginDirectory(pluginPath), blockingPool)
+      extCfg <- Stream.eval(ExternalConfig.sanitize(pluginFiles.getOrElse(ExternalConfig.PluginDirectory(pluginPath))))
+      extMods <- ExternalDatasources[F](extCfg, blockingPool)
       mods =
         DatasourceModule.Lightweight(LocalParsedDatasourceModule) ::
         DatasourceModule.Lightweight(LocalDatasourceModule) ::
@@ -86,11 +92,30 @@ object Main extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
     val blockingPool = BlockingContext.cached("quasar-repl-blocking")
 
-    quasarStream[IOT](blockingPool)
-      .evalMap(repl[IOT])
-      .compile
-      .last
-      .run.map(_._2.getOrElse(ExitCode.Success))
+    def pluginFilesParser[F[_]: Sync]: Parser[F[Option[PluginFiles]]] =
+      many(strOption(short('P'), long("plugin"), metavar("FILE"), help("Plugin file to load (0 or more)"))).map(l =>
+        if (l.isEmpty) none[PluginFiles].pure[F]
+        else l.traverse(Paths.fromString[F]).map(ps => Some(PluginFiles(ps))))
+
+    val parser = pluginFilesParser[IO].map(Args(_))
+
+    val prefs = ParserPrefs(multiSuffix = "", disambiguate = false, showHelpOnError = true, backtrack = true, columns = 80)
+
+    execParserPure(prefs, info(parser <*> helper), args) match {
+      case Success(opts) =>
+        for {
+          files <- opts.pluginFiles
+          qs <- quasarStream[IOT](files, blockingPool)
+                  .evalMap(repl[IOT])
+                  .compile
+                  .last
+                  .run.map(_._2.getOrElse(ExitCode.Success))
+        } yield qs
+      case Failure(f) =>
+        val (s, exitCode) = renderFailure(f, "repl")
+        IO.delay(println(s)) >> ExitCode(exitCode.toInt).pure[IO]
+    }
+
   }
 
 }

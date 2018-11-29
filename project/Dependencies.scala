@@ -126,6 +126,7 @@ object Dependencies {
 
   def repl = Seq(
     "com.github.tototoshi" %% "scala-csv" % "1.3.4",
+    "com.github.xuwei-k" %% "optparse-applicative" % "0.8.0",
     "org.jline" % "jline" % "3.8.0"
   )
 

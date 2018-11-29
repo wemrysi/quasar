@@ -38,6 +38,9 @@ object Paths {
       : F[JPath] =
     F.delay(JFiles.createTempFile(prefix, suffix))
 
+  def fromString[F[_]](s: String)(implicit F: Sync[F]): F[JPath] =
+    F.delay(Try(getPath(NonEmptyList(s)))).flatMap(F.fromTry)
+
   def getBasePath[F[_]](implicit F: Sync[F]): F[JPath] =
     getUserHome.map(h => h.map(_.resolve(getPath(QuasarDirNames)))
       .getOrElse(getPath(TmpQuasarReplDirNames)))
