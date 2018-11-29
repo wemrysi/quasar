@@ -266,8 +266,10 @@ object MapFuncCore {
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
     repeatedly(rewrite[T, A])
 
-  // TODO: This could be split up as it is in LP, with each function containing
-  //       its own normalization.
+  def freeMF[T[_[_]]: BirecursiveT: EqualT, A: Equal: Show](fm: Free[MapFunc[T, ?], A])
+      : Free[MapFunc[T, ?], A] =
+    fm.transCata[Free[MapFunc[T, ?], A]](normalize[T, A])
+
   private def rewrite[T[_[_]]: BirecursiveT: EqualT, A: Equal]:
       CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
     _.run.toOption >>= (MFC.unapply _) >>= {
