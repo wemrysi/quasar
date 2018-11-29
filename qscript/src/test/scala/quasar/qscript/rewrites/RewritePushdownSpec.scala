@@ -20,7 +20,7 @@ import slamdata.Predef.{Map => SMap, _}
 
 import quasar.{ParseType, Qspec}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
-import quasar.ParseInstruction.{Mask, Pivot, Wrap}
+import quasar.ParseInstruction.{Ids, Mask, Pivot, Project, Wrap}
 import quasar.api.resource.ResourcePath
 import quasar.common.CPath
 import quasar.contrib.iota._
@@ -34,7 +34,6 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
 import scalaz.Const
-import scalaz.std.option._
 
 object RewritePushdownSpec extends Qspec {
 
@@ -67,146 +66,13 @@ object RewritePushdownSpec extends Qspec {
 
   val ejs = Fixed[Fix[EJson]]
 
-  val pushdown = new RewritePushdown[Fix]
+  val path = ResourcePath.leaf(rootDir </> file("foo"))
 
-  "path-finding" >> {
+  def rewritePushdown(expr: Fix[QSExtra]): Fix[QSExtra] =
+    expr.transCata[Fix[QSExtra]](RewritePushdown[Fix, QSExtra, QSExtra, ResourcePath])
 
-    "find the path of Hole" >> {
-      pushdown.findPath(funcE.Hole) must equal(
-        Some(CPath.Identity))
-    }
-
-    "find the path of a single object projection" >> {
-      pushdown.findPath(funcE.ProjectKeyS(funcE.Hole, "xyz")) must equal(
-        Some(CPath.parse(".xyz")))
-    }
-
-    "find the path of a single array projection" >> {
-      pushdown.findPath(funcE.ProjectIndexI(funcE.Hole, 7)) must equal(
-        Some(CPath.parse("[7]")))
-    }
-
-    "find the path of a triple object projection" >> {
-      val fm =
-        funcE.ProjectKeyS(
-          funcE.ProjectKeyS(
-            funcE.ProjectKeyS(
-              funcE.Hole,
-              "aaa"),
-            "bbb"),
-          "ccc")
-
-      pushdown.findPath(fm) must equal(
-        Some(CPath.parse(".aaa.bbb.ccc")))
-    }
-
-    "find the path of a triple array projection" >> {
-      val fm =
-        funcE.ProjectIndexI(
-          funcE.ProjectIndexI(
-            funcE.ProjectIndexI(
-              funcE.Hole,
-              2),
-            6),
-          0)
-
-      pushdown.findPath(fm) must equal(
-        Some(CPath.parse("[2][6][0]")))
-    }
-
-    "find the path of an array projection and object projection" >> {
-      val fm =
-        funcE.ProjectKeyS(
-          funcE.ProjectIndexI(
-            funcE.ProjectKeyS(
-              funcE.Hole,
-              "aaa"),
-            42),
-          "ccc")
-
-      pushdown.findPath(fm) must equal(
-        Some(CPath.parse(".aaa[42].ccc")))
-    }
-
-    "fail find the path of an object projection with a non-string key" >> {
-      val fm =
-        funcE.ProjectKey(funcE.Hole, funcE.Constant(ejs.bool(true)))
-
-      pushdown.findPath(fm) must equal(None)
-    }
-
-    "fail find the path of an object projection with a dynamic key" >> {
-      val fm =
-        funcE.ProjectKey(
-          funcE.Hole,
-          funcE.ToString(funcE.ProjectKeyS(funcE.Hole, "foobar")))
-
-      pushdown.findPath(fm) must equal(None)
-    }
-
-    "fail find the path of an array projection with a dynamic key" >> {
-      val fm =
-        funcE.ProjectIndex(
-          funcE.Hole,
-          funcE.Integer(funcE.ProjectIndexI(funcE.Hole, 42)))
-
-      pushdown.findPath(fm) must equal(None)
-    }
-
-    "fail find the path of an object projection with a dynamic key that is itself a projection" >> {
-      val fm =
-        funcE.ProjectKey(
-          funcE.Hole,
-          funcE.ProjectKeyS(funcE.Hole, "foobar"))
-
-      pushdown.findPath(fm) must equal(None)
-    }
-
-    "fail find the path of an array projection with a dynamic key that is itself a projection" >> {
-      val fm =
-        funcE.ProjectIndex(
-          funcE.Hole,
-          funcE.ProjectIndexI(funcE.Hole, 42))
-
-      pushdown.findPath(fm) must equal(None)
-    }
-
-    "fail to find the path of non-projection" >> {
-      val fm =
-        funcE.ProjectKeyS(
-          funcE.MakeMapS(
-            "map key",
-            funcE.ProjectKeyS(funcE.Hole, "aaa")),
-          "ccc")
-
-      pushdown.findPath(fm) must equal(None)
-    }
-
-    "fail to find the path of a projection whose source is not Hole" >> {
-      val fm =
-        funcE.ProjectKeyS(
-          funcE.ProjectKeyS(
-            funcE.ProjectKeyS(
-              funcE.Constant[Hole](ejs.str("constant string")),
-              "aaa"),
-            "bbb"),
-          "ccc")
-
-      pushdown.findPath(fm) must equal(None)
-    }
-  }
-
-  "InterpretedRead rewrite" >> {
-
-    val rewriteLeftShiftFunc: QSExtra[Fix[QSExtra]] => QSExtra[Fix[QSExtra]] =
-      liftFG[QScriptCore[Fix, ?], QSExtra, Fix[QSExtra]](pushdown.rewriteLeftShift[QSExtra, ResourcePath])
-
-    def rewriteLeftShift(expr: Fix[QSExtra]): Fix[QSExtra] =
-      expr.transCata[Fix[QSExtra]](rewriteLeftShiftFunc)
-
-    val path = ResourcePath.leaf(rootDir </> file("foo"))
-
-    "rewrite when the read is shifted at the top-level and only the shifted values are referenced" >> {
+  "pivot" >> {
+    "when the read is shifted at the top-level and only the shifted values are referenced" >> {
       "with IncludeId" >> {
         val initial: Fix[QSExtra] =
           fixE.LeftShift(
@@ -224,16 +90,14 @@ object RewritePushdownSpec extends Qspec {
             fixE.InterpretedRead[ResourcePath](
               path,
               List(
-                Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
-                Wrap(CPath.Identity, ShiftedKey),
-                Pivot(SMap((CPath.parse(s".$ShiftedKey"), (IncludeId, ParseType.Object)))))),
+                Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
+                Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+                Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
-              recFuncE.MakeMapS("k1",
-                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 0)),
-              recFuncE.MakeMapS("v1",
-                recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 1))))
+              recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
+              recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
 
-        rewriteLeftShift(initial) must equal(expected)
+        rewritePushdown(initial) must equal(expected)
       }
 
       "with IdOnly" >> {
@@ -247,17 +111,14 @@ object RewritePushdownSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.RightSide))
 
         val expected: Fix[QSExtra] =
-          fixE.Map(
-            fixE.InterpretedRead[ResourcePath](
-              path,
-              List(
-                Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
-                Wrap(CPath.Identity, ShiftedKey),
-                Pivot(SMap((CPath.parse(s".$ShiftedKey"), (IdOnly, ParseType.Object)))))),
-            recFuncE.MakeMapS("k1",
-              recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
+          fixE.InterpretedRead[ResourcePath](
+            path,
+            List(
+              Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
+              Pivot(SMap(CPath.Identity -> ((IdOnly, ParseType.Object)))),
+              Wrap(CPath.Identity, "k1")))
 
-        rewriteLeftShift(initial) must equal(expected)
+        rewritePushdown(initial) must equal(expected)
       }
 
       "with ExcludeId" >> {
@@ -271,27 +132,24 @@ object RewritePushdownSpec extends Qspec {
             funcE.MakeMapS("v1", funcE.RightSide))
 
         val expected: Fix[QSExtra] =
-          fixE.Map(
-            fixE.InterpretedRead[ResourcePath](
-              path,
-              List(
-                Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
-                Wrap(CPath.Identity, ShiftedKey),
-                Pivot(SMap((CPath.parse(s".$ShiftedKey"), (ExcludeId, ParseType.Object)))))),
-            recFuncE.MakeMapS("v1",
-              recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
+          fixE.InterpretedRead[ResourcePath](
+            path,
+            List(
+              Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
+              Pivot(SMap(CPath.Identity -> ((ExcludeId, ParseType.Object)))),
+              Wrap(CPath.Identity, "v1")))
 
-        rewriteLeftShift(initial) must equal(expected)
+        rewritePushdown(initial) must equal(expected)
       }
     }
 
-    "rewrite when the target LeftShift is the source of another node" >> {
+    "when the target LeftShift is the source of another node" >> {
       val initial: Fix[QSExtra] =
         fixE.Filter(
           fixE.LeftShift(
             fixE.Read[ResourcePath](path, ExcludeId),
             recFuncE.Hole,
-            ExcludeId, // ExcludeId
+            ExcludeId,
             ShiftType.Map,
             OnUndefined.Omit,
             funcE.MakeMapS("v1", funcE.RightSide)),
@@ -299,21 +157,18 @@ object RewritePushdownSpec extends Qspec {
 
       val expected: Fix[QSExtra] =
         fixE.Filter(
-          fixE.Map(
-            fixE.InterpretedRead[ResourcePath](
-              path,
-              List(
-                Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
-                Wrap(CPath.Identity, ShiftedKey),
-                Pivot(SMap((CPath.parse(s".$ShiftedKey"), (ExcludeId, ParseType.Object)))))),
-            recFuncE.MakeMapS("v1",
-              recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey))),
+          fixE.InterpretedRead[ResourcePath](
+            path,
+            List(
+              Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
+              Pivot(SMap(CPath.Identity -> ((ExcludeId, ParseType.Object)))),
+              Wrap(CPath.Identity, "v1"))),
           recFuncE.Constant(ejs.bool(true)))
 
-      rewriteLeftShift(initial) must equal(expected)
+      rewritePushdown(initial) must equal(expected)
     }
 
-    "rewrite when the shift source is a single object projection" >> {
+    "when the shift source is a single object projection" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
           fixE.Read[ResourcePath](path, ExcludeId),
@@ -330,27 +185,18 @@ object RewritePushdownSpec extends Qspec {
             fixE.InterpretedRead[ResourcePath](
               path,
               List(
-                Mask(SMap((CPath.parse(".xyz"), Set(ParseType.Object)))),
-                Wrap(CPath.parse(".xyz"), ShiftedKey),
-                Pivot(SMap((CPath.parse(s".xyz.$ShiftedKey"), (IncludeId, ParseType.Object)))))),
+                Project(CPath.Identity \ "xyz"),
+                Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
+                Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+                Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
-              recFuncE.MakeMapS("k1",
-                recFuncE.ProjectIndexI(
-                  recFuncE.ProjectKeyS(
-                    recFuncE.ProjectKeyS(recFuncE.Hole, "xyz"),
-                    ShiftedKey),
-                  0)),
-              recFuncE.MakeMapS("v1",
-                recFuncE.ProjectIndexI(
-                  recFuncE.ProjectKeyS(
-                    recFuncE.ProjectKeyS(recFuncE.Hole, "xyz"),
-                    ShiftedKey),
-                  1))))
+              recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
+              recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
 
-      rewriteLeftShift(initial) must equal(expected)
+      rewritePushdown(initial) must equal(expected)
     }
 
-    "rewrite when the shift source is three object projections" >> {
+    "when the shift source is three object projections" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
           fixE.Read[ResourcePath](path, ExcludeId),
@@ -372,28 +218,19 @@ object RewritePushdownSpec extends Qspec {
             fixE.InterpretedRead[ResourcePath](
               path,
               List(
-                Mask(SMap((CPath.parse(".aaa.bbb.ccc"), Set(ParseType.Object)))),
-                Wrap(CPath.parse(".aaa.bbb.ccc"), ShiftedKey),
-                Pivot(SMap((CPath.parse(s".aaa.bbb.ccc.$ShiftedKey"), (IncludeId, ParseType.Object)))))),
+                Project(CPath.parse(".aaa.bbb.ccc")),
+                Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
+                Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+                Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
-              recFuncE.MakeMapS("k1",
-                recFuncE.ProjectIndexI(
-                  recFuncE.ProjectKeyS(
-                    recFuncE.ProjectKeyS(recFuncE.ProjectKeyS(recFuncE.ProjectKeyS(recFuncE.Hole, "aaa"), "bbb"), "ccc"),
-                    ShiftedKey),
-                  0)),
-              recFuncE.MakeMapS("v1",
-                recFuncE.ProjectIndexI(
-                  recFuncE.ProjectKeyS(
-                    recFuncE.ProjectKeyS(recFuncE.ProjectKeyS(recFuncE.ProjectKeyS(recFuncE.Hole, "aaa"), "bbb"), "ccc"),
-                    ShiftedKey),
-                  1))))
+              recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
+              recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
 
-      rewriteLeftShift(initial) must equal(expected)
+      rewritePushdown(initial) must equal(expected)
     }
 
     // 🦖  rawr!
-    "rewrite when the shift struct contains static array and object projections" >> {
+    "when the shift struct contains static array and object projections" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
           fixE.Read[ResourcePath](path, ExcludeId),
@@ -415,27 +252,18 @@ object RewritePushdownSpec extends Qspec {
             fixE.InterpretedRead[ResourcePath](
               path,
               List(
-                Mask(SMap((CPath.parse(".aaa[42].ccc"), Set(ParseType.Object)))),
-                Wrap(CPath.parse(".aaa[0].ccc"), ShiftedKey),
-                Pivot(SMap((CPath.parse(s".aaa[0].ccc.$ShiftedKey"), (IncludeId, ParseType.Object)))))),
+                Project(CPath.parse(".aaa[42].ccc")),
+                Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
+                Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+                Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
-              recFuncE.MakeMapS("k1",
-                recFuncE.ProjectIndexI(
-                  recFuncE.ProjectKeyS(
-                    recFuncE.ProjectKeyS(recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, "aaa"), 0), "ccc"),
-                    ShiftedKey),
-                  0)),
-              recFuncE.MakeMapS("v1",
-                recFuncE.ProjectIndexI(
-                  recFuncE.ProjectKeyS(
-                    recFuncE.ProjectKeyS(recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, "aaa"), 0), "ccc"),
-                    ShiftedKey),
-                  1))))
+              recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
+              recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
 
-      rewriteLeftShift(initial) must equal(expected)
+      rewritePushdown(initial) must equal(expected)
     }
 
-    "rewrite when the shift struct contains two static array projections" >> {
+    "when the shift struct contains two static array projections" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
           fixE.Read[ResourcePath](path, ExcludeId),
@@ -457,36 +285,70 @@ object RewritePushdownSpec extends Qspec {
             fixE.InterpretedRead[ResourcePath](
               path,
               List(
-                Mask(SMap((CPath.parse("[17][42].ccc"), Set(ParseType.Object)))),
-                Wrap(CPath.parse("[0][0].ccc"), ShiftedKey),
-                Pivot(SMap((CPath.parse(s"[0][0].ccc.$ShiftedKey"), (IncludeId, ParseType.Object)))))),
+                Project(CPath.parse(".[17][42].ccc")),
+                Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
+                Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+                Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
-              recFuncE.MakeMapS("k1",
-                recFuncE.ProjectIndexI(
-                  recFuncE.ProjectKeyS(
-                    recFuncE.ProjectKeyS(recFuncE.ProjectIndexI(recFuncE.ProjectIndexI(recFuncE.Hole, 0), 0), "ccc"),
-                    ShiftedKey),
-                  0)),
-              recFuncE.MakeMapS("v1",
-                recFuncE.ProjectIndexI(
-                  recFuncE.ProjectKeyS(
-                    recFuncE.ProjectKeyS(recFuncE.ProjectIndexI(recFuncE.ProjectIndexI(recFuncE.Hole, 0), 0), "ccc"),
-                    ShiftedKey),
-                  1))))
+              recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
+              recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
 
-      rewriteLeftShift(initial) must equal(expected)
+      rewritePushdown(initial) must equal(expected)
+    }
+
+    "when the Read has IncludeId" >> {
+      val initial: Fix[QSExtra] =
+        fixE.LeftShift(
+          fixE.Read[ResourcePath](path, IncludeId),
+          recFunc.Hole,
+          IncludeId,
+          ShiftType.Map,
+          OnUndefined.Omit,
+          funcE.RightSide)
+
+      val expected: Fix[QSExtra] =
+        fixE.InterpretedRead[ResourcePath](
+          path,
+          List(
+            Ids,
+            Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
+            Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object))))))
+
+      rewritePushdown(initial) must_= expected
+    }
+
+    "when the Read has IdOnly" >> {
+      val initial: Fix[QSExtra] =
+        fixE.LeftShift(
+          fixE.Read[ResourcePath](path, IdOnly),
+          recFunc.Hole,
+          IncludeId,
+          ShiftType.Map,
+          OnUndefined.Omit,
+          funcE.RightSide)
+
+      val expected: Fix[QSExtra] =
+        fixE.InterpretedRead[ResourcePath](
+          path,
+          List(
+            Ids,
+            Project(CPath.Identity \ 0),
+            Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
+            Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object))))))
+
+      rewritePushdown(initial) must_= expected
     }
 
     // we will need to allow certain static mapfuncs as structs in the future.
     // 🦕  herbivore rawr!
-    "not rewrite when the shift struct is not a projection and not Hole" >> {
+    "not when the shift struct is not a projection and not Hole" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
           fixE.Read[ResourcePath](path, ExcludeId),
           recFuncE.ProjectKeyS(
             recFuncE.MakeMapS( // shift source is not a projection
               "i am a key",
-              recFuncE.ProjectKeyS(recFunc.Hole, "aaa")),
+              recFuncE.Multiply(recFunc.Hole, recFunc.Hole)),
             "ccc"),
           IncludeId,
           ShiftType.Map,
@@ -495,10 +357,10 @@ object RewritePushdownSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
 
-      rewriteLeftShift(initial) must equal(initial)
+      rewritePushdown(initial) must_= initial
     }
 
-    "not rewrite when the non-shifted data is referenced (via LeftSide)" >> {
+    "not when the non-shifted data is referenced (via LeftSide)" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
           fixE.Read[ResourcePath](path, ExcludeId),
@@ -510,36 +372,10 @@ object RewritePushdownSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.LeftSide))) // LeftSide is referenced
 
-      rewriteLeftShift(initial) must equal(initial)
+      rewritePushdown(initial) must equal(initial)
     }
 
-    "not rewrite when the Read has IncludeId" >> {
-      val initial: Fix[QSExtra] =
-        fixE.LeftShift(
-          fixE.Read[ResourcePath](path, IncludeId), // IncludeId
-          recFunc.Hole,
-          IncludeId,
-          ShiftType.Map,
-          OnUndefined.Emit,
-          funcE.RightSide)
-
-      rewriteLeftShift(initial) must equal(initial)
-    }
-
-    "not rewrite when the Read has IdOnly" >> {
-      val initial: Fix[QSExtra] =
-        fixE.LeftShift(
-          fixE.Read[ResourcePath](path, IdOnly), // IdOnly
-          recFunc.Hole,
-          IncludeId,
-          ShiftType.Map,
-          OnUndefined.Emit,
-          funcE.RightSide)
-
-      rewriteLeftShift(initial) must equal(initial)
-    }
-
-    "not rewrite when the shift struct is a (nonsensical) constant" >> {
+    "not when the shift struct is a (nonsensical) constant" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
           fixE.Read[ResourcePath](path, ExcludeId),
@@ -551,7 +387,204 @@ object RewritePushdownSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
 
-      rewriteLeftShift(initial) must equal(initial)
+      rewritePushdown(initial) must equal(initial)
+    }
+
+    "consecutive focused shifts" >> {
+      val initial: Fix[QSExtra] =
+        fixE.LeftShift(
+          fixE.LeftShift(
+            fixE.Read[ResourcePath](path, ExcludeId),
+            recFuncE.ProjectKeyS(
+              recFuncE.ProjectKeyS(
+                recFuncE.ProjectKeyS(recFunc.Hole,
+                  "aaa"),
+                "bbb"),
+              "ccc"),
+            IncludeId,
+            ShiftType.Map,
+            OnUndefined.Omit,
+            funcE.RightSide),
+          recFuncE.ProjectKeyS(
+            recFuncE.ProjectIndexI(recFuncE.Hole, 1),
+            "ddd"),
+          ExcludeId,
+          ShiftType.Array,
+          OnUndefined.Omit,
+          funcE.MakeMapS("result", funcE.RightSide))
+
+      val expected: Fix[QSExtra] =
+        fixE.InterpretedRead[ResourcePath](
+          path,
+          List(
+            Project(CPath.parse(".aaa.bbb.ccc")),
+            Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
+            Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+            Project(CPath.parse(".[1].ddd")),
+            Mask(SMap(CPath.Identity -> Set(ParseType.Array))),
+            Pivot(SMap(CPath.Identity -> ((ExcludeId, ParseType.Array)))),
+            Wrap(CPath.Identity, "result")))
+
+      rewritePushdown(initial) must_= expected
+    }
+  }
+
+  "project" >> {
+    "common prefix from multiple projections" >> {
+      val initial: Fix[QSExtra] =
+        fixE.Map(
+          fixE.Read[ResourcePath](path, ExcludeId),
+          recFuncE.Subtract(
+            recFuncE.ProjectKeyS(
+              recFuncE.ProjectKeyS(
+                recFuncE.ProjectIndexI(recFuncE.Hole, 3),
+                "order"),
+              "tax"),
+            recFuncE.ProjectKeyS(
+              recFuncE.ProjectKeyS(
+                recFuncE.ProjectIndexI(recFuncE.Hole, 3),
+                "order"),
+              "total")))
+
+      val expected: Fix[QSExtra] =
+        fixE.Map(
+          fixE.InterpretedRead[ResourcePath](
+            path,
+            List(
+              Project(CPath.parse(".[3].order")),
+              Mask(SMap(
+                CPath.parse(".tax") -> ParseType.Top,
+                CPath.parse(".total") -> ParseType.Top)))),
+          recFuncE.Subtract(
+            recFuncE.ProjectKeyS(recFuncE.Hole, "tax"),
+            recFuncE.ProjectKeyS(recFuncE.Hole, "total")))
+
+      rewritePushdown(initial) must_= expected
+    }
+  }
+
+  "mask" >> {
+    "multiple projections" >> {
+      val initial: Fix[QSExtra] =
+        fixE.Map(
+          fixE.Read[ResourcePath](path, ExcludeId),
+          recFuncE.Subtract(
+            recFuncE.ProjectKeyS(
+              recFuncE.ProjectKeyS(
+                recFuncE.Hole,
+                "orderA"),
+              "tax"),
+            recFuncE.ProjectKeyS(
+              recFuncE.ProjectKeyS(
+                recFuncE.Hole,
+                "orderB"),
+              "total")))
+
+      val expected: Fix[QSExtra] =
+        fixE.Map(
+          fixE.InterpretedRead[ResourcePath](
+            path,
+            List(Mask(SMap(
+              CPath.parse(".orderA.tax") -> ParseType.Top,
+              CPath.parse(".orderB.total") -> ParseType.Top)))),
+          recFuncE.Subtract(
+            recFuncE.ProjectKeyS(
+              recFuncE.ProjectKeyS(
+                recFuncE.Hole,
+                "orderA"),
+              "tax"),
+            recFuncE.ProjectKeyS(
+              recFuncE.ProjectKeyS(
+                recFuncE.Hole,
+                "orderB"),
+              "total")))
+
+      rewritePushdown(initial) must_= expected
+    }
+
+    "projection from array, rewriting index" >> {
+      val initial: Fix[QSExtra] =
+        fixE.Map(
+          fixE.Read[ResourcePath](path, ExcludeId),
+          recFuncE.Add(
+            recFuncE.ProjectKeyS(
+              recFuncE.ProjectKeyS(
+                recFuncE.Hole,
+                "a"),
+              "aa"),
+            recFuncE.ProjectIndexI(
+              recFuncE.ProjectKeyS(
+                recFuncE.Hole,
+                "b"),
+              4)))
+
+      val expected: Fix[QSExtra] =
+        fixE.Map(
+          fixE.InterpretedRead[ResourcePath](
+            path,
+            List(Mask(SMap(
+              CPath.parse(".a.aa") -> ParseType.Top,
+              CPath.parse(".b[4]") -> ParseType.Top)))),
+          recFuncE.Add(
+            recFuncE.ProjectKeyS(
+              recFuncE.ProjectKeyS(
+                recFuncE.Hole,
+                "a"),
+              "aa"),
+            recFuncE.ProjectIndexI(
+              recFuncE.ProjectKeyS(
+                recFuncE.Hole,
+                "b"),
+              0)))
+
+      rewritePushdown(initial) must_= expected
+    }
+
+    "multiple projections from same array, rewriting indicies" >> {
+      val initial: Fix[QSExtra] =
+        fixE.Map(
+          fixE.Read[ResourcePath](path, ExcludeId),
+          recFuncE.Add(
+            recFuncE.Add(
+              recFuncE.ProjectKeyS(
+                recFuncE.ProjectIndexI(recFuncE.Hole, 3),
+                "a"),
+              recFuncE.ProjectIndexI(
+                recFuncE.ProjectKeyS(
+                  recFuncE.ProjectIndexI(recFuncE.Hole, 9),
+                  "b"),
+                6)),
+            recFuncE.ProjectIndexI(
+              recFuncE.ProjectKeyS(
+                recFuncE.ProjectIndexI(recFuncE.Hole, 9),
+                "b"),
+              2)))
+
+      val expected: Fix[QSExtra] =
+        fixE.Map(
+          fixE.InterpretedRead[ResourcePath](
+            path,
+            List(Mask(SMap(
+              CPath.parse(".[3].a") -> ParseType.Top,
+              CPath.parse(".[9].b[6]") -> ParseType.Top,
+              CPath.parse(".[9].b[2]") -> ParseType.Top)))),
+          recFuncE.Add(
+            recFuncE.Add(
+              recFuncE.ProjectKeyS(
+                recFuncE.ProjectIndexI(recFuncE.Hole, 0),
+                "a"),
+              recFuncE.ProjectIndexI(
+                recFuncE.ProjectKeyS(
+                  recFuncE.ProjectIndexI(recFuncE.Hole, 1),
+                  "b"),
+                1)),
+            recFuncE.ProjectIndexI(
+              recFuncE.ProjectKeyS(
+                recFuncE.ProjectIndexI(recFuncE.Hole, 1),
+                "b"),
+              0)))
+
+      rewritePushdown(initial) must_= expected
     }
   }
 }
