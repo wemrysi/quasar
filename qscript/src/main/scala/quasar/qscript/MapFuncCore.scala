@@ -266,7 +266,7 @@ object MapFuncCore {
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
     repeatedly(rewrite[T, A])
 
-  def freeMF[T[_[_]]: BirecursiveT: EqualT, A: Equal: Show](fm: Free[MapFunc[T, ?], A])
+  def normalized[T[_[_]]: BirecursiveT: EqualT, A: Equal: Show](fm: Free[MapFunc[T, ?], A])
       : Free[MapFunc[T, ?], A] =
     fm.transCata[Free[MapFunc[T, ?], A]](normalize[T, A])
 

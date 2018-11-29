@@ -120,7 +120,7 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
   }
 
   def freeMFEq[A: Equal: Show](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
-    val fmNormalized = MapFuncCore.freeMF[T, A](fm)
+    val fmNormalized = MapFuncCore.normalized[T, A](fm)
     (fm ≠ fmNormalized).option(fmNormalized)
   }
 

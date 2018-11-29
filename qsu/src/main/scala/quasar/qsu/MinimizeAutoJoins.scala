@@ -233,7 +233,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                 candidates2 <- exRebuilds.zipWithIndex traverse {
                   case (rebuild, i) =>
                     val rebuiltFM = recFunc.ProjectKeyS(simplifiedFM, i.toString)
-                    val normalized = MapFuncCore.freeMF(rebuiltFM.linearize)
+                    val normalized = MapFuncCore.normalized(rebuiltFM.linearize)
 
                     rebuild(
                       simplifiedSource,

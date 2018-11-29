@@ -283,7 +283,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               accessHoleLeftF,
               func.MakeMapS(ResultsField, repair2))
 
-            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, OnUndefined.Emit, MapFuncCore.freeMF(repair3))) map { rewritten =>
+            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, OnUndefined.Emit, MapFuncCore.normalized(repair3))) map { rewritten =>
               rewritten :++ src
             }
         }
@@ -294,14 +294,14 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted.linearize)
 
             reconstructed.overwriteAtRoot(
-              QSU.LeftShift(src.root, struct, idStatus, onUndefined, MapFuncCore.freeMF(repair2), rot))
+              QSU.LeftShift(src.root, struct, idStatus, onUndefined, MapFuncCore.normalized(repair2), rot))
 
           case reconstructed @ MultiLeftShift(src, shifts, onUndefined, repair) =>
             val origLifted = origFM >> recFunc.ProjectKeyS(repair.asRec, OriginalField)
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted.linearize)
 
             reconstructed.overwriteAtRoot(
-              QSU.MultiLeftShift(src.root, shifts, onUndefined, MapFuncCore.freeMF(repair2)))
+              QSU.MultiLeftShift(src.root, shifts, onUndefined, MapFuncCore.normalized(repair2)))
 
           case reconstructed => reconstructed
         }
@@ -447,7 +447,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.LeftShift[T, Symbol](
-              sym, structL, idStatusAdj, onUndefinedL, MapFuncCore.freeMF(repair), rotL)
+              sym, structL, idStatusAdj, onUndefinedL, MapFuncCore.normalized(repair), rotL)
           }
 
         case
@@ -471,7 +471,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               (structLAdj, idStatusL, rotL) :: (structRAdj, idStatusR, rotR) :: Nil,
               OnUndefined.Emit,
-              MapFuncCore.freeMF(repair))
+              MapFuncCore.normalized(repair))
           }
 
         case
@@ -497,7 +497,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj ::: (structRAdj, idStatusR, rotR) :: Nil,
               OnUndefined.Emit,
-              MapFuncCore.freeMF(repair))
+              MapFuncCore.normalized(repair))
           }
 
         case
@@ -521,7 +521,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               (structL.linearize, idStatusL, rotL) :: shiftsRAdj,
               OnUndefined.Emit,
-              MapFuncCore.freeMF(repair))
+              MapFuncCore.normalized(repair))
           }
 
         case
@@ -547,7 +547,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj ::: shiftsRAdj,
               OnUndefined.Emit,
-              MapFuncCore.freeMF(repair))
+              MapFuncCore.normalized(repair))
           }
 
         case
@@ -572,7 +572,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               structLAdj.asRec,
               idStatusL,
               OnUndefined.Emit,
-              MapFuncCore.freeMF(repair),
+              MapFuncCore.normalized(repair),
               rotL)
           }
 
@@ -597,7 +597,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsLAdj,
               OnUndefined.Emit,
-              MapFuncCore.freeMF(repair))
+              MapFuncCore.normalized(repair))
           }
 
         case
@@ -622,7 +622,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               structRAdj.asRec,
               idStatusR,
               OnUndefined.Emit,
-              MapFuncCore.freeMF(repair),
+              MapFuncCore.normalized(repair),
               rotR)
           }
 
@@ -647,7 +647,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               shiftsRAdj,
               OnUndefined.Emit,
-              MapFuncCore.freeMF(repair))
+              MapFuncCore.normalized(repair))
           }
 
         case (Nil, Nil) =>
@@ -704,11 +704,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
     def inlineMap(g: QSUGraph): Option[QSUGraph] = g match {
       case Map(LeftShift(src, struct, idStatus, onUndefined, repair, rot), fm) =>
         val repair2 = fm.linearize >> repair
-        g.overwriteAtRoot(QSU.LeftShift(src.root, struct, idStatus, onUndefined, MapFuncCore.freeMF(repair2), rot)).some
+        g.overwriteAtRoot(QSU.LeftShift(src.root, struct, idStatus, onUndefined, MapFuncCore.normalized(repair2), rot)).some
 
       case Map(MultiLeftShift(src, shifts, onUndefined, repair), fm) =>
         val repair2 = fm.linearize >> repair
-        g.overwriteAtRoot(QSU.MultiLeftShift(src.root, shifts, onUndefined, MapFuncCore.freeMF(repair2))).some
+        g.overwriteAtRoot(QSU.MultiLeftShift(src.root, shifts, onUndefined, MapFuncCore.normalized(repair2))).some
       case _ => none
     }
 
