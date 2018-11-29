@@ -21,9 +21,8 @@ import slamdata.Predef._
 import java.nio.file.{Files, Path}
 
 import cats.effect.Sync
-import cats.syntax.applicativeError._
 import scalaz.std.list._
-import scalaz.syntax.all._
+import scalaz.syntax.traverse._
 import shims._
 
 sealed trait ExternalConfig extends Product with Serializable
@@ -45,23 +44,6 @@ object ExternalConfig {
     }
 
     entriesF.map(ExternalConfig.ExplodedDirs(_))
-  }
-
-  def sanitize[F[_]: Sync](cfg: ExternalConfig): F[ExternalConfig] = {
-    cfg match {
-      case ExplodedDirs(_) => cfg.pure[F]
-      case PluginDirectory(dir) => cfg.pure[F]
-      case PluginFiles(files) =>
-        for {
-          fileErrs <- files.traverse(path => Sync[F].delay(path).attempt)
-
-          validPaths = fileErrs.flatMap(_.right.toSeq)    // ignore the errors
-
-          tested <- validPaths traverse { path =>
-            Sync[F].delay(List(path).filter(_ => path.toFile.exists()))
-          }
-        } yield ExternalConfig.PluginFiles(tested.join)
-    }
   }
 
   /**

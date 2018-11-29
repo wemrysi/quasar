@@ -54,6 +54,10 @@ object Paths {
   def mkdirs[F[_]](p: JPath)(implicit F: Sync[F]): F[Boolean] =
     F.delay(p.toFile.mkdirs())
 
+  def ensureFile[F[_]](p: JPath)(implicit F: Sync[F]): F[Unit] =
+    F.delay(p.toFile.isFile())
+      .flatMap(_.unlessM(F.raiseError(new java.lang.RuntimeException(s"$p is not an existing file"))))
+
   ////
 
   private def getPath(names: NonEmptyList[String]): JPath =

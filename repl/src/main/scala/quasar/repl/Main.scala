@@ -71,7 +71,7 @@ object Main extends IOApp {
       (dataPath, pluginPath) <- paths[F]
       precog <- Precog.stream(dataPath.toFile, blockingPool).translate(λ[FunctionK[IO, F]](_.to[F]))
       evalCfg = SstEvalConfig(1000L, 2L, 250L)
-      extCfg <- Stream.eval(ExternalConfig.sanitize(pluginFiles.getOrElse(ExternalConfig.PluginDirectory(pluginPath))))
+      extCfg = pluginFiles.getOrElse(ExternalConfig.PluginDirectory(pluginPath))
       extMods <- ExternalDatasources[F](extCfg, blockingPool)
       mods =
         DatasourceModule.Lightweight(LocalParsedDatasourceModule) ::
@@ -92,10 +92,16 @@ object Main extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
     val blockingPool = BlockingContext.cached("quasar-repl-blocking")
 
+    def existingFile[F[_]: Sync](s: String) =
+      for {
+        p <- Paths.fromString(s)
+        _ <- Paths.ensureFile(p)
+      } yield p
+
     def pluginFilesParser[F[_]: Sync]: Parser[F[Option[PluginFiles]]] =
       many(strOption(short('P'), long("plugin"), metavar("FILE"), help("Plugin file to load (0 or more)"))).map(l =>
         if (l.isEmpty) none[PluginFiles].pure[F]
-        else l.traverse(Paths.fromString[F]).map(ps => Some(PluginFiles(ps))))
+        else l.traverse(existingFile[F]).map(ps => Some(PluginFiles(ps))))
 
     val parser = pluginFilesParser[IO].map(Args(_))
 
