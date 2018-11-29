@@ -32,9 +32,10 @@ private[table] final class ProjectPlate[A] private (
     with CPathPlate[A] {
 
   private val SEARCHING: Int = 0
-  private val FOCUSED: Int = 1
-  private val FINISHED_SEARCHING: Int = 2
-  private val FINISHED_FOCUSED: Int = 3
+  private val DESCENDING: Int = 1
+  private val FOCUSED: Int = 2
+  private val FINISHED_UNFOCUSED: Int = 3
+  private val FINISHED_FOCUSED: Int = 4
 
   private var focus: List[CPathNode] = path.nodes
   private var focusDepth: Int = 0
@@ -91,7 +92,10 @@ private[table] final class ProjectPlate[A] private (
         delegate.nestMap(pathComponent)
 
       case SEARCHING =>
-        search()
+        search(true)
+
+      case DESCENDING =>
+        search(false)
 
       case _ =>
         Signal.SkipRow
@@ -107,7 +111,10 @@ private[table] final class ProjectPlate[A] private (
         delegate.nestArr()
 
       case SEARCHING =>
-        search()
+        search(true)
+
+      case DESCENDING =>
+        search(false)
 
       case _ =>
         Signal.SkipRow
@@ -123,7 +130,10 @@ private[table] final class ProjectPlate[A] private (
         delegate.nestMeta(pathComponent)
 
       case SEARCHING =>
-        search()
+        search(true)
+
+      case DESCENDING =>
+        search(false)
 
       case _ =>
         Signal.SkipRow
@@ -136,7 +146,7 @@ private[table] final class ProjectPlate[A] private (
     val signal = if (projectState > FOCUSED) {
       Signal.SkipRow
     } else if (focusDepth == 0) {
-      projectState = if (focused()) FINISHED_FOCUSED else FINISHED_SEARCHING
+      projectState = if (focused()) FINISHED_FOCUSED else FINISHED_UNFOCUSED
       Signal.SkipRow
     } else if (focused()) {
       delegate.unnest()
@@ -170,12 +180,14 @@ private[table] final class ProjectPlate[A] private (
   private final def focused(): Boolean =
     projectState == FOCUSED
 
-  private final def search(): Signal =
-    if (cursor.head == focus.head) {
+  private final def search(initial: Boolean): Signal =
+    if ((!initial || (cursor.tail eq Nil)) && cursor.head == focus.head) {
       focus = focus.tail
       focusDepth = 0
       if (focus eq Nil) {
         projectState = FOCUSED
+      } else if (initial) {
+        projectState = DESCENDING
       }
       Signal.Continue
     } else {

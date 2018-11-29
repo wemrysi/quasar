@@ -454,6 +454,22 @@ object ParseInstructionSpec {
 
         project(".x", input) must resultIn(expected)
       }
+
+      "only extract paths starting from root" in {
+        val input = ldjson("""
+          { "z": "b", "x": { "y": 4 } }
+          { "x": 2, "y": { "x": 1 } }
+          { "a": { "x": { "z": false, "y": true } }, "b": "five" }
+          { "x": { "y": 1, "z": 2 } }
+          """)
+
+        val expected = ldjson("""
+          4
+          1
+          """)
+
+        project(".x.y", input) must resultIn(expected)
+      }
     }
 
     def evalProject(project: Project, stream: JsonStream): JsonStream
