@@ -24,41 +24,29 @@ import quasar.contrib.iota.SubInject
 import quasar.qscript._
 
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-import iotaz.{CopK, TNilK}
-import iotaz.TListK.:::
-
-object RewriteSpec extends quasar.Qspec with QScriptHelpers {
+object NormalizeSpec extends quasar.Qspec {
   import IdStatus.ExcludeId
 
-  val rewrite = new Rewrite[Fix]
+  type QST[A] = QScriptTotal[Fix, A]
+  type QSNorm[A] = QScriptNormalized[Fix, A]
 
-  def normalizeTExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](rewrite.normalizeT)
+  def normalizeExpr(expr: Fix[QSNorm]): Fix[QSNorm] =
+    NormalizeQScriptFreeMap(NormalizeQScript[Fix](expr))
 
-  def normalizeExpr(expr: Fix[QS]): Fix[QST] =
-    rewrite.normalize[QST].apply(expr)
+  implicit def normalizedToTotal: Injectable[QSNorm, QST] =
+    SubInject[QSNorm, QST]
 
-  type QSI[A] = CopK[QScriptCore ::: ThetaJoin ::: TNilK, A]
+  val qsdsl = construction.mkDefaults[Fix, QSNorm]
 
-  implicit val qsc: Injectable[QScriptCore, QSI] = Injectable.inject[QScriptCore, QSI]
-  implicit val tj: Injectable[ThetaJoin, QSI] = Injectable.inject[ThetaJoin, QSI]
-
-  val qsidsl = construction.mkDefaults[Fix, QSI]
-
-  implicit def qsiToQscriptTotal: Injectable[QSI, QST] = SubInject[QSI, QST]
-
-  // TODO instead of calling `.toOption` on the `\/`
-  // write an `Equal[PlannerError]` and test for specific errors too
   "rewriter" should {
+
+    import qsdsl._
 
     // select b[*] + c[*] from intArrays.data
     "normalize static projections in shift coalescing" in {
-      import qsdsl._
-      import qstdsl.{fix => fixt, func => funct, recFunc => recFunct}
 
       val educated =
         fix.Map(
@@ -88,31 +76,29 @@ object RewriteSpec extends quasar.Qspec with QScriptHelpers {
             recFunc.ProjectKeyS(recFunc.Hole, "1")))
 
       val normalized =
-        fixt.LeftShift(
-          fixt.LeftShift(
-            fixt.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("intArrays")), ExcludeId),
-            recFunct.ProjectKeyS(recFunct.Hole, "b"),
+        fix.LeftShift(
+          fix.LeftShift(
+            fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("intArrays")), ExcludeId),
+            recFunc.ProjectKeyS(recFunc.Hole, "b"),
             ExcludeId,
             ShiftType.Array,
             OnUndefined.Emit,
-            funct.ConcatMaps(
-              funct.MakeMapS("original", funct.LeftSide),
-              funct.MakeMapS("0", funct.RightSide))),
-          recFunct.ProjectKeyS(recFunct.ProjectKeyS(recFunct.Hole, "original"), "c"),
+            func.ConcatMaps(
+              func.MakeMapS("original", func.LeftSide),
+              func.MakeMapS("0", func.RightSide))),
+          recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "original"), "c"),
           ExcludeId,
           ShiftType.Array,
           OnUndefined.Emit,
-          funct.Add(
-            funct.ProjectKeyS(funct.LeftSide, "0"),
-            funct.RightSide))
+          func.Add(
+            func.ProjectKeyS(func.LeftSide, "0"),
+            func.RightSide))
 
       normalizeExpr(educated) must equal(normalized)
     }
 
     // select (select a, b from zips).a + (select a, b from zips).b
     "normalize static projections in a contrived example" in {
-      import qsdsl._
-      import qstdsl.{fix => fixt, recFunc => recFunct}
 
       val educated =
         fix.Map(
@@ -126,37 +112,51 @@ object RewriteSpec extends quasar.Qspec with QScriptHelpers {
             recFunc.ProjectKeyS(recFunc.Hole, "b")))
 
       val normalized =
-        fixt.Map(
-          fixt.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("zips")), ExcludeId),
-            recFunct.Add(
-              recFunct.ProjectKeyS(recFunct.Hole, "a"),
-              recFunct.ProjectKeyS(recFunct.Hole, "b")))
+        fix.Map(
+          fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("zips")), ExcludeId),
+            recFunc.Add(
+              recFunc.ProjectKeyS(recFunc.Hole, "a"),
+              recFunc.ProjectKeyS(recFunc.Hole, "b")))
 
       normalizeExpr(educated) must equal(normalized)
     }
 
-    "coalesce a Map into a subsequent LeftShift" in {
-      import qsidsl._
-      val exp: QSI[Fix[QSI]] =
-        fix.LeftShift(
-          fix.Map(
-            fix.Unreferenced,
-            recFunc.Constant(json.bool(true))),
-          recFunc.Hole,
-          ExcludeId,
-          ShiftType.Array,
-          OnUndefined.Omit,
-          func.RightSide).unFix
+    "elide no-op Map" >> {
 
-      Coalesce[Fix, QSI, QSI].coalesceQC(idPrism).apply(exp) must
-      equal(
-        fix.LeftShift(
-          fix.Unreferenced,
-          recFunc.Constant(json.bool(true)),
-          ExcludeId,
-          ShiftType.Array,
-          OnUndefined.Omit,
-          func.RightSide).unFix.some)
+      val path = ResourcePath.leaf(rootDir </> file("foo"))
+
+      "elide outer no-op Map" >> {
+        val src =
+          fix.Read[ResourcePath](path, ExcludeId)
+
+        normalizeExpr(fix.Map(src, recFunc.Hole)) must equal(src)
+      }
+
+      "elide nested no-op Map" >> {
+        val src =
+          fix.Map(
+            fix.Read[ResourcePath](path, ExcludeId),
+            recFunc.ProjectKeyS(recFunc.Hole, "bar"))
+
+        val qs =
+          fix.Filter(
+            fix.Map(src, recFunc.Hole),
+            recFunc.ProjectKeyS(recFunc.Hole, "baz"))
+
+        val expected =
+          fix.Filter(
+            src,
+            recFunc.ProjectKeyS(recFunc.Hole, "baz"))
+
+        normalizeExpr(qs) must equal(expected)
+      }
+
+      "elide double no-op Map" >> {
+        val src =
+          fix.Read[ResourcePath](path, ExcludeId)
+
+        normalizeExpr(fix.Map(fix.Map(src, recFunc.Hole), recFunc.Hole)) must equal(src)
+      }
     }
   }
 }

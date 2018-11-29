@@ -100,6 +100,12 @@ package object qscript {
       CopK.Inject[QScriptCore[T, ?], QScriptEducated[T, ?]].prj(qt)
   }
 
+  type QScriptNormalizedList[T[_[_]]] =
+    QScriptCore[T, ?] ::: EquiJoin[T, ?] ::: Const[Read[ResourcePath], ?] ::: TNilK
+
+  type QScriptNormalized[T[_[_]], A] =
+    CopK[QScriptNormalizedList[T], A]
+
   type MapFunc[T[_[_]], A] = CopK[MapFuncCore[T, ?] ::: MapFuncDerived[T, ?] ::: TNilK, A]
 
   object MFC {

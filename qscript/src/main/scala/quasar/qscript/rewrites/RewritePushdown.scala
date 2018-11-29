@@ -23,7 +23,7 @@ import quasar.ParseInstruction.{Mask, Pivot, Wrap}
 import quasar.common.{CPath, CPathIndex}
 import quasar.contrib.iota._
 import quasar.ejson
-import quasar.fp.{liftFG, Injectable}
+import quasar.fp.Injectable
 import quasar.qscript._
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.RecFreeS._
@@ -39,15 +39,6 @@ import scalaz.Scalaz._ // apply-traverse syntax conflict
 final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
   import MapFuncsCore.{Constant, IntLit, ProjectIndex, ProjectKey}
-
-  // We perform this rewrite before `extraShift` because sometimes
-  // a no-op Map is added in the transformation from `QScriptEducated`,
-  // which interferes with the pattern matching in `extraShift`.
-  def elideNoopMap[F[a] <: ACopK[a]: Functor](implicit QC: QScriptCore :<<: F)
-      : QScriptCore[T[F]] => F[T[F]] = {
-    case Map(Embed(src), mf) if mf === HoleR => src
-    case qc => QC.inj(qc)
-  }
 
   def rewriteLeftShift[F[a] <: ACopK[a]: Functor, A](
       implicit
@@ -186,15 +177,7 @@ object RewritePushdown {
                QCF: QScriptCore[T, ?] :<<: F,
                QCG: QScriptCore[T, ?] :<<: G)
       : G[T[F]] => F[T[F]] = {
-
     val pushdown = new RewritePushdown[T]
-
-    val rewrite1: G[T[F]] => F[T[F]] =
-      gtf => QCG.prj(gtf).fold(GF.inject(gtf))(pushdown.elideNoopMap[F])
-
-    val rewrite2: F[T[F]] => F[T[F]] =
-      liftFG[QScriptCore[T, ?], F, T[F]](pushdown.rewriteLeftShift[F, A])
-
-    rewrite1 andThen rewrite2
+    gtf => QCG.prj(gtf).fold(GF.inject(gtf))(pushdown.rewriteLeftShift[F, A])
   }
 }

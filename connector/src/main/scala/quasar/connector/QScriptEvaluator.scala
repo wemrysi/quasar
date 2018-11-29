@@ -19,12 +19,17 @@ package quasar.connector
 import quasar.{RenderTree, RenderTreeT}
 import quasar.common.PhaseResultTell
 import quasar.common.phase
-import quasar.qscript._
-import quasar.qscript.rewrites._
 import quasar.contrib.iota._
+import quasar.fp.idPrism
+import quasar.qscript._
+import quasar.qscript.rewrites.{
+  NormalizeQScript,
+  NormalizeQScriptFreeMap,
+  ThetaToEquiJoin
+}
 
 import iotaz.{CopK, TListK}
-import matryoshka.{BirecursiveT, EqualT, ShowT}
+import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import scalaz.{Functor, Monad}
 import scalaz.syntax.monad._
@@ -35,9 +40,8 @@ abstract class QScriptEvaluator[
     F[_]: Monad: MonadPlannerErr: PhaseResultTell,
     R] {
 
-  /** QScript used by this evaluator in Unirewrite. */
-  type QSRewrite[U[_[_]]] <: TListK
-  type QSMRewrite[A] = CopK[QSRewrite[T], A]
+  type QSEd[A] = QScriptEducated[T, A]
+  type QSNorm[A] = QScriptNormalized[T, A]
 
   /** QScript used by this evaluator in planning. */
   type QS[U[_[_]]] <: TListK
@@ -46,11 +50,7 @@ abstract class QScriptEvaluator[
   /** Executable representation. */
   type Repr
 
-  def QSMRewriteFunctor: Functor[QSMRewrite]
   def QSMFunctor: Functor[QSM]
-  def UnirewriteT: Unirewrite[T, QSMRewrite]
-
-  def RenderTQSMRewrite: RenderTree[T[QSMRewrite]]
   def RenderTQSM: RenderTree[T[QSM]]
 
   /** Returns the result of executing the `Repr`. */
@@ -60,25 +60,33 @@ abstract class QScriptEvaluator[
   def plan(cp: T[QSM]): F[Repr]
 
   /** Rewrites the qscript for optimal evaluation. */
-  def optimize: F[QSMRewrite[T[QSM]] => QSM[T[QSM]]]
+  def optimize: F[QSNorm[T[QSM]] => QSM[T[QSM]]]
 
-  ////
-
-  def evaluate(qsr: T[QScriptEducated[T, ?]]): F[R] =
+  def evaluate(qsr: T[QSEd]): F[R] =
     for {
-      rewritten <- Unirewrite[T, QSMRewrite](new Rewrite[T]).apply(qsr).point[F]
-      _ <- phase[F][T[QSMRewrite]]("QScript (Rewritten)", rewritten)
+      equiJoin <- toEquiJoin(qsr).point[F]
+      _ <- phase[F][T[QSNorm]]("QScript (EquiJoin)", equiJoin)
+
+      normQS <- NormalizeQScript[T](equiJoin).point[F]
+      _ <- phase[F][T[QSNorm]]("QScript (Normalized QScript)", normQS)
+
+      normMF <- NormalizeQScriptFreeMap(normQS).point[F]
+      _ <- phase[F][T[QSNorm]]("QScript (Normalized FreeMap)", normMF)
 
       optimized <- optimize
-      interpreted <- phase[F][T[QSM]]("QScript (Optimized)", rewritten.transCata[T[QSM]](optimized))
+      interpreted <- phase[F][T[QSM]]("QScript (Optimized)", normMF.transCata[T[QSM]](optimized))
 
       repr <- plan(interpreted)
       result <- execute(repr)
     } yield result
 
-  private final implicit def _QSMRewriteFunctor: Functor[QSMRewrite] = QSMRewriteFunctor
+  ////
+
+  private def toEquiJoin(qs: T[QSEd]): T[QSNorm] = {
+    val J = ThetaToEquiJoin[T, QSEd, QSNorm]
+    qs.transCata[T[QSNorm]](J.rewrite[J.G](idPrism.reverseGet))
+  }
+
   private final implicit def _QSMFunctor: Functor[QSM] = QSMFunctor
-  private final implicit def _UnirewriteT: Unirewrite[T, QSMRewrite] = UnirewriteT
-  private final implicit def _RenderTQSMRewrite: RenderTree[T[QSMRewrite]] = RenderTQSMRewrite
   private final implicit def _RenderTQSM: RenderTree[T[QSM]] = RenderTQSM
 }
