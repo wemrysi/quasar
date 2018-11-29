@@ -119,7 +119,7 @@ object Main extends IOApp {
         } yield qs
       case Failure(f) =>
         val (s, exitCode) = renderFailure(f, "repl")
-        IO.delay(println(s)) >> ExitCode(exitCode.toInt).pure[IO]
+        IO.delay(println(s)).as(ExitCode(exitCode.toInt))
     }
 
   }
