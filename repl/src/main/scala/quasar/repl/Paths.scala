@@ -38,6 +38,9 @@ object Paths {
       : F[JPath] =
     F.delay(JFiles.createTempFile(prefix, suffix))
 
+  def fromString[F[_]](s: String)(implicit F: Sync[F]): F[JPath] =
+    F.delay(getPath(NonEmptyList(s)))
+
   def getBasePath[F[_]](implicit F: Sync[F]): F[JPath] =
     getUserHome.map(h => h.map(_.resolve(getPath(QuasarDirNames)))
       .getOrElse(getPath(TmpQuasarReplDirNames)))
@@ -50,6 +53,10 @@ object Paths {
 
   def mkdirs[F[_]](p: JPath)(implicit F: Sync[F]): F[Boolean] =
     F.delay(p.toFile.mkdirs())
+
+  def ensureFile[F[_]](p: JPath)(implicit F: Sync[F]): F[Unit] =
+    F.delay(p.toFile.isFile())
+      .flatMap(_.unlessM(F.raiseError(new java.lang.RuntimeException(s"$p is not an existing file"))))
 
   ////
 
