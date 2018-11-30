@@ -390,6 +390,9 @@ trait ColumnarTableModule
           case (instr @ ParseInstruction.Wrap(_, _), plate) =>
             WrapPlate[IO, List[Slice]](instr, plate)
 
+          case (ParseInstruction.Project(path), plate) =>
+            ProjectPlate[IO, List[Slice]](path, plate)
+
           case (instr @ ParseInstruction.Mask(_), plate) =>
             MaskPlate[IO, List[Slice]](instr, plate)
 

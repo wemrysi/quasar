@@ -14,27 +14,35 @@
  * limitations under the License.
  */
 
-package quasar.mimir.evaluate
+package quasar.impl.evaluate
 
-import slamdata.Predef.List
+import slamdata.Predef._
 
 import quasar.{CompositeParseType, IdStatus, ParseInstruction, ParseType}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
-import quasar.ParseInstruction.{Ids, Mask, Pivot, Wrap}
+import quasar.ParseInstruction.{Ids, Mask, Pivot, Project, Wrap}
 import quasar.common.{CPath, CPathField, CPathIndex, CPathNode}
 import quasar.common.data._
 
+import scala.collection.Iterator
+
+import scalaz.std.anyVal._
+import scalaz.std.list._
+import scalaz.std.option._
+import scalaz.syntax.equal._
+import scalaz.syntax.foldable._
 import scalaz.syntax.std.stream._
 
 object RValueParseInstructionInterpreter {
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def interpret(instructions: List[ParseInstruction], rvalue: RValue): List[RValue] =
     instructions.foldLeft(List[RValue](rvalue)) {
       case (prev, instr @ Mask(_)) =>
         prev.flatMap(interpretMask(instr, _).toList)
 
       case (prev, instr @ Pivot(pivots)) =>
-        if (pivots.size == 1)
+        if (pivots.size === 1)
           pivots.head match {
             case (path, (idStatus, structure)) =>
               prev.flatMap(interpretSinglePivot(path, idStatus, structure, _))
@@ -44,6 +52,9 @@ object RValueParseInstructionInterpreter {
 
       case (prev, instr @ Wrap(_, _)) =>
         prev.flatMap(interpretWrap(instr, _) :: Nil)
+
+      case (prev, Project(p)) =>
+        prev.flatMap(interpretProject(p, _))
 
       case (_, Ids) =>
         scala.sys.error("ParseInstruction.Ids not supported for RValue interpretation")
@@ -75,6 +86,7 @@ object RValueParseInstructionInterpreter {
     //
     // build up:
     // only retain if type checks
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(masks: Map[List[CPathNode], Set[ParseType]], rvalue: RValue): Option[RValue] = {
 
       val prefixes: Set[CPathNode] = masks.keySet collect {
@@ -142,8 +154,17 @@ object RValueParseInstructionInterpreter {
     inner(input, rvalue)
   }
 
+  def interpretProject(path: CPath, rvalue: RValue): List[RValue] =
+    path.nodes.foldLeftM(rvalue) {
+      case (rv, CPathField(name)) => RValue.rField1(name).getOption(rv)
+      case (rv, CPathIndex(idx)) => RValue.rElement(idx).getOption(rv)
+      case _ => None
+    }.toList
+
   def interpretSinglePivot(path: CPath, status: IdStatus, structure: CompositeParseType, rvalue: RValue)
       : List[RValue] = {
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(remaining: List[CPathNode], rvalue: RValue): List[RValue] =
       remaining match {
         // perform the pivot
@@ -173,10 +194,10 @@ object RValueParseInstructionInterpreter {
             case (RArray(elems), ParseType.Array) =>
               status match {
                 case IdOnly =>
-                  elems.iterator.zipWithIndex.map(t => CLong(t._2)).toList
+                  elems.iterator.zipWithIndex.map(t => CLong(t._2.toLong)).toList
                 case IncludeId => // the qscript expects the results to be returned in an array
                   val shifted: Iterator[RValue] = elems.iterator.zipWithIndex map {
-                    case (elem, idx) => RArray(CLong(idx), elem)
+                    case (elem, idx) => RArray(CLong(idx.toLong), elem)
                   }
                   shifted.toList
                 case ExcludeId => elems
@@ -223,6 +244,7 @@ object RValueParseInstructionInterpreter {
 
   def interpretWrap(wrap: Wrap, rvalue: RValue): RValue = {
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(remaining: List[CPathNode], rvalue: RValue): RValue =
       (remaining, rvalue) match {
         case (Nil, rv) => RObject((wrap.name, rv))

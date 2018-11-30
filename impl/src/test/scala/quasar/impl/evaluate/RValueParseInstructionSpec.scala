@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.mimir.evaluate
+package quasar.impl.evaluate
 
 import slamdata.Predef._
-import quasar.{CompositeParseType, IdStatus, JsonSpec, ParseInstructionSpec}
+import quasar.{CompositeParseType, IdStatus, ParseInstructionSpec}
 import quasar.common.CPath
 import quasar.common.data.RValue
 
@@ -26,8 +26,8 @@ import qdata.json.QDataFacade
 
 // TODO interpret ParseInstruction.Ids
 object RValueParseInstructionSpec
-    extends JsonSpec
-    with ParseInstructionSpec.WrapSpec
+    extends ParseInstructionSpec.WrapSpec
+    with ParseInstructionSpec.ProjectSpec
     with ParseInstructionSpec.MaskSpec
     with ParseInstructionSpec.SinglePivotSpec {
 
@@ -42,6 +42,9 @@ object RValueParseInstructionSpec
 
   def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream =
     stream.map(RValueParseInstructionInterpreter.interpretWrap(wrap, _))
+
+  def evalProject(project: Project, stream: JsonStream): JsonStream =
+    stream.flatMap(RValueParseInstructionInterpreter.interpretProject(project.path, _))
 
   protected def ldjson(str: String): JsonStream = {
     implicit val facade: Facade[RValue] = QDataFacade[RValue](isPrecise = false)

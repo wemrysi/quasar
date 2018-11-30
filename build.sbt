@@ -290,6 +290,7 @@ lazy val impl = project
     api % BothScopes,
     common % "test->test",
     connector % BothScopes,
+    frontend % "test->test",
     sst)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.impl)

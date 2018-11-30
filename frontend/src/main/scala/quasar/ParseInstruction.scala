@@ -67,6 +67,11 @@ object ParseInstruction {
   final case class Pivot(pivots: Map[CPath, (IdStatus, CompositeParseType)])
       extends ParseInstruction
 
+  /**
+   * Extracts the value at `path`, eliminating all surrounding structure.
+   */
+  final case class Project(path: CPath) extends ParseInstruction
+
   ////
 
   implicit val parseInstructionEqual: Equal[ParseInstruction] =
@@ -75,6 +80,7 @@ object ParseInstruction {
       case (Wrap(p1, n1), Wrap(p2, n2)) => p1 === p2 && n1 === n2
       case (Mask(m1), Mask(m2)) => m1 === m2
       case (Pivot(p1), Pivot(p2)) => p1 === p2
+      case (Project(p1), Project(p2)) => p1 === p2
       case (_, _) => false
     }
 
@@ -84,5 +90,6 @@ object ParseInstruction {
       case Wrap(p, n) => Cord("Wrap(") ++ p.show ++ Cord(", ") ++ n.show ++ Cord(")")
       case Mask(m) => Cord("Mask(") ++ m.show ++ Cord(")")
       case Pivot(p) => Cord("Pivot(") ++ p.show ++ Cord(")")
+      case Project(p) => Cord("Project(") ++ p.show ++ Cord(")")
     }
 }

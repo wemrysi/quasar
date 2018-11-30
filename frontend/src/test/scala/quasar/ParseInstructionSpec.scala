@@ -30,6 +30,7 @@ abstract class ParseInstructionSpec
     extends JsonSpec
     with ParseInstructionSpec.IdsSpec
     with ParseInstructionSpec.WrapSpec
+    with ParseInstructionSpec.ProjectSpec
     with ParseInstructionSpec.MaskSpec
     with ParseInstructionSpec.SinglePivotSpec
 
@@ -268,6 +269,216 @@ object ParseInstructionSpec {
         expected: JsonStream)
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream => evalWrap(Wrap(CPath.parse(path), name), str)}
+  }
+
+  trait ProjectSpec extends JsonSpec {
+    protected final type Project = ParseInstruction.Project
+    protected final val Project = ParseInstruction.Project
+
+    "project" should {
+      "passthrough at identity" in {
+        val input = ldjson("""
+          1
+          "two"
+          false
+          [1, 2, 3]
+          { "a": 1, "b": "two" }
+          []
+          {}
+          """)
+
+        project(".", input) must resultIn(input)
+      }
+
+      "extract .a" in {
+        val input = ldjson("""
+          { "a": 1, "b": "two" }
+          { "a": "foo", "b": "two" }
+          { "a": true, "b": "two" }
+          { "a": [], "b": "two" }
+          { "a": {}, "b": "two" }
+          { "a": [1, 2], "b": "two" }
+          { "a": { "c": 3 }, "b": "two" }
+          """)
+        val expected = ldjson("""
+          1
+          "foo"
+          true
+          []
+          {}
+          [1, 2]
+          { "c": 3 }
+          """)
+
+        project(".a", input) must resultIn(expected)
+      }
+
+      "extract .a.b" in {
+        val input = ldjson("""
+          { "a": { "b": 1 }, "b": "two" }
+          { "a": { "b": "foo" }, "b": "two" }
+          { "a": { "b": true }, "b": "two" }
+          { "a": { "b": [] }, "b": "two" }
+          { "a": { "b": {} }, "b": "two" }
+          { "a": { "b": [1, 2] }, "b": "two" }
+          { "a": { "b": { "c": 3 } }, "b": "two" }
+          """)
+        val expected = ldjson("""
+          1
+          "foo"
+          true
+          []
+          {}
+          [1, 2]
+          { "c": 3 }
+          """)
+
+        project(".a.b", input) must resultIn(expected)
+      }
+
+      "extract .a[1]" in {
+        val input = ldjson("""
+          { "a": [3, 1], "b": "two" }
+          { "a": [3, "foo"], "b": "two" }
+          { "a": [3, true], "b": "two" }
+          { "a": [3, []], "b": "two" }
+          { "a": [3, {}], "b": "two" }
+          { "a": [3, [1, 2]], "b": "two" }
+          { "a": [3, { "c": 3 }], "b": "two" }
+          """)
+        val expected = ldjson("""
+          1
+          "foo"
+          true
+          []
+          {}
+          [1, 2]
+          { "c": 3 }
+          """)
+
+        project(".a[1]", input) must resultIn(expected)
+      }
+
+      "extract [1]" in {
+        val input = ldjson("""
+          [0, 1]
+          [0, "foo"]
+          [0, true]
+          [0, []]
+          [0, {}]
+          [0, [1, 2]]
+          [0, { "c": 3 }]
+          """)
+
+        val expected = ldjson("""
+          1
+          "foo"
+          true
+          []
+          {}
+          [1, 2]
+          { "c": 3 }
+          """)
+
+        project("[1]", input) must resultIn(expected)
+      }
+
+      "extract [1][0]" in {
+        val input = ldjson("""
+          [0, [1]]
+          [0, ["foo"]]
+          [0, [true]]
+          [0, [[]]]
+          [0, [{}]]
+          [0, [[1, 2]]]
+          [0, [{ "c": 3 }]]
+          """)
+
+        val expected = ldjson("""
+          1
+          "foo"
+          true
+          []
+          {}
+          [1, 2]
+          { "c": 3 }
+          """)
+
+        project("[1][0]", input) must resultIn(expected)
+      }
+
+      "extract [1].a" in {
+        val input = ldjson("""
+          [0, { "a": 1 }]
+          [false, { "a": "foo" }]
+          [1, { "a": true }]
+          [[], { "a": [] }]
+          ["foo", { "a": {} }]
+          [{}, { "a": [1, 2] }]
+          [0, { "a": { "c": 3 } }]
+          """)
+
+        val expected = ldjson("""
+          1
+          "foo"
+          true
+          []
+          {}
+          [1, 2]
+          { "c": 3 }
+          """)
+
+        project("[1].a", input) must resultIn(expected)
+      }
+
+      "elide rows not containing path" in {
+        val input = ldjson("""
+          { "x": 1 }
+          { "x": 2, "y": 3 }
+          { "y": 4, "z": 5 }
+          ["a", "b"]
+          4
+          "seven"
+          { "z": 4, "x": 8 }
+          false
+          { "y": "nope", "x": {} }
+          { "one": 1, "two": 2 }
+          """)
+
+        val expected = ldjson("""
+          1
+          2
+          8
+          {}
+          """)
+
+        project(".x", input) must resultIn(expected)
+      }
+
+      "only extract paths starting from root" in {
+        val input = ldjson("""
+          { "z": "b", "x": { "y": 4 } }
+          { "x": 2, "y": { "x": 1 } }
+          { "a": { "x": { "z": false, "y": true } }, "b": "five" }
+          { "x": { "y": 1, "z": 2 } }
+          """)
+
+        val expected = ldjson("""
+          4
+          1
+          """)
+
+        project(".x.y", input) must resultIn(expected)
+      }
+    }
+
+    def evalProject(project: Project, stream: JsonStream): JsonStream
+
+    def project(path: String, stream: JsonStream): JsonStream =
+      evalProject(Project(CPath.parse(path)), stream)
+
+    def resultIn(expected: JsonStream): Matcher[JsonStream] =
+      bestSemanticEqual(expected)
   }
 
   trait MaskSpec extends JsonSpec {
