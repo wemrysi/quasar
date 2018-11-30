@@ -121,6 +121,47 @@ object NormalizeSpec extends quasar.Qspec {
       normalizeExpr(educated) must equal(normalized)
     }
 
+    "normalize within a Union" in {
+
+      val educated =
+        fix.Union(
+          fix.Unreferenced,
+          free.Map(
+            free.Map(
+              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("zips1")), ExcludeId),
+                recFunc.ConcatMaps(
+                  recFunc.MakeMapS("a", recFunc.ProjectKeyS(recFunc.Hole, "a")),
+                  recFunc.MakeMapS("b", recFunc.ProjectKeyS(recFunc.Hole, "b")))),
+            recFunc.Add(
+              recFunc.ProjectKeyS(recFunc.Hole, "a"),
+              recFunc.ProjectKeyS(recFunc.Hole, "b"))),
+          free.Map(
+            free.Map(
+              free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("zips2")), ExcludeId),
+                recFunc.ConcatMaps(
+                  recFunc.MakeMapS("c", recFunc.ProjectKeyS(recFunc.Hole, "c")),
+                  recFunc.MakeMapS("d", recFunc.ProjectKeyS(recFunc.Hole, "d")))),
+            recFunc.Add(
+              recFunc.ProjectKeyS(recFunc.Hole, "c"),
+              recFunc.ProjectKeyS(recFunc.Hole, "d"))))
+
+      val normalized =
+        fix.Union(
+          fix.Unreferenced,
+          free.Map(
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("zips1")), ExcludeId),
+              recFunc.Add(
+                recFunc.ProjectKeyS(recFunc.Hole, "a"),
+                recFunc.ProjectKeyS(recFunc.Hole, "b"))),
+          free.Map(
+            free.Read[ResourcePath](ResourcePath.leaf(rootDir </> file("zips2")), ExcludeId),
+              recFunc.Add(
+                recFunc.ProjectKeyS(recFunc.Hole, "c"),
+                recFunc.ProjectKeyS(recFunc.Hole, "d"))))
+
+      normalizeExpr(educated) must equal(normalized)
+    }
+
     "elide no-op Map" >> {
 
       val path = ResourcePath.leaf(rootDir </> file("foo"))
