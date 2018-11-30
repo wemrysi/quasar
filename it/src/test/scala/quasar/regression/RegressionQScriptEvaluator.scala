@@ -23,14 +23,11 @@ import quasar.connector.QScriptEvaluator
 import quasar.contrib.iota._
 import quasar.fp._
 import quasar.qscript._
-import quasar.qscript.rewrites.{RewritePushdown, Unirewrite}
-
-import scala.Predef.implicitly
+import quasar.qscript.rewrites.RewritePushdown
 
 import cats.effect.IO
 import iotaz.CopK
 import iotaz.TListK.:::
-import iotaz.TNilK
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
@@ -46,28 +43,12 @@ final class RegressionQScriptEvaluator[
 
   type M[A] = IO[A]
 
-  type QSRewrite[U[_[_]]] =
-    QScriptCore[U, ?]            :::
-    EquiJoin[U, ?]               :::
-    Const[Read[ResourcePath], ?] :::
-    TNilK
-
-  type QS[U[_[_]]] = Const[InterpretedRead[ResourcePath], ?] ::: QSRewrite[U]
+  type QS[U[_[_]]] = Const[InterpretedRead[ResourcePath], ?] ::: QScriptNormalizedList[U]
 
   type Repr = QScriptCount
 
-  implicit def QSMToQScriptTotal: Injectable[QSMRewrite, QScriptTotal[T, ?]] =
-    SubInject[CopK[QSRewrite[T], ?], QScriptTotal[T, ?]]
-
-  implicit def QSMRewriteToQSM: Injectable[QSMRewrite, QSM] =
-    SubInject[CopK[QSRewrite[T], ?], CopK[QS[T], ?]]
-
-  def RenderTQSMRewrite: RenderTree[T[QSMRewrite]] = {
-    val toTotal: T[QSMRewrite] => T[QScriptTotal[T, ?]] =
-      _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QSRewrite[T], ?], QScriptTotal[T, ?]].inject(_).embed)
-
-    RenderTree.contramap(toTotal)
-  }
+  implicit def QSNormToQSM: Injectable[QScriptNormalized[T, ?], QSM] =
+    SubInject[QScriptNormalized[T, ?], CopK[QS[T], ?]]
 
   def RenderTQSM: RenderTree[T[QSM]] = {
     val toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
@@ -76,14 +57,10 @@ final class RegressionQScriptEvaluator[
     RenderTree.contramap(toTotal)
   }
 
-  def QSMRewriteFunctor: Functor[QSMRewrite] = Functor[QSMRewrite]
   def QSMFunctor: Functor[QSM] = Functor[QSM]
 
-  def UnirewriteT: Unirewrite[T, QSMRewrite] =
-    implicitly[Unirewrite[T, QSMRewrite]]
-
-  def optimize: F[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
-    RewritePushdown[T, QSM, QSMRewrite, ResourcePath].point[F]
+  def optimize: F[QScriptNormalized[T, T[QSM]] => QSM[T[QSM]]] =
+    RewritePushdown[T, QSM, QScriptNormalized[T, ?], ResourcePath].point[F]
 
   def execute(repr: Repr): F[QScriptCount] = repr.point[F]
 

@@ -31,16 +31,14 @@ import quasar.mimir.MimirRepr
 import quasar.mimir.MimirCake._
 import quasar.mimir.evaluate.Config.{EvalConfigT, EvaluatorConfig}
 import quasar.qscript._
-import quasar.qscript.rewrites.{RewritePushdown, Unirewrite}
+import quasar.qscript.rewrites.RewritePushdown
 import quasar.yggdrasil.{Config => YggConfig, MonadFinalizers}
 
-import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext
 
 import cats.effect.{ContextShift, IO, LiftIO}
 import iotaz.CopK
 import iotaz.TListK.:::
-import iotaz.TNilK
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._
@@ -58,28 +56,12 @@ final class MimirQScriptEvaluator[
   type MT[X[_], A] = EvalConfigT[T, X, IO, A]
   type M[A] = MT[F, A]
 
-  type QSRewrite[U[_[_]]] =
-    QScriptCore[U, ?]            :::
-    EquiJoin[U, ?]               :::
-    Const[Read[ResourcePath], ?] :::
-    TNilK
-
-  type QS[U[_[_]]] = Const[InterpretedRead[ResourcePath], ?] ::: QSRewrite[U]
+  type QS[U[_[_]]] = Const[InterpretedRead[ResourcePath], ?] ::: QScriptNormalizedList[U]
 
   type Repr = MimirRepr
 
-  implicit def QSMToQScriptTotal: Injectable[QSMRewrite, QScriptTotal[T, ?]] =
-    SubInject[CopK[QSRewrite[T], ?], QScriptTotal[T, ?]]
-
-  implicit def QSMRewriteToQSM: Injectable[QSMRewrite, QSM] =
-    SubInject[CopK[QSRewrite[T], ?], CopK[QS[T], ?]]
-
-  def RenderTQSMRewrite: RenderTree[T[QSMRewrite]] = {
-    val toTotal: T[QSMRewrite] => T[QScriptTotal[T, ?]] =
-      _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QSRewrite[T], ?], QScriptTotal[T, ?]].inject(_).embed)
-
-    RenderTree.contramap(toTotal)
-  }
+  implicit def QSNormToQSM: Injectable[QScriptNormalized[T, ?], QSM] =
+    SubInject[QScriptNormalized[T, ?], CopK[QS[T], ?]]
 
   def RenderTQSM: RenderTree[T[QSM]] = {
     val toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
@@ -88,17 +70,15 @@ final class MimirQScriptEvaluator[
     RenderTree.contramap(toTotal)
   }
 
-  def QSMRewriteFunctor: Functor[QSMRewrite] = Functor[QSMRewrite]
   def QSMFunctor: Functor[QSM] = Functor[QSM]
 
-  def UnirewriteT: Unirewrite[T, QSMRewrite] =
-    implicitly[Unirewrite[T, QSMRewrite]]
-
-  def optimize: M[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
+  def optimize: M[QScriptNormalized[T, T[QSM]] => QSM[T[QSM]]] =
     Kleisli.ask[F, EvaluatorConfig[T, IO]] map {
       _.pushdown match {
-        case Pushdown.EnablePushdown => RewritePushdown[T, QSM, QSMRewrite, ResourcePath]
-        case Pushdown.DisablePushdown => QSMRewriteToQSM.inject(_)  // no-op
+        case Pushdown.EnablePushdown =>
+          RewritePushdown[T, QSM, QScriptNormalized[T, ?], ResourcePath]
+        case Pushdown.DisablePushdown =>
+          QSNormToQSM.inject(_)  // no-op
       }
     }
 

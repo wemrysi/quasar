@@ -554,48 +554,4 @@ object RewritePushdownSpec extends Qspec {
       rewriteLeftShift(initial) must equal(initial)
     }
   }
-
-  "no-op Map rewrite" >> {
-
-    val elideNoopMapFunc: QS[Fix[QS]] => QS[Fix[QS]] =
-      liftFG[QScriptCore[Fix, ?], QS, Fix[QS]](pushdown.elideNoopMap[QS])
-
-    def elideNoopMap(expr: Fix[QS]): Fix[QS] =
-      expr.transCata[Fix[QS]](elideNoopMapFunc)
-
-    val path = ResourcePath.leaf(rootDir </> file("foo"))
-
-    "elide outer no-op Map" >> {
-      val src: Fix[QS] =
-        fix.Read[ResourcePath](path, ExcludeId)
-
-      elideNoopMap(fix.Map(src, recFunc.Hole)) must equal(src)
-    }
-
-    "elide nested no-op Map" >> {
-      val src: Fix[QS] =
-        fix.Map(
-          fix.Read[ResourcePath](path, ExcludeId),
-          recFunc.ProjectKeyS(recFunc.Hole, "bar"))
-
-      val qs: Fix[QS] =
-        fix.Filter(
-          fix.Map(src, recFunc.Hole),
-          recFunc.ProjectKeyS(recFunc.Hole, "baz"))
-
-      val expected: Fix[QS] =
-        fix.Filter(
-          src,
-          recFunc.ProjectKeyS(recFunc.Hole, "baz"))
-
-      elideNoopMap(qs) must equal(expected)
-    }
-
-    "elide double no-op Map" >> {
-      val src: Fix[QS] =
-        fix.Read[ResourcePath](path, ExcludeId)
-
-      elideNoopMap(fix.Map(fix.Map(src, recFunc.Hole), recFunc.Hole)) must equal(src)
-    }
-  }
 }

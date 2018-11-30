@@ -21,14 +21,22 @@ import quasar.IdStatus.ExcludeId
 import quasar.api.resource.ResourcePath
 import quasar.common.JoinType
 import quasar.contrib.iota._
+import quasar.ejson, ejson.{EJson, Fixed}
 import quasar.fp._
-import quasar.qscript.QScriptHelpers
+import quasar.qscript._
 
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
 
-object ThetaToEquiJoinSpec extends quasar.Qspec with QScriptHelpers {
+object ThetaToEquiJoinSpec extends quasar.Qspec with TTypes[Fix] {
+
+  type QS[A] = QScriptEducated[A]
+  type QST[A] = QScriptTotal[A]
+
+  val qsdsl = construction.mkDefaults[Fix, QS]
+  val qstdsl = construction.mkDefaults[Fix, QST]
+  val json = Fixed[Fix[EJson]]
 
   def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
     expr.transCata[Fix[QST]](ThetaToEquiJoin[Fix, QS, QST].rewrite(idPrism.reverseGet))
