@@ -18,8 +18,10 @@ package quasar.yggdrasil.vfs
 
 import quasar.blueeyes.json.serialization.Extractor
 
+import monocle.Prism
 import scalaz.{NonEmptyList, Semigroup, Show}
 import scalaz.NonEmptyList.nels
+import scalaz.syntax.show._
 
 sealed trait ResourceError {
   def fold[A](fatalError: ResourceError.FatalError => A, userError: ResourceError.UserError => A): A
@@ -32,6 +34,11 @@ object ResourceError {
   }
 
   implicit val show = Show.showFromToString[ResourceError]
+
+  val throwableP: Prism[Throwable, ResourceError] =
+    Prism.partial[Throwable, ResourceError] {
+      case ResourceException(qe) => qe
+    } (ResourceException(_))
 
   def corrupt(message: String): ResourceError with FatalError         = Corrupt(message)
   def ioError(ex: Throwable): ResourceError with FatalError           = IOError(ex)
@@ -85,4 +92,6 @@ object ResourceError {
 
     def messages: NonEmptyList[String] = errors.flatMap(_.messages)
   }
+
+  private final case class ResourceException(qe: ResourceError) extends Exception(qe.shows)
 }

@@ -37,12 +37,13 @@ import quasar.impl.datasource.local.{
   LocalType
 }
 import quasar.impl.schema.SstEvalConfig
-import quasar.mimir.Precog
-import quasar.mimir.evaluate.Pushdown
+import quasar.mimir.{MimirRepr, Precog}
+import quasar.mimir.evaluate.{Pushdown, QuasarImpl}
+import quasar.mimir.storage.PTableSchema
 import quasar.run.{Quasar, QuasarError, SqlQuery}
 import quasar.run.implicits._
 import quasar.sql.Query
-import quasar.yggdrasil.vfs.contextShiftForS
+import quasar.yggdrasil.vfs.{contextShiftForS, ResourceError}
 
 import java.math.{MathContext, RoundingMode}
 import java.nio.file.{Files, Paths, Path => JPath}
@@ -78,6 +79,9 @@ abstract class Sql2QueryRegressionSpec extends Qspec {
   implicit val ioQuasarError: MonadError_[IO, QuasarError] =
     MonadError_.facet[IO](QuasarError.throwableP)
 
+  implicit val ioResourceError: MonadError_[IO, ResourceError] =
+    MonadError_.facet[IO](ResourceError.throwableP)
+
   implicit val streamQuasarError: MonadError_[Stream[IO, ?], QuasarError] =
     MonadError_.facet[Stream[IO, ?]](QuasarError.throwableP)
 
@@ -91,7 +95,7 @@ abstract class Sql2QueryRegressionSpec extends Qspec {
   /** A name to identify the suite in test output. */
   val suiteName: String = "SQL^2 Regression Queries"
 
-  def RunQuasar(testsDir: JPath): Stream[IO, (Quasar[IO], UUID)] = for {
+  def RunQuasar(testsDir: JPath): Stream[IO, (Quasar[IO, MimirRepr, PTableSchema], UUID)] = for {
     tmpPath <-
       Stream.bracket(IO(Files.createTempDirectory("quasar-test-")))(
         contribFile.deleteRecursively[IO](_))
@@ -100,28 +104,30 @@ abstract class Sql2QueryRegressionSpec extends Qspec {
 
     evalCfg = SstEvalConfig(1L, 1L, 1L)
 
-    q <- Quasar[IO](
+    q <- QuasarImpl[IO](
       precog,
       List(
         DatasourceModule.Lightweight(LocalDatasourceModule),
         DatasourceModule.Lightweight(LocalParsedDatasourceModule)),
       SstEvalConfig.single)
 
-    _ <- Stream.eval(q.pushdown.set(pushdown))
+    (pd, qu) = q
 
-    r <- Stream.eval(q.datasources.addDatasource(ref(testsDir)))
+    _ <- Stream.eval(pd.set(pushdown))
+
+    r <- Stream.eval(qu.datasources.addDatasource(ref(testsDir)))
 
     i <- r.fold(
       e => MonadError_[Stream[IO, ?], DatasourceError.CreateError[Json]].raiseError(e),
       i => Stream.emit(i).covary[IO])
 
-  } yield (q, i)
+  } yield (qu, i)
 
   ////
 
   val buildSuite: IO[Fragment] =
     for {
-      tdef <- Deferred[IO, (Quasar[IO], UUID)]
+      tdef <- Deferred[IO, (Quasar[IO, MimirRepr, PTableSchema], UUID)]
       sdown <- Deferred[IO, Unit]
 
       testsDir <- IO(TestsRoot(Paths.get("")).toAbsolutePath)

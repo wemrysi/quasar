@@ -21,6 +21,9 @@ import slamdata.Predef._
 import quasar.build.BuildInfo
 import quasar.common.{PhaseResultListen, PhaseResultTell}
 import quasar.concurrent.BlockingContext
+import quasar.mimir.MimirRepr
+import quasar.mimir.evaluate.PushdownControl
+import quasar.mimir.storage.PTableSchema
 import quasar.run.{MonadQuasarErr, Quasar}
 
 import java.io.File
@@ -74,10 +77,11 @@ object Repl {
 
   def mk[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       ref: Ref[F, ReplState],
-      quasar: Quasar[F],
+      pushdown: PushdownControl[F],
+      quasar: Quasar[F, MimirRepr, PTableSchema],
       blockingPool: BlockingContext)
       : F[Repl[F]] = {
-    val evaluator = Evaluator[F](ref, quasar, blockingPool)
+    val evaluator = Evaluator[F](ref, pushdown, quasar, blockingPool)
     historyFile[F].map(f => Repl[F](prompt, mkLineReader(f), evaluator.evaluate, blockingPool))
   }
 

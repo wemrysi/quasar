@@ -22,7 +22,7 @@ import quasar.api.datasource._
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableName
 import quasar.mimir.evaluate.Pushdown
-import quasar.run.optics.{stringUuidP => UuidString}
+import quasar.mimir.evaluate.optics.{stringUuidP => UuidString}
 import quasar.sql.Query
 
 import java.util.UUID

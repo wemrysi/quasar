@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar.mimir.evaluate
 
 import slamdata.Predef._
 import quasar.api.resource._
@@ -24,8 +24,7 @@ import quasar.contrib.pathy.AFile
 import quasar.contrib.std.uuid._
 import quasar.impl.datasources.DatasourceManagement.Running
 import quasar.impl.evaluate.Source
-import quasar.mimir.evaluate.QueryAssociate
-import quasar.run.optics.{stringUuidP => UuidString}
+import quasar.mimir.evaluate.optics.{stringUuidP => UuidString}
 
 import java.util.UUID
 

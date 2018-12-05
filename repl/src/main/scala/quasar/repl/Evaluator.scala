@@ -33,9 +33,11 @@ import quasar.fp.ski._
 import quasar.frontend.data.DataCodec
 import quasar.impl.schema.{SstConfig, SstSchema}
 import quasar.mimir.MimirRepr
+import quasar.mimir.evaluate.PushdownControl
+import quasar.mimir.evaluate.ResourceRouter.DatasourceResourcePrefix
+import quasar.mimir.evaluate.optics.{stringUuidP => UuidString}
+import quasar.mimir.storage.PTableSchema
 import quasar.run.{Quasar, QuasarError, MonadQuasarErr, Sql2QueryEvaluator, SqlQuery}
-import quasar.run.ResourceRouter.DatasourceResourcePrefix
-import quasar.run.optics.{stringUuidP => UuidString}
 import quasar.sst._
 import quasar.yggdrasil.util.NullRemover
 
@@ -64,7 +66,8 @@ import spire.std.double._
 
 final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
     stateRef: Ref[F, ReplState],
-    q: Quasar[F],
+    pushdown: PushdownControl[F],
+    q: Quasar[F, MimirRepr, PTableSchema],
     blockingPool: BlockingContext) {
 
   import Command._
@@ -171,7 +174,7 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
           liftS1(s"Unset variable ${n.value}")
 
       case SetPushdown(pd) =>
-        q.pushdown.set(pd) >>
+        pushdown.set(pd) >>
           liftS1(s"Set pushdown: $pd")
 
       case ListVars =>
@@ -554,10 +557,11 @@ object Evaluator {
 
   def apply[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       stateRef: Ref[F, ReplState],
-      quasar: Quasar[F],
+      pushdown: PushdownControl[F],
+      quasar: Quasar[F, MimirRepr, PTableSchema],
       blockingPool: BlockingContext)
       : Evaluator[F] =
-    new Evaluator[F](stateRef, quasar, blockingPool)
+    new Evaluator[F](stateRef, pushdown, quasar, blockingPool)
 
   val helpMsg =
     """Quasar REPL, Copyright © 2014–2018 SlamData Inc.
