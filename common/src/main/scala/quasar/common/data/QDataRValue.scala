@@ -40,6 +40,7 @@ object QDataRValue extends QDataEncode[RValue] with QDataDecode[RValue] {
   def tpe(a: RValue): QType = a match {
     case RObject(_) => QObject
     case RArray(_) => QArray
+    case RMeta(_, _) => QMeta
     case CEmptyObject => QObject
     case CEmptyArray => QArray
     case CString(_) => QString
@@ -168,7 +169,20 @@ object QDataRValue extends QDataEncode[RValue] with QDataDecode[RValue] {
   def pushObject(key: String, a: RValue, na: NascentObject): NascentObject = na + ((key, a))
   def makeObject(na: NascentObject): RValue = if (na.isEmpty) CEmptyObject else RObject(na)
 
-  def getMetaValue(a: RValue): RValue = error(s"Unable to represent metadata in `RValue`.")
-  def getMetaMeta(a: RValue): RValue = error(s"Unable to represent metadata in `RValue`.")
-  def makeMeta(value: RValue, meta: RValue): RValue = value
+  val metaKey: String = "meta"
+
+  def getMetaValue(a: RValue): RValue = a match {
+    case RMeta(value, _) => value
+    case _ => error(s"Expected `RMeta`. Received $a")
+  }
+  def getMetaMeta(a: RValue): RValue = a match {
+    case RMeta(_, RObject(o)) => o.get(metaKey) match {
+      case Some(meta) => meta
+      case _ => error(s"Expected `RObject` with $metaKey in meta meta. Received $a")
+    }
+    case _ => error(s"Expected `RMeta`. Received $a")
+  }
+  def makeMeta(value: RValue, meta: RValue): RValue = {
+    RMeta(value, RObject(Map(metaKey -> meta)))
+  }
 }

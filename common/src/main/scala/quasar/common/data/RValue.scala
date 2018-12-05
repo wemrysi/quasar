@@ -84,6 +84,10 @@ sealed trait RValue { self =>
   "org.wartremover.warts.StringPlusAny",
   "org.wartremover.warts.Var"))
 object RValue extends RValueInstances {
+  val rMeta: Prism[RValue, (RValue, RObject)] =
+    Prism.partial[RValue, (RValue, RObject)] {
+      case RMeta(value, meta) => (value, meta)
+    } { case (value, meta) => RMeta(value, meta) }
 
   val rObject: Prism[RValue, Map[String, RValue]] =
     Prism.partial[RValue, Map[String, RValue]] {
@@ -198,56 +202,80 @@ object RValue extends RValueInstances {
   }
 
   def unsafeInsert(rootTarget: RValue, rootPath: CPath, rootValue: RValue): RValue = {
+
+    def arrayInsert(l: List[RValue], i: Int, rem: CPath, v: RValue): List[RValue] = {
+      def update(l: List[RValue], j: Int): List[RValue] = l match {
+        case x :: xs => (if (j == i) rec(x, rem, v) else x) :: update(xs, j + 1)
+        case Nil     => Nil
+      }
+      update(l.padTo(i + 1, CUndefined), 0)
+    }
+
+    def updateObject(obj: RObject, key: String, cont: CPath, value: RValue): RObject = {
+      val (child, rest) = (obj.fields.get(key).getOrElse(CUndefined), obj.fields - key)
+      RObject(rest + (key -> rec(child, cont, value)))
+    }
+
+    def contMeta(target: RValue, key: String, cont: CPath, value: RValue): RMeta =
+      RMeta(target, RObject(Map(key -> rec(CUndefined, cont, value))))
+
     def rec(target: RValue, path: CPath, value: RValue): RValue = {
       if ((target == CNull || target == CUndefined) && path == CPath.Identity) value
-      else {
-        def arrayInsert(l: List[RValue], i: Int, rem: CPath, v: RValue): List[RValue] = {
-          def update(l: List[RValue], j: Int): List[RValue] = l match {
-            case x :: xs => (if (j == i) rec(x, rem, v) else x) :: update(xs, j + 1)
-            case Nil     => Nil
+      else target match {
+        case obj @ RObject(fields) =>
+          path.nodes match {
+            case CPathField(name) :: nodes =>
+              updateObject(obj, name, CPath(nodes), value)
+            case CPathMeta(name) :: nodes =>
+              contMeta(target, name, CPath(nodes), value)
+            case CPathIndex(_) :: _ =>
+              sys.error("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+            case _ =>
+              sys.error(
+                "RValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
+                  " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
           }
 
-          update(l.padTo(i + 1, CUndefined), 0)
-        }
+        case arr @ RArray(elements) =>
+          path.nodes match {
+            case CPathIndex(index) :: nodes =>
+              RArray(arrayInsert(elements, index, CPath(nodes), value))
+            case CPathMeta(name) :: nodes =>
+              contMeta(target, name, CPath(nodes), value)
+            case CPathField(_) :: _ =>
+              sys.error("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+            case _ =>
+              sys.error(
+                "RValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
+                  " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
+          }
 
-        target match {
-          case obj @ RObject(fields) =>
-            path.nodes match {
-              case CPathField(name) :: nodes =>
-                val (child, rest) = (fields.get(name).getOrElse(CUndefined), fields - name)
-                RObject(rest + (name -> rec(child, CPath(nodes), value)))
+        case meta @ RMeta(metaValue, metaObj) =>
+          path.nodes match {
+            case CPathMeta(name) :: nodes =>
+              RMeta(metaValue, updateObject(metaObj, name, CPath(nodes), value))
+            case _ =>
+              RMeta(rec(value, path, metaValue), metaObj)
+          }
 
-              case CPathIndex(_) :: _ => sys.error("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
-              case _ =>
-                sys.error(
-                  "RValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
-                    " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
-            }
+        case CNull | CUndefined =>
+          path.nodes match {
+            case Nil => value
+            case CPathIndex(_) :: _ => rec(RArray.empty, path, value)
+            case CPathField(_) :: _ => rec(RObject.empty, path, value)
+            case CPathMeta(meta) :: nodes => contMeta(target, meta, CPath(nodes), value)
+            case CPathArray :: _ => sys.error("todo")
+          }
 
-          case arr @ RArray(elements) =>
-            path.nodes match {
-              case CPathIndex(index) :: nodes => RArray(arrayInsert(elements, index, CPath(nodes), value))
-              case CPathField(_) :: _         => sys.error("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
-              case _ =>
-                sys.error(
-                  "RValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
-                    " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
-            }
-
-          case CNull | CUndefined =>
-            path.nodes match {
-              case Nil                => value
-              case CPathIndex(_) :: _ => rec(RArray.empty, path, value)
-              case CPathField(_) :: _ => rec(RObject.empty, path, value)
-              case CPathArray :: _    => sys.error("todo")
-              case CPathMeta(_) :: _  => sys.error("todo")
-            }
-
-          case x =>
-            sys.error(
-              "RValue insert would overwrite existing data: " + x + " cannot be updated to " + value + " at " + path +
-                " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
-        }
+        case x =>
+          path.nodes match {
+            case CPathMeta(name) :: nodes =>
+              contMeta(target, name, CPath(nodes), value)
+            case _ =>
+              sys.error(
+                "RValue insert would overwrite existing data: " + x + " cannot be updated to " + value + " at " + path +
+                  " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
+          }
       }
     }
 
@@ -288,6 +316,7 @@ object RValue extends RValueInstances {
     case RArray(a)           => Data.Arr(a.map(toData))
     case CArray(a, ty)       => Data.Arr(a.map(k => toData(ty.elemType(k))).toList)
     case RObject(a)          => Data.Obj(a.mapValues(toData).toList: _*)
+    case RMeta(value, _)     => toData(value)
     case CEmptyArray         => Data.Arr(Nil)
     case CEmptyObject        => Data.Obj()
     case CString(as)         => Data.Str(as)
@@ -317,6 +346,8 @@ sealed abstract class RValueInstances {
   implicit val qdataEncode: QDataEncode[RValue] = QDataRValue
   implicit val qdataDecode: QDataDecode[RValue] = QDataRValue
 }
+
+final case class RMeta(value: RValue, meta: RObject) extends RValue
 
 final case class RObject(fields: Map[String, RValue]) extends RValue
 
