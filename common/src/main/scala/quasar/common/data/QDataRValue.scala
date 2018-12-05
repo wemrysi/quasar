@@ -170,5 +170,5 @@ object QDataRValue extends QDataEncode[RValue] with QDataDecode[RValue] {
 
   def getMetaValue(a: RValue): RValue = error(s"Unable to represent metadata in `RValue`.")
   def getMetaMeta(a: RValue): RValue = error(s"Unable to represent metadata in `RValue`.")
-  def makeMeta(value: RValue, meta: RValue): RValue = error(s"Unable to represent metadata in `RValue`.")
+  def makeMeta(value: RValue, meta: RValue): RValue = value
 }
