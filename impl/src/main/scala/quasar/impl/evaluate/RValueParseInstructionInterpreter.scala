@@ -62,6 +62,8 @@ object RValueParseInstructionInterpreter {
 
   private def maskTarget(tpes: Set[ParseType], rvalue: RValue): Boolean =
     rvalue match {
+      case RMeta(_, _) => tpes.contains(ParseType.Meta)
+
       case RObject(_) => tpes.contains(ParseType.Object)
       case CEmptyObject => tpes.contains(ParseType.Object)
 

@@ -43,6 +43,13 @@ object QDataRValueSpec extends Qspec with RValueGenerators {
     case RArray(arr) =>
       arr.traverse(v => adjustExpected(v)).map(RArray(_))
 
+    case RMeta(value, meta) => for {
+      newVal <- adjustExpected(value)
+      newMeta <- adjustExpected(meta)
+      newMetaObj <- RValue.rObject.getOption(newMeta)
+    } yield RValue.rMeta(newVal, RObject(newMetaObj))
+
+
     case CUndefined => None // not supported by qdata
     case CArray(_, _) => None // not supported by quasar (or qdata)
 

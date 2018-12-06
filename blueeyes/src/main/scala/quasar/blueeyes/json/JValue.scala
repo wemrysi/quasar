@@ -213,6 +213,7 @@ object JValue {
 
     case RObject(fields) => JObject(fields.mapValues(fromRValue).toMap)
     case RArray(elements) => JArray(elements.map(fromRValue))
+    case RMeta(value, _) => fromRValue(value)
 
     case CBoolean(v) => JBool(v)
     case CString(v) => JString(v)
@@ -241,6 +242,7 @@ object JValue {
 
     case RObject(fields) => JObject(fields.mapValues(fromRValueRaw).toMap)
     case RArray(elements) => JArray(elements.map(fromRValueRaw))
+    case RMeta(value, _) => fromRValueRaw(value)
 
     case CBoolean(v) => JBool(v)
     case CString(v) => JString(v)
