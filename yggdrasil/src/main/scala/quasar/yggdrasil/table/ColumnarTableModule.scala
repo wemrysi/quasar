@@ -1528,7 +1528,7 @@ trait ColumnarTableModule
 
         val resplit: Vector[Slice] = if (slice.size * highWaterMark > Config.maxSliceRows) {
           val targetSize = Config.maxSliceRows / highWaterMark
-          val numSplits = math.ceil(slice.size / targetSize).toInt
+          val numSplits = math.ceil(slice.size.toDouble / targetSize).toInt
 
           // we repeatedly apply windowing to slice.  this avoids linear delegation through Remap
           val acc = (0 until numSplits).foldLeft(Vector.empty[Slice]) {
