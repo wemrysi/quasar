@@ -94,7 +94,7 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           (m, i) => m.updated(CPath.Identity \ i, ParseType.Top))
         IR[T[F]](Const(InterpretedRead(a, instrs :+ Mask(mask))))
 
-      case Map(Embed(Res(a, instrs)), ProjectedRec(fm)) =>
+      case Map(Embed(Res(a, instrs)), ProjectedRec(fm)) if isInnerExpr(fm) =>
         val mask = fm.foldLeft(SMap[CPath, Set[ParseType]]())(_.updated(_, ParseType.Top))
         QC(Map(IR[T[F]](Const(InterpretedRead(a, instrs :+ Mask(mask)))).embed, compactedExpr(fm).asRec))
 
@@ -123,7 +123,7 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
             idStatus,
             shiftType,
             onUndef,
-            repair @ FocusedRepair(_)) =>
+            repair @ FocusedRepair(_)) if isInnerExpr(fm) =>
 
         val maskInstr =
           Mask(fm.foldLeft(SMap[CPath, Set[ParseType]]())(_.updated(_, ParseType.Top)))
@@ -203,7 +203,7 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
       case Map(Embed(Res(a, instrs)), ProjectedRec(FreeA(p))) =>
         ER(Const(InterpretedRead(a, instrs :+ Project(p))))
 
-      case qc @ Map(Embed(Res(a, instrs)), ProjectedRec(fm)) =>
+      case qc @ Map(Embed(Res(a, instrs)), ProjectedRec(fm)) if isInnerExpr(fm) =>
         quotientCommonPrefix(fm).fold(QC(qc)) {
           case (prefix, rebuiltFm) =>
             val newInstrs = instrs :+ Project(prefix)
@@ -231,7 +231,7 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           idStatus,
           shiftType,
           onUndef,
-          rep @ FocusedRepair(_)) =>
+          rep @ FocusedRepair(_)) if isInnerExpr(struct) =>
         quotientCommonPrefix(struct).fold(QC(qc)) {
           case (prefix, rebuiltFm) =>
             val newInstrs = instrs :+ Project(prefix)

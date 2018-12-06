@@ -461,6 +461,21 @@ object RewritePushdownSpec extends Qspec {
 
       rewritePushdown(initial) must_= expected
     }
+
+    "not when expression has 'outer' semantics" >> {
+      val initial: Fix[QSExtra] =
+        fixE.Map(
+          fixE.Read[ResourcePath](path, ExcludeId),
+          recFuncE.StaticMapS(
+            "a" -> recFuncE.IfUndefined(
+              recFuncE.ProjectKeyS(recFuncE.Hole, "x"),
+              recFuncE.Now),
+            "b" -> recFuncE.ProjectKeyS(
+              recFuncE.ProjectKeyS(recFuncE.Hole, "x"),
+              "foo")))
+
+      rewritePushdown(initial) must_= initial
+    }
   }
 
   "mask" >> {
@@ -585,6 +600,31 @@ object RewritePushdownSpec extends Qspec {
               0)))
 
       rewritePushdown(initial) must_= expected
+    }
+
+    "not when expression has 'outer' semantics" >> {
+      val initial: Fix[QSExtra] =
+        fixE.Map(
+          fixE.Read[ResourcePath](path, ExcludeId),
+          recFuncE.StaticMapS(
+            "date" ->
+              recFuncE.NowDate,
+
+            "tax" ->
+              recFuncE.ProjectKeyS(
+                recFuncE.ProjectKeyS(
+                  recFuncE.Hole,
+                  "orderA"),
+                "tax"),
+
+            "total" ->
+              recFuncE.ProjectKeyS(
+                recFuncE.ProjectKeyS(
+                  recFuncE.Hole,
+                  "orderB"),
+                "total")))
+
+      rewritePushdown(initial) must_= initial
     }
   }
 }
