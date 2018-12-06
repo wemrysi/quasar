@@ -1522,15 +1522,13 @@ trait ColumnarTableModule
           math.max(innerHeads.length, primitiveMax)
 
         val resplit: Vector[Slice] = if (slice.size * highWaterMark > Config.maxSliceRows) {
-          val numSplits =
-            math.ceil((slice.size * highWaterMark).toDouble / Config.maxSliceRows).toInt
-
-          val size = math.ceil(Config.maxSliceRows.toDouble / highWaterMark).toInt
+          val targetSize = Config.maxSliceRows / highWaterMark
+          val numSplits = math.ceil(slice.size.toDouble / targetSize).toInt
 
           // we repeatedly apply windowing to slice.  this avoids linear delegation through Remap
           val acc = (0 until numSplits).foldLeft(Vector.empty[Slice]) {
             case (acc, split) =>
-              acc :+ slice.takeRange(size * split, size)
+              acc :+ slice.takeRange(targetSize * split, targetSize)
           }
 
           acc.filterNot(_.isEmpty)

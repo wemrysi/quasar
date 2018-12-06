@@ -16,14 +16,22 @@
 
 package quasar.yggdrasil
 
+import cats.effect.IO
+
+import shims._
+
 import quasar.blueeyes.json._
 import quasar.common.CPath
+import quasar.common.data.CNull
+import quasar.precog.BitSet
+import quasar.precog.common.ColumnRef
 import quasar.yggdrasil.TestIdentities._
+import quasar.yggdrasil.table.{ColumnarTableModuleTestSupport, NullColumn, Slice}
 
 import org.specs2._
 import scalaz._, Scalaz._
 
-trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
+trait LeftShiftSpec extends ColumnarTableModuleTestSupport with SpecificationLike {
 
   def testEmptyLeftShift(emit: Boolean) = {
     val table = fromSample(SampleData(Stream.empty))
@@ -224,6 +232,22 @@ trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
         toRecord(Array(4), JObject("c" -> JArray(Nil)).some))
 
     toJson(table.leftShift(CPath.Identity \ 1 \ "b", emitOnUndef = true)).getJValues.toVector mustEqual expected
+  }
+
+  def testGiantLeftShiftRechunkingBounds(emitOnUndef: Boolean) = {
+    val bs = new BitSet
+    bs.flip(0, 188)
+    val c = NullColumn(bs)
+    val columns = List.tabulate(1352) { i =>
+      ColumnRef(CPath.parse(s"[$i]"), CNull) -> c
+    }
+
+    val stream = Slice(188, Map(columns: _*)) :: StreamT.empty[IO, Slice]
+    val table = Table(stream, UnknownSize)
+
+    val slices = table.leftShift(CPath.parse("."), emitOnUndef).slices.toStream.unsafeRunSync()
+
+    slices must contain((s: Slice) => (s.size must be_>(0)) and (s.size must be_<=(Config.maxSliceRows))).forall
   }
 
   // replaces SampleData.toRecord to avoid ordering issues

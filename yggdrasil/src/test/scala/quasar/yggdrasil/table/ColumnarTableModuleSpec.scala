@@ -401,6 +401,7 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
         "shift a set of arrays" in testSetArrayLeftShift(emit)
         "shift a heterogeneous array" in testHeteroArrayLeftShift(emit)
         "shift a simple array with an inner object" in testTrivialArrayLeftShiftWithInnerObject(emit)
+        "correctly re-associate slices in large shift" in testGiantLeftShiftRechunkingBounds(emit)
       }
     }
 
