@@ -20,15 +20,15 @@ package repl
 import slamdata.Predef._
 import quasar.build.BuildInfo
 import quasar.common.{PhaseResultListen, PhaseResultTell}
+import quasar.concurrent.BlockingContext
 import quasar.run.{MonadQuasarErr, Quasar}
 
 import java.io.File
-import scala.concurrent.ExecutionContext
 
 import cats.effect._
 import cats.effect.concurrent.Ref
 import cats.syntax.{applicative, flatMap, functor}, applicative._, flatMap._, functor._
-import fs2.Stream
+import fs2.{io, text, Stream}
 import org.apache.commons.io.FileUtils
 import org.jline.reader._
 import org.jline.terminal._
@@ -37,42 +37,48 @@ import scalaz._, Scalaz._
 final class Repl[F[_]: ConcurrentEffect: PhaseResultListen](
     prompt: String,
     reader: LineReader,
-    evaluator: Command => F[Evaluator.Result[Stream[F, String]]]) {
+    evaluator: Command => F[Evaluator.Result[Stream[F, String]]],
+    blockingPool: BlockingContext)(
+    implicit cs: ContextShift[F]) {
 
   val F = ConcurrentEffect[F]
 
-  private val read: F[Command] = F.delay(Command.parse(reader.readLine(prompt)))
+  private val read: F[Command] =
+    cs.evalOn(Tag.unwrap(blockingPool))(
+      F.delay(reader.readLine(prompt))).map(Command.parse)
 
-  private def eval(cmd: Command): F[Evaluator.Result[Stream[F, String]]] =
-    F.start(evaluator(cmd)) >>= (_.join)
-
-  private def print(strings: Stream[F, String]): F[Unit] =
-    strings.evalTap(s => F.delay(println(s))).compile.drain
+  private def print(strings: Stream[F, String], blockingPool: BlockingContext): F[Unit] =
+    strings
+      .map(_ + "\n")
+      .through(text.utf8Encode)
+      .to(io.stdout[F](Tag.unwrap(blockingPool)))
+      .compile.drain
 
   val loop: F[ExitCode] =
     for {
       cmd <- read
-      Evaluator.Result(exitCode, strings) <- eval(cmd)
-      _ <- print(strings)
+      Evaluator.Result(exitCode, strings) <- evaluator(cmd)
+      _ <- print(strings, blockingPool)
       next <- exitCode.fold(loop)(_.pure[F])
     } yield next
 }
 
 object Repl {
-  def apply[F[_]: ConcurrentEffect: PhaseResultListen](
+  def apply[F[_]: ConcurrentEffect: PhaseResultListen: ContextShift](
       prompt: String,
       reader: LineReader,
-      evaluator: Command => F[Evaluator.Result[Stream[F, String]]])
+      evaluator: Command => F[Evaluator.Result[Stream[F, String]]],
+      blockingPool: BlockingContext)
       : Repl[F] =
-    new Repl[F](prompt, reader, evaluator)
+    new Repl[F](prompt, reader, evaluator, blockingPool)
 
   def mk[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       ref: Ref[F, ReplState],
-      quasar: Quasar[F])(
-      implicit ec: ExecutionContext)
+      quasar: Quasar[F],
+      blockingPool: BlockingContext)
       : F[Repl[F]] = {
-    val evaluator = Evaluator[F](ref, quasar)
-    historyFile[F].map(f => Repl[F](prompt, mkLineReader(f), evaluator.evaluate))
+    val evaluator = Evaluator[F](ref, quasar, blockingPool)
+    historyFile[F].map(f => Repl[F](prompt, mkLineReader(f), evaluator.evaluate, blockingPool))
   }
 
   ////

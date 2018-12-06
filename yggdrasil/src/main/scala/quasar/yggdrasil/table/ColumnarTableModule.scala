@@ -415,9 +415,7 @@ trait ColumnarTableModule
 
       for {
         d <- LiftIO[M].liftIO(convert.toStreamT(slices))
-        _ <- MonadFinalizers[M, IO].tell(List(d.dispose))
-
-        slices = d.unsafeValue
+        slices <- d.unwrap[M]
       } yield Table(slices, UnknownSize)
     }
 
@@ -430,10 +428,7 @@ trait ColumnarTableModule
 
       for {
         d <- LiftIO[M].liftIO(convert.toStreamT(sliceStream))
-
-        _ <- MonadFinalizers[M, IO].tell(List(d.dispose))
-
-        slices = d.unsafeValue
+        slices <- d.unwrap[M]
       } yield Table(slices, UnknownSize)
     }
 

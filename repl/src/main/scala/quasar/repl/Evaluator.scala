@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.api._, datasource._, resource._, table._
 import quasar.common.{PhaseResultListen, PhaseResultTell, PhaseResults}
 import quasar.common.data.Data
+import quasar.concurrent.BlockingContext
 import quasar.contrib.fs2.convert.fromStreamT
 import quasar.contrib.fs2.pipe
 import quasar.contrib.iota._
@@ -41,7 +42,6 @@ import quasar.yggdrasil.util.NullRemover
 import java.lang.Exception
 import java.nio.CharBuffer
 import java.nio.file.{Path => JPath}
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
@@ -64,8 +64,8 @@ import spire.std.double._
 
 final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
     stateRef: Ref[F, ReplState],
-    q: Quasar[F])(
-    implicit ec: ExecutionContext) {
+    q: Quasar[F],
+    blockingPool: BlockingContext) {
 
   import Command._
   import DatasourceError._
@@ -130,7 +130,7 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
         liftS1(helpMsg)
 
       case Debug(level) =>
-        stateRef.update(_.copy(debugLevel = level)) *>
+        stateRef.update(_.copy(debugLevel = level)) >>
           liftS1(s"Set debug level: $level")
 
       case SummaryCount(rows) =>
@@ -139,7 +139,7 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
           else refineV[Positive](rows).fold(κ(None), p => Some(Some(p)))
         count match {
           case None => liftS1("Rows must be a positive integer or 0 to indicate no limit")
-          case Some(c) => stateRef.update(_.copy(summaryCount = c)) *>
+          case Some(c) => stateRef.update(_.copy(summaryCount = c)) >>
             liftS1 {
               val r = c.map(_.toString).getOrElse("unlimited")
               s"Set rows to show in result: $r"
@@ -147,31 +147,31 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
         }
 
       case Format(fmt) =>
-        stateRef.update(_.copy(format = fmt)) *>
+        stateRef.update(_.copy(format = fmt)) >>
           liftS1(s"Set output format: $fmt")
 
       case Mode(mode) =>
-        stateRef.update(_.copy(mode = mode)) *>
+        stateRef.update(_.copy(mode = mode)) >>
           liftS1(s"Set output mode: $mode")
 
       case SetPhaseFormat(fmt) =>
-        stateRef.update(_.copy(phaseFormat = fmt)) *>
+        stateRef.update(_.copy(phaseFormat = fmt)) >>
           liftS1(s"Set phase format: $fmt")
 
       case SetTimingFormat(fmt) =>
-        stateRef.update(_.copy(timingFormat = fmt)) *>
+        stateRef.update(_.copy(timingFormat = fmt)) >>
           liftS1(s"Set timing format: $fmt")
 
       case SetVar(n, v) =>
-        stateRef.update(state => state.copy(variables = state.variables + (n -> v))) *>
+        stateRef.update(state => state.copy(variables = state.variables + (n -> v))) >>
           liftS1(s"Set variable ${n.value} = ${v.value}")
 
       case UnsetVar(n) =>
-        stateRef.update(state => state.copy(variables = state.variables - n)) *>
+        stateRef.update(state => state.copy(variables = state.variables - n)) >>
           liftS1(s"Unset variable ${n.value}")
 
       case SetPushdown(pd) =>
-        q.pushdown.set(pd) *>
+        q.pushdown.set(pd) >>
           liftS1(s"Set pushdown: $pd")
 
       case ListVars =>
@@ -256,14 +256,15 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
                 printQueryResults(maxLines, rendered.map(_.toString))
               }
             case OutputMode.File =>
-              Paths.createTempFile("tableResults", ".txt").map { tmpFile =>
-                Stream.emit(s"Writing table results to ${tmpFile.toFile.getAbsolutePath}") ++
-                  Stream.eval {
-                    for {
-                      rendered <- renderTableData(id, state.format)
-                      _ <- writeToPath(tmpFile, rendered)
-                    } yield "Done"
-                  }
+              Paths.createTempFile("tableResults", ".txt") map { tmpFile =>
+                val body  = for {
+                  rendered <- Stream.eval(renderTableData(id, state.format))
+                  _ <- writeToPath(tmpFile, rendered)
+                } yield ()
+
+                Stream(s"Writing table results to ${tmpFile.toFile.getAbsolutePath}") ++
+                  body.drain ++
+                  Stream("Done")
             }
           }
         } yield res
@@ -329,15 +330,17 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
                   .map(_.value + OutputFormat.headerLines(state.format))
                 Stream.emit(log) ++ printQueryResults(maxLines, rendered.map(_.toString))
               }
+
             case OutputMode.File =>
-              Paths.createTempFile("results", ".txt").map { tmpFile =>
-                Stream.emit(s"Writing results to ${tmpFile.toFile.getAbsolutePath}") ++
-                  Stream.eval {
-                    for {
-                      (log, rendered) <- doSelect(sql, state)
-                      _ <- writeToPath(tmpFile, Stream(CharBuffer.wrap(log)).covary[F] ++ rendered)
-                    } yield "Done"
-                  }
+              Paths.createTempFile("results", ".txt") map { tmpFile =>
+                val body = for {
+                  (log, rendered) <- Stream.eval(doSelect(sql, state))
+                  _ <- writeToPath(tmpFile, Stream(CharBuffer.wrap(log)).covary[F] ++ rendered)
+                } yield ()
+
+                Stream(s"Writing results to ${tmpFile.toFile.getAbsolutePath}") ++
+                  body.drain ++
+                  Stream("Done")
               }
           }
         } yield res
@@ -539,10 +542,9 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
     private def toADir(path: ResourcePath): ADir =
       path.fold(f => fileParent(f) </> dir(fileName(f).value), rootDir)
 
-    private def writeToPath(path: JPath, s: Stream[F, CharBuffer]): F[Unit] =
+    private def writeToPath(path: JPath, s: Stream[F, CharBuffer]): Stream[F, Unit] =
       s.through(pipe.charBufferToByteUtf8(true))
-        .through(fs2.io.file.writeAll(path, ec))
-        .compile.drain
+        .to(fs2.io.file.writeAll(path, blockingPool))
 }
 
 object Evaluator {
@@ -552,10 +554,10 @@ object Evaluator {
 
   def apply[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       stateRef: Ref[F, ReplState],
-      quasar: Quasar[F])(
-      implicit ec: ExecutionContext)
+      quasar: Quasar[F],
+      blockingPool: BlockingContext)
       : Evaluator[F] =
-    new Evaluator[F](stateRef, quasar)
+    new Evaluator[F](stateRef, quasar, blockingPool)
 
   val helpMsg =
     """Quasar REPL, Copyright © 2014–2018 SlamData Inc.
