@@ -78,6 +78,15 @@ object RValueParseInstructionInterpreter {
       case CDouble(_) => tpes.contains(ParseType.Number)
       case CNum(_) => tpes.contains(ParseType.Number)
 
+      // These are encoded as objects from a parser-perspective
+      case CLocalDateTime(_) => tpes.contains(ParseType.Object)
+      case CLocalDate(_) => tpes.contains(ParseType.Object)
+      case CLocalTime(_) => tpes.contains(ParseType.Object)
+      case COffsetDateTime(_) => tpes.contains(ParseType.Object)
+      case COffsetDate(_) => tpes.contains(ParseType.Object)
+      case COffsetTime(_) => tpes.contains(ParseType.Object)
+      case CInterval(_) => tpes.contains(ParseType.Object)
+
       case _ => false
     }
 
