@@ -159,6 +159,24 @@ object QScriptRegressionSpec extends Qspec {
         result must countInterpretedReadAs(1)
         result must countLeftShiftAs(0)
       }
+
+      val q11 = "select *[1].a[2].b, *[1].a[2].c, *[1].a[2].d from foo"
+      q11 in {
+        val result = count(q11)
+
+        result must countReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(0)
+      }
+
+      val q12 = "select a[3].b, c[1][2].d, e.f[4] from foo"
+      q12 in {
+        val result = count(q12)
+
+        result must countReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(0)
+      }
     }
 
     "have correct number of LeftShift" >> {
