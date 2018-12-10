@@ -1031,16 +1031,19 @@ object MapFuncsCore {
     def apply[T[_[_]]: CorecursiveT, A](str: String): FreeMapA[T, A] =
       Free.roll(MFC(Constant[T, FreeMapA[T, A]](EJson.fromCommon(ejson.Str[T[EJson]](str)))))
 
-    def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]):
-        Option[String] =
-      mf.resume.fold({
+    def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Option[String] =
+      mf.resume.fold(StrLitMapFunc.unapply(_), _ => None)
+  }
+
+  object StrLitMapFunc {
+    def unapply[T[_[_]]: RecursiveT, A](mf: MapFunc[T, A]): Option[String] =
+      mf match {
         case MFC(Constant(ej)) => CommonEJson.prj(ej.project).flatMap {
           case ejson.Str(str) => str.some
           case _ => None
         }
+
         case _ => None
-      }, {
-        _ => None
-      })
+      }
   }
 }

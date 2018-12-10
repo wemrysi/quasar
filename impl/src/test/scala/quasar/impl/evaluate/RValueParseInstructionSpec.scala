@@ -21,17 +21,25 @@ import quasar.{CompositeParseType, IdStatus, ParseInstructionSpec}
 import quasar.common.CPath
 import quasar.common.data.RValue
 
+import cats.effect.IO
+import cats.effect.concurrent.Ref
+
 import jawn.{AsyncParser, Facade}
+
 import qdata.json.QDataFacade
 
-// TODO interpret ParseInstruction.Ids
-object RValueParseInstructionSpec
-    extends ParseInstructionSpec.WrapSpec
-    with ParseInstructionSpec.ProjectSpec
-    with ParseInstructionSpec.MaskSpec
-    with ParseInstructionSpec.SinglePivotSpec {
+import scalaz.std.list._
+import scalaz.syntax.traverse._
 
+import shims._
+
+object RValueParseInstructionSpec extends ParseInstructionSpec {
   type JsonStream = List[RValue]
+
+  def evalIds(stream: JsonStream): JsonStream =
+    Ref[IO].of(0L)
+      .flatMap(r => stream.traverse(RValueParseInstructionInterpreter.interpretIds(r, _)))
+      .unsafeRunSync()
 
   def evalMask(mask: Mask, stream: JsonStream): JsonStream =
     stream.flatMap(RValueParseInstructionInterpreter.interpretMask(mask, _).toList)

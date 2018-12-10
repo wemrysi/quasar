@@ -17,13 +17,14 @@
 package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.IdStatus.ExcludeId
-import quasar.ParseInstruction
-import quasar.ParseInstruction.{Mask, Pivot, Wrap}
-import quasar.common.{CPath, CPathIndex}
+
+import quasar.ParseType
+import quasar.ParseInstruction.{Mask, Pivot, Project, Wrap}
+import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta, CPathNode}
 import quasar.contrib.iota._
-import quasar.ejson
-import quasar.fp.Injectable
+import quasar.contrib.scalaz.free._
+import quasar.fp.{Injectable, liftFG, liftFGM}
+import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.RecFreeS._
@@ -31,153 +32,302 @@ import quasar.qscript.RecFreeS._
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
-import matryoshka.patterns.{ginterpretM, CoEnv}
+import matryoshka.patterns.CoEnv
 
-import scalaz.{\/, -\/, \/-, Const, Functor}
+import scalaz.{-\/, \/-, Const, Foldable, Free, Functor, Kleisli, IMap, State}
 import scalaz.Scalaz._ // apply-traverse syntax conflict
 
-final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
+final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TTypes[T] {
 
-  import MapFuncsCore.{Constant, IntLit, ProjectIndex, ProjectKey}
+  private val mapFunc = construction.Func[T]
+  private val recMapFunc = construction.RecFunc[T]
 
-  def rewriteLeftShift[F[a] <: ACopK[a]: Functor, A](
+  // Assumes `extractProject` and `extractMask` have been applied to the input.
+  def extractFocusedPivot[F[a] <: ACopK[a]: Functor, A](
+      implicit
+        IR: Const[InterpretedRead[A], ?] :<<: F,
+        R: Const[Read[A], ?] :<<: F,
+        QC: QScriptCore :<<: F)
+      : QScriptCore[T[F]] => Option[F[T[F]]] = {
+
+    val Res = Resource[A]
+
+    _ match {
+      case qc @ LeftShift(
+          Embed(Res(a, instrs)),
+          hole @ FreeA(_),
+          shiftStatus,
+          shiftType,
+          OnUndefined.Omit,
+          FocusedRepair(repair)) =>
+
+        val pivotInstr =
+          Pivot(SMap(CPath.Identity -> ((shiftStatus, ShiftType.toParseType(shiftType)))))
+
+        val iread =
+          IR[T[F]](Const(InterpretedRead(a, instrs :+ pivotInstr)))
+
+        some(repair.fold(κ(iread), κ(QC(Map(iread.embed, repair.asRec)))))
+
+      case _ => none
+    }
+  }
+
+  // Assumes `extractProject` has been applied to the input.
+  def extractMask[F[a] <: ACopK[a]: Functor, A](
+      implicit
+        IR: Const[InterpretedRead[A], ?] :<<: F,
+        R: Const[Read[A], ?] :<<: F,
+        QC: QScriptCore :<<: F)
+      : QScriptCore[T[F]] => F[T[F]] = {
+
+    val Res = Resource[A]
+
+    _ match {
+      case Map(Embed(Res(a, instrs)), ProjectedRec(MaskedObject(keys))) =>
+        val mask = keys.foldLeft(SMap[CPath, Set[ParseType]]())(
+          (m, k) => m.updated(CPath.Identity \ k, ParseType.Top))
+        IR[T[F]](Const(InterpretedRead(a, instrs :+ Mask(mask))))
+
+      case Map(Embed(Res(a, instrs)), ProjectedRec(MaskedArray(indices))) =>
+        val mask = indices.foldLeft(SMap[CPath, Set[ParseType]]())(
+          (m, i) => m.updated(CPath.Identity \ i, ParseType.Top))
+        IR[T[F]](Const(InterpretedRead(a, instrs :+ Mask(mask))))
+
+      case Map(Embed(Res(a, instrs)), ProjectedRec(fm)) if isInnerExpr(fm) =>
+        val mask = fm.foldLeft(SMap[CPath, Set[ParseType]]())(_.updated(_, ParseType.Top))
+        QC(Map(IR[T[F]](Const(InterpretedRead(a, instrs :+ Mask(mask)))).embed, compactedExpr(fm).asRec))
+
+      case LeftShift(
+            Embed(Res(a, instrs)),
+            hole @ FreeA(_),
+            idStatus,
+            shiftType,
+            onUndef,
+            repair @ FocusedRepair(_)) =>
+
+        val maskInstr =
+          Mask(SMap(CPath.Identity -> Set(ShiftType.toParseType(shiftType))))
+
+        QC(LeftShift(
+          IR[T[F]](Const(InterpretedRead(a, instrs :+ maskInstr))).embed,
+          hole,
+          idStatus,
+          shiftType,
+          onUndef,
+          repair))
+
+      case LeftShift(
+            Embed(Res(a, instrs)),
+            ProjectedRec(fm),
+            idStatus,
+            shiftType,
+            onUndef,
+            repair @ FocusedRepair(_)) if isInnerExpr(fm) =>
+
+        val maskInstr =
+          Mask(fm.foldLeft(SMap[CPath, Set[ParseType]]())(_.updated(_, ParseType.Top)))
+
+        QC(LeftShift(
+          IR[T[F]](Const(InterpretedRead(a, instrs :+ maskInstr))).embed,
+          compactedExpr(fm).asRec,
+          idStatus,
+          shiftType,
+          onUndef,
+          repair))
+
+      case qc => QC(qc)
+    }
+  }
+
+  def extractProject[F[a] <: ACopK[a]: Functor, A](
       implicit
         ER: Const[InterpretedRead[A], ?] :<<: F,
         SR: Const[Read[A], ?] :<<: F,
         QC: QScriptCore :<<: F)
       : QScriptCore[T[F]] => F[T[F]] = {
 
-    // LeftShift(Read(_, ExcludeId), /foo/bar/, _, _, Omit, f(RightSide))
-    case qc @ LeftShift(Embed(src), struct, shiftStatus, shiftType, OnUndefined.Omit, repair) => {
-      import construction.Func
+    val Res = Resource[A]
 
-      val linearStruct: FreeMap = struct.linearize
-      val pathOpt: Option[CPath] = findPath(linearStruct)
-
-      // arrays are compacted during static array projection
-      // resulting in a single-element array
-      def compactArrayDerefs(mf: CoMapFuncR[T, Hole]): CoMapFuncR[T, Hole] =
-        mf.run match {
-          case \/-(MFC(ProjectIndex(src, ExtractFunc(Constant(Embed(EX(ejson.Int(_)))))))) =>
-            val func: MapFunc[FreeMap] = MFC(ProjectIndex(src, IntLit(0)))
-            CoEnv(func.right[Hole])
-          case f => CoEnv(f)
-        }
-
-      val mfOpt: Option[FreeMap] =
-        repair.traverseM[Option, Hole] {
-          case LeftSide => None  // repair must not contain LeftSide
-          case RightSide =>
-            val compacted: FreeMap = linearStruct.transCata[FreeMap](compactArrayDerefs)
-            Func[T].ProjectKeyS(compacted, ShiftedKey).some
-        }
-
-      val srOpt: Option[Read[A]] = SR.prj(src) flatMap { srConst =>
-        val sr = srConst.getConst
-
-        sr.idStatus match {
-          case ExcludeId => sr.some  // only rewrite if Read has ExcludeId
-          case _ => None
-        }
+    def commonPrefix(xs: List[CPathNode], ys: List[CPathNode]): List[CPathNode] =
+      (xs zip ys) flatMap {
+        case (x, y) if x === y => List(x)
+        case _ => Nil
       }
 
-      val rewritten: Option[F[T[F]]] = (mfOpt |@| srOpt |@| pathOpt) {
-        case (mf, sr, path) =>
-          val tpe = ShiftType.toParseType(shiftType)
-
-          // arrays are compacted during static array projection
-          // resulting in a single-element array
-          val compactedPath: CPath =
-            CPath(path.nodes.map {
-              case CPathIndex(_) => CPathIndex(0)
-              case node => node
-            })
-
-          val instructions: List[ParseInstruction] = List(
-            Mask(SMap((path, Set(tpe)))),
-            Wrap(compactedPath, ShiftedKey),
-            Pivot(SMap((compactedPath \ ShiftedKey, (shiftStatus, tpe)))))
-
-          val src: T[F] = ER.inj(Const[InterpretedRead[A], T[F]](
-            InterpretedRead[A](sr.path, instructions))).embed
-
-          QC.inj(Map(src, mf.asRec))
-      }
-
-      rewritten.getOrElse(QC.inj(qc))
-    }
-
-    case qc => QC.inj(qc)
-  }
-
-  /* Matches on a `FreeMap` of the form
-   * ```
-   * Project<Key or Index>(
-   *   Project<Key or Index>(...(
-   *     Project<Key or Index>(Hole, Const(<Str or Int>))),
-   *     Const(<Str or Int>)),
-   *   Const(<Str or Int>))
-   * ```
-   * returning the `CPath` when that form is matched.
-   */
-  def findPath(fm: FreeMap): Option[CPath] = {
-    // A `FreeMap` effectively has two leaf types: `Constant` and `Hole`.
-    // When we hit a `Constant` we need to keep searching even though
-    // we haven't found a path to shift, and so we encode this as `Unit`.
-    type Acc = Unit \/ CPath
-
-    type CoFreeMap = CoEnv[Hole, MapFunc, (FreeMap, Acc)]
-
-    def transformHole(hole: Hole): Option[Acc] =
-      CPath.Identity.right.some
-
-    def transformFunc(func: MapFunc[(FreeMap, Acc)]): Option[Acc] =
-      func match {
-        case MFC(Constant(Embed(EC(ejson.Str(_))))) =>
-          ().left.some // this is awkward but we have to keep going
-
-        case MFC(Constant(Embed(EX(ejson.Int(_))))) =>
-          ().left.some // this is awkward but we have to keep going
-
-        // the source of a `ProjectKey` must have encoded as a `CPath`
-        case MFC(ProjectKey(
-            (_, \/-(srcPath)),
-            (ExtractFunc(Constant(Embed(EC(ejson.Str(str))))), _))) =>
-          (str \: srcPath).right.some
-
-        // the source of a `ProjectIndex` must have encoded as a `CPath`
-        case MFC(ProjectIndex(
-            (_, \/-(srcPath)),
-            (ExtractFunc(Constant(Embed(EX(ejson.Int(idx))))), _))) if idx.isValidInt =>
-          (idx.toInt \: srcPath).right.some
-
+    def projectFunc(nodes: List[CPathNode]): Option[FreeMap] =
+      nodes.foldLeftM(mapFunc.Hole) {
+        case (src, CPathField(key)) => some(mapFunc.ProjectKeyS(src, key))
+        case (src, CPathIndex(idx)) => some(mapFunc.ProjectIndexI(src, idx))
         case _ => none
       }
 
-    def transform: CoFreeMap => Option[Acc] =
-      ginterpretM[(FreeMap, ?), Option, MapFunc, Hole, Acc](
-        transformHole(_),
-        transformFunc(_))
+    def quotientCommonPrefix(projectedFunc: FreeMapA[CPath]): Option[(CPath, FreeMap)] = {
+      // Extract all paths, leaving behind a pointer so we can resubstitute later
+      val (ipaths, ifm) =
+        (projectedFunc.cataM[State[Int, ?], (SMap[Int, CPath], FreeMapA[Int])] {
+          case CoEnv(-\/(p)) =>
+            for {
+              i <- State.get[Int]
+              _ <- State.put(i + 1)
+            } yield (SMap(i -> p), Free.pure(i))
 
-    val transformed: Option[Acc] =
-      fm.paraM[Option, Acc](transform)
+          case CoEnv(\/-(mf)) =>
+            (
+              mf.foldLeft(SMap[Int, CPath]())(_ ++ _._1),
+              rollMF(mf.map(_._2)).embed
+            ).pure[State[Int, ?]]
+        }).eval(0)
 
-    transformed flatMap {
-      case -\/(_) => none
-      case \/-(path) => CPath(path.nodes.reverse).some
+      // The common prefix among all paths
+      val prefixNodes =
+        ipaths.values.toList.foldMapLeft1Opt(_.nodes)(
+          (pfx, p) => commonPrefix(pfx, p.nodes))
+
+      prefixNodes.filter(_.nonEmpty) flatMap { pnodes =>
+        val prefixLen = pnodes.length
+        val prefixPath = CPath(pnodes)
+
+        val projectFuncs = ipaths.toList.traverse {
+          case (i, p) => projectFunc(p.nodes.drop(prefixLen)) strengthL i
+        }
+
+        projectFuncs map { kvs =>
+          val m = SMap(kvs: _*)
+          (prefixPath, ifm.flatMap(m))
+        }
+      }
+    }
+
+    _ match {
+      case Map(Embed(Res(a, instrs)), ProjectedRec(FreeA(p))) =>
+        ER(Const(InterpretedRead(a, instrs :+ Project(p))))
+
+      case qc @ Map(Embed(Res(a, instrs)), ProjectedRec(fm)) if isInnerExpr(fm) =>
+        quotientCommonPrefix(fm).fold(QC(qc)) {
+          case (prefix, rebuiltFm) =>
+            val newInstrs = instrs :+ Project(prefix)
+            QC(Map(ER[T[F]](Const(InterpretedRead(a, newInstrs))).embed, rebuiltFm.asRec))
+        }
+
+      case LeftShift(
+          Embed(Res(a, instrs)),
+          ProjectedRec(FreeA(p)),
+          idStatus,
+          shiftType,
+          onUndef,
+          rep @ FocusedRepair(_)) =>
+        QC(LeftShift(
+          ER[T[F]](Const(InterpretedRead(a, instrs :+ Project(p)))).embed,
+          recMapFunc.Hole,
+          idStatus,
+          shiftType,
+          onUndef,
+          rep))
+
+      case qc @ LeftShift(
+          Embed(Res(a, instrs)),
+          ProjectedRec(struct),
+          idStatus,
+          shiftType,
+          onUndef,
+          rep @ FocusedRepair(_)) if isInnerExpr(struct) =>
+        quotientCommonPrefix(struct).fold(QC(qc)) {
+          case (prefix, rebuiltFm) =>
+            val newInstrs = instrs :+ Project(prefix)
+            QC(LeftShift(
+              ER[T[F]](Const(InterpretedRead(a, newInstrs))).embed,
+              rebuiltFm.asRec,
+              idStatus,
+              shiftType,
+              onUndef,
+              rep))
+        }
+
+      case qc => QC(qc)
+    }
+  }
+
+  def extractWrap[F[a] <: ACopK[a]: Functor, A](
+      implicit
+        IR: Const[InterpretedRead[A], ?] :<<: F,
+        R: Const[Read[A], ?] :<<: F,
+        QC: QScriptCore :<<: F)
+      : QScriptCore[T[F]] => F[T[F]] = {
+
+    val Res = Resource[A]
+
+    _ match {
+      case Map(Embed(Res(a, instrs)), WrappedRec(p)) =>
+        val wrappedInstrs =
+          p.foldRight(instrs)((s, ins) => ins :+ Wrap(CPath.Identity, s))
+
+        IR[T[F]](Const(InterpretedRead(a, wrappedInstrs)))
+
+      case qc => QC(qc)
+    }
+  }
+
+  /**
+   * Treats the input as a masked expression and returns a concrete expression
+   * accessing the masked values, adjusting array projections as necessary to
+   * accomodate array compaction.
+   */
+  private def compactedExpr(prj: FreeMapA[CPath]): FreeMap = {
+    def indices(p: CPath): IMap[CPath, Set[Int]] =
+      p.nodes.foldLeft((CPath.Identity, IMap.empty[CPath, Set[Int]])) {
+        case ((p, m), CPathIndex(i)) => (p \ i, m.insertWith(_ ++ _, p, Set(i)))
+        case ((p, m), n) => (p \ CPath(n), m)
+      }._2
+
+    val remapping =
+      Foldable[FreeMapA].foldMap(prj)(indices)
+        .map(_.toList.sorted.zipWithIndex.toMap)
+
+    prj flatMap { cpath =>
+      cpath.nodes.foldLeft((CPath.Identity, mapFunc.Hole)) {
+        case ((p, expr), CPathIndex(i)) =>
+          (p \ i, mapFunc.ProjectIndexI(expr, remapping.lookup(p).fold(i)(_(i))))
+
+        case ((p, expr), n @ CPathField(k)) =>
+          (p \ k, mapFunc.ProjectKeyS(expr, k))
+
+        case ((p, expr), m @ CPathMeta(k)) =>
+          (p \ CPath(m), mapFunc.ProjectKeyS(mapFunc.Meta(expr), k))
+
+        case (acc, CPathArray) =>
+          acc
+      }._2
     }
   }
 }
 
 object RewritePushdown {
   def apply[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, G[a] <: ACopK[a], A](
-      implicit GF: Injectable[G, F],
-               ESRF: Const[InterpretedRead[A], ?] :<<: F,
-               SRF: Const[Read[A], ?] :<<: F,
-               QCF: QScriptCore[T, ?] :<<: F,
-               QCG: QScriptCore[T, ?] :<<: G)
+      implicit
+      GF: Injectable[G, F],
+      ESRF: Const[InterpretedRead[A], ?] :<<: F,
+      SRF: Const[Read[A], ?] :<<: F,
+      QCF: QScriptCore[T, ?] :<<: F,
+      QCG: QScriptCore[T, ?] :<<: G)
       : G[T[F]] => F[T[F]] = {
+
     val pushdown = new RewritePushdown[T]
-    gtf => QCG.prj(gtf).fold(GF.inject(gtf))(pushdown.rewriteLeftShift[F, A])
+
+    val extractMappable: QScriptCore[T, T[F]] => F[T[F]] =
+      pushdown.extractProject[F, A] >>>
+      liftFG[QScriptCore[T, ?], F, T[F]](pushdown.extractMask[F, A]) >>>
+      liftFG[QScriptCore[T, ?], F, T[F]](pushdown.extractWrap[F, A])
+
+    val extractMappableG: G[T[F]] => F[T[F]] =
+      gtf => QCG.prj(gtf).fold(GF.inject(gtf))(extractMappable)
+
+    val extractMappableF: F[T[F]] => F[T[F]] =
+      liftFG[QScriptCore[T, ?], F, T[F]](extractMappable)
+
+    val extractFocusedPivot: F[T[F]] => Option[F[T[F]]] =
+      liftFGM[Option, QScriptCore[T, ?], F, T[F]](pushdown.extractFocusedPivot[F, A])
+
+    extractMappableG >>> orOriginal(Kleisli(extractFocusedPivot) map extractMappableF)
   }
 }
