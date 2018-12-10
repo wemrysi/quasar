@@ -36,7 +36,7 @@ final class MimirQueryFederation[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: LiftIO: Monad: MonadPlannerErr: PhaseResultTell] private (
     P: Cake,
-    pushdown: F[PushdownControl[F]])(
+    pushdown: PushdownControl[F])(
     implicit
     cs: ContextShift[IO],
     ec: ExecutionContext)
@@ -53,8 +53,7 @@ final class MimirQueryFederation[
     }
 
     for {
-      ctrl <- pushdown
-      pd <- ctrl.get
+      pd <- pushdown.get
       back <- qscriptEvaluator
         .evaluate(q.query)
         .run(Config.EvaluatorConfig(q.sources, pd))
@@ -69,7 +68,7 @@ object MimirQueryFederation {
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: LiftIO: Monad: MonadPlannerErr: PhaseResultTell](
       P: Cake,
-      pushdown: F[PushdownControl[F]])(
+      pushdown: PushdownControl[F])(
       implicit
       cs: ContextShift[IO],
       ec: ExecutionContext)

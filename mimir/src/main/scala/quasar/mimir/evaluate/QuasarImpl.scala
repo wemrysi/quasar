@@ -42,6 +42,7 @@ import argonaut.Json
 import cats.{~>, Monad}
 import cats.effect.concurrent.Ref
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.syntax.applicative._
 import cats.syntax.functor._
 import fs2.Stream
 import matryoshka.data.Fix
@@ -76,7 +77,7 @@ final class QuasarImpl[F[_]: ConcurrentEffect: Monad: MonadQuasarErr: PhaseResul
 
   val pTableStore = MimirPTableStore[F](precog, PreparationLocation)
 
-  val pushdown = Ref.of[F, Pushdown](Pushdown.EnablePushdown).map(p => new PushdownControl(p))
+  val pushdown = new PushdownControl(Ref.unsafe[F, Pushdown](Pushdown.EnablePushdown))
 
   val federation = MimirQueryFederation[Fix, F](precog, pushdown)
   
@@ -141,8 +142,8 @@ object QuasarImpl {
       sstEvalConfig)
 
     for {
-      p <- Stream.eval(impl.pushdown)
-      q <- qs 
+      p <- Stream.eval(impl.pushdown.pure[F])
+      q <- qs
     } yield (p, q)
   }
 }
