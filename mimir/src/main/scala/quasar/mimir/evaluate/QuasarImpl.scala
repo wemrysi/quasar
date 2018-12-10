@@ -42,7 +42,6 @@ import argonaut.Json
 import cats.{~>, Monad}
 import cats.effect.concurrent.Ref
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
-import cats.syntax.applicative._
 import cats.syntax.functor._
 import fs2.Stream
 import matryoshka.data.Fix
@@ -126,24 +125,18 @@ object QuasarImpl {
       implicit
       cs: ContextShift[IO],
       ec: ExecutionContext)
-      : Stream[F, (PushdownControl[F], Quasar[F, MimirRepr, PTableSchema])] = {
-
-    val pushdown = new PushdownControl(Ref.unsafe[F, Pushdown](Pushdown.EnablePushdown))
-    val impl = new QuasarImpl[F](precog, pushdown)
-
-    val qs = Quasar[F, MimirRepr, PTableSchema](
-      impl.datasourceRefs,
-      impl.tableRefs,
-      impl.getQueryEvaluator,
-      impl.preparationsManager,
-      impl.lookupFromPTableStore,
-      impl.lookupTableSchema,
-      datasourceModules,
-      sstEvalConfig)
-
+      : Stream[F, (PushdownControl[F], Quasar[F, MimirRepr, PTableSchema])] =
     for {
-      p <- Stream.eval(pushdown.pure[F])
-      q <- qs
+      p <- Stream.eval(Ref.of[F, Pushdown](Pushdown.EnablePushdown).map(r => new PushdownControl(r)))
+      impl = new QuasarImpl[F](precog, p)
+      q <- Quasar[F, MimirRepr, PTableSchema](
+        impl.datasourceRefs,
+        impl.tableRefs,
+        impl.getQueryEvaluator,
+        impl.preparationsManager,
+        impl.lookupFromPTableStore,
+        impl.lookupTableSchema,
+        datasourceModules,
+        sstEvalConfig)
     } yield (p, q)
-  }
 }
