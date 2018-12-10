@@ -27,9 +27,11 @@ import quasar.impl.external.{ExternalConfig, ExternalDatasources}
 import quasar.impl.datasource.local.{LocalDatasourceModule, LocalParsedDatasourceModule}
 import quasar.impl.external.ExternalConfig.PluginFiles
 import quasar.impl.schema.SstEvalConfig
-import quasar.mimir.Precog
+import quasar.mimir.{MimirRepr, Precog}
+import quasar.mimir.evaluate.{PushdownControl, QuasarImpl}
+import quasar.mimir.storage.PTableSchema
 import quasar.run.{MonadQuasarErr, Quasar, QuasarError}
-import quasar.yggdrasil.vfs.contextShiftForS
+import quasar.yggdrasil.vfs.{contextShiftForS, ResourceError}
 
 import java.lang.Runtime
 import java.nio.file.Path
@@ -55,6 +57,9 @@ object Main extends IOApp {
   implicit val iotQuasarError: MonadError_[IOT, QuasarError] =
     MonadError_.facet[IOT](QuasarError.throwableP)
 
+  implicit val iotResourceError: MonadError_[IOT, ResourceError] =
+    MonadError_.facet[IOT](ResourceError.throwableP)
+
   implicit val iotTimer: Timer[IOT] = Timer.deriveWriterT
 
   def paths[F[_]](implicit F: Sync[F]): Stream[F, (Path, Path)] =
@@ -66,10 +71,10 @@ object Main extends IOApp {
       _ <- Stream.eval(Paths.mkdirs[F](pluginDir))
     } yield (dataDir, pluginDir)
 
-  def quasarStream[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer](
+  def quasarStream[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: MonadError_[?[_], ResourceError]: PhaseResultTell: Timer](
       pluginFiles: Option[PluginFiles],
       blockingPool: BlockingContext)
-      : Stream[F, Quasar[F]] = {
+      : Stream[F, (PushdownControl[F], Quasar[F, MimirRepr, PTableSchema])] = {
 
     implicit val cpuEC =
       ExecutionContext.fromExecutor(
@@ -86,17 +91,18 @@ object Main extends IOApp {
         DatasourceModule.Lightweight(LocalParsedDatasourceModule) ::
         DatasourceModule.Lightweight(LocalDatasourceModule) ::
         extMods
-      q <- Quasar[F](precog, mods, evalCfg)
+      q <- QuasarImpl[F](precog, mods, evalCfg)
     } yield q
   }
 
   def repl[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
-      q: Quasar[F],
+      pushdown: PushdownControl[F],
+      q: Quasar[F, MimirRepr, PTableSchema],
       blockingPool: BlockingContext)
       : F[ExitCode] =
     for {
       ref <- Ref.of[F, ReplState](ReplState.mk)
-      repl <- Repl.mk[F](ref, q, blockingPool)
+      repl <- Repl.mk[F](ref, pushdown, q, blockingPool)
       l <- repl.loop
     } yield l
 
@@ -123,7 +129,7 @@ object Main extends IOApp {
         for {
           files <- opts.pluginFiles
           qs <- quasarStream[IOT](files, blockingPool)
-            .evalMap(repl[IOT](_, blockingPool))
+            .evalMap({ case (p, q) => repl[IOT](p, q, blockingPool) })
             .compile
             .last
             .run.map(_._2.getOrElse(ExitCode.Success))
@@ -133,7 +139,5 @@ object Main extends IOApp {
         val (s, exitCode) = renderFailure(f, "repl")
         IO.delay(println(s)).as(ExitCode(exitCode.toInt))
     }
-
   }
-
 }

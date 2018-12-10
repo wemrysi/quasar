@@ -302,7 +302,6 @@ lazy val runp = (project in file("run"))
   .dependsOn(
     core,
     impl,
-    mimir,
     qsu)
   .settings(commonSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -314,7 +313,7 @@ lazy val repl = project
   .settings(name := "quasar-repl")
   .dependsOn(
     common % "test->test",
-    runp)
+    mimir)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.repl)
   .settings(
@@ -333,7 +332,7 @@ lazy val it = project
   .configs(ExclusiveTests)
   .dependsOn(
     qscript % "test->test",
-    runp)
+    mimir)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.it)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
@@ -424,7 +423,7 @@ lazy val mimir = project
   .dependsOn(
     yggdrasil % BothScopes,
     impl % BothScopes,
-    connector)
+    runp)
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)

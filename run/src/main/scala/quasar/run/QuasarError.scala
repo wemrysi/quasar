@@ -22,7 +22,6 @@ import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
 import quasar.qscript.PlannerError
 import quasar.sql.ParsingError
-import quasar.yggdrasil.vfs.{ResourceError => MimirResourceError}
 
 import argonaut.Json
 import argonaut.JsonScalaz._
@@ -38,7 +37,6 @@ object QuasarError {
   final case class Evaluating(error: ResourceError) extends QuasarError
   final case class Parsing(error: ParsingError) extends QuasarError
   final case class Planning(error: PlannerError) extends QuasarError
-  final case class Storing(error: MimirResourceError) extends QuasarError
 
   val compiling: Prism[QuasarError, SemanticErrors] =
     Prism.partial[QuasarError, SemanticErrors] {
@@ -65,16 +63,10 @@ object QuasarError {
       case Planning(err) => err
     } (Planning(_))
 
-  val storing: Prism[QuasarError, MimirResourceError] =
-    Prism.partial[QuasarError, MimirResourceError] {
-      case Storing(err) => err
-    } (Storing(_))
-
   val throwableP: Prism[Throwable, QuasarError] =
     Prism.partial[Throwable, QuasarError] {
       case QuasarException(qe) => qe
     } (QuasarException(_))
-
 
   implicit val show: Show[QuasarError] =
     Show show {
@@ -83,7 +75,6 @@ object QuasarError {
       case Evaluating(e) => e.show
       case Parsing(e) => e.show
       case Planning(e) => e.show
-      case Storing(e) => e.show
     }
 
   ////

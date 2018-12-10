@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar.mimir.evaluate
 
-import slamdata.Predef._
 import quasar.{Variables, VarName, VarValue}
 import quasar.api.datasource._
 import quasar.api.table.{TableName, TableRef}
@@ -24,6 +23,7 @@ import quasar.common.data._
 import quasar.contrib.pathy.prismADir
 import quasar.fp.numeric.Positive
 import quasar.mimir.storage.StoreKey
+import quasar.run.SqlQuery
 import quasar.sql.Query
 
 import java.util.UUID
