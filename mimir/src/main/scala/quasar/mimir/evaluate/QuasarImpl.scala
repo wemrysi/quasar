@@ -49,8 +49,9 @@ import matryoshka.data.Fix
 import pathy.Path._
 import shims._
 
-final class QuasarImpl[F[_]: ConcurrentEffect: Monad: MonadQuasarErr: PhaseResultTell: MonadError_[?[_], ResourceError]](
-    precog: Precog)(
+final class QuasarImpl[F[_]: ConcurrentEffect: Monad: MonadQuasarErr: PhaseResultTell: MonadError_[?[_], ResourceError]] private (
+    precog: Precog,
+    pushdown: PushdownControl[F])(
     implicit
     cs: ContextShift[IO],
     ec: ExecutionContext) {
@@ -76,8 +77,6 @@ final class QuasarImpl[F[_]: ConcurrentEffect: Monad: MonadQuasarErr: PhaseResul
       rValueTableRefP(rValueSqlQueryP))
 
   val pTableStore = MimirPTableStore[F](precog, PreparationLocation)
-
-  val pushdown = new PushdownControl(Ref.unsafe[F, Pushdown](Pushdown.EnablePushdown))
 
   val federation = MimirQueryFederation[Fix, F](precog, pushdown)
   
@@ -129,7 +128,8 @@ object QuasarImpl {
       ec: ExecutionContext)
       : Stream[F, (PushdownControl[F], Quasar[F, MimirRepr, PTableSchema])] = {
 
-    val impl = new QuasarImpl[F](precog)
+    val pushdown = new PushdownControl(Ref.unsafe[F, Pushdown](Pushdown.EnablePushdown))
+    val impl = new QuasarImpl[F](precog, pushdown)
 
     val qs = Quasar[F, MimirRepr, PTableSchema](
       impl.datasourceRefs,
@@ -142,7 +142,7 @@ object QuasarImpl {
       sstEvalConfig)
 
     for {
-      p <- Stream.eval(impl.pushdown.pure[F])
+      p <- Stream.eval(pushdown.pure[F])
       q <- qs
     } yield (p, q)
   }
