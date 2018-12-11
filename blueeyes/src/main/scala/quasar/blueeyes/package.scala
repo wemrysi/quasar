@@ -26,7 +26,7 @@ import scala.math.BigDecimal
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
 
-package object blueeyes extends precog.PackageTime {
+package object blueeyes extends PackageTime {
   type ByteBufferPoolS[A] = State[(ByteBufferPool, List[ByteBuffer]), A]
 
   def Utf8Charset: Charset                                               = Charset forName "UTF-8"
