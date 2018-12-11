@@ -34,10 +34,7 @@ script:
       checkHeaders \
       test:compile \
       "testOnly -- failtrace" \
-      "exclusive:testOnly -- failtrace" \
-      repl/assembly
-
-  - scripts/testJar
+      "exclusive:testOnly -- failtrace"
 
   - |-
     if [ $TRAVIS_PULL_REQUEST == "false" ] && [[ "$TRAVIS_BRANCH" =~ backport/v.*|master ]]; then

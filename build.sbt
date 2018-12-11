@@ -93,7 +93,8 @@ lazy val assemblySettings = Seq(
     // in the scala-lang scala-compiler 2.11.11 jar. It comes bundled with jansi OS libraries
     // which conflict with similar jansi libraries brought in by fusesource.jansi.jansi-1.11
     // So the merge needed the following lines to avoid the "deduplicate: different file contents found"
-    // produced by repl/assembly. This is still a problem on quasar v47.0.0
+    // produced by repl/assembly. This is still a problem on quasar v47.0.0.
+    // TODO see if this is a problem now that REPL is in quasar-repl.
     case s if s.endsWith("libjansi.jnilib")                   => MergeStrategy.last
     case s if s.endsWith("jansi.dll")                         => MergeStrategy.last
     case s if s.endsWith("libjansi.so")                       => MergeStrategy.last
@@ -144,7 +145,7 @@ lazy val root = project.in(file("."))
     niflheim,
     precog,
     qscript, qsu,
-    repl, runp,
+    runp,
     sql, sst,
     yggdrasil, yggdrasilPerf
   ).enablePlugins(AutomateHeaderPlugin)
@@ -304,24 +305,6 @@ lazy val runp = (project in file("run"))
     impl,
     qsu)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-/** An interactive REPL application for Quasar.
-  */
-lazy val repl = project
-  .settings(name := "quasar-repl")
-  .dependsOn(
-    common % "test->test",
-    mimir)
-  .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.repl)
-  .settings(
-    mainClass in Compile := Some("quasar.repl.Main"),
-    javaOptions += "-XX:+HeapDumpOnOutOfMemoryError",
-    fork in run := true,
-    connectInput in run := true,
-    outputStrategy := Some(StdoutOutput))
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 

@@ -32,64 +32,6 @@ To compile the project and run tests, first clone the quasar repo and then execu
 
 Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
-#### REPL JAR
-
-To build a JAR for the REPL, which allows entering commands at a command-line prompt, execute the following command:
-
-```bash
-./sbt 'repl/assembly'
-```
-
-The path of the JAR will be `repl/target/scala-2.12/quasar-repl-assembly-[version].jar`, where `[version]` is the Quasar version number.
-
-To run the JAR, execute the following command:
-
-```bash
-java -jar [<path to jar>] [-c <config file>]
-```
-
-### Backends
-
-By default, the REPL assembly contains only the local datasource. In order to use other datasources you will need to add them. See the repl `help` command for more information.
-
-## REPL Usage
-
-The interactive REPL accepts SQL `SELECT` queries.
-
-```
-💪 $ select * from zips where state="CO" limit 3
-
-Query time: 0.1s
- city    | loc[0]       | loc[1]     | pop    | state |
----------|--------------|------------|--------|-------|
- ARVADA  |  -105.098402 |  39.794533 |  12065 | CO    |
- ARVADA  |  -105.065549 |  39.828572 |  32980 | CO    |
- ARVADA  |   -105.11771 |  39.814066 |  33260 | CO    |
-
-💪 $ select city from zips limit 3
-...
- city     |
-----------|
- AGAWAM   |
- CUSHMAN  |
- BARRE    |
-```
-
-You may also store the result of a SQL query:
-
-```sql
-💪 $ out1 := select * from zips where state="CO" limit 3
-```
-
-The location of a collection may be specified as an absolute path by
-surrounding the path with double quotes:
-
-```sql
-select * from `/test/zips`
-```
-
-Type `help` for information on other commands.
-
 ## Schema
 
 Given query results like:
