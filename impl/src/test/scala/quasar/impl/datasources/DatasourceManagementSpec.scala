@@ -30,7 +30,7 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.impl.DatasourceModule
 import quasar.impl.schema.{SstConfig, SstEvalConfig, SstSchema}
-import quasar.qscript.{MonadPlannerErr, PlannerError, QScriptEducated}
+import quasar.qscript.{MonadPlannerErr, PlannerError, QScriptEducated, InterpretedRead}
 import quasar.sst._, StructuralType.TypeST
 import quasar.tpe._
 
@@ -112,8 +112,8 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
     def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
         config: Json)(
         implicit ec: ExecutionContext)
-        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]]]] =
-      mkDatasource[ResourcePath, F](kind, evalDelay).right.pure[F]
+        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]]]] =
+      mkDatasource[InterpretedRead[ResourcePath], F](kind, evalDelay).right.pure[F]
   }
 
   val lightGzipMod = new LightweightDatasourceModule {
@@ -124,15 +124,16 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
     def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
         config: Json)(
         implicit ec: ExecutionContext)
-        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]]]] =
-      mkDatasource[ResourcePath, F](kind, evalDelay)
-        .map(Datasource.evaluator[F, Stream[F, ?], ResourcePath, QueryResult[F]] modify { qe =>
+        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]]]] =
+      mkDatasource[InterpretedRead[ResourcePath], F](kind, evalDelay)
+        .map(Datasource.evaluator[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]] modify { qe =>
           qe.as(QueryResult.compressed(
             CompressionScheme.Gzip,
             QueryResult.typed(
               ParsableType.json(JsonVariant.ArrayWrapped, false),
               Stream.emits(BoolsData.mkString("[", "      ,      ", "]").getBytes("UTF-8"))
-                .through(gzip.compress[F](1024)))))
+                .through(gzip.compress[F](1024)),
+              List())))
         })
         .right.pure[F]
   }
@@ -447,7 +448,8 @@ object DatasourceManagementSpec {
           Stream.emits(BoolsData)
             .map(EJson.bool[Fix[EJson]](_))
             .evalMap(r => tmr.sleep(produceDelay).as(r))
-            .covary[F]).pure[F]
+            .covary[F],
+          List()).pure[F]
 
       def pathIsResource(path: ResourcePath): F[Boolean] =
         false.pure[F]

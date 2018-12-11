@@ -22,6 +22,7 @@ import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource.ResourcePath
 import quasar.connector._
 import quasar.impl.datasource.local._
+import quasar.qscript.InterpretedRead
 
 import scala.concurrent.ExecutionContext
 
@@ -43,18 +44,21 @@ object TestGzippedLocalDatasourceModule extends LightweightDatasourceModule {
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json)(
       implicit ec: ExecutionContext)
-      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]]]] = {
+      : F[InitializationError[Json] \/ Disposable[F, DS[F]]] = {
 
-    val qeLens = Datasource.evaluator[F, Stream[F, ?], ResourcePath, QueryResult[F]]
+    val qeLens = Datasource.evaluator[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]]
 
     LocalDatasourceModule.lightweightDatasource[F](config).map(_.map(_.map(qeLens modify { qe =>
       qe map {
-        case QueryResult.Typed(tpe, bytes) =>
+        case QueryResult.Typed(tpe, bytes, is) =>
           QueryResult.compressed(
             CompressionScheme.Gzip,
             QueryResult.typed(
               tpe,
-              bytes.through(gzip.compress[F](32768))))
+              bytes.through(gzip.compress[F](32768)),
+              is
+            )
+          )
 
         case other => other
       }

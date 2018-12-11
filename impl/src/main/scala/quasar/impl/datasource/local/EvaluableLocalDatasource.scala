@@ -47,7 +47,7 @@ import shims._
 final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
     dsType: DatasourceType,
     root: JPath,
-    queryResult: JPath => QueryResult[F])(
+    queryResult: InterpretedRead[JPath] => QueryResult[F])(
     implicit F: Effect[F], RE: MonadResourceErr[F])
     extends LightweightDatasource[F, Stream[F, ?], QueryResult[F]] {
 
@@ -63,7 +63,7 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
 
       isFile <- Effect[F].delay(Files.isRegularFile(jp))
       _ <- isFile.unlessM(MonadResourceErr[F].raiseError(notAResource(path)))
-    } yield queryResult(jp)
+    } yield queryResult(InterpretedRead(jp, iRead.instructions))
   }
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
@@ -103,7 +103,7 @@ object EvaluableLocalDatasource {
   def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer](
       dsType: DatasourceType,
       root: JPath)(
-      queryResult: JPath => QueryResult[F])
+      queryResult: InterpretedRead[JPath] => QueryResult[F])
       : Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]] =
     new EvaluableLocalDatasource[F](dsType, root, queryResult)
 }

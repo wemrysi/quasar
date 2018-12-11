@@ -41,11 +41,11 @@ object LocalDatasource {
 
     import ParsableType.JsonVariant
 
-    EvaluableLocalDatasource[F](LocalType, root) { path =>
+    EvaluableLocalDatasource[F](LocalType, root) { iRead =>
       QueryResult.typed(
         ParsableType.json(JsonVariant.LineDelimited, true),
-        io.file.readAll[F](path, blockingPool.unwrap, readChunkSizeBytes),
-        List())
+        io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes),
+        iRead.instructions)
     }
   }
 }
