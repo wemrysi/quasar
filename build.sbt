@@ -143,7 +143,6 @@ lazy val root = project.in(file("."))
     impl, it,
     mimir,
     niflheim,
-    precog,
     qscript, qsu,
     runp,
     sql, sst,
@@ -326,27 +325,12 @@ lazy val it = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val precog = project
-  .settings(
-    name := "quasar-precog-internal",
-    scalacStrictMode := false)
-  .dependsOn(common)
-  .settings(libraryDependencies ++= Dependencies.precog)
-  .settings(logBuffered in Test := isTravisBuild.value)
-  .settings(headerLicenseSettings)
-  .settings(publishSettings)
-  .settings(assemblySettings)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 lazy val blueeyes = project
   .settings(
     name := "quasar-blueeyes-internal",
     scalacStrictMode := false,
     scalacOptions += "-language:postfixOps")
-  .dependsOn(
-    precog,
-    frontend % BothScopes)
+  .dependsOn(frontend % BothScopes)
   .settings(libraryDependencies ++= Dependencies.blueeyes)
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
