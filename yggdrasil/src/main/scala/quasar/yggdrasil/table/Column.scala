@@ -55,11 +55,11 @@ sealed trait Column {
         if (from == 0 && to >= max) {
           bs
         } else if (from == 0) {
-          bs.clear(to, max) // clears [to, max)
+          bs.clearFrom(to)
           bs
         } else {
           bs.clear(0, from) // clears [0, from)
-          bs.clear(to, max) // clears [to, max)
+          bs.clearFrom(to)
           bs
         }
 

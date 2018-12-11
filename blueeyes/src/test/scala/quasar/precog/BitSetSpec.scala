@@ -40,6 +40,21 @@ object BitSetSpec extends Specification with ScalaCheck {
   }
 
   "bitset (java)" should {
+    "clearFrom" in prop { (bs: BitSet, from: Int) =>
+      (from >= 0 && from < (bs.length << 6)) ==> {
+        val old = bs.copy()
+        bs.clearFrom(from)
+
+        (0 until from) forall { i: Int =>
+          bs(i) aka s"bs($i)" mustEqual old(i)
+        }
+
+        (from until (old.length << 6)) forall { i: Int =>
+          bs(i) aka s"bs($i)" must beFalse
+        }
+      }
+    }
+
     "sparsenByMod" in prop { (bs: BitSet, offset0: Int, mod0: Int) =>
       (mod0 > Int.MinValue && offset0 > Int.MinValue && (bs.length << 6) < Int.MaxValue / 100) ==> {
         val mod = math.abs(mod0) % 100    // don't let scalacheck go crazy
@@ -50,7 +65,7 @@ object BitSetSpec extends Specification with ScalaCheck {
           val sparsened = bs.sparsenByMod(offset, mod)
 
           (sparsened.length << 6) must beEqualTo((bs.length << 6) * mod)
-          
+
           (0 until (sparsened.length << 6)) forall { i: Int =>
             if (i % mod == offset)
               bs(i / mod) must beEqualTo(sparsened(i)).setMessage(s"bs(${i / mod}) != sparsened($i)")
