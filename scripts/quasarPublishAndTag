@@ -14,7 +14,10 @@ TRAVIS_JOB_NUMBER=1 scripts/publishAndTag 'slamdata/quasar'
 bumpInDownstream() { echo $1 > quasar-version; }
 export -f bumpInDownstream
 
-scripts/bumpDependentProject slamdata slamdata-backend bumpInDownstream
+# internal
+for c in slamdata-backend quasar-repl; do
+  scripts/bumpDependentProject slamdata $c bumpInDownstream
+done
 
 # datasources
 for c in s3 azure url mongo; do
