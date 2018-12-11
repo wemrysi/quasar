@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.regression
+package quasar.run
 
 import slamdata.Predef.{Map => SMap, _}
 import quasar._
@@ -22,7 +22,6 @@ import quasar.api.QueryEvaluator
 import quasar.common.{PhaseResults, PhaseResultTell}
 import quasar.contrib.scalaz.{MonadError_, MonadTell_}
 import quasar.qscript._
-import quasar.run.{MonadQuasarErr, QuasarError, Sql2QueryEvaluator, SqlQuery}
 import quasar.sql.Query
 
 import cats.effect.IO
