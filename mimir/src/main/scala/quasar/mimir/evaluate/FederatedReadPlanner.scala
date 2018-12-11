@@ -113,7 +113,8 @@ final class FederatedReadPlanner[
     for {
       queryResult <- source.src match {
         case QueryAssociate.Lightweight(f) =>
-          f(source.path).to[F]
+          val read = InterpretedRead(source.path, instructions)
+          f(read).to[F]
 
         case QueryAssociate.Heavyweight(f) =>
           val read = dsl.Read(ResourcePath.leaf(path), ExcludeId)
@@ -121,26 +122,24 @@ final class FederatedReadPlanner[
           f(read).to[F]
       }
 
-      table <- tableFromQueryResult(path, queryResult, instructions)
+      table <- tableFromQueryResult(path, queryResult)
     } yield table
 
   @tailrec
   private def tableFromQueryResult(
       path: AFile,
-      qr: QueryResult[IO],
-      instructions: List[ParseInstruction])
+      qr: QueryResult[IO])
       : F[P.Table] =
     qr match {
-      case QueryResult.Parsed(qd, data) =>
+      case QueryResult.Parsed(qd, data, instructions) =>
         tableFromParsed(data, instructions)(qd)
 
       case QueryResult.Compressed(CompressionScheme.Gzip, content) =>
         tableFromQueryResult(
           path,
-          content.modifyBytes(gzip.decompress[IO](DefaultDecompressionBufferSize)),
-          instructions)
+          content.modifyBytes(gzip.decompress[IO](DefaultDecompressionBufferSize)))
 
-      case QueryResult.Typed(tpe, data) =>
+      case QueryResult.Typed(tpe, data, instructions) =>
         tableFromTyped(path, tpe, data, instructions)
     }
 

@@ -25,6 +25,7 @@ import quasar.connector.datasource.LightweightDatasource
 import quasar.contrib.fs2.convert
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
+import quasar.qscript.InterpretedRead
 
 import java.nio.file.{Files, Path => JPath}
 
@@ -52,7 +53,8 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
 
   val kind: DatasourceType = dsType
 
-  def evaluate(path: ResourcePath): F[QueryResult[F]] =
+  def evaluate(iRead: InterpretedRead[ResourcePath]): F[QueryResult[F]] = {
+    val path = iRead.path
     for {
       jp <- toNio[F](path)
 
@@ -62,6 +64,7 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
       isFile <- Effect[F].delay(Files.isRegularFile(jp))
       _ <- isFile.unlessM(MonadResourceErr[F].raiseError(notAResource(path)))
     } yield queryResult(jp)
+  }
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     toNio[F](path) >>= (jp => F.delay(Files.isRegularFile(jp)))
@@ -101,6 +104,6 @@ object EvaluableLocalDatasource {
       dsType: DatasourceType,
       root: JPath)(
       queryResult: JPath => QueryResult[F])
-      : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]] =
+      : Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]] =
     new EvaluableLocalDatasource[F](dsType, root, queryResult)
 }

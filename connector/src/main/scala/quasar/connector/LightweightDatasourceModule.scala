@@ -20,6 +20,7 @@ import quasar.Disposable
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource.ResourcePath
+import quasar.qscript.InterpretedRead
 
 import scala.concurrent.ExecutionContext
 
@@ -29,6 +30,8 @@ import fs2.Stream
 import scalaz.\/
 
 trait LightweightDatasourceModule {
+  type DS[F[_]] = Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]]
+
   def kind: DatasourceType
 
   def sanitizeConfig(config: Json): Json
@@ -36,5 +39,5 @@ trait LightweightDatasourceModule {
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json)(
       implicit ec: ExecutionContext)
-      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]]]]
+      : F[InitializationError[Json] \/ Disposable[F, DS[F]]]
 }

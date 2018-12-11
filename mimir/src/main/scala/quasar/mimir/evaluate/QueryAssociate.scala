@@ -16,20 +16,23 @@
 
 package quasar.mimir.evaluate
 
+import slamdata.Predef._
+
+import quasar.ParseInstruction
 import quasar.api.resource.ResourcePath
 import quasar.connector.QueryResult
-import quasar.qscript.QScriptEducated
+import quasar.qscript.{QScriptEducated, InterpretedRead}
 
 sealed trait QueryAssociate[T[_[_]], F[_]]
 
 object QueryAssociate {
-  final case class Lightweight[T[_[_]], F[_]](f: ResourcePath => F[QueryResult[F]])
+  final case class Lightweight[T[_[_]], F[_]](f: InterpretedRead[ResourcePath]  => F[QueryResult[F]])
       extends QueryAssociate[T, F]
 
   final case class Heavyweight[T[_[_]], F[_]](f: T[QScriptEducated[T, ?]] => F[QueryResult[F]])
       extends QueryAssociate[T, F]
 
-  def lightweight[T[_[_]], F[_]](f: ResourcePath => F[QueryResult[F]])
+  def lightweight[T[_[_]], F[_]](f: InterpretedRead[ResourcePath] => F[QueryResult[F]])
       : QueryAssociate[T, F] =
     Lightweight(f)
 

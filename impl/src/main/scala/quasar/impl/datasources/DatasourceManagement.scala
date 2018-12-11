@@ -172,13 +172,13 @@ final class DatasourceManagement[
     @tailrec
     def sstStream(qr: QueryResult[F]): Stream[F, S] =
       qr match {
-        case QueryResult.Parsed(qdd, data) =>
+        case QueryResult.Parsed(qdd, data, _) =>
           data.map(QData.convert(_)(qdd, sstQDataEncode))
 
         case QueryResult.Compressed(CompressionScheme.Gzip, content) =>
           sstStream(content.modifyBytes(gzip.decompress[F](DefaultDecompressionBufferSize)))
 
-        case QueryResult.Typed(js @ ParsableType.Json(vnt, isPrecise), data) =>
+        case QueryResult.Typed(js @ ParsableType.Json(vnt, isPrecise), data, _) =>
           val mode: TParser.Mode = vnt match {
             case JsonVariant.ArrayWrapped => TParser.UnwrapArray
             case JsonVariant.LineDelimited => TParser.ValueStream
@@ -206,7 +206,7 @@ final class DatasourceManagement[
     withDs[DiscoveryError[I], Option[sstConfig.Schema]](datasourceId) { ds =>
 
       val queryResult: F[QueryResult[F]] =
-        ds.fold(_.evaluate(path), _.evaluate(sampleQuery))
+        ds.fold(_.evaluate(InterpretedRead(path, List())), _.evaluate(sampleQuery))
 
       val k: N = ConvertableTo[N].fromLong(sstEvalConfig.sampleSize.value)
 
@@ -275,7 +275,7 @@ final class DatasourceManagement[
 
 object DatasourceManagement {
   type Modules = IMap[DatasourceType, DatasourceModule]
-  type LDS[F[_]] = Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]]
+  type LDS[F[_]] = Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]]
   type HDS[T[_[_]], F[_]] = Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F]]
   type DS[T[_[_]], F[_]] = LDS[F] \/ HDS[T, F]
   type Running[I, T[_[_]], F[_]] = IMap[I, Disposable[F, DS[T, F]]]
@@ -308,7 +308,7 @@ object DatasourceManagement {
         case (id, ref @ DatasourceRef(kind, _, _)) =>
           modules.lookup(kind) match {
             case None =>
-              val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], ResourcePath, QueryResult[F]](
+              val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]](
                 kind,
                 DatasourceUnsupported(kind, modules.keySet))
 

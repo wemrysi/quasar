@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.api.resource.ResourcePath
 import quasar.concurrent.BlockingContext
 import quasar.connector.{Datasource, MonadResourceErr, ParsableType, QueryResult}
+import quasar.qscript.InterpretedRead
 
 import java.nio.file.{Path => JPath}
 
@@ -36,14 +37,15 @@ object LocalDatasource {
       root: JPath,
       readChunkSizeBytes: Int,
       blockingPool: BlockingContext)
-      : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]] = {
+      : Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]] = {
 
     import ParsableType.JsonVariant
 
     EvaluableLocalDatasource[F](LocalType, root) { path =>
       QueryResult.typed(
         ParsableType.json(JsonVariant.LineDelimited, true),
-        io.file.readAll[F](path, blockingPool.unwrap, readChunkSizeBytes))
+        io.file.readAll[F](path, blockingPool.unwrap, readChunkSizeBytes),
+        List())
     }
   }
 }
