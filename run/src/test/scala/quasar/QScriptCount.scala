@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.regression
+package quasar.run
 
 import slamdata.Predef._
 

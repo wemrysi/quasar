@@ -301,7 +301,7 @@ lazy val impl = project
 lazy val runp = (project in file("run"))
   .settings(name := "quasar-run")
   .dependsOn(
-    core,
+    core % BothScopes,
     impl,
     qsu)
   .settings(commonSettings)
