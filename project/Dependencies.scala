@@ -124,12 +124,6 @@ object Dependencies {
     "com.fasterxml.woodstox" % "woodstox-core" % "5.0.3"
   )
 
-  def repl = Seq(
-    "com.github.tototoshi" %% "scala-csv" % "1.3.4",
-    "com.github.xuwei-k" %% "optparse-applicative" % "0.8.0",
-    "org.jline" % "jline" % "3.8.0"
-  )
-
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % slf4sVersion,
     "org.slf4j"            %  "slf4j-log4j12"   % "1.7.16",
