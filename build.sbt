@@ -7,9 +7,6 @@ import scala.{Boolean, Some, StringContext, sys}
 import scala.Predef._
 import scala.collection.Seq
 
-def exclusiveTasks(tasks: Scoped*) =
-  tasks.flatMap(inTask(_)(tags := Seq((ExclusiveTest, 1))))
-
 lazy val buildSettings = Seq(
   scalacOptions --= Seq("-Ybackend:GenBCode"),
   initialize := {
@@ -31,14 +28,12 @@ lazy val buildSettings = Seq(
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
     Wart.Nothing,               // - see wartremover/wartremover#263
     Wart.NonUnitStatements),    // better-monadic-for causes some spurious warnings from this
-  // Normal tests exclude those tagged in Specs2 with 'exclusive'.
+
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive", "showtimes")),
-  // Exclusive tests include only those tagged with 'exclusive'.
-  testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive", "showtimes")),
 
   logBuffered in Test := isTravisBuild.value,
 
-  console := { (console in Test).value },
+  console := { (console in Test).value }, // console alias test:console
 
   /*
    * This plugin fixes a number of problematic cases in the for-comprehension
@@ -46,7 +41,7 @@ lazy val buildSettings = Seq(
    * Slice#allFromRValues to not free memory, so it's not just a convenience or
    * an optimization.
    */
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4")) // console alias test:console
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4"))
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
@@ -58,9 +53,6 @@ concurrentRestrictions in Global := {
   else
     (concurrentRestrictions in Global).value
 }
-
-// Tasks tagged with `ExclusiveTest` should be run exclusively.
-concurrentRestrictions in Global += Tags.exclusive(ExclusiveTest)
 
 lazy val publishSettings = Seq(
   performMavenCentralSync := false,   // publishes quasar to bintray only, skipping sonatype and maven central
@@ -116,9 +108,8 @@ lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
 lazy val excludeTypelevelScalaLibrary =
   Seq(excludeDependencies += "org.typelevel" % "scala-library")
 
-lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
-lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
-lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
+lazy val isCIBuild = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
+lazy val isIsolatedEnv = settingKey[Boolean]("True if running in an isolated environment")
 
 def createBackendEntry(childPath: Seq[File], parentPath: Seq[File]): Seq[File] =
   (childPath.toSet -- parentPath.toSet).toSeq
@@ -152,9 +143,8 @@ lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
   .settings(commonSettings)
   .settings(
-    buildInfoKeys := Seq[BuildInfoKey](version, isCIBuild, isIsolatedEnv, exclusiveTestTag),
+    buildInfoKeys := Seq[BuildInfoKey](version, isCIBuild, isIsolatedEnv),
     buildInfoPackage := "quasar.build",
-    exclusiveTestTag := "exclusive",
     isCIBuild := isTravisBuild.value,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
     libraryDependencies ++= Dependencies.foundation)
@@ -306,15 +296,11 @@ lazy val runp = (project in file("run"))
   */
 lazy val it = project
   .settings(name := "quasar-it-internal")
-  .configs(ExclusiveTests)
   .dependsOn(
     qscript % "test->test",
     mimir)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.it)
-  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
-  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
-  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
   .settings(logBuffered in Test := false)
   .settings(excludeTypelevelScalaLibrary)
