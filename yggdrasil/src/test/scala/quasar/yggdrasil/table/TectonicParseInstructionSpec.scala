@@ -37,7 +37,7 @@ object TectonicParseInstructionSpec extends ParseInstructionSpec {
         Event.Unnest,
         Event.FinishRow)
 
-      val plateF = ReifiedTerminalPlate[IO].flatMap(
+      val plateF = ReifiedTerminalPlate[IO]().flatMap(
         MaskPlate[IO, List[Event]](
           Mask(Map(CPath.parse(".a") -> Set(ParseType.Object))), _))
 
@@ -68,7 +68,7 @@ object TectonicParseInstructionSpec extends ParseInstructionSpec {
     evalPlate(stream)(SinglePivotPlate[IO, List[Event]](path, idStatus, structure, _))
 
   private def evalPlate(stream: JsonStream)(f: Plate[List[Event]] => IO[Plate[List[Event]]]): JsonStream = {
-    val plate = ReifiedTerminalPlate[IO].flatMap(f).unsafeRunSync()
+    val plate = ReifiedTerminalPlate[IO]().flatMap(f).unsafeRunSync()
     stripNoOps(ReifiedTerminalPlate.visit(stream, plate))
   }
 
@@ -93,7 +93,7 @@ object TectonicParseInstructionSpec extends ParseInstructionSpec {
 
   protected def ldjson(str: String): JsonStream = {
     val eff = for {
-      parser <- Parser(ReifiedTerminalPlate[IO], Parser.ValueStream)
+      parser <- Parser(ReifiedTerminalPlate[IO](), Parser.ValueStream)
 
       events1 <- parser.absorb(str)
       events2 <- parser.finish
