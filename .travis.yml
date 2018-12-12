@@ -33,8 +33,7 @@ script:
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       checkHeaders \
       test:compile \
-      "testOnly -- failtrace" \
-      "exclusive:testOnly -- failtrace"
+      "testOnly -- failtrace"
 
   - |-
     if [ $TRAVIS_PULL_REQUEST == "false" ] && [[ "$TRAVIS_BRANCH" =~ backport/v.*|master ]]; then
