@@ -1,16 +1,11 @@
-import scala.Predef._
 import quasar.project._
 
-import java.lang.{Integer, String, Throwable}
-import scala.{Boolean, List, Predef, None, Some, StringContext, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
-import scala.collection.Seq
-import scala.collection.immutable.Map
-import scala.sys.process._
-
-import sbt._, Keys._
-import sbt.std.Transform.DummyTaskMap
 import sbt.TestFrameworks.Specs2
-import sbtrelease._, ReleaseStateTransformations._, Utilities._
+
+import java.lang.{Integer, String}
+import scala.{Boolean, Some, StringContext, sys}
+import scala.Predef._
+import scala.collection.Seq
 
 def exclusiveTasks(tasks: Scoped*) =
   tasks.flatMap(inTask(_)(tags := Seq((ExclusiveTest, 1))))
