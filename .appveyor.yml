@@ -31,4 +31,4 @@ build_script:
   - cmd: .\sbt ++"2.12.7" test:compile
 
 test_script:
-  - cmd: '.\sbt ++"2.12.7" "testOnly -- xonly" "exclusive:testOnly -- xonly"'
+  - cmd: '.\sbt ++"2.12.7" "testOnly -- xonly"'
