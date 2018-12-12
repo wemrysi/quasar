@@ -17,7 +17,6 @@ lazy val buildSettings = Seq(
 
   // NB: -Xlint triggers issues that need to be fixed
   scalacOptions --= Seq("-Xlint"),
-  scalacOptions --= Seq("-Ybackend:GenBCode"),
 
   // NB: Some warts are disabled in specific projects. Here’s why:
   //   • AsInstanceOf   – wartremover/wartremover#266
