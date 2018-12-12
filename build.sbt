@@ -8,7 +8,6 @@ import scala.Predef._
 import scala.collection.Seq
 
 lazy val buildSettings = Seq(
-  scalacOptions --= Seq("-Ybackend:GenBCode"),
   initialize := {
     val version = sys.props("java.specification.version")
     assert(
@@ -18,6 +17,8 @@ lazy val buildSettings = Seq(
 
   // NB: -Xlint triggers issues that need to be fixed
   scalacOptions --= Seq("-Xlint"),
+  scalacOptions --= Seq("-Ybackend:GenBCode"),
+
   // NB: Some warts are disabled in specific projects. Here’s why:
   //   • AsInstanceOf   – wartremover/wartremover#266
   //   • others         – simply need to be reviewed & fixed
@@ -67,42 +68,8 @@ lazy val publishSettings = Seq(
   publishArtifact in (Test, packageBin) := true
 )
 
-
-lazy val assemblySettings = Seq(
-  test in assembly := {},
-
-  assemblyMergeStrategy in assembly := {
-    case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.last
-    case PathList("org", "apache", "hadoop", "yarn", xs @ _*) => MergeStrategy.last
-    case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
-    case "log4j.properties"                                   => MergeStrategy.discard
-    // After recent library version upgrades there seems to be a library pulling
-    // in the scala-lang scala-compiler 2.11.11 jar. It comes bundled with jansi OS libraries
-    // which conflict with similar jansi libraries brought in by fusesource.jansi.jansi-1.11
-    // So the merge needed the following lines to avoid the "deduplicate: different file contents found"
-    // produced by repl/assembly. This is still a problem on quasar v47.0.0.
-    // TODO see if this is a problem now that REPL is in quasar-repl.
-    case s if s.endsWith("libjansi.jnilib")                   => MergeStrategy.last
-    case s if s.endsWith("jansi.dll")                         => MergeStrategy.last
-    case s if s.endsWith("libjansi.so")                       => MergeStrategy.last
-
-    case other => (assemblyMergeStrategy in assembly).value apply other
-  },
-  assemblyExcludedJars in assembly := {
-    val cp = (fullClasspath in assembly).value
-    cp filter { attributedFile =>
-      val file = attributedFile.data
-
-      val excludeByName: Boolean = file.getName.matches("""scala-library-2\.12\.\d+\.jar""")
-      val excludeByPath: Boolean = file.getPath.contains("org/typelevel")
-
-      excludeByName && excludeByPath
-    }
-  }
-)
-
 // Build and publish a project, excluding its tests.
-lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
+lazy val commonSettings = buildSettings ++ publishSettings
 
 // not doing this causes NoSuchMethodErrors when using coursier
 lazy val excludeTypelevelScalaLibrary =
@@ -111,13 +78,9 @@ lazy val excludeTypelevelScalaLibrary =
 lazy val isCIBuild = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv = settingKey[Boolean]("True if running in an isolated environment")
 
-def createBackendEntry(childPath: Seq[File], parentPath: Seq[File]): Seq[File] =
-  (childPath.toSet -- parentPath.toSet).toSeq
-
 lazy val root = project.in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
-  .settings(aggregate in assembly := false)
   .settings(excludeTypelevelScalaLibrary)
   .aggregate(
     api,
@@ -316,7 +279,6 @@ lazy val blueeyes = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(assemblySettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -329,7 +291,6 @@ lazy val niflheim = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(assemblySettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -345,7 +306,6 @@ lazy val yggdrasil = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(assemblySettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -358,7 +318,6 @@ lazy val yggdrasilPerf = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(noPublishSettings)
-  .settings(assemblySettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
   .enablePlugins(JmhPlugin)
@@ -375,6 +334,5 @@ lazy val mimir = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(assemblySettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
