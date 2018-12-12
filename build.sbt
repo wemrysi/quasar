@@ -71,17 +71,12 @@ lazy val publishSettings = Seq(
 // Build and publish a project, excluding its tests.
 lazy val commonSettings = buildSettings ++ publishSettings
 
-// not doing this causes NoSuchMethodErrors when using coursier
-lazy val excludeTypelevelScalaLibrary =
-  Seq(excludeDependencies += "org.typelevel" % "scala-library")
-
 lazy val isCIBuild = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv = settingKey[Boolean]("True if running in an isolated environment")
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .aggregate(
     api,
     blueeyes,
@@ -111,7 +106,6 @@ lazy val foundation = project
     isCIBuild := isTravisBuild.value,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
     libraryDependencies ++= Dependencies.foundation)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
@@ -120,7 +114,6 @@ lazy val api = project
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.api)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** A fixed-point implementation of the EJson spec. This should probably become
@@ -131,7 +124,6 @@ lazy val ejson = project
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.ejson)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Quasar components shared by both frontend and connector. This includes
@@ -144,7 +136,6 @@ lazy val common = project
     ejson)
   .settings(libraryDependencies ++= Dependencies.common)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Types and operations needed by query language implementations.
@@ -157,21 +148,18 @@ lazy val frontend = project
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Dependencies.frontend)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val sst = project
   .settings(name := "quasar-sst-internal")
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val datagen = project
   .settings(name := "quasar-datagen")
   .dependsOn(sst % BothScopes)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .settings(
     mainClass in Compile := Some("quasar.datagen.Main"),
     libraryDependencies ++= Dependencies.datagen)
@@ -183,7 +171,6 @@ lazy val sql = project
   .settings(name := "quasar-sql-internal")
   .dependsOn(common % BothScopes)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .settings(
     libraryDependencies ++= Dependencies.sql)
   .enablePlugins(AutomateHeaderPlugin)
@@ -194,14 +181,12 @@ lazy val qscript = project
     frontend % BothScopes,
     api)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qsu = project
   .settings(name := "quasar-qsu-internal")
   .dependsOn(qscript % BothScopes)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .settings(libraryDependencies ++= Dependencies.qsu)
   .settings(scalacOptions ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
@@ -217,7 +202,6 @@ lazy val connector = project
     foundation % "test->test",
     qscript)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
@@ -228,7 +212,6 @@ lazy val core = project
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Dependencies.core)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementations of the Quasar API. */
@@ -242,7 +225,6 @@ lazy val impl = project
     sst)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.impl)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))
@@ -252,7 +234,6 @@ lazy val runp = (project in file("run"))
     impl,
     qsu)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Integration tests that have some dependency on a running connector.
@@ -266,7 +247,6 @@ lazy val it = project
   .settings(libraryDependencies ++= Dependencies.it)
   .settings(parallelExecution in Test := false)
   .settings(logBuffered in Test := false)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val blueeyes = project
@@ -279,7 +259,6 @@ lazy val blueeyes = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val niflheim = project
@@ -291,7 +270,6 @@ lazy val niflheim = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasil = project
@@ -306,7 +284,6 @@ lazy val yggdrasil = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasilPerf = project
@@ -318,7 +295,6 @@ lazy val yggdrasilPerf = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(noPublishSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
   .enablePlugins(JmhPlugin)
 
@@ -334,5 +310,4 @@ lazy val mimir = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
