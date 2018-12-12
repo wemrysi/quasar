@@ -91,6 +91,9 @@ private[table] final class IdsPlate[A] private (delegate: Plate[A]) extends Plat
   def finishBatch(terminal: Boolean): A =
     delegate.finishBatch(terminal)
 
+  def skipped(bytes: Int): Unit =
+    delegate.skipped(bytes)
+
   private def emitId(): Unit = {
     if (!sawSomething) {
       sawSomething = true
