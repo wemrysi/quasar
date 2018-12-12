@@ -70,9 +70,6 @@ lazy val publishSettings = Seq(
 // Build and publish a project, excluding its tests.
 lazy val commonSettings = buildSettings ++ publishSettings
 
-lazy val isCIBuild = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
-lazy val isIsolatedEnv = settingKey[Boolean]("True if running in an isolated environment")
-
 lazy val root = project.in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
@@ -100,10 +97,8 @@ lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
   .settings(commonSettings)
   .settings(
-    buildInfoKeys := Seq[BuildInfoKey](version, isCIBuild, isIsolatedEnv),
+    buildInfoKeys := Seq[BuildInfoKey](version),
     buildInfoPackage := "quasar.build",
-    isCIBuild := isTravisBuild.value,
-    isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
     libraryDependencies ++= Dependencies.foundation)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 

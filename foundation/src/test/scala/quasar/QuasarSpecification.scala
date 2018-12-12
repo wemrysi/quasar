@@ -16,8 +16,6 @@
 
 package quasar
 
-import quasar.build.BuildInfo._
-
 import java.lang.String
 import scala._
 
@@ -79,10 +77,5 @@ trait QuasarSpecification extends AnyRef
 
     def pendingUntilFixed(m: String): Result =
       outer.toPendingUntilFixed(t).pendingUntilFixed(m)
-
-    def skippedOnUserEnv: Result= skippedOnUserEnv("")
-
-    def skippedOnUserEnv(m: String): Result =
-      if (isIsolatedEnv) AsResult(t) else Skipped(m)
   }
 }
