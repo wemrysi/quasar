@@ -49,7 +49,7 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     tableStore: IndexedStore[F, I, TableRef[Q]],
     evaluator: QueryEvaluator[F, Q, D],
     manager: PreparationsManager[F, I, Q, D],
-    lookupFromPTableStore: I => F[Option[D]],
+    lookupTableData: I => F[Option[D]],
     lookupTableSchema: I => F[Option[S]])
     extends Tables[F, I, Q, D, S] {
 
@@ -124,7 +124,7 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
   def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, D]] =
     tableStore.lookup(tableId) flatMap {
       case Some(_) =>
-        lookupFromPTableStore(tableId) map {
+        lookupTableData(tableId) map {
           case Some(dataset) =>
             PreparationResult.Available[I, D](tableId, dataset).right
           case None =>
@@ -164,7 +164,7 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     import PreparationsManager.Status
 
     val prepared: F[PreparedStatus] =
-      lookupFromPTableStore(tableId) map { t =>
+      lookupTableData(tableId) map { t =>
         if (t.isDefined) PreparedStatus.Prepared
         else PreparedStatus.Unprepared
       }
@@ -185,7 +185,7 @@ object DefaultTables {
       tableStore: IndexedStore[F, I, TableRef[Q]],
       evaluator: QueryEvaluator[F, Q, D],
       manager: PreparationsManager[F, I, Q, D],
-      lookupFromPTableStore: I => F[Option[D]],
+      lookupTableData: I => F[Option[D]],
       lookupTableSchema: I => F[Option[S]])
       : Tables[F, I, Q, D, S] =
       new DefaultTables[F, I, Q, D, S](
@@ -193,6 +193,6 @@ object DefaultTables {
         tableStore,
         evaluator,
         manager,
-        lookupFromPTableStore,
+        lookupTableData,
         lookupTableSchema)
 }

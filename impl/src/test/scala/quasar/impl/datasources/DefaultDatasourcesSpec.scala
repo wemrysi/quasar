@@ -17,32 +17,45 @@
 package quasar.impl.datasources
 
 import slamdata.Predef.{Stream => _, _}
+
 import quasar.Condition
 import quasar.api.MockSchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
+import quasar.api.resource.ResourcePath
 import quasar.contrib.cats.stateT._
 import quasar.contrib.cats.writerT._
 import quasar.contrib.cats.effect.stateT.catsStateTEffect
 import quasar.contrib.fs2.stream._
 import quasar.contrib.scalaz.MonadState_
 import quasar.impl.storage.PureIndexedStore
+
 import DefaultDatasourcesSpec._
 
 import java.io.IOException
+
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.FiniteDuration
 
 import cats.data.{StateT, WriterT}
 import cats.effect.IO
 import cats.instances.list._
 import cats.syntax.applicative._
 import cats.syntax.flatMap._
+
 import eu.timepit.refined.auto._
+
 import fs2.Stream
+
+import matryoshka.data.Fix
+
 import monocle.macros.Lenses
+
 import scalaz.{-\/, \/-, IMap, ISet, Monoid}
 import scalaz.std.anyVal._
 import scalaz.std.string._
+import scalaz.syntax.std.option._
+
 import shims._
 
 final class DefaultDatasourcesSpec
@@ -85,12 +98,17 @@ final class DefaultDatasourcesSpec
     val errors =
       DatasourceErrors.fromMap(errs.pure[DefaultM])
 
-    val control =
-      MockDatasourceControl[DefaultM, Stream[DefaultM, ?], Int, String](
-        ISet.singleton(supportedType),
-        init, sanitize)
+    val manager =
+      MockDatasourceManager[Int, String, Fix, DefaultM, Stream[DefaultM, ?], Unit](
+        ISet.singleton(supportedType), init, sanitize, ())
 
-    DefaultDatasources(freshId, refs, errors, control)
+    val schema =
+      new ResourceSchema[DefaultM, MockSchemaConfig.type, (ResourcePath, Unit)] {
+        def apply(c: MockSchemaConfig.type, r: (ResourcePath, Unit), d: FiniteDuration) =
+          MockSchemaConfig.MockSchema.some.pure[DefaultM]
+      }
+
+    DefaultDatasources(freshId, refs, errors, manager, schema)
   }
 
   "implementation specific" >> {
@@ -193,7 +211,7 @@ final class DefaultDatasourcesSpec
     }
 
     "replace datasource" >> {
-      "updates control" >> {
+      "updates manager" >> {
         val replaced = for {
           a <- refA
           b <- refB
@@ -211,7 +229,7 @@ final class DefaultDatasourcesSpec
         }).unsafeRunSync()
       }
 
-      "doesn't update control when only name changed" >> {
+      "doesn't update manager when only name changed" >> {
         val renamed = for {
           a <- refA
           n <- randomName
@@ -252,7 +270,7 @@ final class DefaultDatasourcesSpec
 }
 
 object DefaultDatasourcesSpec {
-  import MockDatasourceControl.{Initialized, Shutdowns}
+  import MockDatasourceManager.{Initialized, Shutdowns}
 
   type Refs = IMap[Int, DatasourceRef[String]]
   type DefaultM[A] = StateT[WriterT[IO, Shutdowns[Int], ?], DefaultState, A]

@@ -16,38 +16,32 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{Boolean, List, None, Option, Some, Unit}
+import slamdata.Predef.{List, None, Option, Some, Unit}
+
 import quasar.Condition
-import quasar.api.MockSchemaConfig
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError._
-import quasar.api.resource._
 import quasar.contrib.scalaz.{MonadState_, MonadTell_}
-import MockDatasourceControl.{MonadInit, MonadShutdown}
+import quasar.fp.ski.κ
+import quasar.impl.datasource.EmptyDatasource
 
-import scala.concurrent.duration.FiniteDuration
+import MockDatasourceManager.{MonadInit, MonadShutdown}
 
-import scalaz.{\/, ISet, Monad, Order, PlusEmpty}
-import scalaz.syntax.either._
+import scalaz.{ISet, Monad, Order, PlusEmpty}
 import scalaz.syntax.monad._
-import scalaz.syntax.plusEmpty._
 import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.option._
 
-/** Provides for control over the lifecycle of external Datasources. */
-final class MockDatasourceControl[F[_]: Monad, G[_]: PlusEmpty, I: Order, C] private (
+final class MockDatasourceManager[I: Order, C, T[_[_]], F[_]: Monad, G[_]: PlusEmpty, R] private (
     supportedTypes: ISet[DatasourceType],
     initErrors: C => Option[InitializationError[C]],
-    sanitize: C => C)(
-    implicit initd: MonadInit[F, I], sdown: MonadShutdown[F, I])
-    extends DatasourceControl[F, G, I, C, MockSchemaConfig.type] {
+    sanitize: C => C,
+    emptyResult: R)(
+    implicit
+    initd: MonadInit[F, I],
+    sdown: MonadShutdown[F, I])
+    extends DatasourceManager[I, C, T, F, G, R] {
 
-  def sanitizeRef(ref: DatasourceRef[C]): DatasourceRef[C] =
-    ref.copy(config = sanitize(ref.config))
-
-  def initDatasource(
-      datasourceId: I,
-      ref: DatasourceRef[C])
+  def initDatasource(datasourceId: I, ref: DatasourceRef[C])
       : F[Condition[CreateError[C]]] =
     if (supportedTypes.member(ref.kind))
       initErrors(ref.config) match {
@@ -66,30 +60,15 @@ final class MockDatasourceControl[F[_]: Monad, G[_]: PlusEmpty, I: Order, C] pri
         DatasourceUnsupported(ref.kind, supportedTypes))
         .point[F]
 
-  def pathIsResource(datasourceId: I, path: ResourcePath)
-      : F[ExistentialError[I] \/ Boolean] =
+  def managedDatasource(datasourceId: I): F[Option[ManagedDatasource[T, F, G, R]]] =
     initd.gets(_.member(datasourceId)) map { exists =>
-      if (exists) false.right
-      else datasourceNotFound[I, ExistentialError[I]](datasourceId).left
+      supportedTypes.findMin.filter(κ(exists)) map { kind =>
+        ManagedDatasource.lightweight[T][F, G, R](EmptyDatasource(kind, emptyResult))
+      }
     }
 
-  def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
-      : F[DiscoveryError[I] \/ G[(ResourceName, ResourcePathType)]] =
-    initd.gets(_.member(datasourceId)) map { exists =>
-      if (exists) mempty[G, (ResourceName, ResourcePathType)].right
-      else datasourceNotFound[I, DiscoveryError[I]](datasourceId).left
-    }
-
-  def resourceSchema(
-      datasourceId: I,
-      path: ResourcePath,
-      cfg: MockSchemaConfig.type,
-      timeLimit: FiniteDuration)
-      : F[DiscoveryError[I] \/ Option[cfg.Schema]] =
-    initd.gets(_.member(datasourceId)) map { exists =>
-      if (exists) MockSchemaConfig.MockSchema.some.right
-      else datasourceNotFound[I, DiscoveryError[I]](datasourceId).left
-    }
+  def sanitizedRef(ref: DatasourceRef[C]): DatasourceRef[C] =
+    ref.copy(config = sanitize(ref.config))
 
   def shutdownDatasource(datasourceId: I): F[Unit] =
     sdown.tell(List(datasourceId)) >> initd.modify(_.delete(datasourceId))
@@ -98,18 +77,21 @@ final class MockDatasourceControl[F[_]: Monad, G[_]: PlusEmpty, I: Order, C] pri
     supportedTypes.point[F]
 }
 
-object MockDatasourceControl {
+object MockDatasourceManager {
   type Initialized[I] = ISet[I]
   type MonadInit[F[_], I] = MonadState_[F, Initialized[I]]
 
   type Shutdowns[I] = List[I]
   type MonadShutdown[F[_], I] = MonadTell_[F, Shutdowns[I]]
 
-  def apply[F[_]: Monad, G[_]: PlusEmpty, I: Order, C](
+  def apply[I: Order, C, T[_[_]], F[_]: Monad, G[_]: PlusEmpty, R](
       supportedTypes: ISet[DatasourceType],
       initErrors: C => Option[InitializationError[C]],
-      sanitize: C => C)(
-      implicit MI: MonadInit[F, I], MS: MonadShutdown[F, I])
-      : DatasourceControl[F, G, I, C, MockSchemaConfig.type] =
-    new MockDatasourceControl[F, G, I, C](supportedTypes, initErrors, sanitize)
+      sanitize: C => C,
+      emptyResult: R)(
+      implicit
+      MI: MonadInit[F, I],
+      MS: MonadShutdown[F, I])
+      : DatasourceManager[I, C, T, F, G, R] =
+    new MockDatasourceManager[I, C, T, F, G, R](supportedTypes, initErrors, sanitize, emptyResult)
 }
