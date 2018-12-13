@@ -1,9 +1,0 @@
-{
-    "name": "subselect a reduction",
-    "backends": {
-    },
-    "data": "zips.data",
-    "query": "select count(*) from (select sum(pop) from `zips.data`) as b",
-    "predicate": "exactly",
-    "expected": [1]
-}

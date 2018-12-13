@@ -17,7 +17,6 @@ object Dependencies {
   private val pathyVersion        = "0.2.11"
   private val refinedVersion      = "0.8.3"
   private val scodecBitsVersion   = "1.1.2"
-  private val scodecScalazVersion = "1.4.1a"
   private val scalacheckVersion   = "1.14.0"
   private val scalazVersion       = "7.2.26"
   private val scalazStreamVersion = "0.8.6a"
@@ -122,31 +121,5 @@ object Dependencies {
     // woodstox is added here as a quick and dirty way to get azure working
     // see ch3385 for details
     "com.fasterxml.woodstox" % "woodstox-core" % "5.0.3"
-  )
-
-  def blueeyes = Seq(
-    "org.slf4s" %% "slf4s-api"     % slf4sVersion,
-    "org.slf4j" %  "slf4j-log4j12" % "1.7.16"
-  )
-
-  def yggdrasil = Seq(
-    "com.slamdata"    %% "tectonic"      % tectonicVersion,
-    "com.slamdata"    %% "tectonic-fs2"  % tectonicVersion,
-    "com.slamdata"    %% "tectonic-test" % tectonicVersion      % "test",
-    "com.codecommit"  %% "smock"         % "0.4.0-specs2-4.0.2" % "test",
-    "org.apache.jdbm" %  "jdbm"          % "3.0-alpha5",
-    "org.scodec"      %% "scodec-scalaz" % scodecScalazVersion,
-  )
-
-  def niflheim = Seq(
-    "com.typesafe.akka"  %% "akka-actor" % akkaVersion,
-    "org.objectweb.howl" %  "howl"       % "1.0.1-1"
-  )
-
-  def it = Seq(
-    "co.fs2"           %% "fs2-io"              % fs2Version          % Test,
-    "io.argonaut"      %% "argonaut-monocle"    % argonautVersion     % Test,
-    "eu.timepit"       %% "refined-scalacheck"  % refinedVersion      % Test,
-    "io.verizon.knobs" %% "core"                % "4.0.30-scalaz-7.2" % Test
   )
 }
