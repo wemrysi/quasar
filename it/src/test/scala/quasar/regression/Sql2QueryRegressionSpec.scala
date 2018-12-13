@@ -19,7 +19,6 @@ package quasar.regression
 import slamdata.Predef._
 import quasar._
 import quasar.api.datasource._
-import quasar.build.BuildInfo
 import quasar.common.PhaseResults
 import quasar.common.data.Data
 import quasar.concurrent.BlockingContext
@@ -177,8 +176,6 @@ abstract class Sql2QueryRegressionSpec extends Qspec {
     s"${test.name} [${posixCodec.printPath(loc)}]" >> {
       collectFirstDirective(test.backends, backendName) {
         case TestDirective.Skip    => skipped
-        case TestDirective.SkipCI  =>
-          BuildInfo.isCIBuild.fold(execute.Skipped("(skipped during CI build)"), runTest)
         case TestDirective.Pending | TestDirective.PendingIgnoreFieldOrder =>
           runTest.pendingUntilFixed
       } getOrElse runTest

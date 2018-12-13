@@ -16,8 +16,6 @@
 
 package quasar
 
-import quasar.build.BuildInfo._
-
 import java.lang.String
 import scala._
 
@@ -79,24 +77,5 @@ trait QuasarSpecification extends AnyRef
 
     def pendingUntilFixed(m: String): Result =
       outer.toPendingUntilFixed(t).pendingUntilFixed(m)
-
-    def skippedOnUserEnv: Result= skippedOnUserEnv("")
-
-    def skippedOnUserEnv(m: String): Result =
-      if (isIsolatedEnv) AsResult(t) else Skipped(m)
   }
-}
-
-/** Trait that tags all examples in a spec for exclusive execution. Examples
-  * will be executed sequentially and parallel execution will be disabled.
-  *
-  * Use this when you have tests that muck with global state.
-  */
-trait ExclusiveQuasarSpecification extends QuasarSpecification {
-  import org.specs2.specification.core.Fragments
-  import org.specs2.specification.dsl.FragmentsDsl._
-
-  sequential
-  override def map(fs: => Fragments) =
-    section(exclusiveTestTag) ^ super.map(fs) ^ section(exclusiveTestTag)
 }
