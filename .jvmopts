@@ -1,5 +1,5 @@
 -Xms512m
--Xmx6g
+-Xmx3g
 -Xss4m
 -XX:+UseG1GC
 -XX:ParallelGCThreads=2
