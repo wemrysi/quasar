@@ -26,10 +26,12 @@ import quasar.concurrent.BlockingContext
 import quasar.contrib.scalaz.{MonadError_, MonadTell_}
 import quasar.impl.DatasourceModule
 import quasar.impl.schema.SstEvalConfig
+import quasar.mimir.evaluate.QuasarImpl
 import quasar.regression.Sql2QueryRegressionSpec.TestsRoot
-import quasar.run.{Quasar, QuasarError, SqlQuery}
+import quasar.run.{QuasarError, SqlQuery}
 import quasar.run.implicits._
 import quasar.sql.Query
+import quasar.yggdrasil.vfs.ResourceError
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -54,6 +56,9 @@ object MimirCompressedEvaluationSpec extends EffectfulQSpec[IO] with PrecogCake 
   implicit def ioQuasarError: MonadError_[IO, QuasarError] =
     MonadError_.facet[IO](QuasarError.throwableP)
 
+  implicit def ioResourceError: MonadError_[IO, ResourceError] =
+    MonadError_.facet[IO](ResourceError.throwableP)
+
   implicit def ioTimer: Timer[IO] =
     IO.timer(global)
 
@@ -62,7 +67,7 @@ object MimirCompressedEvaluationSpec extends EffectfulQSpec[IO] with PrecogCake 
 
   "successfully evaluates query involving gzipped resources" >>* {
     val results = for {
-      q <- Quasar[IO](
+      q <- QuasarImpl[IO](
         cake,
         List(DatasourceModule.Lightweight(TestGzippedLocalDatasourceModule)),
         SstEvalConfig.single)
@@ -78,7 +83,7 @@ object MimirCompressedEvaluationSpec extends EffectfulQSpec[IO] with PrecogCake 
           "rootDir" := testsDir.toString,
           "readChunkSizeBytes" := 32768))
 
-      r <- Stream.eval(q.datasources.addDatasource(dsRef))
+      r <- Stream.eval(q._2.datasources.addDatasource(dsRef))
 
       id <- r.fold(
         e => MonadError_[Stream[IO, ?], DatasourceError.CreateError[Json]].raiseError(e),
@@ -88,7 +93,7 @@ object MimirCompressedEvaluationSpec extends EffectfulQSpec[IO] with PrecogCake 
 
       query = SqlQuery(Query(sql2), Variables.empty, Path.rootDir)
 
-      repr <- Stream.force(q.queryEvaluator.evaluate(query))
+      repr <- Stream.force(q._2.queryEvaluator.evaluate(query))
 
       rv <- Stream.evalUnChunk(repr.table.toJson.map(rvs => Chunk.seq(rvs.toSeq)))
     } yield rv

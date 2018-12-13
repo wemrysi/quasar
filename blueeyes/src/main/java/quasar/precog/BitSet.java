@@ -211,6 +211,23 @@ public class BitSet {
         }
     }
 
+    /**
+     * Use this instead of `clear` when you're trying to remove an entire
+     * suffix of the bitset. This function will re-adjust _length. Additionally,
+     * if the new length is less than half the old length, bits will be shrunk
+     * to compensate.
+     */
+    public void clearFrom(int fromIndex) {
+        clear(fromIndex, _length << 6);
+        int length2 = (fromIndex >>> 6) + 1;
+        if (length2 <= _length / 2) {
+            long[] bits2 = new long[length2];
+            System.arraycopy(bits, 0, bits2, 0, length2);
+            bits = bits2;
+        }
+        _length = length2;
+    }
+
     public BitSet copy() {
         long[] _bits = new long[_length];
         System.arraycopy(bits, 0, _bits, 0, _length);

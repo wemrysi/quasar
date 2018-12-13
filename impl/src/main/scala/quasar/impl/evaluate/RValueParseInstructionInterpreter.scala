@@ -18,6 +18,9 @@ package quasar.impl.evaluate
 
 import slamdata.Predef._
 
+import cats.effect.Sync
+import cats.effect.concurrent.Ref
+
 import quasar.{CompositeParseType, IdStatus, ParseInstruction, ParseType}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.ParseInstruction.{Ids, Mask, Pivot, Project, Wrap}
@@ -26,38 +29,43 @@ import quasar.common.data._
 
 import scala.collection.Iterator
 
-import scalaz.std.anyVal._
-import scalaz.std.list._
-import scalaz.std.option._
-import scalaz.syntax.equal._
-import scalaz.syntax.foldable._
-import scalaz.syntax.std.stream._
+import scalaz.{Functor, Scalaz}, Scalaz._
+
+import shims._
 
 object RValueParseInstructionInterpreter {
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def interpret(instructions: List[ParseInstruction], rvalue: RValue): List[RValue] =
-    instructions.foldLeft(List[RValue](rvalue)) {
-      case (prev, instr @ Mask(_)) =>
-        prev.flatMap(interpretMask(instr, _).toList)
+  def apply[F[_]: Sync](instructions: List[ParseInstruction])
+      : F[RValue => F[List[RValue]]] =
+    Ref[F].of(0L) map { counter => (rvalue: RValue) =>
+      instructions.foldLeftM(List[RValue](rvalue)) {
+        case (prev, instr @ Mask(_)) =>
+          prev.flatMap(interpretMask(instr, _).toList).point[F]
 
-      case (prev, instr @ Pivot(pivots)) =>
-        if (pivots.size === 1)
-          pivots.head match {
-            case (path, (idStatus, structure)) =>
-              prev.flatMap(interpretSinglePivot(path, idStatus, structure, _))
-          }
-        else
-          scala.sys.error("Multiple pivots not supported for RValue interpretation")
+        case (prev, instr @ Pivot(pivots)) =>
+          if (pivots.size === 1)
+            pivots.head match {
+              case (path, (idStatus, structure)) =>
+                prev.flatMap(interpretSinglePivot(path, idStatus, structure, _)).point[F]
+            }
+          else
+            scala.sys.error("Multiple pivots not supported for RValue interpretation")
 
-      case (prev, instr @ Wrap(_, _)) =>
-        prev.flatMap(interpretWrap(instr, _) :: Nil)
+        case (prev, instr @ Wrap(_, _)) =>
+          prev.flatMap(interpretWrap(instr, _) :: Nil).point[F]
 
-      case (prev, Project(p)) =>
-        prev.flatMap(interpretProject(p, _))
+        case (prev, Project(p)) =>
+          prev.flatMap(interpretProject(p, _)).point[F]
 
-      case (_, Ids) =>
-        scala.sys.error("ParseInstruction.Ids not supported for RValue interpretation")
+        case (prev, Ids) =>
+          prev.traverse(interpretIds(counter, _))
+      }
+    }
+
+  def interpretIds[F[_]: Functor](ref: Ref[F, Long], rvalue: RValue): F[RValue] =
+    ref.modify(i => (i + 1, i)) map { id =>
+      RValue.rArray(List(RValue.rLong(id), rvalue))
     }
 
   private def maskTarget(tpes: Set[ParseType], rvalue: RValue): Boolean =
@@ -77,6 +85,15 @@ object RValueParseInstructionInterpreter {
       case CLong(_) => tpes.contains(ParseType.Number)
       case CDouble(_) => tpes.contains(ParseType.Number)
       case CNum(_) => tpes.contains(ParseType.Number)
+
+      // These are encoded as objects from a parser-perspective
+      case CLocalDateTime(_) => tpes.contains(ParseType.Object)
+      case CLocalDate(_) => tpes.contains(ParseType.Object)
+      case CLocalTime(_) => tpes.contains(ParseType.Object)
+      case COffsetDateTime(_) => tpes.contains(ParseType.Object)
+      case COffsetDate(_) => tpes.contains(ParseType.Object)
+      case COffsetTime(_) => tpes.contains(ParseType.Object)
+      case CInterval(_) => tpes.contains(ParseType.Object)
 
       case _ => false
     }

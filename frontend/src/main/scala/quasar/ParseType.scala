@@ -16,7 +16,7 @@
 
 package quasar
 
-import slamdata.Predef.{Int, Product, Serializable}
+import slamdata.Predef.{Int, Product, Serializable, Set}
 
 import scalaz.{Order, Show}
 import scalaz.std.anyVal._
@@ -35,6 +35,9 @@ object ParseType {
   final case object Array extends CompositeParseType
   final case object Object extends CompositeParseType
   final case object Meta extends CompositeParseType
+
+  val Top: Set[ParseType] =
+    Set(Boolean, Null, Number, String, Array, Object, Meta)
 
   // ParseType implicits
   implicit val parseTypeShow: Show[ParseType] = Show.showFromToString

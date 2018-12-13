@@ -153,19 +153,15 @@ final class FederatedReadPlanner[
       if (instructions.isEmpty)
         data.map(QData.convert[A, RValue] _)
       else
-        data mapChunks { chunk =>
-          val buf = ArrayBuffer.empty[RValue]
+        Stream.eval(RValueParseInstructionInterpreter[IO](instructions)) flatMap { interpreter =>
+          data.chunks flatMap { chunk =>
+            val interpreted =
+              chunk.foldLeftM(new ArrayBuffer[RValue](chunk.size)) { (buf, a) =>
+                interpreter(QData.convert[A, RValue](a)).map(buf ++= _)
+              }
 
-          chunk foreach { a =>
-            val rvalues =
-              RValueParseInstructionInterpreter.interpret(
-                instructions,
-                QData.convert[A, RValue](a))
-
-            buf ++= rvalues
+            Stream.evalUnChunk(interpreted.map(Chunk.buffer(_)))
           }
-
-          Chunk.buffer(buf)
         }
 
     P.Table.fromQDataStream[F, RValue](interpretedRValues)

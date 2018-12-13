@@ -1,22 +1,13 @@
-import scala.Predef._
 import quasar.project._
 
-import java.lang.{Integer, String, Throwable}
-import scala.{Boolean, List, Predef, None, Some, StringContext, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
-import scala.collection.Seq
-import scala.collection.immutable.Map
-import scala.sys.process._
-
-import sbt._, Keys._
-import sbt.std.Transform.DummyTaskMap
 import sbt.TestFrameworks.Specs2
-import sbtrelease._, ReleaseStateTransformations._, Utilities._
 
-def exclusiveTasks(tasks: Scoped*) =
-  tasks.flatMap(inTask(_)(tags := Seq((ExclusiveTest, 1))))
+import java.lang.{Integer, String}
+import scala.{Boolean, Some, StringContext, sys}
+import scala.Predef._
+import scala.collection.Seq
 
 lazy val buildSettings = Seq(
-  scalacOptions --= Seq("-Ybackend:GenBCode"),
   initialize := {
     val version = sys.props("java.specification.version")
     assert(
@@ -26,6 +17,7 @@ lazy val buildSettings = Seq(
 
   // NB: -Xlint triggers issues that need to be fixed
   scalacOptions --= Seq("-Xlint"),
+
   // NB: Some warts are disabled in specific projects. Here’s why:
   //   • AsInstanceOf   – wartremover/wartremover#266
   //   • others         – simply need to be reviewed & fixed
@@ -36,14 +28,12 @@ lazy val buildSettings = Seq(
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
     Wart.Nothing,               // - see wartremover/wartremover#263
     Wart.NonUnitStatements),    // better-monadic-for causes some spurious warnings from this
-  // Normal tests exclude those tagged in Specs2 with 'exclusive'.
+
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive", "showtimes")),
-  // Exclusive tests include only those tagged with 'exclusive'.
-  testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive", "showtimes")),
 
   logBuffered in Test := isTravisBuild.value,
 
-  console := { (console in Test).value },
+  console := { (console in Test).value }, // console alias test:console
 
   /*
    * This plugin fixes a number of problematic cases in the for-comprehension
@@ -51,7 +41,7 @@ lazy val buildSettings = Seq(
    * Slice#allFromRValues to not free memory, so it's not just a convenience or
    * an optimization.
    */
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4")) // console alias test:console
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4"))
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
@@ -63,9 +53,6 @@ concurrentRestrictions in Global := {
   else
     (concurrentRestrictions in Global).value
 }
-
-// Tasks tagged with `ExclusiveTest` should be run exclusively.
-concurrentRestrictions in Global += Tags.exclusive(ExclusiveTest)
 
 lazy val publishSettings = Seq(
   performMavenCentralSync := false,   // publishes quasar to bintray only, skipping sonatype and maven central
@@ -80,58 +67,12 @@ lazy val publishSettings = Seq(
   publishArtifact in (Test, packageBin) := true
 )
 
-
-lazy val assemblySettings = Seq(
-  test in assembly := {},
-
-  assemblyMergeStrategy in assembly := {
-    case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.last
-    case PathList("org", "apache", "hadoop", "yarn", xs @ _*) => MergeStrategy.last
-    case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
-    case "log4j.properties"                                   => MergeStrategy.discard
-    // After recent library version upgrades there seems to be a library pulling
-    // in the scala-lang scala-compiler 2.11.11 jar. It comes bundled with jansi OS libraries
-    // which conflict with similar jansi libraries brought in by fusesource.jansi.jansi-1.11
-    // So the merge needed the following lines to avoid the "deduplicate: different file contents found"
-    // produced by repl/assembly. This is still a problem on quasar v47.0.0
-    case s if s.endsWith("libjansi.jnilib")                   => MergeStrategy.last
-    case s if s.endsWith("jansi.dll")                         => MergeStrategy.last
-    case s if s.endsWith("libjansi.so")                       => MergeStrategy.last
-
-    case other => (assemblyMergeStrategy in assembly).value apply other
-  },
-  assemblyExcludedJars in assembly := {
-    val cp = (fullClasspath in assembly).value
-    cp filter { attributedFile =>
-      val file = attributedFile.data
-
-      val excludeByName: Boolean = file.getName.matches("""scala-library-2\.12\.\d+\.jar""")
-      val excludeByPath: Boolean = file.getPath.contains("org/typelevel")
-
-      excludeByName && excludeByPath
-    }
-  }
-)
-
 // Build and publish a project, excluding its tests.
-lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
-
-// not doing this causes NoSuchMethodErrors when using coursier
-lazy val excludeTypelevelScalaLibrary =
-  Seq(excludeDependencies += "org.typelevel" % "scala-library")
-
-lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
-lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
-lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
-
-def createBackendEntry(childPath: Seq[File], parentPath: Seq[File]): Seq[File] =
-  (childPath.toSet -- parentPath.toSet).toSeq
+lazy val commonSettings = buildSettings ++ publishSettings
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
-  .settings(aggregate in assembly := false)
-  .settings(excludeTypelevelScalaLibrary)
   .aggregate(
     api,
     blueeyes,
@@ -142,9 +83,8 @@ lazy val root = project.in(file("."))
     impl, it,
     mimir,
     niflheim,
-    precog,
     qscript, qsu,
-    repl, runp,
+    runp,
     sql, sst,
     yggdrasil, yggdrasilPerf
   ).enablePlugins(AutomateHeaderPlugin)
@@ -157,13 +97,9 @@ lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
   .settings(commonSettings)
   .settings(
-    buildInfoKeys := Seq[BuildInfoKey](version, isCIBuild, isIsolatedEnv, exclusiveTestTag),
+    buildInfoKeys := Seq[BuildInfoKey](version),
     buildInfoPackage := "quasar.build",
-    exclusiveTestTag := "exclusive",
-    isCIBuild := isTravisBuild.value,
-    isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
     libraryDependencies ++= Dependencies.foundation)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
@@ -172,7 +108,6 @@ lazy val api = project
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.api)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** A fixed-point implementation of the EJson spec. This should probably become
@@ -183,7 +118,6 @@ lazy val ejson = project
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.ejson)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Quasar components shared by both frontend and connector. This includes
@@ -196,7 +130,6 @@ lazy val common = project
     ejson)
   .settings(libraryDependencies ++= Dependencies.common)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Types and operations needed by query language implementations.
@@ -209,21 +142,18 @@ lazy val frontend = project
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Dependencies.frontend)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val sst = project
   .settings(name := "quasar-sst-internal")
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val datagen = project
   .settings(name := "quasar-datagen")
   .dependsOn(sst % BothScopes)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .settings(
     mainClass in Compile := Some("quasar.datagen.Main"),
     libraryDependencies ++= Dependencies.datagen)
@@ -235,7 +165,6 @@ lazy val sql = project
   .settings(name := "quasar-sql-internal")
   .dependsOn(common % BothScopes)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .settings(
     libraryDependencies ++= Dependencies.sql)
   .enablePlugins(AutomateHeaderPlugin)
@@ -246,14 +175,12 @@ lazy val qscript = project
     frontend % BothScopes,
     api)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qsu = project
   .settings(name := "quasar-qsu-internal")
   .dependsOn(qscript % BothScopes)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .settings(libraryDependencies ++= Dependencies.qsu)
   .settings(scalacOptions ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
@@ -269,7 +196,6 @@ lazy val connector = project
     foundation % "test->test",
     qscript)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
@@ -280,7 +206,6 @@ lazy val core = project
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Dependencies.core)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementations of the Quasar API. */
@@ -294,67 +219,28 @@ lazy val impl = project
     sst)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.impl)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))
   .settings(name := "quasar-run")
   .dependsOn(
-    core,
+    core % BothScopes,
     impl,
-    mimir,
     qsu)
   .settings(commonSettings)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-/** An interactive REPL application for Quasar.
-  */
-lazy val repl = project
-  .settings(name := "quasar-repl")
-  .dependsOn(
-    common % "test->test",
-    runp)
-  .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.repl)
-  .settings(
-    mainClass in Compile := Some("quasar.repl.Main"),
-    javaOptions += "-XX:+HeapDumpOnOutOfMemoryError",
-    fork in run := true,
-    connectInput in run := true,
-    outputStrategy := Some(StdoutOutput))
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Integration tests that have some dependency on a running connector.
   */
 lazy val it = project
   .settings(name := "quasar-it-internal")
-  .configs(ExclusiveTests)
   .dependsOn(
     qscript % "test->test",
-    runp)
+    mimir)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.it)
-  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
-  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
-  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
   .settings(logBuffered in Test := false)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val precog = project
-  .settings(
-    name := "quasar-precog-internal",
-    scalacStrictMode := false)
-  .dependsOn(common)
-  .settings(libraryDependencies ++= Dependencies.precog)
-  .settings(logBuffered in Test := isTravisBuild.value)
-  .settings(headerLicenseSettings)
-  .settings(publishSettings)
-  .settings(assemblySettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val blueeyes = project
@@ -362,15 +248,11 @@ lazy val blueeyes = project
     name := "quasar-blueeyes-internal",
     scalacStrictMode := false,
     scalacOptions += "-language:postfixOps")
-  .dependsOn(
-    precog,
-    frontend % BothScopes)
+  .dependsOn(frontend % BothScopes)
   .settings(libraryDependencies ++= Dependencies.blueeyes)
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(assemblySettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val niflheim = project
@@ -382,8 +264,6 @@ lazy val niflheim = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(assemblySettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasil = project
@@ -398,8 +278,6 @@ lazy val yggdrasil = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(assemblySettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasilPerf = project
@@ -411,8 +289,6 @@ lazy val yggdrasilPerf = project
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(noPublishSettings)
-  .settings(assemblySettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
   .enablePlugins(JmhPlugin)
 
@@ -424,10 +300,8 @@ lazy val mimir = project
   .dependsOn(
     yggdrasil % BothScopes,
     impl % BothScopes,
-    connector)
+    runp)
   .settings(logBuffered in Test := isTravisBuild.value)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
-  .settings(assemblySettings)
-  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)

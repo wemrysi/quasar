@@ -21,7 +21,6 @@ import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
 import quasar.contrib.scalaz.MonadError_
 import quasar.qscript.PlannerError
-import quasar.yggdrasil.vfs.{ResourceError => MimirResourceError}
 
 import argonaut.Json
 
@@ -37,7 +36,4 @@ object implicits {
 
   implicit def planningMonadError[F[_]: MonadQuasarErr]: MonadError_[F, PlannerError] =
     MonadError_.facet[F](QuasarError.planning)
-
-  implicit def storingMonadError[F[_]: MonadQuasarErr]: MonadError_[F, MimirResourceError] =
-    MonadError_.facet[F](QuasarError.storing)
 }

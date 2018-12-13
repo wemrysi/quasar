@@ -14,21 +14,23 @@
  * limitations under the License.
  */
 
-package quasar.repl
+package quasar.run
 
-import slamdata.Predef._
+import quasar._
+import quasar.api.QueryEvaluator
+import quasar.common.PhaseResultTell
+import quasar.qscript._
 
-import scalaz._, Scalaz._
+import matryoshka._
+import scalaz.Monad
 
-sealed abstract class OutputMode
+final class RegressionQueryEvaluator[
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    F[_]: Monad: MonadPlannerErr: PhaseResultTell]
+    extends QueryEvaluator[F, T[QScriptEducated[T, ?]], QScriptCount] {
 
-object OutputMode {
-  final case object Console extends OutputMode
-  final case object File extends OutputMode
+  val regressionEvaluator = new RegressionQScriptEvaluator[T, F]
 
-  def fromString(str: String): Option[OutputMode] = str.toLowerCase match {
-    case "console" => Console.some
-    case "file"    => File.some
-    case _         => none
-  }
+  def evaluate(qs: T[QScriptEducated[T, ?]]): F[QScriptCount] =
+    regressionEvaluator.evaluate(qs)
 }

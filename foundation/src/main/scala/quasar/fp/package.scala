@@ -171,7 +171,7 @@ package object fp
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig)
 
-  def liftFGM[M[_]: Monad, F[_], G[_], A](orig: F[A] => M[G[A]])(implicit F: F :<: G):
+  def liftFGM[M[_]: Monad, F[_], G[a] <: ACopK[a], A](orig: F[A] => M[G[A]])(implicit F: F :<<: G):
       G[A] => M[G[A]] =
     ftf => F.prj(ftf).fold(ftf.point[M])(orig)
 

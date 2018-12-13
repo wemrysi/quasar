@@ -14,20 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.repl
+package quasar.qscript.rewrites
 
-import slamdata.Predef._
+import slamdata.Predef.Option
 
-import scalaz._, Scalaz._
+import quasar.contrib.iota._
+import quasar.qscript.{FreeMap, Hole, JoinFunc, LeftSide, RightSide, SrcHole}
 
-sealed abstract class PhaseFormat
-object PhaseFormat {
-  case object Tree extends PhaseFormat
-  case object Code extends PhaseFormat
+import scalaz.std.option._
+import scalaz.syntax.traverse._
 
-  def fromString(str: String): Option[PhaseFormat] = str.toLowerCase match {
-    case "tree" => Tree.some
-    case "code" => Code.some
-    case _      => none
-  }
+/** Matches on a `JoinFunc` that never references `LeftSide`. */
+object FocusedRepair {
+  def unapply[T[_[_]]](jf: JoinFunc[T]): Option[FreeMap[T]] =
+    jf traverse {
+      case LeftSide => none[Hole]
+      case RightSide => some(SrcHole)
+    }
 }

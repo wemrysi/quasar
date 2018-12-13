@@ -159,6 +159,10 @@ private[table] final class ProjectPlate[A] private (
     signal
   }
 
+  override def skipped(bytes: Int): Unit = {
+    delegate.skipped(bytes)
+  }
+
   override def finishRow(): Unit = {
     super.finishRow()
 

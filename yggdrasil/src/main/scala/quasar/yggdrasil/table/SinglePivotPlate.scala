@@ -234,9 +234,10 @@ private[table] final class SinglePivotPlate[A] private (
     if (pivotedTwice) {
       @tailrec
       def unnestAll(cursor: List[CPathNode]): Unit = cursor match {
+        // This should only occur when we've mismatched nest/unnest.
         case _ :: tail =>
           super.unnest()
-          unnestAll(cursor)
+          unnestAll(tail)
 
         case Nil =>
           super.finishRow()

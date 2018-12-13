@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.precog
+package quasar.blueeyes
 
 import java.time.{Duration, Instant, Period, LocalDateTime}
 import java.time.ZoneOffset.UTC

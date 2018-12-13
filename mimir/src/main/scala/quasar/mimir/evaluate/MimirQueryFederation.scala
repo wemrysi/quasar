@@ -35,8 +35,11 @@ import shims._
 final class MimirQueryFederation[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: LiftIO: Monad: MonadPlannerErr: PhaseResultTell] private (
-    P: Cake, pushdown: PushdownControl[F])(
-    implicit cs: ContextShift[IO], ec: ExecutionContext)
+    P: Cake,
+    pushdown: PushdownControl[F])(
+    implicit
+    cs: ContextShift[IO],
+    ec: ExecutionContext)
     extends QueryFederation[T, F, QueryAssociate[T, IO], Stream[IO, MimirRepr]] {
 
   type FinalizersT[X[_], A] = WriterT[X, List[IO[Unit]], A]
@@ -64,8 +67,11 @@ object MimirQueryFederation {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: LiftIO: Monad: MonadPlannerErr: PhaseResultTell](
-      P: Cake, pushdown: PushdownControl[F])(
-      implicit cs: ContextShift[IO], ec: ExecutionContext)
+      P: Cake,
+      pushdown: PushdownControl[F])(
+      implicit
+      cs: ContextShift[IO],
+      ec: ExecutionContext)
       : QueryFederation[T, F, QueryAssociate[T, IO], Stream[IO, MimirRepr]] =
     new MimirQueryFederation[T, F](P, pushdown)
 }

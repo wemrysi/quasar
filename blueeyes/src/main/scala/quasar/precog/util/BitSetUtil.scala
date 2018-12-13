@@ -113,7 +113,7 @@ object BitSetUtil {
       val bits = bitset.copy()
       if (to >= len) bits
       else {
-        bits.clear(to, len)
+        bits.clearFrom(to)
         bits
       }
     } else {

@@ -215,6 +215,8 @@ private[table] final class SlicePlate private (
     back
   }
 
+  def skipped(bytes: Int): Unit = ()
+
   private def checkGet(ref: ColumnRef): ArrayColumn[_] = {
     var back = columns.getOrElse(ref, null)
 

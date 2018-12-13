@@ -14,31 +14,26 @@
  * limitations under the License.
  */
 
-package quasar.repl
+package quasar.contrib.scalaz
 
-import slamdata.Predef._
+import slamdata.Predef.Option
 
-import monocle.Prism
-import scalaz._, Scalaz._
+import _root_.scalaz.{Free, Functor}
 
-sealed abstract class DebugLevel
+object free {
+  object FreeA {
+    def apply[F[_], A](a: A): Free[F, A] =
+      Free.pure(a)
 
-object DebugLevel {
-  final case object Silent extends DebugLevel
-  final case object Normal extends DebugLevel
-  final case object Verbose extends DebugLevel
+    def unapply[F[_]: Functor, A](fa: Free[F, A]): Option[A] =
+      fa.resume.toOption
+  }
 
-  val int: Prism[Int, DebugLevel] =
-    Prism.partial[Int, DebugLevel] {
-      case 0 => Silent
-      case 1 => Normal
-      case 2 => Verbose
-    } {
-      case Silent  => 0
-      case Normal  => 1
-      case Verbose => 2
-    }
+  object FreeF {
+    def apply[F[_], A](ffa: F[Free[F, A]]): Free[F, A] =
+      Free.roll(ffa)
 
-  implicit val order: Order[DebugLevel] = Order.orderBy(int(_))
-
+    def unapply[F[_]: Functor, A](fa: Free[F, A]): Option[F[Free[F, A]]] =
+      fa.resume.swap.toOption
+  }
 }

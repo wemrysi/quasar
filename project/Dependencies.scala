@@ -124,39 +124,22 @@ object Dependencies {
     "com.fasterxml.woodstox" % "woodstox-core" % "5.0.3"
   )
 
-  def repl = Seq(
-    "com.github.tototoshi" %% "scala-csv" % "1.3.4",
-    "com.github.xuwei-k" %% "optparse-applicative" % "0.8.0",
-    "org.jline" % "jline" % "3.8.0"
-  )
-
-  def precog = Seq(
-    "org.slf4s"            %% "slf4s-api"       % slf4sVersion,
-    "org.slf4j"            %  "slf4j-log4j12"   % "1.7.16",
-    "org.typelevel"        %% "spire"           % spireVersion,
-    "org.scodec"           %% "scodec-scalaz"   % scodecScalazVersion,
-    "org.scodec"           %% "scodec-bits"     % scodecBitsVersion,
-    "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
-    "com.typesafe.akka"    %%  "akka-actor"     % akkaVersion,
-    ("org.quartz-scheduler" %  "quartz"         % "2.3.0")
-      .exclude("com.zaxxer", "HikariCP-java6"), // conflict with Doobie
-    "commons-io"           %  "commons-io"      % "2.5"
-  )
-
   def blueeyes = Seq(
-    "com.google.guava" % "guava" % "13.0"
+    "org.slf4s" %% "slf4s-api"     % slf4sVersion,
+    "org.slf4j" %  "slf4j-log4j12" % "1.7.16"
   )
 
   def yggdrasil = Seq(
-    "com.slamdata" %% "tectonic" % tectonicVersion,
-    "com.slamdata" %% "tectonic-fs2" % tectonicVersion,
-    "com.slamdata" %% "tectonic-test" % tectonicVersion % "test",
-    "com.codecommit" %% "smock" % "0.4.0-specs2-4.0.2" % "test"
+    "com.slamdata"    %% "tectonic"      % tectonicVersion,
+    "com.slamdata"    %% "tectonic-fs2"  % tectonicVersion,
+    "com.slamdata"    %% "tectonic-test" % tectonicVersion      % "test",
+    "com.codecommit"  %% "smock"         % "0.4.0-specs2-4.0.2" % "test",
+    "org.apache.jdbm" %  "jdbm"          % "3.0-alpha5",
+    "org.scodec"      %% "scodec-scalaz" % scodecScalazVersion,
   )
 
   def niflheim = Seq(
     "com.typesafe.akka"  %% "akka-actor" % akkaVersion,
-    "org.typelevel"      %% "spire"      % spireVersion,
     "org.objectweb.howl" %  "howl"       % "1.0.1-1"
   )
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.regression
+package quasar.run
 
 import slamdata.Predef.{Map => SMap, _}
 import quasar._
@@ -22,7 +22,6 @@ import quasar.api.QueryEvaluator
 import quasar.common.{PhaseResults, PhaseResultTell}
 import quasar.contrib.scalaz.{MonadError_, MonadTell_}
 import quasar.qscript._
-import quasar.run.{MonadQuasarErr, QuasarError, Sql2QueryEvaluator, SqlQuery}
 import quasar.sql.Query
 
 import cats.effect.IO
@@ -118,6 +117,60 @@ object QScriptRegressionSpec extends Qspec {
       val q6 = "select a[7].c[_].x, a[7].c[_:] from foo"
       q6 in {
         val result = count(q6)
+
+        result must countReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(0)
+      }
+
+      val q7 = "select a{_} from foo"
+      q7 in {
+        val result = count(q7)
+
+        result must countReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(0)
+      }
+
+      val q8 = "select a.b{_}.c.d[*] from foo"
+      q8 in {
+        val result = count(q8)
+
+        result must countReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(0)
+      }
+
+      val q9 = "select a.b.c, a.b.d, a.b.e from foo"
+      q9 in {
+        val result = count(q9)
+
+        result must countReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(0)
+      }
+
+      val q10 = "select a.b.c, d.e.f, g.h.i from foo"
+      q10 in {
+        val result = count(q10)
+
+        result must countReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(0)
+      }
+
+      val q11 = "select *[1].a[2].b, *[1].a[2].c, *[1].a[2].d from foo"
+      q11 in {
+        val result = count(q11)
+
+        result must countReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(0)
+      }
+
+      val q12 = "select a[3].b, c[1][2].d, e.f[4] from foo"
+      q12 in {
+        val result = count(q12)
 
         result must countReadAs(0)
         result must countInterpretedReadAs(1)
