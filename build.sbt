@@ -75,18 +75,14 @@ lazy val root = project.in(file("."))
   .settings(noPublishSettings)
   .aggregate(
     api,
-    blueeyes,
     common, connector, core,
     datagen,
     ejson,
     foundation, frontend,
-    impl, it,
-    mimir,
-    niflheim,
+    impl,
     qscript, qsu,
     runp,
     sql, sst,
-    yggdrasil, yggdrasilPerf
   ).enablePlugins(AutomateHeaderPlugin)
 
 /** Very general utilities, ostensibly not Quasar-specific, but they just aren’t
@@ -228,80 +224,4 @@ lazy val runp = (project in file("run"))
     impl,
     qsu)
   .settings(commonSettings)
-  .enablePlugins(AutomateHeaderPlugin)
-
-/** Integration tests that have some dependency on a running connector.
-  */
-lazy val it = project
-  .settings(name := "quasar-it-internal")
-  .dependsOn(
-    qscript % "test->test",
-    mimir)
-  .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.it)
-  .settings(parallelExecution in Test := false)
-  .settings(logBuffered in Test := false)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val blueeyes = project
-  .settings(
-    name := "quasar-blueeyes-internal",
-    scalacStrictMode := false,
-    scalacOptions += "-language:postfixOps")
-  .dependsOn(frontend % BothScopes)
-  .settings(libraryDependencies ++= Dependencies.blueeyes)
-  .settings(logBuffered in Test := isTravisBuild.value)
-  .settings(headerLicenseSettings)
-  .settings(publishSettings)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val niflheim = project
-  .settings(
-    name := "quasar-niflheim-internal",
-    scalacStrictMode := false)
-  .dependsOn(blueeyes % BothScopes)
-  .settings(libraryDependencies ++= Dependencies.niflheim)
-  .settings(logBuffered in Test := isTravisBuild.value)
-  .settings(headerLicenseSettings)
-  .settings(publishSettings)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val yggdrasil = project
-  .settings(
-    name := "quasar-yggdrasil-internal",
-    scalacStrictMode := false,
-    scalacOptions += "-language:postfixOps")
-  .dependsOn(niflheim % BothScopes)
-  .settings(
-    resolvers += "bintray-djspiewak-maven" at "https://dl.bintray.com/djspiewak/maven",
-    libraryDependencies ++= Dependencies.yggdrasil)
-  .settings(logBuffered in Test := isTravisBuild.value)
-  .settings(headerLicenseSettings)
-  .settings(publishSettings)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val yggdrasilPerf = project
-  .settings(
-    name := "quasar-yggdrasil-perf-internal",
-    scalacStrictMode := false,
-    javaOptions += "-XX:+HeapDumpOnOutOfMemoryError")
-  .dependsOn(yggdrasil % "compile->compile;compile->test")
-  .settings(logBuffered in Test := isTravisBuild.value)
-  .settings(headerLicenseSettings)
-  .settings(noPublishSettings)
-  .enablePlugins(AutomateHeaderPlugin)
-  .enablePlugins(JmhPlugin)
-
-lazy val mimir = project
-  .settings(
-    name := "quasar-mimir-internal",
-    scalacStrictMode := false,
-    scalacOptions += "-language:postfixOps")
-  .dependsOn(
-    yggdrasil % BothScopes,
-    impl % BothScopes,
-    runp)
-  .settings(logBuffered in Test := isTravisBuild.value)
-  .settings(headerLicenseSettings)
-  .settings(publishSettings)
   .enablePlugins(AutomateHeaderPlugin)

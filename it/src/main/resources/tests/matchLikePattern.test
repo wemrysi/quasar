@@ -1,8 +1,0 @@
-{
-    "name": "match like pattern",
-    "data": "zips.data",
-    "query": "select city from `zips.data` where city like \"%OULD%CIT%\"",
-    "predicate": "atLeast",
-    "ignoreResultOrder": true,
-    "expected": ["GOULD CITY", "BOULDER CITY"]
-}
