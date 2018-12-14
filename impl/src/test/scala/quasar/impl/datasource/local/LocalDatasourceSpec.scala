@@ -18,18 +18,26 @@ package quasar.impl.datasource.local
 
 import slamdata.Predef._
 
+import cats.effect.IO
+
+import fs2.Stream
+
+import java.nio.file.Paths
+
+import scala.concurrent.ExecutionContext
+
+import quasar.{ParseInstruction, ParseType}
 import quasar.api.resource.{ResourceName, ResourcePath}
+import quasar.contrib.std.errorImpossible
 import quasar.common.data.RValue
+import quasar.common.{CPath, CPathField, CPathIndex}
 import quasar.concurrent.BlockingContext
-import quasar.connector.{DatasourceSpec, ResourceError}
+import quasar.connector.{Datasource, QueryResult, ResourceError, DatasourceSpec}
 import quasar.contrib.scalaz.MonadError_
 import quasar.qscript.InterpretedRead
 
-import java.nio.file.Paths
-import scala.concurrent.ExecutionContext
+import qdata.QData
 
-import cats.effect.IO
-import fs2.Stream
 import shims._
 
 abstract class LocalDatasourceSpec
@@ -41,7 +49,7 @@ abstract class LocalDatasourceSpec
   implicit val tmr = IO.timer(ExecutionContext.Implicits.global)
 
   override def datasource
-      : quasar.connector.Datasource[IO, Stream[IO, ?], InterpretedRead[ResourcePath], quasar.connector.QueryResult[IO]]
+      : Datasource[IO, Stream[IO, ?], InterpretedRead[ResourcePath], QueryResult[IO]]
 
   val nonExistentPath =
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")
@@ -74,4 +82,55 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
 
   def datasource =
     LocalParsedDatasource[IO, RValue](Paths.get("./it/src/main/resources/tests"), 1024, blockingPool)
+}
+
+trait LocalInterpretedReadDatasourceSpec extends LocalDatasourceSpec {
+  val interpreter: LocalInterpretedReadDatasource.Interpreter[IO, RValue]
+  val blockingPool: BlockingContext
+
+  def datasource =
+    LocalInterpretedReadDatasource[IO, RValue](
+      Paths.get("./it/src/main/resources/tests"),
+      1024,
+      blockingPool,
+      interpreter
+    )
+
+  "interpretedRead works correctly" >>* {
+    val loc = ParseInstruction.Project(CPath(List(CPathField("loc"))))
+    val mask = ParseInstruction.Mask(Map(CPath(List(CPathIndex(0))) -> Set(ParseType.Number)))
+    val index0 = ParseInstruction.Project(CPath(List(CPathIndex(0))))
+    val instructions = List(loc, mask, index0)
+    val resource = ResourcePath.root() / ResourceName("smallZips.data")
+    val iRead = InterpretedRead(resource, instructions)
+    datasource.evaluate(iRead) flatMap { _ match {
+      case QueryResult.Parsed(decode, data, instructions) =>
+        val rValueStream = data.map(x => QData.convert(x)(decode, RValue.qdataEncode))
+        LocalInterpretedReadDatasource
+          .interpretStream[IO, RValue](rValueStream, LocalInterpretedReadDatasource.fullInterpreter[IO, RValue], instructions)
+          .compile.toList
+          .map(x => x.length === 100)
+      case _ => errorImpossible
+    }}
+  }
+}
+
+object LocalInterpretedReadDatasourceFullInterpretSpec extends LocalInterpretedReadDatasourceSpec {
+  val blockingPool = BlockingContext.cached("local-interpreted-datasource-spec")
+  val interpreter = LocalInterpretedReadDatasource.fullInterpreter[IO, RValue]
+}
+
+object LocalInterpretedReadDatasourceMaskInterpretSpec extends LocalInterpretedReadDatasourceSpec {
+  val blockingPool = BlockingContext.cached("local-interpreted-datasource-spec-mask")
+  val interpreter = LocalInterpretedReadDatasource.onlyMaskInterpreter[IO, RValue]
+}
+
+object LocalInterpretedReadDatasourceNoMaskInterpretSpec extends LocalInterpretedReadDatasourceSpec {
+  val blockingPool = BlockingContext.cached("local-interpreted-datasource-spec-no-mask")
+  val interpreter = LocalInterpretedReadDatasource.noMaskInterpreter[IO, RValue]
+}
+
+object LocalInterpretedReadDatasourceNoInterpretSpec extends LocalInterpretedReadDatasourceSpec {
+  val blockingPool = BlockingContext.cached("local-interpreted-datasource-spec-no")
+  val interpreter = LocalInterpretedReadDatasource.noInterpreter[IO, RValue]
 }
