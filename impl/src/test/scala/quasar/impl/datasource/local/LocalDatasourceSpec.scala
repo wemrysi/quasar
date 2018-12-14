@@ -74,14 +74,14 @@ object LocalDatasourceSpec extends LocalDatasourceSpec {
   val blockingPool = BlockingContext.cached("local-datasource-spec")
 
   def datasource =
-    LocalDatasource[IO](Paths.get("./it/src/main/resources/tests"), 1024, blockingPool)
+    LocalDatasource[IO](Paths.get("./impl/src/test/resources"), 1024, blockingPool)
 }
 
 object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
   val blockingPool = BlockingContext.cached("local-parsed-datasource-spec")
 
   def datasource =
-    LocalParsedDatasource[IO, RValue](Paths.get("./it/src/main/resources/tests"), 1024, blockingPool)
+    LocalParsedDatasource[IO, RValue](Paths.get("./impl/src/test/resources"), 1024, blockingPool)
 }
 
 trait LocalInterpretedReadDatasourceSpec extends LocalDatasourceSpec {
@@ -90,7 +90,7 @@ trait LocalInterpretedReadDatasourceSpec extends LocalDatasourceSpec {
 
   def datasource =
     LocalInterpretedReadDatasource[IO, RValue](
-      Paths.get("./it/src/main/resources/tests"),
+      Paths.get("./impl/src/test/resources"),
       1024,
       blockingPool,
       interpreter

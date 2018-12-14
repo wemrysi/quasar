@@ -1,9 +1,0 @@
-{
-    "name": "triple flatten with mixed content",
-    "backends": {
-    },
-    "data": "nested.data",
-    "query": "select topObj{*}{*}{*} from `nested.data`",
-    "predicate": "exactly",
-    "expected": ["m", "n", "o"]
-}
