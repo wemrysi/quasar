@@ -90,7 +90,7 @@ lazy val root = project.in(file("."))
   * like to push to upstream libraries.
   */
 lazy val foundation = project
-  .settings(name := "quasar-foundation-internal")
+  .settings(name := "quasar-foundation")
   .settings(commonSettings)
   .settings(
     buildInfoKeys := Seq[BuildInfoKey](version),
@@ -100,7 +100,7 @@ lazy val foundation = project
 
 /** Types and interfaces describing Quasar's functionality. */
 lazy val api = project
-  .settings(name := "quasar-api-internal")
+  .settings(name := "quasar-api")
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.api)
   .settings(commonSettings)
@@ -110,7 +110,7 @@ lazy val api = project
   * a standalone library.
   */
 lazy val ejson = project
-  .settings(name := "quasar-ejson-internal")
+  .settings(name := "quasar-ejson")
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.ejson)
   .settings(commonSettings)
@@ -120,7 +120,7 @@ lazy val ejson = project
   * things like data models, types, etc.
   */
 lazy val common = project
-  .settings(name := "quasar-common-internal")
+  .settings(name := "quasar-common")
   .dependsOn(
     foundation % BothScopes,
     ejson)
@@ -131,7 +131,7 @@ lazy val common = project
 /** Types and operations needed by query language implementations.
   */
 lazy val frontend = project
-  .settings(name := "quasar-frontend-internal")
+  .settings(name := "quasar-frontend")
   .dependsOn(
     common % BothScopes,
     ejson % BothScopes)
@@ -141,7 +141,7 @@ lazy val frontend = project
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val sst = project
-  .settings(name := "quasar-sst-internal")
+  .settings(name := "quasar-sst")
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
@@ -158,7 +158,7 @@ lazy val datagen = project
 /** Implementation of the SQL² query language.
   */
 lazy val sql = project
-  .settings(name := "quasar-sql-internal")
+  .settings(name := "quasar-sql")
   .dependsOn(common % BothScopes)
   .settings(commonSettings)
   .settings(
@@ -166,7 +166,7 @@ lazy val sql = project
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qscript = project
-  .settings(name := "quasar-qscript-internal")
+  .settings(name := "quasar-qscript")
   .dependsOn(
     frontend % BothScopes,
     api)
@@ -174,7 +174,7 @@ lazy val qscript = project
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qsu = project
-  .settings(name := "quasar-qsu-internal")
+  .settings(name := "quasar-qsu")
   .dependsOn(qscript % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.qsu)
@@ -187,7 +187,7 @@ lazy val qsu = project
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val connector = project
-  .settings(name := "quasar-connector-internal")
+  .settings(name := "quasar-connector")
   .dependsOn(
     foundation % "test->test",
     qscript)
@@ -195,7 +195,7 @@ lazy val connector = project
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
-  .settings(name := "quasar-core-internal")
+  .settings(name := "quasar-core")
   .dependsOn(
     frontend % BothScopes,
     sql % BothScopes)
@@ -206,7 +206,7 @@ lazy val core = project
 
 /** Implementations of the Quasar API. */
 lazy val impl = project
-  .settings(name := "quasar-impl-internal")
+  .settings(name := "quasar-impl")
   .dependsOn(
     api % BothScopes,
     common % "test->test",
