@@ -21,6 +21,13 @@ env:
     # GITHUB_TOKEN
     - secure: "lH3uaFqFM+4fXAQiF+cQ6eo89HI4Vc7QuIaVUuA7xcVTkPy52cWg6ivrX1ZIG1HQXo5UOFEJDxPmGyeobF/8BrcgacigvEbiHkVhiXzRnWtpZYEPFac3cUmnKd8VRgYA68gXX3pBuF29v+v91MmznDiuBkfKn8r7z/sTykUdHV4="
 
+install:
+  - gem install octokit
+
+  - git config --global user.email "bot@slamdata.com"
+  - git config --global user.name "SlamData Bot"
+
+
 before_script:
   # confirm we are using travis' premium VMs
   - nproc 2>/dev/null && python -c 'import multiprocessing;print multiprocessing.cpu_count()'
@@ -40,7 +47,18 @@ script:
       scripts/quasarPublishAndTag
     fi
 
-after_success: scripts/discordTravisPost success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
+after_success:
+  - |
+    if [ $TRAVIS_PULL_REQUEST != "false" ] && [[ $TRAVIS_PULL_REQUEST_BRANCH =~ 'version-bump' ]]; then
+      clone_dir=$(mktemp -d "/tmp/slamdata-bump.XXXXXXXX")
+      git clone --depth 1 https://$GITHUB_TOKEN@github.com/slamdata/devtools.git $clone_dir
+
+      for t in "$(scripts/listLabels | grep 'version: revision')"; do
+        $clone_dir/bin/sdmerge $TRAVIS_REPO_SLUG $TRAVIS_PULL_REQUEST
+      done
+    fi
+
+  - scripts/discordTravisPost success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
 
 after_failure: scripts/discordTravisPost failure https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
 
