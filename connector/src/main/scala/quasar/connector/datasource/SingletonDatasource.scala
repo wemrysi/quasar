@@ -46,7 +46,7 @@ final class SingletonDatasource[F[_]: MonadResourceErr, G[_]: Applicative, R] pr
     val path = iRead.path
     if (path === location)
       resource
-    else if (location.relativeTo(iRead.path).isDefined)
+    else if (location.relativeTo(path).isDefined)
       MonadResourceErr.raiseError(ResourceError.notAResource(path))
     else
       MonadResourceErr.raiseError(ResourceError.pathNotFound(path))
