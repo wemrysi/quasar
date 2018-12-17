@@ -22,7 +22,6 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.{DatasourceSpec, ResourceError}
 import quasar.contrib.scalaz.MonadError_
-import quasar.qscript.InterpretedRead
 
 import cats.effect.IO
 import eu.timepit.refined.auto._
@@ -35,9 +34,6 @@ object SingletonDatasourceSpec extends DatasourceSpec[IO, List] {
 
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
-
-  private def iPath[A](a: A): InterpretedRead[A] =
-    InterpretedRead(a, List())
 
   val tpe = DatasourceType("singleton", 1L)
   val path = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
@@ -53,20 +49,20 @@ object SingletonDatasourceSpec extends DatasourceSpec[IO, List] {
   }
 
   "evaluating resource path returns resource" >>* {
-    datasource.evaluate(iPath(path)).map(_ must_=== "data")
+    datasource.evaluate(path).map(_ must_=== "data")
   }
 
   "evaluating prefix of resource path returns not a resource" >>* {
     val p = ResourcePath.root() / ResourceName("foo")
 
-    datasource.evaluate(iPath(p)).attempt.map(_ must beLike {
+    datasource.evaluate(p).attempt.map(_ must beLike {
       case Left(ResourceError.throwableP(err)) =>
         err must_= ResourceError.notAResource(p)
     })
   }
 
   "evaluating unrelated path results in resource not found" >>* {
-    datasource.evaluate(iPath(nonExistentPath)).attempt.map(_ must beLike {
+    datasource.evaluate(nonExistentPath).attempt.map(_ must beLike {
       case Left(ResourceError.throwableP(err)) =>
         err must_= ResourceError.pathNotFound(nonExistentPath)
     })
