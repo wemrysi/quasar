@@ -16,3 +16,18 @@ docker/Dockerfiles/Marklogic/MarkLogic.rpm
 docker/Dockerfiles/Spark/scala*.tgz
 docker/Dockerfiles/Spark/spark*.tgz
 docker/Dockerfiles/Hadoop/hadoop*.tar.gz
+
+# sbt-slamdata common resources
+/scripts/bumpDependentProject
+/scripts/checkAndAutoMerge
+/scripts/commonSetup
+/credentials.bintray.enc
+/credentials.sonatype.enc
+/scripts/discordTravisPost
+/scripts/isRevision
+/scripts/listLabels
+/pgppassphrase.sbt.enc
+/scripts/publishAndTag
+/pubring.pgp.enc
+/scripts/readVersion
+/secring.pgp.enc
