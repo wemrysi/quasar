@@ -22,11 +22,8 @@ env:
     - secure: "lH3uaFqFM+4fXAQiF+cQ6eo89HI4Vc7QuIaVUuA7xcVTkPy52cWg6ivrX1ZIG1HQXo5UOFEJDxPmGyeobF/8BrcgacigvEbiHkVhiXzRnWtpZYEPFac3cUmnKd8VRgYA68gXX3pBuF29v+v91MmznDiuBkfKn8r7z/sTykUdHV4="
 
 install:
-  - gem install octokit
-
-  - git config --global user.email "bot@slamdata.com"
-  - git config --global user.name "SlamData Bot"
-
+  - $SBT transferCommonResources
+  - scripts/commonSetup
 
 before_script:
   # check what travis VMs we're using
@@ -42,19 +39,7 @@ script:
 
 after_success:
   - scripts/quasarPublishAndTag
-
-  - |
-    if [ $TRAVIS_PULL_REQUEST != "false" ] && [[ $TRAVIS_PULL_REQUEST_BRANCH =~ 'version-bump' ]]; then
-      if [[ "$(git diff HEAD^ | grep -e '^[-+][0-9]' | sed 's/^[+\-]//' | sed 's/\.[0-9]*$//' | uniq | wc -l)" -eq 2 ]]; then
-        clone_dir=$(mktemp -d "/tmp/slamdata-bump.XXXXXXXX")
-        git clone --depth 1 https://$GITHUB_TOKEN@github.com/slamdata/devtools.git $clone_dir
-
-        for t in "$(scripts/listLabels | grep 'version: revision')"; do
-          $clone_dir/bin/sdmerge $TRAVIS_REPO_SLUG $TRAVIS_PULL_REQUEST
-        done
-      fi
-    fi
-
+  - scripts/checkAndAutoMerge
 
   - scripts/discordTravisPost success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
 
