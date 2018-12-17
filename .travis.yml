@@ -29,25 +29,20 @@ install:
 
 
 before_script:
-  # confirm we are using travis' premium VMs
+  # check what travis VMs we're using
   - nproc 2>/dev/null && python -c 'import multiprocessing;print multiprocessing.cpu_count()'
   - free && cat /proc/meminfo
 
 script:
-  - set -e
-
   - |-
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       checkHeaders \
       test:compile \
       "testOnly -- failtrace"
 
-  - |-
-    if [ $TRAVIS_PULL_REQUEST == "false" ] && [[ "$TRAVIS_BRANCH" =~ backport/v.*|master ]]; then
-      scripts/quasarPublishAndTag
-    fi
-
 after_success:
+  - scripts/quasarPublishAndTag
+
   - |
     if [ $TRAVIS_PULL_REQUEST != "false" ] && [[ $TRAVIS_PULL_REQUEST_BRANCH =~ 'version-bump' ]]; then
       clone_dir=$(mktemp -d "/tmp/slamdata-bump.XXXXXXXX")
