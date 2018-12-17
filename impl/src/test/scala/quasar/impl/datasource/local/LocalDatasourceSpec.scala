@@ -26,17 +26,12 @@ import java.nio.file.Paths
 
 import scala.concurrent.ExecutionContext
 
-import quasar.{ParseInstruction, ParseType}
 import quasar.api.resource.{ResourceName, ResourcePath}
-import quasar.contrib.std.errorImpossible
 import quasar.common.data.RValue
-import quasar.common.{CPath, CPathField, CPathIndex}
 import quasar.concurrent.BlockingContext
 import quasar.connector.{Datasource, QueryResult, ResourceError, DatasourceSpec}
 import quasar.contrib.scalaz.MonadError_
 import quasar.qscript.InterpretedRead
-
-import qdata.QData
 
 import shims._
 
