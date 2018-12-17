@@ -18,22 +18,19 @@ package quasar.impl.datasource.local
 
 import quasar.Disposable
 import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
-import quasar.api.resource.ResourcePath
 import quasar.concurrent.BlockingContext
-import quasar.connector.{Datasource, LightweightDatasourceModule, MonadResourceErr, QueryResult}
+import quasar.connector.{LightweightDatasourceModule, MonadResourceErr}
 
 import java.nio.file.Paths
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import cats.effect._
-import fs2.Stream
 import scalaz.{EitherT, \/}
 import scalaz.syntax.applicative._
 import shims._
 
 object LocalDatasourceModule extends LightweightDatasourceModule {
-
   // FIXME this is side effecting
   private lazy val blockingPool: BlockingContext =
     BlockingContext.cached("local-datasource")
@@ -45,7 +42,7 @@ object LocalDatasourceModule extends LightweightDatasourceModule {
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json)(
       implicit ec: ExecutionContext)
-      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]]]] = {
+      : F[InitializationError[Json] \/ Disposable[F, DS[F]]] = {
 
     val F = ConcurrentEffect[F]
 

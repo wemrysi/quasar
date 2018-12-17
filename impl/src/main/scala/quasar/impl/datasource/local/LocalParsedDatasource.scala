@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.api.resource.ResourcePath
 import quasar.concurrent.BlockingContext
 import quasar.connector.{Datasource, MonadResourceErr, QueryResult}
+import quasar.qscript.InterpretedRead
 
 import java.nio.file.{Path => JPath}
 
@@ -40,17 +41,19 @@ object LocalParsedDatasource {
       root: JPath,
       readChunkSizeBytes: Int,
       blockingPool: BlockingContext)
-      : Datasource[F, Stream[F, ?], ResourcePath, QueryResult[F]] = {
+      : Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]] = {
 
     implicit val facade: Facade[A] = QDataFacade(isPrecise = true)
 
-    EvaluableLocalDatasource[F](LocalParsedType, root) { path =>
+    EvaluableLocalDatasource[F](LocalParsedType, root) { iRead =>
       QueryResult.parsed[F, A](
         QDataDecode[A],
-        io.file.readAll[F](path, blockingPool.unwrap, readChunkSizeBytes)
+        io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes)
           .chunks
           .map(_.toByteBuffer)
-          .parseJsonStream[A])
+          .parseJsonStream[A],
+        iRead.instructions)
+
     }
   }
 }

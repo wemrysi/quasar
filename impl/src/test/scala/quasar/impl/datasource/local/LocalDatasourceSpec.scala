@@ -16,17 +16,23 @@
 
 package quasar.impl.datasource.local
 
+import slamdata.Predef._
+
+import cats.effect.IO
+
+import fs2.Stream
+
+import java.nio.file.Paths
+
+import scala.concurrent.ExecutionContext
+
 import quasar.api.resource.{ResourceName, ResourcePath}
 import quasar.common.data.RValue
 import quasar.concurrent.BlockingContext
-import quasar.connector.{DatasourceSpec, ResourceError}
+import quasar.connector.{Datasource, QueryResult, ResourceError, DatasourceSpec}
 import quasar.contrib.scalaz.MonadError_
+import quasar.qscript.InterpretedRead
 
-import java.nio.file.Paths
-import scala.concurrent.ExecutionContext
-
-import cats.effect.IO
-import fs2.Stream
 import shims._
 
 abstract class LocalDatasourceSpec
@@ -37,7 +43,8 @@ abstract class LocalDatasourceSpec
 
   implicit val tmr = IO.timer(ExecutionContext.Implicits.global)
 
-  override def datasource: quasar.connector.Datasource[IO, Stream[IO, ?], ResourcePath, quasar.connector.QueryResult[IO]]
+  override def datasource
+      : Datasource[IO, Stream[IO, ?], InterpretedRead[ResourcePath], QueryResult[IO]]
 
   val nonExistentPath =
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")
@@ -52,7 +59,7 @@ abstract class LocalDatasourceSpec
 
   "returns data from a nonempty file" >>* {
     datasource
-      .evaluate(ResourcePath.root() / ResourceName("smallZips.data"))
+      .evaluate(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.data"), List()))
       .flatMap(_.data.compile.fold(0)((c, _) => c + 1))
       .map(_ must be_>(0))
   }

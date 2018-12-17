@@ -21,6 +21,7 @@ import slamdata.Predef.{Boolean, Option}
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector._
+import quasar.qscript.InterpretedRead
 
 import scalaz.Applicative
 import scalaz.syntax.applicative._
@@ -41,13 +42,15 @@ final class SingletonDatasource[F[_]: MonadResourceErr, G[_]: Applicative, R] pr
 
   val kind: DatasourceType = tpe
 
-  def evaluate(path: ResourcePath): F[R] =
+  def evaluate(iRead: InterpretedRead[ResourcePath]): F[R] = {
+    val path = iRead.path
     if (path === location)
       resource
     else if (location.relativeTo(path).isDefined)
       MonadResourceErr.raiseError(ResourceError.notAResource(path))
     else
       MonadResourceErr.raiseError(ResourceError.pathNotFound(path))
+  }
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     F.point(path === location)
@@ -65,6 +68,6 @@ object SingletonDatasource {
     tpe: DatasourceType,
     location: ResourcePath,
     resource: F[R])
-    : Datasource[F, G, ResourcePath, R] =
+    : Datasource[F, G, InterpretedRead[ResourcePath], R] =
   new SingletonDatasource[F, G, R](tpe, location, resource)
 }
