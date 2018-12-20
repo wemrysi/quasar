@@ -50,7 +50,7 @@ object ProgressiveSstSpec extends quasar.Qspec {
   def verify(cfg: SstConfig[J, Real], input: List[Data], expected: S) =
     Stream.emits(input map (SST.fromData[J, Real](Real.one, _)))
       .chunks
-      .through(progressiveSst(cfg))
+      .through(ProgressiveSst(cfg))
       .covary[cats.effect.IO]
       .compile.last.unsafeRunSync
       .must(beSome(equal(expected)))

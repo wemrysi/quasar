@@ -16,19 +16,29 @@
 
 package quasar.run
 
-import slamdata.Predef.{Array, Double, List, Option, StringContext, SuppressWarnings}
+import slamdata.Predef._
+
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
 import quasar.api.table.{TableRef, Tables}
 import quasar.common.PhaseResultTell
+import quasar.connector.QueryResult
 import quasar.contrib.std.uuid._
 import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.impl.DatasourceModule
-import quasar.impl.datasources.{DatasourceManagement, DefaultDatasources}
-import quasar.impl.datasources.DatasourceManagement.Running
+import quasar.impl.datasources.{
+  DefaultDatasources,
+  DefaultDatasourceErrors,
+  DefaultDatasourceManager,
+  ManagedDatasource,
+  QueryResultSst
+}
+import quasar.impl.datasources.middleware.ConditionReportingMiddleware
 import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.storage.IndexedStore
 import quasar.impl.table.{DefaultTables, PreparationsManager}
+import quasar.qscript.QScriptEducated
 import quasar.run.implicits._
 
 import java.util.UUID
@@ -36,15 +46,20 @@ import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import argonaut.JsonScalaz._
+
 import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
-import cats.syntax.flatMap._
+
 import fs2.Stream
+
 import matryoshka.data.Fix
+
 import org.slf4s.Logging
+
 import scalaz.IMap
-import scalaz.syntax.foldable._
 import scalaz.syntax.show._
+
 import shims._
+
 import spire.std.double._
 
 final class Quasar[F[_], R, S](
@@ -55,15 +70,16 @@ final class Quasar[F[_], R, S](
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 object Quasar extends Logging {
 
-  /** What it says on the tin.
-    */
+  type LookupRunning[F[_]] = UUID => F[Option[ManagedDatasource[Fix, F, Stream[F, ?], QueryResult[F]]]]
+
+  /** What it says on the tin. */
   def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer, R, S](
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
-      getQueryEvaluator: F[Running[UUID, Fix, F]] => QueryEvaluator[F, SqlQuery, Stream[F, R]],
-      preparationsManager: F[Running[UUID, Fix, F]] => Stream[F, PreparationsManager[F, UUID, SqlQuery, Stream[F, R]]],
-      lookupFromPTableStore: UUID => F[Option[Stream[F, R]]],
-      lookupTableSchema: UUID => F[Option[S]],
+      qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], Stream[F, R]],
+      preparationsManager: QueryEvaluator[F, SqlQuery, Stream[F, R]] => Stream[F, PreparationsManager[F, UUID, SqlQuery, Stream[F, R]]],
+      lookupTableData: UUID => F[Option[Stream[F, R]]],
+      lookupTableSchema: UUID => F[Option[S]])(
       datasourceModules: List[DatasourceModule],
       sstEvalConfig: SstEvalConfig)(
       implicit
@@ -76,40 +92,35 @@ object Quasar extends Logging {
       _ <- Stream.eval(Sync[F] delay {
         datasourceModules.groupBy(_.kind) foreach {
           case (kind, sources) =>
-            if (sources.length > 1)
+            if (sources.length > 1) {
               log.warn(s"Found duplicate modules for type ${kind.shows}")
-            else
-              ()
+            }
         }
       })
 
-      mr <- Stream.bracket(
-        DatasourceManagement[Fix, F, UUID, Double](
-          IMap.fromList(datasourceModules.map(ds => (ds.kind, ds))),
-          configured,
-          sstEvalConfig))(
-        { case (_, r) => r.get.flatMap(_.traverse_(_.dispose)) })
+      (dsErrors, onCondition) <- Stream.eval(DefaultDatasourceErrors[F, UUID])
 
-      (mgmt, running) = mr
-      runningF = running.get
+      moduleMap = IMap.fromList(datasourceModules.map(ds => ds.kind -> ds))
+
+      dsManager <-
+        Stream.resource(DefaultDatasourceManager.Builder[UUID, Fix, F]
+          .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
+          .build(moduleMap, configured))
 
       freshUUID = ConcurrentEffect[F].delay(UUID.randomUUID)
 
-      datasources = DefaultDatasources[F, UUID, Json, SstConfig[Fix[EJson], Double]](
-        freshUUID, datasourceRefs, mgmt, mgmt)
+      resourceSchema = QueryResultSst[F, Fix[EJson], Double](sstEvalConfig)
 
-      queryEvaluator = getQueryEvaluator(runningF)
+      datasources =
+        DefaultDatasources(freshUUID, datasourceRefs, dsErrors, dsManager, resourceSchema)
 
-      prep <- preparationsManager(runningF)
+      sqlEvaluator = Sql2QueryEvaluator(qscriptEvaluator(dsManager.managedDatasource))
 
-      tables = DefaultTables[F, UUID, SqlQuery, Stream[F, R], S](
-        freshUUID,
-        tableRefs,
-        queryEvaluator,
-        prep,
-        lookupFromPTableStore,
-        lookupTableSchema)
+      prepManager <- preparationsManager(sqlEvaluator)
 
-    } yield new Quasar(datasources, tables, queryEvaluator)
+      tables =
+        DefaultTables(freshUUID, tableRefs, sqlEvaluator, prepManager, lookupTableData, lookupTableSchema)
+
+    } yield new Quasar(datasources, tables, sqlEvaluator)
   }
 }

@@ -16,31 +16,43 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{Boolean, Exception, Option, Unit}
-import quasar.Condition
+import slamdata.Predef.{Boolean, Exception, Nil, None, Option, Some, Unit}
+
+import quasar.{Condition, IdStatus, RenderTreeT}
 import quasar.api.SchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
+import quasar.contrib.iota._
 import quasar.impl.storage.IndexedStore
+import quasar.qscript.{construction, educatedToTotal, InterpretedRead, QScriptEducated}
 
 import scala.concurrent.duration.FiniteDuration
 
 import cats.effect.Sync
+
 import fs2.Stream
+
+import matryoshka.{BirecursiveT, EqualT, ShowT}
+
 import scalaz.{\/, -\/, \/-, EitherT, Equal, ISet, OptionT}
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.boolean._
+import scalaz.syntax.std.option._
+
 import shims._
 
 final class DefaultDatasources[
-    F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig] private (
+    F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig,
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    R] private (
     freshId: F[I],
     refs: IndexedStore[F, I, DatasourceRef[C]],
     errors: DatasourceErrors[F, I],
-    control: DatasourceControl[F, Stream[F, ?], I, C, S])
+    manager: DatasourceManager[I, C, T, F, Stream[F, ?], R],
+    schema: ResourceSchema[F, S, (ResourcePath, R)])
     extends Datasources[F, Stream[F, ?], I, C, S] {
 
   def addDatasource(ref: DatasourceRef[C]): F[CreateError[C] \/ I] =
@@ -58,7 +70,8 @@ final class DefaultDatasources[
 
   def datasourceRef(datasourceId: I): F[ExistentialError[I] \/ DatasourceRef[C]] =
     EitherT(lookupRef[ExistentialError[I]](datasourceId))
-      .map(c => control.sanitizeRef(c)).run
+      .map(manager.sanitizedRef)
+      .run
 
   def datasourceStatus(datasourceId: I): F[ExistentialError[I] \/ Condition[Exception]] =
     EitherT(lookupRef[ExistentialError[I]](datasourceId))
@@ -68,15 +81,18 @@ final class DefaultDatasources[
 
   def pathIsResource(datasourceId: I, path: ResourcePath)
       : F[ExistentialError[I] \/ Boolean] =
-    control.pathIsResource(datasourceId, path)
+    withDatasource[ExistentialError[I], Boolean](datasourceId)(_.pathIsResource(path))
 
   def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
       : F[DiscoveryError[I] \/ Stream[F, (ResourceName, ResourcePathType)]] =
-    control.prefixedChildPaths(datasourceId, prefixPath)
+    withDatasource[DiscoveryError[I], Option[Stream[F, (ResourceName, ResourcePathType)]]](
+      datasourceId)(
+      _.prefixedChildPaths(prefixPath))
+      .map(_.flatMap(_ \/> DatasourceError.pathNotFound[DiscoveryError[I]](prefixPath)))
 
   def removeDatasource(datasourceId: I): F[Condition[ExistentialError[I]]] =
     refs.delete(datasourceId).ifM(
-      control.shutdownDatasource(datasourceId).as(Condition.normal[ExistentialError[I]]()),
+      manager.shutdownDatasource(datasourceId).as(Condition.normal[ExistentialError[I]]()),
       Condition.abnormal(datasourceNotFound[I, ExistentialError[I]](datasourceId)).point[F])
 
   def replaceDatasource(datasourceId: I, ref: DatasourceRef[C])
@@ -95,30 +111,42 @@ final class DefaultDatasources[
       schemaConfig: S,
       timeLimit: FiniteDuration)
       : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]] =
-    control.resourceSchema(datasourceId, path, schemaConfig, timeLimit)
+    withDatasource[DiscoveryError[I], Option[schemaConfig.Schema]](datasourceId) { mds =>
+      val fr = mds match {
+        case ManagedDatasource.ManagedLightweight(lw) =>
+          lw.evaluate(InterpretedRead(path, Nil))
+
+        case ManagedDatasource.ManagedHeavyweight(hw) =>
+          hw.evaluate(dsl.Read(path, IdStatus.ExcludeId))
+      }
+
+      fr.flatMap(r => schema(schemaConfig, (path, r), timeLimit))
+    }
 
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
-    control.supportedDatasourceTypes
+    manager.supportedDatasourceTypes
 
   ////
+
+  private val dsl = construction.mkGeneric[T, QScriptEducated[T, ?]]
 
   /** Add the ref at the specified id, replacing any running datasource. */
   private def addRef[E >: CreateError[C] <: DatasourceError[I, C]](
       i: I, ref: DatasourceRef[C])
       : F[Condition[E]] = {
 
-    type T[X[_], A] = EitherT[X, E, A]
-    type M[A] = T[F, A]
+    type L[X[_], A] = EitherT[X, E, A]
+    type M[A] = L[F, A]
 
     val added = for {
       _ <- EitherT(verifyNameUnique[E](ref.name, i))
 
-      _ <- EitherT(control.initDatasource(i, ref) map {
+      _ <- EitherT(manager.initDatasource(i, ref) map {
         case Condition.Normal() => ().right
         case Condition.Abnormal(e) => (e: E).left
       })
 
-      _ <- refs.insert(i, ref).liftM[T]
+      _ <- refs.insert(i, ref).liftM[L]
     } yield ()
 
     added.run.map(Condition.disjunctionIso.reverseGet(_))
@@ -162,14 +190,31 @@ final class DefaultDatasources[
       .exists(t => t._2.name === name && t._1 =/= currentId)
       .compile.fold(false)(_ || _)
       .map(_ ? datasourceNameExists[E](name).left[Unit] | ().right)
+
+  private def withDatasource[E >: ExistentialError[I] <: DatasourceError[I, C], A](
+      datasourceId: I)(
+      f: ManagedDatasource[T, F, Stream[F, ?], R] => F[A])
+      : F[E \/ A] =
+    manager.managedDatasource(datasourceId) flatMap {
+      case Some(ds) =>
+        f(ds).map(_.right[E])
+
+      case None =>
+        DatasourceError.datasourceNotFound[I, E](datasourceId)
+          .left[A].point[F]
+    }
 }
 
 object DefaultDatasources {
-  def apply[F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig](
+  def apply[
+      F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig,
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+      R](
       freshId: F[I],
       refs: IndexedStore[F, I, DatasourceRef[C]],
       errors: DatasourceErrors[F, I],
-      control: DatasourceControl[F, Stream[F, ?], I, C, S])
+      manager: DatasourceManager[I, C, T, F, Stream[F, ?], R],
+      schema: ResourceSchema[F, S, (ResourcePath, R)])
       : Datasources[F, Stream[F, ?], I, C, S] =
-    new DefaultDatasources(freshId, refs, errors, control)
+    new DefaultDatasources(freshId, refs, errors, manager, schema)
 }

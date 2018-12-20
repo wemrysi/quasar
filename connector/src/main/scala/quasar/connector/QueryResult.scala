@@ -22,10 +22,15 @@ import quasar.ParseInstruction
 import quasar.higher.HFunctor
 
 import fs2.Stream
+
+import monocle.Lens
+
 import qdata.QDataDecode
+
 import scalaz.{~>, Cord, Show}
 import scalaz.std.list._
 import scalaz.syntax.show._
+
 import shims._
 
 sealed trait QueryResult[F[_]] extends Product with Serializable {
@@ -64,6 +69,13 @@ object QueryResult extends QueryResultInstances {
 
   object Unparsed {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def instructions[F[_]]: Lens[Unparsed[F], List[ParseInstruction]] =
+      Lens((_: Unparsed[F]).instructions)(i => {
+        case Compressed(s, u) => Compressed(s, instructions[F].set(i)(u))
+        case Typed(t, d, _) => Typed(t, d, i)
+      })
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     implicit def show[F[_]]: Show[Unparsed[F]] =
       Show.show {
         case Compressed(s, c) => Cord("Compressed(") ++ s.show ++ Cord(", ") ++ c.show ++ Cord(")")
@@ -87,6 +99,12 @@ object QueryResult extends QueryResultInstances {
 
   def typed[F[_]](tpe: ParsableType, data: Stream[F, Byte], i: List[ParseInstruction]): Unparsed[F] =
     Typed(tpe, data, i)
+
+  def instructions[F[_]]: Lens[QueryResult[F], List[ParseInstruction]] =
+    Lens((_: QueryResult[F]).instructions)(i => {
+      case Parsed(q, d, _) => Parsed(q, d, i)
+      case u: Unparsed[F] => Unparsed.instructions.set(i)(u)
+    })
 }
 
 sealed abstract class QueryResultInstances {

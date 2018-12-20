@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.impl
+package quasar.impl.schema
 
 import slamdata.Predef._
 import quasar.ejson.EJson
@@ -29,10 +29,10 @@ import scalaz._, Scalaz._
 import spire.algebra.Field
 import spire.math.ConvertableTo
 
-package object schema {
+object ProgressiveSst {
 
   /** Merges input chunks into increasingly accurate SSTs. */
-  def progressiveSst[F[_], J: Order, A: ConvertableTo: Field: Order](
+  def apply[F[_], J: Order, A: ConvertableTo: Field: Order](
       config: SstConfig[J, A])(
       implicit
       JC: Corecursive.Aux[J, EJson],
@@ -41,7 +41,7 @@ package object schema {
     progressiveSst0[F, J, A](config)(f => _.map(f))
 
   /** Merges input chunks, in parallel, into increasingly accurate SSTs. */
-  def progressiveSstAsync[F[_]: Concurrent, J: Order, A: ConvertableTo: Field: Order](
+  def async[F[_]: Concurrent, J: Order, A: ConvertableTo: Field: Order](
       config: SstConfig[J, A],
       paralellism: Int)(
       implicit
