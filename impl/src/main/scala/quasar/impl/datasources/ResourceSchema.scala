@@ -22,8 +22,22 @@ import quasar.api.SchemaConfig
 
 import scala.concurrent.duration.FiniteDuration
 
+import cats.Contravariant
+
 /** Attempt to discover the schema of a resource. */
 trait ResourceSchema[F[_], S <: SchemaConfig, R] {
   def apply(schemaConfig: S, resource: R, timeLimit: FiniteDuration)
       : F[Option[schemaConfig.Schema]]
+}
+
+object ResourceSchema {
+  implicit def contravariant[F[_], S <: SchemaConfig]: Contravariant[ResourceSchema[F, S, ?]] =
+    new Contravariant[ResourceSchema[F, S, ?]] {
+      def contramap[A, B](rs: ResourceSchema[F, S, A])(f: B => A): ResourceSchema[F, S, B] =
+        new ResourceSchema[F, S, B] {
+          def apply(schemaConfig: S, resource: B, timeLimit: FiniteDuration)
+              : F[Option[schemaConfig.Schema]] =
+            rs(schemaConfig, f(resource), timeLimit)
+        }
+    }
 }

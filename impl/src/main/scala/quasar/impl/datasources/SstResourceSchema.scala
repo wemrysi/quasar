@@ -18,10 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef.Option
 
-import quasar.api.resource.ResourcePath
-import quasar.connector.{MonadResourceErr, QueryResult}
 import quasar.ejson.EJson
-import quasar.impl.parsing.ResourceParser
 import quasar.impl.schema._
 import quasar.sst.SST
 
@@ -30,17 +27,17 @@ import scala.concurrent.duration.FiniteDuration
 import cats.effect.{Concurrent, Timer}
 import cats.syntax.functor._
 
-import matryoshka.{Corecursive, Recursive}
+import fs2.Stream
 
-import qdata.QDataEncode
+import matryoshka.{Corecursive, Recursive}
 
 import scalaz.Order
 
 import spire.algebra.Field
 import spire.math.ConvertableTo
 
-final class QueryResultSst[
-    F[_]: Concurrent: MonadResourceErr,
+final class SstResourceSchema[
+    F[_]: Concurrent,
     J: Order,
     N: ConvertableTo: Field: Order] private (
     evalConfig: SstEvalConfig)(
@@ -48,24 +45,17 @@ final class QueryResultSst[
     timer: Timer[F],
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson])
-    extends ResourceSchema[F, SstConfig[J, N], (ResourcePath, QueryResult[F])] {
+    extends ResourceSchema[F, SstConfig[J, N], Stream[F, SST[J, N]]] {
 
   def apply(
       sstConfig: SstConfig[J, N],
-      resource: (ResourcePath, QueryResult[F]),
+      ssts: Stream[F, SST[J, N]],
       timeLimit: FiniteDuration)
       : F[Option[sstConfig.Schema]] = {
 
-    type S = SST[J, N]
-
-    implicit val sstQDataEncode: QDataEncode[S] =
-      QDataCompressedSst.encode[J, N](sstConfig)
-
-    val (path, content) = resource
-
     val k: N = ConvertableTo[N].fromLong(evalConfig.sampleSize.value)
 
-    ResourceParser[F, S](path, content)
+    ssts
       .take(evalConfig.sampleSize.value)
       .chunkLimit(evalConfig.chunkSize.value.toInt)
       .through(ProgressiveSst.async(sstConfig, evalConfig.parallelism.value.toInt))
@@ -75,9 +65,9 @@ final class QueryResultSst[
   }
 }
 
-object QueryResultSst {
+object SstResourceSchema {
   def apply[
-    F[_]: Concurrent: MonadResourceErr,
+    F[_]: Concurrent,
     J: Order,
     N: ConvertableTo: Field: Order](
     evalConfig: SstEvalConfig)(
@@ -85,6 +75,6 @@ object QueryResultSst {
     timer: Timer[F],
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson])
-    : ResourceSchema[F, SstConfig[J, N], (ResourcePath, QueryResult[F])] =
-  new QueryResultSst[F, J, N](evalConfig)
+    : ResourceSchema[F, SstConfig[J, N], Stream[F, SST[J, N]]] =
+  new SstResourceSchema[F, J, N](evalConfig)
 }

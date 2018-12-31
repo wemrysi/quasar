@@ -20,34 +20,39 @@ import slamdata.Predef._
 
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
+import quasar.api.resource.ResourcePath
 import quasar.api.table.{TableRef, Tables}
 import quasar.common.PhaseResultTell
-import quasar.connector.QueryResult
+import quasar.connector.{Datasource, QueryResult}
 import quasar.contrib.std.uuid._
-import quasar.ejson.EJson
+import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.impl.DatasourceModule
+import quasar.impl.datasource.AggregateResult
 import quasar.impl.datasources.{
+  AggregateResourceSchema,
   DefaultDatasources,
   DefaultDatasourceErrors,
   DefaultDatasourceManager,
-  ManagedDatasource,
-  QueryResultSst
+  ManagedDatasource
 }
-import quasar.impl.datasources.middleware.ConditionReportingMiddleware
+import quasar.impl.datasources.middleware._
 import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.storage.IndexedStore
 import quasar.impl.table.{DefaultTables, PreparationsManager}
-import quasar.qscript.QScriptEducated
+import quasar.qscript.{construction, Hole, Map => QSMap, QScriptEducated}
 import quasar.run.implicits._
 
 import java.util.UUID
+
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import argonaut.JsonScalaz._
 
+import cats.Functor
 import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
+import cats.syntax.functor._
 
 import fs2.Stream
 
@@ -55,7 +60,9 @@ import matryoshka.data.Fix
 
 import org.slf4s.Logging
 
-import scalaz.IMap
+import pathy.Path.posixCodec
+
+import scalaz.{~>, IMap}
 import scalaz.syntax.show._
 
 import shims._
@@ -64,21 +71,23 @@ import spire.std.double._
 
 final class Quasar[F[_], R, S](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
-    val tables: Tables[F, UUID, SqlQuery, Stream[F, R], S],
-    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, R]])
+    val tables: Tables[F, UUID, SqlQuery, R, S],
+    val queryEvaluator: QueryEvaluator[F, SqlQuery, R])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 object Quasar extends Logging {
 
-  type LookupRunning[F[_]] = UUID => F[Option[ManagedDatasource[Fix, F, Stream[F, ?], QueryResult[F]]]]
+  type EvalResult[F[_]] = Either[QueryResult[F], Stream[F, (ResourcePath, QSMap[Fix, QueryResult[F]])]]
+
+  type LookupRunning[F[_]] = UUID => F[Option[ManagedDatasource[Fix, F, Stream[F, ?], EvalResult[F]]]]
 
   /** What it says on the tin. */
   def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer, R, S](
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
-      qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], Stream[F, R]],
-      preparationsManager: QueryEvaluator[F, SqlQuery, Stream[F, R]] => Stream[F, PreparationsManager[F, UUID, SqlQuery, Stream[F, R]]],
-      lookupTableData: UUID => F[Option[Stream[F, R]]],
+      qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], R],
+      preparationsManager: QueryEvaluator[F, SqlQuery, R] => Stream[F, PreparationsManager[F, UUID, SqlQuery, R]],
+      lookupTableData: UUID => F[Option[R]],
       lookupTableSchema: UUID => F[Option[S]])(
       datasourceModules: List[DatasourceModule],
       sstEvalConfig: SstEvalConfig)(
@@ -105,16 +114,20 @@ object Quasar extends Logging {
       dsManager <-
         Stream.resource(DefaultDatasourceManager.Builder[UUID, Fix, F]
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
+          .withMiddleware(ChildAggregatingMiddleware(_, _))
           .build(moduleMap, configured))
 
       freshUUID = ConcurrentEffect[F].delay(UUID.randomUUID)
 
-      resourceSchema = QueryResultSst[F, Fix[EJson], Double](sstEvalConfig)
+      resourceSchema = AggregateResourceSchema[F, Fix[EJson], Double](sstEvalConfig)
 
       datasources =
         DefaultDatasources(freshUUID, datasourceRefs, dsErrors, dsManager, resourceSchema)
 
-      sqlEvaluator = Sql2QueryEvaluator(qscriptEvaluator(dsManager.managedDatasource))
+      lookupRunning =
+        (id: UUID) => dsManager.managedDatasource(id).map(_.map(_.modify(reifiedAggregateDs)))
+
+      sqlEvaluator = Sql2QueryEvaluator(qscriptEvaluator(lookupRunning))
 
       prepManager <- preparationsManager(sqlEvaluator)
 
@@ -123,4 +136,30 @@ object Quasar extends Logging {
 
     } yield new Quasar(datasources, tables, sqlEvaluator)
   }
+
+  ////
+
+  import AggregateResourceSchema.{SourceKey, ValueKey}
+
+  private val rec = construction.RecFunc[Fix]
+  private val ejs = Fixed[Fix[EJson]]
+
+  private def reifiedAggregateDs[F[_]: Functor, G[_]]
+      : Datasource[F, G, ?, AggregateResult[F, QueryResult[F]]] ~> Datasource[F, G, ?, EvalResult[F]] =
+    new (Datasource[F, G, ?, AggregateResult[F, QueryResult[F]]] ~> Datasource[F, G, ?, EvalResult[F]]) {
+      def apply[A](ds: Datasource[F, G, A, AggregateResult[F, QueryResult[F]]]) = {
+        val l = Datasource.pevaluator[F, G, A, AggregateResult[F, QueryResult[F]], A, EvalResult[F]]
+        l.modify(_.map(_.map(reifyAggregateStructure)))(ds)
+      }
+    }
+
+  private def reifyAggregateStructure[F[_], A](s: Stream[F, (ResourcePath, A)])
+      : Stream[F, (ResourcePath, QSMap[Fix, A])] =
+    s map { case (rp, a) =>
+      val fm = rec.StaticMapS(
+        SourceKey -> rec.Constant[Hole](ejs.str(posixCodec.printPath(rp.toPath))),
+        ValueKey -> rec.Hole)
+
+      (rp, QSMap(a, fm))
+    }
 }

@@ -24,7 +24,7 @@ import quasar.connector.{Datasource, MonadResourceErr, ResourceError}
 import quasar.contrib.matryoshka.totally
 import quasar.contrib.scalaz._
 
-import scala.util.{Either, Left, Right}
+import scala.util.{Left, Right}
 
 import cats.{Functor, Monad}
 import cats.instances.option._
@@ -44,12 +44,12 @@ import shims._
 final class ChildAggregatingDatasource[F[_]: Monad: MonadResourceErr, Q, R] private (
     underlying: Datasource[F, Stream[F, ?], Q, R],
     queryPath: Lens[Q, ResourcePath])
-    extends Datasource[F, Stream[F, ?], Q, Either[R, Stream[F, (ResourcePath, R)]]] {
+    extends Datasource[F, Stream[F, ?], Q, AggregateResult[F, R]] {
 
   def kind: DatasourceType =
     underlying.kind
 
-  def evaluate(q: Q): F[Either[R, Stream[F, (ResourcePath, R)]]] = {
+  def evaluate(q: Q): F[AggregateResult[F, R]] = {
     def aggregate(p: ResourcePath): F[Stream[F, (ResourcePath, R)]] =
       underlying.prefixedChildPaths(p) flatMap {
         case Some(s) =>
@@ -93,6 +93,6 @@ object ChildAggregatingDatasource {
   def apply[F[_]: Monad: MonadResourceErr, Q, R](
       underlying: Datasource[F, Stream[F, ?], Q, R],
       queryPath: Lens[Q, ResourcePath])
-      : Datasource[F, Stream[F, ?], Q, Either[R, Stream[F, (ResourcePath, R)]]] =
+      : Datasource[F, Stream[F, ?], Q, AggregateResult[F, R]] =
     new ChildAggregatingDatasource(underlying, queryPath)
 }
