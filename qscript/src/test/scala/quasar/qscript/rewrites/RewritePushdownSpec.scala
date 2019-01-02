@@ -91,7 +91,7 @@ object RewritePushdownSpec extends Qspec {
               path,
               List(
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+                Pivot(CPath.Identity, IncludeId, ParseType.Object),
                 Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
@@ -115,7 +115,7 @@ object RewritePushdownSpec extends Qspec {
             path,
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-              Pivot(SMap(CPath.Identity -> ((IdOnly, ParseType.Object)))),
+              Pivot(CPath.Identity, IdOnly, ParseType.Object),
               Wrap(CPath.Identity, "k1")))
 
         rewritePushdown(initial) must equal(expected)
@@ -136,7 +136,7 @@ object RewritePushdownSpec extends Qspec {
             path,
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-              Pivot(SMap(CPath.Identity -> ((ExcludeId, ParseType.Object)))),
+              Pivot(CPath.Identity, ExcludeId, ParseType.Object),
               Wrap(CPath.Identity, "v1")))
 
         rewritePushdown(initial) must equal(expected)
@@ -161,7 +161,7 @@ object RewritePushdownSpec extends Qspec {
             path,
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-              Pivot(SMap(CPath.Identity -> ((ExcludeId, ParseType.Object)))),
+              Pivot(CPath.Identity, ExcludeId, ParseType.Object),
               Wrap(CPath.Identity, "v1"))),
           recFuncE.Constant(ejs.bool(true)))
 
@@ -187,7 +187,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Project(CPath.Identity \ "xyz"),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+                Pivot(CPath.Identity, IncludeId, ParseType.Object),
                 Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
@@ -220,7 +220,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Project(CPath.parse(".aaa.bbb.ccc")),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+                Pivot(CPath.Identity, IncludeId, ParseType.Object),
                 Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
@@ -254,7 +254,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Project(CPath.parse(".aaa[42].ccc")),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+                Pivot(CPath.Identity, IncludeId, ParseType.Object),
                 Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
@@ -287,7 +287,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Project(CPath.parse(".[17][42].ccc")),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+                Pivot(CPath.Identity, IncludeId, ParseType.Object),
                 Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
@@ -312,7 +312,7 @@ object RewritePushdownSpec extends Qspec {
           List(
             Ids,
             Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object))))))
+            Pivot(CPath.Identity, IncludeId, ParseType.Object)))
 
       rewritePushdown(initial) must_= expected
     }
@@ -334,7 +334,7 @@ object RewritePushdownSpec extends Qspec {
             Ids,
             Project(CPath.Identity \ 0),
             Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object))))))
+            Pivot(CPath.Identity, IncludeId, ParseType.Object)))
 
       rewritePushdown(initial) must_= expected
     }
@@ -419,10 +419,10 @@ object RewritePushdownSpec extends Qspec {
           List(
             Project(CPath.parse(".aaa.bbb.ccc")),
             Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(SMap(CPath.Identity -> ((IncludeId, ParseType.Object)))),
+            Pivot(CPath.Identity, IncludeId, ParseType.Object),
             Project(CPath.parse(".[1].ddd")),
             Mask(SMap(CPath.Identity -> Set(ParseType.Array))),
-            Pivot(SMap(CPath.Identity -> ((ExcludeId, ParseType.Array)))),
+            Pivot(CPath.Identity, ExcludeId, ParseType.Array),
             Wrap(CPath.Identity, "result")))
 
       rewritePushdown(initial) must_= expected

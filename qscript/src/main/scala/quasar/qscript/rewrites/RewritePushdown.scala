@@ -43,7 +43,7 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
   private val recMapFunc = construction.RecFunc[T]
 
   // Assumes `extractProject` and `extractMask` have been applied to the input.
-  def extractFocusedPivot[F[a] <: ACopK[a]: Functor, A](
+  def extractPivot[F[a] <: ACopK[a]: Functor, A](
       implicit
         IR: Const[InterpretedRead[A], ?] :<<: F,
         R: Const[Read[A], ?] :<<: F,
@@ -62,7 +62,7 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           FocusedRepair(repair)) =>
 
         val pivotInstr =
-          Pivot(SMap(CPath.Identity -> ((shiftStatus, ShiftType.toParseType(shiftType)))))
+          Pivot(CPath.Identity, shiftStatus, ShiftType.toParseType(shiftType))
 
         val iread =
           IR[T[F]](Const(InterpretedRead(a, instrs :+ pivotInstr)))
@@ -325,9 +325,9 @@ object RewritePushdown {
     val extractMappableF: F[T[F]] => F[T[F]] =
       liftFG[QScriptCore[T, ?], F, T[F]](extractMappable)
 
-    val extractFocusedPivot: F[T[F]] => Option[F[T[F]]] =
-      liftFGM[Option, QScriptCore[T, ?], F, T[F]](pushdown.extractFocusedPivot[F, A])
+    val extractPivot: F[T[F]] => Option[F[T[F]]] =
+      liftFGM[Option, QScriptCore[T, ?], F, T[F]](pushdown.extractPivot[F, A])
 
-    extractMappableG >>> orOriginal(Kleisli(extractFocusedPivot) map extractMappableF)
+    extractMappableG >>> orOriginal(Kleisli(extractPivot) map extractMappableF)
   }
 }
