@@ -113,7 +113,7 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
 
   ///
 
-  private def rewriteFilter(predicate: FreeMap, consequent: FreeMap): FreeMap = {
+  private def rewriteFilter(predicate: FreeMap, fm: FreeMap): FreeMap = {
     val nameToType: SMap[String, Type] =
       SMap(
         "number" -> Type.Dec,
@@ -127,9 +127,9 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
           Embed(CoEnv(\/-(MFC(TypeOf(Embed(CoEnv(-\/(_)))))))),
           Embed(CoEnv(\/-(MFC(Constant(Embed(CommonEJson(Str(expectedType))))))))))) =>
         nameToType.get(expectedType)
-          .fold(func.Cond(predicate, consequent, func.Undefined))(func.Typecheck(consequent, _))
+          .fold(func.Cond(predicate.as(fm).join, fm, func.Undefined))(func.Typecheck(fm, _))
       case _ =>
-        func.Cond(predicate, consequent, func.Undefined)
+        func.Cond(predicate.as(fm).join, fm, func.Undefined)
     }
   }
 }
