@@ -1684,6 +1684,50 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               "2" -> recFunc.ProjectKeyS(recFunc.Hole, "2")))
       }
     }
+
+    "rewrites type-filters into Typecheck in FreeMaps" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu._autojoin2((
+          qsu.qsFilter(
+            qsu.map((
+              qsu.leftShift(
+                qsu.map((qsu.read(afile, ExcludeId), recFunc.ProjectKeyS(recFunc.Hole, "previous_addresses"))),
+                recFunc.Hole,
+                ExcludeId,
+                OnUndefined.Omit,
+                RightTarget[Fix],
+                Rotation.ShiftArray),
+              recFunc.ProjectKeyS(recFunc.Hole, "city"))),
+            recFunc.Eq(recFunc.TypeOf(recFunc.Hole), recFunc.Constant(J.str("string")))),
+          qsu.qsFilter(
+            qsu.map((qsu.read(afile, ExcludeId), recFunc.ProjectKeyS(recFunc.Hole, "last_visit"))),
+            recFunc.Eq(recFunc.TypeOf(recFunc.Hole), recFunc.Constant(J.str("string")))),
+          func.ConcatMaps(
+            func.MakeMapS("left", func.LeftSide),
+            func.MakeMapS("right", func.RightSide)))))
+
+      runOn(qgraph) must beLike {
+        case Map(
+          LeftShift(
+            Read(_, ExcludeId),
+            struct,
+            ExcludeId,
+            OnUndefined.Emit,
+            repair,
+            Rotation.ShiftArray), outerMap) =>
+          struct must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "previous_addresses"))
+          repair must beTreeEqual(
+            func.StaticMapS(
+              "0" -> RightTarget[Fix],
+              "1" -> AccessLeftTarget[Fix](Access.value(_))))
+          outerMap must beTreeEqual(
+            recFunc.StaticMapS(
+              "left" -> recFunc.Typecheck(
+                recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "0"), "city"), Type.Str),
+              "right" -> recFunc.Typecheck(
+                recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "1"), "last_visit"), Type.Str)))
+      }
+    }
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph =

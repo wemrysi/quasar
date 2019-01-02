@@ -17,21 +17,24 @@
 package quasar.qsu
 package minimizers
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => SMap, _}
 
-import quasar.RenderTreeT
+import quasar.{RenderTreeT, Type}
 import quasar.common.effect.NameGenerator
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
+import quasar.ejson.{CommonEJson, Str}
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.qscript.{construction, HoleF, MonadPlannerErr, RecFreeS}, RecFreeS._
+import quasar.qscript.{construction, HoleF, MFC, MonadPlannerErr, RecFreeS}, RecFreeS._
+import quasar.qscript.MapFuncsCore.{Constant, Eq, TypeOf}
 import quasar.qsu.{QScriptUniform => QSU}
 
-import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._
+import matryoshka.patterns.CoEnv
+import matryoshka.{BirecursiveT, Embed, EqualT, ShowT, delayEqual}
 
-import scalaz.Monad
+import scalaz.{-\/, \/-, Monad}
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 
@@ -62,12 +65,7 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
       // this is where we do the actual rewriting
       def rebuild(src: QSUGraph, fm: FreeMap): G[QSUGraph] = {
         updateGraph[T, G](
-          QSU.Map(
-            src.root,
-            recFunc.Cond(
-              predicate.flatMap(_ => fm.asRec),
-              fm.asRec,
-              recFunc.Undefined))).map(_ :++ src)
+          QSU.Map(src.root, rewriteFilter(predicate.linearize, fm).asRec)).map(_ :++ src)
       }
 
       Some((src, rebuild _))
@@ -94,7 +92,7 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
       candidates: List[QSUGraph],
       fm: FreeMapA[Int]): G[Option[(QSUGraph, QSUGraph)]] = {
 
-    val fms: Map[Int, RecFreeMap] = candidates.zipWithIndex.map({
+    val fms: SMap[Int, RecFreeMap] = candidates.zipWithIndex.map({
       case (Map(parent, fm), i) if parent.root === singleSource.root =>
         i -> fm
 
@@ -112,10 +110,33 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
       Some((back, back))
     }
   }
+
+  ///
+
+  private def rewriteFilter(predicate: FreeMap, consequent: FreeMap): FreeMap = {
+    val nameToType: SMap[String, Type] =
+      SMap(
+        "number" -> Type.Dec,
+        "string" -> Type.Str,
+        "boolean" -> Type.Bool,
+        "offsetdatetime" -> Type.OffsetDateTime,
+        "null" -> Type.Null)
+
+    predicate.resume match {
+      case -\/(MFC(Eq(
+          Embed(CoEnv(\/-(MFC(TypeOf(Embed(CoEnv(-\/(_)))))))),
+          Embed(CoEnv(\/-(MFC(Constant(Embed(CommonEJson(Str(expectedType))))))))))) =>
+        nameToType.get(expectedType)
+          .fold(func.Cond(predicate, consequent, func.Undefined))(func.Typecheck(consequent, _))
+      case _ =>
+        func.Cond(predicate, consequent, func.Undefined)
+    }
+  }
 }
 
 object FilterToCond {
   def apply[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: FilterToCond[T] =
     new FilterToCond[T]
+
 }
 
