@@ -21,10 +21,10 @@ import slamdata.Predef._
 import cats.effect.Sync
 import cats.effect.concurrent.Ref
 
-import quasar.{CompositeParseType, IdStatus, ParseInstruction, ParseType}
+import quasar.{ParseInstruction, ParseType}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.ParseInstruction.{Ids, Mask, Pivot, Project, Wrap}
-import quasar.common.{CPath, CPathField, CPathIndex, CPathNode}
+import quasar.common.{CPathField, CPathIndex, CPathNode}
 import quasar.common.data._
 
 import scala.collection.Iterator
@@ -43,20 +43,14 @@ object RValueParseInstructionInterpreter {
         case (prev, instr @ Mask(_)) =>
           prev.flatMap(interpretMask(instr, _).toList).point[F]
 
-        case (prev, instr @ Pivot(pivots)) =>
-          if (pivots.size === 1)
-            pivots.head match {
-              case (path, (idStatus, structure)) =>
-                prev.flatMap(interpretSinglePivot(path, idStatus, structure, _)).point[F]
-            }
-          else
-            scala.sys.error("Multiple pivots not supported for RValue interpretation")
+        case (prev, instr @ Pivot(_, _, _)) =>
+          prev.flatMap(interpretPivot(instr, _)).point[F]
 
         case (prev, instr @ Wrap(_, _)) =>
           prev.flatMap(interpretWrap(instr, _) :: Nil).point[F]
 
-        case (prev, Project(p)) =>
-          prev.flatMap(interpretProject(p, _)).point[F]
+        case (prev, instr @ Project(_)) =>
+          prev.flatMap(interpretProject(instr, _)).point[F]
 
         case (prev, Ids) =>
           prev.traverse(interpretIds(counter, _))
@@ -173,26 +167,25 @@ object RValueParseInstructionInterpreter {
     inner(input, rvalue)
   }
 
-  def interpretProject(path: CPath, rvalue: RValue): List[RValue] =
-    path.nodes.foldLeftM(rvalue) {
+  def interpretProject(project: Project, rvalue: RValue): List[RValue] =
+    project.path.nodes.foldLeftM(rvalue) {
       case (rv, CPathField(name)) => RValue.rField1(name).getOption(rv)
       case (rv, CPathIndex(idx)) => RValue.rElement(idx).getOption(rv)
       case _ => None
     }.toList
 
-  def interpretSinglePivot(path: CPath, status: IdStatus, structure: CompositeParseType, rvalue: RValue)
-      : List[RValue] = {
+  def interpretPivot(pivot: Pivot, rvalue: RValue): List[RValue] = {
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(remaining: List[CPathNode], rvalue: RValue): List[RValue] =
       remaining match {
         // perform the pivot
         case Nil => {
-          (rvalue, structure) match {
+          (rvalue, pivot.structure) match {
 
             // pivot object
             case (RObject(fields), ParseType.Object) => {
-              val pivoted: List[RValue] = status match {
+              val pivoted: List[RValue] = pivot.status match {
                 case IdOnly =>
                   fields.foldLeft(List[RValue]()) {
                     case (acc, (k, _)) => CString(k) :: acc
@@ -211,7 +204,7 @@ object RValueParseInstructionInterpreter {
 
             // pivot array
             case (RArray(elems), ParseType.Array) =>
-              status match {
+              pivot.status match {
                 case IdOnly =>
                   elems.iterator.zipWithIndex.map(t => CLong(t._2.toLong)).toList
                 case IncludeId => // the qscript expects the results to be returned in an array
@@ -258,7 +251,7 @@ object RValueParseInstructionInterpreter {
           scala.sys.error(s"Cannot pivot through $nodes")
       }
 
-    inner(path.nodes, rvalue)
+    inner(pivot.path.nodes, rvalue)
   }
 
   def interpretWrap(wrap: Wrap, rvalue: RValue): RValue = {

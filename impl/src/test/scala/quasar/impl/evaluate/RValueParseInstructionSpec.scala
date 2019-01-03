@@ -17,8 +17,7 @@
 package quasar.impl.evaluate
 
 import slamdata.Predef._
-import quasar.{CompositeParseType, IdStatus, ParseInstructionSpec}
-import quasar.common.CPath
+import quasar.ParseInstructionSpec
 import quasar.common.data.RValue
 
 import cats.effect.IO
@@ -44,15 +43,14 @@ object RValueParseInstructionSpec extends ParseInstructionSpec {
   def evalMask(mask: Mask, stream: JsonStream): JsonStream =
     stream.flatMap(RValueParseInstructionInterpreter.interpretMask(mask, _).toList)
 
-  def evalSinglePivot(path: CPath, idStatus: IdStatus, structure: CompositeParseType, stream: JsonStream)
-      : JsonStream =
-    stream.flatMap(RValueParseInstructionInterpreter.interpretSinglePivot(path, idStatus, structure, _))
+  def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream =
+    stream.flatMap(RValueParseInstructionInterpreter.interpretPivot(pivot, _))
 
   def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream =
     stream.map(RValueParseInstructionInterpreter.interpretWrap(wrap, _))
 
   def evalProject(project: Project, stream: JsonStream): JsonStream =
-    stream.flatMap(RValueParseInstructionInterpreter.interpretProject(project.path, _))
+    stream.flatMap(RValueParseInstructionInterpreter.interpretProject(project, _))
 
   protected def ldjson(str: String): JsonStream = {
     implicit val facade: Facade[RValue] = QDataFacade[RValue](isPrecise = false)
