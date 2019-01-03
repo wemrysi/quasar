@@ -786,7 +786,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         val parentGroups = wrapped groupBy {
           case (ConsecutiveBounded(_, shifts), _) =>
             // TODO this is pretty darn inefficient
-            shifts.index(depth - 1).map(_.bimap(_.source.root, _.source.root))
+            shifts.index(shifts.length - depth).map(_.bimap(_.source.root, _.source.root))
 
           case _ => None
         }
@@ -798,7 +798,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           val outerTier = parentGroups.values.toList map { il =>
             val structGroups = il groupBy {
               case (ConsecutiveBounded(_, shifts), _) =>
-                shifts.index(depth - 1).map(
+                shifts.index(shifts.length - depth).map(
                   _.bimap(
                     ls => EqWrapper((elideGuards(ls.struct.linearize), ls.rot)),
                     mls => mls.shifts.map(t => EqWrapper((elideGuards(t._1), t._3))).distinct))
@@ -901,12 +901,20 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
   }
 
   // each List within a given ShiftAssoc may be coalesced in any order, producing an equivalent result
-  private sealed trait ShiftAssoc extends Product with Serializable
+  private sealed trait ShiftAssoc extends Product with Serializable {
+    def explore: String
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.LeakingSealed"))
   private object ShiftAssoc {
-    case class Leaves(tier: List[(QSUGraph, Set[Int])]) extends ShiftAssoc
-    case class Branches(tier: List[ShiftAssoc]) extends ShiftAssoc
+
+    case class Leaves(tier: List[(QSUGraph, Set[Int])]) extends ShiftAssoc {
+      def explore = tier.map(_._1.shows).mkString("Leaves(\n", ",\n", ")")
+    }
+
+    case class Branches(tier: List[ShiftAssoc]) extends ShiftAssoc {
+      def explore = tier.map(_.explore).mkString("Branches(", ", ", ")")
+    }
   }
 
   // FML

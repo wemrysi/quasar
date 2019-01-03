@@ -963,8 +963,8 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               MultiLeftShift(
                 Read(_, ExcludeId),
                 List(
-                  (cstruct, _, _),
-                  (dstruct, _, _)),
+                  (dstruct, _, _),
+                  (cstruct, _, _)),
                 OnUndefined.Emit,
                 innerRepair),
               outerStruct,
@@ -980,18 +980,18 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           innerRepair must beTreeEqual(
             func.StaticMapS(
               "left" ->
-                func.MakeMapS("0", Free.pure[MapFunc, Access[Hole] \/ Int](0.right)),
+                Free.pure[MapFunc, Access[Hole] \/ Int](0.right),
               "right" ->
-                Free.pure[MapFunc, Access[Hole] \/ Int](1.right)))
+                func.MakeMapS("0", Free.pure[MapFunc, Access[Hole] \/ Int](1.right))))
 
-          outerStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "right"))
+          outerStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "left"))
 
           outerRepair must beTreeEqual(
             func.ConcatMaps(
+              func.MakeMapS("1", RightTarget[Fix]),
               func.ProjectKeyS(
                 AccessLeftTarget[Fix](Access.value(_)),
-                "left"),
-              func.MakeMapS("1", RightTarget[Fix])))
+                "right")))
 
           fm must beTreeEqual(
             recFunc.Divide(
@@ -1063,9 +1063,9 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 MultiLeftShift(
                   Read(`afile`, ExcludeId),
                   List(
-                    (innerastruct, _, _),
+                    (innerdstruct, _, _),
                     (innercstruct, _, _),
-                    (innerdstruct, _, _)),
+                    (innerastruct, _, _)),
                   OnUndefined.Emit,
                   innerMultiRepair),
                 List(
@@ -1113,37 +1113,29 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               "results",
               func.StaticMapS(
                 "left" -> func.ConcatMaps(
+                  func.MakeMapS(
+                    "3",
+                    Free.pure[MapFunc, Access[Hole] \/ Int](0.right)),
                   func.ProjectKeyS(
                     func.ProjectKeyS(
-                      AccessHole[Fix].map(_.left[Int]),
-                      "results"),
-                    "left"),
-                  func.MakeMapS(
-                    "left",
-                    Free.pure[MapFunc, Access[Hole] \/ Int](0.right))),
-                "right" -> func.MakeMapS(
-                  "3",
-                  Free.pure[MapFunc, Access[Hole] \/ Int](1.right))))))
+                      func.ProjectKeyS(
+                        AccessHole[Fix].map(_.left[Int]),
+                        "results"),
+                      "left"),
+                    "right")),
+                "right" -> Free.pure[MapFunc, Access[Hole] \/ Int](1.right)))))
 
         singleRepair must beTreeEqual(
           func.ConcatMaps(
             func.ConcatMaps(
-              func.ConcatMaps(
-                func.MakeMapS(
-                  "0",
-                  RightTarget[Fix]),
-                func.ProjectKeyS(
-                  func.ProjectKeyS(
-                    func.ProjectKeyS(
-                      AccessLeftTarget[Fix](Access.value(_)),
-                      "results"),
-                    "left"),
-                  "right")),
               func.ProjectKeyS(
                 func.ProjectKeyS(
                   AccessLeftTarget[Fix](Access.value(_)),
                   "results"),
-                "right")),
+                "left"),
+              func.MakeMapS(
+                "0",
+                RightTarget[Fix])),
             func.MakeMapS(
               "1",
               func.ProjectKeyS(
@@ -1153,11 +1145,9 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         singleStruct must beTreeEqual(
           recFunc.ProjectKeyS(
             recFunc.ProjectKeyS(
-              recFunc.ProjectKeyS(
-                recFunc.Hole,
-                "results"),
-              "left"),
-          "left"))
+              recFunc.Hole,
+              "results"),
+            "right"))
 
         fm must beTreeEqual(
           recFunc.Subtract(
@@ -1443,8 +1433,8 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             MultiLeftShift(
               Read(_, ExcludeId),
               List(
-                (innerastruct, _, _),
-                (innerbstruct, _, _)),
+                (innerbstruct, _, _),
+                (innerastruct, _, _)),
               _,
               innerRepair),
             outerStruct,
@@ -1460,21 +1450,21 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           innerRepair must beTreeEqual(
             func.StaticMapS(
               "left" ->
+                Free.pure[MapFunc, Access[Hole] \/ Int](0.right),
+              "right" ->
                 func.StaticMapS(
                   "0" ->
-                    Free.pure[MapFunc, Access[Hole] \/ Int](0.right)),
-              "right" ->
-                Free.pure[MapFunc, Access[Hole] \/ Int](1.right)))
+                    Free.pure[MapFunc, Access[Hole] \/ Int](1.right))))
 
           outerStruct must beTreeEqual(
-            recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "right"), "c"))
+            recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "left"), "c"))
 
           outerRepair must beTreeEqual(
             func.ConcatMaps(
+              func.MakeMapS("1", RightTarget[Fix]),
               func.ProjectKeyS(
                 AccessLeftTarget[Fix](Access.value(_)),
-                "left"),
-              func.MakeMapS("1", RightTarget[Fix])))
+                "right")))
 
           fm must beTreeEqual(
             recFunc.Add(
@@ -1727,6 +1717,69 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               "right" -> recFunc.Typecheck(
                 recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "1"), "last_visit"), Type.Str)))
       }
+    }
+
+    // a[*], b[*], a[*][*], b[*]
+    "optimally reassociate shifts during coalescence" in {
+      val read = qsu.read(afile, ExcludeId)
+
+      val as = qsu.leftShift(
+        qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "a"))),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val bs = qsu.leftShift(
+        qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "b"))),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val ass = qsu.leftShift(
+        qsu.leftShift(
+          qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "a"))),
+          recFunc.Hole,
+          ExcludeId,
+          OnUndefined.Omit,
+          RightTarget[Fix],
+          Rotation.ShiftArray),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu._autojoin2((
+          qsu._autojoin2((
+            qsu._autojoin2((
+              qsu.map((
+                as,
+                recFunc.MakeArray(recFunc.Hole))),
+              qsu.map((
+                bs,
+                recFunc.MakeArray(recFunc.Hole))),
+              func.ConcatArrays(func.LeftSide, func.RightSide))),
+            qsu.map((
+              ass,
+              recFunc.MakeArray(recFunc.Hole))),
+            func.ConcatArrays(func.LeftSide, func.RightSide))),
+          qsu.map((
+            bs,
+            recFunc.MakeArray(recFunc.Hole))),
+          func.ConcatArrays(func.LeftSide, func.RightSide))))
+
+      val count = runOn(qgraph).foldMapUp {
+        case LeftShift(_, _, _, _, _, _) => 1
+        case MultiLeftShift(_, ss, _, _) => ss.length
+        case _ => 0
+      }
+
+      count mustEqual 3
     }
   }
 
