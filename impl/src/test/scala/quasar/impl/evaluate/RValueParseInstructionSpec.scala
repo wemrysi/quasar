@@ -33,24 +33,31 @@ import scalaz.syntax.traverse._
 import shims._
 
 object RValueParseInstructionSpec extends ParseInstructionSpec {
-  type JsonStream = List[RValue]
+  import quasar.impl.evaluate.{RValueParseInstructionInterpreter => Interpreter}
+
+  type JsonElement = RValue
 
   def evalIds(stream: JsonStream): JsonStream =
     Ref[IO].of(0L)
-      .flatMap(r => stream.traverse(RValueParseInstructionInterpreter.interpretIds(r, _)))
+      .flatMap(r => stream.traverse(Interpreter.interpretIds(r, _)))
       .unsafeRunSync()
 
   def evalMask(mask: Mask, stream: JsonStream): JsonStream =
-    stream.flatMap(RValueParseInstructionInterpreter.interpretMask(mask, _).toList)
+    stream.flatMap(Interpreter.interpretMask(mask, _).toList)
 
   def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream =
-    stream.flatMap(RValueParseInstructionInterpreter.interpretPivot(pivot, _))
+    stream.flatMap(Interpreter.interpretPivot(pivot, _))
 
   def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream =
-    stream.map(RValueParseInstructionInterpreter.interpretWrap(wrap, _))
+    stream.map(Interpreter.interpretWrap(wrap, _))
 
   def evalProject(project: Project, stream: JsonStream): JsonStream =
-    stream.flatMap(RValueParseInstructionInterpreter.interpretProject(project, _))
+    stream.flatMap(Interpreter.interpretProject(project, _))
+
+  def evalCartesian(cartesian: Cartesian, stream: JsonStream): JsonStream =
+    Ref[IO].of(0L)
+      .flatMap(r => stream.traverseM(Interpreter.interpretCartesian(cartesian, r, _)))
+      .unsafeRunSync()
 
   protected def ldjson(str: String): JsonStream = {
     implicit val facade: Facade[RValue] = QDataFacade[RValue](isPrecise = false)

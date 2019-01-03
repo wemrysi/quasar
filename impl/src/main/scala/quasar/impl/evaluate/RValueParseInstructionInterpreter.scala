@@ -23,7 +23,7 @@ import cats.effect.concurrent.Ref
 
 import quasar.{ParseInstruction, ParseType}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
-import quasar.ParseInstruction.{Ids, Mask, Pivot, Project, Wrap}
+import quasar.ParseInstruction.{Cartesian, Ids, Mask, Pivot, Project, Wrap}
 import quasar.common.{CPathField, CPathIndex, CPathNode}
 import quasar.common.data._
 
@@ -38,23 +38,28 @@ object RValueParseInstructionInterpreter {
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def apply[F[_]: Sync](instructions: List[ParseInstruction])
       : F[RValue => F[List[RValue]]] =
-    Ref[F].of(0L) map { counter => (rvalue: RValue) =>
-      instructions.foldLeftM(List[RValue](rvalue)) {
-        case (prev, instr @ Mask(_)) =>
-          prev.flatMap(interpretMask(instr, _).toList).point[F]
+    Ref[F].of(0L).map(interpret(instructions, _))
 
-        case (prev, instr @ Pivot(_, _, _)) =>
-          prev.flatMap(interpretPivot(instr, _)).point[F]
+  private def interpret[F[_]: Sync](instructions: List[ParseInstruction], counter: Ref[F, Long])(rvalue: RValue)
+      : F[List[RValue]] =
+    instructions.foldLeftM(List[RValue](rvalue)) {
+      case (prev, instr @ Mask(_)) =>
+        prev.flatMap(interpretMask(instr, _).toList).point[F]
 
-        case (prev, instr @ Wrap(_, _)) =>
-          prev.flatMap(interpretWrap(instr, _) :: Nil).point[F]
+      case (prev, instr @ Pivot(_, _, _)) =>
+        prev.flatMap(interpretPivot(instr, _)).point[F]
 
-        case (prev, instr @ Project(_)) =>
-          prev.flatMap(interpretProject(instr, _)).point[F]
+      case (prev, instr @ Wrap(_, _)) =>
+        prev.flatMap(interpretWrap(instr, _) :: Nil).point[F]
 
-        case (prev, Ids) =>
-          prev.traverse(interpretIds(counter, _))
-      }
+      case (prev, instr @ Project(_)) =>
+        prev.flatMap(interpretProject(instr, _)).point[F]
+
+      case (prev, instr @ Cartesian(_)) =>
+        prev.traverseM(interpretCartesian(instr, counter, _))
+
+      case (prev, Ids) =>
+        prev.traverse(interpretIds(counter, _))
     }
 
   def interpretIds[F[_]: Functor](ref: Ref[F, Long], rvalue: RValue): F[RValue] =
@@ -173,6 +178,40 @@ object RValueParseInstructionInterpreter {
       case (rv, CPathIndex(idx)) => RValue.rElement(idx).getOption(rv)
       case _ => None
     }.toList
+
+  def interpretCartesian[F[_]: Sync](cartesian: Cartesian, counter: Ref[F, Long], rvalue: RValue)
+      : F[List[RValue]] =
+    rvalue match {
+      case RObject(fields) =>
+        // the components of the cartesian
+        val componentsF: F[Map[String, List[RValue]]] =
+          cartesian.cartouches.toList.foldLeft(Map[String, List[RValue]]().point[F]) {
+            case (accF, (wrap, (deref, instrs))) =>
+              for {
+                acc <- accF
+                res <- fields.get(deref.name).map(interpret[F](instrs, counter)).sequence
+              } yield {
+                res match {
+                  case Some(v) => acc + (wrap.name -> v)
+                  case None => acc
+                }
+              }
+          }
+
+        // the cartesian
+        componentsF map { components =>
+          val res = components.toList.foldLeft(List[Map[String, RValue]]()) {
+            case (acc, (name, rvs)) =>
+              rvs flatMap { rv =>
+                if (acc.isEmpty) List(Map(name -> rv))
+                else acc.map(_ + (name -> rv))
+              }
+          }
+          res.map(RObject(_))
+        }
+
+      case _ => List[RValue]().point[F]
+    }
 
   def interpretPivot(pivot: Pivot, rvalue: RValue): List[RValue] = {
 

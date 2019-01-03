@@ -16,6 +16,8 @@
 
 package quasar
 
+import slamdata.Predef.List
+
 import org.specs2.matcher.Matcher
 
 import java.lang.String
@@ -25,12 +27,18 @@ import java.lang.String
  * via differing backends.
  */
 abstract class JsonSpec extends Qspec {
-  // you'll get nicer error messages if you keep this simple with nice toStrings
-  // like List[JValue] or something
-  type JsonStream
+
+/**
+ * The representation of a single json element in the underlying interpreter.
+ *
+ * You'll get nicer error messages if you keep this simple with nice toStrings.
+ */
+  type JsonElement
+
+  type JsonStream = List[JsonElement]
 
   protected def ldjson(str: String): JsonStream
 
   protected def bestSemanticEqual(str: JsonStream): Matcher[JsonStream] =
-    beEqualTo(str)
+    containTheSameElementsAs(str)
 }

@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 
-import quasar.common.CPath
+import quasar.common.{CPath, CPathField}
 
 import org.specs2.matcher.Matcher
 
@@ -33,6 +33,7 @@ abstract class ParseInstructionSpec
     with ParseInstructionSpec.ProjectSpec
     with ParseInstructionSpec.MaskSpec
     with ParseInstructionSpec.PivotSpec
+    with ParseInstructionSpec.CartesianSpec
 
 object ParseInstructionSpec {
 
@@ -1273,6 +1274,154 @@ object ParseInstructionSpec {
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>
         evalPivot(Pivot(CPath.parse(path), idStatus, structure), str)
+      }
+  }
+
+  trait CartesianSpec extends JsonSpec {
+
+    protected final type Cartesian = ParseInstruction.Cartesian
+    protected final val Cartesian = ParseInstruction.Cartesian
+
+    "cartesian" should {
+      // a0 as a1, b0 as b1, c0 as c1, d0 as d1
+      "cross fields with no parse instructions" in {
+        val input = ldjson("""
+          { "a0": "hi", "b0": null, "c0": { "x": 42 }, "d0": [1, 2, 3] }
+          """)
+
+        val expected = ldjson("""
+          { "a1": "hi", "b1": null, "c1": { "x": 42 }, "d1": [1, 2, 3] }
+          """)
+
+        val targets = Map(
+          (CPathField("a1"), (CPathField("a0"), Nil)),
+          (CPathField("b1"), (CPathField("b0"), Nil)),
+          (CPathField("c1"), (CPathField("c0"), Nil)),
+          (CPathField("d1"), (CPathField("d0"), Nil)))
+
+        input must cartesianInto(targets)(expected)
+      }
+
+      // a0 as a1, b0 as b1
+      "cross fields with no parse instructions ignoring extra fields" in {
+        val input = ldjson("""
+          { "a0": "hi", "b0": null, "c0": 42 }
+          """)
+
+        val expected = ldjson("""
+          { "a1": "hi", "b1": null }
+          """)
+
+        val targets = Map(
+          (CPathField("a1"), (CPathField("a0"), Nil)),
+          (CPathField("b1"), (CPathField("b0"), Nil)))
+
+        input must cartesianInto(targets)(expected)
+      }
+
+      // a0 as a1, b0 as b1, d0 as d1
+      "cross fields with no parse instructions ignoring absent fields" in {
+        val input = ldjson("""
+          { "a0": "hi", "b0": null }
+          """)
+
+        val expected = ldjson("""
+          { "a1": "hi", "b1": null }
+          """)
+
+        val targets = Map(
+          (CPathField("a1"), (CPathField("a0"), Nil)),
+          (CPathField("b1"), (CPathField("b0"), Nil)),
+          (CPathField("d1"), (CPathField("d0"), Nil)))
+
+        input must cartesianInto(targets)(expected)
+      }
+
+      // a0[_] as a1, b0 as b1, c0{_} as c1
+      "cross fields with single pivot" in {
+        import ParseInstruction.Pivot
+
+        val input = ldjson("""
+          { "a0": [1, 2, 3], "b0": null, "c0": { "x": 4, "y": 5 } }
+          """)
+
+        val expected = ldjson("""
+          { "a1": 1, "b1": null, "c1": 4 }
+          { "a1": 1, "b1": null, "c1": 5 }
+          { "a1": 2, "b1": null, "c1": 4 }
+          { "a1": 2, "b1": null, "c1": 5 }
+          { "a1": 3, "b1": null, "c1": 4 }
+          { "a1": 3, "b1": null, "c1": 5 }
+          """)
+
+        val targets = Map(
+          (CPathField("a1"),
+            (CPathField("a0"), List(Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array)))),
+          (CPathField("b1"),
+            (CPathField("b0"), Nil)),
+          (CPathField("c1"),
+            (CPathField("c0"), List(Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Object)))))
+
+        input must cartesianInto(targets)(expected)
+      }
+
+      // a[_].x0.y0{_} as y, a[_].x1[_] as z, b{_:} as b, c as c
+      "cross fields with multiple nested pivots" in {
+        import ParseInstruction.{Pivot, Project}
+
+        val input = ldjson("""
+          {
+            "a": [ { "x0": { "y0": { "f": "eff", "g": "gee" }, "y1": { "h": 42 } }, "x1": [ "0", 0, null ] } ],
+            "b": { "k1": null, "k2": null },
+            "c": true
+          }
+          """)
+
+        val expected = ldjson("""
+          { "y": "eff", "z": "0" , "b": "k1", "c": true }
+          { "y": "gee", "z": "0" , "b": "k1", "c": true }
+          { "y": "eff", "z": 0   , "b": "k1", "c": true }
+          { "y": "gee", "z": 0   , "b": "k1", "c": true }
+          { "y": "eff", "z": null, "b": "k1", "c": true }
+          { "y": "gee", "z": null, "b": "k1", "c": true }
+          { "y": "eff", "z": "0" , "b": "k2", "c": true }
+          { "y": "gee", "z": "0" , "b": "k2", "c": true }
+          { "y": "eff", "z": 0   , "b": "k2", "c": true }
+          { "y": "gee", "z": 0   , "b": "k2", "c": true }
+          { "y": "eff", "z": null, "b": "k2", "c": true }
+          { "y": "gee", "z": null, "b": "k2", "c": true }
+          """)
+
+        val targets = Map(
+          (CPathField("y"),
+            (CPathField("a"), List(
+              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array),
+              Project(CPath.parse("x0")),
+              Project(CPath.parse("y0")),
+              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Object)))),
+          (CPathField("z"),
+            (CPathField("a"), List(
+              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array),
+              Project(CPath.parse("x1")),
+              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array)))),
+          (CPathField("b"),
+            (CPathField("b"), List(
+              Pivot(CPath.Identity, IdStatus.IdOnly, ParseType.Object)))),
+          (CPathField("c"),
+            (CPathField("c"), Nil)))
+
+        input must cartesianInto(targets)(expected)
+      }
+    }
+
+    def evalCartesian(cartesian: Cartesian, stream: JsonStream): JsonStream
+
+    def cartesianInto(
+        cartouches: Map[CPathField, (CPathField, List[FocusedParseInstruction])])(
+        expected: JsonStream)
+        : Matcher[JsonStream] =
+      bestSemanticEqual(expected) ^^ { str: JsonStream =>
+        evalCartesian(Cartesian(cartouches), str)
       }
   }
 }
