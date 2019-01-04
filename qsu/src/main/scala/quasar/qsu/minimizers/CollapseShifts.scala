@@ -17,7 +17,7 @@
 package quasar.qsu
 package minimizers
 
-import slamdata.Predef.{Map => SMap, _}
+import slamdata.Predef._
 import quasar.{IdStatus, RenderTreeT}, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.common.effect.NameGenerator
 import quasar.contrib.std.errorImpossible
@@ -53,6 +53,7 @@ import scalaz.{
   -\/,
   \/-,
   \/,
+  Equal,
   Free,
   Monad,
   NonEmptyList => NEL,
@@ -723,90 +724,17 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
     def compatibleShifts(l: ShiftGraph, r: ShiftGraph): Boolean = {
       (l, r) match {
-        // FIXME: compare the struct symbols, not the FreeMaps. ch1555
-        case (-\/(QSU.LeftShift(srcL, structL0, _, _, _, rotL)), -\/(QSU.LeftShift(srcR, structR0, _, _, _, rotR))) => {
-          val structL = elideGuards(structL0.linearize)
-          val structR = elideGuards(structR0.linearize)
-
-          srcL.root === srcR.root && structL === structR && rotL === rotR
-        }
+        case (-\/(QSU.LeftShift(srcL, structL, _, _, _, rotL)), -\/(QSU.LeftShift(srcR, structR, _, _, _, rotR))) =>
+          srcL.root === srcR.root &&
+            elideGuards(structL.linearize) === elideGuards(structR.linearize) &&
+            rotL === rotR
 
         case _ => false
       }
     }
 
-    def reorderCandidates(cs: List[QSUGraph]): List[QSUGraph] = {
-      type ShiftDefinition = (Symbol, FreeMap, QSU.Rotation)
-
-      def firstShiftDefinition(g: QSUGraph): Option[ShiftDefinition] = g match {
-        case ConsecutiveBounded(_, shifts) =>
-          shiftDefinition(shifts.head)
-        case _ =>
-          none
-      }
-
-      def shiftDefinition(s: ShiftGraph): Option[ShiftDefinition] = s match {
-        case -\/(QSU.LeftShift(src, struct, _, _, _, rot)) =>
-          (src.root, struct.linearize, rot).some
-        case _ => none
-      }
-
-      val (toReorder, noReorder) =
-        cs.partition(firstShiftDefinition(_).isDefined)
-
-      // Candidates zipped with their first ShiftDefinition
-      val cs0: List[(QSUGraph, ShiftDefinition)] =
-        toReorder.map(c => firstShiftDefinition(c) match {
-          case Some((shifting, struct, rot)) =>
-            (c, (shifting, elideGuards(struct), rot)).some
-          case None =>
-            none
-        }).unite
-
-
-      // FIXME: quadratic complexity. ch1555
-      val cs1 = cs0.map {
-        case (cand, (shifting, struct, rot)) => {
-          val freqCount = cs0.filter {
-            case (_, (shifting0, struct0, rot0)) => {
-              shifting === shifting0 && struct === struct0 && rot === rot0
-            }
-          }.length
-
-          (cand, freqCount, shifting)
-        }
-      }
-
-      // Avoid unnecessary reordering if there are no compatible shifts
-      // to put next to each other.
-      if (cs1.all(_._2 === 1))
-        cs
-      else
-        cs1.sortBy {
-          case (_, freqCount, shifting) => (-freqCount, shifting.name)
-        }.map(_._1) ++ noReorder
-    }
-
-    // The order of the incoming candidates is important and we need to
-    // preserve it since the Map wrapping the final coalesce refers to
-    // the candidates by their original index.  Hence, the reordering
-    // performed by reorderCandidates is only visible inside the final
-    // coalesce.
-
-    // Unlike reorderCandidates, the right int of the tuple are
-    // list positions rather than frequency counts
-    def reorderWithIndex(cs: List[(QSUGraph, Int)]): List[(QSUGraph, Int)] = {
-      val matching = SMap(cs.map(_.leftMap(_.root)): _*)
-      val reordered = reorderCandidates(cs.firsts)
-
-      reordered.map(g => (g, matching(g.root)))
-    }
-
-    for {
-      // converts all candidates to produce final results wrapped in their relevant indices
-      wrapped <- reorderWithIndex(candidates.zipWithIndex) traverse { case (g, i) => wrapCandidate(g, i) }
-
-      coalescedPair <- wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
+    def coalesceWrapped(wrapped: List[(QSUGraph, Set[Int])]): G[(QSUGraph, Set[Int])] = {
+      wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
         case ((ConsecutiveBounded(_, shifts1), leftIndices), (ConsecutiveBounded(_, shifts2), rightIndices)) =>
           val back = coalesceZip(shifts1.toList.reverse, leftIndices, shifts2.toList.reverse, rightIndices, None)
 
@@ -831,8 +759,72 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           back.map(g => (g, leftIndices ++ rightIndices))
       }
+    }
 
-      (coalesced, _) = coalescedPair
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def coalesceTier(tier: ShiftAssoc): G[(QSUGraph, Set[Int])] = tier match {
+      case ShiftAssoc.Leaves(shifts) =>
+        coalesceWrapped(shifts)
+
+      case ShiftAssoc.Branches(shifts) =>
+        shifts.traverse(coalesceTier).flatMap(coalesceWrapped)
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def reassociateShifts(wrapped: List[(QSUGraph, Set[Int])], depth: Int): ShiftAssoc = {
+      if (depth === 0) {
+        val (maps, shifts) = wrapped partition {
+          case (Map(_, _), _) => true
+          case _ => false
+        }
+
+        if (maps.isEmpty)
+          reassociateShifts(shifts, 1)
+        else
+          ShiftAssoc.Branches(List(ShiftAssoc.Leaves(maps.toList), reassociateShifts(shifts, 1)))
+      } else {
+        val parentGroups = wrapped groupBy {
+          case (ConsecutiveBounded(_, shifts), _) =>
+            // TODO this is pretty darn inefficient
+            shifts.index(shifts.length - depth).map(_.bimap(_.source.root, _.source.root))
+
+          case _ => None
+        }
+
+        // this branch is to keep the tests happy, really
+        if (parentGroups.values.forall(_.lengthCompare(1) === 0)) {
+          ShiftAssoc.Leaves(wrapped)
+        } else {
+          val outerTier = parentGroups.values.toList map { il =>
+            val structGroups = il groupBy {
+              case (ConsecutiveBounded(_, shifts), _) =>
+                shifts.index(shifts.length - depth).map(
+                  _.bimap(
+                    ls => EqWrapper((elideGuards(ls.struct.linearize), ls.rot)),
+                    mls => mls.shifts.map(t => EqWrapper((elideGuards(t._1), t._3))).distinct))
+
+              case _ =>
+                None
+            }
+
+            val tier = structGroups.toList map {
+              case (Some(_), il) => reassociateShifts(il, depth + 1)
+              case (None, il) => ShiftAssoc.Leaves(il)
+            }
+
+            ShiftAssoc.Branches(tier)
+          }
+
+          ShiftAssoc.Branches(outerTier)
+        }
+      }
+    }
+
+    for {
+      // converts all candidates to produce final results wrapped in their relevant indices
+      wrapped <- candidates.zipWithIndex traverse { case (g, i) => wrapCandidate(g, i) }
+      assoc = reassociateShifts(wrapped, 0)
+      (coalesced, _) <- coalesceTier(assoc)
 
       // we build the map node to overwrite the original autojoin (qgraph)
       back = qgraph.overwriteAtRoot(
@@ -906,6 +898,44 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       case _ =>
         None
     }
+  }
+
+  // each List within a given ShiftAssoc may be coalesced in any order, producing an equivalent result
+  private sealed trait ShiftAssoc extends Product with Serializable {
+    def explore: String
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.LeakingSealed"))
+  private object ShiftAssoc {
+
+    case class Leaves(tier: List[(QSUGraph, Set[Int])]) extends ShiftAssoc {
+      def explore = tier.map(_._1.shows).mkString("Leaves(\n", ",\n", ")")
+    }
+
+    case class Branches(tier: List[ShiftAssoc]) extends ShiftAssoc {
+      def explore = tier.map(_.explore).mkString("Branches(", ", ", ")")
+    }
+  }
+
+  // FML
+  private final class EqWrapper[A: Equal](private val inner: A) {
+
+    @SuppressWarnings(
+      Array(
+        "org.wartremover.warts.IsInstanceOf",
+        "org.wartremover.warts.AsInstanceOf"))
+    override def equals(other: Any): Boolean = {
+      if (other.isInstanceOf[EqWrapper[_]])
+        other.asInstanceOf[EqWrapper[A]].inner === inner
+      else
+        false
+    }
+
+    override def hashCode = 0
+  }
+
+  private object EqWrapper {
+    def apply[A: Equal](a: A): EqWrapper[A] = new EqWrapper(a)
   }
 
   private trait Extractor {
