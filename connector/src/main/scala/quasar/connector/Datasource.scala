@@ -37,8 +37,8 @@ trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, Q, R] {
     */
   def pathIsResource(path: ResourcePath): F[Boolean]
 
-  /** Returns the name and type of the `ResourcePath`s within the specified
-    * Datasource implied by concatenating each name to `prefixPath`.
+  /** Returns the name and type of the `ResourcePath`s implied by concatenating
+    * each name to `prefixPath` or `None` if `prefixPath` does not exist.
     */
   def prefixedChildPaths(prefixPath: ResourcePath)
       : F[Option[G[(ResourceName, ResourcePathType)]]]

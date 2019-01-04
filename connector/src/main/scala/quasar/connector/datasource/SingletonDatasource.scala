@@ -22,8 +22,8 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector._
 
-import scalaz.Applicative
-import scalaz.syntax.applicative._
+import scalaz.{Applicative, ApplicativePlus}
+import scalaz.syntax.applicativePlus._
 import scalaz.syntax.equal._
 
 /** A Datasource providing access to a single resource.
@@ -32,7 +32,7 @@ import scalaz.syntax.equal._
   * @param location the location of the resource
   * @param resource an effect producing the resource
   */
-final class SingletonDatasource[F[_]: MonadResourceErr, G[_]: Applicative, R] private (
+final class SingletonDatasource[F[_]: MonadResourceErr, G[_]: ApplicativePlus, R] private (
     tpe: DatasourceType,
     location: ResourcePath,
     resource: F[R])(
@@ -45,9 +45,9 @@ final class SingletonDatasource[F[_]: MonadResourceErr, G[_]: Applicative, R] pr
     if (path === location)
       resource
     else if (location.relativeTo(path).isDefined)
-      MonadResourceErr.raiseError(ResourceError.notAResource(path))
+      MonadResourceErr[F].raiseError(ResourceError.notAResource(path))
     else
-      MonadResourceErr.raiseError(ResourceError.pathNotFound(path))
+      MonadResourceErr[F].raiseError(ResourceError.pathNotFound(path))
   }
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
@@ -55,14 +55,15 @@ final class SingletonDatasource[F[_]: MonadResourceErr, G[_]: Applicative, R] pr
 
   def prefixedChildPaths(prefixPath: ResourcePath)
       : F[Option[G[(ResourceName, ResourcePathType)]]] =
-    F.point(location.relativeTo(prefixPath) collect {
+    F.point(location.relativeTo(prefixPath) map {
+      case ResourcePath.Root => mempty[G, (ResourceName, ResourcePathType)]
       case h /: ResourcePath.Root => (ResourceName(h), ResourcePathType.leafResource).point[G]
       case h /: _ => (ResourceName(h), ResourcePathType.prefix).point[G]
     })
 }
 
 object SingletonDatasource {
-  def apply[F[_]: Applicative: MonadResourceErr, G[_]: Applicative, R](
+  def apply[F[_]: Applicative: MonadResourceErr, G[_]: ApplicativePlus, R](
     tpe: DatasourceType,
     location: ResourcePath,
     resource: F[R])

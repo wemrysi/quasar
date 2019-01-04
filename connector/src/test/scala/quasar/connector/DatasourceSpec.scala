@@ -16,14 +16,19 @@
 
 package quasar.connector
 
-import slamdata.Predef.List
+import slamdata.Predef.{Any, List, StringContext}
 import quasar.EffectfulQSpec
 import quasar.api.resource._
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Random
 
 import cats.effect.Effect
+
+import org.specs2.matcher.MatchResult
+
 import scalaz.Scalaz._
+
 import shims._
 
 abstract class DatasourceSpec[F[_]: Effect, G[_]]
@@ -35,12 +40,53 @@ abstract class DatasourceSpec[F[_]: Effect, G[_]]
 
   def gatherMultiple[A](fga: G[A]): F[List[A]]
 
+  private val widthLimit = 10
+
+  /** Confirms that all discovered paths are reported to exist and any
+    * resource paths are confirmed as such by `pathIsResource`.
+    */
+  private def checkAgreementUnder(pfx: ResourcePath): F[MatchResult[Any]] =
+    for {
+      r <- datasource.prefixedChildPaths(pfx)
+
+      children <- r.traverse(gatherMultiple)
+
+      // Try and keep the test reasonably fast if executed on a dense datasource
+      limited <- children traverse { xs =>
+        Effect[F].delay(Random.shuffle(xs).take(widthLimit))
+      }
+
+      agree <- limited.fold(ko(s"Expected ${pfx.shows} to exist.").point[F]) { xs =>
+        xs.foldLeftM(ok) { case (mr, (n, tpe)) =>
+          val path = pfx / n
+
+          val tpeResult = tpe match {
+            case ResourcePathType.LeafResource | ResourcePathType.PrefixResource =>
+              datasource.pathIsResource(path).ifM(
+                checkAgreementUnder(path),
+                ko(s"Expected ${path.shows} to be a resource.").point[F])
+
+            case ResourcePathType.Prefix =>
+              datasource.pathIsResource(path).ifM(
+                ko(s"Expected ${path.shows} not to be a resource.").point[F],
+                checkAgreementUnder(path))
+          }
+
+          tpeResult.map(mr and _)
+        }
+      }
+    } yield agree
+
   "resource discovery" >> {
     "must not be empty" >>* {
       datasource
         .prefixedChildPaths(ResourcePath.root())
         .flatMap(_.traverse(gatherMultiple))
         .map(_.any(g => !g.empty))
+    }
+
+    "prefixed child status agrees with pathIsResource" >>* {
+      checkAgreementUnder(ResourcePath.root())
     }
 
     "children of non-existent is not found" >>* {
@@ -53,19 +99,6 @@ abstract class DatasourceSpec[F[_]: Effect, G[_]]
       datasource
         .pathIsResource(nonExistentPath)
         .map(_ must beFalse)
-    }
-
-    "prefixed child status agrees with pathIsResource" >>* {
-      datasource
-        .prefixedChildPaths(ResourcePath.root())
-        .flatMap(_.traverse(gatherMultiple))
-        .flatMap(_.anyM(_.allM {
-          case (n, ResourcePathType.LeafResource | ResourcePathType.PrefixResource) =>
-            datasource.pathIsResource(ResourcePath.root() / n)
-
-          case (n, ResourcePathType.Prefix) =>
-            datasource.pathIsResource(ResourcePath.root() / n).map(!_)
-        }))
     }
   }
 }

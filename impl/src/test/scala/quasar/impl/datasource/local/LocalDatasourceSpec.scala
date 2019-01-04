@@ -51,12 +51,6 @@ abstract class LocalDatasourceSpec
 
   def gatherMultiple[A](g: Stream[IO, A]) = g.compile.toList
 
-  "listing a file path returns none" >>* {
-    datasource
-      .prefixedChildPaths(ResourcePath.root() / ResourceName("smallZips.data"))
-      .map(_ must beNone)
-  }
-
   "returns data from a nonempty file" >>* {
     datasource
       .evaluate(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.data"), List()))

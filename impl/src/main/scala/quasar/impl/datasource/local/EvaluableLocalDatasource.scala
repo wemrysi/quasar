@@ -27,12 +27,15 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
 import quasar.qscript.InterpretedRead
 
-import java.nio.file.{Files, Path => JPath}
+import scala.Predef.classOf
+
+import java.nio.file.{Files, NoSuchFileException, Path => JPath}
+import java.nio.file.attribute.BasicFileAttributes
 
 import cats.effect.{ContextShift, Effect, Timer}
 import fs2.Stream
 import pathy.Path
-import scalaz.{\/, Scalaz}, Scalaz._
+import scalaz.{\/, OptionT, Scalaz}, Scalaz._
 import shims._
 
 /** A Datasource backed by the underlying filesystem local to Quasar.
@@ -53,18 +56,11 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
 
   val kind: DatasourceType = dsType
 
-  def evaluate(iRead: InterpretedRead[ResourcePath]): F[QueryResult[F]] = {
-    val path = iRead.path
+  def evaluate(ir: InterpretedRead[ResourcePath]): F[QueryResult[F]] =
     for {
-      jp <- toNio[F](path)
-
-      exists <- Effect[F].delay(Files.exists(jp))
-      _ <- exists.unlessM(MonadResourceErr[F].raiseError(pathNotFound(path)))
-
-      isFile <- Effect[F].delay(Files.isRegularFile(jp))
-      _ <- isFile.unlessM(MonadResourceErr[F].raiseError(notAResource(path)))
-    } yield queryResult(InterpretedRead(jp, iRead.instructions))
-  }
+      (jp, attrs) <- attributesOf(ir.path).getOrElseF(RE.raiseError(pathNotFound(ir.path)))
+      _ <- attrs.isRegularFile.unlessM(RE.raiseError(notAResource(ir.path)))
+    } yield queryResult(InterpretedRead(jp, ir.instructions))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     toNio[F](path) >>= (jp => F.delay(Files.isRegularFile(jp)))
@@ -75,18 +71,24 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
         .map(_.fold(ResourcePathType.leafResource, ResourcePathType.prefix))
         .strengthL(toResourceName(jp))
 
-    for {
-      jp <- toNio[F](path)
-
-      isDir <- F.delay(Files.isDirectory(jp))
-
-      children = isDir option {
+    val res = attributesOf(path) map {
+      case (jp, attrs) if attrs.isDirectory =>
         convert.fromJavaStream(F.delay(Files.list(jp))).evalMap(withType)
-      }
-    } yield children
+
+      case _ => Stream.empty
+    }
+
+    res.run
   }
 
   ////
+
+  private def attributesOf(resourcePath: ResourcePath): OptionT[F, (JPath, BasicFileAttributes)] =
+    OptionT(toNio[F](resourcePath) flatMap { jpath =>
+      F.recover(F.delay(some((jpath, Files.readAttributes(jpath, classOf[BasicFileAttributes]))))) {
+        case _: NoSuchFileException => none
+      }
+    })
 
   private def toNio[F[_]: Effect](rp: ResourcePath): F[JPath] =
     Path.flatten("", "", "", ι, ι, rp.toPath).foldLeftM(root) { (p, n) =>
