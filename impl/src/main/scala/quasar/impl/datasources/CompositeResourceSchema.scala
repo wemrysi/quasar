@@ -21,7 +21,7 @@ import slamdata.Predef.{Double, List, Option, String}
 import quasar.api.resource.ResourcePath
 import quasar.connector.{MonadResourceErr, QueryResult}
 import quasar.ejson.EJson
-import quasar.impl.datasource.AggregateResult
+import quasar.impl.datasource.CompositeResult
 import quasar.impl.parsing.ResourceParser
 import quasar.impl.schema._
 import quasar.sst.SST
@@ -43,7 +43,7 @@ import scalaz.Order
 import spire.algebra.Field
 import spire.math.ConvertableTo
 
-final class AggregateResourceSchema[
+final class CompositeResourceSchema[
     F[_]: Concurrent: MonadResourceErr,
     J: Order,
     N: ConvertableTo: Field: Order] private (
@@ -52,15 +52,15 @@ final class AggregateResourceSchema[
     timer: Timer[F],
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson])
-    extends ResourceSchema[F, SstConfig[J, N], (ResourcePath, AggregateResult[F, QueryResult[F]])] {
+    extends ResourceSchema[F, SstConfig[J, N], (ResourcePath, CompositeResult[F, QueryResult[F]])] {
 
-  import AggregateResourceSchema.{ComponentSampleFactor, SourceKey, ValueKey}
+  import CompositeResourceSchema.{ComponentSampleFactor, SourceKey, ValueKey}
 
   private val sstResourceSchema = SstResourceSchema[F, J, N](evalConfig)
 
   def apply(
       sstConfig: SstConfig[J, N],
-      resource: (ResourcePath, AggregateResult[F, QueryResult[F]]),
+      resource: (ResourcePath, CompositeResult[F, QueryResult[F]]),
       timeLimit: FiniteDuration)
       : F[Option[sstConfig.Schema]] = {
 
@@ -107,7 +107,7 @@ final class AggregateResourceSchema[
   }
 }
 
-object AggregateResourceSchema {
+object CompositeResourceSchema {
   // Each component of the aggregate will be sampled this factor of the total
   // sample size.
   val ComponentSampleFactor: Double = 0.1
@@ -124,6 +124,6 @@ object AggregateResourceSchema {
       timer: Timer[F],
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
-      : ResourceSchema[F, SstConfig[J, N], (ResourcePath, AggregateResult[F, QueryResult[F]])] =
-    new AggregateResourceSchema[F, J, N](evalConfig)
+      : ResourceSchema[F, SstConfig[J, N], (ResourcePath, CompositeResult[F, QueryResult[F]])] =
+    new CompositeResourceSchema[F, J, N](evalConfig)
 }

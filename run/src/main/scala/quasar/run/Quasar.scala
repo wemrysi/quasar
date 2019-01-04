@@ -28,9 +28,9 @@ import quasar.contrib.std.uuid._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.impl.DatasourceModule
-import quasar.impl.datasource.AggregateResult
+import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources.{
-  AggregateResourceSchema,
+  CompositeResourceSchema,
   DefaultDatasources,
   DefaultDatasourceErrors,
   DefaultDatasourceManager,
@@ -77,7 +77,7 @@ final class Quasar[F[_], R, S](
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 object Quasar extends Logging {
 
-  type EvalResult[F[_]] = Either[QueryResult[F], Stream[F, (ResourcePath, QSMap[Fix, QueryResult[F]])]]
+  type EvalResult[F[_]] = Either[QueryResult[F], AggregateResult[F, QSMap[Fix, QueryResult[F]]]]
 
   type LookupRunning[F[_]] = UUID => F[Option[ManagedDatasource[Fix, F, Stream[F, ?], EvalResult[F]]]]
 
@@ -119,7 +119,7 @@ object Quasar extends Logging {
 
       freshUUID = ConcurrentEffect[F].delay(UUID.randomUUID)
 
-      resourceSchema = AggregateResourceSchema[F, Fix[EJson], Double](sstEvalConfig)
+      resourceSchema = CompositeResourceSchema[F, Fix[EJson], Double](sstEvalConfig)
 
       datasources =
         DefaultDatasources(freshUUID, datasourceRefs, dsErrors, dsManager, resourceSchema)
@@ -139,16 +139,16 @@ object Quasar extends Logging {
 
   ////
 
-  import AggregateResourceSchema.{SourceKey, ValueKey}
+  import CompositeResourceSchema.{SourceKey, ValueKey}
 
   private val rec = construction.RecFunc[Fix]
   private val ejs = Fixed[Fix[EJson]]
 
   private def reifiedAggregateDs[F[_]: Functor, G[_]]
-      : Datasource[F, G, ?, AggregateResult[F, QueryResult[F]]] ~> Datasource[F, G, ?, EvalResult[F]] =
-    new (Datasource[F, G, ?, AggregateResult[F, QueryResult[F]]] ~> Datasource[F, G, ?, EvalResult[F]]) {
-      def apply[A](ds: Datasource[F, G, A, AggregateResult[F, QueryResult[F]]]) = {
-        val l = Datasource.pevaluator[F, G, A, AggregateResult[F, QueryResult[F]], A, EvalResult[F]]
+      : Datasource[F, G, ?, CompositeResult[F, QueryResult[F]]] ~> Datasource[F, G, ?, EvalResult[F]] =
+    new (Datasource[F, G, ?, CompositeResult[F, QueryResult[F]]] ~> Datasource[F, G, ?, EvalResult[F]]) {
+      def apply[A](ds: Datasource[F, G, A, CompositeResult[F, QueryResult[F]]]) = {
+        val l = Datasource.pevaluator[F, G, A, CompositeResult[F, QueryResult[F]], A, EvalResult[F]]
         l.modify(_.map(_.map(reifyAggregateStructure)))(ds)
       }
     }

@@ -44,13 +44,13 @@ import shims._
 final class ChildAggregatingDatasource[F[_]: Monad: MonadResourceErr, Q, R] private (
     underlying: Datasource[F, Stream[F, ?], Q, R],
     queryPath: Lens[Q, ResourcePath])
-    extends Datasource[F, Stream[F, ?], Q, AggregateResult[F, R]] {
+    extends Datasource[F, Stream[F, ?], Q, CompositeResult[F, R]] {
 
   def kind: DatasourceType =
     underlying.kind
 
-  def evaluate(q: Q): F[AggregateResult[F, R]] = {
-    def aggregate(p: ResourcePath): F[Stream[F, (ResourcePath, R)]] =
+  def evaluate(q: Q): F[CompositeResult[F, R]] = {
+    def aggregate(p: ResourcePath): F[AggregateResult[F, R]] =
       underlying.prefixedChildPaths(p) flatMap {
         case Some(s) =>
           val agg =
@@ -93,6 +93,6 @@ object ChildAggregatingDatasource {
   def apply[F[_]: Monad: MonadResourceErr, Q, R](
       underlying: Datasource[F, Stream[F, ?], Q, R],
       queryPath: Lens[Q, ResourcePath])
-      : Datasource[F, Stream[F, ?], Q, AggregateResult[F, R]] =
+      : Datasource[F, Stream[F, ?], Q, CompositeResult[F, R]] =
     new ChildAggregatingDatasource(underlying, queryPath)
 }

@@ -28,7 +28,7 @@ import quasar.contrib.matryoshka.envT
 import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
-import quasar.impl.datasource.AggregateResult
+import quasar.impl.datasource.CompositeResult
 import quasar.impl.schema._
 import quasar.sst._
 import quasar.sst.StructuralType.TypeST
@@ -61,9 +61,9 @@ import shims.{eqToScalaz => _, orderToScalaz => _, _}
 
 import spire.std.double._
 
-object AggregateResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
+object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
 
-  import AggregateResourceSchema.{SourceKey, ValueKey}
+  import CompositeResourceSchema.{SourceKey, ValueKey}
 
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
@@ -109,8 +109,8 @@ object AggregateResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
       Stream.emits(BoolsData.mkString("\n").getBytes(Charset.forName("UTF-8"))),
       Nil)
 
-  val resourceSchema: ResourceSchema[IO, SstConfig[Fix[EJson], Double], (ResourcePath, AggregateResult[IO, QueryResult[IO]])] =
-    AggregateResourceSchema[IO, Fix[EJson], Double](SstEvalConfig(20L, 1L, 100L))
+  val resourceSchema: ResourceSchema[IO, SstConfig[Fix[EJson], Double], (ResourcePath, CompositeResult[IO, QueryResult[IO]])] =
+    CompositeResourceSchema[IO, Fix[EJson], Double](SstEvalConfig(20L, 1L, 100L))
 
   "computes an SST of parsed data" >>* {
     resourceSchema(defaultCfg, (path, Left(parsedResult)), 1.hour) map { qsst =>

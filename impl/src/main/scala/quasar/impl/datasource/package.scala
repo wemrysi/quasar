@@ -23,5 +23,6 @@ import scala.util.Either
 import fs2.Stream
 
 package object datasource {
-  type AggregateResult[F[_], R] = Either[R, Stream[F, (ResourcePath, R)]]
+  type AggregateResult[F[_], A] = Stream[F, (ResourcePath, A)]
+  type CompositeResult[F[_], A] = Either[A, AggregateResult[F, A]]
 }
