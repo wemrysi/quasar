@@ -16,13 +16,30 @@
 
 package quasar.contrib.cats
 
-import quasar.contrib.scalaz.{MonadListen_, MonadTell_}
+import quasar.contrib.scalaz.{MonadError_, MonadListen_, MonadTell_}
 
-import cats.{Applicative, Functor}
+import cats.{Applicative, Functor, Monoid}
 import cats.data.WriterT
 import cats.syntax.functor._
 
-object writerT {
+object writerT extends WriterTInstances {
+  implicit def catsWriterTMonadError_[E, F[_]: Functor: MonadError_[?[_], E], W: Monoid]
+      : MonadError_[WriterT[F, W, ?], E] =
+    new MonadError_[WriterT[F, W, ?], E] {
+      def raiseError[A](e: E): WriterT[F, W, A] =
+        WriterT(MonadError_[F, E].raiseError[(W, A)](e))
+
+      def handleError[A](fa: WriterT[F, W, A])(f: E => WriterT[F, W, A]): WriterT[F, W, A] =
+        WriterT(MonadError_[F, E].handleError(fa.run)(e => f(e).run))
+    }
+
+  implicit def catsWriterTNestedMonadTell_[W: Monoid, X, F[_]: Applicative: MonadTell_[?[_], X]]: MonadTell_[WriterT[F, W, ?], X] =
+    new MonadTell_[WriterT[F, W, ?], X] {
+      def writer[A](x: X, a: A) = WriterT.liftF(MonadTell_[F, X].writer(x, a))
+    }
+}
+
+sealed abstract class WriterTInstances {
   implicit def catsWriterTMonadListen_[F[_]: Functor, W]: MonadListen_[WriterT[F, W, ?], W] =
     new MonadListen_[WriterT[F, W, ?], W] {
       def listen[A](fa: WriterT[F, W, A]) =
