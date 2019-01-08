@@ -18,16 +18,19 @@ package quasar
 
 import slamdata.Predef._
 
-import quasar.common.CPath
+import quasar.common.{CPath, CPathField}
 
 import scalaz.{Cord, Equal, Show}
+import scalaz.std.list._
 import scalaz.std.map._
 import scalaz.std.set._
 import scalaz.std.string._
+import scalaz.std.tuple._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
 
-sealed abstract class ParseInstruction extends Product with Serializable
+sealed trait ParseInstruction extends Product with Serializable
+sealed trait FocusedParseInstruction extends ParseInstruction
 
 object ParseInstruction {
 
@@ -36,20 +39,20 @@ object ParseInstruction {
    * the identities in the first component, the original values in the second.
    * Just like `Pivot` with `IdStatus.IncludeId`.
    */
-  case object Ids extends ParseInstruction
+  case object Ids extends FocusedParseInstruction
 
   /**
    * Wraps the provided `path` into an object with key `name`, thus adding
    * another layer of structure. All other paths are retained.
    */
-  final case class Wrap(path: CPath, name: String) extends ParseInstruction
+  final case class Wrap(path: CPath, name: String) extends FocusedParseInstruction
 
   /**
    *`Masks` represents the disjunction of the provided `masks`. An empty map indicates
    * that all values should be dropped. Removes all values which are not in one of the
    * path/type designations. The inner set is assumed to be non-empty.
    */
-  final case class Mask(masks: Map[CPath, Set[ParseType]]) extends ParseInstruction
+  final case class Mask(masks: Map[CPath, Set[ParseType]]) extends FocusedParseInstruction
 
   /**
    * Pivots the indices and keys out of arrays and objects, respectively,
@@ -64,16 +67,24 @@ object ParseInstruction {
    * No values outside of the pivot locus should be retained.
    */
   final case class Pivot(path: CPath, status: IdStatus, structure: CompositeParseType)
-      extends ParseInstruction
+      extends FocusedParseInstruction
 
   /**
    * Extracts the value at `path`, eliminating all surrounding structure.
    */
-  final case class Project(path: CPath) extends ParseInstruction
+  final case class Project(path: CPath) extends FocusedParseInstruction
+
+  /**
+   * Applies the provided `List[FocusedParseInstruction]` to each tupled `CPathField`
+   * projection in the `Map` values. Then cartesians those results, wrapping them in the
+   * `CPathField` map key.
+   */
+  final case class Cartesian(cartouches: Map[CPathField, (CPathField, List[FocusedParseInstruction])])
+      extends ParseInstruction
 
   ////
 
-  implicit val parseInstructionEqual: Equal[ParseInstruction] =
+  implicit val focusedParseInstructionEqual: Equal[FocusedParseInstruction] =
     Equal.equal {
       case (Ids, Ids) => true
       case (Wrap(p1, n1), Wrap(p2, n2)) => p1 === p2 && n1 === n2
@@ -83,7 +94,15 @@ object ParseInstruction {
       case (_, _) => false
     }
 
-  implicit val parseInstructionShow: Show[ParseInstruction] =
+  implicit val parseInstructionEqual: Equal[ParseInstruction] =
+    Equal.equal {
+      case (Cartesian(c1), Cartesian(c2)) => c1 === c2
+      case (p1: FocusedParseInstruction, p2: FocusedParseInstruction) =>
+        focusedParseInstructionEqual.equal(p1, p2)
+      case (_, _) => false
+    }
+
+  implicit val focusedParseInstructionShow: Show[FocusedParseInstruction] =
     Show.show {
       case Ids => Cord("Ids")
       case Wrap(p, n) => Cord("Wrap(") ++ p.show ++ Cord(", ") ++ n.show ++ Cord(")")
@@ -91,5 +110,11 @@ object ParseInstruction {
       case Pivot(p, s, t) =>
         Cord("Pivot(") ++ p.show ++ Cord(", ") ++ s.show ++ Cord(", ") ++ t.show  ++ Cord(")")
       case Project(p) => Cord("Project(") ++ p.show ++ Cord(")")
+    }
+
+  implicit val parseInstructionShow: Show[ParseInstruction] =
+    Show.show {
+      case Cartesian(p) => Cord("Cartesian(") ++ p.show ++ Cord(")")
+      case p: FocusedParseInstruction => focusedParseInstructionShow.show(p)
     }
 }

@@ -18,7 +18,7 @@ package quasar.common
 
 import slamdata.Predef._
 
-import scalaz.{Cord, Show}
+import scalaz.{Cord, Order, Show}
 import scalaz.Ordering._
 import scalaz.std.anyVal._
 import scalaz.std.list._
@@ -96,6 +96,11 @@ object CPathNode {
 
 final case class CPathField(name: String) extends CPathNode {
   override def toString = "." + name
+}
+
+object CPathField {
+  implicit val order: Order[CPathField] = Order.orderBy(_.name)
+  implicit val show: Show[CPathField] = Show.shows(cpf => s"CPathField(${cpf.name.shows})")
 }
 
 final case class CPathMeta(name: String) extends CPathNode {
