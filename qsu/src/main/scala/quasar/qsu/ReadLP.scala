@@ -23,6 +23,7 @@ import quasar.{
   Mapping,
   NullaryFunc,
   Reduction,
+  Sifting,
   TernaryFunc,
   UnaryFunc
 }
@@ -191,6 +192,12 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       nullary[G](translated)
 
     case lp.InvokeUnapply(func: UnaryFunc, Sized(a)) if func.effect === Mapping =>
+      val translated =
+        MapFunc.translateUnaryMapping[T, MapFunc, Hole].apply(func)(SrcHole)
+
+      extend1[G](a)(QSU.Unary[T, Symbol](_, translated))
+
+    case lp.InvokeUnapply(func: UnaryFunc, Sized(a)) if func.effect === Sifting =>
       val translated =
         MapFunc.translateUnaryMapping[T, MapFunc, Hole].apply(func)(SrcHole)
 

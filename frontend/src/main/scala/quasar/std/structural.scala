@@ -90,6 +90,31 @@ trait StructuralLib extends Library {
     "Checks for the existence of the specified key in a map",
     noSimplification)
 
+  val AsNumber: UnaryFunc = UnaryFunc(
+    Sifting,
+    "Specifies the expected type of a value (number)",
+    noSimplification)
+
+  val AsString: UnaryFunc = UnaryFunc(
+    Sifting,
+    "Specifies the expected type of a value (string)",
+    noSimplification)
+
+  val AsBoolean: UnaryFunc = UnaryFunc(
+    Sifting,
+    "Specifies the expected type of a value (boolean)",
+    noSimplification)
+
+  val AsDate: UnaryFunc = UnaryFunc(
+    Sifting,
+    "Specifies the expected type of a value (date)",
+    noSimplification)
+
+  val AsNull: UnaryFunc = UnaryFunc(
+    Sifting,
+    "Specifies the expected type of a value (null)",
+    noSimplification)
+
   val FlattenMap = UnaryFunc(
     Expansion,
     "Zooms in on the values of a map, extending the current dimension with the keys",
