@@ -16,7 +16,7 @@
 
 package quasar.impl.datasource
 
-import slamdata.Predef.{Boolean, None, Option, Some}
+import slamdata.Predef.{Boolean, None, Option, Some, Unit}
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
@@ -24,7 +24,7 @@ import quasar.connector.{Datasource, MonadResourceErr, ResourceError}
 import quasar.contrib.matryoshka.totally
 import quasar.contrib.scalaz._
 
-import scala.util.{Left, Right}
+import scala.util.{Either, Left, Right}
 
 import cats.{Functor, Monad}
 import cats.instances.option._
@@ -41,31 +41,38 @@ import shims._
 /** A datasource transformer that converts underlying prefix paths into prefix
   * resources by aggregating all child leaf resources of the prefix.
   */
-final class ChildAggregatingDatasource[F[_]: Monad: MonadResourceErr, Q, R] private (
+final class ChildAggregatingDatasource[F[_]: Monad: MonadResourceErr, Q, R, S, T] private (
     underlying: Datasource[F, Stream[F, ?], Q, R],
-    queryPath: Lens[Q, ResourcePath])
-    extends Datasource[F, Stream[F, ?], Q, CompositeResult[F, R]] {
+    queryPath: Q => ResourcePath,
+    componentQuery: (Q, ResourcePath) => (Q, S),
+    componentResult: (R, S) => T)
+    extends Datasource[F, Stream[F, ?], Q, Either[R, AggregateResult[F, T]]] {
 
   def kind: DatasourceType =
     underlying.kind
 
-  def evaluate(q: Q): F[CompositeResult[F, R]] = {
-    def aggregate(p: ResourcePath): F[AggregateResult[F, R]] =
+  def evaluate(q: Q): F[Either[R, AggregateResult[F, T]]] = {
+    def aggregate(p: ResourcePath): F[AggregateResult[F, T]] =
       underlying.prefixedChildPaths(p) flatMap {
         case Some(s) =>
-          val agg =
-            s.collect { case (n, ResourcePathType.LeafResource) => p / n }
-              .evalMap(r => underlying.evaluate(queryPath.set(r)(q)).tupleLeft(r).attempt)
-              .map(_.toOption)
-              .unNone
+          val resources =
+            s collect {
+              case (n, ResourcePathType.LeafResource) => p / n
+            }
 
-          agg.pure[F]
+          val results =
+            resources evalMap { cp =>
+              val (cq, s) = componentQuery(q, cp)
+              underlying.evaluate(cq).map(r => (cp, componentResult(r, s))).attempt
+            }
+
+          results.map(_.toOption).unNone.pure[F]
 
         case None =>
           MonadResourceErr[F].raiseError(ResourceError.pathNotFound(p))
       }
 
-    val qpath = queryPath.get(q)
+    val qpath = queryPath(q)
 
     underlying.pathIsResource(qpath).ifM(
       underlying.evaluate(q).map(Left(_)),
@@ -90,9 +97,17 @@ final class ChildAggregatingDatasource[F[_]: Monad: MonadResourceErr, Q, R] priv
 }
 
 object ChildAggregatingDatasource {
-  def apply[F[_]: Monad: MonadResourceErr, Q, R](
+  def apply[F[_]: Monad: MonadResourceErr, Q, R, S, T](
+      underlying: Datasource[F, Stream[F, ?], Q, R])(
+      queryPath: Q => ResourcePath,
+      componentQuery: (Q, ResourcePath) => (Q, S),
+      componentResult: (R, S) => T)
+      : Datasource[F, Stream[F, ?], Q, Either[R, AggregateResult[F, T]]] =
+    new ChildAggregatingDatasource(underlying, queryPath, componentQuery, componentResult)
+
+  def composite[F[_]: Monad: MonadResourceErr, Q, R](
       underlying: Datasource[F, Stream[F, ?], Q, R],
       queryPath: Lens[Q, ResourcePath])
       : Datasource[F, Stream[F, ?], Q, CompositeResult[F, R]] =
-    new ChildAggregatingDatasource(underlying, queryPath)
+    apply(underlying)(queryPath.get, (q, p) => (queryPath.set(p)(q), ()), (r, _: Unit) => r)
 }

@@ -59,7 +59,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
         ResourcePath.root() / ResourceName("d") -> 5))
 
   val datasource =
-    ChildAggregatingDatasource(underlying, Lens.id)
+    ChildAggregatingDatasource.composite(underlying, Lens.id)
 
   def nonExistentPath: ResourcePath =
     ResourcePath.root() / ResourceName("x") / ResourceName("y")
@@ -101,7 +101,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
             }
         }
 
-      val ds = ChildAggregatingDatasource(uds, Lens.id)
+      val ds = ChildAggregatingDatasource.composite(uds, Lens.id)
 
       for {
         dres <- ds.prefixedChildPaths(ResourcePath.root())
