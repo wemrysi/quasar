@@ -87,7 +87,7 @@ object MapFunc {
     case structural.AsNumber => a => MFD(D.Typecheck(a, Type.Numeric))
     case structural.AsString => a => MFD(D.Typecheck(a, Type.Str))
     case structural.AsBoolean => a => MFD(D.Typecheck(a, Type.Bool))
-    case structural.AsDate => a => MFD(D.Typecheck(a, Type.OffsetDateTime))
+    case structural.AsDate => a => MFD(D.Typecheck(a, Type.DateTime))
     case structural.AsNull => a => MFD(D.Typecheck(a, Type.Null))
     case structural.MakeArray => a => MFC(C.MakeArray(a))
     case structural.Meta => a => MFC(C.Meta(a))
