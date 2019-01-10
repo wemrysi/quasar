@@ -16,7 +16,7 @@
 
 package quasar.impl.datasources.middleware
 
-import slamdata.Predef.{???, String}
+import slamdata.Predef._
 
 import quasar.{ParseInstruction => PI}
 import quasar.api.resource.ResourcePath
@@ -25,16 +25,20 @@ import quasar.connector.{Datasource, MonadResourceErr}
 import quasar.ejson.{EJson, Fixed}
 import quasar.impl.datasource.{AggregateResult, ChildAggregatingDatasource}
 import quasar.impl.datasources.ManagedDatasource
-import quasar.qscript.{construction, InterpretedRead, Map, QScriptEducated, RecFreeMap}
+import quasar.qscript.{construction, Hole, InterpretedRead, Map, MapFunc, QScriptEducated, RecFreeMap}
+import quasar.qscript.RecFreeS._
 
 import scala.util.{Either, Left}
 
 import cats.Monad
+import cats.syntax.flatMap._
 import cats.syntax.functor._
 
 import fs2.Stream
 
 import matryoshka.data.Fix
+
+import pathy.Path.posixCodec
 
 import shims._
 
@@ -78,24 +82,71 @@ object ChildAggregatingMiddleware {
 
     val SrcField = CPath.parse("." + sourceKey)
     val ValField = CPath.parse("." + valueKey)
-/*
-    def go(
-      in: List[ParseInstruction],
-      spath: CPath,
-      vpath: CPath)
-      : (List[ParseInstruction], Option[CPath], Option[CPath]) =
 
-    instrs match {
+    def sourceFunc = rec.Constant[Hole](EJson.str[Fix[EJson]](posixCodec.printPath(cp.toPath)))
+
+    def reifyPath(path: List[String]): RecFreeMap[Fix] =
+      path.foldRight(rec.Hole)(rec.MakeMapS)
+
+    def reifyStructure(
+        sourceLoc: Option[List[String]],
+        valueLoc: Option[List[String]])
+        : RecFreeMap[Fix] =
+      (sourceLoc, valueLoc) match {
+        case (Some(sloc), Some(vloc)) =>
+          rec.ConcatMaps(reifyPath(sloc) >> sourceFunc, reifyPath(vloc))
+
+        case (Some(sloc), None) => reifyPath(sloc) >> sourceFunc
+        case (None, Some(vloc)) => reifyPath(vloc)
+        case (None, None) => rec.Undefined
+      }
+
+    def go(in: List[PI], spath: CPath, vpath: CPath)
+        : Option[(List[PI], Option[List[String]], Option[List[String]])] =
+      in match {
+        case PI.Project(p) :: t if p.hasPrefix(spath) =>
+          if (p === spath)
+            (t, Some(List()), None)
+          else
+            (List(), None, None)
+
+        case PI.Project(p) :: t if p.hasPrefix(vpath) =>
+          if (p === vpath)
+            (t, None, Some(List()))
+          else
+            (PI.Project(p.dropPrefix(vpath)) :: t, None, Some(List()))
+
+        case PI.Project(_) :: _ =>
+          (List(), None, None)
+
+        case PI.Mask(mask) :: t if mask.size === 1 =>
+          mask.toList.foldLeftM(List[(CPath, Set[ParseType])]()) {
+            case (xs, (p, tpes)) =>
+          }
+
+        case PI.Mask(mask) :: t =>
+
+        case other =>
+          (other, Some(List(sourceKey)), Some(List(valueKey)))
+      }
+
+    ir.instructions match {
       case PI.Ids :: PI.Project(IdIdx) :: _ =>
-        (instrs, rec.Hole)
+        (InterpretedRead(cp, ir.instructions), rec.Hole)
 
       case PI.Ids :: rest =>
         val (out, s, v) = go(rest, ValIdx \ SrcField, ValIdx \ ValField)
 
+        val structure =
+          rec.ConcatArrays(
+            rec.MakeArray(rec.ProjectIndexI(rec.Hole, 0)),
+            rec.MakeArray(reifyStructure(s, v) >> rec.ProjectIndexI(rec.Hole, 1)))
+
+        (InterpretedRead(cp, PI.Ids :: out), structure)
+
       case rest =>
         val (out, s, v) = go(rest, SrcField, ValField)
+        (InterpretedRead(cp, out), reifyStructure(s, v))
     }
-*/
-    ???
   }
 }

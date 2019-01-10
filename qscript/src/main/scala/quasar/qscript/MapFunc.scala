@@ -17,11 +17,24 @@
 package quasar.qscript
 
 import quasar._
+import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta}
+import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.qscript.{MapFuncsCore => C, MapFuncsDerived => D}
 import quasar.std.StdLib._
-import quasar.contrib.iota.{:<<:, ACopK}
+
+import matryoshka.CorecursiveT
+
+import scalaz.Free
 
 object MapFunc {
+  def fromCPathProjection[T[_[_]]: CorecursiveT](cpath: CPath): FreeMap[T] =
+    cpath.nodes.foldLeft(HoleF[T]) {
+      case (fm, CPathArray) => fm
+      case (fm, CPathField(n)) => Free(MFC(C.ProjectKey(fm, C.StrLit(n))))
+      case (fm, CPathIndex(i)) => Free(MFC(C.ProjectIndex(fm, C.IntLit(i))))
+      case (fm, CPathMeta(n)) => Free(MFC(C.ProjectKey(Free(MFC(C.Meta(fm))), C.StrLit(n))))
+    }
+
   def translateNullaryMapping[T[_[_]], MF[a] <: ACopK[a] , A]
       (implicit MFC: MapFuncCore[T, ?] :<<: MF)
       : scala.PartialFunction[NullaryFunc, MF[A]] = {
