@@ -47,14 +47,16 @@ final class CompositeResourceSchema[
     F[_]: Concurrent: MonadResourceErr,
     J: Order,
     N: ConvertableTo: Field: Order] private (
-    evalConfig: SstEvalConfig)(
+    evalConfig: SstEvalConfig,
+    sourceKey: String,
+    valueKey: String)(
     implicit
     timer: Timer[F],
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson])
     extends ResourceSchema[F, SstConfig[J, N], (ResourcePath, CompositeResult[F, QueryResult[F]])] {
 
-  import CompositeResourceSchema.{ComponentSampleFactor, SourceKey, ValueKey}
+  import CompositeResourceSchema.ComponentSampleFactor
 
   private val sstResourceSchema = SstResourceSchema[F, J, N](evalConfig)
 
@@ -80,7 +82,7 @@ final class CompositeResourceSchema[
     def attributeSource(rp: ResourcePath)(valSst: S): S = {
       val srcSst = sstQDataEncode.makeString(posixCodec.printPath(rp.toPath))
 
-      val assocs = List(SourceKey -> srcSst, ValueKey -> valSst)
+      val assocs = List(sourceKey -> srcSst, valueKey -> valSst)
 
       sstQDataEncode.makeObject(
         assocs.foldLeft(sstQDataEncode.prepObject) {
@@ -112,18 +114,17 @@ object CompositeResourceSchema {
   // sample size.
   val ComponentSampleFactor: Double = 0.1
 
-  val SourceKey: String = "source"
-  val ValueKey: String = "value"
-
   def apply[
       F[_]: Concurrent: MonadResourceErr,
       J: Order,
       N: ConvertableTo: Field: Order](
-      evalConfig: SstEvalConfig)(
+      evalConfig: SstEvalConfig,
+      sourceKey: String,
+      valueKey: String)(
       implicit
       timer: Timer[F],
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
       : ResourceSchema[F, SstConfig[J, N], (ResourcePath, CompositeResult[F, QueryResult[F]])] =
-    new CompositeResourceSchema[F, J, N](evalConfig)
+    new CompositeResourceSchema[F, J, N](evalConfig, sourceKey, valueKey)
 }

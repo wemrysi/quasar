@@ -63,8 +63,6 @@ import spire.std.double._
 
 object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
 
-  import CompositeResourceSchema.{SourceKey, ValueKey}
-
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
@@ -91,8 +89,8 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
     TypeStat.coll(5.0, Some(2.0), Some(2.0)),
     TypeST(TypeF.map[Fix[EJson], SST[Fix[EJson], Double]](
       IMap(
-        EJson.str[Fix[EJson]](SourceKey) -> srcSst,
-        EJson.str[Fix[EJson]](ValueKey) -> sst),
+        EJson.str[Fix[EJson]]("source") -> srcSst,
+        EJson.str[Fix[EJson]]("value") -> sst),
       None))).embed
 
   val schema = SstSchema.fromSampled(100.0, sst)
@@ -110,7 +108,10 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
       Nil)
 
   val resourceSchema: ResourceSchema[IO, SstConfig[Fix[EJson], Double], (ResourcePath, CompositeResult[IO, QueryResult[IO]])] =
-    CompositeResourceSchema[IO, Fix[EJson], Double](SstEvalConfig(20L, 1L, 100L))
+    CompositeResourceSchema[IO, Fix[EJson], Double](
+      SstEvalConfig(20L, 1L, 100L),
+      "source",
+      "value")
 
   "computes an SST of parsed data" >>* {
     resourceSchema(defaultCfg, (path, Left(parsedResult)), 1.hour) map { qsst =>
