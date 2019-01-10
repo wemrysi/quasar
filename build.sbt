@@ -7,6 +7,20 @@ import scala.{Boolean, Some, StringContext, sys}
 import scala.Predef._
 import scala.collection.Seq
 
+import Versions._
+
+def readVersion(path: File): String =
+  IO.read(path).trim
+
+lazy val fs2GzipVersion = Def.setting[String](
+  readVersion(baseDirectory.value / ".." / "fs2-gzip-version"))
+
+lazy val qdataVersion = Def.setting[String](
+  readVersion(baseDirectory.value / ".." / "qdata-version"))
+
+lazy val tectonicVersion = Def.setting[String](
+  readVersion(baseDirectory.value / ".." / "tectonic-version"))
+
 lazy val buildSettings = Seq(
   initialize := {
     val version = sys.props("java.specification.version")
@@ -95,14 +109,50 @@ lazy val foundation = project
   .settings(
     buildInfoKeys := Seq[BuildInfoKey](version),
     buildInfoPackage := "quasar.build",
-    libraryDependencies ++= Dependencies.foundation)
+
+    libraryDependencies ++= Seq(
+      "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
+      "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
+      "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
+      "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
+      "com.codecommit"             %% "shims"                     % "1.2.1",
+      "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
+      "co.fs2"                     %% "fs2-core"                  % fs2Version,
+      "co.fs2"                     %% "fs2-io"                    % fs2Version,
+      "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
+      "org.typelevel"              %% "algebra"                   % algebraVersion,
+      "org.typelevel"              %% "spire"                     % spireVersion,
+      "io.argonaut"                %% "argonaut"                  % argonautVersion,
+      "io.argonaut"                %% "argonaut-scalaz"           % argonautVersion,
+      "com.slamdata"               %% "matryoshka-core"           % matryoshkaVersion,
+      "com.slamdata"               %% "pathy-core"                % pathyVersion,
+      "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
+      "com.slamdata"               %% "qdata-time"                % qdataVersion.value,
+      "eu.timepit"                 %% "refined"                   % refinedVersion,
+      "com.chuusai"                %% "shapeless"                 % shapelessVersion,
+      "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
+      "com.propensive"             %% "contextual"                % "1.0.1",
+      "io.frees"                   %% "iotaz-core"                % "0.3.8",
+      "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
+      "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
+      "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
+      "org.typelevel"              %% "spire-laws"                % spireVersion                         % Test,
+      "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
+      "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
+      "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
+      "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.14") % Test,
+      "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.0"                              % Test))
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
 lazy val api = project
   .settings(name := "quasar-api")
   .dependsOn(foundation % BothScopes)
-  .settings(libraryDependencies ++= Dependencies.api)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.github.julien-truffaut" %% "monocle-macro"      % monocleVersion,
+      "eu.timepit"                 %% "refined-scalaz"     % refinedVersion,
+      "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test))
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -112,7 +162,12 @@ lazy val api = project
 lazy val ejson = project
   .settings(name := "quasar-ejson")
   .dependsOn(foundation % BothScopes)
-  .settings(libraryDependencies ++= Dependencies.ejson)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.slamdata" %% "qdata-core" % qdataVersion.value,
+      "com.slamdata" %% "qdata-time" % qdataVersion.value,
+      "com.slamdata" %% "qdata-core" % qdataVersion.value % "test->test" classifier "tests",
+      "com.slamdata" %% "qdata-time" % qdataVersion.value % "test->test" classifier "tests"))
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -124,7 +179,11 @@ lazy val common = project
   .dependsOn(
     foundation % BothScopes,
     ejson)
-  .settings(libraryDependencies ++= Dependencies.common)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.slamdata" %% "qdata-core" % qdataVersion.value,
+      "com.slamdata" %% "qdata-core" % qdataVersion.value % "test->test" classifier "tests",
+      "com.slamdata" %% "qdata-time" % qdataVersion.value % "test->test" classifier "tests"))
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -137,7 +196,10 @@ lazy val frontend = project
     ejson % BothScopes)
   .settings(commonSettings)
   .settings(
-    libraryDependencies ++= Dependencies.frontend)
+    libraryDependencies ++= Seq(
+      "com.slamdata"               %% "qdata-json"    % qdataVersion.value,
+      "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
+      "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val sst = project
@@ -152,7 +214,10 @@ lazy val datagen = project
   .settings(commonSettings)
   .settings(
     mainClass in Compile := Some("quasar.datagen.Main"),
-    libraryDependencies ++= Dependencies.datagen)
+
+    libraryDependencies ++= Seq(
+      "com.github.scopt" %% "scopt"          % scoptVersion,
+      "eu.timepit"       %% "refined-scalaz" % refinedVersion))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the SQL² query language.
@@ -162,7 +227,9 @@ lazy val sql = project
   .dependsOn(common % BothScopes)
   .settings(commonSettings)
   .settings(
-    libraryDependencies ++= Dependencies.sql)
+    libraryDependencies ++= Seq(
+      "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
+      "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6"))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qscript = project
@@ -177,7 +244,8 @@ lazy val qsu = project
   .settings(name := "quasar-qsu")
   .dependsOn(qscript % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.qsu)
+  .settings(
+    libraryDependencies += "org.slf4s" %% "slf4s-api" % slf4sVersion)
   .settings(scalacOptions ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, 12)) => Seq("-Ypatmat-exhaust-depth", "40")
@@ -201,7 +269,9 @@ lazy val core = project
     sql % BothScopes)
   .settings(commonSettings)
   .settings(
-    libraryDependencies ++= Dependencies.core)
+    libraryDependencies ++= Seq(
+      "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
+      "com.slamdata"               %% "pathy-argonaut"            % pathyVersion))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementations of the Quasar API. */
@@ -214,7 +284,18 @@ lazy val impl = project
     frontend % "test->test",
     sst)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.impl)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.slamdata"   %% "fs2-gzip"       % fs2GzipVersion.value,
+      "com.slamdata"   %% "qdata-tectonic" % qdataVersion.value,
+      "com.slamdata"   %% "tectonic-fs2"   % tectonicVersion.value,
+      "org.http4s"     %% "jawn-fs2"       % jawnfs2Version,
+      "org.slf4s"      %% "slf4s-api"      % slf4sVersion,
+      "org.spire-math" %% "jawn-argonaut"  % jawnVersion,
+      "org.spire-math" %% "jawn-util"      % jawnVersion,
+      // woodstox is added here as a quick and dirty way to get azure working
+      // see ch3385 for details
+      "com.fasterxml.woodstox" % "woodstox-core" % "5.0.3"))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))
