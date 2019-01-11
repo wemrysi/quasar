@@ -118,6 +118,13 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           P.value(IdAccess.identity('n2)),
           P.value(IdAccess.groupKey('n2, 1)),
           P.value(IdAccess.groupKey('n2, 0)),
+          P.prjPath(J.str("foobar"))),
+        'n1 -> Dimensions.origin(
+          P.value(IdAccess.identity('n1)),
+          P.value(IdAccess.groupKey('n1, 0)),
+          P.prjPath(J.str("foobar"))),
+        'n0 -> Dimensions.origin(
+          P.value(IdAccess.identity('n0)),
           P.prjPath(J.str("foobar")))
       ))
     }
@@ -137,6 +144,9 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           P.thenn(
             P.value(IdAccess.identity('n2)),
             P.prjPath(J.str("foobar")))),
+        'n1 -> Dimensions.origin(
+          P.value(IdAccess.identity('n2)),
+          P.prjPath(J.str("foobar"))),
         'n2 -> Dimensions.origin(
           P.value(IdAccess.identity('n2)),
           P.prjPath(J.str("foobar")))
@@ -519,8 +529,9 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           result(
             qauth.dims ≟ expectedDims,
             s"received expected authenticated QSU:\n${aqsu.shows}",
-            s"received unexpected authenticated QSU:\n${aqsu.shows}\n" +
-            s"expected:\n[\n${printMultiline(expected.toList)}\n]",
+            s"received unexpected dims:\n${printMultiline(qauth.dims.toList)}\n" + // `aqsu.shows` prunes orphan dims
+            s"wth graph:\n${resultGraph.shows}\n" +
+            s"expected:\n[\n${printMultiline(expectedDims.toList)}\n]",
             s)
         }).merge
       }

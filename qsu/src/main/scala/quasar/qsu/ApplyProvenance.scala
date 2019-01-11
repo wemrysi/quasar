@@ -82,7 +82,6 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       case g @ Extractors.DimEdit(src, _) =>
         for {
           _ <- computeDims[X](g)
-          _ <- QAuthS[X].modify(_.supplant(src.root, g.root))
         } yield g.overwriteAtRoot(src.unfold map (_.root))
 
       case g @ Extractors.Transpose(src, retain, rot) =>
@@ -174,11 +173,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       case DimEdit(src, DTrans.Group(k)) =>
         handleMissingDims(dimsFor[F](src)) flatMap { sdims =>
-          val updated = dims.modifyIdentities(sdims)(IdAccess.groupKey modify {
-            case (s, i) if s === src.root => (g.root, i)
-            case other => other
-          })
-
+          val updated = dims.rename(src.root, g.root, sdims)
           val nextIdx = dims.nextGroupKeyIndex(g.root, updated)
           val idAccess = IdAccess.groupKey(g.root, nextIdx)
           val nextDims = dims.swap(0, 1, dims.lshift(idAccess, updated))

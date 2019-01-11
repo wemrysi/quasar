@@ -72,21 +72,6 @@ final case class QAuth[T[_[_]]](
       InternalError(s"GroupKey[$idx] for $vertex not found.", None)
     }
 
-  /** Supplants `target` with `replacement`, removing the former and replacing
-    * any references to it with the latter.
-    */
-  def supplant
-      (target: Symbol, replacement: Symbol)
-      (implicit T0: BirecursiveT[T], T1: EqualT[T])
-      : QAuth[T] = {
-
-    val qp = QProv[T]
-    val supDims = (dims - target).mapValues(qp.rename(target, replacement, _))
-    val supKeys = groupKeys filterKeys { case (s, _) => s =/= target }
-
-    QAuth(supDims, supKeys)
-  }
-
   def renameRefs
       (target: Symbol, replacement: Symbol)
       (implicit T0: BirecursiveT[T], T1: EqualT[T])
