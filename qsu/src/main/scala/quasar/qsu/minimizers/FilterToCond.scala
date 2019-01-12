@@ -116,7 +116,7 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
   private def rewriteFilter(predicate: FreeMap, fm: FreeMap): FreeMap = {
     val nameToType: SMap[String, Type] =
       SMap(
-        "number" -> Type.Dec,
+        "number" -> Type.Numeric,
         "string" -> Type.Str,
         "boolean" -> Type.Bool,
         "offsetdatetime" -> Type.OffsetDateTime,
