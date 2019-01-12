@@ -105,9 +105,9 @@ trait StructuralLib extends Library {
     "Ensures the value is a boolean",
     noSimplification)
 
-  val EnsureDateTime: UnaryFunc = UnaryFunc(
+  val EnsureOffsetDateTime: UnaryFunc = UnaryFunc(
     Mapping,
-    "Ensures the value is a datetime",
+    "Ensures the value is an OffsetDateTime",
     noSimplification)
 
   val EnsureNull: UnaryFunc = UnaryFunc(

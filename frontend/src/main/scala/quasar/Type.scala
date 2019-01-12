@@ -158,5 +158,4 @@ object Type extends TypeInstances {
   val AnyArray = FlexArr(0, None, Top)
   val AnyObject = Obj(Map(), Some(Top))
   val Numeric = Int ⨿ Dec
-  val DateTime = OffsetDateTime ⨿ LocalDateTime
 }

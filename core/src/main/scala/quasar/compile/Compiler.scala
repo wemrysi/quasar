@@ -271,7 +271,7 @@ final class Compiler[M[_], T: Equal]
       CIName("ensure_number")           -> structural.EnsureNumber,
       CIName("ensure_string")           -> structural.EnsureString,
       CIName("ensure_boolean")          -> structural.EnsureBoolean,
-      CIName("ensure_datetime")         -> structural.EnsureDateTime,
+      CIName("ensure_offset_datetime")  -> structural.EnsureOffsetDateTime,
       CIName("ensure_null")             -> structural.EnsureNull,
       CIName("flatten_map")             -> structural.FlattenMap,
       CIName("flatten_array")           -> structural.FlattenArray,
