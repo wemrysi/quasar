@@ -90,7 +90,7 @@ trait StructuralLib extends Library {
     "Checks for the existence of the specified key in a map",
     noSimplification)
 
-  val EnsureNumeric: UnaryFunc = UnaryFunc(
+  val EnsureNumber: UnaryFunc = UnaryFunc(
     Mapping,
     "Ensures the value is a number",
     noSimplification)
@@ -100,7 +100,7 @@ trait StructuralLib extends Library {
     "Ensures the value is a string",
     noSimplification)
 
-  val EnsureBool: UnaryFunc = UnaryFunc(
+  val EnsureBoolean: UnaryFunc = UnaryFunc(
     Mapping,
     "Ensures the value is a boolean",
     noSimplification)

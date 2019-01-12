@@ -204,80 +204,80 @@ final class Compiler[M[_], T: Equal]
     //     with an `*` to indicate that it’s the “preferred” name, and others
     //     are for compatibility with other SQL dialects.
     val functionMapping = Map[CIName, GenericFunc[_]](
-      CIName("count")                   -> agg.Count,
-      CIName("sum")                     -> agg.Sum,
-      CIName("min")                     -> agg.Min,
-      CIName("max")                     -> agg.Max,
-      CIName("avg")                     -> agg.Avg,
-      CIName("arbitrary")               -> agg.Arbitrary,
-      CIName("array_length")            -> array.ArrayLength,
-      CIName("localdatetime")           -> date.LocalDateTime,
-      CIName("date")                    -> date.LocalDate,
-      CIName("localdate")               -> date.LocalDate,
-      CIName("time")                    -> date.LocalTime,
-      CIName("localtime")               -> date.LocalTime,
-      CIName("offsetdatetime")          -> date.OffsetDateTime,
-      CIName("offsetdate")              -> date.OffsetDate,
-      CIName("offsettime")              -> date.OffsetTime,
-      CIName("clock_timestamp")         -> date.Now, // Postgres (instantaneous)
-      CIName("current_timestamp")       -> date.Now, // *, SQL92
-      CIName("current_time")            -> date.NowTime, // *, SQL92
-      CIName("current_date")            -> date.NowDate, // *, SQL92
-      CIName("getdate")                 -> date.NowDate, // SQL Server
-      CIName("localtimestamp")          -> date.Now, // MySQL, Postgres (trans start)
-      CIName("now")                     -> date.Now, // MySQL, Postgres (trans start)
-      CIName("statement_timestamp")     -> date.Now, // Postgres (statement start)
-      CIName("transaction_timestamp")   -> date.Now, // Postgres (trans start)
-      CIName("timestamp")               -> date.OffsetDateTime,
-      CIName("interval")                -> date.Interval,
-      CIName("start_of_day")            -> date.StartOfDay,
-      CIName("time_of_day")             -> date.TimeOfDay,
-      CIName("to_timestamp")            -> date.ToTimestamp,
-      CIName("to_local")                -> date.ToLocal,
-      CIName("squash")                  -> identity.Squash,
-      CIName("type_of")                 -> identity.TypeOf,
-      CIName("abs")                     -> math.Abs,
-      CIName("ceil")                    -> math.Ceil,
-      CIName("floor")                   -> math.Floor,
-      CIName("trunc")                   -> math.Trunc,
-      CIName("round")                   -> math.Round,
-      CIName("floor_scale")             -> math.FloorScale, // these functions
-      CIName("ceil_scale")              -> math.CeilScale,  // are used extensively
-      CIName("round_scale")             -> math.RoundScale, // for charting and pivot tables
-      CIName("between")                 -> relations.Between,
-      CIName("where")                   -> set.Filter,
-      CIName("within")                  -> set.Within,
-      CIName("constantly")              -> set.Constantly,
-      CIName("concat")                  -> string.Concat,
-      CIName("like")                    -> string.Like,
-      CIName("search")                  -> string.Search,
-      CIName("length")                  -> string.Length,
-      CIName("lower")                   -> string.Lower,
-      CIName("upper")                   -> string.Upper,
-      CIName("substring")               -> string.Substring,
-      CIName("split")                   -> string.Split,
-      CIName("boolean")                 -> string.Boolean,
-      CIName("integer")                 -> string.Integer,
-      CIName("decimal")                 -> string.Decimal,
-      CIName("number")                  -> string.Number,
-      CIName("null")                    -> string.Null,
-      CIName("to_string")               -> string.ToString,
-      CIName("make_map")                -> structural.MakeMap,
-      CIName("make_array")              -> structural.MakeArray,
-      CIName("map_concat")              -> structural.MapConcat,
-      CIName("array_concat")            -> structural.ArrayConcat,
-      CIName("delete_key")              -> structural.DeleteKey,
-      CIName("contains_key")            -> structural.ContainsKey,
-      CIName("ensure_numeric")          -> structural.EnsureNumeric,
-      CIName("ensure_string")           -> structural.EnsureString,
-      CIName("ensure_bool")             -> structural.EnsureBool,
-      CIName("ensure_offset_datetime")  -> structural.EnsureOffsetDateTime,
-      CIName("ensure_null")             -> structural.EnsureNull,
-      CIName("flatten_map")             -> structural.FlattenMap,
-      CIName("flatten_array")           -> structural.FlattenArray,
-      CIName("shift_map")               -> structural.ShiftMap,
-      CIName("shift_array")             -> structural.ShiftArray,
-      CIName("meta")                    -> structural.Meta)
+      CIName("count")                     -> agg.Count,
+      CIName("sum")                       -> agg.Sum,
+      CIName("min")                       -> agg.Min,
+      CIName("max")                       -> agg.Max,
+      CIName("avg")                       -> agg.Avg,
+      CIName("arbitrary")                 -> agg.Arbitrary,
+      CIName("array_length")              -> array.ArrayLength,
+      CIName("localdatetime")             -> date.LocalDateTime,
+      CIName("date")                      -> date.LocalDate,
+      CIName("localdate")                 -> date.LocalDate,
+      CIName("time")                      -> date.LocalTime,
+      CIName("localtime")                 -> date.LocalTime,
+      CIName("offsetdatetime")            -> date.OffsetDateTime,
+      CIName("offsetdate")                -> date.OffsetDate,
+      CIName("offsettime")                -> date.OffsetTime,
+      CIName("clock_timestamp")           -> date.Now, // Postgres (instantaneous)
+      CIName("current_timestamp")         -> date.Now, // *, SQL92
+      CIName("current_time")              -> date.NowTime, // *, SQL92
+      CIName("current_date")              -> date.NowDate, // *, SQL92
+      CIName("getdate")                   -> date.NowDate, // SQL Server
+      CIName("localtimestamp")            -> date.Now, // MySQL, Postgres (trans start)
+      CIName("now")                       -> date.Now, // MySQL, Postgres (trans start)
+      CIName("statement_timestamp")       -> date.Now, // Postgres (statement start)
+      CIName("transaction_timestamp")     -> date.Now, // Postgres (trans start)
+      CIName("timestamp")                 -> date.OffsetDateTime,
+      CIName("interval")                  -> date.Interval,
+      CIName("start_of_day")              -> date.StartOfDay,
+      CIName("time_of_day")               -> date.TimeOfDay,
+      CIName("to_timestamp")              -> date.ToTimestamp,
+      CIName("to_local")                  -> date.ToLocal,
+      CIName("squash")                    -> identity.Squash,
+      CIName("type_of")                   -> identity.TypeOf,
+      CIName("abs")                       -> math.Abs,
+      CIName("ceil")                      -> math.Ceil,
+      CIName("floor")                     -> math.Floor,
+      CIName("trunc")                     -> math.Trunc,
+      CIName("round")                     -> math.Round,
+      CIName("floor_scale")               -> math.FloorScale, // these functions
+      CIName("ceil_scale")                -> math.CeilScale,  // are used extensively
+      CIName("round_scale")               -> math.RoundScale, // for charting and pivot tables
+      CIName("between")                   -> relations.Between,
+      CIName("where")                     -> set.Filter,
+      CIName("within")                    -> set.Within,
+      CIName("constantly")                -> set.Constantly,
+      CIName("concat")                    -> string.Concat,
+      CIName("like")                      -> string.Like,
+      CIName("search")                    -> string.Search,
+      CIName("length")                    -> string.Length,
+      CIName("lower")                     -> string.Lower,
+      CIName("upper")                     -> string.Upper,
+      CIName("substring")                 -> string.Substring,
+      CIName("split")                     -> string.Split,
+      CIName("boolean")                   -> string.Boolean,
+      CIName("integer")                   -> string.Integer,
+      CIName("decimal")                   -> string.Decimal,
+      CIName("number")                    -> string.Number,
+      CIName("null")                      -> string.Null,
+      CIName("to_string")                 -> string.ToString,
+      CIName("make_map")                  -> structural.MakeMap,
+      CIName("make_array")                -> structural.MakeArray,
+      CIName("map_concat")                -> structural.MapConcat,
+      CIName("array_concat")              -> structural.ArrayConcat,
+      CIName("delete_key")                -> structural.DeleteKey,
+      CIName("contains_key")              -> structural.ContainsKey,
+      CIName("_sd_ensure_number")         -> structural.EnsureNumber,
+      CIName("_sd_ensure_string")         -> structural.EnsureString,
+      CIName("_sd_ensure_boolean")        -> structural.EnsureBoolean,
+      CIName("_sd_ensure_offsetdatetime") -> structural.EnsureOffsetDateTime,
+      CIName("_sd_ensure_null")           -> structural.EnsureNull,
+      CIName("flatten_map")               -> structural.FlattenMap,
+      CIName("flatten_array")             -> structural.FlattenArray,
+      CIName("shift_map")                 -> structural.ShiftMap,
+      CIName("shift_array")               -> structural.ShiftArray,
+      CIName("meta")                      -> structural.Meta)
 
     def compileDistinct(t: T) =
       CompilerState.freshName("distinct") ∘ (name =>
