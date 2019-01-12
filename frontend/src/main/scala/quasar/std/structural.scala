@@ -90,18 +90,18 @@ trait StructuralLib extends Library {
     "Checks for the existence of the specified key in a map",
     noSimplification)
 
-  val EnsureNumber: UnaryFunc = UnaryFunc(
-    Sifting,
+  val EnsureNumeric: UnaryFunc = UnaryFunc(
+    Mapping,
     "Ensures the value is a number",
     noSimplification)
 
   val EnsureString: UnaryFunc = UnaryFunc(
-    Sifting,
+    Mapping,
     "Ensures the value is a string",
     noSimplification)
 
-  val EnsureBoolean: UnaryFunc = UnaryFunc(
-    Sifting,
+  val EnsureBool: UnaryFunc = UnaryFunc(
+    Mapping,
     "Ensures the value is a boolean",
     noSimplification)
 
@@ -111,7 +111,7 @@ trait StructuralLib extends Library {
     noSimplification)
 
   val EnsureNull: UnaryFunc = UnaryFunc(
-    Sifting,
+    Mapping,
     "Ensures the value is null",
     noSimplification)
 
