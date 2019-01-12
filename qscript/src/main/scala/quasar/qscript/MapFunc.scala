@@ -84,6 +84,11 @@ object MapFunc {
     case string.Number => a => MFC(C.Number(a))
     case string.Null => a => MFC(C.Null(a))
     case string.ToString => a => MFC(C.ToString(a))
+    case structural.EnsureNumber => a => MFD(D.Typecheck(a, Type.Numeric))
+    case structural.EnsureString => a => MFD(D.Typecheck(a, Type.Str))
+    case structural.EnsureBoolean => a => MFD(D.Typecheck(a, Type.Bool))
+    case structural.EnsureOffsetDateTime => a => MFD(D.Typecheck(a, Type.OffsetDateTime))
+    case structural.EnsureNull => a => MFD(D.Typecheck(a, Type.Null))
     case structural.MakeArray => a => MFC(C.MakeArray(a))
     case structural.Meta => a => MFC(C.Meta(a))
   }
