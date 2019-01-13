@@ -18,7 +18,7 @@ package quasar.impl.datasources.middleware
 
 import slamdata.Predef._
 
-import quasar.{ParseInstruction => PI}
+import quasar.{ParseInstruction => PI, ParseType}
 import quasar.api.resource.ResourcePath
 import quasar.common.{CPath, CPathField}
 import quasar.connector.{Datasource, MonadResourceErr}
@@ -102,7 +102,7 @@ object ChildAggregatingMiddleware {
       }
 
     def go(in: List[PI], spath: CPath, vpath: CPath)
-        : Option[(List[PI], Option[List[String]], Option[List[String]])] =
+        : (List[PI], Option[List[String]], Option[List[String]]) =
       in match {
         case PI.Project(p) :: t if p.hasPrefix(spath) =>
           if (p === spath)
@@ -119,12 +119,38 @@ object ChildAggregatingMiddleware {
         case PI.Project(_) :: _ =>
           (List(), None, None)
 
-        case PI.Mask(mask) :: t if mask.size === 1 =>
-          mask.toList.foldLeftM(List[(CPath, Set[ParseType])]()) {
-            case (xs, (p, tpes)) =>
-          }
-
         case PI.Mask(mask) :: t =>
+          val exclude = none[List[String]]
+
+          val (mask1, sloc, vloc) =
+            mask.foldLeft((Map[CPath, Set[ParseType]](), exclude, exclude)) {
+              case ((m, sp, vp), (k, v)) =>
+                if (k === spath && v.contains(ParseType.String))
+                  (m.updated(k, v), Some(List(sourceKey)), vp)
+                else if (k.hasPrefix(vpath))
+                  (m.updated(k, v), sp, Some(List(valueKey)))
+                else
+                  (m, sp, vp)
+            }
+
+          // TODO: Have to recurse in case of cartesian/wrap
+          (PI.Mask(mask1) :: t, sloc, vloc)
+
+        case PI.Wrap(p, n) :: t if p.hasPrefix(spath) =>
+          if (p === spath)
+            (t, Some(List(sourceKey, n)), Some(List(valueKey)))
+          else
+            (t, None, Some(List(valueKey)))
+
+        case PI.Wrap(p, n) :: t if p.hasPrefix(vpath) =>
+          if (p === vpath)
+            (t, Some(List(sourceKey)), Some(List(valueKey, n)))
+          else
+            (PI.Wrap(p.dropPrefix(vpath), n) :: t, Some(List(sourceKey)), Some(List(valueKey)))
+
+        // What if the cartesian includes "source"?
+        // I guess we'd need to look at the result path and, instead of making a map with source/value, we'd just concat source to every row, using the name given in the cartesian.
+        case PI.Cartesian(cs) =>
 
         case other =>
           (other, Some(List(sourceKey)), Some(List(valueKey)))
