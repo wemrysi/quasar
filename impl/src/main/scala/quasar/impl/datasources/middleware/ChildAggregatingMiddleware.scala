@@ -16,21 +16,23 @@
 
 package quasar.impl.datasources.middleware
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => SMap, _}
 
-import quasar.{ParseInstruction => PI, ParseType}
+import quasar.{FocusedParseInstruction, ParseInstruction => PI, ParseType}
 import quasar.api.resource.ResourcePath
 import quasar.common.{CPath, CPathField}
 import quasar.connector.{Datasource, MonadResourceErr}
 import quasar.ejson.{EJson, Fixed}
 import quasar.impl.datasource.{AggregateResult, ChildAggregatingDatasource}
 import quasar.impl.datasources.ManagedDatasource
-import quasar.qscript.{construction, Hole, InterpretedRead, Map, MapFunc, QScriptEducated, RecFreeMap}
+import quasar.qscript.{construction, Hole, InterpretedRead, Map, QScriptEducated, RecFreeMap}
 import quasar.qscript.RecFreeS._
 
-import scala.util.{Either, Left}
+import scala.util.{Either, Left, Right}
 
 import cats.Monad
+import cats.instances.string._
+import cats.syntax.eq._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 
@@ -83,10 +85,14 @@ object ChildAggregatingMiddleware {
     val SrcField = CPath.parse("." + sourceKey)
     val ValField = CPath.parse("." + valueKey)
 
-    def sourceFunc = rec.Constant[Hole](EJson.str[Fix[EJson]](posixCodec.printPath(cp.toPath)))
+    def sourceFunc =
+      rec.Constant[Hole](EJson.str[Fix[EJson]](posixCodec.printPath(cp.toPath)))
 
     def reifyPath(path: List[String]): RecFreeMap[Fix] =
       path.foldRight(rec.Hole)(rec.MakeMapS)
+
+    def dropPrefix(pfx: CPath, from: CPath): CPath =
+      from.dropPrefix(pfx) getOrElse from
 
     def reifyStructure(
         sourceLoc: Option[List[String]],
@@ -101,59 +107,94 @@ object ChildAggregatingMiddleware {
         case (None, None) => rec.Undefined
       }
 
+    def injectSource(fields: List[String]): RecFreeMap[Fix] =
+      fields.foldLeft(rec.Hole) { (obj, field) =>
+        rec.ConcatMaps(obj, rec.MakeMapS(field, sourceFunc))
+      }
+
+    /** Returns the rewritten parse instructions and either what sourced-valued fields
+      * to add to the output object or whether a new output object should be created
+      * having one of, or both, of the source and output value.
+      */
+    // FIXME: Recursion, need to indicate whether toplevel src/value are included or not
+    // FIXME: need to be able to indicate that source needs to be concatenanted for hte cartesian case.
     def go(in: List[PI], spath: CPath, vpath: CPath)
-        : (List[PI], Option[List[String]], Option[List[String]]) =
+        : (List[PI], Either[List[String], (Option[List[String]], Option[List[String]])]) =
       in match {
         case PI.Project(p) :: t if p.hasPrefix(spath) =>
           if (p === spath)
-            (t, Some(List()), None)
+            (t, Right((Some(List()), None)))
           else
-            (List(), None, None)
+            (List(), Right((None, None)))
 
         case PI.Project(p) :: t if p.hasPrefix(vpath) =>
           if (p === vpath)
-            (t, None, Some(List()))
+            (t, Right((None, Some(List()))))
           else
-            (PI.Project(p.dropPrefix(vpath)) :: t, None, Some(List()))
+            (PI.Project(dropPrefix(vpath, p)) :: t, Right((None, Some(List()))))
 
         case PI.Project(_) :: _ =>
-          (List(), None, None)
+          (List(), Right((None, None)))
 
         case PI.Mask(mask) :: t =>
-          val exclude = none[List[String]]
+          val exclude: Option[List[String]] = None
 
           val (mask1, sloc, vloc) =
-            mask.foldLeft((Map[CPath, Set[ParseType]](), exclude, exclude)) {
+            mask.foldLeft((SMap[CPath, Set[ParseType]](), exclude, exclude)) {
               case ((m, sp, vp), (k, v)) =>
                 if (k === spath && v.contains(ParseType.String))
-                  (m.updated(k, v), Some(List(sourceKey)), vp)
+                  (m, Some(List(sourceKey)), vp)
                 else if (k.hasPrefix(vpath))
-                  (m.updated(k, v), sp, Some(List(valueKey)))
+                  (m.updated(dropPrefix(vpath, k), v), sp, Some(List(valueKey)))
                 else
                   (m, sp, vp)
             }
 
-          // TODO: Have to recurse in case of cartesian/wrap
-          (PI.Mask(mask1) :: t, sloc, vloc)
+          // FIXME: Have to recurse in case of cartesian/wrap
+          (PI.Mask(mask1) :: t, Right((sloc, vloc)))
 
+        // FIXME: Have to recurse in case of cartesian/wrap
         case PI.Wrap(p, n) :: t if p.hasPrefix(spath) =>
           if (p === spath)
-            (t, Some(List(sourceKey, n)), Some(List(valueKey)))
+            (t, Right((Some(List(sourceKey, n)), Some(List(valueKey)))))
           else
-            (t, None, Some(List(valueKey)))
+            (t, Right((None, Some(List(valueKey)))))
 
+        // FIXME: Have to recurse in case of cartesian/wrap
         case PI.Wrap(p, n) :: t if p.hasPrefix(vpath) =>
           if (p === vpath)
-            (t, Some(List(sourceKey)), Some(List(valueKey, n)))
+            (t, Right((Some(List(sourceKey)), Some(List(valueKey, n)))))
           else
-            (PI.Wrap(p.dropPrefix(vpath), n) :: t, Some(List(sourceKey)), Some(List(valueKey)))
+            (PI.Wrap(dropPrefix(vpath, p), n) :: t, Right((Some(List(sourceKey)), Some(List(valueKey)))))
 
         // What if the cartesian includes "source"?
         // I guess we'd need to look at the result path and, instead of making a map with source/value, we'd just concat source to every row, using the name given in the cartesian.
-        case PI.Cartesian(cs) =>
+        case PI.Cartesian(cs) :: Nil =>
+          val (carteisan, sourceFields) =
+            cs.foldLeft((SMap[CPathField, (CPathField, List[FocusedParseInstruction])](), List[String]())) {
+              case ((m, srcs), (outField, (inField, cartouche))) if inField.name === sourceKey =>
+                (m, inField.name :: srcs)
+
+              case ((m, srcs), assoc @ (outField, (inField, cartouche))) if inField.name === valueKey =>
+                (m + assoc, srcs)
+
+              case (res, _) =>
+                res
+            }
+
+          (cs.isEmpty, sourceFields.isEmpty) match {
+            case (true, true) =>
+              (Nil, Right((None, None)))
+
+            // no cartesian, just produce a static map.
+            case (true, false) =>  ???
+
+            case _ =>
+              (List(PI.Wrap(CPath.Identity, valueKey), PI.Cartesian(cs)), Left(sourceFields))
+          }
 
         case other =>
-          (other, Some(List(sourceKey)), Some(List(valueKey)))
+          (other, Right((Some(List(sourceKey)), Some(List(valueKey)))))
       }
 
     ir.instructions match {
@@ -161,18 +202,24 @@ object ChildAggregatingMiddleware {
         (InterpretedRead(cp, ir.instructions), rec.Hole)
 
       case PI.Ids :: rest =>
-        val (out, s, v) = go(rest, ValIdx \ SrcField, ValIdx \ ValField)
+        val (out, struct) = go(rest, ValIdx \ SrcField, ValIdx \ ValField)
 
-        val structure =
-          rec.ConcatArrays(
-            rec.MakeArray(rec.ProjectIndexI(rec.Hole, 0)),
-            rec.MakeArray(reifyStructure(s, v) >> rec.ProjectIndexI(rec.Hole, 1)))
+        val structure = struct match {
+          case Right((s, v)) =>
+            rec.ConcatArrays(
+              rec.MakeArray(rec.ProjectIndexI(rec.Hole, 0)),
+              rec.MakeArray(reifyStructure(s, v) >> rec.ProjectIndexI(rec.Hole, 1)))
+
+          case Left(fields) =>
+            injectSource(fields)
+        }
 
         (InterpretedRead(cp, PI.Ids :: out), structure)
 
       case rest =>
-        val (out, s, v) = go(rest, SrcField, ValField)
-        (InterpretedRead(cp, out), reifyStructure(s, v))
+        val (out, struct) = go(rest, SrcField, ValField)
+        val structure = struct.fold(injectSource, (reifyStructure _).tupled)
+        (InterpretedRead(cp, out), structure)
     }
   }
 }
