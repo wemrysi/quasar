@@ -104,6 +104,8 @@ package object compile {
     T: Recursive.Aux[T, Sql]
   ): Option[String] = {
     val flattening = Set("flatten_map".ci, "shift_map".ci, "flatten_array".ci, "shift_array".ci)
+    val typeFilters = Set("_sd_ensure_number".ci, "_sd_ensure_string".ci, "_sd_ensure_boolean".ci, "_sd_ensure_offsetdatetime".ci, "_sd_ensure_null".ci)
+
     val loop: T => (Option[String] \/ (Option[String] \/ T)) =
       _.project match {
         case Ident(name) => some(name).left
@@ -116,6 +118,7 @@ package object compile {
         case Unop(arg, FlattenArrayValues) => arg.right.right
         case Unop(arg, ShiftArrayIndices) => arg.right.right
         case Unop(arg, ShiftArrayValues) => arg.right.right
+        case InvokeFunction(fnName, List(arg)) if typeFilters.contains(fnName) => arg.right.right
         case InvokeFunction(fnName, List(arg)) if flattening.contains(fnName) => arg.right.right
         case _ => None.left
       }
