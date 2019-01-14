@@ -20,6 +20,7 @@ import slamdata.Predef.{Map => SMap, _}
 
 import quasar.{IdStatus, Qspec, Type}, IdStatus.{ExcludeId, IncludeId}
 import quasar.contrib.pathy.AFile
+import quasar.ejson
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
@@ -150,6 +151,92 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         'n2 -> Dimensions.origin(
           P.value(IdAccess.identity('n2)),
           P.prjPath(J.str("foobar")))
+      ))
+    }
+
+    //      Read
+    //        |
+    //    Transpose
+    //     /     \
+    // DimEdit    Map
+    //   |         |
+    // QSFilter    |
+    //   \        /
+    //   AutoJoin2
+    //        |
+    //     DimEdit
+    "compute provenance for graph branch with squash" >> {
+      val root =
+        qsu.transpose('n1, (
+          qsu.read('n0, (afile, ExcludeId)),
+          QScriptUniform.Retain.Identities,
+          Rotation.FlattenMap))
+
+      val tree =
+        qsu.dimEdit('n6, (
+          qsu._autojoin2('n5, (
+            qsu.qsFilter('n4, (
+              qsu.dimEdit('n3, (
+                root,
+                DTrans.Squash[Fix]())),
+              recFunc.Gt(recFunc.Hole, recFunc.Constant(ejson.Fixed[Fix[EJson]].int(42))))),
+            qsu.map('n2, (
+              root,
+              recFunc.ProjectKeyS(recFunc.Hole, "baz"))),
+            func.ConcatMaps(func.LeftSide, func.RightSide))),
+          DTrans.Squash[Fix]()))
+
+      tree must haveDimensions(SMap(
+        'n0 -> Dimensions.origin(
+          P.value(IdAccess.identity('n0)),
+          P.prjPath(J.str("foobar"))),
+        'n1 -> Dimensions.origin(
+          P.thenn(
+            P.value(IdAccess.identity('n1)),
+            P.value(IdAccess.identity('n0))),
+          P.prjPath(J.str("foobar"))),
+        'n2 -> Dimensions.origin(
+          P.thenn(
+            P.prjValue(J.str("baz")),
+            P.thenn(
+              P.value(IdAccess.identity('n1)),
+              P.value(IdAccess.identity('n0)))),
+          P.prjPath(J.str("foobar"))),
+        'n3 -> Dimensions.origin(
+          P.thenn(
+            P.value(IdAccess.identity('n1)),
+            P.thenn(
+              P.value(IdAccess.identity('n0)),
+              P.prjPath(J.str("foobar"))))),
+        'n4 -> Dimensions.origin(
+          P.thenn(
+            P.value(IdAccess.identity('n1)),
+            P.thenn(
+              P.value(IdAccess.identity('n0)),
+              P.prjPath(J.str("foobar"))))),
+        'n5 -> Dimensions.origin(
+          P.thenn(
+            P.prjValue(J.str("baz")),
+            P.thenn(
+              P.value(IdAccess.identity('n1)),
+              P.value(IdAccess.identity('n0)))),
+          P.thenn(
+            P.value(IdAccess.identity('n1)),
+            P.thenn(
+              P.value(IdAccess.identity('n0)),
+              P.prjPath(J.str("foobar"))))),
+        'n6 -> Dimensions.origin(
+          P.thenn(
+            P.prjValue(J.str("baz")),
+            P.thenn(
+              P.value(IdAccess.identity('n1)),
+              P.thenn(
+                P.value(IdAccess.identity('n0)),
+                P.thenn(
+                  P.value(IdAccess.identity('n1)),
+                    P.thenn(
+                      P.value(IdAccess.identity('n0)),
+                      P.prjPath(J.str("foobar"))))))))
       ))
     }
   }
