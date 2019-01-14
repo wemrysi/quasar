@@ -480,10 +480,14 @@ final class Compiler[M[_], T: Equal]
          * 9. Prune synthetic fields
          */
 
+        val forgetAnn: CoExpr => Fix[Sql] =
+          forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations] _
+        val projs = projections.map(_.map(forgetAnn))
+
         // Selection of wildcards aren't named, we merge them into any other
         // objects created from other columns:
-        val namesOrError: SemanticError \/ List[Option[String]] =
-          projectionNames[Fix[Sql]](projections.map(_.map(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations])), relationName(node).toOption).map(_.map {
+        val namesOrError: SemanticError \/ List[Option[ProjectionName]] =
+          projectionNames[Fix[Sql]](projs, relationName(node).toOption).map(_.map {
             case (name, Embed(expr)) => expr match {
               case Splice(_) => None
               case _         => name.some
@@ -492,7 +496,8 @@ final class Compiler[M[_], T: Equal]
 
         namesOrError.fold(
           MErr.raiseError,
-          names => {
+          names0 => {
+            val names = names0.map(_.map(nameOf(_)))
 
             val syntheticNames: List[String] =
               names.zip(syntheticOf(node)).flatMap {
@@ -501,14 +506,11 @@ final class Compiler[M[_], T: Equal]
               }
 
             val (nam, initial) =
-              projections match {
-                case List(Proj(Cofree(_, Splice(_)), None)) =>
-                  (names.some,
-                    projections
-                      .map(_.expr)
-                      .traverse(compile0)
-                      .map(buildRecord(names, _)))
-                case List(Proj(expr, None)) => (none, compile0(expr))
+              if (names0.unite.all(_.isRight))
+                  (names.some, projections.map(_.expr).traverse(compile0).map(buildRecord(names, _)))
+              else projections match {
+                case List(Proj(expr, None)) =>
+                  (none, compile0(expr))
                 case _ =>
                   (names.some,
                     projections
