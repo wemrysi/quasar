@@ -231,26 +231,34 @@ abstract class StdLibSpec extends Qspec {
         "find contents within string when case sensitive" >> {
           ternary(Search(_, _, _).embed, Data.Str("church"), Data.Str(".*ch.*"), Data.Bool(false), Data.Bool(true)) and
             ternary(Search(_, _, _).embed, Data.Str("China"), Data.Str("^Ch.*$"), Data.Bool(false), Data.Bool(true)) and
-            ternary(Search(_, _, _).embed, Data.Str("matching"), Data.Str(".*ch.*"), Data.Bool(false), Data.Bool(true))
+            ternary(Search(_, _, _).embed, Data.Str("matching"), Data.Str(".*ch.*"), Data.Bool(false), Data.Bool(true)) and
+            ternary(Search(_, _, _).embed, Data.Str("multi\nline\r\nmatching"), Data.Str(".*ch.*"), Data.Bool(false), Data.Bool(true)) and
+            ternary(Search(_, _, _).embed, Data.Str("multi\nline\r\nmatching"), Data.Str("^.*ch.*$"), Data.Bool(false), Data.Bool(true))
         }
 
         "reject a non-matching string when case sensitive" >> {
           ternary(Search(_, _, _).embed, Data.Str("church"), Data.Str("^bs.*$"), Data.Bool(false), Data.Bool(false)) and
             ternary(Search(_, _, _).embed, Data.Str("china"), Data.Str("^bs.*$"), Data.Bool(false), Data.Bool(false)) and
             ternary(Search(_, _, _).embed, Data.Str("matching"), Data.Str(".*bs.*"), Data.Bool(false), Data.Bool(false)) and
-            ternary(Search(_, _, _).embed, Data.Str("matching"), Data.Str(".*CH.*"), Data.Bool(false), Data.Bool(false))
+            ternary(Search(_, _, _).embed, Data.Str("matching"), Data.Str(".*CH.*"), Data.Bool(false), Data.Bool(false)) and
+            ternary(Search(_, _, _).embed, Data.Str("multi\nline\r\nmatching"), Data.Str(".*CH.*"), Data.Bool(false), Data.Bool(false)) and
+            ternary(Search(_, _, _).embed, Data.Str("multi\nline\r\nmatching"), Data.Str("^.*CH.*$"), Data.Bool(false), Data.Bool(false))
         }
 
         "find contents within string when case insensitive" >> {
           ternary(Search(_, _, _).embed, Data.Str("Church"), Data.Str(".*ch.*"), Data.Bool(true), Data.Bool(true)) and
             ternary(Search(_, _, _).embed, Data.Str("cHina"), Data.Str("^ch.*$"), Data.Bool(true), Data.Bool(true)) and
-            ternary(Search(_, _, _).embed, Data.Str("matCHing"), Data.Str(".*ch.*"), Data.Bool(true), Data.Bool(true))
+            ternary(Search(_, _, _).embed, Data.Str("matCHing"), Data.Str(".*ch.*"), Data.Bool(true), Data.Bool(true)) and
+            ternary(Search(_, _, _).embed, Data.Str("multi\nline\r\nmatCHing"), Data.Str(".*ch.*"), Data.Bool(true), Data.Bool(true)) and
+            ternary(Search(_, _, _).embed, Data.Str("multi\nline\r\nmatCHing"), Data.Str("^.*ch.*$"), Data.Bool(true), Data.Bool(true))
         }
 
         "reject a non-matching string when case insensitive" >> {
           ternary(Search(_, _, _).embed, Data.Str("Church"), Data.Str("^bs.*$"), Data.Bool(true), Data.Bool(false)) and
             ternary(Search(_, _, _).embed, Data.Str("cHina"), Data.Str("^bs.*$"), Data.Bool(true), Data.Bool(false)) and
-            ternary(Search(_, _, _).embed, Data.Str("matCHing"), Data.Str(".*bs.*"), Data.Bool(true), Data.Bool(false))
+            ternary(Search(_, _, _).embed, Data.Str("matCHing"), Data.Str(".*bs.*"), Data.Bool(true), Data.Bool(false)) and
+            ternary(Search(_, _, _).embed, Data.Str("multi\nline\r\nmatCHing"), Data.Str(".*bs.*"), Data.Bool(true), Data.Bool(false)) and
+            ternary(Search(_, _, _).embed, Data.Str("multi\nline\r\nmatCHing"), Data.Str("^.*bs.*$"), Data.Bool(true), Data.Bool(false))
         }
       }
 
