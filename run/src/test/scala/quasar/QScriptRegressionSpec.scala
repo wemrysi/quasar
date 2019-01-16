@@ -208,7 +208,6 @@ object QScriptRegressionSpec extends Qspec {
       }
 
       // ch1473
-      // FIXME this should plan as two LeftShift before optimization, not three
       val q4 = "select first[_].second{_}.third as value, first[_].second{_:} as key from mydata"
       q4 in {
         val result = count(q4)
@@ -216,6 +215,40 @@ object QScriptRegressionSpec extends Qspec {
         result must countReadAs(0)
         result must countInterpretedReadAs(1)
         result must countLeftShiftAs(2)
+      }
+    }
+
+    "handle real-world queries" >> {
+
+      // ch2068
+      val q1 = """
+        SELECT
+          (SELECT * FROM (SELECT t2{_:} FROM `post-giraffe-unnested.data` AS t2) AS ot2 WHERE ot2 = "S") AS Key,
+          (SELECT t3.dateTime FROM (SELECT t4.dateTime AS dateTime, t4{_:} AS t5 FROM `post-giraffe-unnested.data` AS t4) AS t3 WHERE type_of(t3.dateTime) = "number" AND (t3.t5 = "MAS" OR t3.t5 = "S")) AS DateTime
+        FROM `post-giraffe-unnested.data`
+        """
+      q1 in {
+        val result = count(q1)
+
+        result must countReadAs(1)
+        result must countInterpretedReadAs(0)
+        result must countLeftShiftAs(1)
+      }
+
+      // ch3531
+      val q2 = """
+        SELECT
+          (SELECT * FROM (SELECT ty.ZZ FROM `post-giraffe-subset` AS ty) AS v WHERE type_of(v) = "string") AS g10,
+          (SELECT * FROM (SELECT ty.ZZ FROM `post-giraffe-subset` AS ty) AS v) AS g8,
+          (SELECT * FROM (SELECT ty.ZZ FROM `post-giraffe-subset` AS ty) AS v) AS g9
+        FROM `post-giraffe-subset`
+      """
+      q2 in {
+        val result = count(q2)
+
+        result must countReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(0)
       }
     }
   }
