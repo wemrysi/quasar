@@ -22,7 +22,16 @@ import scalaz.{Cord, Equal, Show}
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 
-final case class TableRef[Q](name: TableName, query: Q)
+final case class TableRef[Q](name: TableName, query: Q, columns: List[TableColumn])
+
+final case class TableColumn(name: String, coltpe: ColumnScalar)
+
+object TableColumn {
+  implicit val showTableColumn: Show[TableColumn] =
+    Show.show { tc =>
+      Cord("column(") ++ tc.name ++ Cord(", ") ++ tc.coltpe.show ++ Cord(")")
+    }
+}
 
 final case class TableName(name: String)
 

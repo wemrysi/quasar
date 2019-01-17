@@ -17,11 +17,9 @@
 package quasar.api.table
 
 import slamdata.Predef._
-
 import quasar.contrib.cats.stateT._
 import quasar.contrib.scalaz.MonadState_
 import quasar.contrib.std.uuid._
-
 import java.util.UUID
 
 import cats.data.StateT
@@ -29,7 +27,6 @@ import cats.effect.{IO, Sync}
 import scalaz.{~>, Id, IMap, \/-}, Id.Id
 import scalaz.std.string._
 import shims._
-
 import MockTablesSpec.MockM
 
 final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String, String] {
@@ -37,8 +34,29 @@ final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String, Strin
   val tables: Tables[MockM, UUID, String, String, String] =
     MockTables[MockM]
 
-  val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1")
-  val table2: TableRef[String] = TableRef(TableName("table2"), "select * from table2")
+  val columns1: List[TableColumn] =
+    List(TableColumn("foo1", ColumnScalar.Number),
+      TableColumn("foo2", ColumnScalar.String),
+      TableColumn("foo3", ColumnScalar.Boolean),
+      TableColumn("foo4", ColumnScalar.Null),
+      TableColumn("foo5", ColumnScalar.Offsetdatetime))
+
+  val columns2: List[TableColumn] =
+    List(TableColumn("bar1", ColumnScalar.Number),
+      TableColumn("bar2", ColumnScalar.String),
+      TableColumn("bar3", ColumnScalar.Boolean),
+      TableColumn("bar4", ColumnScalar.Null),
+      TableColumn("bar5", ColumnScalar.Offsetdatetime))
+
+  val columns3: List[TableColumn] =
+    List(TableColumn("baz1", ColumnScalar.Number),
+      TableColumn("bas2", ColumnScalar.String),
+      TableColumn("baz3", ColumnScalar.Boolean),
+      TableColumn("baz4", ColumnScalar.Null),
+      TableColumn("baz5", ColumnScalar.Offsetdatetime))
+
+  val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1", columns1)
+  val table2: TableRef[String] = TableRef(TableName("table2"), "select * from table2", columns2)
 
   val preparation1: String = table1.query
   val preparation2: String = table2.query
@@ -61,7 +79,7 @@ final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String, Strin
     "error on request to prepare an already preparing table" >>* {
       for {
         id <- init(MockTables.MockTable(
-          TableRef(TableName("foo"), "bar"),
+          TableRef(TableName("foo"), "bar", columns1),
           PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
         result <- tables.prepareTable(id)
       } yield {
@@ -72,11 +90,11 @@ final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String, Strin
     "cancel an ongoing preparation" >>* {
       for {
         id1 <- init(MockTables.MockTable(
-          TableRef(TableName("foo1"), "bar1"),
+          TableRef(TableName("foo1"), "bar1", columns1),
           PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
 
         id2 <- init(MockTables.MockTable(
-          TableRef(TableName("foo2"), "bar2"),
+          TableRef(TableName("foo2"), "bar2", columns2),
           PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
 
         cancel1 <- tables.cancelPreparation(id1)
@@ -97,7 +115,7 @@ final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String, Strin
     "error a request to cancel a not ongoing preparation" >>* {
       for {
         id1 <- init(MockTables.MockTable(
-          TableRef(TableName("foo1"), "bar1"),
+          TableRef(TableName("foo1"), "bar1", columns1),
           PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing)))
 
         cancel <- tables.cancelPreparation(id1)
@@ -111,15 +129,15 @@ final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String, Strin
     "cancel all ongoing preparations" >>* {
       for {
         id1 <- init(MockTables.MockTable(
-          TableRef(TableName("foo1"), "bar1"),
+          TableRef(TableName("foo1"), "bar1", columns1),
           PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing)))
 
         id2 <- init(MockTables.MockTable(
-          TableRef(TableName("foo2"), "bar2"),
+          TableRef(TableName("foo2"), "bar2", columns2),
           PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.Preparing)))
 
         id3 <- init(MockTables.MockTable(
-          TableRef(TableName("foo3"), "bar3"),
+          TableRef(TableName("foo3"), "bar3", columns3),
           PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
 
         _ <- tables.cancelAllPreparations
@@ -139,7 +157,7 @@ final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String, Strin
     "successfully request schema for prepared table" >>* {
       for {
         id <- init(MockTables.MockTable(
-          TableRef(TableName("foo"), "bar"),
+          TableRef(TableName("foo"), "bar", columns1),
           PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
         result <- tables.preparedSchema(id)
       } yield {

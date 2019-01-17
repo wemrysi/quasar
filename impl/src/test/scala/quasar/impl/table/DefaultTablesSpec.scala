@@ -17,9 +17,8 @@
 package quasar.impl.table
 
 import slamdata.Predef._
-
 import quasar.api.QueryEvaluator
-import quasar.api.table.{TableName, TableRef, Tables, TablesSpec}
+import quasar.api.table._
 import quasar.contrib.scalaz.MonadState_
 import quasar.contrib.std.uuid._
 import quasar.impl.storage.{IndexedStore, PureIndexedStore}
@@ -76,8 +75,22 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, Strin
   val tables: Tables[IO, UUID, String, String, String] =
     DefaultTables[IO, UUID, String, String, String](freshId, tableStore, evaluator, manager(0), lookup, lookupSchema)
 
-  val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1")
-  val table2: TableRef[String] = TableRef(TableName("table2"), "select * from table2")
+  val columns1: List[TableColumn] =
+    List(TableColumn("foo1", ColumnScalar.Number),
+      TableColumn("foo2", ColumnScalar.String),
+      TableColumn("foo3", ColumnScalar.Boolean),
+      TableColumn("foo4", ColumnScalar.Null),
+      TableColumn("foo5", ColumnScalar.Offsetdatetime))
+
+  val columns2: List[TableColumn] =
+    List(TableColumn("bar1", ColumnScalar.Number),
+      TableColumn("bar2", ColumnScalar.String),
+      TableColumn("bar3", ColumnScalar.Boolean),
+      TableColumn("bar4", ColumnScalar.Null),
+      TableColumn("bar5", ColumnScalar.Offsetdatetime))
+
+  val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1", columns1)
+  val table2: TableRef[String] = TableRef(TableName("table2"), "select * from table2", columns2)
 
   val preparation1: String = table1.query
   val preparation2: String = table2.query
