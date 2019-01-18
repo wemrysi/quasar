@@ -115,7 +115,7 @@ lazy val foundation = project
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
       "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
       "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
-      "com.codecommit"             %% "shims"                     % "1.2.1",
+      "com.codecommit"             %% "shims"                     % "1.7.0",
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
       "co.fs2"                     %% "fs2-core"                  % fs2Version,
       "co.fs2"                     %% "fs2-io"                    % fs2Version,
