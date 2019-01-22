@@ -43,10 +43,10 @@ import cats.effect.{ConcurrentEffect, ContextShift, Effect, Sync, Timer}
 import cats.syntax.applicativeError._
 import fs2.{Chunk, Stream}
 import fs2.io.file
-import jawn.AsyncParser
-import jawn.support.argonaut.Parser._
 import jawnfs2._
 import org.slf4s.Logging
+import org.typelevel.jawn.AsyncParser
+import org.typelevel.jawn.support.argonaut.Parser._
 import scalaz.syntax.tag._
 
 object ExternalDatasources extends Logging {
