@@ -438,13 +438,17 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           if compatibleShifts(lshift, rshift) =>
 
           val idStatusAdj = idStatusL |+| idStatusR
-          val repairLAdj = fixCompatible(repairL, idStatusL, idStatusAdj)
-          val repairRAdj = fixCompatible(repairR, idStatusR, idStatusAdj)
 
-          val repair =
+          val repair = if (repairL === repairR && idStatusL === idStatusR) {
+            repairL
+          } else {
+            val repairLAdj = fixCompatible(repairL, idStatusL, idStatusAdj)
+            val repairRAdj = fixCompatible(repairR, idStatusR, idStatusAdj)
+
             func.StaticMapS(
               LeftField -> repairLAdj,
               RightField -> repairRAdj)
+          }
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.LeftShift[T, Symbol](
@@ -725,9 +729,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
     def compatibleShifts(l: ShiftGraph, r: ShiftGraph): Boolean = {
       (l, r) match {
         case (-\/(QSU.LeftShift(srcL, structL, _, _, _, rotL)), -\/(QSU.LeftShift(srcR, structR, _, _, _, rotR))) =>
-          srcL.root === srcR.root &&
-            elideGuards(structL.linearize) === elideGuards(structR.linearize) &&
-            rotL === rotR
+          elideGuards(structL.linearize) === elideGuards(structR.linearize) && rotL === rotR
 
         case _ => false
       }
