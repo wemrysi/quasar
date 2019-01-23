@@ -214,7 +214,17 @@ object QScriptRegressionSpec extends Qspec {
 
         result must countReadAs(0)
         result must countInterpretedReadAs(1)
-        result must countLeftShiftAs(2)
+        result must countLeftShiftAs(0)
+      }
+
+      // ch4703
+      val q5 = "select a[*][*], a[*][*].b[*] from zips"
+      q5 in {
+        val result = count(q5)
+
+        result must countReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(1)
       }
     }
 
