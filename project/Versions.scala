@@ -1,12 +1,12 @@
 package quasar.project
 
 object Versions {
-  val algebraVersion      = "0.7.0"
+  val algebraVersion      = "1.0.0"
   val argonautVersion     = "6.2.2"
-  val catsEffectVersion   = "1.0.0"
+  val catsEffectVersion   = "1.1.0"
   val disciplineVersion   = "0.7.2"
-  val jawnVersion         = "0.13.0"
-  val jawnfs2Version      = "0.13.0"
+  val jawnVersion         = "0.14.1"
+  val jawnfs2Version      = "0.14.1"
   val matryoshkaVersion   = "0.18.3"
   val monocleVersion      = "1.4.0"
   val pathyVersion        = "0.2.11"
@@ -19,8 +19,8 @@ object Versions {
   val shapelessVersion    = "2.3.3"
   val simulacrumVersion   = "0.10.0"
   val specsVersion        = "4.3.3"
-  val spireVersion        = "0.14.1"
+  val spireVersion        = "0.16.0"
   val akkaVersion         = "2.5.1"
-  val fs2Version          = "1.0.0"
+  val fs2Version          = "1.0.2"
   val slf4sVersion        = "1.7.25"
 }
