@@ -23,9 +23,9 @@ import quasar.common.data.RValue
 import cats.effect.IO
 import cats.effect.concurrent.Ref
 
-import jawn.{AsyncParser, Facade}
-
 import qdata.json.QDataFacade
+
+import org.typelevel.jawn.{AsyncParser, Facade}
 
 import scalaz.std.list._
 import scalaz.syntax.traverse._

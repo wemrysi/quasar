@@ -27,8 +27,8 @@ import java.nio.file.{Path => JPath}
 
 import cats.effect.{ContextShift, Effect, Timer}
 import fs2.{io, Stream}
-import jawn.Facade
 import jawnfs2._
+import org.typelevel.jawn.Facade
 import qdata.{QDataDecode, QDataEncode}
 import qdata.json.QDataFacade
 import scalaz.syntax.tag._
