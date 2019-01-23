@@ -16,7 +16,7 @@
 
 package quasar.connector
 
-import slamdata.Predef.{Exception, Product, Serializable, String, StringContext, Throwable}
+import slamdata.Predef._
 
 import quasar.api.resource._
 
@@ -32,6 +32,8 @@ sealed trait ResourceError extends Product with Serializable
 object ResourceError extends ResourceErrorInstances{
   final case class MalformedResource(path: ResourcePath, expectedFormat: String, msg: String) extends ResourceError
   final case class NotAResource(path: ResourcePath) extends ResourceError
+  final case class ConnectionFailed(path: ResourcePath, cause: Throwable) extends ResourceError
+  final case class AccessDenied(path: ResourcePath, cause: Throwable) extends ResourceError
   sealed trait ExistentialError extends ResourceError
   final case class PathNotFound(path: ResourcePath) extends ExistentialError
 
@@ -44,6 +46,16 @@ object ResourceError extends ResourceErrorInstances{
     Prism.partial[ResourceError, ResourcePath] {
       case NotAResource(p) => p
     } (NotAResource(_))
+
+  val connectionFailed: Prism[ResourceError, (ResourcePath, Throwable)] =
+    Prism.partial[ResourceError, (ResourcePath, Throwable)] {
+      case ConnectionFailed(p, t) => (p, t)
+    } (ConnectionFailed.tupled)
+
+  val accessDenied: Prism[ResourceError, (ResourcePath, Throwable)] =
+    Prism.partial[ResourceError, (ResourcePath, Throwable)] {
+      case AccessDenied(p, t) => (p, t)
+    } (AccessDenied.tupled)
 
   def pathNotFound[E >: ExistentialError <: ResourceError]: Prism[E, ResourcePath] =
     Prism.partial[E, ResourcePath] {
@@ -63,10 +75,15 @@ object ResourceError extends ResourceErrorInstances{
 
 sealed abstract class ResourceErrorInstances {
   implicit val equal: Equal[ResourceError] = {
+    implicit val ignoreThrowable: Equal[Throwable] =
+      Equal.equal((_, _) => true)
+
     Equal.equalBy(e => (
       ResourceError.notAResource.getOption(e),
       ResourceError.pathNotFound.getOption(e),
-      ResourceError.malformedResource.getOption(e)))
+      ResourceError.malformedResource.getOption(e),
+      ResourceError.connectionFailed.getOption(e),
+      ResourceError.accessDenied.getOption(e)))
   }
 
   implicit val show: Show[ResourceError] =
@@ -79,5 +96,11 @@ sealed abstract class ResourceErrorInstances {
 
       case ResourceError.MalformedResource(p, expected, msg) =>
         Cord(s"MalformedResource(path: ${p.show}, expected: $expected, msg: $msg)")
+
+      case ResourceError.ConnectionFailed(p, t) =>
+        Cord(s"ConnectionFailed(path: ${p.show})\n\n$t")
+
+      case ResourceError.AccessDenied(p, t) =>
+        Cord(s"AccessDenied(path: ${p.show})\n\n$t")
     }
 }
