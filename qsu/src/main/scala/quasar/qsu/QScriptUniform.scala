@@ -132,12 +132,11 @@ object QScriptUniform {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptUniform[T, ?]] =
     new Delay[Show, QScriptUniform[T, ?]] {
       def apply[A](a: Show[A]) = {
         implicit val showA = a
-        Show.shows {
+        Show shows {
           case AutoJoin2(left, right, combiner) =>
             s"AutoJoin2(${left.shows}, ${right.shows}, ${combiner.shows})"
 
