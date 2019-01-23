@@ -39,21 +39,21 @@ final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String, Strin
       TableColumn("foo2", ColumnScalar.String),
       TableColumn("foo3", ColumnScalar.Boolean),
       TableColumn("foo4", ColumnScalar.Null),
-      TableColumn("foo5", ColumnScalar.Offsetdatetime))
+      TableColumn("foo5", ColumnScalar.OffsetDateTime))
 
   val columns2: List[TableColumn] =
     List(TableColumn("bar1", ColumnScalar.Number),
       TableColumn("bar2", ColumnScalar.String),
       TableColumn("bar3", ColumnScalar.Boolean),
       TableColumn("bar4", ColumnScalar.Null),
-      TableColumn("bar5", ColumnScalar.Offsetdatetime))
+      TableColumn("bar5", ColumnScalar.OffsetDateTime))
 
   val columns3: List[TableColumn] =
     List(TableColumn("baz1", ColumnScalar.Number),
-      TableColumn("bas2", ColumnScalar.String),
+      TableColumn("baz2", ColumnScalar.String),
       TableColumn("baz3", ColumnScalar.Boolean),
       TableColumn("baz4", ColumnScalar.Null),
-      TableColumn("baz5", ColumnScalar.Offsetdatetime))
+      TableColumn("baz5", ColumnScalar.OffsetDateTime))
 
   val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1", columns1)
   val table2: TableRef[String] = TableRef(TableName("table2"), "select * from table2", columns2)

@@ -26,7 +26,7 @@ object ColumnScalar {
   final case object Null extends ColumnScalar
   final case object Number extends ColumnScalar
   final case object String extends ColumnScalar
-  final case object Offsetdatetime extends ColumnScalar
+  final case object OffsetDateTime extends ColumnScalar
 
   implicit val parseTypeShow: Show[ColumnScalar] = Show.showFromToString
 }

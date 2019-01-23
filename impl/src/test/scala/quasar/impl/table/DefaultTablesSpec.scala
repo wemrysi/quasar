@@ -80,14 +80,14 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, Strin
       TableColumn("foo2", ColumnScalar.String),
       TableColumn("foo3", ColumnScalar.Boolean),
       TableColumn("foo4", ColumnScalar.Null),
-      TableColumn("foo5", ColumnScalar.Offsetdatetime))
+      TableColumn("foo5", ColumnScalar.OffsetDateTime))
 
   val columns2: List[TableColumn] =
     List(TableColumn("bar1", ColumnScalar.Number),
       TableColumn("bar2", ColumnScalar.String),
       TableColumn("bar3", ColumnScalar.Boolean),
       TableColumn("bar4", ColumnScalar.Null),
-      TableColumn("bar5", ColumnScalar.Offsetdatetime))
+      TableColumn("bar5", ColumnScalar.OffsetDateTime))
 
   val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1", columns1)
   val table2: TableRef[String] = TableRef(TableName("table2"), "select * from table2", columns2)

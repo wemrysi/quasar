@@ -29,7 +29,7 @@ final case class TableColumn(name: String, coltpe: ColumnScalar)
 object TableColumn {
   implicit val showTableColumn: Show[TableColumn] =
     Show.show { tc =>
-      Cord("column(") ++ tc.name ++ Cord(", ") ++ tc.coltpe.show ++ Cord(")")
+      Cord("TableColumn(") ++ tc.name ++ Cord(", ") ++ tc.coltpe.show ++ Cord(")")
     }
 }
 
