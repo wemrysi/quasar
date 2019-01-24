@@ -460,12 +460,12 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val idStatusAdj = idStatusL |+| idStatusR
 
-          val repair = if (repairL === repairR && idStatusL === idStatusR) {
-            repairL
-          } else {
-            val repairLAdj = fixCompatible(repairL, idStatusL, idStatusAdj)
-            val repairRAdj = fixCompatible(repairR, idStatusR, idStatusAdj)
+          val repairLAdj = fixCompatible(repairL, idStatusL, idStatusAdj)
+          val repairRAdj = fixCompatible(repairR, idStatusR, idStatusAdj)
 
+          val repair = if (repairLAdj === repairRAdj) {
+            repairLAdj
+          } else {
             func.StaticMapS(
               LeftField -> repairLAdj,
               RightField -> repairRAdj)
