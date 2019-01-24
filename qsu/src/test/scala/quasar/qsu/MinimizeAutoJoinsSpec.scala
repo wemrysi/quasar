@@ -50,7 +50,7 @@ import scalaz.{\/, \/-, EitherT, Free, Need, StateT}
 import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
-// import scalaz.syntax.show._
+import scalaz.syntax.show._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.tag._
 
@@ -1859,7 +1859,13 @@ object MinimizeAutoJoinsSpec
           asese,
           func.ConcatMaps(func.LeftSide, func.RightSide))))
 
-      runOn(qgraph) must haveShiftCount(2)
+      println(s"input: ${qgraph.shows}")
+
+      val results = runOn(qgraph)
+
+      println(s"output: ${results.shows}")
+
+      results must haveShiftCount(2)
     }
   }
 

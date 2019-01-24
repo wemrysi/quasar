@@ -226,6 +226,16 @@ object QScriptRegressionSpec extends Qspec {
         result must countInterpretedReadAs(1)
         result must countLeftShiftAs(1)
       }
+
+      // ch4758
+      val q6 = "select topObj{_:} as k1, topObj{_}{_:} as k2, topObj{_}{_} as v2 from `nested.data`"
+      q6 in {
+        val result = count(q6)
+
+        result must countReadAs(0)
+        result must countInterpretedReadAs(1)
+        result must countLeftShiftAs(1)
+      }
     }
 
     "handle real-world queries" >> {
