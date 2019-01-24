@@ -1815,7 +1815,7 @@ object MinimizeAutoJoinsSpec
     }
 
     // a[_:], a[_][_:], a[_][_]
-    "collapses two-tier id-varying shift without re-coalescing with self" in {
+    "collapses two-tier id-varying array shift without re-coalescing with self" in {
       val read = qsu.read(afile, ExcludeId)
 
       val ase = qsu.leftShift(
@@ -1829,7 +1829,7 @@ object MinimizeAutoJoinsSpec
       val asi = qsu.leftShift(
         qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "a"))),
         recFunc.Hole,
-        IncludeId,
+        IdOnly,
         OnUndefined.Omit,
         RightTarget[Fix],
         Rotation.ShiftArray)
@@ -1837,7 +1837,7 @@ object MinimizeAutoJoinsSpec
       val asesi = qsu.leftShift(
         ase,
         recFunc.Hole,
-        IncludeId,
+        IdOnly,
         OnUndefined.Omit,
         RightTarget[Fix],
         Rotation.ShiftArray)
@@ -1858,6 +1858,56 @@ object MinimizeAutoJoinsSpec
             func.ConcatMaps(func.LeftSide, func.RightSide))),
           asese,
           func.ConcatMaps(func.LeftSide, func.RightSide))))
+
+      runOn(qgraph) must haveShiftCount(2)
+    }
+
+    // a{_:}, a{_}{_:}, a{_}{_}
+    "collapses two-tier id-varying object shift without re-coalescing with self" in {
+      val read = qsu.read(afile, ExcludeId)
+
+      val ase = qsu.leftShift(
+        qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "a"))),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val asi = qsu.leftShift(
+        qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "a"))),
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val asesi = qsu.leftShift(
+        ase,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val asese = qsu.leftShift(
+        ase,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu._autojoin2((
+          qsu._autojoin2((
+            asi,
+            asesi,
+            func.StaticMapS(
+              "k1" -> func.LeftSide,
+              "k2" -> func.RightSide))),
+          asese,
+          func.ConcatMaps(func.LeftSide, func.MakeMapS("v2", func.RightSide)))))
 
       runOn(qgraph) must haveShiftCount(2)
     }
