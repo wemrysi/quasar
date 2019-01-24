@@ -167,7 +167,7 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
 
     MonadError_[IO, ResourceError].attempt(qsst) map { r =>
       r must be_-\/.like {
-        case ResourceError.MalformedResource(p, expect, _) =>
+        case ResourceError.MalformedResource(p, expect, _, _) =>
           p must_= path
           expect must_=== "ldjson"
       }

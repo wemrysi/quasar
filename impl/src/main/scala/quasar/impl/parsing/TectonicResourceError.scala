@@ -28,10 +28,10 @@ object TectonicResourceError {
   def apply(path: ResourcePath, tpe: ParsableType, cause: Throwable): Option[ResourceError] =
     Some(cause) collect {
       case ParseException(msg, _, _, _) =>
-        ResourceError.malformedResource(path, typeSummary(tpe), msg)
+        ResourceError.malformedResource(path, typeSummary(tpe), Some(msg), Some(cause))
 
       case IncompleteParseException(msg) =>
-        ResourceError.malformedResource(path, typeSummary(tpe), msg)
+        ResourceError.malformedResource(path, typeSummary(tpe), Some(msg), Some(cause))
     }
 
   val typeSummary: ParsableType => String = {

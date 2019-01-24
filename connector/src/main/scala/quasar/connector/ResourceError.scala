@@ -27,19 +27,23 @@ import scalaz.std.tuple._
 import scalaz.syntax.show._
 import scalaz.{Cord, Equal, Show}
 
-sealed trait ResourceError extends Product with Serializable
+sealed trait ResourceError extends Product with Serializable {
+  def path: ResourcePath
+  def detail: Option[String]
+  def cause: Option[Throwable]
+}
 
 object ResourceError extends ResourceErrorInstances{
-  final case class MalformedResource(path: ResourcePath, expectedFormat: String, msg: String) extends ResourceError
-  final case class NotAResource(path: ResourcePath) extends ResourceError
-  final case class ConnectionFailed(path: ResourcePath, cause: Throwable) extends ResourceError
-  final case class AccessDenied(path: ResourcePath, cause: Throwable) extends ResourceError
+  final case class MalformedResource(path: ResourcePath, expectedFormat: String, detail: Option[String], cause: Option[Throwable]) extends ResourceError
+  final case class NotAResource(path: ResourcePath) extends ResourceError { val detail = None; val cause = None }
+  final case class ConnectionFailed(path: ResourcePath, detail: Option[String], cause: Option[Throwable]) extends ResourceError
+  final case class AccessDenied(path: ResourcePath, detail: Option[String], cause: Option[Throwable]) extends ResourceError
   sealed trait ExistentialError extends ResourceError
-  final case class PathNotFound(path: ResourcePath) extends ExistentialError
+  final case class PathNotFound(path: ResourcePath) extends ExistentialError { val detail = None; val cause = None }
 
-  val malformedResource: Prism[ResourceError, (ResourcePath, String, String)] =
-    Prism.partial[ResourceError, (ResourcePath, String, String)] {
-      case MalformedResource(rp, expected, msg) => (rp, expected, msg)
+  val malformedResource: Prism[ResourceError, (ResourcePath, String, Option[String], Option[Throwable])] =
+    Prism.partial[ResourceError, (ResourcePath, String, Option[String], Option[Throwable])] {
+      case MalformedResource(p, e, d, t) => (p, e, d, t)
     } (MalformedResource.tupled)
 
   val notAResource: Prism[ResourceError, ResourcePath] =
@@ -47,14 +51,14 @@ object ResourceError extends ResourceErrorInstances{
       case NotAResource(p) => p
     } (NotAResource(_))
 
-  val connectionFailed: Prism[ResourceError, (ResourcePath, Throwable)] =
-    Prism.partial[ResourceError, (ResourcePath, Throwable)] {
-      case ConnectionFailed(p, t) => (p, t)
+  val connectionFailed: Prism[ResourceError, (ResourcePath, Option[String], Option[Throwable])] =
+    Prism.partial[ResourceError, (ResourcePath, Option[String], Option[Throwable])] {
+      case ConnectionFailed(p, d, t) => (p, d, t)
     } (ConnectionFailed.tupled)
 
-  val accessDenied: Prism[ResourceError, (ResourcePath, Throwable)] =
-    Prism.partial[ResourceError, (ResourcePath, Throwable)] {
-      case AccessDenied(p, t) => (p, t)
+  val accessDenied: Prism[ResourceError, (ResourcePath, Option[String], Option[Throwable])] =
+    Prism.partial[ResourceError, (ResourcePath, Option[String], Option[Throwable])] {
+      case AccessDenied(p, d, t) => (p, d, t)
     } (AccessDenied.tupled)
 
   def pathNotFound[E >: ExistentialError <: ResourceError]: Prism[E, ResourcePath] =
@@ -86,6 +90,11 @@ sealed abstract class ResourceErrorInstances {
       ResourceError.accessDenied.getOption(e)))
   }
 
+  def printThrowable(throwable: Option[Throwable]): String = throwable match {
+    case None => ""
+    case Some(t) => s"\n$t"
+  }
+
   implicit val show: Show[ResourceError] =
     Show.show {
       case ResourceError.NotAResource(p) =>
@@ -94,13 +103,13 @@ sealed abstract class ResourceErrorInstances {
       case ResourceError.PathNotFound(p) =>
         Cord("PathNotFound(") ++ p.show ++ Cord(")")
 
-      case ResourceError.MalformedResource(p, expected, msg) =>
-        Cord(s"MalformedResource(path: ${p.show}, expected: $expected, msg: $msg)")
+      case ResourceError.MalformedResource(p, e, d, t) =>
+        Cord(s"MalformedResource(path: ${p.show}, expected: $e, detail: ${d.show})${printThrowable(t)}")
 
-      case ResourceError.ConnectionFailed(p, t) =>
-        Cord(s"ConnectionFailed(path: ${p.show})\n\n$t")
+      case ResourceError.ConnectionFailed(p, d, t) =>
+        Cord(s"ConnectionFailed(path: ${p.show}, detail: ${d.show})${printThrowable(t)}")
 
-      case ResourceError.AccessDenied(p, t) =>
-        Cord(s"AccessDenied(path: ${p.show})\n\n$t")
+      case ResourceError.AccessDenied(p, d, t) =>
+        Cord(s"AccessDenied(path: ${p.show}, detail: ${d.show})${printThrowable(t)}")
     }
 }
