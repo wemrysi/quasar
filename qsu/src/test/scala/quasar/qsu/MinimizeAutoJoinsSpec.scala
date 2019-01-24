@@ -50,8 +50,9 @@ import scalaz.{\/, \/-, EitherT, Free, Need, StateT}
 import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
-import scalaz.syntax.tag._
+// import scalaz.syntax.show._
 import scalaz.syntax.std.boolean._
+import scalaz.syntax.tag._
 
 object MinimizeAutoJoinsSpec
     extends Qspec
@@ -1811,6 +1812,54 @@ object MinimizeAutoJoinsSpec
           func.ConcatMaps(func.LeftSide, func.RightSide))))
 
       runOn(qgraph) must haveShiftCount(3)
+    }
+
+    // a[_:], a[_][_:], a[_][_]
+    "collapses two-tier id-varying shift without re-coalescing with self" in {
+      val read = qsu.read(afile, ExcludeId)
+
+      val ase = qsu.leftShift(
+        qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "a"))),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val asi = qsu.leftShift(
+        qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "a"))),
+        recFunc.Hole,
+        IncludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val asesi = qsu.leftShift(
+        ase,
+        recFunc.Hole,
+        IncludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val asese = qsu.leftShift(
+        ase,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu._autojoin2((
+          qsu._autojoin2((
+            asi,
+            asesi,
+            func.ConcatMaps(func.LeftSide, func.RightSide))),
+          asese,
+          func.ConcatMaps(func.LeftSide, func.RightSide))))
+
+      runOn(qgraph) must haveShiftCount(2)
     }
   }
 
