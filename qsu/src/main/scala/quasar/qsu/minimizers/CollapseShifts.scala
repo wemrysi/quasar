@@ -435,18 +435,43 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         }
       }
 
-      def fixCompatible(repair: FreeMapA[ShiftTarget], idStatus: IdStatus, resultIdStatus: IdStatus): FreeMapA[ShiftTarget] =
+      def fixCompatible(
+          repair: FreeMapA[ShiftTarget],
+          idStatus: IdStatus,
+          resultIdStatus: IdStatus,
+          side: JoinSide): FreeMapA[ShiftTarget] =
+
         (idStatus, resultIdStatus) match {
           case (IdOnly, IncludeId) => repair flatMap {
-            case ShiftTarget.LeftTarget => scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
-            case ShiftTarget.RightTarget => func.ProjectIndexI(RightTarget, 0)
-            case access @ ShiftTarget.AccessLeftTarget(_) => Free.pure(access)
+            case ShiftTarget.LeftTarget =>
+              scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
+
+            case ShiftTarget.RightTarget =>
+              func.ProjectIndexI(RightTarget, 0)
+
+            case access @ ShiftTarget.AccessLeftTarget(_) =>
+              val hole = Free.pure[MapFunc, ShiftTarget](access)
+
+              if (hasParent)
+                func.ProjectKeyS(hole, name(side))
+              else
+                hole
           }
 
           case (ExcludeId, IncludeId) => repair flatMap {
-            case ShiftTarget.LeftTarget => scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
-            case ShiftTarget.RightTarget => func.ProjectIndexI(RightTarget, 1)
-            case access @ ShiftTarget.AccessLeftTarget(_) => Free.pure(access)
+            case ShiftTarget.LeftTarget =>
+              scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
+
+            case ShiftTarget.RightTarget =>
+              func.ProjectIndexI(RightTarget, 1)
+
+            case access @ ShiftTarget.AccessLeftTarget(_) =>
+              val hole = Free.pure[MapFunc, ShiftTarget](access)
+
+              if (hasParent)
+                func.ProjectKeyS(hole, name(side))
+              else
+                hole
           }
           case _ => repair
         }
@@ -460,8 +485,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val idStatusAdj = idStatusL |+| idStatusR
 
-          val repairLAdj = fixCompatible(repairL, idStatusL, idStatusAdj)
-          val repairRAdj = fixCompatible(repairR, idStatusR, idStatusAdj)
+          val repairLAdj = fixCompatible(repairL, idStatusL, idStatusAdj, LeftSide)
+          val repairRAdj = fixCompatible(repairR, idStatusR, idStatusAdj, RightSide)
 
           val repair = if (repairLAdj === repairRAdj) {
             repairLAdj

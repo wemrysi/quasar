@@ -1859,7 +1859,47 @@ object MinimizeAutoJoinsSpec
           asese,
           func.ConcatMaps(func.LeftSide, func.RightSide))))
 
-      runOn(qgraph) must haveShiftCount(2)
+      val results = runOn(qgraph)
+      results must haveShiftCount(2)
+
+      results must beLike {
+        case Map(
+          LeftShift(
+            LeftShift(
+              Read(`afile`, ExcludeId),
+              _,
+              _,
+              _,
+              repairInner,
+              _),
+            _,
+            _,
+            _,
+            repair,
+            _),
+          _) =>
+
+        repairInner must beTreeEqual(
+          func.StaticMapS(
+            "left" ->
+              func.StaticMapS(
+                "left" -> func.MakeMapS("0", func.ProjectIndexI(RightTarget[Fix], 0)),
+                "right" -> func.ProjectIndexI(RightTarget[Fix], 1)),
+            "right" -> func.ProjectIndexI(RightTarget[Fix], 1)))
+
+        repair must beTreeEqual(
+          func.ConcatMaps(
+            func.ConcatMaps(
+              func.ProjectKeyS(
+                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "left"),
+                "left"),
+              func.MakeMapS(
+                "1",
+                func.ProjectIndexI(RightTarget[Fix], 0))),
+            func.MakeMapS(
+              "2",
+              func.ProjectIndexI(RightTarget[Fix], 1))))
+      }
     }
 
     // a{_:}, a{_}{_:}, a{_}{_}
