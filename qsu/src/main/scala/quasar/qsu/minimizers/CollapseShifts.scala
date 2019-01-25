@@ -335,7 +335,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         leftIndices: Set[Int],
         right: List[ShiftGraph],
         rightIndices: Set[Int],
-        parent: Option[QSUGraph]): G[QSUGraph] = {
+        parent: Option[QSUGraph],
+        requiresDeref: Boolean): G[QSUGraph] = {
 
       val hasParent = parent.isDefined
 
@@ -343,7 +344,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       def continue(
           fakeParent: QSUGraph,
           tailL: List[ShiftGraph],
-          tailR: List[ShiftGraph])(
+          tailR: List[ShiftGraph],
+          requiresDeref: Boolean)(
           pat: Symbol => QSU[T, Symbol]): G[QSUGraph] = {
 
         val realParent = parent.getOrElse(fakeParent)
@@ -351,13 +353,13 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           Some(rewritten :++ realParent)
         }
 
-        cont.flatMap(coalesceZip(tailL, leftIndices, tailR, rightIndices, _))
+        cont.flatMap(coalesceZip(tailL, leftIndices, tailR, rightIndices, _, requiresDeref))
       }
 
       def name(side: JoinSide) = side.fold(LeftField, RightField)
 
       def fixSingleStruct(struct: FreeMap, side: JoinSide): FreeMap = {
-        if (hasParent)
+        if (hasParent && requiresDeref)
           struct >> func.ProjectKeyS(func.Hole, name(side))
         else
           struct
@@ -375,7 +377,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           case ShiftTarget.AccessLeftTarget(access) =>
             val hole = Free.pure[MapFunc, Access[Hole] \/ Int](access.left[Int])
 
-            if (hasParent)
+            if (hasParent && requiresDeref)
               func.ProjectKeyS(hole, name(side))
             else
               hole
@@ -396,7 +398,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           case access @ ShiftTarget.AccessLeftTarget(_) =>
             val hole = Free.pure[MapFunc, ShiftTarget](access)
 
-            if (hasParent)
+            if (hasParent && requiresDeref)
               func.ProjectKeyS(hole, name(side))
             else
               hole
@@ -409,7 +411,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         shifts map {
           case (struct, idStatus, rot) =>
-            val struct2 = if (hasParent)
+            val struct2 = if (hasParent && requiresDeref)
               struct >> func.ProjectKeyS(func.Hole, name(side))
             else
               struct
@@ -425,7 +427,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         repair flatMap {
           case -\/(access) =>
-            if (hasParent)
+            if (hasParent && requiresDeref)
               func.ProjectKeyS(Free.pure(access.left[Int]), name(side))
             else
               Free.pure(access.left[Int])
@@ -452,7 +454,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             case access @ ShiftTarget.AccessLeftTarget(_) =>
               val hole = Free.pure[MapFunc, ShiftTarget](access)
 
-              if (hasParent)
+              if (hasParent && requiresDeref)
                 func.ProjectKeyS(hole, name(side))
               else
                 hole
@@ -468,7 +470,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             case access @ ShiftTarget.AccessLeftTarget(_) =>
               val hole = Free.pure[MapFunc, ShiftTarget](access)
 
-              if (hasParent)
+              if (hasParent && requiresDeref)
                 func.ProjectKeyS(hole, name(side))
               else
                 hole
@@ -488,7 +490,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           val repairLAdj = fixCompatible(repairL, idStatusL, idStatusAdj, LeftSide)
           val repairRAdj = fixCompatible(repairR, idStatusR, idStatusAdj, RightSide)
 
-          val repair = if (repairLAdj === repairRAdj) {
+          val ignoreStructure = repairLAdj === repairRAdj
+
+          val repair = if (ignoreStructure) {
             repairLAdj
           } else {
             func.StaticMapS(
@@ -496,7 +500,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               RightField -> repairRAdj)
           }
 
-          continue(fakeParent, tailL, tailR) { sym =>
+          continue(fakeParent, tailL, tailR, !ignoreStructure) { sym =>
             QSU.LeftShift[T, Symbol](
               sym, structL, idStatusAdj, onUndefinedL, MapFuncCore.normalized(repair), rotL)
           }
@@ -517,7 +521,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               LeftField -> repairLAdj,
               RightField -> repairRAdj)
 
-          continue(fakeParent, tailL, tailR) { sym =>
+          continue(fakeParent, tailL, tailR, true) { sym =>
             QSU.MultiLeftShift[T, Symbol](
               sym,
               (structLAdj, idStatusL, rotL) :: (structRAdj, idStatusR, rotR) :: Nil,
@@ -543,7 +547,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               LeftField -> repairLAdj,
               RightField -> repairRAdj)
 
-          continue(fakeParent, tailL, tailR) { sym =>
+          continue(fakeParent, tailL, tailR, true) { sym =>
             QSU.MultiLeftShift[T, Symbol](
               sym,
               shiftsLAdj ::: (structRAdj, idStatusR, rotR) :: Nil,
@@ -567,7 +571,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               LeftField -> repairLAdj,
               RightField -> repairRAdj)
 
-          continue(fakeParent, tailL, tailR) { sym =>
+          continue(fakeParent, tailL, tailR, true) { sym =>
             QSU.MultiLeftShift[T, Symbol](
               sym,
               (structL.linearize, idStatusL, rotL) :: shiftsRAdj,
@@ -593,7 +597,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               LeftField -> repairLAdj,
               RightField -> repairRAdj)
 
-          continue(fakeParent, tailL, tailR) { sym =>
+          continue(fakeParent, tailL, tailR, true) { sym =>
             QSU.MultiLeftShift[T, Symbol](
               sym,
               shiftsLAdj ::: shiftsRAdj,
@@ -617,7 +621,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair = func.ConcatMaps(rightSide, func.MakeMapS(LeftField, repairLAdj))
 
-          continue(fakeParent, tailL, Nil) { sym =>
+          continue(fakeParent, tailL, Nil, true) { sym =>
             QSU.LeftShift[T, Symbol](
               sym,
               structLAdj.asRec,
@@ -643,7 +647,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair = func.ConcatMaps(rightSide, func.MakeMapS(LeftField, repairLAdj))
 
-          continue(fakeParent, tailL, Nil) { sym =>
+          continue(fakeParent, tailL, Nil, true) { sym =>
             QSU.MultiLeftShift[T, Symbol](
               sym,
               shiftsLAdj,
@@ -667,7 +671,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair = func.ConcatMaps(leftSide, func.MakeMapS(RightField, repairRAdj))
 
-          continue(fakeParent, Nil, tailR) { sym =>
+          continue(fakeParent, Nil, tailR, true) { sym =>
             QSU.LeftShift[T, Symbol](
               sym,
               structRAdj.asRec,
@@ -693,7 +697,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair = func.ConcatMaps(leftSide, func.MakeMapS(RightField, repairRAdj))
 
-          continue(fakeParent, Nil, tailR) { sym =>
+          continue(fakeParent, Nil, tailR, true) { sym =>
             QSU.MultiLeftShift[T, Symbol](
               sym,
               shiftsRAdj,
@@ -705,8 +709,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           // if parent is None here, it means we invoked on empty lists
           mergeIndexMaps(
             parent.getOrElse(errorImpossible),
-            func.ProjectKeyS(func.Hole, "left"),
-            func.ProjectKeyS(func.Hole, "right"))
+            if (requiresDeref) func.ProjectKeyS(func.Hole, "left") else func.Hole,
+            if (requiresDeref) func.ProjectKeyS(func.Hole, "right") else func.Hole)
       }
     }
 
@@ -775,7 +779,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
     def coalesceWrapped(wrapped: List[(QSUGraph, Set[Int])]): G[(QSUGraph, Set[Int])] = {
       wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
         case ((ConsecutiveBounded(_, shifts1), leftIndices), (ConsecutiveBounded(_, shifts2), rightIndices)) =>
-          val back = coalesceZip(shifts1.toList.reverse, leftIndices, shifts2.toList.reverse, rightIndices, None)
+          val back = coalesceZip(shifts1.toList.reverse, leftIndices, shifts2.toList.reverse, rightIndices, None, false)
 
           back.map(g => (inlineMap(g).getOrElse(g), leftIndices ++ rightIndices))
 
