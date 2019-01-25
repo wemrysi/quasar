@@ -475,7 +475,18 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               else
                 hole
           }
-          case _ => repair
+
+          case _ => repair flatMap {
+            case access @ ShiftTarget.AccessLeftTarget(_) =>
+              val hole = Free.pure[MapFunc, ShiftTarget](access)
+
+              if (hasParent && requiresDeref)
+                func.ProjectKeyS(hole, name(side))
+              else
+                hole
+
+            case target => target.point[FreeMapA]
+          }
         }
 
       (left, right) match {
