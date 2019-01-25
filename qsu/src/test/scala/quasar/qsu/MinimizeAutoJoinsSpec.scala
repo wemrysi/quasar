@@ -50,8 +50,9 @@ import scalaz.{\/, \/-, EitherT, Free, Need, StateT}
 import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
-import scalaz.syntax.tag._
+// import scalaz.syntax.show._
 import scalaz.syntax.std.boolean._
+import scalaz.syntax.tag._
 
 object MinimizeAutoJoinsSpec
     extends Qspec
@@ -1811,6 +1812,144 @@ object MinimizeAutoJoinsSpec
           func.ConcatMaps(func.LeftSide, func.RightSide))))
 
       runOn(qgraph) must haveShiftCount(3)
+    }
+
+    // a[_:], a[_][_:], a[_][_]
+    "collapses two-tier id-varying array shift without re-coalescing with self" in {
+      val read = qsu.read(afile, ExcludeId)
+
+      val ase = qsu.leftShift(
+        qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "a"))),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val asi = qsu.leftShift(
+        qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "a"))),
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val asesi = qsu.leftShift(
+        ase,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val asese = qsu.leftShift(
+        ase,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu._autojoin2((
+          qsu._autojoin2((
+            asi,
+            asesi,
+            func.ConcatMaps(func.LeftSide, func.RightSide))),
+          asese,
+          func.ConcatMaps(func.LeftSide, func.RightSide))))
+
+      val results = runOn(qgraph)
+      results must haveShiftCount(2)
+
+      results must beLike {
+        case Map(
+          LeftShift(
+            LeftShift(
+              Read(`afile`, ExcludeId),
+              _,
+              _,
+              _,
+              repairInner,
+              _),
+            _,
+            _,
+            _,
+            repair,
+            _),
+          _) =>
+
+        repairInner must beTreeEqual(
+          func.StaticMapS(
+            "left" ->
+              func.StaticMapS(
+                "left" -> func.MakeMapS("0", func.ProjectIndexI(RightTarget[Fix], 0)),
+                "right" -> func.ProjectIndexI(RightTarget[Fix], 1)),
+            "right" -> func.ProjectIndexI(RightTarget[Fix], 1)))
+
+        repair must beTreeEqual(
+          func.ConcatMaps(
+            func.ConcatMaps(
+              func.ProjectKeyS(
+                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "left"),
+                "left"),
+              func.MakeMapS(
+                "1",
+                func.ProjectIndexI(RightTarget[Fix], 0))),
+            func.MakeMapS(
+              "2",
+              func.ProjectIndexI(RightTarget[Fix], 1))))
+      }
+    }
+
+    // a{_:}, a{_}{_:}, a{_}{_}
+    "collapses two-tier id-varying object shift without re-coalescing with self" in {
+      val read = qsu.read(afile, ExcludeId)
+
+      val ase = qsu.leftShift(
+        qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "a"))),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val asi = qsu.leftShift(
+        qsu.map((read, recFunc.ProjectKeyS(recFunc.Hole, "a"))),
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val asesi = qsu.leftShift(
+        ase,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val asese = qsu.leftShift(
+        ase,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu._autojoin2((
+          qsu._autojoin2((
+            asi,
+            asesi,
+            func.StaticMapS(
+              "k1" -> func.LeftSide,
+              "k2" -> func.RightSide))),
+          asese,
+          func.ConcatMaps(func.LeftSide, func.MakeMapS("v2", func.RightSide)))))
+
+      runOn(qgraph) must haveShiftCount(2)
     }
   }
 
