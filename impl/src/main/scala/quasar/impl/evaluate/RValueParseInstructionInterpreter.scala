@@ -202,10 +202,12 @@ object RValueParseInstructionInterpreter {
         componentsF map { components =>
           val res = components.toList.foldLeft(List[Map[String, RValue]]()) {
             case (acc, (name, rvs)) =>
-              rvs flatMap { rv =>
-                if (acc.isEmpty) List(Map(name -> rv))
-                else acc.map(_ + (name -> rv))
-              }
+              if (rvs.isEmpty)
+                acc
+              else if (acc.isEmpty)
+                rvs.map(rv => Map(name -> rv))
+              else
+                rvs.flatMap(rv => acc.map(_.updated(name, rv)))
           }
           res.map(RObject(_))
         }

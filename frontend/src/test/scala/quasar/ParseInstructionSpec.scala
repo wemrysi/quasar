@@ -1452,6 +1452,37 @@ object ParseInstructionSpec {
 
         input must cartesianInto(targets)(expected)
       }
+
+      "emit defined fields when some are undefined" in {
+        import ParseInstruction.{Mask, Pivot}
+
+        val input = ldjson("""
+          { "a": 1, "b": [ "two", "three" ] }
+          { "a": 2, "b": { "x": "four", "y": "five" } }
+          { "a": 3, "b": 42 }
+          """)
+
+        val expected = ldjson("""
+          { "a": 1, "ba": "two" }
+          { "a": 1, "ba": "three" }
+          { "a": 2, "bm": "four" }
+          { "a": 2, "bm": "five" }
+          { "a": 3 }
+          """)
+
+        val targets = Map(
+          (CPathField("a"), (CPathField("a"), Nil)),
+
+          (CPathField("ba"), (CPathField("b"), List(
+            Mask(Map(CPath.Identity -> Set(ParseType.Array))),
+            Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array)))),
+
+          (CPathField("bm"), (CPathField("b"), List(
+            Mask(Map(CPath.Identity -> Set(ParseType.Object))),
+            Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Object)))))
+
+        input must cartesianInto(targets)(expected)
+      }
     }
 
     def evalCartesian(cartesian: Cartesian, stream: JsonStream): JsonStream
