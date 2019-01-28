@@ -1262,6 +1262,46 @@ object ParseInstructionSpec {
 
         input must pivotInto(".shifted", IdStatus.IncludeId, ParseType.Object)(expected)
       }
+
+      "preserve empty arrays as values of an array pivot" in {
+        val input = ldjson("""
+          [ 1, "two", [] ]
+          [ [] ]
+          [ [], 3, "four" ]
+          """)
+
+        val expected = ldjson("""
+          1
+          "two"
+          []
+          []
+          []
+          3
+          "four"
+        """)
+
+        input must pivotInto(".", IdStatus.ExcludeId, ParseType.Array)(expected)
+      }
+
+      "preserve empty objects as values of an object pivot" in {
+        val input = ldjson("""
+          { "1": 1, "2": "two", "3": {} }
+          { "4": {} }
+          { "5": {}, "6": 3, "7": "four" }
+          """)
+
+        val expected = ldjson("""
+          1
+          "two"
+          {}
+          {}
+          {}
+          3
+          "four"
+        """)
+
+        input must pivotInto(".", IdStatus.ExcludeId, ParseType.Object)(expected)
+      }
     }
 
     def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream
@@ -1409,6 +1449,37 @@ object ParseInstructionSpec {
               Pivot(CPath.Identity, IdStatus.IdOnly, ParseType.Object)))),
           (CPathField("c"),
             (CPathField("c"), Nil)))
+
+        input must cartesianInto(targets)(expected)
+      }
+
+      "emit defined fields when some are undefined" in {
+        import ParseInstruction.{Mask, Pivot}
+
+        val input = ldjson("""
+          { "a": 1, "b": [ "two", "three" ] }
+          { "a": 2, "b": { "x": "four", "y": "five" } }
+          { "a": 3, "b": 42 }
+          """)
+
+        val expected = ldjson("""
+          { "a": 1, "ba": "two" }
+          { "a": 1, "ba": "three" }
+          { "a": 2, "bm": "four" }
+          { "a": 2, "bm": "five" }
+          { "a": 3 }
+          """)
+
+        val targets = Map(
+          (CPathField("a"), (CPathField("a"), Nil)),
+
+          (CPathField("ba"), (CPathField("b"), List(
+            Mask(Map(CPath.Identity -> Set(ParseType.Array))),
+            Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array)))),
+
+          (CPathField("bm"), (CPathField("b"), List(
+            Mask(Map(CPath.Identity -> Set(ParseType.Object))),
+            Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Object)))))
 
         input must cartesianInto(targets)(expected)
       }
