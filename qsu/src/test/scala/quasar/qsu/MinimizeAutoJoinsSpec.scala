@@ -1951,6 +1951,47 @@ object MinimizeAutoJoinsSpec
 
       runOn(qgraph) must haveShiftCount(2)
     }
+
+    // a[*][*], b[*][*]
+    "avoid collapsing incompatible trailing shifts" in {
+      val read = qsu.read(afile, ExcludeId)
+
+      val ass = qsu.leftShift(
+        qsu.leftShift(
+          read,
+          recFunc.ProjectKeyS(recFunc.Hole, "a"),
+          ExcludeId,
+          OnUndefined.Omit,
+          RightTarget[Fix],
+          Rotation.ShiftMap),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val bss = qsu.leftShift(
+        qsu.leftShift(
+          read,
+          recFunc.ProjectKeyS(recFunc.Hole, "b"),
+          ExcludeId,
+          OnUndefined.Omit,
+          RightTarget[Fix],
+          Rotation.ShiftMap),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu._autojoin2((
+          ass,
+          bss,
+          func.ConcatMaps(func.LeftSide, func.RightSide))))
+
+      runOn(qgraph) must haveShiftCount(4)
+    }
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph =
