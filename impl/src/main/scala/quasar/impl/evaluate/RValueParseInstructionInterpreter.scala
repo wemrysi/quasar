@@ -16,63 +16,126 @@
 
 package quasar.impl.evaluate
 
-import slamdata.Predef._
+import slamdata.Predef.{Stream => _, _}
 
 import cats.effect.Concurrent
-import cats.effect.concurrent.Ref
 
-import quasar.{ParseInstruction, ParseType}
+import quasar.{FocusedParseInstruction, IdStatus, ParseInstruction, ParseType}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.ParseInstruction.{Cartesian, Ids, Mask, Pivot, Project, Wrap}
-import quasar.common.{CPathField, CPathIndex, CPathNode}
+import quasar.common.{CPath, CPathField, CPathIndex, CPathNode}
 import quasar.common.data._
 
+import scala.Predef.identity
 import scala.collection.Iterator
 import scala.math
 
-import scalaz.{Functor, Scalaz}, Scalaz._
+import fs2.{Chunk, Pipe, Stream}
+
+import scalaz.{NonEmptyList, Scalaz}, Scalaz._
 
 import shims._
 
 object RValueParseInstructionInterpreter {
+
+  /** The chunk size used when `minUnit` isn't specified. */
+  val DefaultChunkSize: Int = 1024
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def apply[F[_]: Concurrent](
       parallelism: Int,
       minUnit: Int,
       instructions: List[ParseInstruction])
-      : F[RValue => F[List[RValue]]] =
-    Ref[F].of(0L).map(interpret(parallelism, minUnit, instructions, _))
+      : Pipe[F, RValue, RValue] =
+    instructions match {
+      case Nil =>
+        identity[Stream[F, RValue]]
 
+      case Ids :: Project(CPath(CPathIndex(0))) :: t =>
+        interpretIdStatus(IdOnly) andThen interpret(parallelism, minUnit, t)
+
+      case Ids :: t =>
+        interpretIdStatus(IncludeId) andThen interpret(parallelism, minUnit, t)
+
+      case instrs =>
+        interpret(parallelism, minUnit, instrs)
+    }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def interpret[F[_]: Concurrent](
       parallelism: Int,
       minUnit: Int,
-      instructions: List[ParseInstruction],
-      counter: Ref[F, Long])(rvalue: RValue)
-      : F[List[RValue]] =
-    instructions.foldLeftM(List[RValue](rvalue)) {
-      case (prev, instr @ Mask(_)) =>
-        prev.flatMap(interpretMask(instr, _).toList).point[F]
+      instructions: List[ParseInstruction])
+      : Pipe[F, RValue, RValue] =
+    instructions match {
+      case Nil =>
+        identity[Stream[F, RValue]]
 
-      case (prev, instr @ Pivot(_, _, _)) =>
-        prev.flatMap(interpretPivot(instr, _)).point[F]
+      case FocusedPrefix(focused, rest) =>
+        _.flatMap(rv => Stream.chunk(Chunk.array(interpretFocused(focused, rv).toArray)))
+          .through(interpret(parallelism, minUnit, rest))
 
-      case (prev, instr @ Wrap(_, _)) =>
-        prev.flatMap(interpretWrap(instr, _) :: Nil).point[F]
-
-      case (prev, instr @ Project(_)) =>
-        prev.flatMap(interpretProject(instr, _)).point[F]
-
-      case (prev, instr @ Cartesian(_)) =>
-        prev.traverseM(interpretCartesian(parallelism, minUnit, instr, counter, _))
-
-      case (prev, Ids) =>
-        prev.traverse(interpretIds(counter, _))
+      case (c @ Cartesian(_)) :: rest =>
+        interpretCartesian(parallelism, minUnit, c) andThen interpret(parallelism, minUnit, rest)
     }
 
-  def interpretIds[F[_]: Functor](ref: Ref[F, Long], rvalue: RValue): F[RValue] =
-    ref.modify(i => (i + 1, i)) map { id =>
-      RValue.rArray(List(RValue.rLong(id), rvalue))
+  private object FocusedPrefix {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def unapply(instrs: List[ParseInstruction])
+        : Option[(NonEmptyList[FocusedParseInstruction], List[ParseInstruction])] =
+      instrs match {
+        case (fpi: FocusedParseInstruction) :: t =>
+          val (focused, rest) = t.span(_.isInstanceOf[FocusedParseInstruction])
+          some((NonEmptyList.nels(fpi, focused.asInstanceOf[List[FocusedParseInstruction]]: _*), rest))
+
+        case _ => none
+      }
+  }
+
+  private def interpretFocused(fpis: NonEmptyList[FocusedParseInstruction], rvalue: RValue)
+      : Iterator[RValue] =
+    fpis.foldMapLeft1(interpretFocused1(_, rvalue))((rvs, i) => rvs.flatMap(interpretFocused1(i, _)))
+
+  private def interpretFocused1(fpi: FocusedParseInstruction, rvalue: RValue)
+      : Iterator[RValue] =
+    fpi match {
+      case Ids =>
+        scala.sys.error("Ids only allowed as the first instruction.")
+
+      case instr @ Mask(_) =>
+        interpretMask(instr, rvalue).iterator
+
+      case instr @ Pivot(_, _, _) =>
+        interpretPivot(instr, rvalue)
+
+      case instr @ Project(_) =>
+        interpretProject(instr, rvalue).iterator
+
+      case instr @ Wrap(_, _) =>
+        Iterator(interpretWrap(instr, rvalue))
+    }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  def interpretIdStatus[F[_]](idStatus: IdStatus): Pipe[F, RValue, RValue] =
+    idStatus match {
+      case ExcludeId =>
+        identity[Stream[F, RValue]]
+
+      case IncludeId =>
+        _.zipWithIndex map {
+          case (rvalue, id) => RValue.rArray(List(RValue.rLong(id), rvalue))
+        }
+
+      case IdOnly =>
+        _.scanChunks(0L) { (index, c) =>
+          var idx = index
+          val out = c.map { _ =>
+            val id = RValue.rLong(idx)
+            idx += 1
+            id
+          }
+          (idx, out)
+        }
     }
 
   private def maskTarget(tpes: Set[ParseType], rvalue: RValue): Boolean =
@@ -180,140 +243,199 @@ object RValueParseInstructionInterpreter {
     inner(input, rvalue)
   }
 
-  def interpretProject(project: Project, rvalue: RValue): List[RValue] =
+  def interpretProject(project: Project, rvalue: RValue): Option[RValue] =
     project.path.nodes.foldLeftM(rvalue) {
       case (rv, CPathField(name)) => RValue.rField1(name).getOption(rv)
       case (rv, CPathIndex(idx)) => RValue.rElement(idx).getOption(rv)
       case _ => None
-    }.toList
+    }
 
   def interpretCartesian[F[_]: Concurrent](
       parallelism: Int,
       minUnit: Int,
-      cartesian: Cartesian,
-      counter: Ref[F, Long],
-      rvalue: RValue)
-      : F[List[RValue]] =
-    rvalue match {
+      cartesian: Cartesian)
+      : Pipe[F, RValue, RValue] = {
+
+    val cartouches =
+      cartesian.cartouches.mapValues(_.map(_.toNel))
+
+    _.flatMap {
       case RObject(fields) =>
-        // the components of the cartesian
-        val componentsF: F[Map[String, Array[RValue]]] =
-          cartesian.cartouches.toList.foldLeft(Map[String, Array[RValue]]().point[F]) {
-            case (accF, (wrap, (deref, instrs))) =>
-              for {
-                acc <- accF
-                res <- fields.get(deref.name).map(
-                  interpret[F](parallelism, minUnit, instrs, counter)).sequence
-              } yield {
-                res match {
-                  case Some(rvs) => acc + (wrap.name -> rvs.toArray)
-                  case None => acc
-                }
-              }
-          }
+        interpretCartesian1(parallelism, minUnit, cartouches, fields)
 
-        def cross(input: List[(String, Array[RValue])]): F[List[RValue]] =
-          Concurrent[F] delay {
-            val back = input.foldLeft(List[Map[String, RValue]]()) {
-              case (acc, (name, rvs)) =>
-                if (rvs.isEmpty)
-                  acc
-                else if (acc.isEmpty)
-                  rvs.toList.map(rv => Map(name -> rv))
-                else
-                  rvs.toList.flatMap(rv => acc.map(_.updated(name, rv)))
-            }
-            back.map(RObject(_))
-          }
+      case _ =>
+        Stream.empty
+    }
+  }
 
-        // the cartesian
-        componentsF flatMap { components =>
-          val sorted: List[(String, Array[RValue])] = components.toList sortWith {
-            case ((_, leftRvs), (_, rightRvs)) => leftRvs.length > rightRvs.length
-          }
+  private def interpretCartesian1[F[_]: Concurrent](
+      parallelism: Int,
+      minUnit: Int,
+      cartouches: Map[CPathField, (CPathField, Option[NonEmptyList[FocusedParseInstruction]])],
+      fields: Map[String, RValue])
+      : Stream[F, RValue] = {
 
-          val penabled = parallelism > 0 && minUnit > 0
+    /**
+      * @param from1 the index within the first component to begin from
+      * @param count the number of values to emit
+      */
+    @SuppressWarnings(Array(
+      "org.wartremover.warts.Equals",
+      "org.wartremover.warts.Var",
+      "org.wartremover.warts.While"))
+    def cross(fieldNames: Array[String], components: Array[Array[RValue]], from1: Int, count: Int)
+        : Stream[F, RValue] =
+      Stream.evalUnChunk(Concurrent[F] delay {
+        val size = components.length
+        val rvalues = new Array[RValue](count)
+        val cursors = Array.fill(size)(0)
+        var fields = Map.empty[String, RValue]
 
-          val resultLength: Int =
-            if (penabled) {
-              sorted.foldLeft(1) {
-                case (acc, (_, rvs)) => acc * rvs.length
-              }
-            } else {
-              -1
-            }
+        var i = size - 1
 
-          val (headName, headRvs) :: tail = sorted
+        cursors(0) = from1
 
-          if (penabled && resultLength > minUnit * 2 && !tail.isEmpty) { // we go parallel
-            val numberOfJobs: Int =
-              math.min(parallelism, resultLength / minUnit)
-
-            val chunkSize: Int =
-              math.ceil(headRvs.length.toDouble / numberOfJobs.toDouble).toInt
-
-            val headChunks: List[Array[RValue]] =
-              headRvs.grouped(chunkSize).toList
-
-            val chunks: List[List[(String, Array[RValue])]] = 
-              headChunks.map(chunk => ((headName, chunk)) :: tail)
-
-            chunks.traverse(chunk =>
-              Concurrent[F].start(cross(chunk))).flatMap(_.traverseM(_.join))
-          } else {
-            cross(sorted)
-          }
+        while (i >= 0) {
+          fields += (fieldNames(i) -> components(i)(cursors(i)))
+          i -= 1
         }
 
-      case _ => List[RValue]().point[F]
+        rvalues(0) = RObject(fields)
+
+        var total = 1
+        val first1 = components.indexWhere(_.length == 1)
+        val init = if (first1 > 0) first1 - 1 else components.length - 1
+
+        while (total < count) {
+          i = init
+
+          while (i >= 0) {
+            val c = components(i)
+            val j = cursors(i)
+
+            if (j == (c.length - 1)) {
+              fields += (fieldNames(i) -> c(0))
+              cursors(i) = 0
+              i -= 1
+            } else {
+              fields += (fieldNames(i) -> c(j + 1))
+              cursors(i) = j + 1
+              i = -1
+            }
+          }
+
+          rvalues(total) = RObject(fields)
+
+          total += 1
+        }
+
+        Chunk.array(rvalues)
+      })
+
+    def ranges1(totalSize: Int, chunkSize: Int, size1: Int): Stream[F, (Int, Int)] = {
+      val resultsPerTick = totalSize / size1
+      val ticksPerChunk = math.max(1, chunkSize / resultsPerTick)
+
+      Stream.ranges(0, size1, ticksPerChunk) map {
+        case (b, e) => (b, (e - b) * resultsPerTick)
+      }
     }
 
-  def interpretPivot(pivot: Pivot, rvalue: RValue): List[RValue] = {
+    Stream suspend {
+      // TODO: these could also be in parallel
+      val components: List[(String, Array[RValue])] =
+        cartouches.toList flatMap {
+          case (wrap, (deref, fpis)) =>
+            fields.get(deref.name)
+              .map(rv => (wrap.name, fpis.fold(Array(rv))(interpretFocused(_, rv).toArray)))
+              .toList
+        }
+
+      val sorted: List[(String, Array[RValue])] =
+        components.filter(_._2.nonEmpty) sortWith {
+          case ((_, leftRvs), (_, rightRvs)) => leftRvs.length > rightRvs.length
+        }
+
+      val penabled = parallelism > 0 && minUnit > 0
+
+      val resultLength: Int =
+        sorted.foldLeft(1) {
+          case (acc, (_, rvs)) => acc * rvs.length
+        }
+
+      val (names, values) =
+        sorted.unfzip.bimap(_.toArray, _.toArray)
+
+      if (sorted.forall(_._2.isEmpty)) {
+        Stream.empty
+      } else if (penabled && resultLength > minUnit * 2 && values.length > 1) { // we go parallel
+        val numberOfJobs: Int =
+          math.min(parallelism, resultLength / minUnit)
+
+        val jobSize: Int =
+          math.ceil(values(0).length.toDouble / numberOfJobs.toDouble).toInt
+
+        val chunksPerJob: Int =
+          math.ceil(jobSize.toDouble / minUnit.toDouble).toInt
+
+        val chunks =
+          ranges1(resultLength, minUnit, values(0).length)
+            .map { case (b, c) => cross(names, values, b, c) }
+
+        val coalesced =
+          if (chunksPerJob > 1)
+            chunks
+              .chunkN(chunksPerJob)
+              .map(_.foldLeft[Stream[F, RValue]](Stream.empty)((s, ss) => ss ++ s))
+          else
+            chunks
+
+        coalesced.parJoin(numberOfJobs)
+      } else {
+        ranges1(resultLength, DefaultChunkSize, values(0).length) flatMap {
+          case (b, c) => cross(names, values, b, c)
+        }
+      }
+    }
+  }
+
+  def interpretPivot(pivot: Pivot, rvalue: RValue): Iterator[RValue] = {
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def inner(remaining: List[CPathNode], rvalue: RValue): List[RValue] =
+    def inner(remaining: List[CPathNode], rvalue: RValue): Iterator[RValue] =
       remaining match {
         // perform the pivot
         case Nil => {
           (rvalue, pivot.structure) match {
 
             // pivot object
-            case (RObject(fields), ParseType.Object) => {
-              val pivoted: List[RValue] = pivot.status match {
+            case (RObject(fields), ParseType.Object) =>
+              pivot.status match {
                 case IdOnly =>
-                  fields.foldLeft(List[RValue]()) {
-                    case (acc, (k, _)) => CString(k) :: acc
-                  }
+                  fields.iterator.map(kv => CString(kv._1))
                 case IncludeId => // the qscript expects the results to be returned in an array
-                  fields.foldLeft(List[RValue]()) {
-                    case (acc, (k, v)) => RArray(CString(k), v) :: acc
-                  }
+                  fields.iterator.map(kv => RArray(CString(kv._1), kv._2))
                 case ExcludeId =>
-                  fields.foldLeft(List[RValue]()) {
-                    case (acc, (_, v)) => v :: acc
-                  }
+                  fields.valuesIterator
               }
-              pivoted.reverse
-            }
 
             // pivot array
             case (RArray(elems), ParseType.Array) =>
               pivot.status match {
                 case IdOnly =>
-                  elems.iterator.zipWithIndex.map(t => CLong(t._2.toLong)).toList
+                  elems.iterator.zipWithIndex.map(t => CLong(t._2.toLong))
                 case IncludeId => // the qscript expects the results to be returned in an array
-                  val shifted: Iterator[RValue] = elems.iterator.zipWithIndex map {
+                  elems.iterator.zipWithIndex map {
                     case (elem, idx) => RArray(CLong(idx.toLong), elem)
                   }
-                  shifted.toList
-                case ExcludeId => elems
+                case ExcludeId => elems.iterator
               }
 
             // pivot empty object drops the row
-            case (CEmptyObject, ParseType.Object) => Nil
+            case (CEmptyObject, ParseType.Object) => Iterator.empty
 
             // pivot empty array drops the row
-            case (CEmptyArray, ParseType.Array) => Nil
+            case (CEmptyArray, ParseType.Array) => Iterator.empty
 
             case (v, t) =>
               scala.sys.error(s"No surrounding structure allowed when pivoting. Received: ${(v, t)}")

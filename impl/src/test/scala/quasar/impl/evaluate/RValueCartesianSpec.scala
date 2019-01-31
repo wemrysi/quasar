@@ -16,22 +16,23 @@
 
 package quasar.impl.evaluate
 
-import slamdata.Predef._
+import slamdata.Predef.{Stream => _, _}
+
 import quasar._
 import quasar.ParseInstruction.{Cartesian, Pivot}
 import quasar.common._
 import quasar.common.data._
 
+import scala.concurrent.ExecutionContext
+
 import cats.effect.{ContextShift, IO}
-import cats.effect.concurrent.Ref
+
+import fs2.Stream
+
 import org.specs2.matcher.Matcher
 import org.typelevel.jawn.{AsyncParser, Facade}
-import qdata.json.QDataFacade
-import scalaz.std.list._
-import scalaz.syntax.traverse._
-import shims._
 
-import scala.concurrent.ExecutionContext
+import qdata.json.QDataFacade
 
 object RValueCartesianSpec extends JsonSpec {
   import quasar.impl.evaluate.{RValueParseInstructionInterpreter => Interpreter}
@@ -136,9 +137,9 @@ object RValueCartesianSpec extends JsonSpec {
       minUnit: Int,
       cartesian: Cartesian,
       stream: JsonStream): JsonStream =
-    Ref[IO].of(0L)
-      .flatMap(r => stream.traverseM(
-        Interpreter.interpretCartesian(parallelism, minUnit, cartesian, r, _)))
+    Stream.emits(stream)
+      .through(Interpreter.interpretCartesian[IO](parallelism, minUnit, cartesian))
+      .compile.toList
       .unsafeRunSync()
 
   def cartesianInto(
