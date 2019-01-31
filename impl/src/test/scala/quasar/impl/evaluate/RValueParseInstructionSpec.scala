@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.ParseInstructionSpec
 import quasar.common.data.RValue
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import cats.effect.concurrent.Ref
 
 import qdata.json.QDataFacade
@@ -32,8 +32,13 @@ import scalaz.syntax.traverse._
 
 import shims._
 
+import scala.concurrent.ExecutionContext
+
 object RValueParseInstructionSpec extends ParseInstructionSpec {
   import quasar.impl.evaluate.{RValueParseInstructionInterpreter => Interpreter}
+
+  implicit def executionContext: ExecutionContext = ExecutionContext.Implicits.global
+  implicit val cs: ContextShift[IO] = IO.contextShift(executionContext)
 
   type JsonElement = RValue
 
@@ -54,10 +59,14 @@ object RValueParseInstructionSpec extends ParseInstructionSpec {
   def evalProject(project: Project, stream: JsonStream): JsonStream =
     stream.flatMap(Interpreter.interpretProject(project, _))
 
-  def evalCartesian(cartesian: Cartesian, stream: JsonStream): JsonStream =
+  def evalCartesian(cartesian: Cartesian, stream: JsonStream): JsonStream = {
+    val parallelism = java.lang.Runtime.getRuntime().availableProcessors()
+    val minUnit = 1024
+
     Ref[IO].of(0L)
-      .flatMap(r => stream.traverseM(Interpreter.interpretCartesian(cartesian, r, _)))
+      .flatMap(r => stream.traverseM(Interpreter.interpretCartesian(parallelism, minUnit, cartesian, r, _)))
       .unsafeRunSync()
+  }
 
   protected def ldjson(str: String): JsonStream = {
     implicit val facade: Facade[RValue] = QDataFacade[RValue](isPrecise = false)

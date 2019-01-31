@@ -18,7 +18,7 @@ package quasar.impl.evaluate
 
 import slamdata.Predef._
 
-import cats.effect.Sync
+import cats.effect.Concurrent
 import cats.effect.concurrent.Ref
 
 import quasar.{ParseInstruction, ParseType}
@@ -28,6 +28,7 @@ import quasar.common.{CPathField, CPathIndex, CPathNode}
 import quasar.common.data._
 
 import scala.collection.Iterator
+import scala.math
 
 import scalaz.{Functor, Scalaz}, Scalaz._
 
@@ -36,11 +37,18 @@ import shims._
 object RValueParseInstructionInterpreter {
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def apply[F[_]: Sync](instructions: List[ParseInstruction])
+  def apply[F[_]: Concurrent](
+      parallelism: Int,
+      minUnit: Int,
+      instructions: List[ParseInstruction])
       : F[RValue => F[List[RValue]]] =
-    Ref[F].of(0L).map(interpret(instructions, _))
+    Ref[F].of(0L).map(interpret(parallelism, minUnit, instructions, _))
 
-  private def interpret[F[_]: Sync](instructions: List[ParseInstruction], counter: Ref[F, Long])(rvalue: RValue)
+  private def interpret[F[_]: Concurrent](
+      parallelism: Int,
+      minUnit: Int,
+      instructions: List[ParseInstruction],
+      counter: Ref[F, Long])(rvalue: RValue)
       : F[List[RValue]] =
     instructions.foldLeftM(List[RValue](rvalue)) {
       case (prev, instr @ Mask(_)) =>
@@ -56,7 +64,7 @@ object RValueParseInstructionInterpreter {
         prev.flatMap(interpretProject(instr, _)).point[F]
 
       case (prev, instr @ Cartesian(_)) =>
-        prev.traverseM(interpretCartesian(instr, counter, _))
+        prev.traverseM(interpretCartesian(parallelism, minUnit, instr, counter, _))
 
       case (prev, Ids) =>
         prev.traverse(interpretIds(counter, _))
@@ -179,37 +187,82 @@ object RValueParseInstructionInterpreter {
       case _ => None
     }.toList
 
-  def interpretCartesian[F[_]: Sync](cartesian: Cartesian, counter: Ref[F, Long], rvalue: RValue)
+  def interpretCartesian[F[_]: Concurrent](
+      parallelism: Int,
+      minUnit: Int,
+      cartesian: Cartesian,
+      counter: Ref[F, Long],
+      rvalue: RValue)
       : F[List[RValue]] =
     rvalue match {
       case RObject(fields) =>
         // the components of the cartesian
-        val componentsF: F[Map[String, List[RValue]]] =
-          cartesian.cartouches.toList.foldLeft(Map[String, List[RValue]]().point[F]) {
+        val componentsF: F[Map[String, Array[RValue]]] =
+          cartesian.cartouches.toList.foldLeft(Map[String, Array[RValue]]().point[F]) {
             case (accF, (wrap, (deref, instrs))) =>
               for {
                 acc <- accF
-                res <- fields.get(deref.name).map(interpret[F](instrs, counter)).sequence
+                res <- fields.get(deref.name).map(
+                  interpret[F](parallelism, minUnit, instrs, counter)).sequence
               } yield {
                 res match {
-                  case Some(v) => acc + (wrap.name -> v)
+                  case Some(rvs) => acc + (wrap.name -> rvs.toArray)
                   case None => acc
                 }
               }
           }
 
-        // the cartesian
-        componentsF map { components =>
-          val res = components.toList.foldLeft(List[Map[String, RValue]]()) {
-            case (acc, (name, rvs)) =>
-              if (rvs.isEmpty)
-                acc
-              else if (acc.isEmpty)
-                rvs.map(rv => Map(name -> rv))
-              else
-                rvs.flatMap(rv => acc.map(_.updated(name, rv)))
+        def cross(input: List[(String, Array[RValue])]): F[List[RValue]] =
+          Concurrent[F] delay {
+            val back = input.foldLeft(List[Map[String, RValue]]()) {
+              case (acc, (name, rvs)) =>
+                if (rvs.isEmpty)
+                  acc
+                else if (acc.isEmpty)
+                  rvs.toList.map(rv => Map(name -> rv))
+                else
+                  rvs.toList.flatMap(rv => acc.map(_.updated(name, rv)))
+            }
+            back.map(RObject(_))
           }
-          res.map(RObject(_))
+
+        // the cartesian
+        componentsF flatMap { components =>
+          val sorted: List[(String, Array[RValue])] = components.toList sortWith {
+            case ((_, leftRvs), (_, rightRvs)) => leftRvs.length > rightRvs.length
+          }
+
+          val penabled = parallelism > 0 && minUnit > 0
+
+          val resultLength: Int =
+            if (penabled) {
+              sorted.foldLeft(1) {
+                case (acc, (_, rvs)) => acc * rvs.length
+              }
+            } else {
+              -1
+            }
+
+          val (headName, headRvs) :: tail = sorted
+
+          if (penabled && resultLength > minUnit * 2 && !tail.isEmpty) { // we go parallel
+            val numberOfJobs: Int =
+              math.min(parallelism, resultLength / minUnit)
+
+            val chunkSize: Int =
+              math.ceil(headRvs.length.toDouble / numberOfJobs.toDouble).toInt
+
+            val headChunks: List[Array[RValue]] =
+              headRvs.grouped(chunkSize).toList
+
+            val chunks: List[List[(String, Array[RValue])]] = 
+              headChunks.map(chunk => ((headName, chunk)) :: tail)
+
+            chunks.traverse(chunk =>
+              Concurrent[F].start(cross(chunk))).flatMap(_.traverseM(_.join))
+          } else {
+            cross(sorted)
+          }
         }
 
       case _ => List[RValue]().point[F]
