@@ -145,20 +145,6 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
       tempShift <- QSUGraph.withName[T, G](NamePrefix)(tempShiftPat)
       commonShift = tempShift.overwriteAtRoot(tempShiftPat.copy(source = commonRoot))
 
-      joinRepair = sameFocus map {
-        case (sym, _, _) =>
-          func.Cond(
-            func.Or(
-              func.Eq(
-                AccessLeftTarget[T](Access.id(IdAccess.identity(sym), _)),
-                AccessLeftTarget[T](Access.id(IdAccess.identity(commonShift.root), _))),
-              func.IfUndefined(
-                AccessLeftTarget[T](Access.id(IdAccess.identity(commonShift.root), _)),
-                func.Constant(json.bool(true)))),
-            repair,
-            func.Undefined)
-      }
-
       srcDims <- dimsOf(src.root)
 
       // If another shift matched, use its dimensions, otherwise compute
@@ -176,7 +162,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
       newShift = commonShift overwriteAtRoot {
         tempShiftPat.copy(
           struct = adjustedStruct.asRec,
-          repair = joinRepair getOrElse repair)
+          repair = repair)
       }
 
       _ <- MonadState_[G, CompatInfo].put((newShift.root, rotation, structDim) :: compatInfo)
