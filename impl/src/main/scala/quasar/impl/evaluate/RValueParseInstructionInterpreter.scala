@@ -61,59 +61,23 @@ object RValueParseInstructionInterpreter {
         interpret(parallelism, minUnit, instrs)
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def interpret[F[_]: Concurrent](
+  def interpretCartesian[F[_]: Concurrent](
       parallelism: Int,
       minUnit: Int,
-      instructions: List[ParseInstruction])
-      : Pipe[F, RValue, RValue] =
-    instructions match {
-      case Nil =>
-        identity[Stream[F, RValue]]
+      cartesian: Cartesian)
+      : Pipe[F, RValue, RValue] = {
 
-      case FocusedPrefix(focused, rest) =>
-        _.flatMap(rv => Stream.chunk(Chunk.array(interpretFocused(focused, rv).toArray)))
-          .through(interpret(parallelism, minUnit, rest))
+    val cartouches =
+      cartesian.cartouches.mapValues(_.map(_.toNel))
 
-      case (c @ Cartesian(_)) :: rest =>
-        interpretCartesian(parallelism, minUnit, c) andThen interpret(parallelism, minUnit, rest)
+    _.flatMap {
+      case RObject(fields) =>
+        interpretCartesian1(parallelism, minUnit, cartouches, fields)
+
+      case _ =>
+        Stream.empty
     }
-
-  private object FocusedPrefix {
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-    def unapply(instrs: List[ParseInstruction])
-        : Option[(NonEmptyList[FocusedParseInstruction], List[ParseInstruction])] =
-      instrs match {
-        case (fpi: FocusedParseInstruction) :: t =>
-          val (focused, rest) = t.span(_.isInstanceOf[FocusedParseInstruction])
-          some((NonEmptyList.nels(fpi, focused.asInstanceOf[List[FocusedParseInstruction]]: _*), rest))
-
-        case _ => none
-      }
   }
-
-  private def interpretFocused(fpis: NonEmptyList[FocusedParseInstruction], rvalue: RValue)
-      : Iterator[RValue] =
-    fpis.foldMapLeft1(interpretFocused1(_, rvalue))((rvs, i) => rvs.flatMap(interpretFocused1(i, _)))
-
-  private def interpretFocused1(fpi: FocusedParseInstruction, rvalue: RValue)
-      : Iterator[RValue] =
-    fpi match {
-      case Ids =>
-        scala.sys.error("Ids only allowed as the first instruction.")
-
-      case instr @ Mask(_) =>
-        interpretMask(instr, rvalue).iterator
-
-      case instr @ Pivot(_, _, _) =>
-        interpretPivot(instr, rvalue)
-
-      case instr @ Project(_) =>
-        interpretProject(instr, rvalue).iterator
-
-      case instr @ Wrap(_, _) =>
-        Iterator(interpretWrap(instr, rvalue))
-    }
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   def interpretIdStatus[F[_]](idStatus: IdStatus): Pipe[F, RValue, RValue] =
@@ -136,36 +100,6 @@ object RValueParseInstructionInterpreter {
           }
           (idx, out)
         }
-    }
-
-  private def maskTarget(tpes: Set[ParseType], rvalue: RValue): Boolean =
-    rvalue match {
-      case RMeta(_, _) => tpes.contains(ParseType.Meta)
-
-      case RObject(_) => tpes.contains(ParseType.Object)
-      case CEmptyObject => tpes.contains(ParseType.Object)
-
-      case RArray(_) => tpes.contains(ParseType.Array)
-      case CEmptyArray => tpes.contains(ParseType.Array)
-
-      case CString(_) => tpes.contains(ParseType.String)
-      case CBoolean(_) => tpes.contains(ParseType.Boolean)
-      case CNull => tpes.contains(ParseType.Null)
-
-      case CLong(_) => tpes.contains(ParseType.Number)
-      case CDouble(_) => tpes.contains(ParseType.Number)
-      case CNum(_) => tpes.contains(ParseType.Number)
-
-      // These are encoded as objects from a parser-perspective
-      case CLocalDateTime(_) => tpes.contains(ParseType.Object)
-      case CLocalDate(_) => tpes.contains(ParseType.Object)
-      case CLocalTime(_) => tpes.contains(ParseType.Object)
-      case COffsetDateTime(_) => tpes.contains(ParseType.Object)
-      case COffsetDate(_) => tpes.contains(ParseType.Object)
-      case COffsetTime(_) => tpes.contains(ParseType.Object)
-      case CInterval(_) => tpes.contains(ParseType.Object)
-
-      case _ => false
     }
 
   def interpretMask(mask: Mask, rvalue: RValue): Option[RValue] = {
@@ -243,6 +177,77 @@ object RValueParseInstructionInterpreter {
     inner(input, rvalue)
   }
 
+  def interpretPivot(pivot: Pivot, rvalue: RValue): Iterator[RValue] = {
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def inner(remaining: List[CPathNode], rvalue: RValue): Iterator[RValue] =
+      remaining match {
+        // perform the pivot
+        case Nil => {
+          (rvalue, pivot.structure) match {
+
+            // pivot object
+            case (RObject(fields), ParseType.Object) =>
+              pivot.status match {
+                case IdOnly =>
+                  fields.iterator.map(kv => CString(kv._1))
+                case IncludeId => // the qscript expects the results to be returned in an array
+                  fields.iterator.map(kv => RArray(CString(kv._1), kv._2))
+                case ExcludeId =>
+                  fields.valuesIterator
+              }
+
+            // pivot array
+            case (RArray(elems), ParseType.Array) =>
+              pivot.status match {
+                case IdOnly =>
+                  elems.iterator.zipWithIndex.map(t => CLong(t._2.toLong))
+                case IncludeId => // the qscript expects the results to be returned in an array
+                  elems.iterator.zipWithIndex map {
+                    case (elem, idx) => RArray(CLong(idx.toLong), elem)
+                  }
+                case ExcludeId => elems.iterator
+              }
+
+            // pivot empty object drops the row
+            case (CEmptyObject, ParseType.Object) => Iterator.empty
+
+            // pivot empty array drops the row
+            case (CEmptyArray, ParseType.Array) => Iterator.empty
+
+            case (v, t) =>
+              scala.sys.error(s"No surrounding structure allowed when pivoting. Received: ${(v, t)}")
+          }
+        }
+
+        // recurse on an object deref
+        case CPathField(field) :: tail => rvalue match {
+          case obj @ RObject(fields) =>
+            fields.toList match {
+              case (`field`, target) :: Nil =>
+                inner(tail, target).map(v => RObject((field, v)))
+              case _ =>
+                scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $obj")
+            }
+          case rv =>
+            scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $rv")
+        }
+
+        // recurse on an array deref
+        case CPathIndex(0) :: tail => rvalue match {
+          case arr @ RArray(target :: Nil) =>
+            inner(tail, target).map(v => RArray(List(v)))
+          case rv =>
+            scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $rv")
+        }
+
+        case nodes =>
+          scala.sys.error(s"Cannot pivot through $nodes")
+      }
+
+    inner(pivot.path.nodes, rvalue)
+  }
+
   def interpretProject(project: Project, rvalue: RValue): Option[RValue] =
     project.path.nodes.foldLeftM(rvalue) {
       case (rv, CPathField(name)) => RValue.rField1(name).getOption(rv)
@@ -250,23 +255,119 @@ object RValueParseInstructionInterpreter {
       case _ => None
     }
 
-  def interpretCartesian[F[_]: Concurrent](
+  def interpretWrap(wrap: Wrap, rvalue: RValue): RValue = {
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def inner(remaining: List[CPathNode], rvalue: RValue): RValue =
+      (remaining, rvalue) match {
+        case (Nil, rv) => RObject((wrap.name, rv))
+
+        case (CPathField(field) :: tail, obj @ RObject(fields)) =>
+          fields.get(field).fold(obj)(target =>
+            RObject(fields.updated(field, inner(tail, target))))
+
+        case (CPathIndex(idx) :: tail, arr @ RArray(elems)) =>
+          if (idx < 0) {
+            arr
+          } else {
+            val result: Option[RValue] = elems.toStream.toZipper flatMap { orig =>
+              orig.move(idx).map(moved =>
+                RArray(moved.update(inner(tail, moved.focus)).toStream.toList))
+            }
+            result.getOrElse(arr)
+          }
+
+        case (_, rv) => rv
+      }
+
+    inner(wrap.path.nodes, rvalue)
+  }
+
+  ////
+
+  private object FocusedPrefix {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def unapply(instrs: List[ParseInstruction])
+        : Option[(NonEmptyList[FocusedParseInstruction], List[ParseInstruction])] =
+      instrs match {
+        case (fpi: FocusedParseInstruction) :: t =>
+          val (focused, rest) = t.span(_.isInstanceOf[FocusedParseInstruction])
+          some((NonEmptyList.nels(fpi, focused.asInstanceOf[List[FocusedParseInstruction]]: _*), rest))
+
+        case _ => none
+      }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def interpret[F[_]: Concurrent](
       parallelism: Int,
       minUnit: Int,
-      cartesian: Cartesian)
-      : Pipe[F, RValue, RValue] = {
+      instructions: List[ParseInstruction])
+      : Pipe[F, RValue, RValue] =
+    instructions match {
+      case Nil =>
+        identity[Stream[F, RValue]]
 
-    val cartouches =
-      cartesian.cartouches.mapValues(_.map(_.toNel))
+      case FocusedPrefix(focused, rest) =>
+        _.flatMap(rv => Stream.chunk(Chunk.array(interpretFocused(focused, rv).toArray)))
+          .through(interpret(parallelism, minUnit, rest))
 
-    _.flatMap {
-      case RObject(fields) =>
-        interpretCartesian1(parallelism, minUnit, cartouches, fields)
-
-      case _ =>
-        Stream.empty
+      case (c @ Cartesian(_)) :: rest =>
+        interpretCartesian(parallelism, minUnit, c) andThen interpret(parallelism, minUnit, rest)
     }
-  }
+
+  private def interpretFocused(fpis: NonEmptyList[FocusedParseInstruction], rvalue: RValue)
+      : Iterator[RValue] =
+    fpis.foldMapLeft1(interpretFocused1(_, rvalue))((rvs, i) => rvs.flatMap(interpretFocused1(i, _)))
+
+  private def interpretFocused1(fpi: FocusedParseInstruction, rvalue: RValue)
+      : Iterator[RValue] =
+    fpi match {
+      case Ids =>
+        scala.sys.error("Ids only allowed as the first instruction.")
+
+      case instr @ Mask(_) =>
+        interpretMask(instr, rvalue).iterator
+
+      case instr @ Pivot(_, _, _) =>
+        interpretPivot(instr, rvalue)
+
+      case instr @ Project(_) =>
+        interpretProject(instr, rvalue).iterator
+
+      case instr @ Wrap(_, _) =>
+        Iterator(interpretWrap(instr, rvalue))
+    }
+
+  private def maskTarget(tpes: Set[ParseType], rvalue: RValue): Boolean =
+    rvalue match {
+      case RMeta(_, _) => tpes.contains(ParseType.Meta)
+
+      case RObject(_) => tpes.contains(ParseType.Object)
+      case CEmptyObject => tpes.contains(ParseType.Object)
+
+      case RArray(_) => tpes.contains(ParseType.Array)
+      case CEmptyArray => tpes.contains(ParseType.Array)
+
+      case CString(_) => tpes.contains(ParseType.String)
+      case CBoolean(_) => tpes.contains(ParseType.Boolean)
+      case CNull => tpes.contains(ParseType.Null)
+
+      case CLong(_) => tpes.contains(ParseType.Number)
+      case CDouble(_) => tpes.contains(ParseType.Number)
+      case CNum(_) => tpes.contains(ParseType.Number)
+
+      // These are encoded as objects from a parser-perspective
+      case CLocalDateTime(_) => tpes.contains(ParseType.Object)
+      case CLocalDate(_) => tpes.contains(ParseType.Object)
+      case CLocalTime(_) => tpes.contains(ParseType.Object)
+      case COffsetDateTime(_) => tpes.contains(ParseType.Object)
+      case COffsetDate(_) => tpes.contains(ParseType.Object)
+      case COffsetTime(_) => tpes.contains(ParseType.Object)
+      case CInterval(_) => tpes.contains(ParseType.Object)
+
+      case _ => false
+    }
 
   private def interpretCartesian1[F[_]: Concurrent](
       parallelism: Int,
@@ -397,104 +498,5 @@ object RValueParseInstructionInterpreter {
         }
       }
     }
-  }
-
-  def interpretPivot(pivot: Pivot, rvalue: RValue): Iterator[RValue] = {
-
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def inner(remaining: List[CPathNode], rvalue: RValue): Iterator[RValue] =
-      remaining match {
-        // perform the pivot
-        case Nil => {
-          (rvalue, pivot.structure) match {
-
-            // pivot object
-            case (RObject(fields), ParseType.Object) =>
-              pivot.status match {
-                case IdOnly =>
-                  fields.iterator.map(kv => CString(kv._1))
-                case IncludeId => // the qscript expects the results to be returned in an array
-                  fields.iterator.map(kv => RArray(CString(kv._1), kv._2))
-                case ExcludeId =>
-                  fields.valuesIterator
-              }
-
-            // pivot array
-            case (RArray(elems), ParseType.Array) =>
-              pivot.status match {
-                case IdOnly =>
-                  elems.iterator.zipWithIndex.map(t => CLong(t._2.toLong))
-                case IncludeId => // the qscript expects the results to be returned in an array
-                  elems.iterator.zipWithIndex map {
-                    case (elem, idx) => RArray(CLong(idx.toLong), elem)
-                  }
-                case ExcludeId => elems.iterator
-              }
-
-            // pivot empty object drops the row
-            case (CEmptyObject, ParseType.Object) => Iterator.empty
-
-            // pivot empty array drops the row
-            case (CEmptyArray, ParseType.Array) => Iterator.empty
-
-            case (v, t) =>
-              scala.sys.error(s"No surrounding structure allowed when pivoting. Received: ${(v, t)}")
-          }
-        }
-
-        // recurse on an object deref
-        case CPathField(field) :: tail => rvalue match {
-          case obj @ RObject(fields) =>
-            fields.toList match {
-              case (`field`, target) :: Nil =>
-                inner(tail, target).map(v => RObject((field, v)))
-              case _ =>
-                scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $obj")
-            }
-          case rv =>
-            scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $rv")
-        }
-
-        // recurse on an array deref
-        case CPathIndex(0) :: tail => rvalue match {
-          case arr @ RArray(target :: Nil) =>
-            inner(tail, target).map(v => RArray(List(v)))
-          case rv =>
-            scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $rv")
-        }
-
-        case nodes =>
-          scala.sys.error(s"Cannot pivot through $nodes")
-      }
-
-    inner(pivot.path.nodes, rvalue)
-  }
-
-  def interpretWrap(wrap: Wrap, rvalue: RValue): RValue = {
-
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def inner(remaining: List[CPathNode], rvalue: RValue): RValue =
-      (remaining, rvalue) match {
-        case (Nil, rv) => RObject((wrap.name, rv))
-
-        case (CPathField(field) :: tail, obj @ RObject(fields)) =>
-          fields.get(field).fold(obj)(target =>
-            RObject(fields.updated(field, inner(tail, target))))
-
-        case (CPathIndex(idx) :: tail, arr @ RArray(elems)) =>
-          if (idx < 0) {
-            arr
-          } else {
-            val result: Option[RValue] = elems.toStream.toZipper flatMap { orig =>
-              orig.move(idx).map(moved =>
-                RArray(moved.update(inner(tail, moved.focus)).toStream.toList))
-            }
-            result.getOrElse(arr)
-          }
-
-        case (_, rv) => rv
-      }
-
-    inner(wrap.path.nodes, rvalue)
   }
 }
