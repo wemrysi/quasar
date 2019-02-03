@@ -459,7 +459,7 @@ object RValueParseInstructionInterpreter {
 
       val penabled = parallelism > 0 && minUnit > 0
 
-      val resultLength: Int =
+      val resultSize: Int =
         sorted.foldLeft(1) {
           case (acc, (_, rvs)) => acc * rvs.length
         }
@@ -469,18 +469,18 @@ object RValueParseInstructionInterpreter {
 
       if (sorted.forall(_._2.isEmpty)) {
         Stream.empty
-      } else if (penabled && resultLength > minUnit * 2 && values.length > 1) { // we go parallel
+      } else if (penabled && resultSize > minUnit * 2 && values.length > 1) { // we go parallel
         val numberOfJobs: Int =
-          math.min(parallelism, resultLength / minUnit)
+          math.min(parallelism, resultSize / minUnit)
 
         val jobSize: Int =
-          math.ceil(values(0).length.toDouble / numberOfJobs.toDouble).toInt
+          math.ceil(resultSize.toDouble / numberOfJobs.toDouble).toInt
 
         val chunksPerJob: Int =
           math.ceil(jobSize.toDouble / minUnit.toDouble).toInt
 
         val chunks =
-          ranges1(resultLength, minUnit, values(0).length)
+          ranges1(resultSize, minUnit, values(0).length)
             .map { case (b, c) => cross(names, values, b, c) }
 
         val coalesced =
@@ -493,7 +493,7 @@ object RValueParseInstructionInterpreter {
 
         coalesced.parJoin(numberOfJobs)
       } else {
-        ranges1(resultLength, DefaultChunkSize, values(0).length) flatMap {
+        ranges1(resultSize, DefaultChunkSize, values(0).length) flatMap {
           case (b, c) => cross(names, values, b, c)
         }
       }
