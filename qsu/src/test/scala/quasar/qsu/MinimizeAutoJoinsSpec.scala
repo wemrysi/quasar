@@ -1992,6 +1992,96 @@ object MinimizeAutoJoinsSpec
 
       runOn(qgraph) must haveShiftCount(4)
     }
+
+    // foo[_].baz[_], foo[_].qux[_], bar[_][_]
+    "ensure necessary deconstruction is created in downstream shifts" in {
+      val read = qsu.read(afile, ExcludeId)
+
+      val barss = qsu.leftShift(
+        qsu.leftShift(
+          qsu.map(
+            read,
+            recFunc.ProjectKeyS(recFunc.Hole, "bar")),
+          recFunc.Hole,
+          ExcludeId,
+          OnUndefined.Omit,
+          RightTarget[Fix],
+          Rotation.ShiftArray),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val foos = qsu.leftShift(
+        qsu.map(
+          read,
+          recFunc.ProjectKeyS(recFunc.Hole, "foo")),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val quxs = qsu.leftShift(
+        qsu.map(
+          foos,
+          recFunc.ProjectKeyS(recFunc.Hole, "qux")),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val bazs = qsu.leftShift(
+        qsu.map(
+          foos,
+          recFunc.ProjectKeyS(recFunc.Hole, "baz")),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu._autojoin2((
+          qsu._autojoin2((
+            bazs,
+            quxs,
+            func.StaticMapS(
+              "0" -> func.LeftSide,
+              "1" -> func.RightSide))),
+          barss,
+          func.ConcatMaps(
+            func.LeftSide,
+            func.MakeMapS("2", func.RightSide)))))
+
+      runOn(qgraph) must beLike {
+        case
+          Map(
+            MultiLeftShift(
+              MultiLeftShift(
+                Read(_, ExcludeId),
+                List(
+                  (struct1, ExcludeId, Rotation.ShiftArray),
+                  (struct2, ExcludeId, Rotation.ShiftArray)),
+                OnUndefined.Emit,
+                _),
+              List(
+                (struct3, ExcludeId, Rotation.ShiftArray),
+                (struct4, ExcludeId, Rotation.ShiftArray),
+                (struct5, ExcludeId, Rotation.ShiftArray)),
+              OnUndefined.Emit,
+              _),
+            _) =>
+
+          struct1 must not(beTreeEqual(func.Hole))
+          struct2 must not(beTreeEqual(func.Hole))
+          struct3 must not(beTreeEqual(func.Hole))
+          struct4 must not(beTreeEqual(func.Hole))
+          struct5 must not(beTreeEqual(func.Hole))
+      }
+    }
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph =

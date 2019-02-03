@@ -585,7 +585,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           continue(fakeParent, tailL, tailR, true) { sym =>
             QSU.MultiLeftShift[T, Symbol](
               sym,
-              (structL.linearize, idStatusL, rotL) :: shiftsRAdj,
+              (structLAdj, idStatusL, rotL) :: shiftsRAdj,
               OnUndefined.Emit,
               MapFuncCore.normalized(repair))
           }
