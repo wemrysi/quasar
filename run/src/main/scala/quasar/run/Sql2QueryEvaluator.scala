@@ -16,7 +16,7 @@
 
 package quasar.run
 
-import slamdata.Predef.{Long, None}
+import slamdata.Predef.{Long, None, StringContext}
 import quasar.RenderTreeT
 import quasar.api.QueryEvaluator
 import quasar.common.{phaseM, PhaseResultTell}
