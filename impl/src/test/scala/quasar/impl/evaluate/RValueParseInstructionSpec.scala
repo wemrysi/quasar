@@ -16,23 +16,20 @@
 
 package quasar.impl.evaluate
 
-import slamdata.Predef._
-import quasar.ParseInstructionSpec
+import slamdata.Predef.{Stream => _, _}
+
+import quasar.{IdStatus, ParseInstructionSpec}
 import quasar.common.data.RValue
 
+import scala.concurrent.ExecutionContext
+
 import cats.effect.{ContextShift, IO}
-import cats.effect.concurrent.Ref
+
+import fs2.Stream
 
 import qdata.json.QDataFacade
 
 import org.typelevel.jawn.{AsyncParser, Facade}
-
-import scalaz.std.list._
-import scalaz.syntax.traverse._
-
-import shims._
-
-import scala.concurrent.ExecutionContext
 
 object RValueParseInstructionSpec extends ParseInstructionSpec {
   import quasar.impl.evaluate.{RValueParseInstructionInterpreter => Interpreter}
@@ -43,9 +40,9 @@ object RValueParseInstructionSpec extends ParseInstructionSpec {
   type JsonElement = RValue
 
   def evalIds(stream: JsonStream): JsonStream =
-    Ref[IO].of(0L)
-      .flatMap(r => stream.traverse(Interpreter.interpretIds(r, _)))
-      .unsafeRunSync()
+    Stream.emits(stream)
+      .through(Interpreter.interpretIdStatus(IdStatus.IncludeId))
+      .compile.toList
 
   def evalMask(mask: Mask, stream: JsonStream): JsonStream =
     stream.flatMap(Interpreter.interpretMask(mask, _).toList)
@@ -63,8 +60,9 @@ object RValueParseInstructionSpec extends ParseInstructionSpec {
     val parallelism = java.lang.Runtime.getRuntime().availableProcessors()
     val minUnit = 1024
 
-    Ref[IO].of(0L)
-      .flatMap(r => stream.traverseM(Interpreter.interpretCartesian(parallelism, minUnit, cartesian, r, _)))
+    Stream.emits(stream)
+      .through(Interpreter.interpretCartesian[IO](parallelism, minUnit, cartesian))
+      .compile.toList
       .unsafeRunSync()
   }
 
