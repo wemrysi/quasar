@@ -16,7 +16,7 @@
 
 package quasar.run
 
-import slamdata.Predef.{Long, None}
+import slamdata.Predef.{Long, None, StringContext}
 import quasar.RenderTreeT
 import quasar.api.QueryEvaluator
 import quasar.common.{phaseM, PhaseResultTell}
@@ -31,19 +31,22 @@ import quasar.sql.parser
 
 import eu.timepit.refined.auto._
 import matryoshka._
+import org.slf4s.Logging
 import scalaz.{Monad, StateT}
 import scalaz.syntax.bind._
 
-object Sql2QueryEvaluator {
+object Sql2QueryEvaluator extends Logging {
   def apply[
     T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
     F[_]: Monad: MonadQuasarErr: PhaseResultTell,
     R](
     qScriptEvaluator: QueryEvaluator[F, T[QScriptEducated[T, ?]], R])
     : QueryEvaluator[F, SqlQuery, R] =
-  QueryEvaluator.mapEval(qScriptEvaluator) { eval => squery =>
-    sql2ToQScript[T, F](squery) >>= eval
-  }
+    QueryEvaluator.mapEval(qScriptEvaluator) { eval => squery => {
+        log.debug(s"Evaluating query=${squery.query.value}, basePath=${pathy.Path.posixCodec.printPath(squery.basePath)}")
+        sql2ToQScript[T, F](squery) >>= eval
+      }
+    }
 
   def sql2ToQScript[
       T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
