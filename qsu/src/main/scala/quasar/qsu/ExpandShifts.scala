@@ -47,9 +47,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
   private val json = Fixed[T[EJson]]
   private type P = prov.P
   private type QAuthS[F[_]] = MonadState_[F, QAuth]
-  private type MonadCI[F[_]] = MonadState_[F, CompatInfo]
-  private type CompatInfo = IList[(Symbol, Rotation, QDims)]
-  private type S = (QAuth, RevIdx, CompatInfo)
+  private type S = (QAuth, RevIdx)
 
   private implicit def qauthState[F[_]: Monad]: MonadState_[StateT[F, S, ?], QAuth] =
     MonadState_.zoom[StateT[F, S, ?]](_1[S, QAuth])
@@ -57,24 +55,20 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
   private implicit def revIdxState[F[_]: Monad]: MonadState_[StateT[F, S, ?], RevIdx] =
     MonadState_.zoom[StateT[F, S, ?]](_2[S, RevIdx])
 
-  private implicit def ciState[F[_]: Monad]: MonadState_[StateT[F, S, ?], CompatInfo] =
-    MonadState_.zoom[StateT[F, S, ?]](_3[S, CompatInfo])
-
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] =
     aqsu.graph.rewriteM[StateT[F, S, ?]](expandShifts[StateT[F, S, ?]])
-      .run((aqsu.auth, aqsu.graph.generateRevIndex, IList()))
-      .map { case ((auth, _, _), graph) => AuthenticatedQSU(graph, auth) }
+      .run((aqsu.auth, aqsu.graph.generateRevIndex))
+      .map { case ((auth, _), graph) => AuthenticatedQSU(graph, auth) }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def expandShifts[G[_]: Monad: NameGenerator: RevIdxM: MonadPlannerErr: QAuthS: MonadCI]
+  def expandShifts[G[_]: Monad: NameGenerator: RevIdxM: MonadPlannerErr: QAuthS]
       : PartialFunction[QSUGraph, G[QSUGraph]] = {
     case mls @ MultiLeftShift(source, shifts, _, repair) =>
       shifts.toNel.fold(source.pure[G]) { shifts1 =>
         val indexed = shifts.zipWithIndex
 
         val shiftedG = for {
-          _ <- MonadState_[G, CompatInfo].put(IList())
           headShift <- buildShift[G](source.root, source, indexed.head)
           expandedShifts <- indexed.tail.foldLeftM(headShift)(buildShift[G](source.root, _, _))
         } yield expandedShifts
@@ -97,7 +91,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
   private val SrcVal = AccessLeftTarget[T](Access.value(_))
   private val PrjOriginal = func.ProjectKeyS(func.Hole, OriginalKey)
 
-  private def buildShift[G[_]: Monad: NameGenerator: RevIdxM: MonadPlannerErr: QAuthS: MonadCI](
+  private def buildShift[G[_]: Monad: NameGenerator: RevIdxM: MonadPlannerErr: QAuthS](
       commonRoot: Symbol,
       src: QSUGraph,
       shift: ((FreeMap, IdStatus, Rotation), Int))
@@ -136,8 +130,6 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
       tempShift <- QSUGraph.withName[T, G](NamePrefix)(tempShiftPat)
       commonShift = tempShift.overwriteAtRoot(tempShiftPat.copy(source = commonRoot))
 
-      srcDims <- dimsOf(src.root)
-
       // compute provenance for this shift on the common source.
       newDims <- ApplyProvenance.computeDims[T, G](commonShift)
 
@@ -148,8 +140,6 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
           struct = adjustedStruct.asRec,
           repair = repair)
       }
-
-      _ <- MonadState_[G, CompatInfo].put(IList((newShift.root, rotation, structDim)))
     } yield newShift :++ src
   }
 }
