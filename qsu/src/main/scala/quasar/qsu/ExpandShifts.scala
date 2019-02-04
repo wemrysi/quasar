@@ -22,7 +22,6 @@ import quasar.IdStatus
 import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz._
 import quasar.ejson.{EJson, Fixed}
-import quasar.fp.ski.κ
 import quasar.qscript.{
   MonadPlannerErr,
   OnUndefined,
@@ -117,16 +116,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
       QSU.LeftShift[T, Symbol](
         src.root, struct.asRec, status, OnUndefined.Emit, RightTarget, rotation)
 
-    def dimsOf(sym: Symbol): G[QDims] =
-      MonadState_[G, QAuth].get >>= (_.lookupDimsE[G](sym))
-
     for {
-      commonSrcDims <- dimsOf(commonRoot)
-
-      structDim =
-        ApplyProvenance.computeFuncDims(struct)(κ(commonSrcDims))
-          .getOrElse(commonSrcDims)
-
       tempShift <- QSUGraph.withName[T, G](NamePrefix)(tempShiftPat)
       commonShift = tempShift.overwriteAtRoot(tempShiftPat.copy(source = commonRoot))
 
