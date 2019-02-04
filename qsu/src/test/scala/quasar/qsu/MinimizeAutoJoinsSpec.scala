@@ -50,7 +50,7 @@ import scalaz.{\/, \/-, EitherT, Free, Need, StateT}
 import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
-// import scalaz.syntax.show._
+import scalaz.syntax.show._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.tag._
 
@@ -2242,6 +2242,77 @@ object MinimizeAutoJoinsSpec
                 "left"),
               "left"))
       }
+    }
+
+    // r11{_}{_}{_}{_:}, r11{_}{_:}, r11{_}{_}{_:}
+    "detect compatibility across certain complex ternary structures" in {
+      val read = qsu.read(afile, ExcludeId)
+
+      val rs = qsu.leftShift(
+        read,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rsse = qsu.leftShift(
+        rs,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rssi = qsu.leftShift(
+        rs,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rsssi = qsu.leftShift(
+        rsse,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rssse = qsu.leftShift(
+        rsse,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rssssi = qsu.leftShift(
+        rssse,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu._autojoin2((
+          qsu._autojoin2((
+            rssssi,
+            rssi,
+            func.StaticMapS(
+              "0" -> func.LeftSide,
+              "1" -> func.RightSide))),
+          rsssi,
+          func.ConcatMaps(
+            func.LeftSide,
+            func.MakeMapS("3", func.RightSide)))))
+
+      val results = runOn(qgraph)
+      println(results.shows)
+
+      results must haveShiftCount(4)
     }
   }
 
