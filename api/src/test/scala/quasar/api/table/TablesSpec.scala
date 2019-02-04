@@ -89,6 +89,19 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D: 
       }
     }
 
+    "error when replacing a table with a name conflict" >>* {
+      for {
+        errorOrId1 <- tables.createTable(table1)
+        id1 <- isSuccess(errorOrId1)
+        errorOrId2 <- tables.createTable(table2)
+        _ <- isSuccess(errorOrId2)
+        table11 = table1.copy(name = table2.name)
+        cond <- tables.replaceTable(id1, table11)
+      } yield {
+        cond must beAbnormal(TableError.NameConflict(table2.name): TableError.ModificationError[I])
+      }
+    }
+
     "error when preparing a nonexistent table" >>* {
       for {
         id <- uniqueId.point[F]
@@ -205,6 +218,25 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D: 
         }
         replacedResult must beLike {
           case \/-(t) => t must_= table2
+        }
+      }
+    }
+
+    "succesfully replace a table without changing name" >>* {
+      for {
+        errorOrId <- tables.createTable(table1)
+        id <- isSuccess(errorOrId)
+        originalResult <- tables.table(id)
+        newCols = TableColumn("quux", ColumnScalar.Number) :: table1.columns
+        newTable = table1.copy(columns = newCols)
+        _ <- tables.replaceTable(id, newTable)
+        replacedResult <- tables.table(id)
+      } yield {
+        originalResult must beLike {
+          case \/-(t) => t must_= table1
+        }
+        replacedResult must beLike {
+          case \/-(t) => t must_= newTable
         }
       }
     }

@@ -27,6 +27,7 @@ import java.util.UUID
 import fs2.Stream
 import scalaz.{\/, IMap, Monad}
 import scalaz.syntax.either._
+import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 
@@ -50,7 +51,7 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
       .map(_.table)
       .toRightDisjunction(TableNotFound(tableId)))
 
-  def createTable(table: TableRef[String]): F[NameConflict \/ UUID] =
+  def createTable(table: TableRef[String]): F[CreateError[UUID] \/ UUID] =
     store.get map { store =>
         (store, store.values.map(_.table.name).contains(table.name))
     } flatMap { case (s, exists) =>
@@ -61,18 +62,21 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
           id <- UUID.randomUUID.point[F]
           back <- store.put(s.insert(id,
             MockTable(table, PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.NotPreparing))))
-        } yield id.right[NameConflict]
+        } yield id.right[CreateError[UUID]]
     }
 
   def replaceTable(tableId: UUID, table: TableRef[String])
       : F[Condition[ModificationError[UUID]]] =
-    store.gets(_.lookup(tableId)) flatMap { res =>
-      val modified = res map { s =>
-        store.modify(_.insert(tableId, MockTable(table, s.status)))
-          .as(Condition.normal[ModificationError[UUID]]())
-      }
-      modified.getOrElse(Condition.abnormal[ModificationError[UUID]](
-        TableNotFound(tableId)).point[F])
+    store.gets(s => (s.lookup(tableId), s.filter(_.table.name === table.name))) flatMap {
+      case (Some(mt), sameName) =>
+        if (sameName.keys.forall(_ === tableId))
+          store.modify(_.insert(tableId, MockTable(table, mt.status)))
+            .as(Condition.normal[ModificationError[UUID]]())
+        else
+          Condition.abnormal[ModificationError[UUID]](NameConflict(table.name)).point[F]
+
+      case (None, _) =>
+        Condition.abnormal[ModificationError[UUID]](TableNotFound(tableId)).point[F]
     }
 
   // mock tables prepare immediately

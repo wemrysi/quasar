@@ -30,9 +30,9 @@ import scalaz.\/
   */
 trait Tables[F[_], I, Q, D, S] {
   import TableError.{
+    CreateError,
     ExistenceError,
     ModificationError,
-    NameConflict,
     PreparationNotInProgress,
     PrePreparationError
   }
@@ -41,7 +41,7 @@ trait Tables[F[_], I, Q, D, S] {
 
   def table(tableId: I): F[ExistenceError[I] \/ TableRef[Q]]
 
-  def createTable(table: TableRef[Q]): F[NameConflict \/ I]
+  def createTable(table: TableRef[Q]): F[CreateError[I] \/ I]
 
   def replaceTable(tableId: I, table: TableRef[Q]): F[Condition[ModificationError[I]]]
 
