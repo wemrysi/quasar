@@ -59,7 +59,8 @@ import scalaz.{
   Free,
   Monad,
   NonEmptyList => NEL,
-  Scalaz
+  Scalaz,
+  Show
 }, Scalaz._
 
 final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] private () extends Minimizer[T] {
@@ -86,6 +87,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
   private[this] object ShiftGraph {
     case class Single(pattern: QSU.LeftShift[T, QSUGraph], dims: QDims) extends ShiftGraph
     case class Multi(pattern: QSU.MultiLeftShift[T, QSUGraph], dims: List[QDims]) extends ShiftGraph
+
+    implicit val show: Show[ShiftGraph] = Show shows {
+      case Single(pattern, _) => s"Single(${QScriptUniform.traverse[T].map(pattern)(_.root).shows})"
+      case Multi(pattern, _) => s"Multi(${QScriptUniform.traverse[T].map(pattern)(_.root).shows})"
+    }
   }
 
   private val func = construction.Func[T]
@@ -279,7 +285,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             }
 
             val repair3 = func.ConcatMaps(
-              AccessLeftTarget[T](Access.value(_)),
+              subsetObject(AccessLeftTarget[T](Access.value(_)), OriginalField),
               func.MakeMapS(ResultsField, repair2))
 
             updateGraph[T, G](QSU.LeftShift[T, Symbol](src.root, struct2, idStatus, OnUndefined.Emit, repair3, rot)) map { rewritten =>
@@ -302,7 +308,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             }
 
             val repair3 = func.ConcatMaps(
-              accessHoleLeftF,
+              subsetObject(accessHoleLeftF, OriginalField),
               func.MakeMapS(ResultsField, repair2))
 
             updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, OnUndefined.Emit, MapFuncCore.normalized(repair3))) map { rewritten =>
@@ -631,7 +637,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val rightSide =
             if (hasParent)
-              AccessLeftTarget[T](Access.value(_))
+              subsetObject(AccessLeftTarget[T](Access.value(_)), RightField)
             else
               func.MakeMapS(RightField, AccessLeftTarget(Access.value(_)))
 
@@ -657,7 +663,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val rightSide =
             if (hasParent)
-              AccessHole[T].map(_.left[Int])
+              subsetObject(AccessHole[T].map(_.left[Int]), RightField)
             else
               func.MakeMapS(RightField, AccessHole[T].map(_.left[Int]))
 
@@ -681,7 +687,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val leftSide =
             if (hasParent)
-              AccessLeftTarget[T](Access.value(_))
+              subsetObject(AccessLeftTarget[T](Access.value(_)), LeftField)
             else
               func.MakeMapS(LeftField, AccessLeftTarget[T](Access.value(_)))
 
@@ -707,7 +713,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val leftSide =
             if (hasParent)
-              AccessHole[T].map(_.left[Int])
+              subsetObject(AccessHole[T].map(_.left[Int]), LeftField)
             else
               func.MakeMapS(LeftField, AccessHole[T].map(_.left[Int]))
 
@@ -794,7 +800,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
     def coalesceWrapped(wrapped: List[(QSUGraph, Set[Int])]): G[(QSUGraph, Set[Int])] = {
       wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
-        case ((ConsecutiveBounded(_, shifts1), leftIndices), (ConsecutiveBounded(_, shifts2), rightIndices)) =>
+        case ((graphL @ ConsecutiveBounded(_, shifts1), leftIndices), (graphR @ ConsecutiveBounded(_, shifts2), rightIndices)) =>
           val back = coalesceZip(shifts1.toList.reverse, leftIndices, shifts2.toList.reverse, rightIndices, None, false)
 
           back.map(g => (inlineMap(g).getOrElse(g), leftIndices ++ rightIndices))
@@ -916,12 +922,12 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         val struct2 = struct >> fm.asRec
 
-        val from = inners.last match {
+        val from = inners.head match {
           case ShiftGraph.Single(_, dims) => dims
           case ShiftGraph.Multi(_, _) => Dimensions.origin(qprov.prov.fresh())   // completely disable compatible shift collapse under MultiLeftShift (TODO do better)
         }
 
-        val dims = computeStructProv(from, Some(inners.last), struct2.linearize)
+        val dims = computeStructProv(from, Some(inners.head), struct2.linearize)
 
         val repair2 = repair flatMap {
           case alt @ ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
@@ -948,13 +954,13 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             (struct >> fm, idStatus, rot)
         }
 
-        val from = inners.last match {
+        val from = inners.head match {
           case ShiftGraph.Single(_, dims) => dims
           case ShiftGraph.Multi(_, _) => Dimensions.origin(qprov.prov.fresh())   // completely disable compatible shift collapse under MultiLeftShift (TODO do better)
         }
 
         val dims = shifts2 map {
-          case (struct, _, _) => computeStructProv(from, Some(inners.last), struct)
+          case (struct, _, _) => computeStructProv(from, Some(inners.head), struct)
         }
 
         val repair2 = repair flatMap {
@@ -1005,6 +1011,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         ApplyProvenance.computeFuncDims(struct)(κ(from)).getOrElse(from)
     }
   }
+
+  private[this] def subsetObject[A](fm: FreeMapA[A], field: String): FreeMapA[A] =
+    func.MakeMapS(field, func.ProjectKeyS(fm, field))
 
   // each List within a given ShiftAssoc may be coalesced in any order, producing an equivalent result
   private sealed trait ShiftAssoc extends Product with Serializable {

@@ -916,9 +916,9 @@ object MinimizeAutoJoinsSpec
             recFunc.ProjectKeyS(recFunc.Hole, "results"))
 
           repairInner must beTreeEqual(
-            func.ConcatMaps(
-              AccessLeftTarget[Fix](Access.value(_)),
-              func.MakeMapS("results", RightTarget[Fix])))
+            func.StaticMapS(
+              "original" -> func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "original"),
+              "results" -> RightTarget[Fix]))
 
           structOuter must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "results"))
 
@@ -1117,10 +1117,11 @@ object MinimizeAutoJoinsSpec
         outerdstruct must beTreeEqual(func.ProjectKeyS(func.ProjectKeyS(func.Hole, "results"), "right"))
 
         outerMultiRepair must beTreeEqual(
-          func.ConcatMaps(
-            AccessHole[Fix].map(_.left[Int]),
-            func.MakeMapS(
-              "results",
+          func.StaticMapS(
+            "original" ->
+              func.ProjectKeyS(AccessHole[Fix].map(_.left[Int]), "original"),
+
+            "results" ->
               func.StaticMapS(
                 "left" -> func.ConcatMaps(
                   func.MakeMapS(
@@ -1133,7 +1134,7 @@ object MinimizeAutoJoinsSpec
                         "results"),
                       "left"),
                     "right")),
-                "right" -> Free.pure[MapFunc, Access[Hole] \/ Int](1.right)))))
+                "right" -> Free.pure[MapFunc, Access[Hole] \/ Int](1.right))))
 
         singleRepair must beTreeEqual(
           func.ConcatMaps(
@@ -2202,8 +2203,8 @@ object MinimizeAutoJoinsSpec
           Map(
             LeftShift(
               LeftShift(
-                MultiLeftShift(
-                  MultiLeftShift(
+                LeftShift(
+                  LeftShift(
                     LeftShift(
                       LeftShift(
                         Read(`afile`, ExcludeId),
@@ -2219,7 +2220,11 @@ object MinimizeAutoJoinsSpec
                       _),
                     _,
                     _,
+                    _,
+                    _,
                     _),
+                  _,
+                  _,
                   _,
                   _,
                   _),
@@ -2242,6 +2247,74 @@ object MinimizeAutoJoinsSpec
                 "left"),
               "left"))
       }
+    }
+
+    // r11{_}{_}{_}{_:}, r11{_}{_:}, r11{_}{_}{_:}
+    "detect compatibility across certain complex ternary structures" in {
+      val read = qsu.read(afile, ExcludeId)
+
+      val rs = qsu.leftShift(
+        read,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rsse = qsu.leftShift(
+        rs,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rssi = qsu.leftShift(
+        rs,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rsssi = qsu.leftShift(
+        rsse,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rssse = qsu.leftShift(
+        rsse,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rssssi = qsu.leftShift(
+        rssse,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu._autojoin2((
+          qsu._autojoin2((
+            rssssi,
+            rssi,
+            func.StaticMapS(
+              "0" -> func.LeftSide,
+              "1" -> func.RightSide))),
+          rsssi,
+          func.ConcatMaps(
+            func.LeftSide,
+            func.MakeMapS("3", func.RightSide)))))
+
+      runOn(qgraph) must haveShiftCount(4)
     }
   }
 
