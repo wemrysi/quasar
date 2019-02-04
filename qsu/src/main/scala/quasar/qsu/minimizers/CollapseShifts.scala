@@ -511,9 +511,14 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               RightField -> repairRAdj)
           }
 
+          val structLAdj = if (hasParent && requiresDeref)
+            structL >> recFunc.ProjectKeyS(recFunc.Hole, name(LeftSide))
+          else
+            structL
+
           continue(fakeParent, tailL, tailR, !ignoreStructure) { sym =>
             QSU.LeftShift[T, Symbol](
-              sym, structL, idStatusAdj, onUndefinedL, MapFuncCore.normalized(repair), rotL)
+              sym, structLAdj, idStatusAdj, onUndefinedL, MapFuncCore.normalized(repair), rotL)
           }
 
         case
