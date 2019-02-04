@@ -2082,6 +2082,167 @@ object MinimizeAutoJoinsSpec
           struct5 must not(beTreeEqual(func.Hole))
       }
     }
+
+    // r11{_}{_}{_}{_}{_}{_:}, r11{_}{_}{_:}, r11{_}{_:}, r11{_:}, r11{_}{_}{_}{_:}
+    "ensure downstream compatible structs are adjusted for upstream compatible wrapping" in {
+      val rlp0 = qsu.read(afile, ExcludeId)
+
+      val rlp3 = qsu.leftShift(
+        rlp0,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rlp4 = qsu.leftShift(
+        rlp3,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rlp5 = qsu.leftShift(
+        rlp4,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rlp23 = qsu.leftShift(
+        rlp5,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rlp19 = qsu.leftShift(
+        rlp0,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rlp15 = qsu.leftShift(
+        rlp3,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rlp11 = qsu.leftShift(
+        rlp4,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rlp6 = qsu.leftShift(
+        rlp5,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rlp7 = qsu.leftShift(
+        rlp6,
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rlp8 = qsu.leftShift(
+        rlp7,
+        recFunc.Hole,
+        IdOnly,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftMap)
+
+      val rlp13 = qsu._autojoin2((
+        rlp8,
+        rlp11,
+        func.StaticMapS(
+          "0" -> func.LeftSide,
+          "1" -> func.RightSide)))
+
+      val rlp17 = qsu._autojoin2((
+        rlp13,
+        rlp15,
+        func.ConcatMaps(
+          func.LeftSide,
+          func.MakeMapS("2", func.RightSide))))
+
+      val rlp21 = qsu._autojoin2((
+        rlp17,
+        rlp19,
+        func.ConcatMaps(
+          func.LeftSide,
+          func.MakeMapS("3", func.RightSide))))
+
+      val rlp26 = qsu._autojoin2((
+        rlp21,
+        rlp23,
+        func.ConcatMaps(
+          func.LeftSide,
+          func.MakeMapS("4", func.RightSide))))
+
+      val qgraph = QSUGraph.fromTree[Fix](rlp26)
+
+      runOn(qgraph) must beLike {
+        case
+          Map(
+            LeftShift(
+              LeftShift(
+                MultiLeftShift(
+                  MultiLeftShift(
+                    LeftShift(
+                      LeftShift(
+                        Read(`afile`, ExcludeId),
+                        _,
+                        _,
+                        _,
+                        _,
+                        _),
+                      struct,
+                      _,
+                      _,
+                      _,
+                      _),
+                    _,
+                    _,
+                    _),
+                  _,
+                  _,
+                  _),
+                _,
+                _,
+                _,
+                _,
+                _),
+              _,
+              _,
+              _,
+              _,
+              _),
+            _) =>
+
+          struct must beTreeEqual(
+            recFunc.ProjectKeyS(
+              recFunc.ProjectKeyS(
+                recFunc.Hole,
+                "left"),
+              "left"))
+      }
+    }
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph =
