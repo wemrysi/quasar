@@ -22,7 +22,6 @@ import quasar.IdStatus
 import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz._
 import quasar.ejson.{EJson, Fixed}
-import quasar.ejson.implicits._
 import quasar.fp.ski.κ
 import quasar.qscript.{
   MonadPlannerErr,
@@ -60,8 +59,6 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
 
   private implicit def ciState[F[_]: Monad]: MonadState_[StateT[F, S, ?], CompatInfo] =
     MonadState_.zoom[StateT[F, S, ?]](_3[S, CompatInfo])
-
-  import prov.prov.implicits._
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] =
@@ -136,28 +133,15 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
         ApplyProvenance.computeFuncDims(struct)(κ(commonSrcDims))
           .getOrElse(commonSrcDims)
 
-      compatInfo <- MonadState_[G, CompatInfo].get
-
-      sameFocus = compatInfo findLeft {
-        case (_, rot, qds) => (rotation ≟ rot) && (structDim ≟ qds)
-      }
-
       tempShift <- QSUGraph.withName[T, G](NamePrefix)(tempShiftPat)
       commonShift = tempShift.overwriteAtRoot(tempShiftPat.copy(source = commonRoot))
 
       srcDims <- dimsOf(src.root)
 
-      // If another shift matched, use its dimensions, otherwise compute
-      // provenance for this shift on the common source.
-      newDims <- sameFocus match {
-        case Some((sym, _, _)) => dimsOf(sym)
-        case None => ApplyProvenance.computeDims[T, G](commonShift)
-      }
+      // compute provenance for this shift on the common source.
+      newDims <- ApplyProvenance.computeDims[T, G](commonShift)
 
-      joinDims =
-        if (idx === 0) newDims else prov.join(newDims, srcDims)
-
-      _ <- MonadState_[G, QAuth].modify(_.addDims(commonShift.root, joinDims))
+      _ <- MonadState_[G, QAuth].modify(_.addDims(commonShift.root, newDims))
 
       newShift = commonShift overwriteAtRoot {
         tempShiftPat.copy(
@@ -165,7 +149,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
           repair = repair)
       }
 
-      _ <- MonadState_[G, CompatInfo].put((newShift.root, rotation, structDim) :: compatInfo)
+      _ <- MonadState_[G, CompatInfo].put(IList((newShift.root, rotation, structDim)))
     } yield newShift :++ src
   }
 }
