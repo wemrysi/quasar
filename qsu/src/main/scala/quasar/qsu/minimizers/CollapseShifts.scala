@@ -356,9 +356,6 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         val realParent = parent.getOrElse(fakeParent)
         val cont = updateGraph[T, G](pat(realParent.root)) map { rewritten =>
-          // println("")
-          // println(s">>> continuing with ${pat(realParent.root).shows}")
-          // println("")
           Some(rewritten :++ realParent)
         }
 
@@ -503,7 +500,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             (
               (lshift @ ShiftGraph.Single(QSU.LeftShift(fakeParent, structL, idStatusL, onUndefinedL, repairL, rotL), dimsL)) :: tailL,
               (rshift @ ShiftGraph.Single(QSU.LeftShift(_, _, idStatusR, onUndefinedR, repairR, rotR), dimsR)) :: tailR)
-            if {/*println(s"dimsL = $dimsL, dimsR = $dimsR; === = ${dimsL === dimsR}");*/ dimsL === dimsR && rotL === rotR } =>
+            if dimsL === dimsR && rotL === rotR =>
 
           val idStatusAdj = idStatusL |+| idStatusR
 
@@ -804,11 +801,6 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
     def coalesceWrapped(wrapped: List[(QSUGraph, Set[Int])]): G[(QSUGraph, Set[Int])] = {
       wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
         case ((graphL @ ConsecutiveBounded(_, shifts1), leftIndices), (graphR @ ConsecutiveBounded(_, shifts2), rightIndices)) =>
-          // println(s"coalesceWrapping:")
-          // println(graphL.shows)
-          // println(graphR.shows)
-          // println("")
-
           val back = coalesceZip(shifts1.toList.reverse, leftIndices, shifts2.toList.reverse, rightIndices, None, false)
 
           back.map(g => (inlineMap(g).getOrElse(g), leftIndices ++ rightIndices))
@@ -836,12 +828,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def coalesceTier(tier: ShiftAssoc): G[(QSUGraph, Set[Int])] = tier match {
-      case ShiftAssoc.Leaves(shifts) => {
-        // println(s"single tier ${shifts.shows}")
-        // println("")
-
+      case ShiftAssoc.Leaves(shifts) =>
         coalesceWrapped(shifts)
-      }
 
       case ShiftAssoc.Branches(shifts) =>
         shifts.traverse(coalesceTier).flatMap(coalesceWrapped)
@@ -932,8 +920,6 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           repair,
           rot) =>
 
-        // println(s"!!! inners! ${inners.shows}")
-
         val struct2 = struct >> fm.asRec
 
         val from = inners.head match {
@@ -1014,10 +1000,6 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             case other => other.point[FreeMapA]
           }
         } getOrElse repair
-
-        // println(s"from = $from")
-        // println(s"struct = ${struct.shows}")
-        // println(s"repair2 = ${repair2.shows}")
 
         ApplyProvenance.computeFuncDims(struct >> repair2)(κ(from)).getOrElse(from)
 

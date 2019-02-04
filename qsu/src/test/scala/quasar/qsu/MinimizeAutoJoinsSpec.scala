@@ -50,7 +50,7 @@ import scalaz.{\/, \/-, EitherT, Free, Need, StateT}
 import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
-import scalaz.syntax.show._
+// import scalaz.syntax.show._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.tag._
 
@@ -916,9 +916,9 @@ object MinimizeAutoJoinsSpec
             recFunc.ProjectKeyS(recFunc.Hole, "results"))
 
           repairInner must beTreeEqual(
-            func.ConcatMaps(
-              AccessLeftTarget[Fix](Access.value(_)),
-              func.MakeMapS("results", RightTarget[Fix])))
+            func.StaticMapS(
+              "original" -> func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "original"),
+              "results" -> RightTarget[Fix]))
 
           structOuter must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "results"))
 
@@ -1117,10 +1117,11 @@ object MinimizeAutoJoinsSpec
         outerdstruct must beTreeEqual(func.ProjectKeyS(func.ProjectKeyS(func.Hole, "results"), "right"))
 
         outerMultiRepair must beTreeEqual(
-          func.ConcatMaps(
-            AccessHole[Fix].map(_.left[Int]),
-            func.MakeMapS(
-              "results",
+          func.StaticMapS(
+            "original" ->
+              func.ProjectKeyS(AccessHole[Fix].map(_.left[Int]), "original"),
+
+            "results" ->
               func.StaticMapS(
                 "left" -> func.ConcatMaps(
                   func.MakeMapS(
@@ -1133,7 +1134,7 @@ object MinimizeAutoJoinsSpec
                         "results"),
                       "left"),
                     "right")),
-                "right" -> Free.pure[MapFunc, Access[Hole] \/ Int](1.right)))))
+                "right" -> Free.pure[MapFunc, Access[Hole] \/ Int](1.right))))
 
         singleRepair must beTreeEqual(
           func.ConcatMaps(
@@ -2202,8 +2203,8 @@ object MinimizeAutoJoinsSpec
           Map(
             LeftShift(
               LeftShift(
-                MultiLeftShift(
-                  MultiLeftShift(
+                LeftShift(
+                  LeftShift(
                     LeftShift(
                       LeftShift(
                         Read(`afile`, ExcludeId),
@@ -2219,7 +2220,11 @@ object MinimizeAutoJoinsSpec
                       _),
                     _,
                     _,
+                    _,
+                    _,
                     _),
+                  _,
+                  _,
                   _,
                   _,
                   _),
@@ -2309,10 +2314,7 @@ object MinimizeAutoJoinsSpec
             func.LeftSide,
             func.MakeMapS("3", func.RightSide)))))
 
-      val results = runOn(qgraph)
-      println(results.shows)
-
-      results must haveShiftCount(4)
+      runOn(qgraph) must haveShiftCount(4)
     }
   }
 
