@@ -55,156 +55,28 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   def index(i: Int): FreeMapA[Access[Hole] \/ Int] =
     i.right[Access[Hole]].pure[FreeMapA]
 
-  "convert singly nested LeftShift/ThetaJoin" in {
-    val dataset = qsu.leftShift(
-      qsu.read(rootDir </> file("dataset"), ExcludeId),
-      recFunc.Hole,
-      ExcludeId,
-      OnUndefined.Omit,
-      RightTarget[Fix],
-      Rotation.ShiftArray)
+  "MLS expansion" should {
+    "convert singly nested LeftShift/ThetaJoin" in {
+      val dataset = qsu.leftShift(
+        qsu.read(rootDir </> file("dataset"), ExcludeId),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
 
-    val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
-      dataset,
-      List(
-        (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
-        (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray)
-      ),
-      OnUndefined.Omit,
-      func.Add(index(0), index(1))
-    ))
-
-    multiShift must expandTo {
-      case qg@Map(
-        LeftShift(
-          LeftShift(
-            LeftShift(
-              Read(afile, ExcludeId),
-              shiftedReadStruct,
-              ExcludeId,
-              OnUndefined.Omit,
-              shiftedReadRepair,
-              Rotation.ShiftArray
-            ),
-            projectFoo,
-            ExcludeId,
-            OnUndefined.Emit,
-            innerRepair,
-            Rotation.ShiftArray
-          ),
-          projectBar,
-          ExcludeId,
-          OnUndefined.Emit,
-          outerRepair,
-          Rotation.ShiftArray
+      val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
+        dataset,
+        List(
+          (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
+          (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray)
         ),
-        fm
-      ) =>
-        fm.linearize must beTreeEqual(
-          func.Add(
-            func.ProjectKeyS(func.Hole, "0"),
-            func.ProjectKeyS(func.Hole, "1")))
+        OnUndefined.Omit,
+        func.Add(index(0), index(1))
+      ))
 
-        projectBar.linearize must beTreeEqual(
-          func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "bar")
-        )
-
-        projectFoo.linearize must beTreeEqual(
-          func.ProjectKeyS(func.Hole, "foo")
-        )
-
-        shiftedReadStruct.linearize must beTreeEqual(
-          func.Hole
-        )
-
-        shiftedReadRepair must beTreeEqual(
-          RightTarget[Fix]
-        )
-
-        innerRepair must beTreeEqual(
-          func.StaticMapS(
-            "original" -> AccessLeftTarget[Fix](Access.value(_)),
-            "0" -> RightTarget[Fix])
-        )
-
-        outerRepair must beTreeEqual(
-          func.ConcatMaps(
-            AccessLeftTarget[Fix](Access.value(_)),
-            func.MakeMapS("1", RightTarget[Fix])))
-    }
-  }
-
-  "convert singly nested LeftShift/ThetaJoin with onUndefined = OnUndefined.Emit" in {
-    val dataset = qsu.leftShift(
-      qsu.read(rootDir </> file("dataset"), ExcludeId),
-      recFunc.Hole,
-      ExcludeId,
-      OnUndefined.Omit,
-      RightTarget[Fix],
-      Rotation.ShiftArray)
-
-    val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
-      dataset,
-      List(
-        (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
-        (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray)
-      ),
-      OnUndefined.Emit,
-      func.Add(index(0), index(1))
-    ))
-
-    multiShift must expandTo {
-      case qg@Map(
-        LeftShift(
-          LeftShift(
-            LeftShift(
-              Read(afile, ExcludeId),
-              shiftedReadStruct,
-              ExcludeId,
-              OnUndefined.Omit,
-              shiftedReadRepair,
-              Rotation.ShiftArray
-            ),
-            projectFoo,
-            ExcludeId,
-            OnUndefined.Emit,
-            innerRepair,
-            Rotation.ShiftArray
-          ),
-          projectBar,
-          ExcludeId,
-          OnUndefined.Emit,
-          outerRepair,
-          Rotation.ShiftArray
-        ),
-        fm
-      ) => ok
-    }
-  }
-
-  "convert doubly nested LeftShift/ThetaJoin" in {
-    val dataset = qsu.leftShift(
-      qsu.read(rootDir </> file("dataset"), ExcludeId),
-      recFunc.Hole,
-      ExcludeId,
-      OnUndefined.Omit,
-      RightTarget[Fix],
-      Rotation.ShiftArray)
-
-    val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
-      dataset,
-      List(
-        (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
-        (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray),
-        (func.ProjectKeyS(func.Hole, "baz"), ExcludeId, Rotation.ShiftArray)
-      ),
-      OnUndefined.Omit,
-      func.Subtract(func.Add(index(0), index(1)), index(2))
-    ))
-
-    multiShift must expandTo {
-      case qg @ Map(
-        LeftShift(
+      multiShift must expandTo {
+        case qg@Map(
           LeftShift(
             LeftShift(
               LeftShift(
@@ -218,140 +90,270 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               projectFoo,
               ExcludeId,
               OnUndefined.Emit,
-              innermostRepair,
+              innerRepair,
               Rotation.ShiftArray
             ),
             projectBar,
             ExcludeId,
             OnUndefined.Emit,
-            innerRepair,
+            outerRepair,
             Rotation.ShiftArray
           ),
-          projectBaz,
-          ExcludeId,
-          OnUndefined.Emit,
-          outerRepair,
-          Rotation.ShiftArray
-        ),
-        fm
-      ) =>
-        fm.linearize must beTreeEqual(
-          func.Subtract(
+          fm
+        ) =>
+          fm.linearize must beTreeEqual(
             func.Add(
               func.ProjectKeyS(func.Hole, "0"),
-              func.ProjectKeyS(func.Hole, "1")),
-            func.ProjectKeyS(func.Hole, "2")))
+              func.ProjectKeyS(func.Hole, "1")))
 
-        projectBaz.linearize must beTreeEqual(
-          func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "baz")
-        )
+          projectBar.linearize must beTreeEqual(
+            func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "bar")
+          )
 
-        projectBar.linearize must beTreeEqual(
-          func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "bar")
-        )
+          projectFoo.linearize must beTreeEqual(
+            func.ProjectKeyS(func.Hole, "foo")
+          )
 
-        projectFoo.linearize must beTreeEqual(
-          func.ProjectKeyS(func.Hole, "foo")
-        )
+          shiftedReadStruct.linearize must beTreeEqual(
+            func.Hole
+          )
 
-        shiftedReadStruct.linearize must beTreeEqual(
-          func.Hole
-        )
+          shiftedReadRepair must beTreeEqual(
+            RightTarget[Fix]
+          )
 
-        shiftedReadRepair must beTreeEqual(
-          RightTarget[Fix]
-        )
+          innerRepair must beTreeEqual(
+            func.StaticMapS(
+              "original" -> AccessLeftTarget[Fix](Access.value(_)),
+              "0" -> RightTarget[Fix])
+          )
 
-        innermostRepair must beTreeEqual(
-          func.StaticMapS(
-            "original" -> AccessLeftTarget[Fix](Access.value(_)),
-            "0" -> RightTarget[Fix])
-        )
-
-        innerRepair must beTreeEqual(
-          func.ConcatMaps(
-            AccessLeftTarget[Fix](Access.value(_)),
-            func.MakeMapS("1", RightTarget[Fix])))
-
-        outerRepair must beTreeEqual(
-          func.ConcatMaps(
-            AccessLeftTarget[Fix](Access.value(_)),
-            func.MakeMapS("2", RightTarget[Fix])))
+          outerRepair must beTreeEqual(
+            func.ConcatMaps(
+              AccessLeftTarget[Fix](Access.value(_)),
+              func.MakeMapS("1", RightTarget[Fix])))
+      }
     }
-  }
 
-  "join shifts of the same focus" >> {
-    val dataset = qsu.leftShift(
-      qsu.read(rootDir </> file("dataset"), ExcludeId),
-      recFunc.Hole,
-      ExcludeId,
-      OnUndefined.Omit,
-      RightTarget[Fix],
-      Rotation.ShiftArray)
+    "convert singly nested LeftShift/ThetaJoin with onUndefined = OnUndefined.Emit" in {
+      val dataset = qsu.leftShift(
+        qsu.read(rootDir </> file("dataset"), ExcludeId),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
 
-    val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
-      dataset,
-      List(
-        (func.ProjectKeyS(func.Hole, "foo"), IdOnly, Rotation.ShiftArray),
-        (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray)
-      ),
-      OnUndefined.Emit,
-      func.StaticMapS(
-        "id" -> index(0),
-        "val" -> index(1))
-    ))
+      val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
+        dataset,
+        List(
+          (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
+          (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray)
+        ),
+        OnUndefined.Emit,
+        func.Add(index(0), index(1))
+      ))
 
-    multiShift must expandTo {
-      case qg@Map(
-        LeftShift(
+      multiShift must expandTo {
+        case qg@Map(
           LeftShift(
             LeftShift(
-              Read(afile, ExcludeId),
-              shiftedReadStruct,
+              LeftShift(
+                Read(afile, ExcludeId),
+                shiftedReadStruct,
+                ExcludeId,
+                OnUndefined.Omit,
+                shiftedReadRepair,
+                Rotation.ShiftArray
+              ),
+              projectFoo,
               ExcludeId,
-              OnUndefined.Omit,
-              shiftedReadRepair,
+              OnUndefined.Emit,
+              innerRepair,
               Rotation.ShiftArray
             ),
-            projectFoo1,
-            IdOnly,
+            projectBar,
+            ExcludeId,
             OnUndefined.Emit,
-            innerRepair,
+            outerRepair,
             Rotation.ShiftArray
           ),
-          projectFoo2,
-          ExcludeId,
-          OnUndefined.Emit,
-          outerRepair,
-          Rotation.ShiftArray
-        ),
-        fm
-      ) =>
-        projectFoo1.linearize must beTreeEqual(
-          func.ProjectKeyS(func.Hole, "foo"))
-
-        projectFoo2.linearize must beTreeEqual(
-          func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "foo"))
-
-        innerRepair must beTreeEqual(
-          func.StaticMapS(
-            "original" -> AccessLeftTarget[Fix](Access.value(_)),
-            "0" -> RightTarget[Fix]))
-
-        outerRepair must beTreeEqual(
-           func.Cond(
-             func.Or(
-               func.Eq(
-                 AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh0), _)),
-                 AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _))),
-               func.IfUndefined(
-                 AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _)),
-                 func.Constant(json.bool(true)))),
-             func.ConcatMaps(
-               AccessLeftTarget[Fix](Access.value(_)),
-               func.MakeMapS("1", RightTarget[Fix])),
-             func.Undefined))
+          fm
+        ) => ok
+      }
     }
+
+    "convert doubly nested LeftShift/ThetaJoin" in {
+      val dataset = qsu.leftShift(
+        qsu.read(rootDir </> file("dataset"), ExcludeId),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
+        dataset,
+        List(
+          (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
+          (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray),
+          (func.ProjectKeyS(func.Hole, "baz"), ExcludeId, Rotation.ShiftArray)
+        ),
+        OnUndefined.Omit,
+        func.Subtract(func.Add(index(0), index(1)), index(2))
+      ))
+
+      multiShift must expandTo {
+        case qg @ Map(
+          LeftShift(
+            LeftShift(
+              LeftShift(
+                LeftShift(
+                  Read(afile, ExcludeId),
+                  shiftedReadStruct,
+                  ExcludeId,
+                  OnUndefined.Omit,
+                  shiftedReadRepair,
+                  Rotation.ShiftArray
+                ),
+                projectFoo,
+                ExcludeId,
+                OnUndefined.Emit,
+                innermostRepair,
+                Rotation.ShiftArray
+              ),
+              projectBar,
+              ExcludeId,
+              OnUndefined.Emit,
+              innerRepair,
+              Rotation.ShiftArray
+            ),
+            projectBaz,
+            ExcludeId,
+            OnUndefined.Emit,
+            outerRepair,
+            Rotation.ShiftArray
+          ),
+          fm
+        ) =>
+          fm.linearize must beTreeEqual(
+            func.Subtract(
+              func.Add(
+                func.ProjectKeyS(func.Hole, "0"),
+                func.ProjectKeyS(func.Hole, "1")),
+              func.ProjectKeyS(func.Hole, "2")))
+
+          projectBaz.linearize must beTreeEqual(
+            func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "baz")
+          )
+
+          projectBar.linearize must beTreeEqual(
+            func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "bar")
+          )
+
+          projectFoo.linearize must beTreeEqual(
+            func.ProjectKeyS(func.Hole, "foo")
+          )
+
+          shiftedReadStruct.linearize must beTreeEqual(
+            func.Hole
+          )
+
+          shiftedReadRepair must beTreeEqual(
+            RightTarget[Fix]
+          )
+
+          innermostRepair must beTreeEqual(
+            func.StaticMapS(
+              "original" -> AccessLeftTarget[Fix](Access.value(_)),
+              "0" -> RightTarget[Fix])
+          )
+
+          innerRepair must beTreeEqual(
+            func.ConcatMaps(
+              AccessLeftTarget[Fix](Access.value(_)),
+              func.MakeMapS("1", RightTarget[Fix])))
+
+          outerRepair must beTreeEqual(
+            func.ConcatMaps(
+              AccessLeftTarget[Fix](Access.value(_)),
+              func.MakeMapS("2", RightTarget[Fix])))
+      }
+    }
+
+    "join shifts of the same focus" in {
+      val dataset = qsu.leftShift(
+        qsu.read(rootDir </> file("dataset"), ExcludeId),
+        recFunc.Hole,
+        ExcludeId,
+        OnUndefined.Omit,
+        RightTarget[Fix],
+        Rotation.ShiftArray)
+
+      val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
+        dataset,
+        List(
+          (func.ProjectKeyS(func.Hole, "foo"), IdOnly, Rotation.ShiftArray),
+          (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray)
+        ),
+        OnUndefined.Emit,
+        func.StaticMapS(
+          "id" -> index(0),
+          "val" -> index(1))
+      ))
+
+      multiShift must expandTo {
+        case qg@Map(
+          LeftShift(
+            LeftShift(
+              LeftShift(
+                Read(afile, ExcludeId),
+                shiftedReadStruct,
+                ExcludeId,
+                OnUndefined.Omit,
+                shiftedReadRepair,
+                Rotation.ShiftArray
+              ),
+              projectFoo1,
+              IdOnly,
+              OnUndefined.Emit,
+              innerRepair,
+              Rotation.ShiftArray
+            ),
+            projectFoo2,
+            ExcludeId,
+            OnUndefined.Emit,
+            outerRepair,
+            Rotation.ShiftArray
+          ),
+          fm
+        ) =>
+          projectFoo1.linearize must beTreeEqual(
+            func.ProjectKeyS(func.Hole, "foo"))
+
+          projectFoo2.linearize must beTreeEqual(
+            func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "foo"))
+
+          innerRepair must beTreeEqual(
+            func.StaticMapS(
+              "original" -> AccessLeftTarget[Fix](Access.value(_)),
+              "0" -> RightTarget[Fix]))
+
+          outerRepair must beTreeEqual(
+             func.Cond(
+               func.Or(
+                 func.Eq(
+                   AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh0), _)),
+                   AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _))),
+                 func.IfUndefined(
+                   AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _)),
+                   func.Constant(json.bool(true)))),
+               func.ConcatMaps(
+                 AccessLeftTarget[Fix](Access.value(_)),
+                 func.MakeMapS("1", RightTarget[Fix])),
+               func.Undefined))
+      }
+    }.pendingUntilFixed
   }
 
   def expandTo(pf: PartialFunction[QSUGraph, MatchResult[_]]): Matcher[QSUGraph] =

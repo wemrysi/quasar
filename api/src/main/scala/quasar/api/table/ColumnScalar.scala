@@ -14,25 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.api.table
 
-import slamdata.Predef._
-import quasar.fp.ski._
-import quasar.{RenderTree, Terminal}
+import scalaz.Show
+import slamdata.Predef.{Product, Serializable}
 
-import monocle.Iso
-import scalaz._
+sealed abstract class ColumnScalar extends Product with Serializable
 
-sealed abstract class Hole
+object ColumnScalar {
+  final case object Boolean extends ColumnScalar
+  final case object Null extends ColumnScalar
+  final case object Number extends ColumnScalar
+  final case object String extends ColumnScalar
+  final case object OffsetDateTime extends ColumnScalar
 
-final case object SrcHole extends Hole
-
-object Hole {
-  def apply(): Hole = SrcHole
-
-  def unit = Iso[Hole, Unit](κ(()))(κ(SrcHole))
-
-  implicit val equal: Equal[Hole] = Equal.equalA
-  implicit val show: Show[Hole] = Show.showFromToString
-  implicit val renderTree: RenderTree[Hole] = RenderTree.make(κ(Terminal(List("○"), None)))
+  implicit val parseTypeShow: Show[ColumnScalar] = Show.showFromToString
 }
