@@ -54,6 +54,7 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
     extends Tables[F, I, Q, D, S] {
 
   import TableError.{
+    CreateError,
     ExistenceError,
     ModificationError,
     NameConflict,
@@ -78,12 +79,14 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
         PreparationNotInProgress(i)
     })
 
-  def createTable(table: TableRef[Q]): F[NameConflict \/ I] =
+  def createTable(table: TableRef[Q]): F[CreateError[I] \/ I] =
     tableStore.entries
       .exists(_._2.name === table.name)
       .compile.last
       .flatMap {
-        case Some(true) => NameConflict(table.name).left.pure[F]
+        case Some(true) =>
+          (NameConflict(table.name): CreateError[I]).left.pure[F]
+
         case _ => for {
           tableId <- freshId
           _ <- tableStore.insert(tableId, table)
@@ -137,7 +140,15 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
   def replaceTable(tableId: I, table: TableRef[Q]): F[Condition[ModificationError[I]]] =
     tableStore.lookup(tableId) flatMap {
       case Some(_) =>
-        tableStore.insert(tableId, table).map(_ => Condition.normal())
+        val nameIsAvailable =
+          tableStore.entries
+            .collect { case (id, ref) if ref.name === table.name => id }
+            .compile.fold(true)((b, id) => b && (id === tableId))
+
+        nameIsAvailable.ifM(
+          tableStore.insert(tableId, table).as(Condition.normal[ModificationError[I]]()),
+          Condition.abnormal[ModificationError[I]](NameConflict(table.name)).pure[F])
+
       case None =>
         Condition.abnormal(TableNotFound(tableId): ModificationError[I]).pure[F]
     }

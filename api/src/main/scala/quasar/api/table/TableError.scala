@@ -24,23 +24,19 @@ import scalaz.syntax.show._
 sealed trait TableError extends Product with Serializable
 
 object TableError {
-  final case class NameConflict(name: TableName) extends TableError
   final case class PreparationNotInProgress[I](tableId: I) extends TableError
 
   sealed trait ModificationError[I] extends TableError
   final case class PreparationExists[I](tableId: I) extends ModificationError[I]
+
+  sealed trait CreateError[I] extends ModificationError[I]
+  final case class NameConflict[I](name: TableName) extends CreateError[I]
 
   sealed trait PrePreparationError[I] extends ModificationError[I]
   final case class PreparationInProgress[I](tableId: I) extends PrePreparationError[I]
 
   sealed trait ExistenceError[I] extends ModificationError[I] with PrePreparationError[I]
   final case class TableNotFound[I](tableId: I) extends ExistenceError[I]
-
-  implicit val showNameConflict: Show[NameConflict] =
-    Show.show {
-      case NameConflict(n) =>
-        Cord("NameConflict(") ++ n.show ++ Cord(")")
-    }
 
   implicit def showPreparationNotInProgress[I: Show]: Show[PreparationNotInProgress[I]] =
     Show.show {
@@ -52,7 +48,14 @@ object TableError {
     Show.show {
       case PreparationExists(id) =>
         Cord("PreparationExists(") ++ id.show ++ Cord(")")
+      case e:CreateError[I] => e.show
       case e:PrePreparationError[I] => e.show
+    }
+
+  implicit def showCreateError[I]: Show[CreateError[I]] =
+    Show.show {
+      case NameConflict(n) =>
+        Cord("NameConflict(") ++ n.show ++ Cord(")")
     }
 
   implicit def showPrePreparationError[I: Show]: Show[PrePreparationError[I]] =
