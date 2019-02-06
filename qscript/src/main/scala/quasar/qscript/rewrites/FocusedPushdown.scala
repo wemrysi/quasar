@@ -62,7 +62,7 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           FocusedRepair(repair)) =>
 
         val pivotInstr =
-          Pivot(CPath.Identity, shiftStatus, ShiftType.toParseType(shiftType))
+          Pivot(shiftStatus, ShiftType.toParseType(shiftType))
 
         val iread =
           IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ pivotInstr)))

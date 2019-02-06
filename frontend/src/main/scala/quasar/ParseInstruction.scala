@@ -57,7 +57,7 @@ object ParseInstruction {
    *
    * No values outside of the pivot locus should be retained.
    */
-  final case class Pivot(path: CPath, status: IdStatus, structure: CompositeParseType)
+  final case class Pivot(status: IdStatus, structure: CompositeParseType)
       extends FocusedParseInstruction
 
   /**
@@ -79,7 +79,7 @@ object ParseInstruction {
     Equal.equal {
       case (Wrap(p1, n1), Wrap(p2, n2)) => p1 === p2 && n1 === n2
       case (Mask(m1), Mask(m2)) => m1 === m2
-      case (Pivot(p1, s1, t1), Pivot(p2, s2, t2)) => p1 === p2 && s1 === s2 && t1 === t2
+      case (Pivot(s1, t1), Pivot(s2, t2)) => s1 === s2 && t1 === t2
       case (Project(p1), Project(p2)) => p1 === p2
       case (_, _) => false
     }
@@ -96,8 +96,7 @@ object ParseInstruction {
     Show.show {
       case Wrap(p, n) => Cord("Wrap(") ++ p.show ++ Cord(", ") ++ n.show ++ Cord(")")
       case Mask(m) => Cord("Mask(") ++ m.show ++ Cord(")")
-      case Pivot(p, s, t) =>
-        Cord("Pivot(") ++ p.show ++ Cord(", ") ++ s.show ++ Cord(", ") ++ t.show  ++ Cord(")")
+      case Pivot(s, t) => Cord("Pivot(") ++ s.show ++ Cord(", ") ++ t.show  ++ Cord(")")
       case Project(p) => Cord("Project(") ++ p.show ++ Cord(")")
     }
 

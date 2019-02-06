@@ -880,7 +880,7 @@ object ParseInstructionSpec {
     protected final val Pivot = ParseInstruction.Pivot
 
     "pivot" should {
-      "shift an array at identity" >> {
+      "shift an array" >> {
         val input = ldjson("""
           [1, 2, 3]
           [4, 5, 6]
@@ -907,7 +907,7 @@ object ParseInstructionSpec {
             13
             """)
 
-          input must pivotInto(".", IdStatus.ExcludeId, ParseType.Array)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ParseType.Array)(expected)
         }
 
         "IdOnly" >> {
@@ -927,7 +927,7 @@ object ParseInstructionSpec {
             1
             """)
 
-          input must pivotInto(".", IdStatus.IdOnly, ParseType.Array)(expected)
+          input must pivotInto(IdStatus.IdOnly, ParseType.Array)(expected)
         }
 
         "IncludeId" >> {
@@ -947,154 +947,11 @@ object ParseInstructionSpec {
             [1, 13]
             """)
 
-          input must pivotInto(".", IdStatus.IncludeId, ParseType.Array)(expected)
+          input must pivotInto(IdStatus.IncludeId, ParseType.Array)(expected)
         }
       }
 
-      "shift an array at .a.b (with no surrounding structure)" >> {
-        val input = ldjson("""
-          { "a": { "b": [1, 2, 3] } }
-          { "a": { "b": [4, 5, 6] } }
-          { "a": { "b": [7, 8, 9, 10] } }
-          { "a": { "b": [11] } }
-          { "a": { "b": [] } }
-          { "a": { "b": [12, 13] } }
-          """)
-
-        "ExcludeId" >> {
-          val expected = ldjson("""
-            { "a": { "b": 1 } }
-            { "a": { "b": 2 } }
-            { "a": { "b": 3 } }
-            { "a": { "b": 4 } }
-            { "a": { "b": 5 } }
-            { "a": { "b": 6 } }
-            { "a": { "b": 7 } }
-            { "a": { "b": 8 } }
-            { "a": { "b": 9 } }
-            { "a": { "b": 10 } }
-            { "a": { "b": 11 } }
-            { "a": { "b": 12 } }
-            { "a": { "b": 13 } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.ExcludeId, ParseType.Array)(expected)
-        }
-
-        "IdOnly" >> {
-          val expected = ldjson("""
-            { "a": { "b": 0 } }
-            { "a": { "b": 1 } }
-            { "a": { "b": 2 } }
-            { "a": { "b": 0 } }
-            { "a": { "b": 1 } }
-            { "a": { "b": 2 } }
-            { "a": { "b": 0 } }
-            { "a": { "b": 1 } }
-            { "a": { "b": 2 } }
-            { "a": { "b": 3 } }
-            { "a": { "b": 0 } }
-            { "a": { "b": 0 } }
-            { "a": { "b": 1 } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.IdOnly, ParseType.Array)(expected)
-        }
-
-        "IncludeId" >> {
-          val expected = ldjson("""
-            { "a": { "b": [0, 1] } }
-            { "a": { "b": [1, 2] } }
-            { "a": { "b": [2, 3] } }
-            { "a": { "b": [0, 4] } }
-            { "a": { "b": [1, 5] } }
-            { "a": { "b": [2, 6] } }
-            { "a": { "b": [0, 7] } }
-            { "a": { "b": [1, 8] } }
-            { "a": { "b": [2, 9] } }
-            { "a": { "b": [3, 10] } }
-            { "a": { "b": [0, 11] } }
-            { "a": { "b": [0, 12] } }
-            { "a": { "b": [1, 13] } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.IncludeId, ParseType.Array)(expected)
-        }
-      }
-
-     "shift an array at .a[0] (with no surrounding structure)" >> {
-        val input = ldjson("""
-          { "a": [ [1, 2, 3] ] }
-          { "a": [ [4, 5, 6] ] }
-          { "a": [ [7, 8, 9, 10] ] }
-          { "a": [ [11] ] }
-          { "a": [ [] ] }
-          { "a": [ [12, 13] ] }
-          """)
-
-        "ExcludeId" >> {
-          val expected = ldjson("""
-            { "a": [ 1 ] }
-            { "a": [ 2 ] }
-            { "a": [ 3 ] }
-            { "a": [ 4 ] }
-            { "a": [ 5 ] }
-            { "a": [ 6 ] }
-            { "a": [ 7 ] }
-            { "a": [ 8 ] }
-            { "a": [ 9 ] }
-            { "a": [ 10 ] }
-            { "a": [ 11 ] }
-            { "a": [ 12 ] }
-            { "a": [ 13 ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.ExcludeId, ParseType.Array)(expected)
-        }
-
-        "IdOnly" >> {
-          val expected = ldjson("""
-            { "a": [ 0 ] }
-            { "a": [ 1 ] }
-            { "a": [ 2 ] }
-            { "a": [ 0 ] }
-            { "a": [ 1 ] }
-            { "a": [ 2 ] }
-            { "a": [ 0 ] }
-            { "a": [ 1 ] }
-            { "a": [ 2 ] }
-            { "a": [ 3 ] }
-            { "a": [ 0 ] }
-            { "a": [ 0 ] }
-            { "a": [ 1 ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.IdOnly, ParseType.Array)(expected)
-        }
-
-        "IncludeId" >> {
-          val expected = ldjson("""
-            { "a": [ [0, 1] ] }
-            { "a": [ [1, 2] ] }
-            { "a": [ [2, 3] ] }
-            { "a": [ [0, 4] ] }
-            { "a": [ [1, 5] ] }
-            { "a": [ [2, 6] ] }
-            { "a": [ [0, 7] ] }
-            { "a": [ [1, 8] ] }
-            { "a": [ [2, 9] ] }
-            { "a": [ [3, 10] ] }
-            { "a": [ [0, 11] ] }
-            { "a": [ [0, 12] ] }
-            { "a": [ [1, 13] ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.IncludeId, ParseType.Array)(expected)
-        }
-      }
-
-
-      "shift an object at identity" >> {
+      "shift an object" >> {
         val input = ldjson("""
           { "a": 1, "b": 2, "c": 3 }
           { "d": 4, "e": 5, "f": 6 }
@@ -1121,7 +978,7 @@ object ParseInstructionSpec {
             13
             """)
 
-          input must pivotInto(".", IdStatus.ExcludeId, ParseType.Object)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ParseType.Object)(expected)
         }
 
         "IdOnly" >> {
@@ -1141,7 +998,7 @@ object ParseInstructionSpec {
             "m"
             """)
 
-          input must pivotInto(".", IdStatus.IdOnly, ParseType.Object)(expected)
+          input must pivotInto(IdStatus.IdOnly, ParseType.Object)(expected)
         }
 
         "IncludeId" >> {
@@ -1161,162 +1018,8 @@ object ParseInstructionSpec {
             ["m", 13]
             """)
 
-          input must pivotInto(".", IdStatus.IncludeId, ParseType.Object)(expected)
+          input must pivotInto(IdStatus.IncludeId, ParseType.Object)(expected)
         }
-      }
-
-      "shift an object at .a.b (no surrounding structure)" >> {
-        val input = ldjson("""
-          { "a": { "b": { "a": 1, "b": 2, "c": 3 } } }
-          { "a": { "b": { "d": 4, "e": 5, "f": 6 } } }
-          { "a": { "b": { "g": 7, "h": 8, "i": 9, "j": 10 } } }
-          { "a": { "b": { "k": 11 } } }
-          { "a": { "b": {} } }
-          { "a": { "b": { "l": 12, "m": 13 } } }
-          """)
-
-        "ExcludeId" >> {
-          val expected = ldjson("""
-            { "a": { "b": 1 } }
-            { "a": { "b": 2 } }
-            { "a": { "b": 3 } }
-            { "a": { "b": 4 } }
-            { "a": { "b": 5 } }
-            { "a": { "b": 6 } }
-            { "a": { "b": 7 } }
-            { "a": { "b": 8 } }
-            { "a": { "b": 9 } }
-            { "a": { "b": 10 } }
-            { "a": { "b": 11 } }
-            { "a": { "b": 12 } }
-            { "a": { "b": 13 } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.ExcludeId, ParseType.Object)(expected)
-        }
-
-        "IdOnly" >> {
-          val expected = ldjson("""
-            { "a": { "b": "a" } }
-            { "a": { "b": "b" } }
-            { "a": { "b": "c" } }
-            { "a": { "b": "d" } }
-            { "a": { "b": "e" } }
-            { "a": { "b": "f" } }
-            { "a": { "b": "g" } }
-            { "a": { "b": "h" } }
-            { "a": { "b": "i" } }
-            { "a": { "b": "j" } }
-            { "a": { "b": "k" } }
-            { "a": { "b": "l" } }
-            { "a": { "b": "m" } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.IdOnly, ParseType.Object)(expected)
-        }
-
-        "IncludeId" >> {
-          val expected = ldjson("""
-            { "a": { "b": ["a", 1] } }
-            { "a": { "b": ["b", 2] } }
-            { "a": { "b": ["c", 3] } }
-            { "a": { "b": ["d", 4] } }
-            { "a": { "b": ["e", 5] } }
-            { "a": { "b": ["f", 6] } }
-            { "a": { "b": ["g", 7] } }
-            { "a": { "b": ["h", 8] } }
-            { "a": { "b": ["i", 9] } }
-            { "a": { "b": ["j", 10] } }
-            { "a": { "b": ["k", 11] } }
-            { "a": { "b": ["l", 12] } }
-            { "a": { "b": ["m", 13] } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.IncludeId, ParseType.Object)(expected)
-        }
-      }
-
-      "shift an object at .a[0] (no surrounding structure)" >> {
-        val input = ldjson("""
-          { "a": [ { "a": 1, "b": 2, "c": 3 } ] }
-          { "a": [ { "d": 4, "e": 5, "f": 6 } ] }
-          { "a": [ { "g": 7, "h": 8, "i": 9, "j": 10 } ] }
-          { "a": [ { "k": 11 } ] }
-          { "a": [ {} ] }
-          { "a": [ { "l": 12, "m": 13 } ] }
-          """)
-
-        "ExcludeId" >> {
-          val expected = ldjson("""
-            { "a": [ 1 ] }
-            { "a": [ 2 ] }
-            { "a": [ 3 ] }
-            { "a": [ 4 ] }
-            { "a": [ 5 ] }
-            { "a": [ 6 ] }
-            { "a": [ 7 ] }
-            { "a": [ 8 ] }
-            { "a": [ 9 ] }
-            { "a": [ 10 ] }
-            { "a": [ 11 ] }
-            { "a": [ 12 ] }
-            { "a": [ 13 ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.ExcludeId, ParseType.Object)(expected)
-        }
-
-        "IdOnly" >> {
-          val expected = ldjson("""
-            { "a": [ "a" ] }
-            { "a": [ "b" ] }
-            { "a": [ "c" ] }
-            { "a": [ "d" ] }
-            { "a": [ "e" ] }
-            { "a": [ "f" ] }
-            { "a": [ "g" ] }
-            { "a": [ "h" ] }
-            { "a": [ "i" ] }
-            { "a": [ "j" ] }
-            { "a": [ "k" ] }
-            { "a": [ "l" ] }
-            { "a": [ "m" ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.IdOnly, ParseType.Object)(expected)
-        }
-
-        "IncludeId" >> {
-          val expected = ldjson("""
-            { "a": [ ["a", 1] ] }
-            { "a": [ ["b", 2] ] }
-            { "a": [ ["c", 3] ] }
-            { "a": [ ["d", 4] ] }
-            { "a": [ ["e", 5] ] }
-            { "a": [ ["f", 6] ] }
-            { "a": [ ["g", 7] ] }
-            { "a": [ ["h", 8] ] }
-            { "a": [ ["i", 9] ] }
-            { "a": [ ["j", 10] ] }
-            { "a": [ ["k", 11] ] }
-            { "a": [ ["l", 12] ] }
-            { "a": [ ["m", 13] ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.IncludeId, ParseType.Object)(expected)
-        }
-      }
-
-      "shift an object under .shifted with IncludeId and only one field" in {
-        val input = ldjson("""
-          { "shifted": { "shifted1": { "foo": "bar" } } }
-          """)
-
-        val expected = ldjson("""
-          { "shifted": ["shifted1", { "foo": "bar" }] }
-          """)
-
-        input must pivotInto(".shifted", IdStatus.IncludeId, ParseType.Object)(expected)
       }
 
       "preserve empty arrays as values of an array pivot" in {
@@ -1336,7 +1039,7 @@ object ParseInstructionSpec {
           "four"
         """)
 
-        input must pivotInto(".", IdStatus.ExcludeId, ParseType.Array)(expected)
+        input must pivotInto(IdStatus.ExcludeId, ParseType.Array)(expected)
       }
 
       "preserve empty objects as values of an object pivot" in {
@@ -1356,20 +1059,19 @@ object ParseInstructionSpec {
           "four"
         """)
 
-        input must pivotInto(".", IdStatus.ExcludeId, ParseType.Object)(expected)
+        input must pivotInto(IdStatus.ExcludeId, ParseType.Object)(expected)
       }
     }
 
     def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream
 
     def pivotInto(
-        path: String,
         idStatus: IdStatus,
         structure: CompositeParseType)(
         expected: JsonStream)
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>
-        evalPivot(Pivot(CPath.parse(path), idStatus, structure), str)
+        evalPivot(Pivot(idStatus, structure), str)
       }
   }
 
@@ -1452,11 +1154,11 @@ object ParseInstructionSpec {
 
         val targets = Map(
           (CPathField("a1"),
-            (CPathField("a0"), List(Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array)))),
+            (CPathField("a0"), List(Pivot(IdStatus.ExcludeId, ParseType.Array)))),
           (CPathField("b1"),
             (CPathField("b0"), Nil)),
           (CPathField("c1"),
-            (CPathField("c0"), List(Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Object)))))
+            (CPathField("c0"), List(Pivot(IdStatus.ExcludeId, ParseType.Object)))))
 
         input must cartesianInto(targets)(expected)
       }
@@ -1491,18 +1193,18 @@ object ParseInstructionSpec {
         val targets = Map(
           (CPathField("y"),
             (CPathField("a"), List(
-              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array),
+              Pivot(IdStatus.ExcludeId, ParseType.Array),
               Project(CPath.parse("x0")),
               Project(CPath.parse("y0")),
-              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Object)))),
+              Pivot(IdStatus.ExcludeId, ParseType.Object)))),
           (CPathField("z"),
             (CPathField("a"), List(
-              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array),
+              Pivot(IdStatus.ExcludeId, ParseType.Array),
               Project(CPath.parse("x1")),
-              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array)))),
+              Pivot(IdStatus.ExcludeId, ParseType.Array)))),
           (CPathField("b"),
             (CPathField("b"), List(
-              Pivot(CPath.Identity, IdStatus.IdOnly, ParseType.Object)))),
+              Pivot(IdStatus.IdOnly, ParseType.Object)))),
           (CPathField("c"),
             (CPathField("c"), Nil)))
 
@@ -1531,11 +1233,11 @@ object ParseInstructionSpec {
 
           (CPathField("ba"), (CPathField("b"), List(
             Mask(Map(CPath.Identity -> Set(ParseType.Array))),
-            Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array)))),
+            Pivot(IdStatus.ExcludeId, ParseType.Array)))),
 
           (CPathField("bm"), (CPathField("b"), List(
             Mask(Map(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Object)))))
+            Pivot(IdStatus.ExcludeId, ParseType.Object)))))
 
         input must cartesianInto(targets)(expected)
       }
