@@ -260,7 +260,7 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
     _ match {
       case Map(Embed(Res(a, readStatus, instrs)), WrappedRec(p)) =>
         val wrappedInstrs =
-          p.foldRight(instrs)((s, ins) => ins :+ Wrap(CPath.Identity, s))
+          p.foldRight(instrs)((s, ins) => ins :+ Wrap(s))
 
         IR[T[F]](Const(InterpretedRead(a, readStatus, wrappedInstrs)))
 

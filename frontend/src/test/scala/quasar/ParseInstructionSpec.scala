@@ -149,7 +149,7 @@ object ParseInstructionSpec {
     protected final val Wrap = ParseInstruction.Wrap
 
     "wrap" should {
-      "nest scalars at identity" in {
+      "nest scalars" in {
         val input = ldjson("""
           1
           "hi"
@@ -162,10 +162,10 @@ object ParseInstructionSpec {
           { "foo": true }
           """)
 
-        input must wrapInto(".", "foo")(expected)
+        input must wrapInto("foo")(expected)
       }
 
-      "nest vectors at identity" in {
+      "nest vectors" in {
         val input = ldjson("""
           [1, 2, 3]
           { "a": "hi", "b": { "c": null } }
@@ -178,154 +178,17 @@ object ParseInstructionSpec {
           { "bar": [{ "d": {} }] }
           """)
 
-        input must wrapInto(".", "bar")(expected)
-      }
-
-      "nest scalars at .a.b" in {
-        val input = ldjson("""
-          { "a": { "b": 1 } }
-          { "a": { "b": "hi" } }
-          { "a": { "b": true } }
-          """)
-
-        val expected = ldjson("""
-          { "a": { "b": { "foo": 1 } } }
-          { "a": { "b": { "foo": "hi" } } }
-          { "a": { "b": { "foo": true } } }
-          """)
-
-        input must wrapInto(".a.b", "foo")(expected)
-      }
-
-      "nest scalars at .a.b keeping rows excluding the target" in {
-        val input = ldjson("""
-          { "a": { "b": 1 } }
-          { "a": { "c": 2 } }
-          { "a": { "b": "hi" } }
-          { "a": { "d": "bye" } }
-          {}
-          []
-          42
-          """)
-
-        val expected = ldjson("""
-          { "a": { "b": { "foo": 1 } } }
-          { "a": { "c": 2 } }
-          { "a": { "b": { "foo": "hi" } } }
-          { "a": { "d": "bye" } }
-          {}
-          []
-          42
-          """)
-
-        input must wrapInto(".a.b", "foo")(expected)
-      }
-
-      "nest scalars at .a[1] with surrounding structure" in {
-        val input = ldjson("""
-          { "a": [null, 1, "nada"] }
-          { "a": [[], "hi"] }
-          { "a": [null, true, "nada"] }
-          """)
-
-        val expected = ldjson("""
-          { "a": [null, { "bin": 1 }, "nada"] }
-          { "a": [[], { "bin": "hi" }] }
-          { "a": [null, { "bin": true }, "nada"] }
-          """)
-
-        input must wrapInto(".a[1]", "bin")(expected)
-      }
-
-      "nest scalars at .a[2] with surrounding structure keeping rows excluding the target" in {
-        val input = ldjson("""
-          { "a": [null, 1, "nada"] }
-          { "a": [[], "hi"] }
-          { "a": [null, true, "nada", "nix", "nil"] }
-          { "a": [] }
-          {}
-          []
-          42
-          """)
-
-        val expected = ldjson("""
-          { "a": [null, 1, { "bin": "nada" }] }
-          { "a": [[], "hi"] }
-          { "a": [null, true, { "bin": "nada" }, "nix", "nil"] }
-          { "a": [] }
-          {}
-          []
-          42
-          """)
-
-        input must wrapInto(".a[2]", "bin")(expected)
-      }
-
-      "nest vectors at .a.b" in {
-        val input = ldjson("""
-          { "a": { "b": [1, 2, 3] } }
-          { "a": { "b": { "a": "hi", "b": { "c": null } } } }
-          { "a": { "b": [{ "d": {} }] } }
-          """)
-
-        val expected = ldjson("""
-          { "a": { "b": { "bar": [1, 2, 3] } } }
-          { "a": { "b": { "bar": { "a": "hi", "b": { "c": null } } } } }
-          { "a": { "b": { "bar": [{ "d": {} }] } } }
-          """)
-
-        input must wrapInto(".a.b", "bar")(expected)
-      }
-
-      "retain surrounding structure with scalars at .a.b" in {
-        val input = ldjson("""
-          { "z": null, "a": { "b": 1 }, "d": false, "b": [] }
-          { "z": [], "a": { "b": "hi" }, "d": "to be or not to be", "b": { "a": 321} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "b": true }, "d": {} }
-          """)
-
-        val expected = ldjson("""
-          { "z": null, "a": { "b": { "qux": 1 } }, "d": false, "b": [] }
-          { "z": [], "a": { "b": { "qux": "hi" } }, "d": "to be or not to be", "b": { "a": 321} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "b": { "qux": true } }, "d": {} }
-          """)
-
-        input must wrapInto(".a.b", "qux")(expected)
-      }
-
-      "retain surrounding structure with scalars at .a.b keeping rows excluding the target" in {
-        val input = ldjson("""
-          { "z": null, "a": { "b": 1 }, "d": false, "b": [] }
-          { "z": [], "a": { "b": "hi" }, "d": "to be or not to be", "b": { "a": 321} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "c": null }, "d": {} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "b": true }, "d": {} }
-          {}
-          []
-          42
-          """)
-
-        val expected = ldjson("""
-          { "z": null, "a": { "b": { "qux": 1 } }, "d": false, "b": [] }
-          { "z": [], "a": { "b": { "qux": "hi" } }, "d": "to be or not to be", "b": { "a": 321} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "c": null }, "d": {} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "b": { "qux": true } }, "d": {} }
-          {}
-          []
-          42
-          """)
-
-        input must wrapInto(".a.b", "qux")(expected)
+        input must wrapInto("bar")(expected)
       }
     }
 
     def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream
 
     def wrapInto(
-        path: String,
         name: String)(
         expected: JsonStream)
         : Matcher[JsonStream] =
-      bestSemanticEqual(expected) ^^ { str: JsonStream => evalWrap(Wrap(CPath.parse(path), name), str)}
+      bestSemanticEqual(expected) ^^ { str: JsonStream => evalWrap(Wrap(name), str)}
   }
 
   trait ProjectSpec extends JsonSpec {

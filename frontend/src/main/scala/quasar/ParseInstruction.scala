@@ -35,10 +35,10 @@ sealed trait FocusedParseInstruction extends ParseInstruction
 object ParseInstruction {
 
   /**
-   * Wraps the provided `path` into an object with key `name`, thus adding
-   * another layer of structure. All other paths are retained.
+   * Wraps the row into an object with key `name`, thus adding
+   * another layer of structure.
    */
-  final case class Wrap(path: CPath, name: String) extends FocusedParseInstruction
+  final case class Wrap(name: String) extends FocusedParseInstruction
 
   /**
    *`Masks` represents the disjunction of the provided `masks`. An empty map indicates
@@ -77,7 +77,7 @@ object ParseInstruction {
 
   implicit val focusedParseInstructionEqual: Equal[FocusedParseInstruction] =
     Equal.equal {
-      case (Wrap(p1, n1), Wrap(p2, n2)) => p1 === p2 && n1 === n2
+      case (Wrap(n1), Wrap(n2)) => n1 === n2
       case (Mask(m1), Mask(m2)) => m1 === m2
       case (Pivot(s1, t1), Pivot(s2, t2)) => s1 === s2 && t1 === t2
       case (Project(p1), Project(p2)) => p1 === p2
@@ -94,7 +94,7 @@ object ParseInstruction {
 
   implicit val focusedParseInstructionShow: Show[FocusedParseInstruction] =
     Show.show {
-      case Wrap(p, n) => Cord("Wrap(") ++ p.show ++ Cord(", ") ++ n.show ++ Cord(")")
+      case Wrap(n) => Cord("Wrap(") ++ n.show ++ Cord(")")
       case Mask(m) => Cord("Mask(") ++ m.show ++ Cord(")")
       case Pivot(s, t) => Cord("Pivot(") ++ s.show ++ Cord(", ") ++ t.show  ++ Cord(")")
       case Project(p) => Cord("Project(") ++ p.show ++ Cord(")")

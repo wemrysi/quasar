@@ -44,7 +44,7 @@ object RValueCartesianSpec extends JsonSpec {
 
   "RValue Cartesian interpreter" should {
 
-    val pivot = Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array)
+    val pivot = Pivot(IdStatus.ExcludeId, ParseType.Array)
 
     val cartouches = Map(
       (CPathField("a_"), (CPathField("a"), List(pivot))),

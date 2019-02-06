@@ -211,33 +211,8 @@ object RValueParseInstructionInterpreter {
       case _ => None
     }
 
-  def interpretWrap(wrap: Wrap, rvalue: RValue): RValue = {
-
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def inner(remaining: List[CPathNode], rvalue: RValue): RValue =
-      (remaining, rvalue) match {
-        case (Nil, rv) => RObject((wrap.name, rv))
-
-        case (CPathField(field) :: tail, obj @ RObject(fields)) =>
-          fields.get(field).fold(obj)(target =>
-            RObject(fields.updated(field, inner(tail, target))))
-
-        case (CPathIndex(idx) :: tail, arr @ RArray(elems)) =>
-          if (idx < 0) {
-            arr
-          } else {
-            val result: Option[RValue] = elems.toStream.toZipper flatMap { orig =>
-              orig.move(idx).map(moved =>
-                RArray(moved.update(inner(tail, moved.focus)).toStream.toList))
-            }
-            result.getOrElse(arr)
-          }
-
-        case (_, rv) => rv
-      }
-
-    inner(wrap.path.nodes, rvalue)
-  }
+  def interpretWrap(wrap: Wrap, rvalue: RValue): RValue =
+    RObject(wrap.name -> rvalue)
 
   ////
 
@@ -288,7 +263,7 @@ object RValueParseInstructionInterpreter {
       case instr @ Project(_) =>
         interpretProject(instr, rvalue).iterator
 
-      case instr @ Wrap(_, _) =>
+      case instr @ Wrap(_) =>
         Iterator(interpretWrap(instr, rvalue))
     }
 
