@@ -169,76 +169,40 @@ object RValueParseInstructionInterpreter {
     inner(input, rvalue)
   }
 
-  def interpretPivot(pivot: Pivot, rvalue: RValue): Iterator[RValue] = {
-
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def inner(remaining: List[CPathNode], rvalue: RValue): Iterator[RValue] =
-      remaining match {
-        // perform the pivot
-        case Nil => {
-          (rvalue, pivot.structure) match {
-
-            // pivot object
-            case (RObject(fields), ParseType.Object) =>
-              pivot.status match {
-                case IdOnly =>
-                  fields.iterator.map(kv => CString(kv._1))
-                case IncludeId => // the qscript expects the results to be returned in an array
-                  fields.iterator.map(kv => RArray(CString(kv._1), kv._2))
-                case ExcludeId =>
-                  fields.valuesIterator
-              }
-
-            // pivot array
-            case (RArray(elems), ParseType.Array) =>
-              pivot.status match {
-                case IdOnly =>
-                  elems.iterator.zipWithIndex.map(t => CLong(t._2.toLong))
-                case IncludeId => // the qscript expects the results to be returned in an array
-                  elems.iterator.zipWithIndex map {
-                    case (elem, idx) => RArray(CLong(idx.toLong), elem)
-                  }
-                case ExcludeId => elems.iterator
-              }
-
-            // pivot empty object drops the row
-            case (CEmptyObject, ParseType.Object) => Iterator.empty
-
-            // pivot empty array drops the row
-            case (CEmptyArray, ParseType.Array) => Iterator.empty
-
-            case (v, t) =>
-              scala.sys.error(s"No surrounding structure allowed when pivoting. Received: ${(v, t)}")
-          }
+  def interpretPivot(pivot: Pivot, rvalue: RValue): Iterator[RValue] =
+    (rvalue, pivot.structure) match {
+      // pivot object
+      case (RObject(fields), ParseType.Object) =>
+        pivot.status match {
+          case IdOnly =>
+            fields.iterator.map(kv => CString(kv._1))
+          case IncludeId => // the qscript expects the results to be returned in an array
+            fields.iterator.map(kv => RArray(CString(kv._1), kv._2))
+          case ExcludeId =>
+            fields.valuesIterator
         }
 
-        // recurse on an object deref
-        case CPathField(field) :: tail => rvalue match {
-          case obj @ RObject(fields) =>
-            fields.toList match {
-              case (`field`, target) :: Nil =>
-                inner(tail, target).map(v => RObject((field, v)))
-              case _ =>
-                scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $obj")
+      // pivot array
+      case (RArray(elems), ParseType.Array) =>
+        pivot.status match {
+          case IdOnly =>
+            elems.iterator.zipWithIndex.map(t => CLong(t._2.toLong))
+          case IncludeId => // the qscript expects the results to be returned in an array
+            elems.iterator.zipWithIndex map {
+              case (elem, idx) => RArray(CLong(idx.toLong), elem)
             }
-          case rv =>
-            scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $rv")
+          case ExcludeId => elems.iterator
         }
 
-        // recurse on an array deref
-        case CPathIndex(0) :: tail => rvalue match {
-          case arr @ RArray(target :: Nil) =>
-            inner(tail, target).map(v => RArray(List(v)))
-          case rv =>
-            scala.sys.error(s"No surrounding structure allowed when pivoting. Received: $rv")
-        }
+      // pivot empty object drops the row
+      case (CEmptyObject, ParseType.Object) => Iterator.empty
 
-        case nodes =>
-          scala.sys.error(s"Cannot pivot through $nodes")
-      }
+      // pivot empty array drops the row
+      case (CEmptyArray, ParseType.Array) => Iterator.empty
 
-    inner(pivot.path.nodes, rvalue)
-  }
+      case (v, t) =>
+        scala.sys.error(s"Invalid pivot input: ${(v, t)}")
+    }
 
   def interpretProject(project: Project, rvalue: RValue): Option[RValue] =
     project.path.nodes.foldLeftM(rvalue) {
@@ -318,7 +282,7 @@ object RValueParseInstructionInterpreter {
       case instr @ Mask(_) =>
         interpretMask(instr, rvalue).iterator
 
-      case instr @ Pivot(_, _, _) =>
+      case instr @ Pivot(_, _) =>
         interpretPivot(instr, rvalue)
 
       case instr @ Project(_) =>

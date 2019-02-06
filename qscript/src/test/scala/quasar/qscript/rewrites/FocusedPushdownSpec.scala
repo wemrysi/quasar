@@ -95,7 +95,7 @@ object FocusedPushdownSpec extends Qspec {
               ExcludeId,
               List(
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(CPath.Identity, IncludeId, ParseType.Object),
+                Pivot(IncludeId, ParseType.Object),
                 Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
@@ -120,7 +120,7 @@ object FocusedPushdownSpec extends Qspec {
             ExcludeId,
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-              Pivot(CPath.Identity, IdOnly, ParseType.Object),
+              Pivot(IdOnly, ParseType.Object),
               Wrap(CPath.Identity, "k1")))
 
         focusedPushdown(initial) must equal(expected)
@@ -142,7 +142,7 @@ object FocusedPushdownSpec extends Qspec {
             ExcludeId,
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-              Pivot(CPath.Identity, ExcludeId, ParseType.Object),
+              Pivot(ExcludeId, ParseType.Object),
               Wrap(CPath.Identity, "v1")))
 
         focusedPushdown(initial) must equal(expected)
@@ -168,7 +168,7 @@ object FocusedPushdownSpec extends Qspec {
             ExcludeId,
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-              Pivot(CPath.Identity, ExcludeId, ParseType.Object),
+              Pivot(ExcludeId, ParseType.Object),
               Wrap(CPath.Identity, "v1"))),
           recFuncE.Constant(ejs.bool(true)))
 
@@ -195,7 +195,7 @@ object FocusedPushdownSpec extends Qspec {
               List(
                 Project(CPath.Identity \ "xyz"),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(CPath.Identity, IncludeId, ParseType.Object),
+                Pivot(IncludeId, ParseType.Object),
                 Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
@@ -229,7 +229,7 @@ object FocusedPushdownSpec extends Qspec {
               List(
                 Project(CPath.parse(".aaa.bbb.ccc")),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(CPath.Identity, IncludeId, ParseType.Object),
+                Pivot(IncludeId, ParseType.Object),
                 Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
@@ -264,7 +264,7 @@ object FocusedPushdownSpec extends Qspec {
               List(
                 Project(CPath.parse(".aaa[42].ccc")),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(CPath.Identity, IncludeId, ParseType.Object),
+                Pivot(IncludeId, ParseType.Object),
                 Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
@@ -298,7 +298,7 @@ object FocusedPushdownSpec extends Qspec {
               List(
                 Project(CPath.parse(".[17][42].ccc")),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(CPath.Identity, IncludeId, ParseType.Object),
+                Pivot(IncludeId, ParseType.Object),
                 Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
@@ -323,7 +323,7 @@ object FocusedPushdownSpec extends Qspec {
           IncludeId,
           List(
             Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(CPath.Identity, IncludeId, ParseType.Object)))
+            Pivot(IncludeId, ParseType.Object)))
 
       focusedPushdown(initial) must_= expected
     }
@@ -344,7 +344,7 @@ object FocusedPushdownSpec extends Qspec {
           IdOnly,
           List(
             Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(CPath.Identity, IncludeId, ParseType.Object)))
+            Pivot(IncludeId, ParseType.Object)))
 
       focusedPushdown(initial) must_= expected
     }
@@ -430,10 +430,10 @@ object FocusedPushdownSpec extends Qspec {
           List(
             Project(CPath.parse(".aaa.bbb.ccc")),
             Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(CPath.Identity, IncludeId, ParseType.Object),
+            Pivot(IncludeId, ParseType.Object),
             Project(CPath.parse(".[1].ddd")),
             Mask(SMap(CPath.Identity -> Set(ParseType.Array))),
-            Pivot(CPath.Identity, ExcludeId, ParseType.Array),
+            Pivot(ExcludeId, ParseType.Array),
             Wrap(CPath.Identity, "result")))
 
       focusedPushdown(initial) must_= expected
