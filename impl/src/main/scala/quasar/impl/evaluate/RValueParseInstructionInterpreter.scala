@@ -22,8 +22,8 @@ import cats.effect.Concurrent
 
 import quasar.{FocusedParseInstruction, IdStatus, ParseInstruction, ParseType}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
-import quasar.ParseInstruction.{Cartesian, Ids, Mask, Pivot, Project, Wrap}
-import quasar.common.{CPath, CPathField, CPathIndex, CPathNode}
+import quasar.ParseInstruction.{Cartesian, Mask, Pivot, Project, Wrap}
+import quasar.common.{CPathField, CPathIndex, CPathNode}
 import quasar.common.data._
 
 import scala.Predef.identity
@@ -45,21 +45,13 @@ object RValueParseInstructionInterpreter {
   def apply[F[_]: Concurrent](
       parallelism: Int,
       minUnit: Int,
+      idStatus: IdStatus,
       instructions: List[ParseInstruction])
       : Pipe[F, RValue, RValue] =
-    instructions match {
-      case Nil =>
-        identity[Stream[F, RValue]]
-
-      case Ids :: Project(CPath(CPathIndex(0))) :: t =>
-        interpretIdStatus(IdOnly) andThen interpret(parallelism, minUnit, t)
-
-      case Ids :: t =>
-        interpretIdStatus(IncludeId) andThen interpret(parallelism, minUnit, t)
-
-      case instrs =>
-        interpret(parallelism, minUnit, instrs)
-    }
+    if (instructions.isEmpty)
+      interpretIdStatus(idStatus)
+    else
+      interpretIdStatus(idStatus) andThen interpret(parallelism, minUnit, instructions)
 
   def interpretCartesian[F[_]: Concurrent](
       parallelism: Int,
@@ -323,9 +315,6 @@ object RValueParseInstructionInterpreter {
   private def interpretFocused1(fpi: FocusedParseInstruction, rvalue: RValue)
       : Iterator[RValue] =
     fpi match {
-      case Ids =>
-        scala.sys.error("Ids only allowed as the first instruction.")
-
       case instr @ Mask(_) =>
         interpretMask(instr, rvalue).iterator
 

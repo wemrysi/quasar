@@ -35,13 +35,6 @@ sealed trait FocusedParseInstruction extends ParseInstruction
 object ParseInstruction {
 
   /**
-   * Generates one unique identity per row. Creates a top-level array with
-   * the identities in the first component, the original values in the second.
-   * Just like `Pivot` with `IdStatus.IncludeId`.
-   */
-  case object Ids extends FocusedParseInstruction
-
-  /**
    * Wraps the provided `path` into an object with key `name`, thus adding
    * another layer of structure. All other paths are retained.
    */
@@ -55,13 +48,11 @@ object ParseInstruction {
   final case class Mask(masks: Map[CPath, Set[ParseType]]) extends FocusedParseInstruction
 
   /**
-   * Pivots the indices and keys out of arrays and objects, respectively,
-   * according to the provided structure, performing a full cross of all pivoted
-   * values.
+   * Pivots the indices and keys out of arrays and objects, respectively.
    *
-   * `idStatus` determines how the values is returned:
-   *   - `IncludeId` wraps the key/value pair in a two element array.
-   *   - `IdOnly` returns the value unwrapped.
+   * `idStatus` determines how values are returned:
+   *   - `IncludeId` wraps the id/value pair in a two element array.
+   *   - `IdOnly` returns the id unwrapped.
    *   - `ExcludeId` returns the value unwrapped.
    *
    * No values outside of the pivot locus should be retained.
@@ -86,7 +77,6 @@ object ParseInstruction {
 
   implicit val focusedParseInstructionEqual: Equal[FocusedParseInstruction] =
     Equal.equal {
-      case (Ids, Ids) => true
       case (Wrap(p1, n1), Wrap(p2, n2)) => p1 === p2 && n1 === n2
       case (Mask(m1), Mask(m2)) => m1 === m2
       case (Pivot(p1, s1, t1), Pivot(p2, s2, t2)) => p1 === p2 && s1 === s2 && t1 === t2
@@ -104,7 +94,6 @@ object ParseInstruction {
 
   implicit val focusedParseInstructionShow: Show[FocusedParseInstruction] =
     Show.show {
-      case Ids => Cord("Ids")
       case Wrap(p, n) => Cord("Wrap(") ++ p.show ++ Cord(", ") ++ n.show ++ Cord(")")
       case Mask(m) => Cord("Mask(") ++ m.show ++ Cord(")")
       case Pivot(p, s, t) =>
