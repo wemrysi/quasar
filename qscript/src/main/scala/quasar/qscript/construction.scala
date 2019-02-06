@@ -780,10 +780,12 @@ object construction {
         f,
         combine)))
 
-    def InterpretedRead[A](path: A,
-                           instructions: List[ParseInstruction])
-                           (implicit F: Injectable[Const[InterpretedRead[A], ?], F]): R =
-      embed(F.inject(Const(qscript.InterpretedRead(path, instructions))))
+    def InterpretedRead[A](
+        path: A,
+        idStatus: IdStatus,
+        instructions: List[ParseInstruction])
+        (implicit F: Injectable[Const[InterpretedRead[A], ?], F]): R =
+      embed(F.inject(Const(qscript.InterpretedRead(path, idStatus, instructions))))
 
     def Read[A](path: A,
                 idStatus: IdStatus)

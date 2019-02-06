@@ -18,13 +18,12 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{List, Option}
 
-import quasar.FocusedParseInstruction
+import quasar.{FocusedParseInstruction, IdStatus}
 import quasar.contrib.iota._
 import quasar.qscript.{InterpretedRead, Read}
 
 import scalaz._, Scalaz._
 
-// TODO: Unnecessary once we have `ParseInstructions` class
 object FocusedResource {
   def apply[A] = new PartiallyApplied[A]
 
@@ -33,14 +32,14 @@ object FocusedResource {
         implicit
         IR: Const[InterpretedRead[A], ?] :<<: F,
         R: Const[Read[A], ?] :<<: F)
-        : Option[(A, List[FocusedParseInstruction])] =
+        : Option[(A, IdStatus, List[FocusedParseInstruction])] =
       Resource[A].unapply(fb) flatMap {
-        case (a, instrs) =>
+        case (a, idStatus, instrs) =>
           val r = instrs traverse {
             case fpi: FocusedParseInstruction => some(fpi)
             case _ => none
           }
-          r.strengthL(a)
+          r.map((a, idStatus, _))
       }
   }
 }
