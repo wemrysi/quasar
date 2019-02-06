@@ -1746,24 +1746,33 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
   }
 
-  "namedProjections" should {
+  "inferred names" should {
     def inferred(s: String): ProjectionName =
       Inferred(s).right
+
+    def namesOf(projections: List[Proj[Fix[Sql]]]): List[ProjectionName] =
+      projectionNames(projections, None).toOption.toList.join.firsts
 
     "create unique names" >> {
       "when two fields have the same name" in {
         val query = sqlE"SELECT owner.name, car.name from owners as owner join cars as car on car.`_id` = owner.carId"
         val projections = query.project.asInstanceOf[Select[Fix[Sql]]].projections
-        projectionNames(projections, None) must beLike { case \/-(list) =>
-          list.map(_._1) must contain(allOf(inferred("name"), inferred("name0")))
-        }
+
+        namesOf(projections) must_=== List(inferred("name"), inferred("name0"))
       }
+
+      "when multiple flattened fields have the same name" in {
+        val query = sqlE"SELECT foo{:*}, foo{*:}, foo[:*], foo[*:] from bar"
+        val projections = query.project.asInstanceOf[Select[Fix[Sql]]].projections
+
+        namesOf(projections) must_=== List(inferred("foo"), inferred("foo0"), inferred("foo1"), inferred("foo2"))
+      }
+
       "when a field and an alias have the same name" in {
         val query = sqlE"SELECT owner.name, car.model as name from owners as owner join cars as car on car.`_id` = owner.carId"
         val projections = query.project.asInstanceOf[Select[Fix[Sql]]].projections
-        projectionNames(projections, None) must beLike { case \/-(list) =>
-          list.map(_._1) must contain(allOf(inferred("name0"), inferred("name")))
-        }
+
+        namesOf(projections) must_=== List(inferred("name0"), inferred("name"))
       }
     }
   }
