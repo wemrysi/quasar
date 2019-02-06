@@ -39,9 +39,9 @@ object RValueParseInstructionSpec extends ParseInstructionSpec {
 
   type JsonElement = RValue
 
-  def evalIds(stream: JsonStream): JsonStream =
+  def evalIds(idStatus: IdStatus, stream: JsonStream): JsonStream =
     Stream.emits(stream)
-      .through(Interpreter.interpretIdStatus(IdStatus.IncludeId))
+      .through(Interpreter.interpretIdStatus(idStatus))
       .compile.toList
 
   def evalMask(mask: Mask, stream: JsonStream): JsonStream =

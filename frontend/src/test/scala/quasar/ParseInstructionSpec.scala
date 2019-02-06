@@ -46,9 +46,65 @@ object ParseInstructionSpec {
    * changed.
    */
   trait IdsSpec extends JsonSpec {
-    protected final val Ids = ParseInstruction.Ids
+    import IdStatus.{ExcludeId, IdOnly, IncludeId}
 
-    "ids" should {
+    "ExcludeId" should {
+      "emit scalar rows unmodified" in {
+        val input = ldjson("""
+          1
+          "hi"
+          true
+          """)
+
+        input must interpretIdsAs(ExcludeId, input)
+      }
+
+      "emit vector rows unmodified" in {
+        val input = ldjson("""
+          [1, 2, 3]
+          { "a": "hi", "b": { "c": null } }
+          [{ "d": {} }]
+          """)
+
+        input must interpretIdsAs(ExcludeId, input)
+      }
+    }
+
+    "IdOnly" should {
+      "return monotonic integers for each scalar row" in {
+        val input = ldjson("""
+          1
+          "hi"
+          true
+          """)
+
+        val expected = ldjson("""
+          0
+          1
+          2
+          """)
+
+        input must interpretIdsAs(IdOnly, expected)
+      }
+
+      "return monotonic integers for each vector row" in {
+        val input = ldjson("""
+          [1, 2, 3]
+          { "a": "hi", "b": { "c": null } }
+          [{ "d": {} }]
+          """)
+
+        val expected = ldjson("""
+          0
+          1
+          2
+          """)
+
+        input must interpretIdsAs(IdOnly, expected)
+      }
+    }
+
+    "IncludeId" should {
       "wrap each scalar row in monotonic integers" in {
         val input = ldjson("""
           1
@@ -62,7 +118,7 @@ object ParseInstructionSpec {
           [2, true]
           """)
 
-        input must assignIdsTo(expected)
+        input must interpretIdsAs(IncludeId, expected)
       }
 
       "wrap each vector row in monotonic integers" in {
@@ -78,14 +134,14 @@ object ParseInstructionSpec {
           [2, [{ "d": {} }]]
           """)
 
-        input must assignIdsTo(expected)
+        input must interpretIdsAs(IncludeId, expected)
       }
     }
 
-    def evalIds(stream: JsonStream): JsonStream
+    def evalIds(idStatus: IdStatus, stream: JsonStream): JsonStream
 
-    def assignIdsTo(expected: JsonStream) : Matcher[JsonStream] =
-      bestSemanticEqual(expected) ^^ { str: JsonStream => evalIds(str) }
+    def interpretIdsAs(idStatus: IdStatus, expected: JsonStream) : Matcher[JsonStream] =
+      bestSemanticEqual(expected) ^^ { str: JsonStream => evalIds(idStatus, str) }
   }
 
   trait WrapSpec extends JsonSpec {

@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import quasar.ParseInstruction
 import quasar.api.resource.{ResourceName, ResourcePath}
+import quasar.common.CPath
 import quasar.common.data.RValue
 import quasar.connector.{CompressionScheme, ParsableType, QueryResult, ResourceError}
 import quasar.connector.ParsableType.JsonVariant
@@ -176,7 +177,7 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
 
   "error when any parse instructions" >>* {
     val withInstrs =
-      QueryResult.instructions.set(List(ParseInstruction.Ids))(parsedResult)
+      QueryResult.instructions.set(List(ParseInstruction.Project(CPath.Identity)))(parsedResult)
 
     resourceSchema(defaultCfg, (path, Left(withInstrs)), 1.hour)
       .attempt
