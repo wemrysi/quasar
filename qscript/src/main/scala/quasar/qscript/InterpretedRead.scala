@@ -16,24 +16,25 @@
 
 package quasar.qscript
 
-import slamdata.Predef.List
-import quasar.{ParseInstruction, RenderTree}
+import slamdata.Predef.{List, StringContext}
+import quasar.{IdStatus, ParseInstruction, RenderTree}
 
 import monocle.macros.Lenses
 import scalaz.{Equal, Show}
 import scalaz.std.list._
+import scalaz.std.option._
 import scalaz.std.tuple._
 import scalaz.syntax.show._
-import scalaz.syntax.std.option._
 
 @Lenses final case class InterpretedRead[A](
   path: A,
+  idStatus: IdStatus,
   instructions: List[ParseInstruction])
 
 object InterpretedRead {
 
   implicit def equal[A: Equal]: Equal[InterpretedRead[A]] =
-    Equal.equalBy(r => (r.path, r.instructions))
+    Equal.equalBy(r => (r.path, r.idStatus, r.instructions))
 
   implicit def show[A: Show]: Show[InterpretedRead[A]] =
     RenderTree.toShow
@@ -41,5 +42,5 @@ object InterpretedRead {
   implicit def renderTree[A: Show]: RenderTree[InterpretedRead[A]] =
     RenderTree.simple(
       List("InterpretedRead"),
-      r => (r.path.shows + ", " + r.instructions.shows).some)
+      r => some(s"${r.path.shows},  ${r.idStatus.shows}, ${r.instructions.shows}"))
 }

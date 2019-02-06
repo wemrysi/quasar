@@ -20,7 +20,7 @@ import slamdata.Predef.{Map => SMap, _}
 
 import quasar.{ParseType, Qspec}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
-import quasar.ParseInstruction.{Ids, Mask, Pivot, Project, Wrap}
+import quasar.ParseInstruction.{Mask, Pivot, Project, Wrap}
 import quasar.api.resource.ResourcePath
 import quasar.common.CPath
 import quasar.contrib.iota._
@@ -92,6 +92,7 @@ object FocusedPushdownSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[ResourcePath](
               path,
+              ExcludeId,
               List(
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
                 Pivot(CPath.Identity, IncludeId, ParseType.Object),
@@ -116,6 +117,7 @@ object FocusedPushdownSpec extends Qspec {
         val expected: Fix[QSExtra] =
           fixE.InterpretedRead[ResourcePath](
             path,
+            ExcludeId,
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
               Pivot(CPath.Identity, IdOnly, ParseType.Object),
@@ -137,6 +139,7 @@ object FocusedPushdownSpec extends Qspec {
         val expected: Fix[QSExtra] =
           fixE.InterpretedRead[ResourcePath](
             path,
+            ExcludeId,
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
               Pivot(CPath.Identity, ExcludeId, ParseType.Object),
@@ -162,6 +165,7 @@ object FocusedPushdownSpec extends Qspec {
         fixE.Filter(
           fixE.InterpretedRead[ResourcePath](
             path,
+            ExcludeId,
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
               Pivot(CPath.Identity, ExcludeId, ParseType.Object),
@@ -187,6 +191,7 @@ object FocusedPushdownSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[ResourcePath](
               path,
+              ExcludeId,
               List(
                 Project(CPath.Identity \ "xyz"),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
@@ -220,6 +225,7 @@ object FocusedPushdownSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[ResourcePath](
               path,
+              ExcludeId,
               List(
                 Project(CPath.parse(".aaa.bbb.ccc")),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
@@ -254,6 +260,7 @@ object FocusedPushdownSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[ResourcePath](
               path,
+              ExcludeId,
               List(
                 Project(CPath.parse(".aaa[42].ccc")),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
@@ -287,6 +294,7 @@ object FocusedPushdownSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[ResourcePath](
               path,
+              ExcludeId,
               List(
                 Project(CPath.parse(".[17][42].ccc")),
                 Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
@@ -312,8 +320,8 @@ object FocusedPushdownSpec extends Qspec {
       val expected: Fix[QSExtra] =
         fixE.InterpretedRead[ResourcePath](
           path,
+          IncludeId,
           List(
-            Ids,
             Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
             Pivot(CPath.Identity, IncludeId, ParseType.Object)))
 
@@ -333,9 +341,8 @@ object FocusedPushdownSpec extends Qspec {
       val expected: Fix[QSExtra] =
         fixE.InterpretedRead[ResourcePath](
           path,
+          IdOnly,
           List(
-            Ids,
-            Project(CPath.Identity \ 0),
             Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
             Pivot(CPath.Identity, IncludeId, ParseType.Object)))
 
@@ -419,6 +426,7 @@ object FocusedPushdownSpec extends Qspec {
       val expected: Fix[QSExtra] =
         fixE.InterpretedRead[ResourcePath](
           path,
+          ExcludeId,
           List(
             Project(CPath.parse(".aaa.bbb.ccc")),
             Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
@@ -453,6 +461,7 @@ object FocusedPushdownSpec extends Qspec {
         fixE.Map(
           fixE.InterpretedRead[ResourcePath](
             path,
+            ExcludeId,
             List(
               Project(CPath.parse(".[3].order")),
               Mask(SMap(
@@ -502,6 +511,7 @@ object FocusedPushdownSpec extends Qspec {
         fixE.Map(
           fixE.InterpretedRead[ResourcePath](
             path,
+            ExcludeId,
             List(Mask(SMap(
               CPath.parse(".orderA.tax") -> ParseType.Top,
               CPath.parse(".orderB.total") -> ParseType.Top)))),
@@ -540,6 +550,7 @@ object FocusedPushdownSpec extends Qspec {
         fixE.Map(
           fixE.InterpretedRead[ResourcePath](
             path,
+            ExcludeId,
             List(Mask(SMap(
               CPath.parse(".a.aa") -> ParseType.Top,
               CPath.parse(".b[4]") -> ParseType.Top)))),
@@ -582,6 +593,7 @@ object FocusedPushdownSpec extends Qspec {
         fixE.Map(
           fixE.InterpretedRead[ResourcePath](
             path,
+            ExcludeId,
             List(Mask(SMap(
               CPath.parse(".[3].a") -> ParseType.Top,
               CPath.parse(".[9].b[6]") -> ParseType.Top,

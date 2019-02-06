@@ -114,7 +114,7 @@ final class DefaultDatasources[
     withDatasource[DiscoveryError[I], Option[schemaConfig.Schema]](datasourceId) { mds =>
       val fr = mds match {
         case ManagedDatasource.ManagedLightweight(lw) =>
-          lw.evaluate(InterpretedRead(path, Nil))
+          lw.evaluate(InterpretedRead(path, IdStatus.ExcludeId, Nil))
 
         case ManagedDatasource.ManagedHeavyweight(hw) =>
           hw.evaluate(dsl.Read(path, IdStatus.ExcludeId))

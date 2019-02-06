@@ -54,7 +54,7 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
 
     _ match {
       case qc @ LeftShift(
-          Embed(Res(a, instrs)),
+          Embed(Res(a, readStatus, instrs)),
           hole @ FreeA(_),
           shiftStatus,
           shiftType,
@@ -65,7 +65,7 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           Pivot(CPath.Identity, shiftStatus, ShiftType.toParseType(shiftType))
 
         val iread =
-          IR[T[F]](Const(InterpretedRead(a, instrs :+ pivotInstr)))
+          IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ pivotInstr)))
 
         some(repair.fold(κ(iread), κ(QC(Map(iread.embed, repair.asRec)))))
 
@@ -84,24 +84,24 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
     val Res = Resource[A]
 
     _ match {
-      case Map(Embed(Res(a, instrs)), ProjectedRec(MaskedObject(keys))) =>
+      case Map(Embed(Res(a, readStatus, instrs)), ProjectedRec(MaskedObject(keys))) =>
         val mask = keys.foldLeft(SMap[CPath, Set[ParseType]]())(
           (m, k) => m.updated(CPath.Identity \ k, ParseType.Top))
-        IR[T[F]](Const(InterpretedRead(a, instrs :+ Mask(mask))))
+        IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ Mask(mask))))
 
-      case Map(Embed(Res(a, instrs)), ProjectedRec(MaskedArray(indices))) =>
+      case Map(Embed(Res(a, readStatus, instrs)), ProjectedRec(MaskedArray(indices))) =>
         val mask = indices.foldLeft(SMap[CPath, Set[ParseType]]())(
           (m, i) => m.updated(CPath.Identity \ i, ParseType.Top))
-        IR[T[F]](Const(InterpretedRead(a, instrs :+ Mask(mask))))
+        IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ Mask(mask))))
 
-      case Map(Embed(Res(a, instrs)), ProjectedRec(fm)) if isInnerExpr(fm) =>
+      case Map(Embed(Res(a, readStatus, instrs)), ProjectedRec(fm)) if isInnerExpr(fm) =>
         val mask = fm.foldLeft(SMap[CPath, Set[ParseType]]())(_.updated(_, ParseType.Top))
-        QC(Map(IR[T[F]](Const(InterpretedRead(a, instrs :+ Mask(mask)))).embed, compactedExpr(fm).asRec))
+        QC(Map(IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ Mask(mask)))).embed, compactedExpr(fm).asRec))
 
       case LeftShift(
-            Embed(Res(a, instrs)),
+            Embed(Res(a, readStatus, instrs)),
             hole @ FreeA(_),
-            idStatus,
+            shiftStatus,
             shiftType,
             onUndef,
             repair @ FocusedRepair(_)) =>
@@ -110,17 +110,17 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           Mask(SMap(CPath.Identity -> Set(ShiftType.toParseType(shiftType))))
 
         QC(LeftShift(
-          IR[T[F]](Const(InterpretedRead(a, instrs :+ maskInstr))).embed,
+          IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ maskInstr))).embed,
           hole,
-          idStatus,
+          shiftStatus,
           shiftType,
           onUndef,
           repair))
 
       case LeftShift(
-            Embed(Res(a, instrs)),
+            Embed(Res(a, readStatus, instrs)),
             ProjectedRec(fm),
-            idStatus,
+            shiftStatus,
             shiftType,
             onUndef,
             repair @ FocusedRepair(_)) if isInnerExpr(fm) =>
@@ -129,9 +129,9 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           Mask(fm.foldLeft(SMap[CPath, Set[ParseType]]())(_.updated(_, ParseType.Top)))
 
         QC(LeftShift(
-          IR[T[F]](Const(InterpretedRead(a, instrs :+ maskInstr))).embed,
+          IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ maskInstr))).embed,
           compactedExpr(fm).asRec,
-          idStatus,
+          shiftStatus,
           shiftType,
           onUndef,
           repair))
@@ -200,35 +200,35 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
     }
 
     _ match {
-      case Map(Embed(Res(a, instrs)), ProjectedRec(FreeA(p))) =>
-        ER(Const(InterpretedRead(a, instrs :+ Project(p))))
+      case Map(Embed(Res(a, readStatus, instrs)), ProjectedRec(FreeA(p))) =>
+        ER(Const(InterpretedRead(a, readStatus, instrs :+ Project(p))))
 
-      case qc @ Map(Embed(Res(a, instrs)), ProjectedRec(fm)) if isInnerExpr(fm) =>
+      case qc @ Map(Embed(Res(a, readStatus, instrs)), ProjectedRec(fm)) if isInnerExpr(fm) =>
         quotientCommonPrefix(fm).fold(QC(qc)) {
           case (prefix, rebuiltFm) =>
             val newInstrs = instrs :+ Project(prefix)
-            QC(Map(ER[T[F]](Const(InterpretedRead(a, newInstrs))).embed, rebuiltFm.asRec))
+            QC(Map(ER[T[F]](Const(InterpretedRead(a, readStatus, newInstrs))).embed, rebuiltFm.asRec))
         }
 
       case LeftShift(
-          Embed(Res(a, instrs)),
+          Embed(Res(a, readStatus, instrs)),
           ProjectedRec(FreeA(p)),
-          idStatus,
+          shiftStatus,
           shiftType,
           onUndef,
           rep @ FocusedRepair(_)) =>
         QC(LeftShift(
-          ER[T[F]](Const(InterpretedRead(a, instrs :+ Project(p)))).embed,
+          ER[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ Project(p)))).embed,
           recMapFunc.Hole,
-          idStatus,
+          shiftStatus,
           shiftType,
           onUndef,
           rep))
 
       case qc @ LeftShift(
-          Embed(Res(a, instrs)),
+          Embed(Res(a, readStatus, instrs)),
           ProjectedRec(struct),
-          idStatus,
+          shiftStatus,
           shiftType,
           onUndef,
           rep @ FocusedRepair(_)) if isInnerExpr(struct) =>
@@ -236,9 +236,9 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           case (prefix, rebuiltFm) =>
             val newInstrs = instrs :+ Project(prefix)
             QC(LeftShift(
-              ER[T[F]](Const(InterpretedRead(a, newInstrs))).embed,
+              ER[T[F]](Const(InterpretedRead(a, readStatus, newInstrs))).embed,
               rebuiltFm.asRec,
-              idStatus,
+              shiftStatus,
               shiftType,
               onUndef,
               rep))
@@ -258,11 +258,11 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
     val Res = Resource[A]
 
     _ match {
-      case Map(Embed(Res(a, instrs)), WrappedRec(p)) =>
+      case Map(Embed(Res(a, readStatus, instrs)), WrappedRec(p)) =>
         val wrappedInstrs =
           p.foldRight(instrs)((s, ins) => ins :+ Wrap(CPath.Identity, s))
 
-        IR[T[F]](Const(InterpretedRead(a, wrappedInstrs)))
+        IR[T[F]](Const(InterpretedRead(a, readStatus, wrappedInstrs)))
 
       case qc => QC(qc)
     }

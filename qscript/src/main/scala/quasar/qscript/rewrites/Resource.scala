@@ -19,7 +19,6 @@ package quasar.qscript.rewrites
 import slamdata.Predef.{List, Nil, Option}
 
 import quasar.{IdStatus, ParseInstruction}
-import quasar.common.CPath
 import quasar.contrib.iota._
 import quasar.qscript.{InterpretedRead, Read}
 
@@ -33,28 +32,14 @@ object Resource {
         implicit
         IR: Const[InterpretedRead[A], ?] :<<: F,
         R: Const[Read[A], ?] :<<: F)
-        : Option[(A, List[ParseInstruction])] = {
+        : Option[(A, IdStatus, List[ParseInstruction])] = {
 
       def isIR = IR.prj(fb) map {
-        case Const(InterpretedRead(a, instrs)) => (a, instrs)
+        case Const(InterpretedRead(a, idStatus, instrs)) => (a, idStatus, instrs)
       }
 
       def isR = R.prj(fb) map {
-        case Const(Read(a, idStatus)) =>
-          val instrs = idStatus match {
-            case IdStatus.IdOnly =>
-              List(
-                ParseInstruction.Ids,
-                ParseInstruction.Project(CPath.Identity \ 0))
-
-            case IdStatus.IncludeId =>
-              List(ParseInstruction.Ids)
-
-            case IdStatus.ExcludeId =>
-              Nil
-          }
-
-          (a, instrs)
+        case Const(Read(a, idStatus)) => (a, idStatus, Nil)
       }
 
       isIR orElse isR

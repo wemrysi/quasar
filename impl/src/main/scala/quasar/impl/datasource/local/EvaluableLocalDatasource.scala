@@ -60,7 +60,7 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
     for {
       (jp, attrs) <- attributesOf(ir.path).getOrElseF(RE.raiseError(pathNotFound(ir.path)))
       _ <- attrs.isRegularFile.unlessM(RE.raiseError(notAResource(ir.path)))
-    } yield queryResult(InterpretedRead(jp, ir.instructions))
+    } yield queryResult(InterpretedRead(jp, ir.idStatus, ir.instructions))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     toNio[F](path) >>= (jp => F.delay(Files.isRegularFile(jp)))
