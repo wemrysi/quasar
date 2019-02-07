@@ -227,7 +227,7 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D: 
         errorOrId <- tables.createTable(table1)
         id <- isSuccess(errorOrId)
         originalResult <- tables.table(id)
-        newCols = TableColumn("quux", ColumnScalar.Number) :: table1.columns
+        newCols = TableColumn("quux", ColumnType.Number) :: table1.columns
         newTable = table1.copy(columns = newCols)
         _ <- tables.replaceTable(id, newTable)
         replacedResult <- tables.table(id)
