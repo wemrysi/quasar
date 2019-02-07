@@ -19,6 +19,7 @@ package quasar
 import slamdata.Predef._
 import quasar.contrib.scalaz.{MonadListen_, MonadTell_}
 
+import cats.Eval
 import scalaz._
 
 package object common {
@@ -32,11 +33,11 @@ package object common {
       CIString.unapply(name)
   }
 
-  type PhaseResults = Vector[PhaseResult]
+  type PhaseResults = Vector[Eval[PhaseResult]]
 
   object PhaseResults {
     final def logPhase[M[_]]
-      (pr: PhaseResult)
+      (pr: Eval[PhaseResult])
       (implicit MT: PhaseResultTell[M])
         : M[Unit] =
       MT.tell(Vector(pr))
@@ -62,7 +63,7 @@ package object common {
     def apply[F[_]] = new PartiallyApplied[F]
     final class PartiallyApplied[F[_]] {
       def apply[A: RenderTree](label: String, a: A)(implicit F: PhaseResultTell[F]): F[A] =
-        F.writer(Vector(PhaseResult.tree(label, a)), a)
+        F.writer(Vector(Eval.later(PhaseResult.tree(label, a))), a)
     }
   }
 
