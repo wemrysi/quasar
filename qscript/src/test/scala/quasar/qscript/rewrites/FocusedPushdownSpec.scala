@@ -121,7 +121,7 @@ object FocusedPushdownSpec extends Qspec {
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
               Pivot(IdOnly, ParseType.Object),
-              Wrap(CPath.Identity, "k1")))
+              Wrap("k1")))
 
         focusedPushdown(initial) must equal(expected)
       }
@@ -143,7 +143,7 @@ object FocusedPushdownSpec extends Qspec {
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
               Pivot(ExcludeId, ParseType.Object),
-              Wrap(CPath.Identity, "v1")))
+              Wrap("v1")))
 
         focusedPushdown(initial) must equal(expected)
       }
@@ -169,7 +169,7 @@ object FocusedPushdownSpec extends Qspec {
             List(
               Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
               Pivot(ExcludeId, ParseType.Object),
-              Wrap(CPath.Identity, "v1"))),
+              Wrap("v1"))),
           recFuncE.Constant(ejs.bool(true)))
 
       focusedPushdown(initial) must equal(expected)
@@ -434,7 +434,7 @@ object FocusedPushdownSpec extends Qspec {
             Project(CPath.parse(".[1].ddd")),
             Mask(SMap(CPath.Identity -> Set(ParseType.Array))),
             Pivot(ExcludeId, ParseType.Array),
-            Wrap(CPath.Identity, "result")))
+            Wrap("result")))
 
       focusedPushdown(initial) must_= expected
     }
