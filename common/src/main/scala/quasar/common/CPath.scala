@@ -168,9 +168,8 @@ object CPath {
     case CPathMeta(name) => Cord("CPathMeta(") ++ name.show ++ Cord(")")
   }
 
-  implicit val cPathShow: Show[CPath] = Show.show {
-    case CompositeCPath(nodes) => nodes.show
-  }
+  implicit val cPathShow: Show[CPath] =
+    Show.showFromToString
 
   implicit object CPathOrder extends scalaz.Order[CPath] {
     def order(v1: CPath, v2: CPath): scalaz.Ordering = {

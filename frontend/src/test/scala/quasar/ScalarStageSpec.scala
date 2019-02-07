@@ -18,6 +18,7 @@ package quasar
 
 import slamdata.Predef._
 
+import quasar.api.table.ColumnType
 import quasar.common.{CPath, CPathField}
 
 import org.specs2.matcher.Matcher
@@ -26,16 +27,16 @@ import scala.collection.immutable.{Map, Set}
 
 import java.lang.String
 
-abstract class ParseInstructionSpec
+abstract class ScalarStageSpec
     extends JsonSpec
-    with ParseInstructionSpec.IdsSpec
-    with ParseInstructionSpec.WrapSpec
-    with ParseInstructionSpec.ProjectSpec
-    with ParseInstructionSpec.MaskSpec
-    with ParseInstructionSpec.PivotSpec
-    with ParseInstructionSpec.CartesianSpec
+    with ScalarStageSpec.IdsSpec
+    with ScalarStageSpec.WrapSpec
+    with ScalarStageSpec.ProjectSpec
+    with ScalarStageSpec.MaskSpec
+    with ScalarStageSpec.PivotSpec
+    with ScalarStageSpec.CartesianSpec
 
-object ParseInstructionSpec {
+object ScalarStageSpec {
 
   /*
    * Please note that this is currently *over*-specified.
@@ -145,8 +146,8 @@ object ParseInstructionSpec {
   }
 
   trait WrapSpec extends JsonSpec {
-    protected final type Wrap = ParseInstruction.Wrap
-    protected final val Wrap = ParseInstruction.Wrap
+    protected final type Wrap = ScalarStage.Wrap
+    protected final val Wrap = ScalarStage.Wrap
 
     "wrap" should {
       "nest scalars" in {
@@ -207,8 +208,8 @@ object ParseInstructionSpec {
   }
 
   trait ProjectSpec extends JsonSpec {
-    protected final type Project = ParseInstruction.Project
-    protected final val Project = ParseInstruction.Project
+    protected final type Project = ScalarStage.Project
+    protected final val Project = ScalarStage.Project
 
     "project" should {
       "passthrough at identity" in {
@@ -417,10 +418,10 @@ object ParseInstructionSpec {
   }
 
   trait MaskSpec extends JsonSpec {
-    import ParseType._
+    import ColumnType._
 
-    protected final type Mask = ParseInstruction.Mask
-    protected final val Mask = ParseInstruction.Mask
+    protected final type Mask = ScalarStage.Mask
+    protected final val Mask = ScalarStage.Mask
 
     "masks" should {
       "drop everything when empty" in {
@@ -744,7 +745,7 @@ object ParseInstructionSpec {
     def evalMask(mask: Mask, stream: JsonStream): JsonStream
 
     def maskInto(
-        masks: (String, Set[ParseType])*)(
+        masks: (String, Set[ColumnType])*)(
         expected: JsonStream)
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>
@@ -754,8 +755,8 @@ object ParseInstructionSpec {
 
   trait PivotSpec extends JsonSpec {
 
-    protected final type Pivot = ParseInstruction.Pivot
-    protected final val Pivot = ParseInstruction.Pivot
+    protected final type Pivot = ScalarStage.Pivot
+    protected final val Pivot = ScalarStage.Pivot
 
     "pivot" should {
       "shift an array" >> {
@@ -785,7 +786,7 @@ object ParseInstructionSpec {
             13
             """)
 
-          input must pivotInto(IdStatus.ExcludeId, ParseType.Array)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
         }
 
         "IdOnly" >> {
@@ -805,7 +806,7 @@ object ParseInstructionSpec {
             1
             """)
 
-          input must pivotInto(IdStatus.IdOnly, ParseType.Array)(expected)
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(expected)
         }
 
         "IncludeId" >> {
@@ -825,7 +826,7 @@ object ParseInstructionSpec {
             [1, 13]
             """)
 
-          input must pivotInto(IdStatus.IncludeId, ParseType.Array)(expected)
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(expected)
         }
       }
 
@@ -856,7 +857,7 @@ object ParseInstructionSpec {
             13
             """)
 
-          input must pivotInto(IdStatus.ExcludeId, ParseType.Object)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
         }
 
         "IdOnly" >> {
@@ -876,7 +877,7 @@ object ParseInstructionSpec {
             "m"
             """)
 
-          input must pivotInto(IdStatus.IdOnly, ParseType.Object)(expected)
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(expected)
         }
 
         "IncludeId" >> {
@@ -896,7 +897,7 @@ object ParseInstructionSpec {
             ["m", 13]
             """)
 
-          input must pivotInto(IdStatus.IncludeId, ParseType.Object)(expected)
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(expected)
         }
       }
 
@@ -917,7 +918,7 @@ object ParseInstructionSpec {
           "four"
         """)
 
-        input must pivotInto(IdStatus.ExcludeId, ParseType.Array)(expected)
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
       }
 
       "preserve empty objects as values of an object pivot" in {
@@ -937,7 +938,7 @@ object ParseInstructionSpec {
           "four"
         """)
 
-        input must pivotInto(IdStatus.ExcludeId, ParseType.Object)(expected)
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
       }
     }
 
@@ -945,7 +946,7 @@ object ParseInstructionSpec {
 
     def pivotInto(
         idStatus: IdStatus,
-        structure: CompositeParseType)(
+        structure: ColumnType.Vector)(
         expected: JsonStream)
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>
@@ -955,8 +956,8 @@ object ParseInstructionSpec {
 
   trait CartesianSpec extends JsonSpec {
 
-    protected final type Cartesian = ParseInstruction.Cartesian
-    protected final val Cartesian = ParseInstruction.Cartesian
+    protected final type Cartesian = ScalarStage.Cartesian
+    protected final val Cartesian = ScalarStage.Cartesian
 
     "cartesian" should {
       // a0 as a1, b0 as b1, c0 as c1, d0 as d1
@@ -1015,7 +1016,7 @@ object ParseInstructionSpec {
 
       // a0[_] as a1, b0 as b1, c0{_} as c1
       "cross fields with single pivot" in {
-        import ParseInstruction.Pivot
+        import ScalarStage.Pivot
 
         val input = ldjson("""
           { "a0": [1, 2, 3], "b0": null, "c0": { "x": 4, "y": 5 } }
@@ -1032,18 +1033,18 @@ object ParseInstructionSpec {
 
         val targets = Map(
           (CPathField("a1"),
-            (CPathField("a0"), List(Pivot(IdStatus.ExcludeId, ParseType.Array)))),
+            (CPathField("a0"), List(Pivot(IdStatus.ExcludeId, ColumnType.Array)))),
           (CPathField("b1"),
             (CPathField("b0"), Nil)),
           (CPathField("c1"),
-            (CPathField("c0"), List(Pivot(IdStatus.ExcludeId, ParseType.Object)))))
+            (CPathField("c0"), List(Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
 
         input must cartesianInto(targets)(expected)
       }
 
       // a[_].x0.y0{_} as y, a[_].x1[_] as z, b{_:} as b, c as c
       "cross fields with multiple nested pivots" in {
-        import ParseInstruction.{Pivot, Project}
+        import ScalarStage.{Pivot, Project}
 
         val input = ldjson("""
           {
@@ -1071,18 +1072,18 @@ object ParseInstructionSpec {
         val targets = Map(
           (CPathField("y"),
             (CPathField("a"), List(
-              Pivot(IdStatus.ExcludeId, ParseType.Array),
+              Pivot(IdStatus.ExcludeId, ColumnType.Array),
               Project(CPath.parse("x0")),
               Project(CPath.parse("y0")),
-              Pivot(IdStatus.ExcludeId, ParseType.Object)))),
+              Pivot(IdStatus.ExcludeId, ColumnType.Object)))),
           (CPathField("z"),
             (CPathField("a"), List(
-              Pivot(IdStatus.ExcludeId, ParseType.Array),
+              Pivot(IdStatus.ExcludeId, ColumnType.Array),
               Project(CPath.parse("x1")),
-              Pivot(IdStatus.ExcludeId, ParseType.Array)))),
+              Pivot(IdStatus.ExcludeId, ColumnType.Array)))),
           (CPathField("b"),
             (CPathField("b"), List(
-              Pivot(IdStatus.IdOnly, ParseType.Object)))),
+              Pivot(IdStatus.IdOnly, ColumnType.Object)))),
           (CPathField("c"),
             (CPathField("c"), Nil)))
 
@@ -1090,7 +1091,7 @@ object ParseInstructionSpec {
       }
 
       "emit defined fields when some are undefined" in {
-        import ParseInstruction.{Mask, Pivot}
+        import ScalarStage.{Mask, Pivot}
 
         val input = ldjson("""
           { "a": 1, "b": [ "two", "three" ] }
@@ -1110,12 +1111,12 @@ object ParseInstructionSpec {
           (CPathField("a"), (CPathField("a"), Nil)),
 
           (CPathField("ba"), (CPathField("b"), List(
-            Mask(Map(CPath.Identity -> Set(ParseType.Array))),
-            Pivot(IdStatus.ExcludeId, ParseType.Array)))),
+            Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Array)))),
 
           (CPathField("bm"), (CPathField("b"), List(
-            Mask(Map(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(IdStatus.ExcludeId, ParseType.Object)))))
+            Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
 
         input must cartesianInto(targets)(expected)
       }
@@ -1124,7 +1125,7 @@ object ParseInstructionSpec {
     def evalCartesian(cartesian: Cartesian, stream: JsonStream): JsonStream
 
     def cartesianInto(
-        cartouches: Map[CPathField, (CPathField, List[FocusedParseInstruction])])(
+        cartouches: Map[CPathField, (CPathField, List[ScalarStage.Focused])])(
         expected: JsonStream)
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>

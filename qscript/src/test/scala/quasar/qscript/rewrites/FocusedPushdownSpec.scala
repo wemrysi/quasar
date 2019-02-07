@@ -18,10 +18,11 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => SMap, _}
 
-import quasar.{ParseType, Qspec}
+import quasar.{Qspec, ScalarStages}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
-import quasar.ParseInstruction.{Mask, Pivot, Project, Wrap}
+import quasar.ScalarStage.{Mask, Pivot, Project, Wrap}
 import quasar.api.resource.ResourcePath
+import quasar.api.table.ColumnType
 import quasar.common.CPath
 import quasar.contrib.iota._
 import quasar.ejson.{EJson, Fixed}
@@ -92,11 +93,10 @@ object FocusedPushdownSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[ResourcePath](
               path,
-              ExcludeId,
-              List(
-                Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(IncludeId, ParseType.Object),
-                Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
+              ScalarStages(ExcludeId, List(
+                Mask(SMap(CPath.Identity -> Set(ColumnType.Object))),
+                Pivot(IncludeId, ColumnType.Object),
+                Mask(SMap((CPath.Identity \ 0) -> ColumnType.Top, (CPath.Identity \ 1) -> ColumnType.Top))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
               recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
@@ -117,11 +117,10 @@ object FocusedPushdownSpec extends Qspec {
         val expected: Fix[QSExtra] =
           fixE.InterpretedRead[ResourcePath](
             path,
-            ExcludeId,
-            List(
-              Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-              Pivot(IdOnly, ParseType.Object),
-              Wrap("k1")))
+            ScalarStages(ExcludeId, List(
+              Mask(SMap(CPath.Identity -> Set(ColumnType.Object))),
+              Pivot(IdOnly, ColumnType.Object),
+              Wrap("k1"))))
 
         focusedPushdown(initial) must equal(expected)
       }
@@ -139,11 +138,10 @@ object FocusedPushdownSpec extends Qspec {
         val expected: Fix[QSExtra] =
           fixE.InterpretedRead[ResourcePath](
             path,
-            ExcludeId,
-            List(
-              Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-              Pivot(ExcludeId, ParseType.Object),
-              Wrap("v1")))
+            ScalarStages(ExcludeId, List(
+              Mask(SMap(CPath.Identity -> Set(ColumnType.Object))),
+              Pivot(ExcludeId, ColumnType.Object),
+              Wrap("v1"))))
 
         focusedPushdown(initial) must equal(expected)
       }
@@ -165,11 +163,10 @@ object FocusedPushdownSpec extends Qspec {
         fixE.Filter(
           fixE.InterpretedRead[ResourcePath](
             path,
-            ExcludeId,
-            List(
-              Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-              Pivot(ExcludeId, ParseType.Object),
-              Wrap("v1"))),
+            ScalarStages(ExcludeId, List(
+              Mask(SMap(CPath.Identity -> Set(ColumnType.Object))),
+              Pivot(ExcludeId, ColumnType.Object),
+              Wrap("v1")))),
           recFuncE.Constant(ejs.bool(true)))
 
       focusedPushdown(initial) must equal(expected)
@@ -191,12 +188,11 @@ object FocusedPushdownSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[ResourcePath](
               path,
-              ExcludeId,
-              List(
+              ScalarStages(ExcludeId, List(
                 Project(CPath.Identity \ "xyz"),
-                Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(IncludeId, ParseType.Object),
-                Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
+                Mask(SMap(CPath.Identity -> Set(ColumnType.Object))),
+                Pivot(IncludeId, ColumnType.Object),
+                Mask(SMap((CPath.Identity \ 0) -> ColumnType.Top, (CPath.Identity \ 1) -> ColumnType.Top))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
               recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
@@ -225,12 +221,11 @@ object FocusedPushdownSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[ResourcePath](
               path,
-              ExcludeId,
-              List(
+              ScalarStages(ExcludeId, List(
                 Project(CPath.parse(".aaa.bbb.ccc")),
-                Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(IncludeId, ParseType.Object),
-                Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
+                Mask(SMap(CPath.Identity -> Set(ColumnType.Object))),
+                Pivot(IncludeId, ColumnType.Object),
+                Mask(SMap((CPath.Identity \ 0) -> ColumnType.Top, (CPath.Identity \ 1) -> ColumnType.Top))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
               recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
@@ -260,12 +255,11 @@ object FocusedPushdownSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[ResourcePath](
               path,
-              ExcludeId,
-              List(
+              ScalarStages(ExcludeId, List(
                 Project(CPath.parse(".aaa[42].ccc")),
-                Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(IncludeId, ParseType.Object),
-                Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
+                Mask(SMap(CPath.Identity -> Set(ColumnType.Object))),
+                Pivot(IncludeId, ColumnType.Object),
+                Mask(SMap((CPath.Identity \ 0) -> ColumnType.Top, (CPath.Identity \ 1) -> ColumnType.Top))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
               recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
@@ -294,12 +288,11 @@ object FocusedPushdownSpec extends Qspec {
           fixE.Map(
             fixE.InterpretedRead[ResourcePath](
               path,
-              ExcludeId,
-              List(
+              ScalarStages(ExcludeId, List(
                 Project(CPath.parse(".[17][42].ccc")),
-                Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-                Pivot(IncludeId, ParseType.Object),
-                Mask(SMap((CPath.Identity \ 0) -> ParseType.Top, (CPath.Identity \ 1) -> ParseType.Top)))),
+                Mask(SMap(CPath.Identity -> Set(ColumnType.Object))),
+                Pivot(IncludeId, ColumnType.Object),
+                Mask(SMap((CPath.Identity \ 0) -> ColumnType.Top, (CPath.Identity \ 1) -> ColumnType.Top))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
               recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
@@ -320,10 +313,9 @@ object FocusedPushdownSpec extends Qspec {
       val expected: Fix[QSExtra] =
         fixE.InterpretedRead[ResourcePath](
           path,
-          IncludeId,
-          List(
-            Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(IncludeId, ParseType.Object)))
+          ScalarStages(IncludeId, List(
+            Mask(SMap(CPath.Identity -> Set(ColumnType.Object))),
+            Pivot(IncludeId, ColumnType.Object))))
 
       focusedPushdown(initial) must_= expected
     }
@@ -341,10 +333,9 @@ object FocusedPushdownSpec extends Qspec {
       val expected: Fix[QSExtra] =
         fixE.InterpretedRead[ResourcePath](
           path,
-          IdOnly,
-          List(
-            Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(IncludeId, ParseType.Object)))
+          ScalarStages(IdOnly, List(
+            Mask(SMap(CPath.Identity -> Set(ColumnType.Object))),
+            Pivot(IncludeId, ColumnType.Object))))
 
       focusedPushdown(initial) must_= expected
     }
@@ -426,15 +417,14 @@ object FocusedPushdownSpec extends Qspec {
       val expected: Fix[QSExtra] =
         fixE.InterpretedRead[ResourcePath](
           path,
-          ExcludeId,
-          List(
+          ScalarStages(ExcludeId, List(
             Project(CPath.parse(".aaa.bbb.ccc")),
-            Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(IncludeId, ParseType.Object),
+            Mask(SMap(CPath.Identity -> Set(ColumnType.Object))),
+            Pivot(IncludeId, ColumnType.Object),
             Project(CPath.parse(".[1].ddd")),
-            Mask(SMap(CPath.Identity -> Set(ParseType.Array))),
-            Pivot(ExcludeId, ParseType.Array),
-            Wrap("result")))
+            Mask(SMap(CPath.Identity -> Set(ColumnType.Array))),
+            Pivot(ExcludeId, ColumnType.Array),
+            Wrap("result"))))
 
       focusedPushdown(initial) must_= expected
     }
@@ -461,12 +451,11 @@ object FocusedPushdownSpec extends Qspec {
         fixE.Map(
           fixE.InterpretedRead[ResourcePath](
             path,
-            ExcludeId,
-            List(
+            ScalarStages(ExcludeId, List(
               Project(CPath.parse(".[3].order")),
               Mask(SMap(
-                CPath.parse(".tax") -> ParseType.Top,
-                CPath.parse(".total") -> ParseType.Top)))),
+                CPath.parse(".tax") -> ColumnType.Top,
+                CPath.parse(".total") -> ColumnType.Top))))),
           recFuncE.Subtract(
             recFuncE.ProjectKeyS(recFuncE.Hole, "tax"),
             recFuncE.ProjectKeyS(recFuncE.Hole, "total")))
@@ -511,10 +500,9 @@ object FocusedPushdownSpec extends Qspec {
         fixE.Map(
           fixE.InterpretedRead[ResourcePath](
             path,
-            ExcludeId,
-            List(Mask(SMap(
-              CPath.parse(".orderA.tax") -> ParseType.Top,
-              CPath.parse(".orderB.total") -> ParseType.Top)))),
+            ScalarStages(ExcludeId, List(Mask(SMap(
+              CPath.parse(".orderA.tax") -> ColumnType.Top,
+              CPath.parse(".orderB.total") -> ColumnType.Top))))),
           recFuncE.Subtract(
             recFuncE.ProjectKeyS(
               recFuncE.ProjectKeyS(
@@ -550,10 +538,9 @@ object FocusedPushdownSpec extends Qspec {
         fixE.Map(
           fixE.InterpretedRead[ResourcePath](
             path,
-            ExcludeId,
-            List(Mask(SMap(
-              CPath.parse(".a.aa") -> ParseType.Top,
-              CPath.parse(".b[4]") -> ParseType.Top)))),
+            ScalarStages(ExcludeId, List(Mask(SMap(
+              CPath.parse(".a.aa") -> ColumnType.Top,
+              CPath.parse(".b[4]") -> ColumnType.Top))))),
           recFuncE.Add(
             recFuncE.ProjectKeyS(
               recFuncE.ProjectKeyS(
@@ -593,11 +580,10 @@ object FocusedPushdownSpec extends Qspec {
         fixE.Map(
           fixE.InterpretedRead[ResourcePath](
             path,
-            ExcludeId,
-            List(Mask(SMap(
-              CPath.parse(".[3].a") -> ParseType.Top,
-              CPath.parse(".[9].b[6]") -> ParseType.Top,
-              CPath.parse(".[9].b[2]") -> ParseType.Top)))),
+            ScalarStages(ExcludeId, List(Mask(SMap(
+              CPath.parse(".[3].a") -> ColumnType.Top,
+              CPath.parse(".[9].b[6]") -> ColumnType.Top,
+              CPath.parse(".[9].b[2]") -> ColumnType.Top))))),
           recFuncE.Add(
             recFuncE.Add(
               recFuncE.ProjectKeyS(

@@ -18,8 +18,9 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => SMap, _}
 
-import quasar.ParseType
-import quasar.ParseInstruction.{Mask, Pivot, Project, Wrap}
+import quasar.ScalarStages
+import quasar.ScalarStage.{Mask, Pivot, Project, Wrap}
+import quasar.api.table.ColumnType
 import quasar.common.{CPath, CPathArray, CPathField, CPathIndex, CPathMeta, CPathNode}
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.free._
@@ -62,10 +63,10 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           FocusedRepair(repair)) =>
 
         val pivotInstr =
-          Pivot(shiftStatus, ShiftType.toParseType(shiftType))
+          Pivot(shiftStatus, ShiftType.toColumnType(shiftType))
 
         val iread =
-          IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ pivotInstr)))
+          IR[T[F]](Const(InterpretedRead(a, ScalarStages(readStatus, instrs :+ pivotInstr))))
 
         some(repair.fold(κ(iread), κ(QC(Map(iread.embed, repair.asRec)))))
 
@@ -85,18 +86,18 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
 
     _ match {
       case Map(Embed(Res(a, readStatus, instrs)), ProjectedRec(MaskedObject(keys))) =>
-        val mask = keys.foldLeft(SMap[CPath, Set[ParseType]]())(
-          (m, k) => m.updated(CPath.Identity \ k, ParseType.Top))
-        IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ Mask(mask))))
+        val mask = keys.foldLeft(SMap[CPath, Set[ColumnType]]())(
+          (m, k) => m.updated(CPath.Identity \ k, ColumnType.Top))
+        IR[T[F]](Const(InterpretedRead(a, ScalarStages(readStatus, instrs :+ Mask(mask)))))
 
       case Map(Embed(Res(a, readStatus, instrs)), ProjectedRec(MaskedArray(indices))) =>
-        val mask = indices.foldLeft(SMap[CPath, Set[ParseType]]())(
-          (m, i) => m.updated(CPath.Identity \ i, ParseType.Top))
-        IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ Mask(mask))))
+        val mask = indices.foldLeft(SMap[CPath, Set[ColumnType]]())(
+          (m, i) => m.updated(CPath.Identity \ i, ColumnType.Top))
+        IR[T[F]](Const(InterpretedRead(a, ScalarStages(readStatus, instrs :+ Mask(mask)))))
 
       case Map(Embed(Res(a, readStatus, instrs)), ProjectedRec(fm)) if isInnerExpr(fm) =>
-        val mask = fm.foldLeft(SMap[CPath, Set[ParseType]]())(_.updated(_, ParseType.Top))
-        QC(Map(IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ Mask(mask)))).embed, compactedExpr(fm).asRec))
+        val mask = fm.foldLeft(SMap[CPath, Set[ColumnType]]())(_.updated(_, ColumnType.Top))
+        QC(Map(IR[T[F]](Const(InterpretedRead(a, ScalarStages(readStatus, instrs :+ Mask(mask))))).embed, compactedExpr(fm).asRec))
 
       case LeftShift(
             Embed(Res(a, readStatus, instrs)),
@@ -107,10 +108,10 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
             repair @ FocusedRepair(_)) =>
 
         val maskInstr =
-          Mask(SMap(CPath.Identity -> Set(ShiftType.toParseType(shiftType))))
+          Mask(SMap(CPath.Identity -> Set(ShiftType.toColumnType(shiftType))))
 
         QC(LeftShift(
-          IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ maskInstr))).embed,
+          IR[T[F]](Const(InterpretedRead(a, ScalarStages(readStatus, instrs :+ maskInstr)))).embed,
           hole,
           shiftStatus,
           shiftType,
@@ -126,10 +127,10 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
             repair @ FocusedRepair(_)) if isInnerExpr(fm) =>
 
         val maskInstr =
-          Mask(fm.foldLeft(SMap[CPath, Set[ParseType]]())(_.updated(_, ParseType.Top)))
+          Mask(fm.foldLeft(SMap[CPath, Set[ColumnType]]())(_.updated(_, ColumnType.Top)))
 
         QC(LeftShift(
-          IR[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ maskInstr))).embed,
+          IR[T[F]](Const(InterpretedRead(a, ScalarStages(readStatus, instrs :+ maskInstr)))).embed,
           compactedExpr(fm).asRec,
           shiftStatus,
           shiftType,
@@ -201,13 +202,13 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
 
     _ match {
       case Map(Embed(Res(a, readStatus, instrs)), ProjectedRec(FreeA(p))) =>
-        ER(Const(InterpretedRead(a, readStatus, instrs :+ Project(p))))
+        ER(Const(InterpretedRead(a, ScalarStages(readStatus, instrs :+ Project(p)))))
 
       case qc @ Map(Embed(Res(a, readStatus, instrs)), ProjectedRec(fm)) if isInnerExpr(fm) =>
         quotientCommonPrefix(fm).fold(QC(qc)) {
           case (prefix, rebuiltFm) =>
             val newInstrs = instrs :+ Project(prefix)
-            QC(Map(ER[T[F]](Const(InterpretedRead(a, readStatus, newInstrs))).embed, rebuiltFm.asRec))
+            QC(Map(ER[T[F]](Const(InterpretedRead(a, ScalarStages(readStatus, newInstrs)))).embed, rebuiltFm.asRec))
         }
 
       case LeftShift(
@@ -218,7 +219,7 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           onUndef,
           rep @ FocusedRepair(_)) =>
         QC(LeftShift(
-          ER[T[F]](Const(InterpretedRead(a, readStatus, instrs :+ Project(p)))).embed,
+          ER[T[F]](Const(InterpretedRead(a, ScalarStages(readStatus, instrs :+ Project(p))))).embed,
           recMapFunc.Hole,
           shiftStatus,
           shiftType,
@@ -236,7 +237,7 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           case (prefix, rebuiltFm) =>
             val newInstrs = instrs :+ Project(prefix)
             QC(LeftShift(
-              ER[T[F]](Const(InterpretedRead(a, readStatus, newInstrs))).embed,
+              ER[T[F]](Const(InterpretedRead(a, ScalarStages(readStatus, newInstrs)))).embed,
               rebuiltFm.asRec,
               shiftStatus,
               shiftType,
@@ -262,7 +263,7 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
         val wrappedInstrs =
           p.foldRight(instrs)((s, ins) => ins :+ Wrap(s))
 
-        IR[T[F]](Const(InterpretedRead(a, readStatus, wrappedInstrs)))
+        IR[T[F]](Const(InterpretedRead(a, ScalarStages(readStatus, wrappedInstrs))))
 
       case qc => QC(qc)
     }

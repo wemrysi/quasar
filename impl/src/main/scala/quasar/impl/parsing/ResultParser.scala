@@ -18,6 +18,7 @@ package quasar.impl.parsing
 
 import slamdata.Predef._
 
+import quasar.ScalarStages
 import quasar.connector.{CompressionScheme, ParsableType, QueryResult}
 import quasar.connector.ParsableType.JsonVariant
 
@@ -31,6 +32,8 @@ import fs2.{gzip, Chunk, Stream}
 
 import qdata.{QData, QDataEncode}
 import qdata.tectonic.QDataPlate
+
+import scalaz.syntax.equal._
 
 import tectonic.fs2.StreamParser
 import tectonic.json.{Parser => TParser}
@@ -68,7 +71,7 @@ object ResultParser {
           data.through(parserPipe)
       }
 
-    if (queryResult.instructions.isEmpty)
+    if (queryResult.stages === ScalarStages.Id)
       parsedStream(queryResult)
     else
       // TODO: Be nice to have a static representation of the absence of parse instructions

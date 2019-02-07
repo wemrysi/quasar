@@ -18,11 +18,10 @@ package quasar.impl.evaluate
 
 import slamdata.Predef.{Stream => _, _}
 
-import cats.effect.Concurrent
-
-import quasar.{FocusedParseInstruction, IdStatus, ParseInstruction, ParseType}
+import quasar.{IdStatus, ScalarStage, ScalarStages}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
-import quasar.ParseInstruction.{Cartesian, Mask, Pivot, Project, Wrap}
+import quasar.ScalarStage.{Cartesian, Mask, Pivot, Project, Wrap}
+import quasar.api.table.ColumnType
 import quasar.common.{CPathField, CPathIndex, CPathNode}
 import quasar.common.data._
 
@@ -30,13 +29,15 @@ import scala.Predef.identity
 import scala.collection.Iterator
 import scala.math
 
+import cats.effect.Concurrent
+
 import fs2.{Chunk, Pipe, Stream}
 
 import scalaz.{NonEmptyList, Scalaz}, Scalaz._
 
 import shims._
 
-object RValueParseInstructionInterpreter {
+object RValueScalarStagesInterpreter {
 
   /** The chunk size used when `minUnit` isn't specified. */
   val DefaultChunkSize: Int = 1024
@@ -45,13 +46,13 @@ object RValueParseInstructionInterpreter {
   def apply[F[_]: Concurrent](
       parallelism: Int,
       minUnit: Int,
-      idStatus: IdStatus,
-      instructions: List[ParseInstruction])
+      scalarStages: ScalarStages)
       : Pipe[F, RValue, RValue] =
-    if (instructions.isEmpty)
-      interpretIdStatus(idStatus)
+    if (scalarStages.stages.isEmpty)
+      interpretIdStatus(scalarStages.idStatus)
     else
-      interpretIdStatus(idStatus) andThen interpret(parallelism, minUnit, instructions)
+      interpretIdStatus(scalarStages.idStatus)
+        .andThen(interpret(parallelism, minUnit, scalarStages.stages))
 
   def interpretCartesian[F[_]: Concurrent](
       parallelism: Int,
@@ -102,13 +103,13 @@ object RValueParseInstructionInterpreter {
     // build up:
     // only retain if type checks
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def inner(masks: Map[List[CPathNode], Set[ParseType]], rvalue: RValue): Option[RValue] = {
+    def inner(masks: Map[List[CPathNode], Set[ColumnType]], rvalue: RValue): Option[RValue] = {
 
       val prefixes: Set[CPathNode] = masks.keySet collect {
         case head :: _ => head
       }
 
-      def relevantMasks(prefix: CPathNode): Map[List[CPathNode], Set[ParseType]] =
+      def relevantMasks(prefix: CPathNode): Map[List[CPathNode], Set[ColumnType]] =
         masks collect {
           case (`prefix` :: tail, tpes) => (tail, tpes)
         }
@@ -172,7 +173,7 @@ object RValueParseInstructionInterpreter {
   def interpretPivot(pivot: Pivot, rvalue: RValue): Iterator[RValue] =
     (rvalue, pivot.structure) match {
       // pivot object
-      case (RObject(fields), ParseType.Object) =>
+      case (RObject(fields), ColumnType.Object) =>
         pivot.status match {
           case IdOnly =>
             fields.iterator.map(kv => CString(kv._1))
@@ -183,7 +184,7 @@ object RValueParseInstructionInterpreter {
         }
 
       // pivot array
-      case (RArray(elems), ParseType.Array) =>
+      case (RArray(elems), ColumnType.Array) =>
         pivot.status match {
           case IdOnly =>
             elems.iterator.zipWithIndex.map(t => CLong(t._2.toLong))
@@ -195,10 +196,10 @@ object RValueParseInstructionInterpreter {
         }
 
       // pivot empty object drops the row
-      case (CEmptyObject, ParseType.Object) => Iterator.empty
+      case (CEmptyObject, ColumnType.Object) => Iterator.empty
 
       // pivot empty array drops the row
-      case (CEmptyArray, ParseType.Array) => Iterator.empty
+      case (CEmptyArray, ColumnType.Array) => Iterator.empty
 
       case (v, t) =>
         scala.sys.error(s"Invalid pivot input: ${(v, t)}")
@@ -218,12 +219,12 @@ object RValueParseInstructionInterpreter {
 
   private object FocusedPrefix {
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-    def unapply(instrs: List[ParseInstruction])
-        : Option[(NonEmptyList[FocusedParseInstruction], List[ParseInstruction])] =
+    def unapply(instrs: List[ScalarStage])
+        : Option[(NonEmptyList[ScalarStage.Focused], List[ScalarStage])] =
       instrs match {
-        case (fpi: FocusedParseInstruction) :: t =>
-          val (focused, rest) = t.span(_.isInstanceOf[FocusedParseInstruction])
-          some((NonEmptyList.nels(fpi, focused.asInstanceOf[List[FocusedParseInstruction]]: _*), rest))
+        case (fpi: ScalarStage.Focused) :: t =>
+          val (focused, rest) = t.span(_.isInstanceOf[ScalarStage.Focused])
+          some((NonEmptyList.nels(fpi, focused.asInstanceOf[List[ScalarStage.Focused]]: _*), rest))
 
         case _ => none
       }
@@ -233,9 +234,9 @@ object RValueParseInstructionInterpreter {
   private def interpret[F[_]: Concurrent](
       parallelism: Int,
       minUnit: Int,
-      instructions: List[ParseInstruction])
+      stages: List[ScalarStage])
       : Pipe[F, RValue, RValue] =
-    instructions match {
+    stages match {
       case Nil =>
         identity[Stream[F, RValue]]
 
@@ -247,13 +248,13 @@ object RValueParseInstructionInterpreter {
         interpretCartesian(parallelism, minUnit, c) andThen interpret(parallelism, minUnit, rest)
     }
 
-  private def interpretFocused(fpis: NonEmptyList[FocusedParseInstruction], rvalue: RValue)
+  private def interpretFocused(stagesf: NonEmptyList[ScalarStage.Focused], rvalue: RValue)
       : Iterator[RValue] =
-    fpis.foldMapLeft1(interpretFocused1(_, rvalue))((rvs, i) => rvs.flatMap(interpretFocused1(i, _)))
+    stagesf.foldMapLeft1(interpretFocused1(_, rvalue))((rvs, s) => rvs.flatMap(interpretFocused1(s, _)))
 
-  private def interpretFocused1(fpi: FocusedParseInstruction, rvalue: RValue)
+  private def interpretFocused1(stage: ScalarStage.Focused, rvalue: RValue)
       : Iterator[RValue] =
-    fpi match {
+    stage match {
       case instr @ Mask(_) =>
         interpretMask(instr, rvalue).iterator
 
@@ -267,40 +268,41 @@ object RValueParseInstructionInterpreter {
         Iterator(interpretWrap(instr, rvalue))
     }
 
-  private def maskTarget(tpes: Set[ParseType], rvalue: RValue): Boolean =
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def maskTarget(tpes: Set[ColumnType], rvalue: RValue): Boolean =
     rvalue match {
-      case RMeta(_, _) => tpes.contains(ParseType.Meta)
+      case RMeta(v, _) => maskTarget(tpes, v)
 
-      case RObject(_) => tpes.contains(ParseType.Object)
-      case CEmptyObject => tpes.contains(ParseType.Object)
+      case RObject(_) => tpes.contains(ColumnType.Object)
+      case CEmptyObject => tpes.contains(ColumnType.Object)
 
-      case RArray(_) => tpes.contains(ParseType.Array)
-      case CEmptyArray => tpes.contains(ParseType.Array)
+      case RArray(_) => tpes.contains(ColumnType.Array)
+      case CEmptyArray => tpes.contains(ColumnType.Array)
 
-      case CString(_) => tpes.contains(ParseType.String)
-      case CBoolean(_) => tpes.contains(ParseType.Boolean)
-      case CNull => tpes.contains(ParseType.Null)
+      case CString(_) => tpes.contains(ColumnType.String)
+      case CBoolean(_) => tpes.contains(ColumnType.Boolean)
+      case CNull => tpes.contains(ColumnType.Null)
 
-      case CLong(_) => tpes.contains(ParseType.Number)
-      case CDouble(_) => tpes.contains(ParseType.Number)
-      case CNum(_) => tpes.contains(ParseType.Number)
+      case CLong(_) => tpes.contains(ColumnType.Number)
+      case CDouble(_) => tpes.contains(ColumnType.Number)
+      case CNum(_) => tpes.contains(ColumnType.Number)
 
-      // These are encoded as objects from a parser-perspective
-      case CLocalDateTime(_) => tpes.contains(ParseType.Object)
-      case CLocalDate(_) => tpes.contains(ParseType.Object)
-      case CLocalTime(_) => tpes.contains(ParseType.Object)
-      case COffsetDateTime(_) => tpes.contains(ParseType.Object)
-      case COffsetDate(_) => tpes.contains(ParseType.Object)
-      case COffsetTime(_) => tpes.contains(ParseType.Object)
-      case CInterval(_) => tpes.contains(ParseType.Object)
+      case CLocalDateTime(_) => false
+      case CLocalDate(_) => false
+      case CLocalTime(_) => false
+      case COffsetDateTime(_) => tpes.contains(ColumnType.OffsetDateTime)
+      case COffsetDate(_) => false
+      case COffsetTime(_) => false
+      case CInterval(_) => false
 
-      case _ => false
+      case CArray(_, _) => false
+      case CUndefined => false
     }
 
   private def interpretCartesian1[F[_]: Concurrent](
       parallelism: Int,
       minUnit: Int,
-      cartouches: Map[CPathField, (CPathField, Option[NonEmptyList[FocusedParseInstruction]])],
+      cartouches: Map[CPathField, (CPathField, Option[NonEmptyList[ScalarStage.Focused]])],
       fields: Map[String, RValue])
       : Stream[F, RValue] = {
 

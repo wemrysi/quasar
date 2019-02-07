@@ -129,10 +129,7 @@ sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
     make(v => NonTerminal(List("List"), None, v.map(RA.render)))
 
   implicit def listMapRenderTree[K: Show, V](implicit RV: RenderTree[V]): RenderTree[ListMap[K, V]] =
-    make(v => NonTerminal("Map" :: Nil, None,
-      v.toList.map { case (k, v) =>
-        NonTerminal("Key" :: "Map" :: Nil, Some(k.shows), RV.render(v) :: Nil)
-      }))
+    make(RenderTree[Map[K, V]].render(_))
 
   implicit def vectorRenderTree[A](implicit RA: RenderTree[A]): RenderTree[Vector[A]] =
     make(v => NonTerminal(List("Vector"), None, v.map(RA.render).toList))
@@ -182,6 +179,12 @@ sealed abstract class RenderTreeInstances0 extends RenderTreeInstances1 {
           RC.render(t._2)    ::
           Nil)
     }
+
+  implicit def mapRenderTree[K: Show, V](implicit RV: RenderTree[V]): RenderTree[Map[K, V]] =
+    RenderTree.make(v => NonTerminal("Map" :: Nil, None,
+      v.toList.map { case (k, v) =>
+        NonTerminal("Key" :: "Map" :: Nil, Some(k.shows), RV.render(v) :: Nil)
+      }))
 
   implicit def fix[F[_]: Functor](implicit F: Delay[RenderTree, F]): RenderTree[Fix[F]] =
     RenderTree.recursive

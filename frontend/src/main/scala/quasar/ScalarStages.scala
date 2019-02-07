@@ -14,30 +14,41 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar
 
-import slamdata.Predef.List
+import slamdata.Predef.{List, Nil}
 
-import quasar.{NonTerminal, RenderTree, ScalarStages}
 import quasar.RenderTree.ops._
 
 import monocle.macros.Lenses
+
 import scalaz.{Equal, Show}
+import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 
+/** Describes a sequence of row-level transformations to apply to a dataset.
+  *
+  * `idStatus` is always the first transformation, followed by `stages`.
+  */
 @Lenses
-final case class InterpretedRead[A](path: A, stages: ScalarStages)
+final case class ScalarStages(idStatus: IdStatus, stages: List[ScalarStage])
 
-object InterpretedRead {
-  implicit def equal[A: Equal]: Equal[InterpretedRead[A]] =
-    Equal.equalBy(r => (r.path, r.stages))
+object ScalarStages {
+  /** Does not modify a dataset. */
+  val Id: ScalarStages =
+    ScalarStages(IdStatus.ExcludeId, Nil)
 
-  implicit def show[A: Show]: Show[InterpretedRead[A]] =
+  implicit val equal: Equal[ScalarStages] =
+    Equal.equalBy(ss => (ss.idStatus, ss.stages))
+
+  implicit val renderTree: RenderTree[ScalarStages] =
+    RenderTree.make(ss => NonTerminal(
+      List("ScalarStages"),
+      some(ss.idStatus.shows),
+      ss.stages.render.children))
+
+  implicit val show: Show[ScalarStages] =
     RenderTree.toShow
-
-  implicit def renderTree[A: Show]: RenderTree[InterpretedRead[A]] =
-    RenderTree.make(r =>
-      NonTerminal(List("InterpretedRead"), some(r.path.shows), List(r.stages.render)))
 }

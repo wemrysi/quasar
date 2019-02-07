@@ -18,34 +18,41 @@ package quasar
 
 import slamdata.Predef._
 
+import quasar.RenderTree.ops._
+import quasar.api.table.ColumnType
 import quasar.common.{CPath, CPathField}
 
-import scalaz.{Cord, Equal, Show}
+import scala.math.Ordering
+
+import scalaz.{Equal, Order, Show}
 import scalaz.std.list._
 import scalaz.std.map._
+import scalaz.std.option._
 import scalaz.std.set._
 import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
 
-sealed trait ParseInstruction extends Product with Serializable
-sealed trait FocusedParseInstruction extends ParseInstruction
+sealed trait ScalarStage extends Product with Serializable
 
-object ParseInstruction {
+object ScalarStage extends ScalarStageInstances {
+
+  /** Stages that refer to their input exactly once. */
+  sealed trait Focused extends ScalarStage
 
   /**
    * Wraps the input to the stage in a singleton object at key `name`, adding
    * another layer of structure.
    */
-  final case class Wrap(name: String) extends FocusedParseInstruction
+  final case class Wrap(name: String) extends Focused
 
   /**
    *`Masks` represents the disjunction of the provided `masks`. An empty map indicates
    * that all values should be dropped. Removes all values which are not in one of the
    * path/type designations. The inner set is assumed to be non-empty.
    */
-  final case class Mask(masks: Map[CPath, Set[ParseType]]) extends FocusedParseInstruction
+  final case class Mask(masks: Map[CPath, Set[ColumnType]]) extends Focused
 
   /**
    * Pivots the indices and keys out of arrays and objects, respectively.
@@ -57,52 +64,66 @@ object ParseInstruction {
    *
    * No values outside of the pivot locus should be retained.
    */
-  final case class Pivot(status: IdStatus, structure: CompositeParseType)
-      extends FocusedParseInstruction
+  final case class Pivot(status: IdStatus, structure: ColumnType.Vector)
+      extends Focused
 
   /**
    * Extracts the value at `path`, eliminating all surrounding structure.
    */
-  final case class Project(path: CPath) extends FocusedParseInstruction
+  final case class Project(path: CPath) extends Focused
 
   /**
-   * Applies the provided `List[FocusedParseInstruction]` to each tupled `CPathField`
+   * Applies the provided `List[Focused]` to each tupled `CPathField`
    * projection in the `Map` values. Then cartesians those results, wrapping them in the
    * `CPathField` map key.
    */
-  final case class Cartesian(cartouches: Map[CPathField, (CPathField, List[FocusedParseInstruction])])
-      extends ParseInstruction
+  final case class Cartesian(cartouches: Map[CPathField, (CPathField, List[Focused])])
+      extends ScalarStage
+}
+
+sealed abstract class ScalarStageInstances {
+  import ScalarStage._
+
+  implicit def scalarStageEqual[S <: ScalarStage]: Equal[S] =
+    Equal.equal(equal)
+
+  implicit def scalarStageRenderTree[S <: ScalarStage]: RenderTree[S] =
+    RenderTree.make(asRenderedTree)
+
+  implicit def scalarStageShow[S <: ScalarStage]: Show[S] =
+    RenderTree.toShow
 
   ////
 
-  implicit val focusedParseInstructionEqual: Equal[FocusedParseInstruction] =
-    Equal.equal {
+  private implicit val columnTypeOrdering: Ordering[ColumnType] =
+    Order[ColumnType].toScalaOrdering
+
+  private def equal(x: ScalarStage, y: ScalarStage): Boolean =
+    (x, y) match {
       case (Wrap(n1), Wrap(n2)) => n1 === n2
       case (Mask(m1), Mask(m2)) => m1 === m2
       case (Pivot(s1, t1), Pivot(s2, t2)) => s1 === s2 && t1 === t2
       case (Project(p1), Project(p2)) => p1 === p2
-      case (_, _) => false
-    }
-
-  implicit val parseInstructionEqual: Equal[ParseInstruction] =
-    Equal.equal {
       case (Cartesian(c1), Cartesian(c2)) => c1 === c2
-      case (p1: FocusedParseInstruction, p2: FocusedParseInstruction) =>
-        focusedParseInstructionEqual.equal(p1, p2)
-      case (_, _) => false
+      case _ => false
     }
 
-  implicit val focusedParseInstructionShow: Show[FocusedParseInstruction] =
-    Show.show {
-      case Wrap(n) => Cord("Wrap(") ++ n.show ++ Cord(")")
-      case Mask(m) => Cord("Mask(") ++ m.show ++ Cord(")")
-      case Pivot(s, t) => Cord("Pivot(") ++ s.show ++ Cord(", ") ++ t.show  ++ Cord(")")
-      case Project(p) => Cord("Project(") ++ p.show ++ Cord(")")
-    }
+  private def asRenderedTree(ss: ScalarStage): RenderedTree =
+    ss match {
+      case Wrap(n) => Terminal(List("Wrap"), some(n))
 
-  implicit val parseInstructionShow: Show[ParseInstruction] =
-    Show.show {
-      case Cartesian(p) => Cord("Cartesian(") ++ p.show ++ Cord(")")
-      case p: FocusedParseInstruction => focusedParseInstructionShow.show(p)
+      case Mask(m) =>
+        NonTerminal(List("Mask"), none, m.toList map {
+          case (p, types) =>
+            Terminal(List(s"Column[$p]"), some(types.toList.sorted.mkString(", ")))
+        })
+
+      case Pivot(s, t) => Terminal(List("Pivot"), some(s"${s.shows}, ${t.shows}"))
+
+      case Project(p) => Terminal(List("Project"), some(p.shows))
+
+      case Cartesian(cs) =>
+        val stringified = cs map { case (t, (s, v)) => (t.toString, (s.toString, v)) }
+        NonTerminal(List("Cartesian"), none, stringified.render.children)
     }
 }

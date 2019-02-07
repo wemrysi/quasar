@@ -45,7 +45,7 @@ object LocalDatasource {
       QueryResult.typed(
         ParsableType.json(JsonVariant.LineDelimited, true),
         io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes),
-        iRead.instructions)
+        iRead.stages)
     }
   }
 }

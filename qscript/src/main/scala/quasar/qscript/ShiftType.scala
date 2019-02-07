@@ -16,7 +16,8 @@
 
 package quasar.qscript
 
-import quasar.{CompositeParseType, ParseType, RenderTree}
+import quasar.RenderTree
+import quasar.api.table.ColumnType
 
 import scala.{Product, Serializable}
 import scalaz.{Equal, Show}
@@ -27,10 +28,10 @@ object ShiftType {
   case object Array extends ShiftType
   case object Map extends ShiftType
 
-  def toParseType(shiftType: ShiftType): CompositeParseType =
+  def toColumnType(shiftType: ShiftType): ColumnType.Vector =
     shiftType match {
-      case Array => ParseType.Array
-      case Map => ParseType.Object
+      case Array => ColumnType.Array
+      case Map => ColumnType.Object
     }
 
   implicit def equal: Equal[ShiftType] = Equal.equalA

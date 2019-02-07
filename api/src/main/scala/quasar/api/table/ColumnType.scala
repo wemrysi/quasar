@@ -16,7 +16,7 @@
 
 package quasar.api.table
 
-import slamdata.Predef.{Int, Product, Serializable}
+import slamdata.Predef.{Int, Product, Serializable, Set}
 
 import scalaz.{Order, Show}
 import scalaz.std.anyVal._
@@ -35,6 +35,9 @@ object ColumnType {
   sealed trait Vector extends ColumnType
   final case object Array extends Vector
   final case object Object extends Vector
+
+  val Top: Set[ColumnType] =
+    Set(Null, Boolean, Number, OffsetDateTime, String, Array, Object)
 
   implicit def columnTypeOrder[T <: ColumnType]: Order[T] =
     Order.order((x, y) => asInt(x) ?|? asInt(y))

@@ -18,9 +18,8 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.ParseInstruction
+import quasar.{IdStatus, ScalarStages}
 import quasar.api.resource.{ResourceName, ResourcePath}
-import quasar.common.CPath
 import quasar.common.data.RValue
 import quasar.connector.{CompressionScheme, ParsableType, QueryResult, ResourceError}
 import quasar.connector.ParsableType.JsonVariant
@@ -102,13 +101,13 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
     QueryResult.parsed(
       QDataDecode[RValue],
       Stream.emits(BoolsData.map(RValue.rBoolean(_))),
-      Nil)
+      ScalarStages.Id)
 
   val unparsedResult: QueryResult.Unparsed[IO] =
     QueryResult.typed(
       ParsableType.Json(JsonVariant.LineDelimited, false),
       Stream.emits(BoolsData.mkString("\n").getBytes(Charset.forName("UTF-8"))),
-      Nil)
+      ScalarStages.Id)
 
   val resourceSchema: ResourceSchema[IO, SstConfig[Fix[EJson], Double], (ResourcePath, CompositeResult[IO, QueryResult[IO]])] =
     CompositeResourceSchema[IO, Fix[EJson], Double](SstEvalConfig(20L, 1L, 100L))
@@ -145,7 +144,7 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
       QueryResult.parsed(
         QDataDecode[RValue],
         bs.map(RValue.rBoolean(_)).covary[IO],
-        Nil)
+        ScalarStages.Id)
 
     val agg = Stream(
       (ResourcePath.root() / ResourceName("a")) -> boolResult(as),
@@ -162,7 +161,7 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
       QueryResult.typed[IO](
         ParsableType.Json(JsonVariant.LineDelimited, false),
         Stream.emits("""{ "foo": sdlfkj""".getBytes(Charset.forName("UTF-8"))),
-        Nil)
+        ScalarStages.Id)
 
     val qsst = resourceSchema(defaultCfg, (path, Left(badResult)), 1.hour)
 
@@ -175,9 +174,9 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
     }
   }
 
-  "error when any parse instructions" >>* {
+  "error when stages modifies input" >>* {
     val withInstrs =
-      QueryResult.instructions.set(List(ParseInstruction.Project(CPath.Identity)))(parsedResult)
+      QueryResult.stages.set(ScalarStages(IdStatus.IncludeId, List()))(parsedResult)
 
     resourceSchema(defaultCfg, (path, Left(withInstrs)), 1.hour)
       .attempt

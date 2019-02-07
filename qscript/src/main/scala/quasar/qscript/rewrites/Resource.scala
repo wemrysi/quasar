@@ -18,7 +18,7 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{List, Nil, Option}
 
-import quasar.{IdStatus, ParseInstruction}
+import quasar.{IdStatus, ScalarStage}
 import quasar.contrib.iota._
 import quasar.qscript.{InterpretedRead, Read}
 
@@ -32,10 +32,10 @@ object Resource {
         implicit
         IR: Const[InterpretedRead[A], ?] :<<: F,
         R: Const[Read[A], ?] :<<: F)
-        : Option[(A, IdStatus, List[ParseInstruction])] = {
+        : Option[(A, IdStatus, List[ScalarStage])] = {
 
       def isIR = IR.prj(fb) map {
-        case Const(InterpretedRead(a, idStatus, instrs)) => (a, idStatus, instrs)
+        case Const(InterpretedRead(a, ss)) => (a, ss.idStatus, ss.stages)
       }
 
       def isR = R.prj(fb) map {

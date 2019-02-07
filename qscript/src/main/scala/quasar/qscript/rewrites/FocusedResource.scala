@@ -18,7 +18,7 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{List, Option}
 
-import quasar.{FocusedParseInstruction, IdStatus}
+import quasar.{IdStatus, ScalarStage}
 import quasar.contrib.iota._
 import quasar.qscript.{InterpretedRead, Read}
 
@@ -32,11 +32,11 @@ object FocusedResource {
         implicit
         IR: Const[InterpretedRead[A], ?] :<<: F,
         R: Const[Read[A], ?] :<<: F)
-        : Option[(A, IdStatus, List[FocusedParseInstruction])] =
+        : Option[(A, IdStatus, List[ScalarStage.Focused])] =
       Resource[A].unapply(fb) flatMap {
         case (a, idStatus, instrs) =>
           val r = instrs traverse {
-            case fpi: FocusedParseInstruction => some(fpi)
+            case ssf: ScalarStage.Focused => some(ssf)
             case _ => none
           }
           r.map((a, idStatus, _))

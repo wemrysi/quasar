@@ -19,7 +19,8 @@ package quasar.impl.evaluate
 import slamdata.Predef.{Stream => _, _}
 
 import quasar._
-import quasar.ParseInstruction.{Cartesian, Pivot}
+import quasar.ScalarStage.{Cartesian, Pivot}
+import quasar.api.table.ColumnType
 import quasar.common._
 import quasar.common.data._
 
@@ -35,7 +36,7 @@ import org.typelevel.jawn.{AsyncParser, Facade}
 import qdata.json.QDataFacade
 
 object RValueCartesianSpec extends JsonSpec {
-  import quasar.impl.evaluate.{RValueParseInstructionInterpreter => Interpreter}
+  import quasar.impl.evaluate.{RValueScalarStagesInterpreter => Interpreter}
 
   type JsonElement = RValue
 
@@ -44,7 +45,7 @@ object RValueCartesianSpec extends JsonSpec {
 
   "RValue Cartesian interpreter" should {
 
-    val pivot = Pivot(IdStatus.ExcludeId, ParseType.Array)
+    val pivot = Pivot(IdStatus.ExcludeId, ColumnType.Array)
 
     val cartouches = Map(
       (CPathField("a_"), (CPathField("a"), List(pivot))),
@@ -145,7 +146,7 @@ object RValueCartesianSpec extends JsonSpec {
   def cartesianInto(
       parallelism: Int,
       minUnit: Int,
-      cartouches: Map[CPathField, (CPathField, List[FocusedParseInstruction])])(
+      cartouches: Map[CPathField, (CPathField, List[ScalarStage.Focused])])(
       expected: JsonStream)
       : Matcher[JsonStream] =
     bestSemanticEqual(expected) ^^ { str: JsonStream =>

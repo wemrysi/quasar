@@ -18,7 +18,7 @@ package quasar.impl.evaluate
 
 import slamdata.Predef.{Stream => _, _}
 
-import quasar.{IdStatus, ParseInstructionSpec}
+import quasar.{IdStatus, ScalarStageSpec}
 import quasar.common.data.RValue
 
 import scala.concurrent.ExecutionContext
@@ -31,8 +31,8 @@ import qdata.json.QDataFacade
 
 import org.typelevel.jawn.{AsyncParser, Facade}
 
-object RValueParseInstructionSpec extends ParseInstructionSpec {
-  import quasar.impl.evaluate.{RValueParseInstructionInterpreter => Interpreter}
+object RValueParseInstructionSpec extends ScalarStageSpec {
+  import quasar.impl.evaluate.{RValueScalarStagesInterpreter => Interpreter}
 
   implicit def executionContext: ExecutionContext = ExecutionContext.Implicits.global
   implicit val cs: ContextShift[IO] = IO.contextShift(executionContext)
