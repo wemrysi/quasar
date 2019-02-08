@@ -21,7 +21,6 @@ import slamdata.Predef._
 import scalaz.{Cord, Order, Show}
 import scalaz.Ordering._
 import scalaz.std.anyVal._
-import scalaz.std.list._
 import scalaz.std.string._
 import scalaz.syntax.show._
 
