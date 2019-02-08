@@ -18,7 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.{ConditionMatchers, Disposable, RenderTreeT}
+import quasar.{ConditionMatchers, Disposable, RenderTreeT, ScalarStages}
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
@@ -106,7 +106,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       QueryResult.typed(
         ParsableType.Json(JsonVariant.LineDelimited, false),
         Stream.empty,
-        Nil))
+        ScalarStages.Id))
 
   val LightT = DatasourceType("light", 1L)
   val HeavyT = DatasourceType("heavy", 2L)

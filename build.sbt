@@ -192,6 +192,7 @@ lazy val common = project
 lazy val frontend = project
   .settings(name := "quasar-frontend")
   .dependsOn(
+    api,
     common % BothScopes,
     ejson % BothScopes)
   .settings(commonSettings)
@@ -235,8 +236,8 @@ lazy val sql = project
 lazy val qscript = project
   .settings(name := "quasar-qscript")
   .dependsOn(
-    frontend % BothScopes,
-    api)
+    api,
+    frontend % BothScopes)
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 

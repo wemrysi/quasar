@@ -18,6 +18,7 @@ package quasar
 
 import slamdata.Predef._
 
+import quasar.api.table.ColumnType
 import quasar.common.{CPath, CPathField}
 
 import org.specs2.matcher.Matcher
@@ -26,16 +27,16 @@ import scala.collection.immutable.{Map, Set}
 
 import java.lang.String
 
-abstract class ParseInstructionSpec
+abstract class ScalarStageSpec
     extends JsonSpec
-    with ParseInstructionSpec.IdsSpec
-    with ParseInstructionSpec.WrapSpec
-    with ParseInstructionSpec.ProjectSpec
-    with ParseInstructionSpec.MaskSpec
-    with ParseInstructionSpec.PivotSpec
-    with ParseInstructionSpec.CartesianSpec
+    with ScalarStageSpec.IdsSpec
+    with ScalarStageSpec.WrapSpec
+    with ScalarStageSpec.ProjectSpec
+    with ScalarStageSpec.MaskSpec
+    with ScalarStageSpec.PivotSpec
+    with ScalarStageSpec.CartesianSpec
 
-object ParseInstructionSpec {
+object ScalarStageSpec {
 
   /*
    * Please note that this is currently *over*-specified.
@@ -46,9 +47,65 @@ object ParseInstructionSpec {
    * changed.
    */
   trait IdsSpec extends JsonSpec {
-    protected final val Ids = ParseInstruction.Ids
+    import IdStatus.{ExcludeId, IdOnly, IncludeId}
 
-    "ids" should {
+    "ExcludeId" should {
+      "emit scalar rows unmodified" in {
+        val input = ldjson("""
+          1
+          "hi"
+          true
+          """)
+
+        input must interpretIdsAs(ExcludeId, input)
+      }
+
+      "emit vector rows unmodified" in {
+        val input = ldjson("""
+          [1, 2, 3]
+          { "a": "hi", "b": { "c": null } }
+          [{ "d": {} }]
+          """)
+
+        input must interpretIdsAs(ExcludeId, input)
+      }
+    }
+
+    "IdOnly" should {
+      "return monotonic integers for each scalar row" in {
+        val input = ldjson("""
+          1
+          "hi"
+          true
+          """)
+
+        val expected = ldjson("""
+          0
+          1
+          2
+          """)
+
+        input must interpretIdsAs(IdOnly, expected)
+      }
+
+      "return monotonic integers for each vector row" in {
+        val input = ldjson("""
+          [1, 2, 3]
+          { "a": "hi", "b": { "c": null } }
+          [{ "d": {} }]
+          """)
+
+        val expected = ldjson("""
+          0
+          1
+          2
+          """)
+
+        input must interpretIdsAs(IdOnly, expected)
+      }
+    }
+
+    "IncludeId" should {
       "wrap each scalar row in monotonic integers" in {
         val input = ldjson("""
           1
@@ -62,7 +119,7 @@ object ParseInstructionSpec {
           [2, true]
           """)
 
-        input must assignIdsTo(expected)
+        input must interpretIdsAs(IncludeId, expected)
       }
 
       "wrap each vector row in monotonic integers" in {
@@ -78,22 +135,22 @@ object ParseInstructionSpec {
           [2, [{ "d": {} }]]
           """)
 
-        input must assignIdsTo(expected)
+        input must interpretIdsAs(IncludeId, expected)
       }
     }
 
-    def evalIds(stream: JsonStream): JsonStream
+    def evalIds(idStatus: IdStatus, stream: JsonStream): JsonStream
 
-    def assignIdsTo(expected: JsonStream) : Matcher[JsonStream] =
-      bestSemanticEqual(expected) ^^ { str: JsonStream => evalIds(str) }
+    def interpretIdsAs(idStatus: IdStatus, expected: JsonStream) : Matcher[JsonStream] =
+      bestSemanticEqual(expected) ^^ { str: JsonStream => evalIds(idStatus, str) }
   }
 
   trait WrapSpec extends JsonSpec {
-    protected final type Wrap = ParseInstruction.Wrap
-    protected final val Wrap = ParseInstruction.Wrap
+    protected final type Wrap = ScalarStage.Wrap
+    protected final val Wrap = ScalarStage.Wrap
 
     "wrap" should {
-      "nest scalars at identity" in {
+      "nest scalars" in {
         val input = ldjson("""
           1
           "hi"
@@ -106,10 +163,10 @@ object ParseInstructionSpec {
           { "foo": true }
           """)
 
-        input must wrapInto(".", "foo")(expected)
+        input must wrapInto("foo")(expected)
       }
 
-      "nest vectors at identity" in {
+      "nest vectors" in {
         val input = ldjson("""
           [1, 2, 3]
           { "a": "hi", "b": { "c": null } }
@@ -122,159 +179,37 @@ object ParseInstructionSpec {
           { "bar": [{ "d": {} }] }
           """)
 
-        input must wrapInto(".", "bar")(expected)
+        input must wrapInto("bar")(expected)
       }
 
-      "nest scalars at .a.b" in {
+      "nest empty objects" in {
         val input = ldjson("""
-          { "a": { "b": 1 } }
-          { "a": { "b": "hi" } }
-          { "a": { "b": true } }
-          """)
-
-        val expected = ldjson("""
-          { "a": { "b": { "foo": 1 } } }
-          { "a": { "b": { "foo": "hi" } } }
-          { "a": { "b": { "foo": true } } }
-          """)
-
-        input must wrapInto(".a.b", "foo")(expected)
-      }
-
-      "nest scalars at .a.b keeping rows excluding the target" in {
-        val input = ldjson("""
-          { "a": { "b": 1 } }
-          { "a": { "c": 2 } }
-          { "a": { "b": "hi" } }
-          { "a": { "d": "bye" } }
+          "a"
           {}
           []
-          42
+          1
           """)
 
         val expected = ldjson("""
-          { "a": { "b": { "foo": 1 } } }
-          { "a": { "c": 2 } }
-          { "a": { "b": { "foo": "hi" } } }
-          { "a": { "d": "bye" } }
-          {}
-          []
-          42
+          { "bar": "a" }
+          { "bar": {} }
+          { "bar": [] }
+          { "bar": 1 }
           """)
 
-        input must wrapInto(".a.b", "foo")(expected)
-      }
-
-      "nest scalars at .a[1] with surrounding structure" in {
-        val input = ldjson("""
-          { "a": [null, 1, "nada"] }
-          { "a": [[], "hi"] }
-          { "a": [null, true, "nada"] }
-          """)
-
-        val expected = ldjson("""
-          { "a": [null, { "bin": 1 }, "nada"] }
-          { "a": [[], { "bin": "hi" }] }
-          { "a": [null, { "bin": true }, "nada"] }
-          """)
-
-        input must wrapInto(".a[1]", "bin")(expected)
-      }
-
-      "nest scalars at .a[2] with surrounding structure keeping rows excluding the target" in {
-        val input = ldjson("""
-          { "a": [null, 1, "nada"] }
-          { "a": [[], "hi"] }
-          { "a": [null, true, "nada", "nix", "nil"] }
-          { "a": [] }
-          {}
-          []
-          42
-          """)
-
-        val expected = ldjson("""
-          { "a": [null, 1, { "bin": "nada" }] }
-          { "a": [[], "hi"] }
-          { "a": [null, true, { "bin": "nada" }, "nix", "nil"] }
-          { "a": [] }
-          {}
-          []
-          42
-          """)
-
-        input must wrapInto(".a[2]", "bin")(expected)
-      }
-
-      "nest vectors at .a.b" in {
-        val input = ldjson("""
-          { "a": { "b": [1, 2, 3] } }
-          { "a": { "b": { "a": "hi", "b": { "c": null } } } }
-          { "a": { "b": [{ "d": {} }] } }
-          """)
-
-        val expected = ldjson("""
-          { "a": { "b": { "bar": [1, 2, 3] } } }
-          { "a": { "b": { "bar": { "a": "hi", "b": { "c": null } } } } }
-          { "a": { "b": { "bar": [{ "d": {} }] } } }
-          """)
-
-        input must wrapInto(".a.b", "bar")(expected)
-      }
-
-      "retain surrounding structure with scalars at .a.b" in {
-        val input = ldjson("""
-          { "z": null, "a": { "b": 1 }, "d": false, "b": [] }
-          { "z": [], "a": { "b": "hi" }, "d": "to be or not to be", "b": { "a": 321} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "b": true }, "d": {} }
-          """)
-
-        val expected = ldjson("""
-          { "z": null, "a": { "b": { "qux": 1 } }, "d": false, "b": [] }
-          { "z": [], "a": { "b": { "qux": "hi" } }, "d": "to be or not to be", "b": { "a": 321} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "b": { "qux": true } }, "d": {} }
-          """)
-
-        input must wrapInto(".a.b", "qux")(expected)
-      }
-
-      "retain surrounding structure with scalars at .a.b keeping rows excluding the target" in {
-        val input = ldjson("""
-          { "z": null, "a": { "b": 1 }, "d": false, "b": [] }
-          { "z": [], "a": { "b": "hi" }, "d": "to be or not to be", "b": { "a": 321} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "c": null }, "d": {} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "b": true }, "d": {} }
-          {}
-          []
-          42
-          """)
-
-        val expected = ldjson("""
-          { "z": null, "a": { "b": { "qux": 1 } }, "d": false, "b": [] }
-          { "z": [], "a": { "b": { "qux": "hi" } }, "d": "to be or not to be", "b": { "a": 321} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "c": null }, "d": {} }
-          { "z": { "a": { "b": 3.14 } }, "a": { "b": { "qux": true } }, "d": {} }
-          {}
-          []
-          42
-          """)
-
-        input must wrapInto(".a.b", "qux")(expected)
+        input must wrapInto("bar")(expected)
       }
     }
 
     def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream
 
-    def wrapInto(
-        path: String,
-        name: String)(
-        expected: JsonStream)
-        : Matcher[JsonStream] =
-      bestSemanticEqual(expected) ^^ { str: JsonStream => evalWrap(Wrap(CPath.parse(path), name), str)}
+    def wrapInto(name: String)(expected: JsonStream): Matcher[JsonStream] =
+      bestSemanticEqual(expected) ^^ { str: JsonStream => evalWrap(Wrap(name), str)}
   }
 
   trait ProjectSpec extends JsonSpec {
-    protected final type Project = ParseInstruction.Project
-    protected final val Project = ParseInstruction.Project
+    protected final type Project = ScalarStage.Project
+    protected final val Project = ScalarStage.Project
 
     "project" should {
       "passthrough at identity" in {
@@ -483,10 +418,10 @@ object ParseInstructionSpec {
   }
 
   trait MaskSpec extends JsonSpec {
-    import ParseType._
+    import ColumnType._
 
-    protected final type Mask = ParseInstruction.Mask
-    protected final val Mask = ParseInstruction.Mask
+    protected final type Mask = ScalarStage.Mask
+    protected final val Mask = ScalarStage.Mask
 
     "masks" should {
       "drop everything when empty" in {
@@ -810,7 +745,7 @@ object ParseInstructionSpec {
     def evalMask(mask: Mask, stream: JsonStream): JsonStream
 
     def maskInto(
-        masks: (String, Set[ParseType])*)(
+        masks: (String, Set[ColumnType])*)(
         expected: JsonStream)
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>
@@ -820,11 +755,11 @@ object ParseInstructionSpec {
 
   trait PivotSpec extends JsonSpec {
 
-    protected final type Pivot = ParseInstruction.Pivot
-    protected final val Pivot = ParseInstruction.Pivot
+    protected final type Pivot = ScalarStage.Pivot
+    protected final val Pivot = ScalarStage.Pivot
 
     "pivot" should {
-      "shift an array at identity" >> {
+      "shift an array" >> {
         val input = ldjson("""
           [1, 2, 3]
           [4, 5, 6]
@@ -851,7 +786,7 @@ object ParseInstructionSpec {
             13
             """)
 
-          input must pivotInto(".", IdStatus.ExcludeId, ParseType.Array)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
         }
 
         "IdOnly" >> {
@@ -871,7 +806,7 @@ object ParseInstructionSpec {
             1
             """)
 
-          input must pivotInto(".", IdStatus.IdOnly, ParseType.Array)(expected)
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(expected)
         }
 
         "IncludeId" >> {
@@ -891,154 +826,11 @@ object ParseInstructionSpec {
             [1, 13]
             """)
 
-          input must pivotInto(".", IdStatus.IncludeId, ParseType.Array)(expected)
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(expected)
         }
       }
 
-      "shift an array at .a.b (with no surrounding structure)" >> {
-        val input = ldjson("""
-          { "a": { "b": [1, 2, 3] } }
-          { "a": { "b": [4, 5, 6] } }
-          { "a": { "b": [7, 8, 9, 10] } }
-          { "a": { "b": [11] } }
-          { "a": { "b": [] } }
-          { "a": { "b": [12, 13] } }
-          """)
-
-        "ExcludeId" >> {
-          val expected = ldjson("""
-            { "a": { "b": 1 } }
-            { "a": { "b": 2 } }
-            { "a": { "b": 3 } }
-            { "a": { "b": 4 } }
-            { "a": { "b": 5 } }
-            { "a": { "b": 6 } }
-            { "a": { "b": 7 } }
-            { "a": { "b": 8 } }
-            { "a": { "b": 9 } }
-            { "a": { "b": 10 } }
-            { "a": { "b": 11 } }
-            { "a": { "b": 12 } }
-            { "a": { "b": 13 } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.ExcludeId, ParseType.Array)(expected)
-        }
-
-        "IdOnly" >> {
-          val expected = ldjson("""
-            { "a": { "b": 0 } }
-            { "a": { "b": 1 } }
-            { "a": { "b": 2 } }
-            { "a": { "b": 0 } }
-            { "a": { "b": 1 } }
-            { "a": { "b": 2 } }
-            { "a": { "b": 0 } }
-            { "a": { "b": 1 } }
-            { "a": { "b": 2 } }
-            { "a": { "b": 3 } }
-            { "a": { "b": 0 } }
-            { "a": { "b": 0 } }
-            { "a": { "b": 1 } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.IdOnly, ParseType.Array)(expected)
-        }
-
-        "IncludeId" >> {
-          val expected = ldjson("""
-            { "a": { "b": [0, 1] } }
-            { "a": { "b": [1, 2] } }
-            { "a": { "b": [2, 3] } }
-            { "a": { "b": [0, 4] } }
-            { "a": { "b": [1, 5] } }
-            { "a": { "b": [2, 6] } }
-            { "a": { "b": [0, 7] } }
-            { "a": { "b": [1, 8] } }
-            { "a": { "b": [2, 9] } }
-            { "a": { "b": [3, 10] } }
-            { "a": { "b": [0, 11] } }
-            { "a": { "b": [0, 12] } }
-            { "a": { "b": [1, 13] } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.IncludeId, ParseType.Array)(expected)
-        }
-      }
-
-     "shift an array at .a[0] (with no surrounding structure)" >> {
-        val input = ldjson("""
-          { "a": [ [1, 2, 3] ] }
-          { "a": [ [4, 5, 6] ] }
-          { "a": [ [7, 8, 9, 10] ] }
-          { "a": [ [11] ] }
-          { "a": [ [] ] }
-          { "a": [ [12, 13] ] }
-          """)
-
-        "ExcludeId" >> {
-          val expected = ldjson("""
-            { "a": [ 1 ] }
-            { "a": [ 2 ] }
-            { "a": [ 3 ] }
-            { "a": [ 4 ] }
-            { "a": [ 5 ] }
-            { "a": [ 6 ] }
-            { "a": [ 7 ] }
-            { "a": [ 8 ] }
-            { "a": [ 9 ] }
-            { "a": [ 10 ] }
-            { "a": [ 11 ] }
-            { "a": [ 12 ] }
-            { "a": [ 13 ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.ExcludeId, ParseType.Array)(expected)
-        }
-
-        "IdOnly" >> {
-          val expected = ldjson("""
-            { "a": [ 0 ] }
-            { "a": [ 1 ] }
-            { "a": [ 2 ] }
-            { "a": [ 0 ] }
-            { "a": [ 1 ] }
-            { "a": [ 2 ] }
-            { "a": [ 0 ] }
-            { "a": [ 1 ] }
-            { "a": [ 2 ] }
-            { "a": [ 3 ] }
-            { "a": [ 0 ] }
-            { "a": [ 0 ] }
-            { "a": [ 1 ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.IdOnly, ParseType.Array)(expected)
-        }
-
-        "IncludeId" >> {
-          val expected = ldjson("""
-            { "a": [ [0, 1] ] }
-            { "a": [ [1, 2] ] }
-            { "a": [ [2, 3] ] }
-            { "a": [ [0, 4] ] }
-            { "a": [ [1, 5] ] }
-            { "a": [ [2, 6] ] }
-            { "a": [ [0, 7] ] }
-            { "a": [ [1, 8] ] }
-            { "a": [ [2, 9] ] }
-            { "a": [ [3, 10] ] }
-            { "a": [ [0, 11] ] }
-            { "a": [ [0, 12] ] }
-            { "a": [ [1, 13] ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.IncludeId, ParseType.Array)(expected)
-        }
-      }
-
-
-      "shift an object at identity" >> {
+      "shift an object" >> {
         val input = ldjson("""
           { "a": 1, "b": 2, "c": 3 }
           { "d": 4, "e": 5, "f": 6 }
@@ -1065,7 +857,7 @@ object ParseInstructionSpec {
             13
             """)
 
-          input must pivotInto(".", IdStatus.ExcludeId, ParseType.Object)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
         }
 
         "IdOnly" >> {
@@ -1085,7 +877,7 @@ object ParseInstructionSpec {
             "m"
             """)
 
-          input must pivotInto(".", IdStatus.IdOnly, ParseType.Object)(expected)
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(expected)
         }
 
         "IncludeId" >> {
@@ -1105,162 +897,8 @@ object ParseInstructionSpec {
             ["m", 13]
             """)
 
-          input must pivotInto(".", IdStatus.IncludeId, ParseType.Object)(expected)
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(expected)
         }
-      }
-
-      "shift an object at .a.b (no surrounding structure)" >> {
-        val input = ldjson("""
-          { "a": { "b": { "a": 1, "b": 2, "c": 3 } } }
-          { "a": { "b": { "d": 4, "e": 5, "f": 6 } } }
-          { "a": { "b": { "g": 7, "h": 8, "i": 9, "j": 10 } } }
-          { "a": { "b": { "k": 11 } } }
-          { "a": { "b": {} } }
-          { "a": { "b": { "l": 12, "m": 13 } } }
-          """)
-
-        "ExcludeId" >> {
-          val expected = ldjson("""
-            { "a": { "b": 1 } }
-            { "a": { "b": 2 } }
-            { "a": { "b": 3 } }
-            { "a": { "b": 4 } }
-            { "a": { "b": 5 } }
-            { "a": { "b": 6 } }
-            { "a": { "b": 7 } }
-            { "a": { "b": 8 } }
-            { "a": { "b": 9 } }
-            { "a": { "b": 10 } }
-            { "a": { "b": 11 } }
-            { "a": { "b": 12 } }
-            { "a": { "b": 13 } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.ExcludeId, ParseType.Object)(expected)
-        }
-
-        "IdOnly" >> {
-          val expected = ldjson("""
-            { "a": { "b": "a" } }
-            { "a": { "b": "b" } }
-            { "a": { "b": "c" } }
-            { "a": { "b": "d" } }
-            { "a": { "b": "e" } }
-            { "a": { "b": "f" } }
-            { "a": { "b": "g" } }
-            { "a": { "b": "h" } }
-            { "a": { "b": "i" } }
-            { "a": { "b": "j" } }
-            { "a": { "b": "k" } }
-            { "a": { "b": "l" } }
-            { "a": { "b": "m" } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.IdOnly, ParseType.Object)(expected)
-        }
-
-        "IncludeId" >> {
-          val expected = ldjson("""
-            { "a": { "b": ["a", 1] } }
-            { "a": { "b": ["b", 2] } }
-            { "a": { "b": ["c", 3] } }
-            { "a": { "b": ["d", 4] } }
-            { "a": { "b": ["e", 5] } }
-            { "a": { "b": ["f", 6] } }
-            { "a": { "b": ["g", 7] } }
-            { "a": { "b": ["h", 8] } }
-            { "a": { "b": ["i", 9] } }
-            { "a": { "b": ["j", 10] } }
-            { "a": { "b": ["k", 11] } }
-            { "a": { "b": ["l", 12] } }
-            { "a": { "b": ["m", 13] } }
-            """)
-
-          input must pivotInto(".a.b", IdStatus.IncludeId, ParseType.Object)(expected)
-        }
-      }
-
-      "shift an object at .a[0] (no surrounding structure)" >> {
-        val input = ldjson("""
-          { "a": [ { "a": 1, "b": 2, "c": 3 } ] }
-          { "a": [ { "d": 4, "e": 5, "f": 6 } ] }
-          { "a": [ { "g": 7, "h": 8, "i": 9, "j": 10 } ] }
-          { "a": [ { "k": 11 } ] }
-          { "a": [ {} ] }
-          { "a": [ { "l": 12, "m": 13 } ] }
-          """)
-
-        "ExcludeId" >> {
-          val expected = ldjson("""
-            { "a": [ 1 ] }
-            { "a": [ 2 ] }
-            { "a": [ 3 ] }
-            { "a": [ 4 ] }
-            { "a": [ 5 ] }
-            { "a": [ 6 ] }
-            { "a": [ 7 ] }
-            { "a": [ 8 ] }
-            { "a": [ 9 ] }
-            { "a": [ 10 ] }
-            { "a": [ 11 ] }
-            { "a": [ 12 ] }
-            { "a": [ 13 ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.ExcludeId, ParseType.Object)(expected)
-        }
-
-        "IdOnly" >> {
-          val expected = ldjson("""
-            { "a": [ "a" ] }
-            { "a": [ "b" ] }
-            { "a": [ "c" ] }
-            { "a": [ "d" ] }
-            { "a": [ "e" ] }
-            { "a": [ "f" ] }
-            { "a": [ "g" ] }
-            { "a": [ "h" ] }
-            { "a": [ "i" ] }
-            { "a": [ "j" ] }
-            { "a": [ "k" ] }
-            { "a": [ "l" ] }
-            { "a": [ "m" ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.IdOnly, ParseType.Object)(expected)
-        }
-
-        "IncludeId" >> {
-          val expected = ldjson("""
-            { "a": [ ["a", 1] ] }
-            { "a": [ ["b", 2] ] }
-            { "a": [ ["c", 3] ] }
-            { "a": [ ["d", 4] ] }
-            { "a": [ ["e", 5] ] }
-            { "a": [ ["f", 6] ] }
-            { "a": [ ["g", 7] ] }
-            { "a": [ ["h", 8] ] }
-            { "a": [ ["i", 9] ] }
-            { "a": [ ["j", 10] ] }
-            { "a": [ ["k", 11] ] }
-            { "a": [ ["l", 12] ] }
-            { "a": [ ["m", 13] ] }
-            """)
-
-          input must pivotInto(".a[0]", IdStatus.IncludeId, ParseType.Object)(expected)
-        }
-      }
-
-      "shift an object under .shifted with IncludeId and only one field" in {
-        val input = ldjson("""
-          { "shifted": { "shifted1": { "foo": "bar" } } }
-          """)
-
-        val expected = ldjson("""
-          { "shifted": ["shifted1", { "foo": "bar" }] }
-          """)
-
-        input must pivotInto(".shifted", IdStatus.IncludeId, ParseType.Object)(expected)
       }
 
       "preserve empty arrays as values of an array pivot" in {
@@ -1280,7 +918,7 @@ object ParseInstructionSpec {
           "four"
         """)
 
-        input must pivotInto(".", IdStatus.ExcludeId, ParseType.Array)(expected)
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
       }
 
       "preserve empty objects as values of an object pivot" in {
@@ -1300,27 +938,26 @@ object ParseInstructionSpec {
           "four"
         """)
 
-        input must pivotInto(".", IdStatus.ExcludeId, ParseType.Object)(expected)
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
       }
     }
 
     def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream
 
     def pivotInto(
-        path: String,
         idStatus: IdStatus,
-        structure: CompositeParseType)(
+        structure: ColumnType.Vector)(
         expected: JsonStream)
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>
-        evalPivot(Pivot(CPath.parse(path), idStatus, structure), str)
+        evalPivot(Pivot(idStatus, structure), str)
       }
   }
 
   trait CartesianSpec extends JsonSpec {
 
-    protected final type Cartesian = ParseInstruction.Cartesian
-    protected final val Cartesian = ParseInstruction.Cartesian
+    protected final type Cartesian = ScalarStage.Cartesian
+    protected final val Cartesian = ScalarStage.Cartesian
 
     "cartesian" should {
       // a0 as a1, b0 as b1, c0 as c1, d0 as d1
@@ -1379,7 +1016,7 @@ object ParseInstructionSpec {
 
       // a0[_] as a1, b0 as b1, c0{_} as c1
       "cross fields with single pivot" in {
-        import ParseInstruction.Pivot
+        import ScalarStage.Pivot
 
         val input = ldjson("""
           { "a0": [1, 2, 3], "b0": null, "c0": { "x": 4, "y": 5 } }
@@ -1396,18 +1033,18 @@ object ParseInstructionSpec {
 
         val targets = Map(
           (CPathField("a1"),
-            (CPathField("a0"), List(Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array)))),
+            (CPathField("a0"), List(Pivot(IdStatus.ExcludeId, ColumnType.Array)))),
           (CPathField("b1"),
             (CPathField("b0"), Nil)),
           (CPathField("c1"),
-            (CPathField("c0"), List(Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Object)))))
+            (CPathField("c0"), List(Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
 
         input must cartesianInto(targets)(expected)
       }
 
       // a[_].x0.y0{_} as y, a[_].x1[_] as z, b{_:} as b, c as c
       "cross fields with multiple nested pivots" in {
-        import ParseInstruction.{Pivot, Project}
+        import ScalarStage.{Pivot, Project}
 
         val input = ldjson("""
           {
@@ -1435,18 +1072,18 @@ object ParseInstructionSpec {
         val targets = Map(
           (CPathField("y"),
             (CPathField("a"), List(
-              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array),
+              Pivot(IdStatus.ExcludeId, ColumnType.Array),
               Project(CPath.parse("x0")),
               Project(CPath.parse("y0")),
-              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Object)))),
+              Pivot(IdStatus.ExcludeId, ColumnType.Object)))),
           (CPathField("z"),
             (CPathField("a"), List(
-              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array),
+              Pivot(IdStatus.ExcludeId, ColumnType.Array),
               Project(CPath.parse("x1")),
-              Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array)))),
+              Pivot(IdStatus.ExcludeId, ColumnType.Array)))),
           (CPathField("b"),
             (CPathField("b"), List(
-              Pivot(CPath.Identity, IdStatus.IdOnly, ParseType.Object)))),
+              Pivot(IdStatus.IdOnly, ColumnType.Object)))),
           (CPathField("c"),
             (CPathField("c"), Nil)))
 
@@ -1454,7 +1091,7 @@ object ParseInstructionSpec {
       }
 
       "emit defined fields when some are undefined" in {
-        import ParseInstruction.{Mask, Pivot}
+        import ScalarStage.{Mask, Pivot}
 
         val input = ldjson("""
           { "a": 1, "b": [ "two", "three" ] }
@@ -1474,12 +1111,12 @@ object ParseInstructionSpec {
           (CPathField("a"), (CPathField("a"), Nil)),
 
           (CPathField("ba"), (CPathField("b"), List(
-            Mask(Map(CPath.Identity -> Set(ParseType.Array))),
-            Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Array)))),
+            Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Array)))),
 
           (CPathField("bm"), (CPathField("b"), List(
-            Mask(Map(CPath.Identity -> Set(ParseType.Object))),
-            Pivot(CPath.Identity, IdStatus.ExcludeId, ParseType.Object)))))
+            Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
 
         input must cartesianInto(targets)(expected)
       }
@@ -1488,7 +1125,7 @@ object ParseInstructionSpec {
     def evalCartesian(cartesian: Cartesian, stream: JsonStream): JsonStream
 
     def cartesianInto(
-        cartouches: Map[CPathField, (CPathField, List[FocusedParseInstruction])])(
+        cartouches: Map[CPathField, (CPathField, List[ScalarStage.Focused])])(
         expected: JsonStream)
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>

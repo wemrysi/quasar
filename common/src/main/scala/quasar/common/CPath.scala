@@ -21,7 +21,6 @@ import slamdata.Predef._
 import scalaz.{Cord, Order, Show}
 import scalaz.Ordering._
 import scalaz.std.anyVal._
-import scalaz.std.list._
 import scalaz.std.string._
 import scalaz.syntax.show._
 
@@ -168,9 +167,8 @@ object CPath {
     case CPathMeta(name) => Cord("CPathMeta(") ++ name.show ++ Cord(")")
   }
 
-  implicit val cPathShow: Show[CPath] = Show.show {
-    case CompositeCPath(nodes) => nodes.show
-  }
+  implicit val cPathShow: Show[CPath] =
+    Show.showFromToString
 
   implicit object CPathOrder extends scalaz.Order[CPath] {
     def order(v1: CPath, v2: CPath): scalaz.Ordering = {

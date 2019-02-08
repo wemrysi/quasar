@@ -16,9 +16,9 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{Boolean, Exception, Nil, None, Option, Some, Unit}
+import slamdata.Predef.{Boolean, Exception, None, Option, Some, Unit}
 
-import quasar.{Condition, IdStatus, RenderTreeT}
+import quasar.{Condition, IdStatus, RenderTreeT, ScalarStages}
 import quasar.api.SchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
@@ -114,7 +114,7 @@ final class DefaultDatasources[
     withDatasource[DiscoveryError[I], Option[schemaConfig.Schema]](datasourceId) { mds =>
       val fr = mds match {
         case ManagedDatasource.ManagedLightweight(lw) =>
-          lw.evaluate(InterpretedRead(path, Nil))
+          lw.evaluate(InterpretedRead(path, ScalarStages.Id))
 
         case ManagedDatasource.ManagedHeavyweight(hw) =>
           hw.evaluate(dsl.Read(path, IdStatus.ExcludeId))

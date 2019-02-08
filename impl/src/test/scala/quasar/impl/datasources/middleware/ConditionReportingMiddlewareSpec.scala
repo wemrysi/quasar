@@ -18,7 +18,7 @@ package quasar.impl.datasources.middleware
 
 import slamdata.Predef.{Boolean, List, None, Option, Unit}
 
-import quasar.{Condition, ConditionMatchers}
+import quasar.{Condition, ConditionMatchers, ScalarStages}
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.Datasource
@@ -87,7 +87,7 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
       r <- Ref[IO].of(List[Condition[Exception]]())
       ds <- ConditionReportingMiddleware[IO, Unit]((_, c) => r.update(c :: _))((), managedTester)
       res = ds match {
-        case ManagedDatasource.ManagedLightweight(lw) => lw.evaluate(InterpretedRead(ResourcePath.root(), List()))
+        case ManagedDatasource.ManagedLightweight(lw) => lw.evaluate(InterpretedRead(ResourcePath.root(), ScalarStages.Id))
         case _ => IO.pure(())
       }
       _ <- res.attempt

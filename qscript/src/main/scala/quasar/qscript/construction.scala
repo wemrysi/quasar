@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef._
-import quasar.{ejson, qscript, IdStatus, ParseInstruction}
+import quasar.{ejson, qscript, IdStatus, ScalarStages}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.iota.copkTraverse
 import quasar.ejson.EJson
@@ -780,10 +780,9 @@ object construction {
         f,
         combine)))
 
-    def InterpretedRead[A](path: A,
-                           instructions: List[ParseInstruction])
-                           (implicit F: Injectable[Const[InterpretedRead[A], ?], F]): R =
-      embed(F.inject(Const(qscript.InterpretedRead(path, instructions))))
+    def InterpretedRead[A](path: A, stages: ScalarStages)
+        (implicit F: Injectable[Const[InterpretedRead[A], ?], F]): R =
+      embed(F.inject(Const(qscript.InterpretedRead(path, stages))))
 
     def Read[A](path: A,
                 idStatus: IdStatus)

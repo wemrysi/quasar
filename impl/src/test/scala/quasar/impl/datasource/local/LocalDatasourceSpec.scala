@@ -26,6 +26,7 @@ import java.nio.file.Paths
 
 import scala.concurrent.ExecutionContext
 
+import quasar.ScalarStages
 import quasar.api.resource.{ResourceName, ResourcePath}
 import quasar.common.data.RValue
 import quasar.concurrent.BlockingContext
@@ -53,7 +54,7 @@ abstract class LocalDatasourceSpec
 
   "returns data from a nonempty file" >>* {
     datasource
-      .evaluate(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.data"), List()))
+      .evaluate(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.data"), ScalarStages.Id))
       .flatMap(_.data.compile.fold(0)((c, _) => c + 1))
       .map(_ must be_>(0))
   }

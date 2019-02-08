@@ -18,36 +18,39 @@ package quasar.api.table
 
 import slamdata.Predef._
 
-import scalaz.{Cord, Equal, Show}
+import scalaz.{Cord, Equal, Order, Show}
+import scalaz.std.list._
 import scalaz.std.tuple._
+import scalaz.std.string._
 import scalaz.syntax.show._
-
-final case class TableRef[Q](name: TableName, query: Q, columns: List[TableColumn])
-
-final case class TableColumn(name: String, coltpe: ColumnScalar)
-
-object TableColumn {
-  implicit val showTableColumn: Show[TableColumn] =
-    Show.show { tc =>
-      Cord("TableColumn(") ++ tc.name ++ Cord(", ") ++ tc.coltpe.show ++ Cord(")")
-    }
-}
 
 final case class TableName(name: String)
 
 object TableName {
-  implicit val equalTableName: Equal[TableName] = Equal.equalA
+  implicit val orderTableName: Order[TableName] = Order.orderBy(_.name)
   implicit val showTableName: Show[TableName] = Show.showFromToString
 }
 
-object TableRef {
-  import TableName._
+final case class TableColumn(name: String, tpe: ColumnType.Scalar)
 
+object TableColumn {
+  implicit val equalTableColumn: Equal[TableColumn] =
+    Equal.equalBy(c => (c.name, c.tpe))
+
+  implicit val showTableColumn: Show[TableColumn] =
+    Show show { tc =>
+      Cord("TableColumn(") ++ tc.name ++ Cord(", ") ++ tc.tpe.show ++ Cord(")")
+    }
+}
+
+final case class TableRef[Q](name: TableName, query: Q, columns: List[TableColumn])
+
+object TableRef {
   implicit def equalTableRef[Q: Equal]: Equal[TableRef[Q]] =
-    Equal.equalBy(t => (t.name, t.query))
+    Equal.equalBy(t => (t.name, t.query, t.columns))
 
   implicit def showTableRef[Q: Show]: Show[TableRef[Q]] =
-    Show.show { t =>
-      Cord("TableRef(") ++ t.name.show ++ Cord(", ") ++ t.query.show ++ Cord(")")
+    Show show { t =>
+      Cord("TableRef(") ++ t.name.show ++ Cord(", ") ++ t.query.show ++ Cord(", ") ++ t.columns.show ++ Cord(")")
     }
 }

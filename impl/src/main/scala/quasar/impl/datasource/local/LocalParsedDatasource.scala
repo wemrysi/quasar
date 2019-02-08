@@ -52,7 +52,7 @@ object LocalParsedDatasource {
           .chunks
           .map(_.toByteBuffer)
           .parseJsonStream[A],
-        iRead.instructions)
+        iRead.stages)
 
     }
   }
