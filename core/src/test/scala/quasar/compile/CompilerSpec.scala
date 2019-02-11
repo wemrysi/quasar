@@ -378,7 +378,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile let with select in body selecting let binding ident" in {
       val query = sqlE"foo := 12; select foo from bar"
       val expectation =
-        lpf.invoke1(Squash, lpf.constant(Data.Int(12)))
+        lpf.invoke1(Squash,
+          lpf.invoke2(MakeMap,
+            lpf.constant(Data.Str("foo")),
+            lpf.constant(Data.Int(12))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -393,9 +396,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       val query = sqlE"select foo from (bar := 12; select * from baz) as quag"
       val expectation =
         lpf.invoke1(Squash,
-          lpf.invoke2(MapProject,
-            lpf.invoke1(Squash, read("baz")),
-            lpf.constant(Data.Str("foo"))))
+          lpf.invoke2(MakeMap,
+            lpf.constant(Data.Str("foo")),
+            lpf.invoke2(MapProject,
+              lpf.invoke1(Squash, read("baz")),
+              lpf.constant(Data.Str("foo")))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -404,9 +409,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       val query = sqlE"select foo from (bar := 12; select * from bar) as quag"
       val expectation =
         lpf.invoke1(Squash,
-          lpf.invoke2(MapProject,
-            lpf.invoke1(Squash, lpf.constant(Data.Int(12))),
-            lpf.constant(Data.Str("foo"))))
+          lpf.invoke2(MakeMap,
+            lpf.constant(Data.Str("foo")),
+              lpf.invoke2(MapProject,
+                lpf.invoke1(Squash, lpf.constant(Data.Int(12))),
+                lpf.constant(Data.Str("foo")))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -415,9 +422,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       val query = sqlE"select bar from (bar := 12; select * from bar) as quag"
       val expectation =
         lpf.invoke1(Squash,
-          lpf.invoke2(MapProject,
-            lpf.invoke1(Squash, lpf.constant(Data.Int(12))),
-            lpf.constant(Data.Str("bar"))))
+          lpf.invoke2(MakeMap,
+            lpf.constant(Data.Str("bar")),
+            lpf.invoke2(MapProject,
+              lpf.invoke1(Squash, lpf.constant(Data.Int(12))),
+              lpf.constant(Data.Str("bar")))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -425,7 +434,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile selection with same ident as nested let and alias" in {
       val query = sqlE"select bar from (bar := 12; select * from bar) as bar"
       val expectation =
-        lpf.invoke1(Squash, lpf.constant(Data.Int(12)))
+        lpf.invoke1(Squash,
+          lpf.invoke2(MakeMap,
+            lpf.constant(Data.Str("bar")),
+            lpf.invoke1(Squash, lpf.constant(Data.Int(12)))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -471,9 +483,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         sqlE"select foo.bar from baz",
         lpf.invoke1(Squash,
-          lpf.invoke2(MapProject,
-            lpf.invoke2(MapProject, read("baz"), lpf.constant(Data.Str("foo"))),
-            lpf.constant(Data.Str("bar")))))
+          lpf.invoke2(MakeMap,
+            lpf.constant(Data.Str("bar")),
+            lpf.invoke2(MapProject,
+              lpf.invoke2(MapProject, read("baz"), lpf.constant(Data.Str("foo"))),
+              lpf.constant(Data.Str("bar"))))))
     }
 
     "compile simple 1-table projection when root identifier is also a table ref" in {
@@ -482,7 +496,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         sqlE"select foo.bar from foo",
         lpf.invoke1(Squash,
-          lpf.invoke2(MapProject, read("foo"), lpf.constant(Data.Str("bar")))))
+          lpf.invoke2(MakeMap,
+            lpf.constant(Data.Str("bar")),
+            lpf.invoke2(MapProject, read("foo"), lpf.constant(Data.Str("bar"))))))
     }
 
     "compile two term addition from one table" in {
@@ -621,14 +637,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"""select bar from foo where bar like "a%" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
-            lpf.invoke2(MapProject,
-              lpf.invoke2(Filter,
-                lpf.free('__tmp0),
-                lpf.invoke3(Like,
-                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
-                  lpf.constant(Data.Str("a%")),
-                  lpf.constant(Data.Str("\\")))),
-              lpf.constant(Data.Str("bar"))))))
+            lpf.invoke2(MakeMap,
+              lpf.constant(Data.Str("bar")),
+              lpf.invoke2(MapProject,
+                lpf.invoke2(Filter,
+                  lpf.free('__tmp0),
+                  lpf.invoke3(Like,
+                    lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                    lpf.constant(Data.Str("a%")),
+                    lpf.constant(Data.Str("\\")))),
+                lpf.constant(Data.Str("bar")))))))
     }
 
     "compile like with escape char" in {
@@ -636,6 +654,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"""select bar from foo where bar like "a=%" escape "=" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
+            lpf.invoke2(MakeMap,
+              lpf.constant(Data.Str("bar")),
             lpf.invoke2(MapProject,
               lpf.invoke2(Filter,
                 lpf.free('__tmp0),
@@ -643,7 +663,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                   lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
                   lpf.constant(Data.Str("a=%")),
                   lpf.constant(Data.Str("=")))),
-              lpf.constant(Data.Str("bar"))))))
+              lpf.constant(Data.Str("bar")))))))
     }
 
     "compile not like" in {
@@ -651,14 +671,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"""select bar from foo where bar not like "a%" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
-            lpf.invoke2(MapProject, lpf.invoke2(Filter,
-              lpf.free('__tmp0),
-              lpf.invoke1(Not,
-                lpf.invoke3(Like,
-                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
-                  lpf.constant(Data.Str("a%")),
-                  lpf.constant(Data.Str("\\"))))),
-              lpf.constant(Data.Str("bar"))))))
+            lpf.invoke2(MakeMap,
+              lpf.constant(Data.Str("bar")),
+              lpf.invoke2(MapProject, lpf.invoke2(Filter,
+                lpf.free('__tmp0),
+                lpf.invoke1(Not,
+                  lpf.invoke3(Like,
+                    lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                    lpf.constant(Data.Str("a%")),
+                    lpf.constant(Data.Str("\\"))))),
+                lpf.constant(Data.Str("bar")))))))
     }
 
     "compile ~" in {
@@ -666,14 +688,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"""select bar from foo where bar ~ "a.$$" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
-            lpf.invoke2(MapProject,
-              lpf.invoke2(Filter,
-                lpf.free('__tmp0),
-                lpf.invoke3(Search,
-                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
-                  lpf.constant(Data.Str("a.$")),
-                  lpf.constant(Data.Bool(false)))),
-              lpf.constant(Data.Str("bar"))))))
+            lpf.invoke2(MakeMap,
+              lpf.constant(Data.Str("bar")),
+              lpf.invoke2(MapProject,
+                lpf.invoke2(Filter,
+                  lpf.free('__tmp0),
+                  lpf.invoke3(Search,
+                    lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                    lpf.constant(Data.Str("a.$")),
+                    lpf.constant(Data.Bool(false)))),
+                lpf.constant(Data.Str("bar")))))))
     }
 
     "compile complex expression" in {
@@ -738,9 +762,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         sqlE"select name from person where 1",
         lpf.invoke1(Squash,
-          lpf.invoke2(MapProject,
-            lpf.invoke2(Filter, read("person"), lpf.constant(Data.Int(1))),
-            lpf.constant(Data.Str("name")))))
+          lpf.invoke2(MakeMap,
+            lpf.constant(Data.Str("name")),
+            lpf.invoke2(MapProject,
+              lpf.invoke2(Filter, read("person"), lpf.constant(Data.Int(1))),
+              lpf.constant(Data.Str("name"))))))
     }
 
     "compile simple where" in {
@@ -748,13 +774,15 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"select name from person where age > 18",
         lpf.let('__tmp0, read("person"),
           lpf.invoke1(Squash,
-            lpf.invoke2(MapProject,
-              lpf.invoke2(Filter,
-                lpf.free('__tmp0),
-                lpf.invoke2(Gt,
-                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("age"))),
-                  lpf.constant(Data.Int(18)))),
-              lpf.constant(Data.Str("name"))))))
+            lpf.invoke2(MakeMap,
+              lpf.constant(Data.Str("name")),
+              lpf.invoke2(MapProject,
+                lpf.invoke2(Filter,
+                  lpf.free('__tmp0),
+                  lpf.invoke2(Gt,
+                    lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("age"))),
+                    lpf.constant(Data.Int(18)))),
+                lpf.constant(Data.Str("name")))))))
     }
 
     "compile simple group by" in {
@@ -830,15 +858,20 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           "pop" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))))
     val setB =
       lpf.invoke1(Squash,
-        lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("city"))))
+        lpf.invoke2(MakeMap,
+          lpf.constant(Data.Str("city")),
+          lpf.invoke2(MapProject,
+            read("zips"),
+            lpf.constant(Data.Str("city")))))
 
     "compile union" in {
       testLogicalPlanCompile(
         sqlE"select loc, pop from zips union select city from zips",
-        lpf.normalizeLets(lpf.normalizeLets(
-          lpf.let('__tmp1, lpf.invoke2(Union, setA, setB),
-            lpf.invoke1(Arbitrary,
-              lpf.invoke2(GroupBy, lpf.free('__tmp1), lpf.free('__tmp1)))))))
+        lpf.normalizeLets(
+          lpf.normalizeLets(
+            lpf.let('__tmp1, lpf.invoke2(Union, setA, setB),
+              lpf.invoke1(Arbitrary,
+                lpf.invoke2(GroupBy, lpf.free('__tmp1), lpf.free('__tmp1)))))))
     }
 
     "compile union all" in {
@@ -922,7 +955,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile top-level map flatten" in {
       testLogicalPlanCompile(
         sqlE"select zips{:*} from zips",
-        lpf.invoke1(Squash, lpf.invoke1(FlattenMap, read("zips"))))
+        lpf.invoke1(Squash,
+          lpf.invoke2(MakeMap,
+            lpf.constant(Data.Str("zips")),
+            lpf.invoke1(FlattenMap, read("zips")))))
     }
 
     "have {_} as alias for {:_}" in {
@@ -979,7 +1015,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         sqlE"select loc[:*] from zips",
         lpf.invoke1(Squash,
-          lpf.invoke1(FlattenArray, lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("loc"))))))
+          lpf.invoke2(MakeMap,
+            lpf.constant(Data.Str("loc")),
+            lpf.invoke1(FlattenArray,
+              lpf.invoke2(MapProject,
+                read("zips"),
+                lpf.constant(Data.Str("loc")))))))
     }
 
     "compile simple order by" in {
@@ -1003,10 +1044,17 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"select name from person order by name",
         lpf.let('__tmp0,
           lpf.invoke1(Squash,
-            lpf.invoke2(MapProject, read("person"), lpf.constant(Data.Str("name")))),
+            lpf.invoke2(MakeMap,
+              lpf.constant(Data.Str("name")),
+              lpf.invoke2(
+                MapProject,
+                read("person"),
+                lpf.constant(Data.Str("name"))))),
           lpf.sort(
             lpf.free('__tmp0),
-            (lpf.free('__tmp0), SortDir.asc).wrapNel)))
+            (lpf.invoke2(MapProject,
+              lpf.free('__tmp0),
+              lpf.constant(Data.Str("name"))), SortDir.asc).wrapNel)))
     }
 
     "compile order by reusing selected flattened field" in {
@@ -1014,14 +1062,19 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"select quux[*] from foo order by quux[*]",
         lpf.let('__tmp0,
           lpf.invoke1(Squash,
-            lpf.invoke1(
-              FlattenArray,
-              lpf.invoke2(MapProject,
-                read("foo"),
-                lpf.constant(Data.Str("quux"))))),
+            lpf.invoke2(MakeMap,
+              lpf.constant(Data.Str("quux")),
+              lpf.invoke1(
+                FlattenArray,
+                lpf.invoke2(MapProject,
+                  read("foo"),
+                  lpf.constant(Data.Str("quux")))))),
           lpf.sort(
             lpf.free('__tmp0),
-            (lpf.free('__tmp0), SortDir.asc).wrapNel)))
+            (lpf.invoke2(
+              MapProject,
+              lpf.free('__tmp0),
+              lpf.constant(Data.Str("quux"))), SortDir.asc).wrapNel)))
     }
 
     "compile simple order by with filter" in {
@@ -1442,7 +1495,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let(
           '__tmp0,
           lpf.invoke1(Squash,
-            lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("city")))),
+            lpf.invoke2(MakeMap,
+              lpf.constant(Data.Str("city")),
+              lpf.invoke2(
+                MapProject,
+                read("zips"),
+                lpf.constant(Data.Str("city"))))),
           lpf.invoke1(Arbitrary,
             lpf.invoke2(GroupBy, lpf.free('__tmp0), lpf.free('__tmp0)))))
     }
@@ -1453,16 +1511,25 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let(
           '__tmp0,
           lpf.invoke1(Squash,
-            lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("city")))),
+            lpf.invoke2(MakeMap,
+              lpf.constant(Data.Str("city")),
+              lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("city"))))),
           lpf.let(
             '__tmp1,
-            lpf.sort(lpf.free('__tmp0), (lpf.free('__tmp0), SortDir.asc).wrapNel),
+            lpf.sort(
+              lpf.free('__tmp0),
+              (lpf.invoke2(
+                MapProject,
+                lpf.free('__tmp0),
+                lpf.constant(Data.Str("city"))), SortDir.asc).wrapNel),
             lpf.sort(
               lpf.invoke1(Arbitrary,
                 lpf.invoke2(GroupBy, lpf.free('__tmp1), lpf.free('__tmp1))),
-              (lpf.invoke1(Arbitrary,
-                lpf.invoke2(GroupBy, lpf.free('__tmp1), lpf.free('__tmp1))),
-                SortDir.asc).wrapNel))))
+              (lpf.invoke2(
+                MapProject,
+                lpf.invoke1(Arbitrary,
+                  lpf.invoke2(GroupBy, lpf.free('__tmp1), lpf.free('__tmp1))),
+                lpf.constant(Data.Str("city"))), SortDir.asc).wrapNel))))
     }
 
     "compile distinct with unrelated order by" in {
@@ -1562,13 +1629,15 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(sqlE"select name from zips where age < :age",
         lpf.let('__tmp0, read("zips"),
           lpf.invoke1(Squash,
-            lpf.invoke2(MapProject,
-              lpf.invoke2(Filter,
-                lpf.free('__tmp0),
-                lpf.invoke2(Lt,
-                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("age"))),
-                  lpf.free('age))),
-              lpf.constant(Data.Str("name"))))))
+            lpf.invoke2(MakeMap,
+              lpf.constant(Data.Str("name")),
+              lpf.invoke2(MapProject,
+                lpf.invoke2(Filter,
+                  lpf.free('__tmp0),
+                  lpf.invoke2(Lt,
+                    lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("age"))),
+                    lpf.free('age))),
+                lpf.constant(Data.Str("name")))))))
     }
   }
 
@@ -1677,21 +1746,33 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
   }
 
-  "namedProjections" should {
+  "inferred names" should {
+    def inferred(s: String): ProjectionName =
+      Inferred(s).right
+
+    def namesOf(projections: List[Proj[Fix[Sql]]]): List[ProjectionName] =
+      projectionNames(projections, None).toOption.toList.join.firsts
+
     "create unique names" >> {
       "when two fields have the same name" in {
         val query = sqlE"SELECT owner.name, car.name from owners as owner join cars as car on car.`_id` = owner.carId"
         val projections = query.project.asInstanceOf[Select[Fix[Sql]]].projections
-        projectionNames(projections, None) must beLike { case \/-(list) =>
-          list.map(_._1) must contain(allOf("name", "name0"))
-        }
+
+        namesOf(projections) must_=== List(inferred("name"), inferred("name0"))
       }
+
+      "when multiple flattened fields have the same name" in {
+        val query = sqlE"SELECT foo{:*}, foo{*:}, foo[:*], foo[*:] from bar"
+        val projections = query.project.asInstanceOf[Select[Fix[Sql]]].projections
+
+        namesOf(projections) must_=== List(inferred("foo"), inferred("foo0"), inferred("foo1"), inferred("foo2"))
+      }
+
       "when a field and an alias have the same name" in {
         val query = sqlE"SELECT owner.name, car.model as name from owners as owner join cars as car on car.`_id` = owner.carId"
         val projections = query.project.asInstanceOf[Select[Fix[Sql]]].projections
-        projectionNames(projections, None) must beLike { case \/-(list) =>
-          list.map(_._1) must contain(allOf("name0", "name"))
-        }
+
+        namesOf(projections) must_=== List(inferred("name0"), inferred("name"))
       }
     }
   }
