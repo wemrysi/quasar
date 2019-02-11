@@ -287,13 +287,13 @@ object RValueScalarStagesInterpreter {
       case CDouble(_) => tpes.contains(ColumnType.Number)
       case CNum(_) => tpes.contains(ColumnType.Number)
 
-      case CLocalDateTime(_) => false
-      case CLocalDate(_) => false
-      case CLocalTime(_) => false
+      case CLocalDateTime(_) => tpes.contains(ColumnType.LocalDateTime)
+      case CLocalDate(_) => tpes.contains(ColumnType.LocalDate)
+      case CLocalTime(_) => tpes.contains(ColumnType.LocalTime)
       case COffsetDateTime(_) => tpes.contains(ColumnType.OffsetDateTime)
-      case COffsetDate(_) => false
-      case COffsetTime(_) => false
-      case CInterval(_) => false
+      case COffsetDate(_) => tpes.contains(ColumnType.OffsetDate)
+      case COffsetTime(_) => tpes.contains(ColumnType.OffsetTime)
+      case CInterval(_) => tpes.contains(ColumnType.Interval)
 
       case CArray(_, _) => false
       case CUndefined => false

@@ -28,8 +28,14 @@ object ColumnType {
   sealed trait Scalar extends ColumnType
   final case object Null extends Scalar
   final case object Boolean extends Scalar
-  final case object Number extends Scalar
+  final case object LocalTime extends Scalar
+  final case object OffsetTime extends Scalar
+  final case object LocalDate extends Scalar
+  final case object OffsetDate extends Scalar
+  final case object LocalDateTime extends Scalar
   final case object OffsetDateTime extends Scalar
+  final case object Interval extends Scalar
+  final case object Number extends Scalar
   final case object String extends Scalar
 
   sealed trait Vector extends ColumnType
@@ -37,7 +43,20 @@ object ColumnType {
   final case object Object extends Vector
 
   val Top: Set[ColumnType] =
-    Set(Null, Boolean, Number, OffsetDateTime, String, Array, Object)
+    Set(
+      Null,
+      Boolean,
+      LocalTime,
+      OffsetTime,
+      LocalDate,
+      OffsetDate,
+      LocalDateTime,
+      OffsetDateTime,
+      Interval,
+      Number,
+      String,
+      Array,
+      Object)
 
   implicit def columnTypeOrder[T <: ColumnType]: Order[T] =
     Order.order((x, y) => asInt(x) ?|? asInt(y))
@@ -50,10 +69,16 @@ object ColumnType {
   private val asInt: ColumnType => Int = {
     case Null => 0
     case Boolean => 1
-    case Number => 2
-    case OffsetDateTime => 3
-    case String => 4
-    case Array => 5
-    case Object => 6
+    case LocalTime => 2
+    case OffsetTime => 3
+    case LocalDate => 4
+    case OffsetDate => 5
+    case LocalDateTime => 6
+    case OffsetDateTime => 7
+    case Interval => 8
+    case Number => 9
+    case String => 10
+    case Array => 11
+    case Object => 12
   }
 }
