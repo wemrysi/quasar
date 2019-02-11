@@ -133,12 +133,6 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
     cancelled.void
   }
 
-  // the live data is the query
-  def liveData(tableId: UUID): F[ExistenceError[UUID] \/ String] =
-    store.gets(_.lookup(tableId)
-      .map(_.table.query)
-      .toRightDisjunction(TableNotFound(tableId): ExistenceError[UUID]))
-
   // the prepared data is the query
   def preparedData(tableId: UUID): F[ExistenceError[UUID] \/ PreparationResult[UUID, String]] =
     store gets { t =>
