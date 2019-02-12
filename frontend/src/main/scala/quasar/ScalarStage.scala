@@ -114,6 +114,9 @@ sealed abstract class ScalarStageInstances {
 
       case Mask(m) =>
         NonTerminal(List("Mask"), none, m.toList map {
+          case (p, types) if types === ColumnType.Top =>
+            Terminal(List(s"Column[$p]"), some("⊤"))
+
           case (p, types) =>
             Terminal(List(s"Column[$p]"), some(types.toList.sorted.mkString(", ")))
         })
