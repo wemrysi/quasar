@@ -119,11 +119,6 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
   def preparationEvents: Stream[F, PreparationEvent[I]] =
     manager.notifications
 
-  def liveData(tableId: I): F[ExistenceError[I] \/ D] =
-    table(tableId) flatMap {
-      _.traverse(ref => evaluator.evaluate(ref.query))
-    }
-
   def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, D]] =
     tableStore.lookup(tableId) flatMap {
       case Some(_) =>
