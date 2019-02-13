@@ -297,11 +297,6 @@ object MapFuncCore {
 
       case Or(BoolLit(true), _) => some(BoolLit[T, A](true).project)
 
-      case Eq(v1, v2) if v1 ≟ v2 => some(BoolLit[T, A](true).project)
-
-      case Eq(ExtractFunc(Constant(v1)), ExtractFunc(Constant(v2))) =>
-        some(BoolLit[T, A](v1 ≟ v2).project)
-
       case DeleteKey(
         Embed(StaticMap(map)),
         ExtractFunc(Constant(key))) =>
