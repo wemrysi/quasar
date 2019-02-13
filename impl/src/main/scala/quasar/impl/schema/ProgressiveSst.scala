@@ -82,25 +82,20 @@ object ProgressiveSst {
       "org.wartremover.warts.Equals",
       "org.wartremover.warts.Var",
       "org.wartremover.warts.While"))
-    def reduceChunk(stepSize: Int)(c: Chunk[SST[J, A]]): Option[SST[J, A]] =
+    def reduceChunk(c: Chunk[SST[J, A]]): Option[SST[J, A]] =
       if (c.isEmpty) none
       else if (c.size == 1) some(c(0))
       else {
         var i = 1
         var acc = c(0)
         while (i < c.size) {
-          acc = acc |+| c(i)
-
-          if (i % stepSize == 0) {
-            acc = reduce(acc)
-          }
-
+          acc = reduce(acc |+| c(i))
           i = i + 1
         }
         some(reduce(acc))
       }
 
-    _.through(f(reduceChunk(config.mapMaxSize.value.toInt)))
+    _.through(f(reduceChunk))
       .unNone
       .scan1((x, y) => reduce(x |+| y))
   }
