@@ -17,100 +17,23 @@
 package quasar.run
 
 import quasar._
-import quasar.api.resource.ResourcePath
 import quasar.common.PhaseResultTell
-import quasar.connector.QScriptEvaluator
 import quasar.contrib.iota._
-import quasar.fp._
 import quasar.qscript._
-import quasar.qscript.rewrites.FocusedPushdown
 
-import cats.effect.IO
-import iotaz.CopK
-import iotaz.TListK.:::
 import matryoshka.{Hole => _, _}
-import matryoshka.data._
 import matryoshka.implicits._
-import scalaz.{\/-, -\/, Const, Functor, Monad, Monoid}
+
+import scalaz.Monad
 import scalaz.syntax.applicative._
-import scalaz.syntax.monoid._
+
 import shims._
 
 final class RegressionQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: Monad: MonadPlannerErr: PhaseResultTell]
-    extends QScriptEvaluator[T, F, QScriptCount] {
-
-  type M[A] = IO[A]
-
-  type QS[U[_[_]]] = Const[InterpretedRead[ResourcePath], ?] ::: QScriptNormalizedList[U]
-
-  type Repr = QScriptCount
-
-  implicit def QSNormToQSM: Injectable[QScriptNormalized[T, ?], QSM] =
-    SubInject[QScriptNormalized[T, ?], CopK[QS[T], ?]]
-
-  def RenderTQSM: RenderTree[T[QSM]] = {
-    val toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
-      _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]].inject(_).embed)
-
-    RenderTree.contramap(toTotal)
-  }
-
-  def QSMFunctor: Functor[QSM] = Functor[QSM]
+    extends CountingQScriptEvaluator[T, F] {
 
   def optimize(norm: T[QScriptNormalized[T, ?]]): F[T[QSM]] =
-    norm.transCata[T[QSM]](FocusedPushdown[T, QSM, QScriptNormalized[T, ?], ResourcePath]).point[F]
-
-  def execute(repr: Repr): F[QScriptCount] = repr.point[F]
-
-  def plan(cp: T[QSM]): F[Repr] = {
-    val QScriptCore = CopK.Inject[QScriptCore[T, ?], QSM]
-    val EquiJoin = CopK.Inject[EquiJoin[T, ?], QSM]
-    val Read = CopK.Inject[Const[Read[ResourcePath], ?], QSM]
-    val InterpretedRead = CopK.Inject[Const[InterpretedRead[ResourcePath], ?], QSM]
-
-    def count: QSM[QScriptCount] => QScriptCount = {
-      case InterpretedRead(_) => QScriptCount.incrementInterpretedRead
-
-      case Read(_) => QScriptCount.incrementRead
-
-      case EquiJoin(value) =>
-        value.src |+| countBranch(value.lBranch) |+| countBranch(value.rBranch)
-
-      case QScriptCore(value) => value match {
-        case Map(src, _) => src
-        case LeftShift(src, _, _, _, _, _) =>
-          src |+| QScriptCount.incrementLeftShift
-        case Reduce(src, _, _, _) => src
-        case Sort(src, _, _) => src
-        case Union(src, lBranch, rBranch) =>
-          src |+| countBranch(lBranch) |+| countBranch(rBranch)
-        case Filter(src, _) => src
-        case Subset(src, from, _, count) =>
-          src |+| countBranch(from) |+| countBranch(count)
-        case Unreferenced() => Monoid[QScriptCount].zero
-      }
-    }
-
-    def alg: ((T[QSM], QSM[QScriptCount])) => QScriptCount = {
-      case (_, qsm) => count(qsm)
-    }
-
-    def algCoEnv: ((FreeQS[T], CoEnvQS[T, QScriptCount])) => QScriptCount = {
-      case (_, coenv) => coenv.run match {
-        case -\/(_) =>
-          Monoid[QScriptCount].zero
-        case \/-(qst) =>
-          SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]].project(qst)
-            .map(count)
-            .getOrElse(scala.sys.error("NOPE"))
-      }
-    }
-
-    def countBranch(freeqs: FreeQS[T]): QScriptCount =
-      freeqs.elgotPara[QScriptCount](algCoEnv)
-
-    cp.elgotPara[QScriptCount](alg).point[F]
-  }
+    norm.transCata[T[QSM]](QSNormToQSM.inject(_)).point[F]
 }
