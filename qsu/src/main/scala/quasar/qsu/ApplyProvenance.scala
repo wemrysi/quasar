@@ -35,9 +35,7 @@ import quasar.qscript.{
   LeftSide,
   LeftSide3,
   MapFuncsCore,
-  MapFuncsDerived,
   MFC,
-  MFD,
   MonadPlannerErr,
   OnUndefined,
   PlannerError,
@@ -334,14 +332,8 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       // FIXME{ch1487}: Adjust rhs based on knowledge of lhs.
       dims.join(l, r)
 
-    case MFC(MapFuncsCore.ConcatMaps((_, l), (_, r))) =>
-      dims.join(l, r)
-
     case MFC(MapFuncsCore.Cond(_, (_, t), (_, f))) =>
       dims.union(t, f)
-
-    case MFC(MapFuncsCore.DeleteKey((_, d), _)) =>
-      d
 
     case MFC(MapFuncsCore.Guard(_, _, (_, a), (_, b))) =>
       dims.union(a, b)
@@ -355,25 +347,25 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
     case MFC(MapFuncsCore.MakeMap((ExtractFunc(MapFuncsCore.Constant(k)), _), (_, v))) =>
       dims.injectStatic(k, v)
 
-    case MFC(MapFuncsCore.MakeMap(_, (_, v))) =>
-      dims.injectDynamic(v)
+    case MFC(MapFuncsCore.MakeMap((_, k), (_, v))) =>
+      dims.injectDynamic(dims.join(k, v))
 
     case MFC(MapFuncsCore.ProjectIndex((_, a), (ExtractFunc(MapFuncsCore.Constant(i)), _))) =>
       dims.projectStatic(i, a)
 
-    case MFC(MapFuncsCore.ProjectIndex((_, a), _)) =>
-      dims.projectDynamic(a)
+    case MFC(MapFuncsCore.ProjectIndex((_, a), (_, i))) =>
+      dims.projectDynamic(dims.join(a, i))
 
     case MFC(MapFuncsCore.ProjectKey((_, m), (ExtractFunc(MapFuncsCore.Constant(k)), _))) =>
       dims.projectStatic(k, m)
 
-    case MFC(MapFuncsCore.ProjectKey((_, m), _)) =>
-      dims.projectDynamic(m)
+    case MFC(MapFuncsCore.ProjectKey((_, m), (_, k))) =>
+      dims.projectDynamic(dims.join(m, k))
 
-    case MFD(MapFuncsDerived.Typecheck((_, d), _)) =>
-      d
-
-    case _ => dims.empty
+    case func =>
+      func.foldRight(dims.empty) {
+        case ((_, h), t) => dims.join(h, t)
+      }
   }
 
   ////
