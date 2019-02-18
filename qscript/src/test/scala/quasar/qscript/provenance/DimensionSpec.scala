@@ -43,6 +43,29 @@ object DimensionSpec extends Qspec {
     D.projectStatic('z', d) must_= D.empty
   }
 
+  "project static eliminates inject static" >> {
+    val init = Dimensions.origin(
+      P.both(P.injValue('x'), P.injValue('y')),
+      P.value(3),
+      P.prjPath('a'))
+
+    val exp = Dimensions.origin(P.value(3), P.prjPath('a'))
+
+    D.projectStatic('x', init) must_= exp
+  }
+
+  "project static eliminates inject static within sequence" >> {
+    val init = Dimensions.origin(
+      P.thenn(
+        P.both(P.injValue('x'), P.injValue('y')),
+        P.value(3)),
+      P.prjPath('a'))
+
+    val exp = Dimensions.origin(P.value(3), P.prjPath('a'))
+
+    D.projectStatic('x', init) must_= exp
+  }
+
   "inject static on empty dims is empty" >> {
     D.injectStatic('x', D.empty) must_= D.empty
   }
