@@ -484,11 +484,7 @@ object MinimizeAutoJoinsSpec
         case m @ Map(r @ QSReduce(_, _, _, _), _) =>
           val expDims =
             Dimensions.origin(
-              qprov.prov.thenn(
-                qprov.prov.both(
-                  qprov.prov.injValue(J.str("0")),
-                  qprov.prov.injValue(J.str("1"))),
-                qprov.prov.value(IdAccess.bucket(r.root, 0))),
+              qprov.prov.value(IdAccess.bucket(r.root, 0)),
               qprov.prov.prjPath(J.str("afile")))
 
           auth.dims(m.root) must_= expDims

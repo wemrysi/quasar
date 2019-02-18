@@ -93,6 +93,46 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
       tree must haveDimensions(dims)
     }
 
+    "produce normalized provenance for map" in {
+      val fm1: RecFreeMap =
+        recFunc.StaticMapS(
+          "A" -> recFunc.ProjectKeyS(recFunc.Hole, "X"),
+          "B" -> recFunc.ProjectKeyS(recFunc.Hole, "Y"))
+
+      val fm2: RecFreeMap =
+        recFunc.Add(recFunc.ProjectKeyS(recFunc.Hole, "B"), RecIntLit(17))
+
+      val tree: Cofree[QSU, Symbol] =
+        qsu.map('name2, (
+          qsu.map('name1, (
+            qsu.read('name0, (afile, ExcludeId)),
+            fm1)),
+          fm2))
+
+      val dims: SMap[Symbol, QDims] = SMap(
+        'name0 -> Dimensions.origin(
+          P.value(IdAccess.identity('name0)),
+          P.prjPath(J.str("foobar"))),
+        'name1 -> Dimensions.origin(
+          P.thenn(
+            P.both(
+              P.thenn(
+                P.injValue(J.str("A")),
+                P.prjValue(J.str("X"))),
+              P.thenn(
+                P.injValue(J.str("B")),
+                P.prjValue(J.str("Y")))),
+            P.value(IdAccess.identity('name0))),
+          P.prjPath(J.str("foobar"))),
+        'name2 -> Dimensions.origin(
+          P.thenn(
+            P.prjValue(J.str("Y")),
+            P.value(IdAccess.identity('name0))),
+          P.prjPath(J.str("foobar"))))
+
+      tree must haveDimensions(dims)
+    }
+
     "compute correct provenance nested dimEdits" >> {
       val tree =
         qsu.lpReduce('n4, (
