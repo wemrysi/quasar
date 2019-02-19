@@ -40,6 +40,8 @@ trait Prov[D, I, P] {
   implicit def PC: Corecursive.Aux[P, PF]
   implicit def PR: Recursive.Aux[P, PF]
 
+  def staticId: Prism[I, D]
+
   import ProvF._
   private val O = ProvF.Optics[D, I]
 
@@ -194,6 +196,8 @@ trait Prov[D, I, P] {
 
     (left.project, right.project) match {
       case (Value(l), Value(r)) => F.writer(JoinKeys.singleton(l, r), true)
+      case (PrjValue(l), Value(r)) => F.writer(JoinKeys.singleton(staticId(l), r), true)
+      case (Value(l), PrjValue(r)) => F.writer(JoinKeys.singleton(l, staticId(r)), true)
       case (Both(_, _), _) => joinBoths(left, right)
       case (_, Both(_, _)) => joinBoths(left, right)
       case (Then(_, _), _) => joinThens(left, right)
@@ -272,12 +276,14 @@ trait Prov[D, I, P] {
     }
   }
 
+  /** Flatten a conjunction into a `NonEmptyList`. */
   def flattenBoth(p: P): NonEmptyList[P] =
     p.elgotPara[NonEmptyList[P]] {
       case (_, Both(l, r)) => l append r
       case (other, _) => NonEmptyList(other)
     }
 
+  /** Flatten a sequence into a `NonEmptyList`. */
   def flattenThen(p: P): NonEmptyList[P] =
     p.elgotPara[NonEmptyList[P]] {
       case (_, Then(h, t)) => h append t
@@ -286,7 +292,7 @@ trait Prov[D, I, P] {
 }
 
 object Prov {
-  def apply[D, I, P](
+  def apply[D, I, P](staticP: Prism[I, D])(
       implicit
       TC: Corecursive.Aux[P, ProvF[D, I, ?]],
       TR: Recursive.Aux[P, ProvF[D, I, ?]])
@@ -294,5 +300,6 @@ object Prov {
     new Prov[D, I, P] {
       val PC = TC
       val PR = TR
+      val staticId = staticP
     }
 }
