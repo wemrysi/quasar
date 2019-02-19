@@ -105,6 +105,11 @@ final class ProvSpec extends Qspec with ProvFGenerator {
       P.applyProjection(tree) must_= V.success(Option(p1))
     }
 
+    "prj(k) << (inj(k) ∧ inj(j)) << r == r" >> {
+      val tree = P.thenn(pk1, P.thenn(P.both(ik1, ik2), p1))
+      P.applyProjection(tree) must_= V.success(Option(p1))
+    }
+
     "prj(k) << (inj(j) ∧ inj(l) << q) << r == Failure" >> {
       val tree = P.thenn(pk1, P.thenn(P.both(ik2, P.thenn(ik3, p2)), p1))
       P.applyProjection(tree) must beFailure

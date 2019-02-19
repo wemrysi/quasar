@@ -35,9 +35,7 @@ import quasar.qscript.{
   LeftSide,
   LeftSide3,
   MapFuncsCore,
-  MapFuncsDerived,
   MFC,
-  MFD,
   MonadPlannerErr,
   OnUndefined,
   PlannerError,
@@ -52,7 +50,7 @@ import matryoshka.implicits._
 import monocle.macros.Lenses
 import monocle.Traversal
 import pathy.Path
-import scalaz.{-\/, \/-, Applicative, Cord, Foldable, Functor, IList, Monad, NonEmptyList, Show, StateT, ValidationNel}
+import scalaz.{-\/, \/-, Applicative, Cord, Foldable, Functor, ICons, IList, INil, IMap, Monad, NonEmptyList, Show, StateT, ValidationNel}
 import scalaz.Scalaz._
 import scalaz.Tags.{Disjunction => Disj}
 
@@ -70,10 +68,9 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   implicit def V[F[_]: Applicative] = Applicative[F].compose[ValidationNel[Symbol, ?]]
 
   val dims = QProv[T]
+  val ejs = ejson.Fixed[T[EJson]]
   val func = construction.Func[T]
   val recFunc = construction.RecFunc[T]
-
-  import dims.prov.implicits._
 
   def apply[F[_]: Monad: MonadPlannerErr](graph: QSUGraph): F[AuthenticatedQSU[T]] = {
     type X[A] = StateT[F, QAuth, A]
@@ -278,15 +275,38 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       case Unary(_, _) => unexpectedError
 
       case Map(src, fm) =>
-        compute1[F](g, src) { sdims =>
-          val sigil = dims.prov.fresh()
-          val fdims = computeFuncDims(fm.linearize)(κ(Dimensions.origin(sigil)))
-          val fhead = fdims.flatMap(Dimensions.join[dims.P].headOption)
+        compute1F[F](g, src) { sdims =>
+          val z = (IList[NonEmptyList[dims.P]](), IMap[Int, IList[dims.P]]())
 
-          fhead.fold(sdims)(h =>
-            Dimensions.join[dims.P]
-              .modify(j => joinT.modify(_.transApoT(substitute(sigil, j.head)))(h) :::> j.tail)
-              .apply(sdims))
+          val (heads, tails) = sdims.union.zipWithIndex.foldRight(z) {
+            case ((NonEmptyList(h, t), i), (hs, ts)) =>
+              (NonEmptyList(h, dims.prov.prjPath(ejs.int(i))) :: hs, ts.insert(i, t))
+          }
+
+          val fheads = computeFuncDims(fm.linearize)(κ(Dimensions(heads)))
+
+          def tailNotFound(i: Int): F[NonEmptyList[dims.P]] =
+            MonadPlannerErr[F].raiseError(
+              PlannerError.InternalError.fromMsg(
+                s"Tail with index '$i' not found in '${tails.shows}'"))
+
+          fheads.fold(sdims.point[F])(Dimensions.join.modifyF[F] {
+            case NonEmptyList(h, ICons(dims.prov.prjPath(ejs.int(i)), INil())) =>
+              tails
+                .lookup(i.toInt)
+                .fold(tailNotFound(i.toInt))(NonEmptyList.nel(h, _).point[F])
+
+            case NonEmptyList(dims.prov.prjPath(ejs.int(i)), INil()) =>
+              tails
+                .lookup(i.toInt)
+                .flatMap(_.toNel)
+                .fold(tailNotFound(i.toInt))(_.point[F])
+
+            case other =>
+              MonadPlannerErr[F].raiseError(
+                PlannerError.InternalError.fromMsg(
+                  s"Invalid result when computing `Map` provenance: src = ${src.shows}, join = ${other.shows}"))
+          })
         }
 
       case Read(file, idStatus) =>
@@ -334,14 +354,8 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       // FIXME{ch1487}: Adjust rhs based on knowledge of lhs.
       dims.join(l, r)
 
-    case MFC(MapFuncsCore.ConcatMaps((_, l), (_, r))) =>
-      dims.join(l, r)
-
     case MFC(MapFuncsCore.Cond(_, (_, t), (_, f))) =>
       dims.union(t, f)
-
-    case MFC(MapFuncsCore.DeleteKey((_, d), _)) =>
-      d
 
     case MFC(MapFuncsCore.Guard(_, _, (_, a), (_, b))) =>
       dims.union(a, b)
@@ -355,25 +369,25 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
     case MFC(MapFuncsCore.MakeMap((ExtractFunc(MapFuncsCore.Constant(k)), _), (_, v))) =>
       dims.injectStatic(k, v)
 
-    case MFC(MapFuncsCore.MakeMap(_, (_, v))) =>
-      dims.injectDynamic(v)
+    case MFC(MapFuncsCore.MakeMap((_, k), (_, v))) =>
+      dims.injectDynamic(dims.join(k, v))
 
     case MFC(MapFuncsCore.ProjectIndex((_, a), (ExtractFunc(MapFuncsCore.Constant(i)), _))) =>
       dims.projectStatic(i, a)
 
-    case MFC(MapFuncsCore.ProjectIndex((_, a), _)) =>
-      dims.projectDynamic(a)
+    case MFC(MapFuncsCore.ProjectIndex((_, a), (_, i))) =>
+      dims.projectDynamic(dims.join(a, i))
 
     case MFC(MapFuncsCore.ProjectKey((_, m), (ExtractFunc(MapFuncsCore.Constant(k)), _))) =>
       dims.projectStatic(k, m)
 
-    case MFC(MapFuncsCore.ProjectKey((_, m), _)) =>
-      dims.projectDynamic(m)
+    case MFC(MapFuncsCore.ProjectKey((_, m), (_, k))) =>
+      dims.projectDynamic(dims.join(m, k))
 
-    case MFD(MapFuncsDerived.Typecheck((_, d), _)) =>
-      d
-
-    case _ => dims.empty
+    case func =>
+      func.foldRight(dims.empty) {
+        case ((_, h), t) => dims.join(h, t)
+      }
   }
 
   ////
@@ -381,14 +395,21 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   private val joinT: Traversal[NonEmptyList[dims.P], dims.P] =
     Traversal.fromTraverse
 
+  private def compute1F[F[_]: Monad: MonadPlannerErr: QAuthS]
+      (g: QSUGraph, src: QSUGraph)
+      (f: QDims => F[QDims])
+      : F[QDims] =
+    for {
+      sdims <- handleMissingDims(dimsFor[F](src))
+      gdims <- f(sdims)
+      _ <- QAuthS.modify(_.addDims(g.root, gdims))
+    } yield gdims
+
   private def compute1[F[_]: Monad: MonadPlannerErr: QAuthS]
       (g: QSUGraph, src: QSUGraph)
       (f: QDims => QDims)
       : F[QDims] =
-    handleMissingDims(dimsFor[F](src)) flatMap { sdims =>
-      val gdims = f(sdims)
-      QAuthS.modify(_.addDims(g.root, gdims)) as gdims
-    }
+    compute1F[F](g, src)(sdims => f(sdims).point[F])
 
   private def compute2[F[_]: Monad: MonadPlannerErr: QAuthS]
       (g: QSUGraph, l: QSUGraph, r: QSUGraph)

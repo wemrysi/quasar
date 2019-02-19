@@ -93,6 +93,46 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
       tree must haveDimensions(dims)
     }
 
+    "produce normalized provenance for map" in {
+      val fm1: RecFreeMap =
+        recFunc.StaticMapS(
+          "A" -> recFunc.ProjectKeyS(recFunc.Hole, "X"),
+          "B" -> recFunc.ProjectKeyS(recFunc.Hole, "Y"))
+
+      val fm2: RecFreeMap =
+        recFunc.Add(recFunc.ProjectKeyS(recFunc.Hole, "B"), RecIntLit(17))
+
+      val tree: Cofree[QSU, Symbol] =
+        qsu.map('name2, (
+          qsu.map('name1, (
+            qsu.read('name0, (afile, ExcludeId)),
+            fm1)),
+          fm2))
+
+      val dims: SMap[Symbol, QDims] = SMap(
+        'name0 -> Dimensions.origin(
+          P.value(IdAccess.identity('name0)),
+          P.prjPath(J.str("foobar"))),
+        'name1 -> Dimensions.origin(
+          P.thenn(
+            P.both(
+              P.thenn(
+                P.injValue(J.str("A")),
+                P.prjValue(J.str("X"))),
+              P.thenn(
+                P.injValue(J.str("B")),
+                P.prjValue(J.str("Y")))),
+            P.value(IdAccess.identity('name0))),
+          P.prjPath(J.str("foobar"))),
+        'name2 -> Dimensions.origin(
+          P.thenn(
+            P.prjValue(J.str("Y")),
+            P.value(IdAccess.identity('name0))),
+          P.prjPath(J.str("foobar"))))
+
+      tree must haveDimensions(dims)
+    }
+
     "compute correct provenance nested dimEdits" >> {
       val tree =
         qsu.lpReduce('n4, (
@@ -143,10 +183,14 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
       tree must haveDimensions(SMap(
         'n0 -> Dimensions.origin(
           P.thenn(
-            P.value(IdAccess.identity('n2)),
+            P.thenn(
+              P.prjValue(J.str("bar")),
+              P.value(IdAccess.identity('n2))),
             P.prjPath(J.str("foobar")))),
         'n1 -> Dimensions.origin(
-          P.value(IdAccess.identity('n2)),
+          P.thenn(
+            P.prjValue(J.str("bar")),
+            P.value(IdAccess.identity('n2))),
           P.prjPath(J.str("foobar"))),
         'n2 -> Dimensions.origin(
           P.value(IdAccess.identity('n2)),
@@ -500,8 +544,21 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
       }) must beTrue
     }
 
-    "delete key is identity" >> {
-      computeFuncDims(func.DeleteKeyS(func.Hole, "k"))(κ(rdims)) must_= Some(rdims)
+    "delete key" >> {
+      "identity when key is static" >> {
+        computeFuncDims(func.DeleteKeyS(func.Hole, "k"))(κ(rdims)) must_= Some(rdims)
+      }
+
+      "join when key is dynamic" >> {
+        val l = qprov.projectStatic(J.str("obj"), rdims)
+        val r = qprov.projectStatic(J.str("keyName"), rdims)
+
+        val mf = func.DeleteKey(
+          func.ProjectKeyS(func.Hole, "obj"),
+          func.ProjectKeyS(func.Hole, "keyName"))
+
+        computeFuncDims(mf)(κ(rdims)) must_= Some(qprov.join(l, r))
+      }
     }
 
     "if undefined unions" >> {
@@ -588,6 +645,18 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
     "undefined is empty" >> {
       computeFuncDims(func.Undefined)(κ(rdims)) must beNone
+    }
+
+    "default is to join" >> {
+      val fm = func.Add(
+        func.ProjectKeyS(func.Hole, "x"),
+        func.ProjectKeyS(func.Hole, "y"))
+
+      val exp = qprov.join(
+        qprov.projectStatic(J.str("x"), rdims),
+        qprov.projectStatic(J.str("y"), rdims))
+
+      computeFuncDims(fm)(κ(rdims)) must_= Some(exp)
     }
   }
 
