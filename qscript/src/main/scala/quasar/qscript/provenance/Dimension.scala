@@ -33,8 +33,11 @@ trait Dimension[D, I, P] {
   def autojoinKeys(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D]): JoinKeys[I] =
     ls.union.tuple(rs.union) foldMap {
       case (l, r) =>
+        val fl = l.flatMap(flattenThen).reverse
+        val fr = r.flatMap(flattenThen).reverse
+
         val joined =
-          l.reverse.alignBoth(r.reverse).foldLeftM(true) { (b, lr) =>
+          fl.alignBoth(fr).foldLeftM(true) { (b, lr) =>
             if (b)
               lr anyM { case (a, b) => autojoined[Writer[JoinKeys[I], ?]](a, b) }
             else
