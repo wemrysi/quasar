@@ -21,14 +21,21 @@ import quasar.contrib.matryoshka.arbitrary._
 import quasar.Qspec
 
 import scala.Predef.implicitly
+import scala.util.{Either, Left, Right}
 
 import matryoshka.data.Fix
+
+import monocle.std.either.stdLeft
+
 import org.scalacheck.{Arbitrary, Properties}
+
 import org.specs2.scalacheck._
+
 import scalaz.{@@, Equal, IList, NonEmptyList, Writer, Validation => V, Show}
 import scalaz.Tags.Conjunction
 import scalaz.scalacheck.ScalazProperties.{equal => eql, semigroup, semilattice}
 import scalaz.std.anyVal._
+import scalaz.std.either._
 import scalaz.std.option._
 import scalaz.std.tuple._
 import scalaz.syntax.equal._
@@ -38,6 +45,7 @@ final class ProvSpec extends Qspec with ProvFGenerator {
 
   implicit val params = Parameters(maxSize = 10)
 
+  import ProvSpec.I
   import ProvSpec.P.implicits._
 
   val P = ProvSpec.P
@@ -53,17 +61,17 @@ final class ProvSpec extends Qspec with ProvFGenerator {
   val ik2 = P.injValue('b')
   val ik3 = P.injValue('c')
 
-  val v1i = 1
+  val v1i: I = Right(1)
   val v1 = P.value(v1i)
-  val v2i = 2
+  val v2i: I = Right(2)
   val v2 = P.value(v2i)
-  val v3i = 3
+  val v3i: I = Right(3)
   val v3 = P.value(v3i)
-  val v4i = 4
+  val v4i: I = Right(4)
   val v4 = P.value(v4i)
 
-  def autojoined(a: Fix[P.PF], b: Fix[P.PF]): (JoinKeys[Int], Boolean) =
-    P.autojoined[Writer[JoinKeys[Int], ?]](a, b).run
+  def autojoined(a: Fix[P.PF], b: Fix[P.PF]): (JoinKeys[I], Boolean) =
+    P.autojoined[Writer[JoinKeys[I], ?]](a, b).run
 
   "apply projection" >> {
     "prj(k) << inj(k) << p == p" >> {
@@ -192,7 +200,7 @@ final class ProvSpec extends Qspec with ProvFGenerator {
     }
 
     "value θ prjValue" >> {
-      autojoined(v1, pk1) must_= ((JoinKeys.empty, false))
+      autojoined(v1, pk1) must_= ((JoinKeys.singleton(v1i, Left('a')), true))
     }
 
     "value θ value" >> {
@@ -284,5 +292,6 @@ final class ProvSpec extends Qspec with ProvFGenerator {
 }
 
 object ProvSpec {
-  val P = Prov[Char, Int, Fix[ProvF[Char, Int, ?]]]
+  type I = Either[Char, Int]
+  val P = Prov[Char, I, Fix[ProvF[Char, I, ?]]](stdLeft)
 }
