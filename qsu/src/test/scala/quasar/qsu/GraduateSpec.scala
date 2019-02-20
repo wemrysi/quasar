@@ -61,10 +61,12 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
   type QSU[A] = QScriptUniform[A]
   type QSE[A] = QScriptEducated[A]
+  type D = Fix[EJson]
 
   val researched = ReifyIdentities[Fix, F] _
   val grad = Graduate[Fix, F] _
 
+  val accO = Access.Optics[D]
   val qsu = QScriptUniform.DslT[Fix]
 
   val defaults = construction.mkDefaults[Fix, QSE]
@@ -107,7 +109,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSReduce" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
-        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value[Hole](_)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(accO.value[Hole](_)))
         val reducers: List[ReduceFunc[FreeMap]] = List(ReduceFuncs.Count(HoleF))
         val repair: FreeMapA[ReduceIndex] = ReduceIndexF(\/-(0))
 
@@ -120,8 +122,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
       "convert LeftShift" in {
         val struct: RecFreeMap = recFunc.Add(recFunc.Hole, recFunc.Constant(Fixed[Fix[EJson]].int(17)))
 
-        val arepair: FreeMapA[QScriptUniform.ShiftTarget] = func.ConcatArrays(
-          func.MakeArray(AccessLeftTarget[Fix](Access.value(_))),
+        val arepair: FreeMapA[QScriptUniform.ShiftTarget[D]] = func.ConcatArrays(
+          func.MakeArray(AccessLeftTarget[Fix](accO.value(_))),
           func.ConcatArrays(
             LeftTarget[Fix],
             func.MakeArray(RightTarget[Fix])))
@@ -139,7 +141,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSSort" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
-        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value[Hole](_)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(accO.value[Hole](_)))
         val order: NEL[(FreeMap, SortDir)] = NEL(HoleF -> SortDir.Descending)
 
         val qgraph: Fix[QSU] = qsu.qsSort(qsu.read(afile, ExcludeId), abuckets, order)
@@ -180,7 +182,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
     "graduate naive `select * from zips`" in {
       val aconcatArr =
         func.ConcatArrays(
-          func.MakeArray(AccessLeftTarget[Fix](Access.value(_))),
+          func.MakeArray(AccessLeftTarget[Fix](accO.value(_))),
           func.MakeArray(RightTarget[Fix]))
       val concatArr =
         func.ConcatArrays(

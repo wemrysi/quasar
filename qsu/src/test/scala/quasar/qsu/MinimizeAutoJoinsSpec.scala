@@ -72,7 +72,9 @@ object MinimizeAutoJoinsSpec
   val qprov = QProv[Fix]
 
   type J = Fix[EJson]
-  val J = Fixed[Fix[EJson]]
+  val J = Fixed[J]
+
+  val accO = Access.Optics[J]
 
   val afile = Path.rootDir[Sandboxed] </> Path.file("afile")
   val afile2 = Path.rootDir[Sandboxed] </> Path.file("afile2")
@@ -621,7 +623,7 @@ object MinimizeAutoJoinsSpec
           repair must beTreeEqual(
             func.StaticMapS(
               "0" -> RightTarget[Fix],
-              "1" -> AccessLeftTarget[Fix](Access.value(_))))
+              "1" -> AccessLeftTarget[Fix](accO.value(_))))
 
           fm must beTreeEqual(
             recFunc.Add(
@@ -660,7 +662,7 @@ object MinimizeAutoJoinsSpec
           repair must beTreeEqual(
             func.StaticMapS(
               "1" -> RightTarget[Fix],
-              "0" -> AccessLeftTarget[Fix](Access.value(_))))
+              "0" -> AccessLeftTarget[Fix](accO.value(_))))
 
           fm must beTreeEqual(
             recFunc.Add(
@@ -711,7 +713,7 @@ object MinimizeAutoJoinsSpec
         repairInner must beTreeEqual(
           func.StaticMapS(
             "0" -> RightTarget[Fix],
-            "1" -> AccessLeftTarget[Fix](Access.value(_))))
+            "1" -> AccessLeftTarget[Fix](accO.value(_))))
 
         h1 must beTreeEqual(func.ProjectKeyS(func.Hole, "0"))
         h2 must beTreeEqual(func.ProjectKeyS(func.Hole, "1"))
@@ -770,7 +772,7 @@ object MinimizeAutoJoinsSpec
         repairInner must beTreeEqual(
           func.StaticMapS(
             "0" -> RightTarget[Fix],
-            "1" -> AccessLeftTarget[Fix](Access.value(_))))
+            "1" -> AccessLeftTarget[Fix](accO.value(_))))
 
         h1 must beTreeEqual(func.ProjectKeyS(func.Hole, "0"))
         h2 must beTreeEqual(func.ProjectKeyS(func.Hole, "1"))
@@ -829,7 +831,7 @@ object MinimizeAutoJoinsSpec
 
           repairInner must beTreeEqual(
             func.StaticMapS(
-              "original" -> AccessLeftTarget[Fix](Access.value(_)),
+              "original" -> AccessLeftTarget[Fix](accO.value(_)),
               "results" -> RightTarget[Fix]))
 
           structOuter must beTreeEqual(
@@ -841,7 +843,7 @@ object MinimizeAutoJoinsSpec
                 RightTarget[Fix],
               "1" ->
                 func.ProjectKeyS(
-                  AccessLeftTarget[Fix](Access.value(_)),
+                  AccessLeftTarget[Fix](accO.value(_)),
                   "original")))
 
           fm must beTreeEqual(
@@ -905,7 +907,7 @@ object MinimizeAutoJoinsSpec
 
           repairInnerInner must beTreeEqual(
             func.StaticMapS(
-              "original" -> AccessLeftTarget[Fix](Access.value(_)),
+              "original" -> AccessLeftTarget[Fix](accO.value(_)),
               "results" -> RightTarget[Fix]))
 
           structInner must beTreeEqual(
@@ -913,7 +915,7 @@ object MinimizeAutoJoinsSpec
 
           repairInner must beTreeEqual(
             func.StaticMapS(
-              "original" -> func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "original"),
+              "original" -> func.ProjectKeyS(AccessLeftTarget[Fix](accO.value(_)), "original"),
               "results" -> RightTarget[Fix]))
 
           structOuter must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "results"))
@@ -924,7 +926,7 @@ object MinimizeAutoJoinsSpec
                 RightTarget[Fix],
               "1" ->
                 func.ProjectKeyS(
-                  AccessLeftTarget[Fix](Access.value(_)),
+                  AccessLeftTarget[Fix](accO.value(_)),
                   "original")))
 
           fm must beTreeEqual(
@@ -986,9 +988,9 @@ object MinimizeAutoJoinsSpec
           innerRepair must beTreeEqual(
             func.StaticMapS(
               "left" ->
-                Free.pure[MapFunc, Access[Hole] \/ Int](0.right),
+                Free.pure[MapFunc, QAccess[Hole] \/ Int](0.right),
               "right" ->
-                func.MakeMapS("0", Free.pure[MapFunc, Access[Hole] \/ Int](1.right))))
+                func.MakeMapS("0", Free.pure[MapFunc, QAccess[Hole] \/ Int](1.right))))
 
           outerStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "left"))
 
@@ -996,7 +998,7 @@ object MinimizeAutoJoinsSpec
             func.ConcatMaps(
               func.MakeMapS("1", RightTarget[Fix]),
               func.ProjectKeyS(
-                AccessLeftTarget[Fix](Access.value(_)),
+                AccessLeftTarget[Fix](accO.value(_)),
                 "right")))
 
           fm must beTreeEqual(
@@ -1097,11 +1099,11 @@ object MinimizeAutoJoinsSpec
             "results" -> func.StaticMapS(
               "left" -> func.StaticMapS(
                 "left" ->
-                  Free.pure[MapFunc, Access[Hole] \/ Int](0.right),
+                  Free.pure[MapFunc, QAccess[Hole] \/ Int](0.right),
                 "right" ->
-                  func.MakeMapS("2", Free.pure[MapFunc, Access[Hole] \/ Int](1.right))),
+                  func.MakeMapS("2", Free.pure[MapFunc, QAccess[Hole] \/ Int](1.right))),
               "right" ->
-                Free.pure[MapFunc, Access[Hole] \/ Int](2.right))))
+                Free.pure[MapFunc, QAccess[Hole] \/ Int](2.right))))
 
         outerastruct must beTreeEqual(
           func.ProjectKeyS(
@@ -1122,7 +1124,7 @@ object MinimizeAutoJoinsSpec
                 "left" -> func.ConcatMaps(
                   func.MakeMapS(
                     "3",
-                    Free.pure[MapFunc, Access[Hole] \/ Int](0.right)),
+                    Free.pure[MapFunc, QAccess[Hole] \/ Int](0.right)),
                   func.ProjectKeyS(
                     func.ProjectKeyS(
                       func.ProjectKeyS(
@@ -1130,14 +1132,14 @@ object MinimizeAutoJoinsSpec
                         "results"),
                       "left"),
                     "right")),
-                "right" -> Free.pure[MapFunc, Access[Hole] \/ Int](1.right))))
+                "right" -> Free.pure[MapFunc, QAccess[Hole] \/ Int](1.right))))
 
         singleRepair must beTreeEqual(
           func.ConcatMaps(
             func.ConcatMaps(
               func.ProjectKeyS(
                 func.ProjectKeyS(
-                  AccessLeftTarget[Fix](Access.value(_)),
+                  AccessLeftTarget[Fix](accO.value(_)),
                   "results"),
                 "left"),
               func.MakeMapS(
@@ -1146,7 +1148,7 @@ object MinimizeAutoJoinsSpec
             func.MakeMapS(
               "1",
               func.ProjectKeyS(
-                AccessLeftTarget[Fix](Access.value(_)),
+                AccessLeftTarget[Fix](accO.value(_)),
                 "original"))))
 
         singleStruct must beTreeEqual(
@@ -1231,7 +1233,7 @@ object MinimizeAutoJoinsSpec
           innerRepair must beTreeEqual(
             func.StaticMapS(
               "original" ->
-                AccessLeftTarget[Fix](Access.value(_)),
+                AccessLeftTarget[Fix](accO.value(_)),
               "results" ->
                 RightTarget[Fix]))
 
@@ -1243,7 +1245,7 @@ object MinimizeAutoJoinsSpec
                 RightTarget[Fix],
               "0" ->
                 func.ProjectKeyS(
-                  AccessLeftTarget[Fix](Access.value(_)),
+                  AccessLeftTarget[Fix](accO.value(_)),
                   "original")))
 
           fm must beTreeEqual(
@@ -1382,7 +1384,7 @@ object MinimizeAutoJoinsSpec
           innerRepair must beTreeEqual(
             func.StaticMapS(
               "original" ->
-                AccessLeftTarget[Fix](Access.value(_)),
+                AccessLeftTarget[Fix](accO.value(_)),
               "results" ->
                 RightTarget[Fix]))
 
@@ -1394,7 +1396,7 @@ object MinimizeAutoJoinsSpec
               "1" ->
                 RightTarget[Fix],
               "0" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "original")))
+                func.ProjectKeyS(AccessLeftTarget[Fix](accO.value(_)), "original")))
 
           fm must beTreeEqual(
             recFunc.Add(
@@ -1457,11 +1459,11 @@ object MinimizeAutoJoinsSpec
           innerRepair must beTreeEqual(
             func.StaticMapS(
               "left" ->
-                Free.pure[MapFunc, Access[Hole] \/ Int](0.right),
+                Free.pure[MapFunc, QAccess[Hole] \/ Int](0.right),
               "right" ->
                 func.StaticMapS(
                   "0" ->
-                    Free.pure[MapFunc, Access[Hole] \/ Int](1.right))))
+                    Free.pure[MapFunc, QAccess[Hole] \/ Int](1.right))))
 
           outerStruct must beTreeEqual(
             recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "left"), "c"))
@@ -1470,7 +1472,7 @@ object MinimizeAutoJoinsSpec
             func.ConcatMaps(
               func.MakeMapS("1", RightTarget[Fix]),
               func.ProjectKeyS(
-                AccessLeftTarget[Fix](Access.value(_)),
+                AccessLeftTarget[Fix](accO.value(_)),
                 "right")))
 
           fm must beTreeEqual(
@@ -1662,10 +1664,10 @@ object MinimizeAutoJoinsSpec
 
           repair must beTreeEqual(
             func.ConcatMaps(
-              func.StaticMapS("1" -> 0.right[Access[Hole]].pure[FreeMapA]),
+              func.StaticMapS("1" -> 0.right[QAccess[Hole]].pure[FreeMapA]),
               func.StaticMapS(
-                "0" -> func.ProjectIndexI(1.right[Access[Hole]].pure[FreeMapA], 0),
-                "2" -> func.ProjectIndexI(1.right[Access[Hole]].pure[FreeMapA], 1))))
+                "0" -> func.ProjectIndexI(1.right[QAccess[Hole]].pure[FreeMapA], 0),
+                "2" -> func.ProjectIndexI(1.right[QAccess[Hole]].pure[FreeMapA], 1))))
 
           outerMap must beTreeEqual(
             recFunc.StaticMapS(
@@ -1709,7 +1711,7 @@ object MinimizeAutoJoinsSpec
           repair must beTreeEqual(
             func.StaticMapS(
               "0" -> RightTarget[Fix],
-              "1" -> AccessLeftTarget[Fix](Access.value(_))))
+              "1" -> AccessLeftTarget[Fix](accO.value(_))))
           outerMap must beTreeEqual(
             recFunc.StaticMapS(
               "left" -> recFunc.Typecheck(
@@ -1888,7 +1890,7 @@ object MinimizeAutoJoinsSpec
           func.ConcatMaps(
             func.ConcatMaps(
               func.ProjectKeyS(
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "left"),
+                func.ProjectKeyS(AccessLeftTarget[Fix](accO.value(_)), "left"),
                 "left"),
               func.MakeMapS(
                 "1",

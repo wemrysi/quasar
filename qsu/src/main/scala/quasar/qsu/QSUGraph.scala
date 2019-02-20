@@ -22,6 +22,7 @@ import quasar.common.effect.NameGenerator
 import quasar.contrib.iota._
 import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript.{FreeMapA, OnUndefined, RecFreeMap}
@@ -484,14 +485,14 @@ object QSUGraph extends QSUGraphInstances {
     }
 
     object LeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], RecFreeMap[T], IdStatus, OnUndefined, FreeMapA[T, QSU.ShiftTarget], QSU.Rotation)] = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], RecFreeMap[T], IdStatus, OnUndefined, FreeMapA[T, QSU.ShiftTarget[T[EJson]]], QSU.Rotation)] = g.unfold match {
         case g: QSU.LeftShift[T, QSUGraph[T]] => QSU.LeftShift.unapply(g)
         case _ => None
       }
     }
 
     object MultiLeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], List[(FreeMap[T], IdStatus, QSU.Rotation)], OnUndefined, FreeMapA[T, Access[Hole] \/ Int])] = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], List[(FreeMap[T], IdStatus, QSU.Rotation)], OnUndefined, FreeMapA[T, Access[T[EJson], Hole] \/ Int])] = g.unfold match {
         case g: QSU.MultiLeftShift[T, QSUGraph[T]] => QSU.MultiLeftShift.unapply(g)
         case _ => None
       }

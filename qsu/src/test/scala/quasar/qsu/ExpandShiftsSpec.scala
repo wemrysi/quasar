@@ -20,6 +20,7 @@ import quasar.{Qspec, TreeMatchers}
 import quasar.IdStatus.{ExcludeId, IdOnly}
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, Fixed}
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.qscript.{construction, Hole, OnUndefined, PlannerError, SrcHole}
@@ -42,18 +43,20 @@ import QSUGraph.Extractors._
 
 object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   type QSU[A] = QScriptUniform[A]
+  type D = Fix[EJson]
 
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
   val json = Fixed[Fix[EJson]]
   val recFunc = construction.RecFunc[Fix]
+  val accO = Access.Optics[D]
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
   val hole: Hole = SrcHole
 
-  def index(i: Int): FreeMapA[Access[Hole] \/ Int] =
-    i.right[Access[Hole]].pure[FreeMapA]
+  def index(i: Int): FreeMapA[QAccess[Hole] \/ Int] =
+    i.right[QAccess[Hole]].pure[FreeMapA]
 
   "MLS expansion" should {
     "convert singly nested LeftShift/ThetaJoin" in {
@@ -124,13 +127,13 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
           innerRepair must beTreeEqual(
             func.StaticMapS(
-              "original" -> AccessLeftTarget[Fix](Access.value(_)),
+              "original" -> AccessLeftTarget[Fix](accO.value(_)),
               "0" -> RightTarget[Fix])
           )
 
           outerRepair must beTreeEqual(
             func.ConcatMaps(
-              AccessLeftTarget[Fix](Access.value(_)),
+              AccessLeftTarget[Fix](accO.value(_)),
               func.MakeMapS("1", RightTarget[Fix])))
       }
     }
@@ -265,18 +268,18 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
           innermostRepair must beTreeEqual(
             func.StaticMapS(
-              "original" -> AccessLeftTarget[Fix](Access.value(_)),
+              "original" -> AccessLeftTarget[Fix](accO.value(_)),
               "0" -> RightTarget[Fix])
           )
 
           innerRepair must beTreeEqual(
             func.ConcatMaps(
-              AccessLeftTarget[Fix](Access.value(_)),
+              AccessLeftTarget[Fix](accO.value(_)),
               func.MakeMapS("1", RightTarget[Fix])))
 
           outerRepair must beTreeEqual(
             func.ConcatMaps(
-              AccessLeftTarget[Fix](Access.value(_)),
+              AccessLeftTarget[Fix](accO.value(_)),
               func.MakeMapS("2", RightTarget[Fix])))
       }
     }
@@ -336,20 +339,20 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
           innerRepair must beTreeEqual(
             func.StaticMapS(
-              "original" -> AccessLeftTarget[Fix](Access.value(_)),
+              "original" -> AccessLeftTarget[Fix](accO.value(_)),
               "0" -> RightTarget[Fix]))
 
           outerRepair must beTreeEqual(
              func.Cond(
                func.Or(
                  func.Eq(
-                   AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh0), _)),
-                   AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _))),
+                   AccessLeftTarget[Fix](accO.id(IdAccess.identity[D]('esh0), _)),
+                   AccessLeftTarget[Fix](accO.id(IdAccess.identity[D]('esh1), _))),
                  func.IfUndefined(
-                   AccessLeftTarget[Fix](Access.id(IdAccess.identity('esh1), _)),
+                   AccessLeftTarget[Fix](accO.id(IdAccess.identity[D]('esh1), _)),
                    func.Constant(json.bool(true)))),
                func.ConcatMaps(
-                 AccessLeftTarget[Fix](Access.value(_)),
+                 AccessLeftTarget[Fix](accO.value(_)),
                  func.MakeMapS("1", RightTarget[Fix])),
                func.Undefined))
       }

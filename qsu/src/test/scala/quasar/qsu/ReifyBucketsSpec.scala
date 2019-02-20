@@ -22,10 +22,10 @@ import quasar.{Qspec, TreeMatchers}
 import quasar.IdStatus.ExcludeId
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
-import quasar.contrib.iota.{copkEqual, copkTraverse}
+import quasar.contrib.iota.{copkEqual, copkShow, copkTraverse}
 import quasar.qscript.{construction, Hole, MapFuncsCore, PlannerError, ReduceFuncs, SrcHole}
 
-import matryoshka.{delayEqual, Embed}
+import matryoshka.{delayEqual, showTShow, Embed}
 import matryoshka.data.Fix
 import matryoshka.data.{freeEqual, freeRecursive}
 import matryoshka.patterns.CoEnv
@@ -36,6 +36,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   import QScriptUniform.{DTrans, Retain, Rotation}
 
   val J = Fixed[Fix[EJson]]
+  val accO = Access.Optics[Fix[EJson]]
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
   val recFunc = construction.RecFunc[Fix]
@@ -60,7 +61,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           ReduceFuncs.Sum(()))
 
       val expBucket =
-        func.ProjectKeyS(func.Hole, "state") map (Access.value[Hole](_))
+        func.ProjectKeyS(func.Hole, "state") map (accO.value[Hole](_))
 
       val expReducer =
         func.ProjectKeyS(func.Hole, "pop")
@@ -89,7 +90,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           ReduceFuncs.Sum(()))
 
       val expB =
-        func.Constant[Access[Hole]](J.int(7))
+        func.Constant[QAccess[Hole]](J.int(7))
 
       val expReducer =
         func.ProjectKeyS(func.Hole, "pop")
@@ -165,13 +166,13 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           _(MapFuncsCore.ConcatMaps(_, _))))
 
       val expArbBucket =
-        func.ProjectKeyS(func.Hole, "city") map (Access.value[Hole](_))
+        func.ProjectKeyS(func.Hole, "city") map (accO.value[Hole](_))
 
       val expArbExpr =
         func.ProjectKeyS(func.Hole, "city")
 
       val expSumBucket =
-        func.ProjectKeyS(func.ProjectKeyS(func.Hole, "grouped"), "city") map (Access.value[Hole](_))
+        func.ProjectKeyS(func.ProjectKeyS(func.Hole, "grouped"), "city") map (accO.value[Hole](_))
 
       val expSumExpr =
         func.ProjectKeyS(func.Hole, "reduce_expr_0")
@@ -251,13 +252,13 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           _(MapFuncsCore.ConcatMaps(_, _))))
 
       val expArbBucket =
-        func.ProjectKeyS(func.Hole, "city") map (Access.value[Hole](_))
+        func.ProjectKeyS(func.Hole, "city") map (accO.value[Hole](_))
 
       val expArbExpr =
         func.ProjectKeyS(func.Hole, "city")
 
       val expSumBucket =
-        func.ProjectKeyS(func.ProjectKeyS(func.Hole, "grouped"), "city") map (Access.value[Hole](_))
+        func.ProjectKeyS(func.ProjectKeyS(func.Hole, "grouped"), "city") map (accO.value[Hole](_))
 
       val expSumExpr =
         func.ProjectKeyS(func.ProjectKeyS(func.Hole, "reduce_expr_0"), "quux")

@@ -19,6 +19,7 @@ package quasar
 import slamdata.Predef.{Map => SMap, _}
 import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz.MonadState_
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript._, PlannerError.InternalError
 import quasar.qscript.provenance.Dimensions
@@ -31,27 +32,28 @@ import scalaz.syntax.traverse._
 import scalaz.syntax.show._
 
 package object qsu {
-  type FreeAccess[T[_[_]], A] = FreeMapA[T, Access[A]]
+  type QAccess[T[_[_]], A] = Access[T[EJson], A]
+  type FreeAccess[T[_[_]], A] = FreeMapA[T, QAccess[T, A]]
   type QDims[T[_[_]]] = Dimensions[QProv.P[T]]
   type QSUVerts[T[_[_]]] = SMap[Symbol, QScriptUniform[T, Symbol]]
 
   type RevIdxM[T[_[_]], F[_]] = MonadState_[F, QSUGraph.RevIdx[T]]
   def RevIdxM[T[_[_]], F[_]](implicit ev: RevIdxM[T, F]): RevIdxM[T, F] = ev
 
-  def AccessHole[T[_[_]]]: FreeMapA[T, Access[Hole]] =
-    Free.pure(Access.value(SrcHole))
+  def AccessHole[T[_[_]]]: FreeMapA[T, QAccess[T, Hole]] =
+    Free.pure(Access.Optics[T[EJson]].value(SrcHole))
 
-  def LeftTarget[T[_[_]]]: FreeMapA[T, ShiftTarget] =
-    Free.pure(ShiftTarget.LeftTarget)
+  def LeftTarget[T[_[_]]]: FreeMapA[T, ShiftTarget[T[EJson]]] =
+    Free.pure(ShiftTarget.LeftTarget())
 
-  def RightTarget[T[_[_]]]: FreeMapA[T, ShiftTarget] =
-    Free.pure(ShiftTarget.RightTarget)
+  def RightTarget[T[_[_]]]: FreeMapA[T, ShiftTarget[T[EJson]]] =
+    Free.pure(ShiftTarget.RightTarget())
 
-  def AccessLeftTarget[T[_[_]]](f: Hole => Access[Hole]): FreeMapA[T, ShiftTarget] =
+  def AccessLeftTarget[T[_[_]]](f: Hole => QAccess[T, Hole]): FreeMapA[T, ShiftTarget[T[EJson]]] =
     Free.pure(ShiftTarget.AccessLeftTarget(f(SrcHole)))
 
   def AccessValueF[T[_[_]], A](a: A): FreeAccess[T, A] =
-    Free.pure[MapFunc[T, ?], Access[A]](Access.Value(a))
+    Free.pure[MapFunc[T, ?], QAccess[T, A]](Access.Value(a))
 
   def AccessValueHoleF[T[_[_]]]: FreeAccess[T, Hole] =
     AccessValueF[T, Hole](SrcHole)
