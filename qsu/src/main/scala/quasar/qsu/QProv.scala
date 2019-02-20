@@ -28,17 +28,17 @@ import matryoshka.implicits._
 import scalaz.{Lens => _, _}, Scalaz._, Tags.MaxVal
 
 final class QProv[T[_[_]]: BirecursiveT: EqualT]
-    extends Dimension[T[EJson], IdAccess, QProv.P[T]]
+    extends Dimension[T[EJson], IdAccess[T[EJson]], QProv.P[T]]
     with QSUTTypes[T] {
 
   import QProv.BucketsState
 
   type D     = T[EJson]
-  type I     = IdAccess
+  type I     = IdAccess[D]
   type PF[A] = QProv.PF[T, A]
   type P     = QProv.P[T]
 
-  val prov: Prov[D, I, P] = Prov[D, I, P]
+  val prov: Prov[D, I, P] = Prov[D, I, P](IdAccess.static)
 
   import prov.implicits._
 
@@ -63,7 +63,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
           )) as s.nextIdx
         }
 
-        b = IdAccess.bucket(src, idx)
+        b = IdAccess.bucket[D](src, idx)
       } yield prov.value(b)
 
     case other =>
@@ -122,7 +122,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
 }
 
 object QProv {
-  type PF[T[_[_]], A] = ProvF[T[EJson], IdAccess, A]
+  type PF[T[_[_]], A] = ProvF[T[EJson], IdAccess[T[EJson]], A]
   type P[T[_[_]]]     = T[PF[T, ?]]
 
   final case class BucketsState[I](nextIdx: SInt, buckets: I ==>> SInt)

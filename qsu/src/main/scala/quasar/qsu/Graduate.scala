@@ -23,6 +23,7 @@ import quasar.common.effect.NameGenerator
 import quasar.common.JoinType
 import quasar.contrib.scalaz.MonadReader_
 import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski.κ
@@ -67,10 +68,11 @@ import iotaz.CopK
 
 final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
 
+  type D = T[EJson]
   type QSE[A] = QScriptEducated[A]
 
   def apply[F[_]: Monad: MonadPlannerErr: NameGenerator](rqsu: ResearchedQSU[T]): F[T[QSE]] = {
-    type G[A] = ReaderT[F, References, A]
+    type G[A] = ReaderT[F, References[D], A]
 
     val grad = graduateƒ[G, QSE](None)(NaturalTransformation.refl[QSE])
 
@@ -82,11 +84,12 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
   ////
 
   private type QSU[A] = QScriptUniform[A]
-  private type RefsR[F[_]] = MonadReader_[F, References]
+  private type RefsR[F[_]] = MonadReader_[F, References[D]]
 
   // We can't use final here due to SI-4440 - it results in warning
   private case class SrcMerge[A, B](src: A, lval: B, rval: B)
 
+  private val accO = Access.Optics[D]
   private val func = construction.Func[T]
 
   private def mergeSources[F[_]: Monad: MonadPlannerErr: NameGenerator: RefsR](
@@ -159,20 +162,20 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
     (pattern: QSUPattern[T, QSUGraph])
       : F[QSE[QSUGraph]] = pattern match {
     case QSUPattern(name, qsu) =>
-      val MR = MonadReader_[F, References]
+      val MR = MonadReader_[F, References[D]]
 
       def holeAs(sym: Symbol): Hole => Symbol =
         κ(sym)
 
-      def resolveAccess[A, B](fa: FreeMapA[A])(ex: A => Access[B] \/ B)(f: B => Symbol)
+      def resolveAccess[A, B](fa: FreeMapA[A])(ex: A => QAccess[B] \/ B)(f: B => Symbol)
           : F[FreeMapA[B]] =
         MR.asks(_.resolveAccess[A, B](name, fa)(f)(ex))
 
-      def eqCond(lroot: Symbol, rroot: Symbol): JoinKey[IdAccess] => F[JoinFunc] = {
+      def eqCond(lroot: Symbol, rroot: Symbol): JoinKey[IdAccess[D]] => F[JoinFunc] = {
         case JoinKey(l, r) =>
           for {
-            lside <- resolveAccess(func.Hole as Access.id(l, lroot))(_.left)(κ(lroot))
-            rside <- resolveAccess(func.Hole as Access.id(r, rroot))(_.left)(κ(rroot))
+            lside <- resolveAccess(func.Hole as accO.id(l, lroot))(_.left)(κ(lroot))
+            rside <- resolveAccess(func.Hole as accO.id(r, rroot))(_.left)(κ(rroot))
           } yield func.Eq(lside >> func.LeftSide, rside >> func.RightSide)
       }
 
@@ -199,8 +202,8 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
             resolvedRepair <-
               resolveAccess(repair) {
                 case QSU.ShiftTarget.AccessLeftTarget(access) => access.map[JoinSide](_ => LeftSide).left
-                case QSU.ShiftTarget.LeftTarget => (LeftSide: JoinSide).right
-                case QSU.ShiftTarget.RightTarget => (RightSide: JoinSide).right
+                case QSU.ShiftTarget.LeftTarget() => (LeftSide: JoinSide).right
+                case QSU.ShiftTarget.RightTarget() => (RightSide: JoinSide).right
               }(κ(source.root))
 
             shiftType = rot match {
@@ -231,7 +234,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
 
         // TODO distinct should be its own node in qscript proper
         case QSU.Distinct(source) =>
-          resolveAccess(HoleF map (Access.value(_)))(_.left)(holeAs(source.root)) map { fm =>
+          resolveAccess(HoleF map (accO.value(_)))(_.left)(holeAs(source.root)) map { fm =>
             QCE(Reduce[T, QSUGraph](
               source,
               // Bucket by the value
@@ -249,11 +252,11 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
             val mkEq = eqCond(left.root, right.root)
 
             val mkIsect =
-              (_: NonEmptyList[JoinKey[IdAccess]])
+              (_: NonEmptyList[JoinKey[IdAccess[D]]])
                 .foldMapRight1(mkEq)((l, r) => (mkEq(l) |@| r)(func.Or(_, _)))
 
             val mkConj =
-              (_: NonEmptyList[NonEmptyList[JoinKey[IdAccess]]])
+              (_: NonEmptyList[NonEmptyList[JoinKey[IdAccess[D]]]])
                 .foldMapRight1(mkIsect)((l, r) => (mkIsect(l) |@| r)(func.And(_, _)))
 
             jks.foldMapRight1(mkConj)((l, r) => (mkConj(l) |@| r)(func.Or(_, _)))

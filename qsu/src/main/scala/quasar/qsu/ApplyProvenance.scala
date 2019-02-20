@@ -172,7 +172,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         handleMissingDims(dimsFor[F](src)) flatMap { sdims =>
           val updated = dims.rename(src.root, g.root, sdims)
           val nextIdx = dims.nextGroupKeyIndex(g.root, updated)
-          val idAccess = IdAccess.groupKey(g.root, nextIdx)
+          val idAccess = IdAccess.groupKey[dims.D](g.root, nextIdx)
           val nextDims = dims.swap(0, 1, dims.lshift(idAccess, updated))
 
           QAuthS[F].modify(
@@ -190,7 +190,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       case JoinSideRef(_) => unexpectedError
 
       case LeftShift(src, struct, idStatus, _, repair, rot) =>
-        val tid = IdAccess.identity(g.root)
+        val tid = IdAccess.identity[dims.D](g.root)
         compute1[F](g, src) { sdims =>
           val structDims =
             computeFuncDims(struct.linearize)(κ(sdims)) getOrElse sdims
@@ -204,10 +204,10 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
           }
 
           val repairDims = computeFuncDims(repair) {
-            case ShiftTarget.LeftTarget =>
+            case ShiftTarget.LeftTarget() =>
               shiftedDims
 
-            case ShiftTarget.RightTarget =>
+            case ShiftTarget.RightTarget() =>
               applyIdStatus(idStatus, shiftedDims)
 
             case ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
@@ -221,7 +221,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         }
 
       case MultiLeftShift(src, shifts, _, repair) =>
-        val tid = IdAccess.identity(g.root)
+        val tid = IdAccess.identity[dims.D](g.root)
         compute1[F](g, src) { sdims =>
           val shiftsDims = shifts map {
             case (struct, idStatus, rot) =>
@@ -310,7 +310,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         }
 
       case Read(file, idStatus) =>
-        val tid = IdAccess.identity(g.root)
+        val tid = IdAccess.identity[dims.D](g.root)
 
         val rdims = segments(file).toNel.fold(Dimensions.empty[dims.P]) { ss =>
           dims.squash(Dimensions.origin1(ss.map(projPathSegment).reverse))
@@ -327,7 +327,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         computeJoin2[F](g, left, right, combine)
 
       case Transpose(src, _, rot) =>
-        val tid = IdAccess.identity(g.root)
+        val tid = IdAccess.identity[dims.D](g.root)
         compute1[F](g, src) { sdims =>
           rot match {
             case Rotation.ShiftMap | Rotation.ShiftArray =>

@@ -234,7 +234,7 @@ object QScriptUniform {
   final case class QSAutoJoin[T[_[_]], A](
     left: A,
     right: A,
-    keys: JoinKeys[IdAccess],
+    keys: JoinKeys[IdAccess[T[EJson]]],
     combiner: JoinFunc[T]) extends QScriptUniform[T, A]
 
   final case class GroupBy[T[_[_]], A](
@@ -384,33 +384,33 @@ object QScriptUniform {
       Show.showFromToString
   }
 
-  sealed trait ShiftTarget extends Product with Serializable
+  sealed trait ShiftTarget[A] extends Product with Serializable
 
   object ShiftTarget {
-    case object LeftTarget extends ShiftTarget
-    case object RightTarget extends ShiftTarget
-    final case class AccessLeftTarget(access: Access[Hole]) extends ShiftTarget
+    final case class LeftTarget[A]() extends ShiftTarget[A]
+    final case class RightTarget[A]() extends ShiftTarget[A]
+    final case class AccessLeftTarget[A](access: Access[A, Hole]) extends ShiftTarget[A]
 
-    implicit val equalShiftTarget: Equal[ShiftTarget] = Equal.equal {
+    implicit def equalShiftTarget[A: Equal]: Equal[ShiftTarget[A]] = Equal.equal[ShiftTarget[A]] {
       case (AccessLeftTarget(access1), AccessLeftTarget(access2)) => access1 ≟ access2
-      case (LeftTarget, LeftTarget) => true
-      case (RightTarget, RightTarget) => true
+      case (LeftTarget(), LeftTarget()) => true
+      case (RightTarget(), RightTarget()) => true
       case _ => false
     }
 
-    implicit val showShiftTarget: Show[ShiftTarget] = Show.shows {
-      case LeftTarget => "LeftTarget"
-      case RightTarget => "RightTarget"
+    implicit def showShiftTarget[A: Show]: Show[ShiftTarget[A]] = Show.shows {
+      case LeftTarget() => "LeftTarget"
+      case RightTarget() => "RightTarget"
       case AccessLeftTarget(access) => s"AccessLeftTarget(${access.shows})"
     }
 
-    implicit val renderShiftTarget: RenderTree[ShiftTarget] = RenderTree.make {
-      case LeftTarget =>
+    implicit def renderShiftTarget[A: Show]: RenderTree[ShiftTarget[A]] = RenderTree.make {
+      case LeftTarget() =>
         RenderedTree("ShiftTarget" :: Nil, "LeftTarget".some, Nil)
-      case RightTarget =>
+      case RightTarget() =>
         RenderedTree("ShiftTarget" :: Nil, "RightTarget".some, Nil)
       case AccessLeftTarget(access) =>
-        RenderedTree("ShiftTarget" :: Nil, "AccessLeftTarget".some, RenderTree[Access[Hole]].render(access) :: Nil)
+        RenderedTree("ShiftTarget" :: Nil, "AccessLeftTarget".some, RenderTree[Access[A, Hole]].render(access) :: Nil)
     }
   }
 
@@ -420,7 +420,7 @@ object QScriptUniform {
       struct: RecFreeMap[T],
       idStatus: IdStatus,
       onUndefined: OnUndefined,
-      repair: FreeMapA[T, ShiftTarget],
+      repair: FreeMapA[T, ShiftTarget[T[EJson]]],
       rot: Rotation) extends QScriptUniform[T, A]
 
   // shifting multiple structs on the same source;
@@ -430,7 +430,7 @@ object QScriptUniform {
       // TODO: NEL
       shifts: List[(FreeMap[T], IdStatus, Rotation)],
       onUndefined: OnUndefined,
-      repair: FreeMapA[T, Access[Hole] \/ Int]) extends QScriptUniform[T, A]
+      repair: FreeMapA[T, QAccess[T, Hole] \/ Int]) extends QScriptUniform[T, A]
 
   // LPish
   final case class LPReduce[T[_[_]], A](
@@ -440,7 +440,7 @@ object QScriptUniform {
   // QScriptish
   final case class QSReduce[T[_[_]], A](
       source: A,
-      buckets: List[FreeMapA[T, Access[Hole]]],
+      buckets: List[FreeMapA[T, QAccess[T, Hole]]],
       // TODO: NEL
       reducers: List[ReduceFunc[FreeMap[T]]],
       repair: FreeMapA[T, ReduceIndex]) extends QScriptUniform[T, A]
@@ -455,7 +455,7 @@ object QScriptUniform {
   // QScriptish
   final case class QSSort[T[_[_]], A](
       source: A,
-      buckets: List[FreeMapA[T, Access[Hole]]],
+      buckets: List[FreeMapA[T, QAccess[T, Hole]]],
       order: NEL[(FreeMap[T], SortDir)]) extends QScriptUniform[T, A]
 
   final case class Union[T[_[_]], A](left: A, right: A) extends QScriptUniform[T, A]
@@ -510,13 +510,13 @@ object QScriptUniform {
         case JoinSideRef(s) => s
       } (JoinSideRef(_))
 
-    def leftShift[A]: Prism[QScriptUniform[A], (A, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget], Rotation)] =
-      Prism.partial[QScriptUniform[A], (A, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget], Rotation)] {
+    def leftShift[A]: Prism[QScriptUniform[A], (A, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T[EJson]]], Rotation)] =
+      Prism.partial[QScriptUniform[A], (A, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T[EJson]]], Rotation)] {
         case LeftShift(s, fm, ids, ou, jf, rot) => (s, fm, ids, ou, jf, rot)
       } { case (s, fm, ids, ou, jf, rot) => LeftShift(s, fm, ids, ou, jf, rot) }
 
-    def multiLeftShift[A]: Prism[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[Access[Hole] \/ Int])] =
-      Prism.partial[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[Access[Hole] \/ Int])] {
+    def multiLeftShift[A]: Prism[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[QAccess[Hole] \/ Int])] =
+      Prism.partial[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[QAccess[Hole] \/ Int])] {
         case MultiLeftShift(s, ss, ou, map) => (s, ss, ou, map)
       } { case (s, ss, ou, map) => MultiLeftShift(s, ss, ou, map) }
 
@@ -550,8 +550,8 @@ object QScriptUniform {
         case Map(a, fm) => (a, fm)
       } { case (a, fm) => Map(a, fm) }
 
-    def qsAutoJoin[A]: Prism[QScriptUniform[A], (A, A, JoinKeys[IdAccess], JoinFunc)] =
-      Prism.partial[QScriptUniform[A], (A, A, JoinKeys[IdAccess], JoinFunc)] {
+    def qsAutoJoin[A]: Prism[QScriptUniform[A], (A, A, JoinKeys[IdAccess[T[EJson]]], JoinFunc)] =
+      Prism.partial[QScriptUniform[A], (A, A, JoinKeys[IdAccess[T[EJson]]], JoinFunc)] {
         case QSAutoJoin(l, r, ks, c) => (l, r, ks, c)
       } { case (l, r, ks, c) => QSAutoJoin(l, r, ks, c) }
 
@@ -665,12 +665,12 @@ object QScriptUniform {
       composeLifting[G](O.joinSideRef[A])
     }
 
-    def leftShift: Prism[A, F[(A, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget], Rotation)]] = {
-      composeLifting[(?, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget], Rotation)](O.leftShift[A])
+    def leftShift: Prism[A, F[(A, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T[EJson]]], Rotation)]] = {
+      composeLifting[(?, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T[EJson]]], Rotation)](O.leftShift[A])
     }
 
-    def multiLeftShift: Prism[A, F[(A, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[Access[Hole] \/ Int])]] = {
-      composeLifting[(?, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[Access[Hole] \/ Int])](O.multiLeftShift[A])
+    def multiLeftShift: Prism[A, F[(A, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[QAccess[Hole] \/ Int])]] = {
+      composeLifting[(?, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[QAccess[Hole] \/ Int])](O.multiLeftShift[A])
     }
 
     def lpFilter: Prism[A, F[(A, A)]] = {
@@ -702,8 +702,8 @@ object QScriptUniform {
         case(src, f) => (src, RecFreeS.roll(mfc(f.as(recFunc.Hole))))
       })
 
-    def qsAutoJoin: Prism[A, F[(A, A, JoinKeys[IdAccess], JoinFunc)]] = {
-      type G[A] = (A, A, JoinKeys[IdAccess], JoinFunc)
+    def qsAutoJoin: Prism[A, F[(A, A, JoinKeys[IdAccess[T[EJson]]], JoinFunc)]] = {
+      type G[A] = (A, A, JoinKeys[IdAccess[T[EJson]]], JoinFunc)
       composeLifting[G](O.qsAutoJoin[A])
     }
 

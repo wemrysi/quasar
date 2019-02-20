@@ -22,6 +22,7 @@ import quasar.{IdStatus, RenderTreeT}, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.common.effect.NameGenerator
 import quasar.contrib.std.errorImpossible
 import quasar.contrib.matryoshka._
+import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
@@ -48,7 +49,7 @@ import quasar.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 
 import matryoshka.{Recursive, Corecursive}
 import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
-import matryoshka.delayShow
+import matryoshka.{delayShow, showTShow}
 import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
 import scalaz.{
@@ -67,6 +68,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
   import MinimizeAutoJoins._
   import QSUGraph.Extractors._
 
+  type D = T[EJson]
+
+  private[this] val accO = Access.Optics[D]
   private[this] val qprov = QProv[T]
   private[this] val QPZero = Dimensions.origin(qprov.prov.fresh())
 
@@ -104,7 +108,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
   private val RightField = "right"
 
   private val accessHoleLeftF =
-    Access.value[Hole](SrcHole).left[Int].point[FreeMapA]
+    accO.value[Hole](SrcHole).left[Int].point[FreeMapA]
 
   def couldApplyTo(candidates: List[QSUGraph]): Boolean =
     candidates exists { case ConsecutiveUnbounded(_, _) => true; case _ => false }
@@ -125,16 +129,16 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
             val repair2 = repair flatMap {
               case ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
-                fm.map[ShiftTarget](
-                  κ(ShiftTarget.AccessLeftTarget(Access.value(SrcHole))))
+                fm.map[ShiftTarget[D]](
+                  κ(ShiftTarget.AccessLeftTarget(accO.value(SrcHole))))
 
               case access @ ShiftTarget.AccessLeftTarget(_) =>
-                (access: ShiftTarget).pure[FreeMapA]
+                (access: ShiftTarget[D]).pure[FreeMapA]
 
-              case ShiftTarget.LeftTarget =>
+              case ShiftTarget.LeftTarget() =>
                 scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
 
-              case ShiftTarget.RightTarget =>
+              case ShiftTarget.RightTarget() =>
                 RightTarget[T]
             }
 
@@ -150,10 +154,10 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
             val repair2 = repair flatMap {
               case -\/(access) =>
-                fm.map[Access[Hole] \/ Int](κ(-\/(access)))
+                fm.map[QAccess[Hole] \/ Int](κ(-\/(access)))
 
               case \/-(idx) =>
-                idx.right[Access[Hole]].point[FreeMapA]
+                idx.right[QAccess[Hole]].point[FreeMapA]
             }
 
             updateGraph[T, G](QSU.MultiLeftShift(src.root, shifts2, onUndefined, repair2)) map { rewritten =>
@@ -248,7 +252,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       val initPattern = reversed.head match {
         case ShiftGraph.Single(QSU.LeftShift(_, struct, idStatus, _, repair, rot), _) =>
           val repair2 = func.StaticMapS(
-            OriginalField -> AccessLeftTarget[T](Access.value(_)),
+            OriginalField -> AccessLeftTarget[T](accO.value(_)),
             ResultsField -> repair)
 
           QSU.LeftShift[T, Symbol](src.root, struct, idStatus, OnUndefined.Emit, repair2, rot)
@@ -271,21 +275,21 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             val repair2 = repair flatMap {
               case ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
                 func.ProjectKeyS(
-                  AccessLeftTarget[T](Access.value(_)),
+                  AccessLeftTarget[T](accO.value(_)),
                   ResultsField)
 
               case ShiftTarget.AccessLeftTarget(access) =>
                 AccessLeftTarget[T](access.as(_))
 
-              case ShiftTarget.LeftTarget =>
+              case ShiftTarget.LeftTarget() =>
                 scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
 
-              case ShiftTarget.RightTarget =>
+              case ShiftTarget.RightTarget() =>
                 RightTarget[T]
             }
 
             val repair3 = func.ConcatMaps(
-              subsetObject(AccessLeftTarget[T](Access.value(_)), OriginalField),
+              subsetObject(AccessLeftTarget[T](accO.value(_)), OriginalField),
               func.MakeMapS(ResultsField, repair2))
 
             updateGraph[T, G](QSU.LeftShift[T, Symbol](src.root, struct2, idStatus, OnUndefined.Emit, repair3, rot)) map { rewritten =>
@@ -304,7 +308,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               case -\/(access) =>
                 func.ProjectKeyS(access.left[Int].point[FreeMapA], ResultsField)
 
-              case \/-(idx) => idx.right[Access[Hole]].point[FreeMapA]
+              case \/-(idx) => idx.right[QAccess[Hole]].point[FreeMapA]
             }
 
             val repair3 = func.ConcatMaps(
@@ -372,37 +376,37 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       }
 
       def fixSingleRepairForMulti(
-          repair: FreeMapA[ShiftTarget],
+          repair: FreeMapA[ShiftTarget[D]],
           offset: Int,
-          side: JoinSide): FreeMapA[Access[Hole] \/ Int] = {
+          side: JoinSide): FreeMapA[Access[D, Hole] \/ Int] = {
 
         repair flatMap {
-          case ShiftTarget.LeftTarget =>
+          case ShiftTarget.LeftTarget() =>
             scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
 
           case ShiftTarget.AccessLeftTarget(access) =>
-            val hole = Free.pure[MapFunc, Access[Hole] \/ Int](access.left[Int])
+            val hole = Free.pure[MapFunc, QAccess[Hole] \/ Int](access.left[Int])
 
             if (hasParent && requiresDeref)
               func.ProjectKeyS(hole, name(side))
             else
               hole
 
-          case ShiftTarget.RightTarget =>
-            Free.pure(offset.right[Access[Hole]])
+          case ShiftTarget.RightTarget() =>
+            Free.pure(offset.right[QAccess[Hole]])
         }
       }
 
       def fixSingleRepairForSingle(
-          repair: FreeMapA[ShiftTarget],
-          side: JoinSide): FreeMapA[ShiftTarget] = {
+          repair: FreeMapA[ShiftTarget[D]],
+          side: JoinSide): FreeMapA[ShiftTarget[D]] = {
 
         repair flatMap {
-          case target @ (ShiftTarget.LeftTarget | ShiftTarget.RightTarget) =>
+          case target @ (ShiftTarget.LeftTarget() | ShiftTarget.RightTarget()) =>
             Free.pure(target)
 
           case access @ ShiftTarget.AccessLeftTarget(_) =>
-            val hole = Free.pure[MapFunc, ShiftTarget](access)
+            val hole = Free.pure[MapFunc, ShiftTarget[D]](access)
 
             if (hasParent && requiresDeref)
               func.ProjectKeyS(hole, name(side))
@@ -427,9 +431,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       }
 
       def fixMultiRepair(
-          repair: FreeMapA[Access[Hole] \/ Int],
+          repair: FreeMapA[QAccess[Hole] \/ Int],
           offset: Int,
-          side: JoinSide): FreeMapA[Access[Hole] \/ Int] = {
+          side: JoinSide): FreeMapA[QAccess[Hole] \/ Int] = {
 
         repair flatMap {
           case -\/(access) =>
@@ -439,26 +443,26 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               Free.pure(access.left[Int])
 
           case \/-(i) =>
-            Free.pure((i + offset).right[Access[Hole]])
+            Free.pure((i + offset).right[QAccess[Hole]])
         }
       }
 
       def fixCompatible(
-          repair: FreeMapA[ShiftTarget],
+          repair: FreeMapA[ShiftTarget[D]],
           idStatus: IdStatus,
           resultIdStatus: IdStatus,
-          side: JoinSide): FreeMapA[ShiftTarget] =
+          side: JoinSide): FreeMapA[ShiftTarget[D]] =
 
         (idStatus, resultIdStatus) match {
           case (IdOnly, IncludeId) => repair flatMap {
-            case ShiftTarget.LeftTarget =>
+            case ShiftTarget.LeftTarget() =>
               scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
 
-            case ShiftTarget.RightTarget =>
+            case ShiftTarget.RightTarget() =>
               func.ProjectIndexI(RightTarget, 0)
 
             case access @ ShiftTarget.AccessLeftTarget(_) =>
-              val hole = Free.pure[MapFunc, ShiftTarget](access)
+              val hole = Free.pure[MapFunc, ShiftTarget[D]](access)
 
               if (hasParent && requiresDeref)
                 func.ProjectKeyS(hole, name(side))
@@ -467,14 +471,14 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           }
 
           case (ExcludeId, IncludeId) => repair flatMap {
-            case ShiftTarget.LeftTarget =>
+            case ShiftTarget.LeftTarget() =>
               scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
 
-            case ShiftTarget.RightTarget =>
+            case ShiftTarget.RightTarget() =>
               func.ProjectIndexI(RightTarget, 1)
 
             case access @ ShiftTarget.AccessLeftTarget(_) =>
-              val hole = Free.pure[MapFunc, ShiftTarget](access)
+              val hole = Free.pure[MapFunc, ShiftTarget[D]](access)
 
               if (hasParent && requiresDeref)
                 func.ProjectKeyS(hole, name(side))
@@ -484,7 +488,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           case _ => repair flatMap {
             case access @ ShiftTarget.AccessLeftTarget(_) =>
-              val hole = Free.pure[MapFunc, ShiftTarget](access)
+              val hole = Free.pure[MapFunc, ShiftTarget[D]](access)
 
               if (hasParent && requiresDeref)
                 func.ProjectKeyS(hole, name(side))
@@ -637,9 +641,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val rightSide =
             if (hasParent)
-              subsetObject(AccessLeftTarget[T](Access.value(_)), RightField)
+              subsetObject(AccessLeftTarget[T](accO.value(_)), RightField)
             else
-              func.MakeMapS(RightField, AccessLeftTarget(Access.value(_)))
+              func.MakeMapS(RightField, AccessLeftTarget(accO.value(_)))
 
           val repair = func.ConcatMaps(rightSide, func.MakeMapS(LeftField, repairLAdj))
 
@@ -687,9 +691,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val leftSide =
             if (hasParent)
-              subsetObject(AccessLeftTarget[T](Access.value(_)), LeftField)
+              subsetObject(AccessLeftTarget[T](accO.value(_)), LeftField)
             else
-              func.MakeMapS(LeftField, AccessLeftTarget[T](Access.value(_)))
+              func.MakeMapS(LeftField, AccessLeftTarget[T](accO.value(_)))
 
           val repair = func.ConcatMaps(leftSide, func.MakeMapS(RightField, repairRAdj))
 
@@ -931,9 +935,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         val repair2 = repair flatMap {
           case alt @ ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
-            fm.map(_ => alt: ShiftTarget)
+            fm.map(_ => alt: ShiftTarget[D])
 
-          case t => Free.pure[MapFunc, ShiftTarget](t)
+          case t => Free.pure[MapFunc, ShiftTarget[D]](t)
         }
 
         Some((parent, ShiftGraph.Single(QSU.LeftShift[T, QSUGraph](oparent, struct2, idStatus, onUndefined, repair2, rot), dims) <:: inners))
@@ -965,9 +969,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         val repair2 = repair flatMap {
           case l @ -\/(Access.Value(_)) =>
-            fm.map(_ => l: (Access[Hole] \/ Int))
+            fm.map(_ => l: (QAccess[Hole] \/ Int))
 
-          case r => Free.pure[MapFunc, Access[Hole] \/ Int](r)
+          case r => Free.pure[MapFunc, QAccess[Hole] \/ Int](r)
         }
 
         Some((parent, ShiftGraph.Multi(QSU.MultiLeftShift[T, QSUGraph](oparent, shifts2, onUndefined, repair2), dims) <:: inners))
@@ -996,7 +1000,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         val repair2 = adjustment map { i =>
           repair flatMap {
-            case t @ ShiftTarget.RightTarget => func.ProjectIndexI(t.point[FreeMapA], i)
+            case t @ ShiftTarget.RightTarget() => func.ProjectIndexI(RightTarget[T], i)
             case other => other.point[FreeMapA]
           }
         } getOrElse repair

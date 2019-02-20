@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz.MonadState_
+import quasar.ejson.EJson
 import quasar.fp.symbolOrder
 import quasar.fp.ski.ι
 import quasar.qscript.{construction, Hole, HoleF, MonadPlannerErr, ReduceFunc, ReduceIndexF, SrcHole}
@@ -31,6 +32,7 @@ import scalaz.{ISet, Monad, NonEmptyList, Scalaz, StateT}, Scalaz._
 final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
 
+  val accO = Access.Optics[T[EJson]]
   val prov = QProv[T]
   val qsu  = QScriptUniform.Optics[T]
   val func = construction.Func[T]
@@ -53,7 +55,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
                 case (newSrc, original, reduceExpr) =>
                   val buckets =
                     buckets0.map(_ flatMap { access =>
-                      if (Access.value[Hole].isEmpty(access))
+                      if (accO.value[Hole].isEmpty(access))
                         func.Hole as access
                       else
                         original as access
@@ -98,10 +100,10 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
       res <- ids traverse {
         case id @ IdAccess.GroupKey(s, i) =>
           qauth.lookupGroupKeyE[F](s, i)
-            .map(fm => (ISet.singleton(s), fm as Access.value[Hole](SrcHole)))
+            .map(fm => (ISet.singleton(s), fm as accO.value[Hole](SrcHole)))
 
         case other =>
-          (ISet.empty[Symbol], HoleF[T] as Access.id[Hole](other, SrcHole)).point[F]
+          (ISet.empty[Symbol], HoleF[T] as accO.id[Hole](other, SrcHole)).point[F]
       }
     } yield res.unfzip leftMap (_.foldMap(ι))
 

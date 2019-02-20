@@ -87,7 +87,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
 
   private val OriginalKey = "original"
   private val NamePrefix = "esh"
-  private val SrcVal = AccessLeftTarget[T](Access.value(_))
+  private val SrcVal = AccessLeftTarget[T](Access.Optics[T[EJson]].value(_))
   private val PrjOriginal = func.ProjectKeyS(func.Hole, OriginalKey)
 
   private def buildShift[G[_]: Monad: NameGenerator: RevIdxM: MonadPlannerErr: QAuthS](

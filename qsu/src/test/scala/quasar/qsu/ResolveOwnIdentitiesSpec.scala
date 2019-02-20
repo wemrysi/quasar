@@ -23,7 +23,7 @@ import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
-import quasar.contrib.iota.{copkEqual, copkTraverse}
+import quasar.contrib.iota.{copkEqual, copkShow, copkTraverse}
 import quasar.fp.ski.κ
 import quasar.qscript.{construction, Hole, OnUndefined, SrcHole}
 
@@ -39,6 +39,7 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
 
   type J = Fix[EJson]
 
+  val accO = Access.Optics[J]
   val qsu = QScriptUniform.AnnotatedDsl[Fix, Symbol]
   val func = construction.Func[Fix]
   val recFunc = construction.RecFunc[Fix]
@@ -53,7 +54,7 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
         val renamedRep = rep map {
           case ShiftTarget.AccessLeftTarget(access) =>
             val renamedAccess =
-              Access.id[Hole]
+              accO.id[Hole]
                 .composeLens(_1)
                 .composePrism(IdAccess.identity)
                 .modify(rns)
@@ -67,8 +68,8 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
     }
 
   "resolving own left shift identity" should {
-    val ownAccess: Access[Hole] =
-      Access.id[Hole](IdAccess.identity('ls), SrcHole)
+    val ownAccess: QAccess[Hole] =
+      accO.id[Hole](IdAccess.identity[J]('ls), SrcHole)
 
     val initialRepair =
       func.ConcatArrays(

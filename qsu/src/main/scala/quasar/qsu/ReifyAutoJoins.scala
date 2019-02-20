@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef._
 
 import quasar.common.effect.NameGenerator
+import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.qscript.{
   construction,
@@ -65,7 +66,7 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
     case g @ AutoJoin2(left, right, combiner) =>
       val (l, r) = (left.root, right.root)
 
-      val keys: F[JoinKeys[IdAccess]] =
+      val keys: F[JoinKeys[IdAccess[T[EJson]]]] =
         (auth.lookupDimsE[F](l) |@| auth.lookupDimsE[F](r))(prov.autojoinKeys(_, _))
 
       keys.map(ks =>
@@ -86,7 +87,7 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
 
         case (joinName, lName, cName, ldims, cdims, rdims) =>
 
-          val lcKeys: JoinKeys[IdAccess] =
+          val lcKeys: JoinKeys[IdAccess[T[EJson]]] =
             prov.autojoinKeys(ldims, cdims)
 
           def lcCombiner: JoinFunc =
@@ -112,7 +113,7 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
           val lcDims: QDims =
             prov.join(ldims, cdims)
 
-          val keys: JoinKeys[IdAccess] =
+          val keys: JoinKeys[IdAccess[T[EJson]]] =
             prov.autojoinKeys(lcDims, rdims)
 
           val lcName = Symbol(joinName)

@@ -20,6 +20,7 @@ import slamdata.Predef.{Boolean, Option, Symbol}
 
 import quasar.IdStatus, IdStatus.{IdOnly, IncludeId}
 import quasar.contrib.iota._
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.{construction, Hole}
 import quasar.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
@@ -36,14 +37,14 @@ final class ResolveOwnIdentities[T[_[_]]: BirecursiveT: EqualT] private () exten
   val func = construction.Func[T]
 
   object ShiftId {
-    def unapply(qa: Access[Hole]): Option[Symbol] =
-      Access.id[Hole]
+    def unapply(qa: QAccess[Hole]): Option[Symbol] =
+      Access.Optics[T[EJson]].id[Hole]
         .composeLens(_1)
         .composePrism(IdAccess.identity)
         .getOption(qa)
   }
 
-  def accessesShiftIdOf(node: Symbol): ShiftTarget => Boolean = {
+  def accessesShiftIdOf(node: Symbol): ShiftTarget[T[EJson]] => Boolean = {
     case ShiftTarget.AccessLeftTarget(ShiftId(sym)) => sym === node
     case _ => false
   }
@@ -59,7 +60,7 @@ final class ResolveOwnIdentities[T[_[_]]: BirecursiveT: EqualT] private () exten
             else
               func.ProjectIndexI(RightTarget, 0)
 
-          case ShiftTarget.RightTarget =>
+          case ShiftTarget.RightTarget() =>
             if (idStatus === IdOnly)
               RightTarget
             else
