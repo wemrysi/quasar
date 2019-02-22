@@ -26,17 +26,17 @@ import scalaz._
 trait ProvFGenerator {
   import ProvF._
 
-  implicit def arbitraryProvF[D: Arbitrary, I: Arbitrary]: Delay[Arbitrary, ProvF[D, I, ?]] =
-    new PatternArbitrary[ProvF[D, I, ?]] {
-      val O = new Optics[D, I]
+  implicit def arbitraryProvF[D: Arbitrary, I: Arbitrary, S: Arbitrary]: Delay[Arbitrary, ProvF[D, I, S, ?]] =
+    new PatternArbitrary[ProvF[D, I, S, ?]] {
+      val O = new Optics[D, I, S]
 
       def leafGenerators[A] =
         NonEmptyList(
           2 -> Gen.delay(Gen.const(O.fresh[A]())),
           10 -> (arbitrary[D] ^^ (O.prjPath[A](_))),
-          10 -> (arbitrary[D] ^^ (O.prjValue[A](_))),
-          10 -> (arbitrary[D] ^^ (O.injValue[A](_))),
-          10 -> (arbitrary[I] ^^ (O.value[A](_))))
+          10 -> (arbitrary[(D, S)] ^^ (O.prjValue[A](_))),
+          10 -> (arbitrary[(D, S)] ^^ (O.injValue[A](_))),
+          10 -> (arbitrary[(I, S)] ^^ (O.value[A](_))))
 
       def branchGenerators[A: Arbitrary] =
         uniformly(

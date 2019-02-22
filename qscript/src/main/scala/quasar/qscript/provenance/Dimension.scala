@@ -23,14 +23,15 @@ import matryoshka._
 import scalaz._, Scalaz._
 import scalaz.Tags.Conjunction
 
-trait Dimension[D, I, P] {
-  val prov: Prov[D, I, P]
+trait Dimension[D, I, S, P] {
+  val prov: Prov[D, I, S, P]
 
   import prov._
   import prov.implicits._
 
   /** Returns the `JoinKeys` describing the autojoin of the two dimensions. */
-  def autojoinKeys(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D]): JoinKeys[I] =
+  def autojoinKeys(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D], S: Equal[S])
+      : JoinKeys[I] =
     ls.union.tuple(rs.union) foldMap {
       case (l, r) =>
         val fl = l.flatMap(flattenThen).reverse
@@ -56,26 +57,28 @@ trait Dimension[D, I, P] {
   /** Updates the dimensional stack by sequencing a new dimension from value
     * space with the top dimension.
     */
-  def flatten(id: I, ds: Dimensions[P]): Dimensions[P] =
-    nest(lshift(id, ds))
+  def flatten(id: I, sort: S, ds: Dimensions[P]): Dimensions[P] =
+    nest(lshift(id, sort, ds))
 
   /** Inject a value into a structure at an unknown field. */
   val injectDynamic: Dimensions[P] => Dimensions[P] =
     Dimensions.topDimension.modify(fresh() ≺: _)
 
   /** Inject a value into a structure at the given field. */
-  def injectStatic(field: D, ds: Dimensions[P]): Dimensions[P] =
-    Dimensions.topDimension[P].modify(injValue(field) ≺: _)(ds)
+  def injectStatic(field: D, sort: S, ds: Dimensions[P]): Dimensions[P] =
+    Dimensions.topDimension[P].modify(injValue(field, sort) ≺: _)(ds)
 
   /** Joins two dimensions into a single dimension stack, starting from the base. */
-  def join(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): Dimensions[P] =
+  def join(ls: Dimensions[P], rs: Dimensions[P])(
+      implicit D: Equal[D], I: Equal[I], S: Equal[S])
+      : Dimensions[P] =
     Conjunction.unsubst(Conjunction.subst(ls) ∧ Conjunction.subst(rs))
 
   /** Shifts the dimensional stack by pushing a new dimension from value space
     * onto the stack.
     */
-  def lshift(id: I, ds: Dimensions[P]): Dimensions[P] =
-    ds.mapJoin(value(id) <:: _)
+  def lshift(id: I, sort: S, ds: Dimensions[P]): Dimensions[P] =
+    ds.mapJoin(value(id, sort) <:: _)
 
   /** Sequences the top and preceding dimensions. */
   val nest: Dimensions[P] => Dimensions[P] =
@@ -96,9 +99,11 @@ trait Dimension[D, I, P] {
       Dimensions.topDimension[P].modify(prjPath(segment) ≺: _)(ds)
 
   /** Project a static field from value-level structure. */
-  def projectStatic(field: D, ds: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): Dimensions[P] =
+  def projectStatic(field: D, sort: S, ds: Dimensions[P])(
+      implicit D: Equal[D], I: Equal[I], S: Equal[S])
+      : Dimensions[P] =
     Dimensions.union[P].modify(_ flatMap { jn =>
-      applyProjection(prjValue(field) ≺: jn.head) match {
+      applyProjection(prjValue(field, sort) ≺: jn.head) match {
         case Success(Some(p)) => IList(NonEmptyList.nel(p, jn.tail))
         case Success(None) => jn.tail.toNel.toIList
         case Failure(_) => IList()
@@ -135,11 +140,13 @@ trait Dimension[D, I, P] {
   }
 
   /** Disjoin two dimension stacks. */
-  def union(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): Dimensions[P] =
+  def union(ls: Dimensions[P], rs: Dimensions[P])(
+      implicit D: Equal[D], I: Equal[I], S: Equal[S])
+      : Dimensions[P] =
     ls ∨ rs
 }
 
 object Dimension {
-  def apply[D, I, P](prov0: Prov[D, I, P]): Dimension[D, I, P] =
-    new Dimension[D, I, P] { val prov = prov0 }
+  def apply[D, I, S, P](prov0: Prov[D, I, S, P]): Dimension[D, I, S, P] =
+    new Dimension[D, I, S, P] { val prov = prov0 }
 }
