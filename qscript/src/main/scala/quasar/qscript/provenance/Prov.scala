@@ -31,11 +31,12 @@ import scalaz.syntax.tag._
 /**
   * @tparam D type of data
   * @tparam I type of identity
+  * @tparam S sorts of identities
   * @tparam P provenance representation
   *
   */
-trait Prov[D, I, P] {
-  type PF[A] = ProvF[D, I, A]
+trait Prov[D, I, S, P] {
+  type PF[A] = ProvF[D, I, S, A]
 
   implicit def PC: Corecursive.Aux[P, PF]
   implicit def PR: Recursive.Aux[P, PF]
@@ -43,7 +44,7 @@ trait Prov[D, I, P] {
   def staticId: Prism[I, D]
 
   import ProvF._
-  private val O = ProvF.Optics[D, I]
+  private val O = ProvF.Optics[D, I, S]
 
   // Optics
 
@@ -53,13 +54,13 @@ trait Prov[D, I, P] {
   def prjPath: Prism[P, D] =
     birecursiveIso[P, PF] composePrism O.prjPath[P]
 
-  def prjValue: Prism[P, D] =
+  def prjValue: Prism[P, (D, S)] =
     birecursiveIso[P, PF] composePrism O.prjValue[P]
 
-  def injValue: Prism[P, D] =
+  def injValue: Prism[P, (D, S)] =
     birecursiveIso[P, PF] composePrism O.injValue[P]
 
-  def value: Prism[P, I] =
+  def value: Prism[P, (I, S)] =
     birecursiveIso[P, PF] composePrism O.value[P]
 
   def both: Prism[P, (P, P)] =
@@ -70,7 +71,7 @@ trait Prov[D, I, P] {
 
   object implicits {
     implicit final class ProvOps(p: P) {
-      def ∧(q: P)(implicit D: Equal[D], I: Equal[I]): P =
+      def ∧(q: P)(implicit D: Equal[D], I: Equal[I], S: Equal[S]): P =
         provConjunctionSemiLattice.append(Conjunction(p), Conjunction(q)).unwrap
 
       def ≺:(q: P): P =
@@ -80,13 +81,13 @@ trait Prov[D, I, P] {
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Recursion"))
-    implicit def provEqual(implicit D: Equal[D], I: Equal[I]): Equal[P] =
+    implicit def provEqual(implicit D: Equal[D], I: Equal[I], S: Equal[S]): Equal[P] =
       Equal.equal((x, y) => (x.project, y.project) match {
         case (a@Fresh(), b@Fresh()) => a eq b
-        case (Value(l), Value(r)) => l ≟ r
+        case (Value(l, sl), Value(r, sr)) => l ≟ r && sl ≟ sr
         case (PrjPath(l), PrjPath(r)) => l ≟ r
-        case (PrjValue(l), PrjValue(r)) => l ≟ r
-        case (InjValue(l), InjValue(r)) => l ≟ r
+        case (PrjValue(l, sl), PrjValue(r, sr)) => l ≟ r && sl ≟ sr
+        case (InjValue(l, sl), InjValue(r, sr)) => l ≟ r && sl ≟ sr
         case (Both(_, _), _) => AsSet(flattenBoth(x)) ≟ AsSet(flattenBoth(y))
         case (_, Both(_, _)) => AsSet(flattenBoth(x)) ≟ AsSet(flattenBoth(y))
         case (Then(_, _), _) => flattenThen(x) ≟ flattenThen(y)
@@ -94,7 +95,8 @@ trait Prov[D, I, P] {
         case _ => false
       })
 
-    implicit def provConjunctionSemiLattice(implicit D: Equal[D], I: Equal[I]): SemiLattice[P @@ Conjunction] =
+    implicit def provConjunctionSemiLattice(implicit D: Equal[D], I: Equal[I], S: Equal[S])
+        : SemiLattice[P @@ Conjunction] =
       new SemiLattice[P @@ Conjunction] {
         def append(a: P @@ Conjunction, b: => P @@ Conjunction) =
           Conjunction(zipWhileEq(a.unwrap, b.unwrap))
