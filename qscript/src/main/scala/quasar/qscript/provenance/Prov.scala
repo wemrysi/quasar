@@ -31,11 +31,12 @@ import scalaz.syntax.tag._
 /**
   * @tparam D type of data
   * @tparam I type of identity
+  * @tparam S sorts of identities
   * @tparam P provenance representation
   *
   */
-trait Prov[D, I, P] {
-  type PF[A] = ProvF[D, I, A]
+trait Prov[D, I, S, P] {
+  type PF[A] = ProvF[D, I, S, A]
 
   implicit def PC: Corecursive.Aux[P, PF]
   implicit def PR: Recursive.Aux[P, PF]
@@ -43,7 +44,7 @@ trait Prov[D, I, P] {
   def staticId: Prism[I, D]
 
   import ProvF._
-  private val O = ProvF.Optics[D, I]
+  private val O = ProvF.Optics[D, I, S]
 
   // Optics
 
@@ -53,13 +54,13 @@ trait Prov[D, I, P] {
   def prjPath: Prism[P, D] =
     birecursiveIso[P, PF] composePrism O.prjPath[P]
 
-  def prjValue: Prism[P, D] =
+  def prjValue: Prism[P, (D, S)] =
     birecursiveIso[P, PF] composePrism O.prjValue[P]
 
-  def injValue: Prism[P, D] =
+  def injValue: Prism[P, (D, S)] =
     birecursiveIso[P, PF] composePrism O.injValue[P]
 
-  def value: Prism[P, I] =
+  def value: Prism[P, (I, S)] =
     birecursiveIso[P, PF] composePrism O.value[P]
 
   def both: Prism[P, (P, P)] =
@@ -70,7 +71,7 @@ trait Prov[D, I, P] {
 
   object implicits {
     implicit final class ProvOps(p: P) {
-      def ∧(q: P)(implicit D: Equal[D], I: Equal[I]): P =
+      def ∧(q: P)(implicit D: Equal[D], I: Equal[I], S: Equal[S]): P =
         provConjunctionSemiLattice.append(Conjunction(p), Conjunction(q)).unwrap
 
       def ≺:(q: P): P =
@@ -80,13 +81,13 @@ trait Prov[D, I, P] {
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Recursion"))
-    implicit def provEqual(implicit D: Equal[D], I: Equal[I]): Equal[P] =
+    implicit def provEqual(implicit D: Equal[D], I: Equal[I], S: Equal[S]): Equal[P] =
       Equal.equal((x, y) => (x.project, y.project) match {
         case (a@Fresh(), b@Fresh()) => a eq b
-        case (Value(l), Value(r)) => l ≟ r
+        case (Value(l, sl), Value(r, sr)) => l ≟ r && sl ≟ sr
         case (PrjPath(l), PrjPath(r)) => l ≟ r
-        case (PrjValue(l), PrjValue(r)) => l ≟ r
-        case (InjValue(l), InjValue(r)) => l ≟ r
+        case (PrjValue(l, sl), PrjValue(r, sr)) => l ≟ r && sl ≟ sr
+        case (InjValue(l, sl), InjValue(r, sr)) => l ≟ r && sl ≟ sr
         case (Both(_, _), _) => AsSet(flattenBoth(x)) ≟ AsSet(flattenBoth(y))
         case (_, Both(_, _)) => AsSet(flattenBoth(x)) ≟ AsSet(flattenBoth(y))
         case (Then(_, _), _) => flattenThen(x) ≟ flattenThen(y)
@@ -94,10 +95,12 @@ trait Prov[D, I, P] {
         case _ => false
       })
 
-    implicit def provConjunctionEqual(implicit D: Equal[D], I: Equal[I]): Equal[P @@ Conjunction] =
+    implicit def provConjunctionEqual(implicit D: Equal[D], I: Equal[I], S: Equal[S])
+        : Equal[P @@ Conjunction] =
       Conjunction.subst(Equal[P])
 
-    implicit def provConjunctionSemiLattice(implicit D: Equal[D], I: Equal[I]): SemiLattice[P @@ Conjunction] =
+    implicit def provConjunctionSemiLattice(implicit D: Equal[D], I: Equal[I], S: Equal[S])
+        : SemiLattice[P @@ Conjunction] =
       new SemiLattice[P @@ Conjunction] {
         def append(a: P @@ Conjunction, b: => P @@ Conjunction) =
           Conjunction(zipWhileEq(a.unwrap, b.unwrap))
@@ -152,7 +155,8 @@ trait Prov[D, I, P] {
   def autojoined[F[_]: Monad](left: P, right: P)(
       implicit
       F: MonadTell_[F, JoinKeys[I]],
-      D: Equal[D])
+      D: Equal[D],
+      S: Equal[S])
       : F[Boolean] = {
 
     // NB: We don't want to consider identities themselves when checking for
@@ -195,9 +199,9 @@ trait Prov[D, I, P] {
     }
 
     (left.project, right.project) match {
-      case (Value(l), Value(r)) => F.writer(JoinKeys.singleton(l, r), true)
-      case (PrjValue(l), Value(r)) => F.writer(JoinKeys.singleton(staticId(l), r), true)
-      case (Value(l), PrjValue(r)) => F.writer(JoinKeys.singleton(l, staticId(r)), true)
+      case (Value(l, sl), Value(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(l, r), true)
+      case (PrjValue(l, sl), Value(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(staticId(l), r), true)
+      case (Value(l, sl), PrjValue(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(l, staticId(r)), true)
       case (Both(_, _), _) => joinBoths(left, right)
       case (_, Both(_, _)) => joinBoths(left, right)
       case (Then(_, _), _) => joinThens(left, right)
@@ -207,7 +211,7 @@ trait Prov[D, I, P] {
   }
 
   /** Remove duplicate values from conjunctions. */
-  def distinctConjunctions(p: P)(implicit D: Equal[D], I: Equal[I]): P = {
+  def distinctConjunctions(p: P)(implicit D: Equal[D], I: Equal[I], S: Equal[S]): P = {
     def distinctConjunction(conj: NonEmptyList[P]): P =
       conj.distinctE1.foldRight1(both(_, _))
 
@@ -227,14 +231,16 @@ trait Prov[D, I, P] {
     *
     * A failure indicates the projection is statically known to result in undefined.
     */
-  def applyProjection(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): Validation[Unit, Option[P]] = {
-    def applyProjection0(key: D, from: P): Option[(Boolean, IList[P])] = {
-      val (foundKey, join) = flattenBoth(from) foldMap {
-        case Embed(InjValue(k)) =>
-          ((k ≟ key).disjunction, IList[NonEmptyList[P] \/ (Boolean, P)]())
+  def applyProjection(p: P)(implicit eqD: Equal[D], eqI: Equal[I], eqS: Equal[S])
+      : Validation[Unit, Option[P]] = {
 
-        case Embed(Then(Embed(InjValue(k)), s)) =>
-          ((k ≟ key).disjunction, IList(((k ≟ key), s).right[NonEmptyList[P]]))
+    def applyProjection0(key: D, sort: S, from: P): Option[(Boolean, IList[P])] = {
+      val (foundKey, join) = flattenBoth(from) foldMap {
+        case Embed(InjValue(k, s)) =>
+          ((k ≟ key && s ≟ sort).disjunction, IList[NonEmptyList[P] \/ (Boolean, P)]())
+
+        case Embed(Then(Embed(InjValue(k, s)), snd)) =>
+          ((k ≟ key && s ≟ sort).disjunction, IList(((k ≟ key && s ≟ sort), snd).right[NonEmptyList[P]]))
 
         case other =>
           (false.disjunction, IList(flattenThen(other).left[(Boolean, P)]))
@@ -256,14 +262,14 @@ trait Prov[D, I, P] {
     }
 
     flattenThen(p) match {
-      case NonEmptyList(Embed(PrjValue(k)), ICons(r, rs)) =>
-        applyProjection0(k, r).toSuccess(()) map { ps0 =>
+      case NonEmptyList(Embed(PrjValue(k, s)), ICons(r, rs)) =>
+        applyProjection0(k, s, r).toSuccess(()) map { ps0 =>
           val ps = ps0.map(_.toNel) match {
             case (true, Some(jn)) =>
               some(NonEmptyList.nel(jn.foldMap1(_.conjunction).unwrap, rs))
 
             case (false, Some(jn)) =>
-              some(NonEmptyList.nel(prjValue(k), jn.foldMap1(_.conjunction).unwrap :: rs))
+              some(NonEmptyList.nel(prjValue(k, s), jn.foldMap1(_.conjunction).unwrap :: rs))
 
             case (_, None) =>
               rs.toNel
@@ -292,12 +298,12 @@ trait Prov[D, I, P] {
 }
 
 object Prov {
-  def apply[D, I, P](staticP: Prism[I, D])(
+  def apply[D, I, S, P](staticP: Prism[I, D])(
       implicit
-      TC: Corecursive.Aux[P, ProvF[D, I, ?]],
-      TR: Recursive.Aux[P, ProvF[D, I, ?]])
-      : Prov[D, I, P] =
-    new Prov[D, I, P] {
+      TC: Corecursive.Aux[P, ProvF[D, I, S, ?]],
+      TR: Recursive.Aux[P, ProvF[D, I, S, ?]])
+      : Prov[D, I, S, P] =
+    new Prov[D, I, S, P] {
       val PC = TC
       val PR = TR
       val staticId = staticP
