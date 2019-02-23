@@ -272,15 +272,13 @@ trait Prov[D, I, P] {
     }
   }
 
-  ////
-
-  private def flattenBoth(p: P): NonEmptyList[P] =
+  def flattenBoth(p: P): NonEmptyList[P] =
     p.elgotPara[NonEmptyList[P]] {
       case (_, Both(l, r)) => l append r
       case (other, _) => NonEmptyList(other)
     }
 
-  private def flattenThen(p: P): NonEmptyList[P] =
+  def flattenThen(p: P): NonEmptyList[P] =
     p.elgotPara[NonEmptyList[P]] {
       case (_, Then(h, t)) => h append t
       case (other, _) => NonEmptyList(other)
