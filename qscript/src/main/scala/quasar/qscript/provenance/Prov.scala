@@ -92,6 +92,9 @@ trait Prov[D, I, P] {
         case _ => false
       })
 
+    implicit def provConjunctionEqual(implicit D: Equal[D], I: Equal[I]): Equal[P @@ Conjunction] =
+      Conjunction.subst(Equal[P])
+
     implicit def provConjunctionSemiLattice(implicit D: Equal[D], I: Equal[I]): SemiLattice[P @@ Conjunction] =
       new SemiLattice[P @@ Conjunction] {
         def append(a: P @@ Conjunction, b: => P @@ Conjunction) =
