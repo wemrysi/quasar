@@ -48,7 +48,7 @@ import matryoshka._
 import matryoshka.data.free._
 import matryoshka.implicits._
 import monocle.macros.Lenses
-import monocle.Traversal
+import monocle.{Prism, Traversal}
 import pathy.Path
 import scalaz.{-\/, \/-, Applicative, Cord, Foldable, Functor, ICons, IList, INil, IMap, Monad, NonEmptyList, Show, StateT, ValidationNel}
 import scalaz.Scalaz._
@@ -280,32 +280,52 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
           val (heads, tails) = sdims.union.zipWithIndex.foldRight(z) {
             case ((NonEmptyList(h, t), i), (hs, ts)) =>
-              (NonEmptyList(h, dims.prov.prjPath(ejs.int(i))) :: hs, ts.insert(i, t))
+              (NonEmptyList(h, intPath(i)) :: hs, ts.insert(i, t))
           }
 
           val fheads = computeFuncDims(fm.linearize)(κ(Dimensions(heads)))
 
-          def tailNotFound(i: Int): F[NonEmptyList[dims.P]] =
+          def tailNotFound(i: Int): F[IList[dims.P]] =
             MonadPlannerErr[F].raiseError(
               PlannerError.InternalError.fromMsg(
                 s"Tail with index '$i' not found in '${tails.shows}'"))
 
-          fheads.fold(sdims.point[F])(Dimensions.join.modifyF[F] {
-            case NonEmptyList(h, ICons(dims.prov.prjPath(ejs.int(i)), INil())) =>
-              tails
-                .lookup(i.toInt)
-                .fold(tailNotFound(i.toInt))(NonEmptyList.nel(h, _).point[F])
+          def joinTails(ts: dims.P): F[IList[dims.P]] =
+            dims.prov.flattenBoth(ts).traverse(intPath.getOption(_)) match {
+              case Some(ints) =>
+                for {
+                  tjoins <- ints traverse { i =>
+                    tails.lookup(i.toInt) getOrElseF tailNotFound(i.toInt)
+                  }
 
-            case NonEmptyList(dims.prov.prjPath(ejs.int(i)), INil()) =>
-              tails
-                .lookup(i.toInt)
-                .flatMap(_.toNel)
-                .fold(tailNotFound(i.toInt))(_.point[F])
+                  tdims = tjoins.map(_.toNel.cata(Dimensions.origin1, Dimensions.empty[dims.P]))
 
-            case other =>
-              MonadPlannerErr[F].raiseError(
-                PlannerError.InternalError.fromMsg(
-                  s"Invalid result when computing `Map` provenance: src = ${src.shows}, join = ${other.shows}"))
+                  joined = tdims.foldRight1(dims.join(_, _))
+
+                  jtail = Dimensions.join[dims.P].headOption(joined)
+                } yield jtail.cata(_.list, INil())
+
+              case None =>
+                MonadPlannerErr[F].raiseError(
+                  PlannerError.InternalError.fromMsg(
+                    s"Invalid result when computing `Map` provenance: unexpected tails = ${ts.shows}"))
+            }
+
+          fheads.fold(sdims.point[F])(Dimensions.union.modifyF[F] { u =>
+            val u2 = u traverse {
+              case NonEmptyList(h, ICons(ts, INil())) =>
+                joinTails(ts).map(jts => IList(NonEmptyList.nel(h, jts)))
+
+              case NonEmptyList(ts, INil()) =>
+                joinTails(ts).map(_.toNel.cata(IList(_), IList[NonEmptyList[dims.P]]()))
+
+              case other =>
+                MonadPlannerErr[F].raiseError[IList[NonEmptyList[dims.P]]](
+                  PlannerError.InternalError.fromMsg(
+                    s"Invalid result when computing `Map` provenance: src = ${src.shows}, join = ${other.shows}"))
+            }
+
+            u2.map(_.join)
           })
         }
 
@@ -391,6 +411,9 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   }
 
   ////
+
+  private val intPath: Prism[dims.P, BigInt] =
+    dims.prov.prjPath composePrism ejs.int
 
   private val joinT: Traversal[NonEmptyList[dims.P], dims.P] =
     Traversal.fromTraverse

@@ -92,6 +92,9 @@ trait Prov[D, I, P] {
         case _ => false
       })
 
+    implicit def provConjunctionEqual(implicit D: Equal[D], I: Equal[I]): Equal[P @@ Conjunction] =
+      Conjunction.subst(Equal[P])
+
     implicit def provConjunctionSemiLattice(implicit D: Equal[D], I: Equal[I]): SemiLattice[P @@ Conjunction] =
       new SemiLattice[P @@ Conjunction] {
         def append(a: P @@ Conjunction, b: => P @@ Conjunction) =
@@ -269,15 +272,13 @@ trait Prov[D, I, P] {
     }
   }
 
-  ////
-
-  private def flattenBoth(p: P): NonEmptyList[P] =
+  def flattenBoth(p: P): NonEmptyList[P] =
     p.elgotPara[NonEmptyList[P]] {
       case (_, Both(l, r)) => l append r
       case (other, _) => NonEmptyList(other)
     }
 
-  private def flattenThen(p: P): NonEmptyList[P] =
+  def flattenThen(p: P): NonEmptyList[P] =
     p.elgotPara[NonEmptyList[P]] {
       case (_, Then(h, t)) => h append t
       case (other, _) => NonEmptyList(other)

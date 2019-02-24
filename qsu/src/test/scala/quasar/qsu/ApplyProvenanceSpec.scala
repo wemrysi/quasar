@@ -41,7 +41,7 @@ import matryoshka._
 import matryoshka.data.Fix
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
 import pathy.Path, Path.{file, Sandboxed}
-import scalaz.{\/, Cofree}
+import scalaz.{\/, Cofree, IList, NonEmptyList}
 import scalaz.syntax.apply._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
@@ -128,6 +128,64 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           P.thenn(
             P.prjValue(J.str("Y")),
             P.value(IdAccess.identity('name0))),
+          P.prjPath(J.str("foobar"))))
+
+      tree must haveDimensions(dims)
+    }
+
+    "produce provenance for map involving a union" in {
+      val fm1: RecFreeMap =
+        recFunc.StaticMapS(
+          "x" -> recFunc.IfUndefined(
+            recFunc.ProjectKeyS(recFunc.Hole, "a"),
+            recFunc.ProjectKeyS(recFunc.Hole, "b")),
+          "y" -> recFunc.ProjectKeyS(recFunc.Hole, "c"))
+
+      val fm2: RecFreeMap =
+        recFunc.Add(
+          recFunc.ProjectKeyS(recFunc.Hole, "x"),
+          recFunc.ProjectKeyS(recFunc.Hole, "y"))
+
+      val tree: Cofree[QSU, Symbol] =
+        qsu.map('name0, (
+          qsu.map('name1, (
+            qsu.read('name2, (afile, ExcludeId)),
+            fm1)),
+          fm2))
+
+      val dims: SMap[Symbol, QDims] = SMap(
+        'name0 -> Dimensions(IList(
+          NonEmptyList(
+            P.thenn(
+              P.both(
+                P.prjValue(J.str("a")),
+                P.prjValue(J.str("c"))),
+              P.value(IdAccess.identity('name2))),
+            P.prjPath(J.str("foobar"))),
+          NonEmptyList(
+            P.thenn(
+              P.both(
+                P.prjValue(J.str("b")),
+                P.prjValue(J.str("c"))),
+              P.value(IdAccess.identity('name2))),
+            P.prjPath(J.str("foobar"))))),
+        'name1 -> Dimensions(IList(
+          NonEmptyList(
+            P.thenn(
+              P.both(
+                P.thenn(P.injValue(J.str("x")), P.prjValue(J.str("a"))),
+                P.thenn(P.injValue(J.str("y")), P.prjValue(J.str("c")))),
+              P.value(IdAccess.identity('name2))),
+            P.prjPath(J.str("foobar"))),
+          NonEmptyList(
+            P.thenn(
+              P.both(
+                P.thenn(P.injValue(J.str("x")), P.prjValue(J.str("b"))),
+                P.thenn(P.injValue(J.str("y")), P.prjValue(J.str("c")))),
+              P.value(IdAccess.identity('name2))),
+            P.prjPath(J.str("foobar"))))),
+        'name2 -> Dimensions.origin(
+          P.value(IdAccess.identity('name2)),
           P.prjPath(J.str("foobar"))))
 
       tree must haveDimensions(dims)

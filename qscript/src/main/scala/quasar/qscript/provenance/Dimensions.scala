@@ -21,7 +21,7 @@ import quasar.fp.ski.ι
 
 import monocle.{Iso, PIso, PTraversal, Traversal}
 import monocle.function.Cons1
-import scalaz.{@@, Applicative, Cord, Equal, IList, Monoid, NonEmptyList, SemiLattice, Show, Traverse}
+import scalaz.{@@, Applicative, Cord, Equal, ICons, IList, Monoid, NonEmptyList, SemiLattice, Show, Traverse}
 import scalaz.Scalaz._
 import scalaz.Tags.{Disjunction, Conjunction}
 import scalaz.syntax.tag._
@@ -39,17 +39,22 @@ final case class Dimensions[A](union: IList[NonEmptyList[A]]) {
   def mapJoin[B](f: NonEmptyList[A] => NonEmptyList[B]): Dimensions[B] =
     Dimensions.pjoin.modify(f)(this)
 
-  def and(rhs: Dimensions[A])(implicit A: SemiLattice[A]): Dimensions[A] =
+  def and(rhs: Dimensions[A])(implicit A0: Equal[A], A1: SemiLattice[A]): Dimensions[A] =
     if (isEmpty) rhs
     else if (rhs.isEmpty) this
-    else Dimensions(for {
-      l <- union
-      r <- rhs.union
-    } yield {
-      l.reverse.alignWith(r.reverse)(_.fold(ι, ι, _ |+| _)).reverse
-    })
+    else {
+      val conj = Dimensions(for {
+        l <- union
+        r <- rhs.union
+      } yield l.reverse.alignWith(r.reverse)(_.fold(ι, ι, _ |+| _)).reverse)
 
-  def ∧(rhs: Dimensions[A])(implicit A: SemiLattice[A]): Dimensions[A] =
+      if (hasMany(union) && hasMany(rhs.union))
+        Dimensions.normalize(conj)
+      else
+        conj
+    }
+
+  def ∧(rhs: Dimensions[A])(implicit A0: Equal[A], A1: SemiLattice[A]): Dimensions[A] =
     and(rhs)
 
   def or(rhs: Dimensions[A])(implicit A: Equal[A]): Dimensions[A] =
@@ -57,6 +62,14 @@ final case class Dimensions[A](union: IList[NonEmptyList[A]]) {
 
   def ∨(rhs: Dimensions[A])(implicit A: Equal[A]): Dimensions[A] =
     or(rhs)
+
+  ////
+
+  private def hasMany(xs: IList[_]): Boolean =
+    xs match {
+      case ICons(_, ICons(_, _)) => true
+      case _ => false
+    }
 }
 
 object Dimensions extends DimensionsInstances {
@@ -102,7 +115,7 @@ sealed abstract class DimensionsInstances {
       Disjunction(Dimensions.empty[A]))
 
   // TODO: Actually a CommutativeMonoid, rewrite using type from cats.
-  implicit def conjMonoid[A: SemiLattice]: Monoid[Dimensions[A] @@ Conjunction] =
+  implicit def conjMonoid[A: Equal: SemiLattice]: Monoid[Dimensions[A] @@ Conjunction] =
     Monoid.instance(
       (l, r) => Conjunction(l.unwrap ∧ r.unwrap),
       Conjunction(Dimensions.empty[A]))

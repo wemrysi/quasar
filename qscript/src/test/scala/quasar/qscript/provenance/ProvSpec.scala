@@ -25,7 +25,7 @@ import scala.Predef.implicitly
 import matryoshka.data.Fix
 import org.scalacheck.{Arbitrary, Properties}
 import org.specs2.scalacheck._
-import scalaz.{@@, Equal, IList, NonEmptyList, Writer, Validation => V, Show}
+import scalaz.{@@, IList, NonEmptyList, Writer, Validation => V, Show}
 import scalaz.Tags.Conjunction
 import scalaz.scalacheck.ScalazProperties.{equal => eql, semigroup, semilattice}
 import scalaz.std.anyVal._
@@ -266,9 +266,6 @@ final class ProvSpec extends Qspec with ProvFGenerator {
       autojoined(P.both(v1, P.thenn(v2, p1)), P.thenn(v3, p1)) must_= ((keys, true))
     }
   }
-
-  implicit def conjProvEqual: Equal[Fix[P.PF] @@ Conjunction] =
-    Conjunction.subst(Equal[Fix[P.PF]])
 
   implicit def conjProvArbitrary: Arbitrary[Fix[P.PF] @@ Conjunction] =
     Conjunction.subst(implicitly[Arbitrary[Fix[P.PF]]])
