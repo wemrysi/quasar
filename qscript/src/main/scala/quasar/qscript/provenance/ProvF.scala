@@ -52,7 +52,7 @@ object ProvF extends ProvFInstances {
       } (PrjPath(_))
 
     def prjValue[A]: Prism[ProvF[D, I, S, A], (D, S)] =
-      Prism.partial[ProvF[D, I, S, A], D] {
+      Prism.partial[ProvF[D, I, S, A], (D, S)] {
         case PrjValue(k, s) => (k, s)
       } {
         case (k, s) => PrjValue(k, s)

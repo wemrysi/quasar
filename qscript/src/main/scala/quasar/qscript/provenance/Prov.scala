@@ -151,7 +151,8 @@ trait Prov[D, I, S, P] {
   def autojoined[F[_]: Monad](left: P, right: P)(
       implicit
       F: MonadTell_[F, JoinKeys[I]],
-      D: Equal[D])
+      D: Equal[D],
+      S: Equal[S])
       : F[Boolean] = {
 
     // NB: We don't want to consider identities themselves when checking for
@@ -194,9 +195,9 @@ trait Prov[D, I, S, P] {
     }
 
     (left.project, right.project) match {
-      case (Value(l), Value(r)) => F.writer(JoinKeys.singleton(l, r), true)
-      case (PrjValue(l), Value(r)) => F.writer(JoinKeys.singleton(staticId(l), r), true)
-      case (Value(l), PrjValue(r)) => F.writer(JoinKeys.singleton(l, staticId(r)), true)
+      case (Value(l, sl), Value(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(l, r), true)
+      case (PrjValue(l, sl), Value(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(staticId(l), r), true)
+      case (Value(l, sl), PrjValue(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(l, staticId(r)), true)
       case (Both(_, _), _) => joinBoths(left, right)
       case (_, Both(_, _)) => joinBoths(left, right)
       case (Then(_, _), _) => joinThens(left, right)
@@ -206,7 +207,7 @@ trait Prov[D, I, S, P] {
   }
 
   /** Remove duplicate values from conjunctions. */
-  def distinctConjunctions(p: P)(implicit D: Equal[D], I: Equal[I]): P = {
+  def distinctConjunctions(p: P)(implicit D: Equal[D], I: Equal[I], S: Equal[S]): P = {
     def distinctConjunction(conj: NonEmptyList[P]): P =
       conj.distinctE1.foldRight1(both(_, _))
 
@@ -226,14 +227,16 @@ trait Prov[D, I, S, P] {
     *
     * A failure indicates the projection is statically known to result in undefined.
     */
-  def applyProjection(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): Validation[Unit, Option[P]] = {
-    def applyProjection0(key: D, from: P): Option[(Boolean, IList[P])] = {
-      val (foundKey, join) = flattenBoth(from) foldMap {
-        case Embed(InjValue(k)) =>
-          ((k ≟ key).disjunction, IList[NonEmptyList[P] \/ (Boolean, P)]())
+  def applyProjection(p: P)(implicit eqD: Equal[D], eqI: Equal[I], eqS: Equal[S])
+      : Validation[Unit, Option[P]] = {
 
-        case Embed(Then(Embed(InjValue(k)), s)) =>
-          ((k ≟ key).disjunction, IList(((k ≟ key), s).right[NonEmptyList[P]]))
+    def applyProjection0(key: D, sort: S, from: P): Option[(Boolean, IList[P])] = {
+      val (foundKey, join) = flattenBoth(from) foldMap {
+        case Embed(InjValue(k, s)) =>
+          ((k ≟ key && s ≟ sort).disjunction, IList[NonEmptyList[P] \/ (Boolean, P)]())
+
+        case Embed(Then(Embed(InjValue(k, s)), snd)) =>
+          ((k ≟ key && s ≟ sort).disjunction, IList(((k ≟ key && s ≟ sort), snd).right[NonEmptyList[P]]))
 
         case other =>
           (false.disjunction, IList(flattenThen(other).left[(Boolean, P)]))
@@ -255,14 +258,14 @@ trait Prov[D, I, S, P] {
     }
 
     flattenThen(p) match {
-      case NonEmptyList(Embed(PrjValue(k)), ICons(r, rs)) =>
-        applyProjection0(k, r).toSuccess(()) map { ps0 =>
+      case NonEmptyList(Embed(PrjValue(k, s)), ICons(r, rs)) =>
+        applyProjection0(k, s, r).toSuccess(()) map { ps0 =>
           val ps = ps0.map(_.toNel) match {
             case (true, Some(jn)) =>
               some(NonEmptyList.nel(jn.foldMap1(_.conjunction).unwrap, rs))
 
             case (false, Some(jn)) =>
-              some(NonEmptyList.nel(prjValue(k), jn.foldMap1(_.conjunction).unwrap :: rs))
+              some(NonEmptyList.nel(prjValue(k, s), jn.foldMap1(_.conjunction).unwrap :: rs))
 
             case (_, None) =>
               rs.toNel
@@ -291,12 +294,12 @@ trait Prov[D, I, S, P] {
 }
 
 object Prov {
-  def apply[D, I, P](staticP: Prism[I, D])(
+  def apply[D, I, S, P](staticP: Prism[I, D])(
       implicit
-      TC: Corecursive.Aux[P, ProvF[D, I, ?]],
-      TR: Recursive.Aux[P, ProvF[D, I, ?]])
-      : Prov[D, I, P] =
-    new Prov[D, I, P] {
+      TC: Corecursive.Aux[P, ProvF[D, I, S, ?]],
+      TR: Recursive.Aux[P, ProvF[D, I, S, ?]])
+      : Prov[D, I, S, P] =
+    new Prov[D, I, S, P] {
       val PC = TC
       val PR = TR
       val staticId = staticP

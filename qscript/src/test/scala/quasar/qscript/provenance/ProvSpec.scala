@@ -50,97 +50,105 @@ final class ProvSpec extends Qspec with ProvFGenerator {
 
   val P = ProvSpec.P
 
+  val T: Boolean = true
+  val F: Boolean = false
+
   val p1 = P.prjPath('x')
   val p2 = P.prjPath('y')
   val p3 = P.prjPath('z')
 
-  val pk1 = P.prjValue('a')
-  val pk2 = P.prjValue('b')
+  val pk1 = P.prjValue('a', T)
+  val pk2 = P.prjValue('b', T)
 
-  val ik1 = P.injValue('a')
-  val ik2 = P.injValue('b')
-  val ik3 = P.injValue('c')
+  val ik1 = P.injValue('a', T)
+  val ik2 = P.injValue('b', T)
+  val ik3 = P.injValue('c', T)
 
   val v1i: I = Right(1)
-  val v1 = P.value(v1i)
+  val v1 = P.value(v1i, T)
   val v2i: I = Right(2)
-  val v2 = P.value(v2i)
+  val v2 = P.value(v2i, T)
   val v3i: I = Right(3)
-  val v3 = P.value(v3i)
+  val v3 = P.value(v3i, T)
   val v4i: I = Right(4)
-  val v4 = P.value(v4i)
+  val v4 = P.value(v4i, T)
 
   def autojoined(a: Fix[P.PF], b: Fix[P.PF]): (JoinKeys[I], Boolean) =
     P.autojoined[Writer[JoinKeys[I], ?]](a, b).run
 
   "apply projection" >> {
-    "prj(k) << inj(k) << p == p" >> {
+    "prj(k) ≺ inj(k) ≺ p == p" >> {
       P.applyProjection(P.thenn(pk1, P.thenn(ik1, p1))) must_= V.success(Option(p1))
     }
 
-    "prj(k) << (inj(k) ∧ p) << q == q" >> {
+    "prj(k) ≺ (inj(k) ∧ p) ≺ q == q" >> {
       P.applyProjection(P.thenn(pk1, P.thenn(P.both(ik1, p2), p1))) must_= V.success(Option(p1))
     }
 
-    "prj(k) << (inj(k) ∧ (∃ << q)) << r == q << r" >> {
+    "prj(k) ≺ (inj(k) ∧ (∃ ≺ q)) ≺ r == q ≺ r" >> {
       val fp = P.fresh()
       val tree = P.thenn(pk1, P.thenn(P.both(ik1, P.thenn(fp, p2)), p1))
       P.applyProjection(tree) must_= V.success(Option(P.thenn(p2, p1)))
     }
 
-    "prj(k) << (inj(j) ∧ (inj(k) << q)) << r == q << r" >> {
+    "prj(k) ≺ (inj(j) ∧ (inj(k) ≺ q)) ≺ r == q ≺ r" >> {
       val tree = P.thenn(pk1, P.thenn(P.both(ik2, P.thenn(ik1, p2)), p1))
       P.applyProjection(tree) must_= V.success(Option(P.thenn(p2, p1)))
     }
 
-    "prj(k) << (inj(k) ∧ (inj(j) << q)) << r == r" >> {
+    "prj(k) ≺ (inj(k) ∧ (inj(j) ≺ q)) ≺ r == r" >> {
       val tree = P.thenn(pk1, P.thenn(P.both(ik1, P.thenn(ik2, p2)), p1))
       P.applyProjection(tree) must_= V.success(Option(p1))
     }
 
-    "prj(k) << inj(j) << q == Failure" >> prop { (k: Char, j: Char, p: Fix[P.PF]) => (k =/= j) ==> {
-      val tree = P.thenn(P.prjValue(k), P.thenn(P.injValue(j), p))
+    "prj(k) ≺ inj(j) ≺ q == Failure" >> prop { (k: Char, j: Char, p: Fix[P.PF]) => (k =/= j) ==> {
+      val tree = P.thenn(P.prjValue(k, T), P.thenn(P.injValue(j, T), p))
       P.applyProjection(tree) must beFailure
     }}
 
-    "prj(k) << (p ∧ q) << r == id" >> {
+    "prj(kT) ≺ inj(kF) ≺ q == Failure" >> prop { (k: Char, p: Fix[P.PF]) =>
+      val tree = P.thenn(P.prjValue(k, T), P.thenn(P.injValue(k, F), p))
+      P.applyProjection(tree) must beFailure
+    }
+
+    "prj(k) ≺ (p ∧ q) ≺ r == id" >> {
       val tree = P.thenn(pk1, P.thenn(P.both(p3, p2), p1))
       P.applyProjection(tree).map(_.shows) must beSuccess(Option(tree).shows)
     }
 
-    "prj(k) << (inj(j) ∧ inj(k)) << r == r" >> {
+    "prj(k) ≺ (inj(j) ∧ inj(k)) ≺ r == r" >> {
       val tree = P.thenn(pk1, P.thenn(P.both(ik2, ik1), p1))
       P.applyProjection(tree) must_= V.success(Option(p1))
     }
 
-    "prj(k) << (inj(k) ∧ inj(j)) << r == r" >> {
+    "prj(k) ≺ (inj(k) ∧ inj(j)) ≺ r == r" >> {
       val tree = P.thenn(pk1, P.thenn(P.both(ik1, ik2), p1))
       P.applyProjection(tree) must_= V.success(Option(p1))
     }
 
-    "prj(k) << (inj(j) ∧ inj(l) << q) << r == Failure" >> {
+    "prj(k) ≺ (inj(j) ∧ inj(l) ≺ q) ≺ r == Failure" >> {
       val tree = P.thenn(pk1, P.thenn(P.both(ik2, P.thenn(ik3, p2)), p1))
       P.applyProjection(tree) must beFailure
     }
 
-    "prj(k) << (inj(j) ∧ p << q) << r == prj(k) << p << q << r" >> {
+    "prj(k) ≺ (inj(j) ∧ p ≺ q) ≺ r == prj(k) ≺ p ≺ q ≺ r" >> {
       val tree = P.thenn(pk1, P.thenn(P.both(ik2, P.thenn(v1, p2)), p1))
       P.applyProjection(tree) must_= V.success(Option(P.thenn(pk1, P.thenn(v1, P.thenn(p2, p1)))))
     }
 
     "multiple projects on nested conjunctions" >> {
       //inj{l} ≺ inj{0} ≺ 1 ∧ inj{r} ≺ 1)
-      val x = P.thenn(P.injValue('r'), v1)
-      val y = P.both(P.thenn(P.injValue('l'), P.thenn(P.injValue('0'), v1)), x)
+      val x = P.thenn(P.injValue('r', T), v1)
+      val y = P.both(P.thenn(P.injValue('l', T), P.thenn(P.injValue('0', T), v1)), x)
 
-      val lhs = P.thenn(P.injValue('l'), y)
-      val rhs = P.thenn(P.injValue('r'), v1)
+      val lhs = P.thenn(P.injValue('l', T), y)
+      val rhs = P.thenn(P.injValue('r', T), v1)
 
       // inj{l} ≺ (inj{l} ≺ inj{0} ≺ 1 ∧ inj{r} ≺ 1) ∧ inj{r} ≺ 1
       val tree = P.both(lhs, rhs)
 
-      val prjL = P.applyProjection(P.thenn(P.prjValue('l'), tree))
-      val prjLR = prjL.map(_.map(l => P.applyProjection(P.thenn(P.prjValue('r'), l))))
+      val prjL = P.applyProjection(P.thenn(P.prjValue('l', T), tree))
+      val prjLR = prjL.map(_.map(l => P.applyProjection(P.thenn(P.prjValue('r', T), l))))
 
       prjL must_= V.success(Option(y))
 
@@ -175,39 +183,58 @@ final class ProvSpec extends Qspec with ProvFGenerator {
   }
 
   "autojoined" >> {
-    "p1 θ p1" >> {
+    "p1 ⋈ p1" >> {
       autojoined(p1, p1) must_= ((JoinKeys.empty, true))
     }
 
-    "p1 θ p2" >> {
+    "p1 ⋈ p2" >> {
       autojoined(p1, p2) must_= ((JoinKeys.empty, false))
     }
 
-    "pk1 θ pk1" >> {
+    "pk1 ⋈ pk1" >> {
       autojoined(pk1, pk1) must_= ((JoinKeys.empty, true))
     }
 
-    "pk1 θ pk2" >> {
+    "pk(T) ⋈ pk(F)" >> {
+      val kt = P.prjValue('k', T)
+      val kf = P.prjValue('k', F)
+
+      autojoined(kt, kf) must_= ((JoinKeys.empty, false))
+    }
+
+    "pk1 ⋈ pk2" >> {
       autojoined(pk1, pk2) must_= ((JoinKeys.empty, false))
     }
 
-    "prjPath θ prjValue" >> {
+    "prjPath ⋈ prjValue" >> {
       autojoined(p1, pk1) must_= ((JoinKeys.empty, false))
     }
 
-    "value θ prjPath" >> {
+    "value ⋈ prjPath" >> {
       autojoined(v1, p1) must_= ((JoinKeys.empty, false))
     }
 
-    "value θ prjValue" >> {
+    "value ⋈ prjValue" >> {
       autojoined(v1, pk1) must_= ((JoinKeys.singleton(v1i, Left('a')), true))
     }
 
-    "value θ value" >> {
+    "value(T) ⋈ prjValue(F)" >> {
+      val v = P.value(Right(3), T)
+      val pk = P.prjValue('y', F)
+      autojoined(v, pk) must_= ((JoinKeys.empty, false))
+    }
+
+    "value ⋈ value" >> {
       autojoined(v1, v2) must_= ((JoinKeys.singleton(v1i, v2i), true))
     }
 
-    "(v1 ∧ v2) θ v3" >> {
+    "value(T) ⋈ value(F)" >> {
+      val vt = P.value(Right(1), T)
+      val vf = P.value(Right(1), F)
+      autojoined(vt, vf) must_= ((JoinKeys.empty, false))
+    }
+
+    "(v1 ∧ v2) ⋈ v3" >> {
       val keys =
         JoinKeys(IList(NonEmptyList(NonEmptyList(
           JoinKey(v1i, v3i),
@@ -216,7 +243,7 @@ final class ProvSpec extends Qspec with ProvFGenerator {
       autojoined(P.both(v1, v2), v3) must_= ((keys, true))
     }
 
-    "(v1 ∧ v2) θ (v3 ∧ v4)" >> {
+    "(v1 ∧ v2) ⋈ (v3 ∧ v4)" >> {
       val keys =
         JoinKeys(IList(NonEmptyList(NonEmptyList(
           JoinKey(v1i, v3i),
@@ -227,7 +254,7 @@ final class ProvSpec extends Qspec with ProvFGenerator {
       autojoined(P.both(v1, v2), P.both(v3, v4)) must_= ((keys, true))
     }
 
-    "(v1 ∧ v2) θ (v3 << v4)" >> {
+    "(v1 ∧ v2) ⋈ (v3 ≺ v4)" >> {
       val keys =
         JoinKeys(IList(NonEmptyList(NonEmptyList(
           JoinKey(v1i, v4i),
@@ -236,11 +263,11 @@ final class ProvSpec extends Qspec with ProvFGenerator {
       autojoined(P.both(v1, v2), P.thenn(v3, v4)) must_= ((keys, false))
     }
 
-    "(v2 << v1) θ v3" >> {
+    "(v2 ≺ v1) ⋈ v3" >> {
       autojoined(P.thenn(v2, v1), v3) must_= ((JoinKeys.singleton(v1i, v3i), false))
     }
 
-    "(v2 << v1) θ (v4 << v3)" >> {
+    "(v2 ≺ v1) ⋈ (v4 ≺ v3)" >> {
       val keys =
         JoinKeys(IList(NonEmptyList(
           NonEmptyList(JoinKey(v1i, v3i)),
@@ -249,15 +276,15 @@ final class ProvSpec extends Qspec with ProvFGenerator {
       autojoined(P.thenn(v2, v1), P.thenn(v4, v3)) must_= ((keys, true))
     }
 
-    "(pk1 << v1) θ (pk1 << v3)" >> {
+    "(pk1 ≺ v1) ⋈ (pk1 ≺ v3)" >> {
       autojoined(P.thenn(pk1, v1), P.thenn(pk1, v3)) must_= ((JoinKeys.singleton(v1i, v3i), true))
     }
 
-    "(pk1 << v1) θ (pk2 << v3)" >> {
+    "(pk1 ≺ v1) ⋈ (pk2 ≺ v3)" >> {
       autojoined(P.thenn(pk1, v1), P.thenn(pk2, v3)) must_= ((JoinKeys.singleton(v1i, v3i), false))
     }
 
-    "((v1 ∧ v2) << p) θ (v3 << p)" >> {
+    "((v1 ∧ v2) ≺ p) ⋈ (v3 ≺ p)" >> {
       val keys =
         JoinKeys(IList(NonEmptyList(NonEmptyList(
           JoinKey(v1i, v3i),
@@ -266,7 +293,7 @@ final class ProvSpec extends Qspec with ProvFGenerator {
       autojoined(P.thenn(P.both(v1, v2), p1), P.thenn(v3, p1)) must_= ((keys, true))
     }
 
-    "(v1 ∧ (v2 << p)) θ (v3 << p)" >> {
+    "(v1 ∧ (v2 ≺ p)) ⋈ (v3 ≺ p)" >> {
       val keys =
         JoinKeys(IList(NonEmptyList(NonEmptyList(
           JoinKey(v2i, v3i)))))
@@ -293,5 +320,5 @@ final class ProvSpec extends Qspec with ProvFGenerator {
 
 object ProvSpec {
   type I = Either[Char, Int]
-  val P = Prov[Char, I, Fix[ProvF[Char, I, ?]]](stdLeft)
+  val P = Prov[Char, I, Boolean, Fix[ProvF[Char, I, Boolean, ?]]](stdLeft)
 }
