@@ -1169,6 +1169,36 @@ object ScalarStageSpec {
 
         input must cartesianInto(targets)(expected)
       }
+
+      "cart-7 nested pivoting doesn't produce unnecessary empty fields" in {
+        import ScalarStage.{Mask, Pivot}
+
+        val input = ldjson("""
+          { "a": 1, "b": [[ "two", "three" ], 12, ["four"]] }
+          { "a": 2, "b": [{ "x": "four", "y": "five" }] }
+          { "a": 3, "b": 42 }
+          """)
+
+        val expected = ldjson("""
+          { "a": 1, "ba": "two" }
+          { "a": 1, "ba": "three" }
+          { "a": 1 }
+          { "a": 1, "ba": "four" }
+          { "a": 2 }
+          { "a": 3 }
+          """)
+
+        val targets = Map(
+          (CPathField("a"), (CPathField("a"), Nil)),
+
+          (CPathField("ba"), (CPathField("b"), List(
+            Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Array),
+            Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
+
+        input must cartesianInto(targets)(expected)
+      }
     }
 
     override def is: SpecStructure =
