@@ -17,7 +17,6 @@
 package quasar.qsu
 
 import slamdata.Predef.{Eq => _, Int => SInt, _}
-import quasar.api.table.ColumnType
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson._
 import quasar.ejson.implicits._
@@ -32,14 +31,14 @@ import matryoshka.implicits._
 import scalaz.{Lens => _, _}, Scalaz._, Tags.MaxVal
 
 final class QProv[T[_[_]]: BirecursiveT: EqualT]
-    extends Dimension[T[EJson], IdAccess[T[EJson]], ColumnType.Vector, QProv.P[T]]
+    extends Dimension[T[EJson], IdAccess[T[EJson]], IdType, QProv.P[T]]
     with QSUTTypes[T] {
 
   import QProv.BucketsState
 
   type D     = T[EJson]
   type I     = IdAccess[D]
-  type S     = ColumnType.Vector
+  type S     = IdType
   type PF[A] = QProv.PF[T, A]
   type P     = QProv.P[T]
 
@@ -57,7 +56,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     p.cataM[M, P](bucketedIdsƒ[M](src))
 
   def bucketedIdsƒ[M[_]: Monad](src: Symbol)(implicit M: BucketsM[M]): AlgebraM[M, PF, P] = {
-    case ProvF.Value(i, t) =>
+    case ProvF.Inflate(i, t) =>
       for {
         s <- M.get
 
@@ -69,7 +68,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
         }
 
         b = IdAccess.bucket[D](src, idx)
-      } yield prov.value(b, t)
+      } yield prov.inflate(b, t)
 
     case other =>
       other.embed.point[M]
@@ -99,11 +98,18 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
   /** Returns new dimensions where all identities have been modified by `f`. */
   def modifyIdentities(dims: Dimensions[P])(f: I => I): Dimensions[P] =
     Dimensions.normalize(dims.map(d =>
-      prov.distinctConjunctions(d.transCata[P](pfo.value.composeLens(_1) modify f))))
+      prov.distinctConjunctions(d.transCata[P](pfo.inflate.composeLens(_1) modify f))))
 
   /** The index of the next group key for `of`. */
   def nextGroupKeyIndex(of: Symbol, dims: Dimensions[P]): SInt =
     maxGroupKeyIndex(of, dims).fold(0)(_ + 1)
+
+  /** Project a static path segment. */
+  def projectPath(segment: D, ds: Dimensions[P]): Dimensions[P] =
+    if (ds.isEmpty)
+      Dimensions.origin(prov.project(segment, IdType.Dataset))
+    else
+      Dimensions.topDimension[P].modify(prov.project(segment, IdType.Dataset) ≺: _)(ds)
 
   /** Renames `from` to `to` in the given dimensions. */
   def rename(from: Symbol, to: Symbol, dims: Dimensions[P]): Dimensions[P] = {
@@ -116,7 +122,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
   ////
 
   private val pfo = ProvF.Optics[D, I, S]
-  private val groupKey = prov.value composeLens _1 composePrism IdAccess.groupKey
+  private val groupKey = prov.inflate composeLens _1 composePrism IdAccess.groupKey
 
   private def bucketedDims(src: Symbol, dims: Dimensions[P]): (I ==>> SInt, Dimensions[P]) =
     dims.reverse
@@ -127,7 +133,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
 }
 
 object QProv {
-  type PF[T[_[_]], A] = ProvF[T[EJson], IdAccess[T[EJson]], ColumnType.Vector, A]
+  type PF[T[_[_]], A] = ProvF[T[EJson], IdAccess[T[EJson]], IdType, A]
   type P[T[_[_]]]     = T[PF[T, ?]]
 
   final case class BucketsState[I](nextIdx: SInt, buckets: I ==>> SInt)

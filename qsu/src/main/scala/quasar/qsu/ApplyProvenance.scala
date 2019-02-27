@@ -173,7 +173,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
           val updated = dims.rename(src.root, g.root, sdims)
           val nextIdx = dims.nextGroupKeyIndex(g.root, updated)
           val idAccess = IdAccess.groupKey[dims.D](g.root, nextIdx)
-          val nextDims = dims.swap(0, 1, dims.lshift(idAccess, updated))
+          val nextDims = dims.swap(0, 1, dims.lshift(idAccess, IdType.Expr, updated))
 
           QAuthS[F].modify(
             _.addDims(g.root, nextDims)
@@ -197,10 +197,10 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
           val shiftedDims = rot match {
             case Rotation.ShiftMap | Rotation.ShiftArray =>
-              dims.lshift(tid, structDims)
+              dims.lshift(tid, IdType.fromRotation(rot), structDims)
 
             case Rotation.FlattenMap | Rotation.FlattenArray =>
-              dims.flatten(tid, structDims)
+              dims.flatten(tid, IdType.fromRotation(rot), structDims)
           }
 
           val repairDims = computeFuncDims(repair) {
@@ -230,10 +230,10 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
               rot match {
                 case Rotation.ShiftMap | Rotation.ShiftArray =>
-                  dims.lshift(tid, structDims)
+                  dims.lshift(tid, IdType.fromRotation(rot), structDims)
 
                 case Rotation.FlattenMap | Rotation.FlattenArray =>
-                  dims.flatten(tid, structDims)
+                  dims.flatten(tid, IdType.fromRotation(rot), structDims)
               }
           }
 
@@ -280,7 +280,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
           val (heads, tails) = sdims.union.zipWithIndex.foldRight(z) {
             case ((NonEmptyList(h, t), i), (hs, ts)) =>
-              (NonEmptyList(h, dims.prov.prjPath(ejs.int(i))) :: hs, ts.insert(i, t))
+              (NonEmptyList(h, dims.prov.project(ejs.int(i), IdType.Dataset)) :: hs, ts.insert(i, t))
           }
 
           val fheads = computeFuncDims(fm.linearize)(κ(Dimensions(heads)))
@@ -291,12 +291,12 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
                 s"Tail with index '$i' not found in '${tails.shows}'"))
 
           fheads.fold(sdims.point[F])(Dimensions.join.modifyF[F] {
-            case NonEmptyList(h, ICons(dims.prov.prjPath(ejs.int(i)), INil())) =>
+            case NonEmptyList(h, ICons(dims.prov.project(ejs.int(i), IdType.Dataset), INil())) =>
               tails
                 .lookup(i.toInt)
                 .fold(tailNotFound(i.toInt))(NonEmptyList.nel(h, _).point[F])
 
-            case NonEmptyList(dims.prov.prjPath(ejs.int(i)), INil()) =>
+            case NonEmptyList(dims.prov.project(ejs.int(i), IdType.Dataset), INil()) =>
               tails
                 .lookup(i.toInt)
                 .flatMap(_.toNel)
@@ -316,7 +316,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
           dims.squash(Dimensions.origin1(ss.map(projPathSegment).reverse))
         }
 
-        val sdims = applyIdStatus(idStatus, dims.lshift(tid, rdims))
+        val sdims = applyIdStatus(idStatus, dims.lshift(tid, IdType.Dataset, rdims))
 
         QAuthS[F].modify(_.addDims(g.root, sdims)) as sdims
 
@@ -331,10 +331,10 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         compute1[F](g, src) { sdims =>
           rot match {
             case Rotation.ShiftMap | Rotation.ShiftArray =>
-              dims.lshift(tid, sdims)
+              dims.lshift(tid, IdType.fromRotation(rot), sdims)
 
             case Rotation.FlattenMap | Rotation.FlattenArray =>
-              dims.flatten(tid, sdims)
+              dims.flatten(tid, IdType.fromRotation(rot), sdims)
           }
         }
 
@@ -364,22 +364,22 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       dims.union(a, b)
 
     case MFC(MapFuncsCore.MakeArray((_, d))) =>
-      dims.injectStatic(EJson.int[T[EJson]](0), d)
+      dims.injectStatic(EJson.int[T[EJson]](0), IdType.Array, d)
 
     case MFC(MapFuncsCore.MakeMap((ExtractFunc(MapFuncsCore.Constant(k)), _), (_, v))) =>
-      dims.injectStatic(k, v)
+      dims.injectStatic(k, IdType.Map, v)
 
     case MFC(MapFuncsCore.MakeMap((_, k), (_, v))) =>
       dims.injectDynamic(dims.join(k, v))
 
     case MFC(MapFuncsCore.ProjectIndex((_, a), (ExtractFunc(MapFuncsCore.Constant(i)), _))) =>
-      dims.projectStatic(i, a)
+      dims.projectStatic(i, IdType.Array, a)
 
     case MFC(MapFuncsCore.ProjectIndex((_, a), (_, i))) =>
       dims.projectDynamic(dims.join(a, i))
 
     case MFC(MapFuncsCore.ProjectKey((_, m), (ExtractFunc(MapFuncsCore.Constant(k)), _))) =>
-      dims.projectStatic(k, m)
+      dims.projectStatic(k, IdType.Map, m)
 
     case MFC(MapFuncsCore.ProjectKey((_, m), (_, k))) =>
       dims.projectDynamic(dims.join(m, k))
@@ -463,7 +463,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
     }
 
   private def projPathSegment(s: String): QProv.P[T] =
-    dims.prov.prjPath(ejson.CommonEJson(ejson.Str[T[EJson]](s)).embed)
+    dims.prov.project(ejson.CommonEJson(ejson.Str[T[EJson]](s)).embed, IdType.Dataset)
 
   private def segments(p: Path[_, _, _]): IList[String] = {
     val segs = Path.flatten[IList[String]](IList(), IList(), IList(), IList(_), IList(_), p)
@@ -500,8 +500,8 @@ object ApplyProvenance {
       case IncludeId =>
         val dims = QProv[T]
         dims.join(
-          dims.injectStatic(EJson.int[T[EJson]](0), qdims),
-          dims.injectStatic(EJson.int[T[EJson]](1), qdims))
+          dims.injectStatic(EJson.int[T[EJson]](0), IdType.Array, qdims),
+          dims.injectStatic(EJson.int[T[EJson]](1), IdType.Array, qdims))
 
       case _ => qdims
     }
