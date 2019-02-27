@@ -37,6 +37,11 @@ abstract class ScalarStageSpec
     with ScalarStageSpec.PivotSpec
     with ScalarStageSpec.CartesianSpec
 
+/*
+ * Test names must begin with the prefix specified in their
+ * `override def is` implementation followed by `-#*` in
+ * order for `pendingFragments` to come into effect.
+ */
 object ScalarStageSpec {
 
   def parseNumber(prefix: String, name: String): Option[Int] = {
