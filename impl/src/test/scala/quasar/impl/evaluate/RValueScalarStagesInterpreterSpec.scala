@@ -31,13 +31,20 @@ import qdata.json.QDataFacade
 
 import org.typelevel.jawn.{AsyncParser, Facade}
 
-object RValueParseInstructionSpec extends ScalarStageSpec {
+object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
   import quasar.impl.evaluate.{RValueScalarStagesInterpreter => Interpreter}
 
   implicit def executionContext: ExecutionContext = ExecutionContext.Implicits.global
   implicit val cs: ContextShift[IO] = IO.contextShift(executionContext)
 
   type JsonElement = RValue
+
+  val idsPendingExamples: Set[Int] = Set()
+  val wrapPendingExamples: Set[Int] = Set()
+  val projectPendingExamples: Set[Int] = Set()
+  val maskPendingExamples: Set[Int] = Set()
+  val pivotPendingExamples: Set[Int] = Set()
+  val cartesianPendingExamples: Set[Int] = Set()
 
   def evalIds(idStatus: IdStatus, stream: JsonStream): JsonStream =
     Stream.emits(stream)
