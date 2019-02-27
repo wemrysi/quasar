@@ -17,20 +17,23 @@
 package quasar.qscript.provenance
 
 import slamdata.Predef._
+
 import quasar.contrib.matryoshka.birecursiveIso
 import quasar.contrib.scalaz.MonadTell_
 import quasar.fp.ski.{ι, κ}
 
 import matryoshka._
 import matryoshka.implicits._
+
 import monocle.Prism
+
 import scalaz._, Scalaz._
 import scalaz.Tags.{Conjunction, Disjunction}
 import scalaz.syntax.tag._
 
 /**
-  * @tparam D type of data
-  * @tparam I type of identity
+  * @tparam D type of scalar identity
+  * @tparam I type of vector identity
   * @tparam S sorts of identities
   * @tparam P provenance representation
   *
@@ -51,17 +54,14 @@ trait Prov[D, I, S, P] {
   def fresh: Prism[P, Unit] =
     birecursiveIso[P, PF] composePrism O.fresh[P]
 
-  def prjPath: Prism[P, D] =
-    birecursiveIso[P, PF] composePrism O.prjPath[P]
+  def project: Prism[P, (D, S)] =
+    birecursiveIso[P, PF] composePrism O.project[P]
 
-  def prjValue: Prism[P, (D, S)] =
-    birecursiveIso[P, PF] composePrism O.prjValue[P]
+  def inject: Prism[P, (D, S)] =
+    birecursiveIso[P, PF] composePrism O.inject[P]
 
-  def injValue: Prism[P, (D, S)] =
-    birecursiveIso[P, PF] composePrism O.injValue[P]
-
-  def value: Prism[P, (I, S)] =
-    birecursiveIso[P, PF] composePrism O.value[P]
+  def inflate: Prism[P, (I, S)] =
+    birecursiveIso[P, PF] composePrism O.inflate[P]
 
   def both: Prism[P, (P, P)] =
     birecursiveIso[P, PF] composePrism O.both[P]
@@ -84,10 +84,9 @@ trait Prov[D, I, S, P] {
     implicit def provEqual(implicit D: Equal[D], I: Equal[I], S: Equal[S]): Equal[P] =
       Equal.equal((x, y) => (x.project, y.project) match {
         case (a@Fresh(), b@Fresh()) => a eq b
-        case (Value(l, sl), Value(r, sr)) => l ≟ r && sl ≟ sr
-        case (PrjPath(l), PrjPath(r)) => l ≟ r
-        case (PrjValue(l, sl), PrjValue(r, sr)) => l ≟ r && sl ≟ sr
-        case (InjValue(l, sl), InjValue(r, sr)) => l ≟ r && sl ≟ sr
+        case (Inflate(l, sl), Inflate(r, sr)) => l ≟ r && sl ≟ sr
+        case (Project(l, sl), Project(r, sr)) => l ≟ r && sl ≟ sr
+        case (Inject(l, sl), Inject(r, sr)) => l ≟ r && sl ≟ sr
         case (Both(_, _), _) => AsSet(flattenBoth(x)) ≟ AsSet(flattenBoth(y))
         case (_, Both(_, _)) => AsSet(flattenBoth(x)) ≟ AsSet(flattenBoth(y))
         case (Then(_, _), _) => flattenThen(x) ≟ flattenThen(y)
@@ -156,7 +155,7 @@ trait Prov[D, I, S, P] {
       : F[Boolean] = {
 
     // NB: We don't want to consider identities themselves when checking for
-    //     joinability, just that both sides are Value(_).
+    //     joinability, just that both sides are comparable.
     implicit val ignoreI: Equal[I] = Equal.equalBy(κ(()))
 
     def joinBoths(l0: P, r0: P): F[Boolean] = {
@@ -195,9 +194,9 @@ trait Prov[D, I, S, P] {
     }
 
     (left.project, right.project) match {
-      case (Value(l, sl), Value(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(l, r), true)
-      case (PrjValue(l, sl), Value(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(staticId(l), r), true)
-      case (Value(l, sl), PrjValue(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(l, staticId(r)), true)
+      case (Inflate(l, sl), Inflate(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(l, r), true)
+      case (Project(l, sl), Inflate(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(staticId(l), r), true)
+      case (Inflate(l, sl), Project(r, sr)) if sl ≟ sr => F.writer(JoinKeys.singleton(l, staticId(r)), true)
       case (Both(_, _), _) => joinBoths(left, right)
       case (_, Both(_, _)) => joinBoths(left, right)
       case (Then(_, _), _) => joinThens(left, right)
@@ -220,7 +219,7 @@ trait Prov[D, I, S, P] {
     distinctConjunction(p.elgotPara(distinctConjunctionsƒ))
   }
 
-  /** Attempt to reduce a sequence ending in a value projection.
+  /** Attempt to reduce a sequence ending in a projection.
     *
     * A success indicates there was no projection or it was applied successfully,
     * possibly eliminating provenance entirely.
@@ -232,10 +231,10 @@ trait Prov[D, I, S, P] {
 
     def applyProjection0(key: D, sort: S, from: P): Option[(Boolean, IList[P])] = {
       val (foundKey, join) = flattenBoth(from) foldMap {
-        case Embed(InjValue(k, s)) =>
+        case Embed(Inject(k, s)) =>
           ((k ≟ key && s ≟ sort).disjunction, IList[NonEmptyList[P] \/ (Boolean, P)]())
 
-        case Embed(Then(Embed(InjValue(k, s)), snd)) =>
+        case Embed(Then(Embed(Inject(k, s)), snd)) =>
           ((k ≟ key && s ≟ sort).disjunction, IList(((k ≟ key && s ≟ sort), snd).right[NonEmptyList[P]]))
 
         case other =>
@@ -258,14 +257,14 @@ trait Prov[D, I, S, P] {
     }
 
     flattenThen(p) match {
-      case NonEmptyList(Embed(PrjValue(k, s)), ICons(r, rs)) =>
+      case NonEmptyList(Embed(Project(k, s)), ICons(r, rs)) =>
         applyProjection0(k, s, r).toSuccess(()) map { ps0 =>
           val ps = ps0.map(_.toNel) match {
             case (true, Some(jn)) =>
               some(NonEmptyList.nel(jn.foldMap1(_.conjunction).unwrap, rs))
 
             case (false, Some(jn)) =>
-              some(NonEmptyList.nel(prjValue(k, s), jn.foldMap1(_.conjunction).unwrap :: rs))
+              some(NonEmptyList.nel(project(k, s), jn.foldMap1(_.conjunction).unwrap :: rs))
 
             case (_, None) =>
               rs.toNel

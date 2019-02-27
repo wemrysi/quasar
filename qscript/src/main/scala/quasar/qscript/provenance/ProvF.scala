@@ -24,8 +24,8 @@ import monocle.Prism
 import scalaz._, Scalaz._
 
 /**
-  * @tparam D type of data
-  * @tparam I type of identity
+  * @tparam D type of scalar identities
+  * @tparam I type of vector identities
   * @tparam S sorts of identities
   * @tparam A recursive position
   */
@@ -33,10 +33,9 @@ sealed abstract class ProvF[D, I, S, A]
 
 object ProvF extends ProvFInstances {
   final case class Fresh[D, I, S, A]() extends ProvF[D, I, S, A]
-  final case class PrjPath[D, I, S, A](segment: D) extends ProvF[D, I, S, A]
-  final case class PrjValue[D, I, S, A](field: D, sort: S) extends ProvF[D, I, S, A]
-  final case class InjValue[D, I, S, A](field: D, sort: S) extends ProvF[D, I, S, A]
-  final case class Value[D, I, S, A](id: I, sort: S) extends ProvF[D, I, S, A]
+  final case class Project[D, I, S, A](id: D, sort: S) extends ProvF[D, I, S, A]
+  final case class Inject[D, I, S, A](id: D, sort: S) extends ProvF[D, I, S, A]
+  final case class Inflate[D, I, S, A](id: I, sort: S) extends ProvF[D, I, S, A]
   final case class Both[D, I, S, A](left: A, right: A) extends ProvF[D, I, S, A]
   final case class Then[D, I, S, A](fst: A, snd: A) extends ProvF[D, I, S, A]
 
@@ -46,30 +45,25 @@ object ProvF extends ProvFInstances {
         case Fresh() => ()
       } (κ(Fresh()))
 
-    def prjPath[A]: Prism[ProvF[D, I, S, A], D] =
-      Prism.partial[ProvF[D, I, S, A], D] {
-        case PrjPath(c) => c
-      } (PrjPath(_))
-
-    def prjValue[A]: Prism[ProvF[D, I, S, A], (D, S)] =
+    def project[A]: Prism[ProvF[D, I, S, A], (D, S)] =
       Prism.partial[ProvF[D, I, S, A], (D, S)] {
-        case PrjValue(k, s) => (k, s)
+        case Project(d, s) => (d, s)
       } {
-        case (k, s) => PrjValue(k, s)
+        case (d, s) => Project(d, s)
       }
 
-    def injValue[A]: Prism[ProvF[D, I, S, A], (D, S)] =
+    def inject[A]: Prism[ProvF[D, I, S, A], (D, S)] =
       Prism.partial[ProvF[D, I, S, A], (D, S)] {
-        case InjValue(k, s) => (k, s)
+        case Inject(d, s) => (d, s)
       } {
-        case (k, s) => InjValue(k, s)
+        case (d, s) => Inject(d, s)
       }
 
-    def value[A]: Prism[ProvF[D, I, S, A], (I, S)] =
+    def inflate[A]: Prism[ProvF[D, I, S, A], (I, S)] =
       Prism.partial[ProvF[D, I, S, A], (I, S)] {
-        case Value(i, s) => (i, s)
+        case Inflate(i, s) => (i, s)
       } {
-        case (i, s) => Value(i, s)
+        case (i, s) => Inflate(i, s)
       }
 
     def both[A]: Prism[ProvF[D, I, S, A], (A, A)] =
@@ -96,17 +90,17 @@ object ProvF extends ProvFInstances {
 sealed abstract class ProvFInstances {
   import ProvF._
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   implicit def traverse[D, I, S]: Traverse[ProvF[D, I, S, ?]] =
     new Traverse[ProvF[D, I, S, ?]] {
       val O = Optics[D, I, S]
 
       def traverseImpl[F[_]: Applicative, A, B](p: ProvF[D, I, S, A])(g: A => F[B]) =
         p match {
-          case Fresh() => O.fresh[B]().point[F]
-          case PrjPath(d) => O.prjPath[B](d).point[F]
-          case PrjValue(d, s) => O.prjValue[B](d, s).point[F]
-          case InjValue(d, s) => O.injValue[B](d, s).point[F]
-          case Value(i, s) => O.value[B](i, s).point[F]
+          case p@Fresh() => p.asInstanceOf[ProvF[D, I, S, B]].point[F]
+          case Project(d, s) => O.project[B](d, s).point[F]
+          case Inject(d, s) => O.inject[B](d, s).point[F]
+          case Inflate(i, s) => O.inflate[B](i, s).point[F]
           case Both(l, r) => g(l).tuple(g(r)).map(O.both(_))
           case Then(f, s) => g(f).tuple(g(s)).map(O.thenn(_))
         }
@@ -118,11 +112,10 @@ sealed abstract class ProvFInstances {
         implicit val showA = show
         Show.show {
           case Fresh() => Cord("∃")
-          case PrjPath(d) => Cord("\\") ++ d.show
-          case PrjValue(d, s) => Cord("prj{") ++ d.show ++ Cord("} :: ") ++ s.show
-          case InjValue(d, s) => Cord("inj{") ++ d.show ++ Cord("} :: ") ++ s.show
-          case Value(i, s) => i.show ++ Cord(" :: ") ++ s.show
-          case Both(l, r) => Cord("(") ++ l.show ++ Cord(" ∧ ") ++ r.show ++ Cord(")")
+          case Project(d, s) => Cord("∏(") ++ d.show ++ Cord(" :: ") ++ s.show ++ Cord(")")
+          case Inject(d, s) => Cord("I(") ++ d.show ++ Cord(" :: ") ++ s.show ++ Cord(")")
+          case Inflate(i, s) => Cord("∆(") ++ i.show ++ Cord(" :: ") ++ s.show ++ Cord(")")
+          case Both(l, r) => Cord("{") ++ l.show ++ Cord(" ∧ ") ++ r.show ++ Cord("}")
           case Then(f, s) => f.show ++ Cord(" ≺ ") ++ s.show
         }
       }
