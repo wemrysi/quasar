@@ -65,11 +65,31 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
   val app = ApplyProvenance[Fix, F] _
   val qprov = QProv[Fix]
+
   type P = qprov.P
   val P = qprov.prov
 
   val root = Path.rootDir[Sandboxed]
   val afile: AFile = root </> file("foobar")
+  val FooBar: P = prjPath("foobar")
+
+  def prjPath(name: String): P =
+    P.project(J.str(name), IdType.Dataset)
+
+  def infRow(id: Symbol): P =
+    P.inflate(IdAccess.identity(id), IdType.Dataset)
+
+  def infGrp(id: Symbol, idx: Int): P =
+    P.inflate(IdAccess.bucket(id, idx), IdType.Expr)
+
+  def infMap(id: Symbol): P =
+    P.inflate(IdAccess.identity(id), IdType.Map)
+
+  def injMap(key: String): P =
+    P.project(J.str(key), IdType.Map)
+
+  def prjMap(key: String): P =
+    P.inject(J.str(key), IdType.Map)
 
   import P.implicits._
 
@@ -83,12 +103,8 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           (qsu.read('name1, (afile, ExcludeId)), fm))
 
       val dims: SMap[Symbol, QDims] = SMap(
-        'name0 -> Dimensions.origin(
-          P.value(IdAccess.identity('name1)),
-          P.prjPath(J.str("foobar"))),
-        'name1 -> Dimensions.origin(
-          P.value(IdAccess.identity('name1)),
-          P.prjPath(J.str("foobar"))))
+        'name0 -> Dimensions.origin(infRow('name1), FooBar),
+        'name1 -> Dimensions.origin(infRow('name1), FooBar))
 
       tree must haveDimensions(dims)
     }
@@ -110,25 +126,17 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           fm2))
 
       val dims: SMap[Symbol, QDims] = SMap(
-        'name0 -> Dimensions.origin(
-          P.value(IdAccess.identity('name0)),
-          P.prjPath(J.str("foobar"))),
+        'name0 -> Dimensions.origin(infRow('name0), FooBar),
         'name1 -> Dimensions.origin(
           P.thenn(
             P.both(
-              P.thenn(
-                P.injValue(J.str("A")),
-                P.prjValue(J.str("X"))),
-              P.thenn(
-                P.injValue(J.str("B")),
-                P.prjValue(J.str("Y")))),
-            P.value(IdAccess.identity('name0))),
-          P.prjPath(J.str("foobar"))),
+              P.thenn(injMap("A"), prjMap("X")),
+              P.thenn(injMap("B"), prjMap("Y"))),
+            infRow('name0)),
+          FooBar),
         'name2 -> Dimensions.origin(
-          P.thenn(
-            P.prjValue(J.str("Y")),
-            P.value(IdAccess.identity('name0))),
-          P.prjPath(J.str("foobar"))))
+          P.thenn(prjMap("Y"), infRow('name0)),
+          FooBar))
 
       tree must haveDimensions(dims)
     }
@@ -205,26 +213,26 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
       tree must haveDimensions(SMap(
         'n4 -> Dimensions.origin(
-          P.value(IdAccess.bucket('n4, 1)),
-          P.value(IdAccess.bucket('n4, 0)),
-          P.prjPath(J.str("foobar"))),
+          infGrp('n4, 1),
+          infGrp('n4, 0),
+          FooBar),
         'n3 -> Dimensions.origin(
-          P.prjValue(J.str("pop")) ≺: P.value(IdAccess.identity('n2)),
-          P.value(IdAccess.groupKey('n2, 1)),
-          P.value(IdAccess.groupKey('n2, 0)),
-          P.prjPath(J.str("foobar"))),
+          prjMap("pop") ≺: infRow('n2),
+          infGrp('n2, 1),
+          infGrp('n2, 0),
+          FooBar),
         'n2 -> Dimensions.origin(
-          P.value(IdAccess.identity('n2)),
-          P.value(IdAccess.groupKey('n2, 1)),
-          P.value(IdAccess.groupKey('n2, 0)),
-          P.prjPath(J.str("foobar"))),
+          infRow('n2),
+          infGrp('n2, 1),
+          infGrp('n2, 0),
+          FooBar),
         'n1 -> Dimensions.origin(
-          P.value(IdAccess.identity('n1)),
-          P.value(IdAccess.groupKey('n1, 0)),
-          P.prjPath(J.str("foobar"))),
+          infRow('n1),
+          infGrp('n1, 0),
+          FooBar),
         'n0 -> Dimensions.origin(
-          P.value(IdAccess.identity('n0)),
-          P.prjPath(J.str("foobar")))
+          infRow('n0),
+          FooBar)
       ))
     }
 
@@ -239,20 +247,9 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           DTrans.Squash[Fix]()))
 
       tree must haveDimensions(SMap(
-        'n0 -> Dimensions.origin(
-          P.thenn(
-            P.thenn(
-              P.prjValue(J.str("bar")),
-              P.value(IdAccess.identity('n2))),
-            P.prjPath(J.str("foobar")))),
-        'n1 -> Dimensions.origin(
-          P.thenn(
-            P.prjValue(J.str("bar")),
-            P.value(IdAccess.identity('n2))),
-          P.prjPath(J.str("foobar"))),
-        'n2 -> Dimensions.origin(
-          P.value(IdAccess.identity('n2)),
-          P.prjPath(J.str("foobar")))
+        'n0 -> Dimensions.origin(prjMap("bar") ≺: infRow('n2) ≺: FooBar),
+        'n1 -> Dimensions.origin(prjMap("bar") ≺: infRow('n2), FooBar),
+        'n2 -> Dimensions.origin(infRow('n2), FooBar)
       ))
     }
 
@@ -289,44 +286,15 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           DTrans.Squash[Fix]()))
 
       tree must haveDimensions(SMap(
-        'n0 -> Dimensions.origin(
-          P.value(IdAccess.identity('n0)),
-          P.prjPath(J.str("foobar"))),
-        'n1 -> Dimensions.origin(
-          P.thenn(
-            P.value(IdAccess.identity('n1)),
-            P.value(IdAccess.identity('n0))),
-          P.prjPath(J.str("foobar"))),
-        'n2 -> Dimensions.origin(
-          P.thenn(
-            P.prjValue(J.str("baz")),
-            P.thenn(
-              P.value(IdAccess.identity('n1)),
-              P.value(IdAccess.identity('n0)))),
-          P.prjPath(J.str("foobar"))),
-        'n3 -> Dimensions.origin(
-          P.thenn(
-            P.value(IdAccess.identity('n1)),
-            P.thenn(
-              P.value(IdAccess.identity('n0)),
-              P.prjPath(J.str("foobar"))))),
-        'n4 -> Dimensions.origin(
-          P.thenn(
-            P.value(IdAccess.identity('n1)),
-            P.thenn(
-              P.value(IdAccess.identity('n0)),
-              P.prjPath(J.str("foobar"))))),
+        'n0 -> Dimensions.origin(infRow('n0), FooBar),
+        'n1 -> Dimensions.origin(infMap('n1) ≺: infRow('n0), FooBar),
+        'n2 -> Dimensions.origin(prjMap("baz") ≺: infMap('n1) ≺: infRow('n0), FooBar),
+        'n3 -> Dimensions.origin(infMap('n1) ≺: infRow('n0), FooBar),
+        'n4 -> Dimensions.origin(infMap('n1) ≺: infRow('n0), FooBar),
+        // FIXME: Hmm, this doesn't seem correct, does one dominate?
         'n5 -> Dimensions.origin(
-          P.thenn(
-            P.prjValue(J.str("baz")),
-            P.thenn(
-              P.value(IdAccess.identity('n1)),
-              P.value(IdAccess.identity('n0)))),
-          P.thenn(
-            P.value(IdAccess.identity('n1)),
-            P.thenn(
-              P.value(IdAccess.identity('n0)),
-              P.prjPath(J.str("foobar"))))),
+          prjMap("baz") ≺: infMap('n1) ≺: infRow('n0),
+          infMap('n1) ≺: infRow('n0) ≺: FooBar),
         'n6 -> Dimensions.origin(
           P.thenn(
             P.prjValue(J.str("baz")),

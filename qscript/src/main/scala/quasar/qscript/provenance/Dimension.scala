@@ -60,13 +60,13 @@ trait Dimension[D, I, S, P] {
   def flatten(id: I, sort: S, ds: Dimensions[P]): Dimensions[P] =
     nest(lshift(id, sort, ds))
 
-  /** Inject a value into a structure at an unknown field. */
+  /** Inject into a structure at an unknown field. */
   val injectDynamic: Dimensions[P] => Dimensions[P] =
     Dimensions.topDimension.modify(fresh() ≺: _)
 
-  /** Inject a value into a structure at the given field. */
+  /** Inject into a structure at the given field. */
   def injectStatic(field: D, sort: S, ds: Dimensions[P]): Dimensions[P] =
-    Dimensions.topDimension[P].modify(injValue(field, sort) ≺: _)(ds)
+    Dimensions.topDimension[P].modify(inject(field, sort) ≺: _)(ds)
 
   /** Joins two dimensions into a single dimension stack, starting from the base. */
   def join(ls: Dimensions[P], rs: Dimensions[P])(
@@ -78,7 +78,7 @@ trait Dimension[D, I, S, P] {
     * onto the stack.
     */
   def lshift(id: I, sort: S, ds: Dimensions[P]): Dimensions[P] =
-    ds.mapJoin(value(id, sort) <:: _)
+    ds.mapJoin(inflate(id, sort) <:: _)
 
   /** Sequences the top and preceding dimensions. */
   val nest: Dimensions[P] => Dimensions[P] =
@@ -87,23 +87,16 @@ trait Dimension[D, I, S, P] {
       case other => other
     }
 
-  /** Project an unknown field from a value-level structure. */
+  /** Project an unknown field. */
   val projectDynamic: Dimensions[P] => Dimensions[P] =
     Dimensions.topDimension.modify(fresh() ≺: _)
 
-  /** Project a static path segment. */
-  def projectPath(segment: D, ds: Dimensions[P]): Dimensions[P] =
-    if (ds.isEmpty)
-      Dimensions.origin(prjPath(segment))
-    else
-      Dimensions.topDimension[P].modify(prjPath(segment) ≺: _)(ds)
-
-  /** Project a static field from value-level structure. */
+  /** Project a staticlly known field. */
   def projectStatic(field: D, sort: S, ds: Dimensions[P])(
       implicit D: Equal[D], I: Equal[I], S: Equal[S])
       : Dimensions[P] =
     Dimensions.union[P].modify(_ flatMap { jn =>
-      applyProjection(prjValue(field, sort) ≺: jn.head) match {
+      applyProjection(project(field, sort) ≺: jn.head) match {
         case Success(Some(p)) => IList(NonEmptyList.nel(p, jn.tail))
         case Success(None) => jn.tail.toNel.toIList
         case Failure(_) => IList()
