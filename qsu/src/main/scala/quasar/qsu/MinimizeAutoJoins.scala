@@ -104,7 +104,8 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
     val groupKeyOf: Traversal[Option[QDims], Symbol] =
       someP[QDims] composeTraversal
       Dimensions.dimension[QP.P] composePrism
-      QP.prov.value composePrism
+      QP.prov.value composeLens
+      _1 composePrism
       IdAccess.groupKey composeLens
       _1
 
