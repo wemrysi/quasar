@@ -44,7 +44,7 @@ object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
   val projectPendingExamples: Set[Int] = Set()
   val maskPendingExamples: Set[Int] = Set()
   val pivotPendingExamples: Set[Int] = Set()
-  val cartesianPendingExamples: Set[Int] = Set(7)
+  val cartesianPendingExamples: Set[Int] = Set(7, 8)
 
   def evalIds(idStatus: IdStatus, stream: JsonStream): JsonStream =
     Stream.emits(stream)
