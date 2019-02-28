@@ -12,6 +12,7 @@ tmp
 .settings
 *.sw*
 tags
+.envrc
 docker/Dockerfiles/Marklogic/MarkLogic.rpm
 docker/Dockerfiles/Spark/scala*.tgz
 docker/Dockerfiles/Spark/spark*.tgz

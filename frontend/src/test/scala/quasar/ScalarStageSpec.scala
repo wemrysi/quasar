@@ -21,22 +21,50 @@ import slamdata.Predef._
 import quasar.api.table.ColumnType
 import quasar.common.{CPath, CPathField}
 
+import org.specs2.execute.PendingUntilFixed._
 import org.specs2.matcher.Matcher
+import org.specs2.specification.core.SpecStructure
 
 import scala.collection.immutable.{Map, Set}
 
 import java.lang.String
 
 abstract class ScalarStageSpec
-    extends JsonSpec
-    with ScalarStageSpec.IdsSpec
+    extends ScalarStageSpec.IdsSpec
     with ScalarStageSpec.WrapSpec
     with ScalarStageSpec.ProjectSpec
     with ScalarStageSpec.MaskSpec
     with ScalarStageSpec.PivotSpec
     with ScalarStageSpec.CartesianSpec
 
+/*
+ * Test names must begin with the prefix specified in their
+ * `override def is` implementation followed by `-#*` in
+ * order for `pendingFragments` to come into effect.
+ */
 object ScalarStageSpec {
+
+  def parseNumber(prefix: String, name: String): Option[Int] = {
+    val regexPrefix = s"${prefix}-[1-9][0-9]*".r
+    val regexIdx = s"[1-9][0-9]*".r
+
+    regexPrefix.findPrefixOf(name)
+      .flatMap(regexIdx.findFirstIn)
+      .map(_.toInt)
+  }
+
+  def pendingFragments(sis: SpecStructure, pendingExamples: Set[Int], prefix: String)
+      : SpecStructure =
+    sis.copy(lazyFragments = () => sis.fragments.map { f =>
+      parseNumber(prefix, f.description.show) match {
+        case Some(i) =>
+          if (pendingExamples.contains(i))
+            f.updateExecution(_.mapResult(_.pendingUntilFixed))
+          else
+            f
+        case None => f
+      }
+    })
 
   /*
    * Please note that this is currently *over*-specified.
@@ -49,8 +77,10 @@ object ScalarStageSpec {
   trait IdsSpec extends JsonSpec {
     import IdStatus.{ExcludeId, IdOnly, IncludeId}
 
+    val idsPendingExamples: Set[Int]
+
     "ExcludeId" should {
-      "emit scalar rows unmodified" in {
+      "ids-1 emit scalar rows unmodified" in {
         val input = ldjson("""
           1
           "hi"
@@ -60,7 +90,7 @@ object ScalarStageSpec {
         input must interpretIdsAs(ExcludeId, input)
       }
 
-      "emit vector rows unmodified" in {
+      "ids-2 emit vector rows unmodified" in {
         val input = ldjson("""
           [1, 2, 3]
           { "a": "hi", "b": { "c": null } }
@@ -72,7 +102,7 @@ object ScalarStageSpec {
     }
 
     "IdOnly" should {
-      "return monotonic integers for each scalar row" in {
+      "ids-3 return monotonic integers for each scalar row" in {
         val input = ldjson("""
           1
           "hi"
@@ -88,7 +118,7 @@ object ScalarStageSpec {
         input must interpretIdsAs(IdOnly, expected)
       }
 
-      "return monotonic integers for each vector row" in {
+      "ids-4 return monotonic integers for each vector row" in {
         val input = ldjson("""
           [1, 2, 3]
           { "a": "hi", "b": { "c": null } }
@@ -106,7 +136,7 @@ object ScalarStageSpec {
     }
 
     "IncludeId" should {
-      "wrap each scalar row in monotonic integers" in {
+      "ids-5 wrap each scalar row in monotonic integers" in {
         val input = ldjson("""
           1
           "hi"
@@ -122,7 +152,7 @@ object ScalarStageSpec {
         input must interpretIdsAs(IncludeId, expected)
       }
 
-      "wrap each vector row in monotonic integers" in {
+      "ids-6 wrap each vector row in monotonic integers" in {
         val input = ldjson("""
           [1, 2, 3]
           { "a": "hi", "b": { "c": null } }
@@ -139,6 +169,9 @@ object ScalarStageSpec {
       }
     }
 
+    override def is: SpecStructure =
+      pendingFragments(super.is, idsPendingExamples, "ids")
+
     def evalIds(idStatus: IdStatus, stream: JsonStream): JsonStream
 
     def interpretIdsAs(idStatus: IdStatus, expected: JsonStream) : Matcher[JsonStream] =
@@ -149,8 +182,10 @@ object ScalarStageSpec {
     protected final type Wrap = ScalarStage.Wrap
     protected final val Wrap = ScalarStage.Wrap
 
+    val wrapPendingExamples: Set[Int]
+
     "wrap" should {
-      "nest scalars" in {
+      "wrap-1 nest scalars" in {
         val input = ldjson("""
           1
           "hi"
@@ -166,7 +201,7 @@ object ScalarStageSpec {
         input must wrapInto("foo")(expected)
       }
 
-      "nest vectors" in {
+      "wrap-2 nest vectors" in {
         val input = ldjson("""
           [1, 2, 3]
           { "a": "hi", "b": { "c": null } }
@@ -182,7 +217,7 @@ object ScalarStageSpec {
         input must wrapInto("bar")(expected)
       }
 
-      "nest empty objects" in {
+      "wrap-3 nest empty objects" in {
         val input = ldjson("""
           "a"
           {}
@@ -201,6 +236,9 @@ object ScalarStageSpec {
       }
     }
 
+    override def is: SpecStructure =
+      pendingFragments(super.is, wrapPendingExamples, "wrap")
+
     def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream
 
     def wrapInto(name: String)(expected: JsonStream): Matcher[JsonStream] =
@@ -211,8 +249,10 @@ object ScalarStageSpec {
     protected final type Project = ScalarStage.Project
     protected final val Project = ScalarStage.Project
 
+    val projectPendingExamples: Set[Int]
+
     "project" should {
-      "passthrough at identity" in {
+      "prj-1 passthrough at identity" in {
         val input = ldjson("""
           1
           "two"
@@ -226,7 +266,7 @@ object ScalarStageSpec {
         project(".", input) must resultIn(input)
       }
 
-      "extract .a" in {
+      "prj-2 extract .a" in {
         val input = ldjson("""
           { "a": 1, "b": "two" }
           { "a": "foo", "b": "two" }
@@ -249,7 +289,7 @@ object ScalarStageSpec {
         project(".a", input) must resultIn(expected)
       }
 
-      "extract .a.b" in {
+      "prj-3 extract .a.b" in {
         val input = ldjson("""
           { "a": { "b": 1 }, "b": "two" }
           { "a": { "b": "foo" }, "b": "two" }
@@ -272,7 +312,7 @@ object ScalarStageSpec {
         project(".a.b", input) must resultIn(expected)
       }
 
-      "extract .a[1]" in {
+      "prj-4 extract .a[1]" in {
         val input = ldjson("""
           { "a": [3, 1], "b": "two" }
           { "a": [3, "foo"], "b": "two" }
@@ -295,7 +335,7 @@ object ScalarStageSpec {
         project(".a[1]", input) must resultIn(expected)
       }
 
-      "extract [1]" in {
+      "prj-5 extract [1]" in {
         val input = ldjson("""
           [0, 1]
           [0, "foo"]
@@ -319,7 +359,7 @@ object ScalarStageSpec {
         project("[1]", input) must resultIn(expected)
       }
 
-      "extract [1][0]" in {
+      "prj-6 extract [1][0]" in {
         val input = ldjson("""
           [0, [1]]
           [0, ["foo"]]
@@ -343,7 +383,7 @@ object ScalarStageSpec {
         project("[1][0]", input) must resultIn(expected)
       }
 
-      "extract [1].a" in {
+      "prj-7 extract [1].a" in {
         val input = ldjson("""
           [0, { "a": 1 }]
           [false, { "a": "foo" }]
@@ -367,7 +407,7 @@ object ScalarStageSpec {
         project("[1].a", input) must resultIn(expected)
       }
 
-      "elide rows not containing path" in {
+      "prj-8 elide rows not containing path" in {
         val input = ldjson("""
           { "x": 1 }
           { "x": 2, "y": 3 }
@@ -391,7 +431,7 @@ object ScalarStageSpec {
         project(".x", input) must resultIn(expected)
       }
 
-      "only extract paths starting from root" in {
+      "prj-9 only extract paths starting from root" in {
         val input = ldjson("""
           { "z": "b", "x": { "y": 4 } }
           { "x": 2, "y": { "x": 1 } }
@@ -408,6 +448,9 @@ object ScalarStageSpec {
       }
     }
 
+    override def is: SpecStructure =
+      pendingFragments(super.is, projectPendingExamples, "prj")
+
     def evalProject(project: Project, stream: JsonStream): JsonStream
 
     def project(path: String, stream: JsonStream): JsonStream =
@@ -423,8 +466,10 @@ object ScalarStageSpec {
     protected final type Mask = ScalarStage.Mask
     protected final val Mask = ScalarStage.Mask
 
+    val maskPendingExamples: Set[Int]
+
     "masks" should {
-      "drop everything when empty" in {
+      "mask-1 drop everything when empty" in {
         val input = ldjson("""
           1
           "hi"
@@ -439,7 +484,7 @@ object ScalarStageSpec {
         input must maskInto()(expected)
       }
 
-      "retain two scalar types at identity" in {
+      "mask-2 retain two scalar types at identity" in {
         val input = ldjson("""
           1
           "hi"
@@ -458,7 +503,7 @@ object ScalarStageSpec {
         input must maskInto("." -> Set(Number, Boolean))(expected)
       }
 
-      "retain different sorts of numbers at identity" in {
+      "mask-3 retain different sorts of numbers at identity" in {
         val input = ldjson("""
           42
           3.14
@@ -476,7 +521,7 @@ object ScalarStageSpec {
         input must maskInto("." -> Set(Number))(expected)
       }
 
-      "retain different sorts of objects at identity" in {
+      "mask-4 retain different sorts of objects at identity" in {
         val input = ldjson("""
           1
           "hi"
@@ -497,7 +542,7 @@ object ScalarStageSpec {
         input must maskInto("." -> Set(Object))(expected)
       }
 
-      "retain different sorts of arrays at identity" in {
+      "mask-5 retain different sorts of arrays at identity" in {
         val input = ldjson("""
           1
           "hi"
@@ -518,7 +563,7 @@ object ScalarStageSpec {
         input must maskInto("." -> Set(Array))(expected)
       }
 
-      "retain two scalar types at .a.b" in {
+      "mask-6 retain two scalar types at .a.b" in {
         val input = ldjson("""
           { "a": { "b": 1 } }
           null
@@ -541,7 +586,7 @@ object ScalarStageSpec {
         input must maskInto(".a.b" -> Set(Number, Boolean))(expected)
       }
 
-      "retain different sorts of numbers at .a.b" in {
+      "mask-7 retain different sorts of numbers at .a.b" in {
         val input = ldjson("""
           { "a": { "b": 42 } }
           null
@@ -562,7 +607,7 @@ object ScalarStageSpec {
         input must maskInto(".a.b" -> Set(Number))(expected)
       }
 
-      "retain different sorts of objects at .a.b" in {
+      "mask-8 retain different sorts of objects at .a.b" in {
         val input = ldjson("""
           { "a": { "b": 1 } }
           { "a": { "b": "hi" } }
@@ -583,7 +628,7 @@ object ScalarStageSpec {
         input must maskInto(".a.b" -> Set(Object))(expected)
       }
 
-      "retain different sorts of arrays at .a.b" in {
+      "mask-9 retain different sorts of arrays at .a.b" in {
         val input = ldjson("""
           { "a": { "b": 1 } }
           { "a": { "b": "hi" } }
@@ -604,7 +649,7 @@ object ScalarStageSpec {
         input must maskInto(".a.b" -> Set(Array))(expected)
       }
 
-      "discard unmasked structure" in {
+      "mask-10 discard unmasked structure" in {
         val input = ldjson("""
           { "a": { "b": 42, "c": true }, "c": [] }
           """)
@@ -616,7 +661,7 @@ object ScalarStageSpec {
         input must maskInto(".a.c" -> Set(Boolean))(expected)
       }
 
-      "compose disjunctively across paths" in {
+      "mask-11 compose disjunctively across paths" in {
         val input = ldjson("""
           { "a": { "b": 42, "c": true }, "c": [] }
           """)
@@ -628,7 +673,7 @@ object ScalarStageSpec {
         input must maskInto(".a.c" -> Set(Boolean), ".c" -> Set(Array))(expected)
       }
 
-      "compose disjunctively across suffix-overlapped paths" in {
+      "mask-12 compose disjunctively across suffix-overlapped paths" in {
         val input = ldjson("""
           { "a": { "x": 42, "b": { "c": true } }, "b": { "c": [] }, "c": [1, 2] }
           """)
@@ -640,7 +685,7 @@ object ScalarStageSpec {
         input must maskInto(".a.b.c" -> Set(Boolean), ".b.c" -> Set(Array))(expected)
       }
 
-      "compose disjunctively across paths where one side is false" in {
+      "mask-13 compose disjunctively across paths where one side is false" in {
         val input = ldjson("""
           { "a": { "b": 42, "c": true } }
           """)
@@ -652,7 +697,7 @@ object ScalarStageSpec {
         input must maskInto(".a.c" -> Set(Boolean), ".a" -> Set(Array))(expected)
       }
 
-      "subsume inner by outer" in {
+      "mask-14 subsume inner by outer" in {
         val input = ldjson("""
           { "a": { "b": 42, "c": true }, "c": [] }
           """)
@@ -664,7 +709,7 @@ object ScalarStageSpec {
         input must maskInto(".a.b" -> Set(Boolean), ".a" -> Set(Object))(expected)
       }
 
-      "disallow the wrong sort of vector" in {
+      "mask-15 disallow the wrong sort of vector" in {
         val input = ldjson("""
           { "a": true }
           [1, 2, 3]
@@ -682,11 +727,11 @@ object ScalarStageSpec {
         input must maskInto("." -> Set(Array))(expected2)
       }
 
-      "compact surrounding array" in {
+      "mask-16 compact surrounding array" in {
         ldjson("[1, 2, 3]") must maskInto("[1]" -> Set(Number))(ldjson("[2]"))
       }
 
-      "compact surrounding array with multiple values retained" in {
+      "mask-17 compact surrounding array with multiple values retained" in {
         val input = ldjson("""
           [1, 2, 3, 4, 5]
           """)
@@ -701,7 +746,7 @@ object ScalarStageSpec {
           "[3]" -> Set(Number))(expected)
       }
 
-      "compact surrounding nested array with multiple values retained" in {
+      "mask-18 compact surrounding nested array with multiple values retained" in {
         val input = ldjson("""
           { "a": { "b": [1, 2, 3, 4, 5], "c" : null } }
           """)
@@ -716,7 +761,7 @@ object ScalarStageSpec {
           ".a.b[3]" -> Set(Number))(expected)
       }
 
-      "compact array containing nested arrays with single nested value retained" in {
+      "mask-19 compact array containing nested arrays with single nested value retained" in {
         val input = ldjson("""
           { "a": [[[1, 3, 5], "k"], "foo", { "b": [5, 6, 7], "c": [] }], "d": "x" }
           """)
@@ -728,19 +773,22 @@ object ScalarStageSpec {
         input must maskInto(".a[2].b" -> Set(Array))(expected)
       }
 
-      "remove object entirely when no values are retained" in {
+      "mask-20 remove object entirely when no values are retained" in {
         ldjson("""{ "a": 42 }""") must maskInto(".a" -> Set(Boolean))(ldjson(""))
       }
 
-      "remove array entirely when no values are retained" in {
+      "mask-21 remove array entirely when no values are retained" in {
         ldjson("[42]") must maskInto("[0]" -> Set(Boolean))(ldjson(""))
       }
 
-      "retain vector at depth and all recursive contents" in {
+      "mask-22 retain vector at depth and all recursive contents" in {
         val input = ldjson("""{ "a": { "b": { "c": { "e": true }, "d": 42 } } }""")
         input must maskInto(".a.b" -> Set(Object))(input)
       }
     }
+
+    override def is: SpecStructure =
+      pendingFragments(super.is, maskPendingExamples, "mask")
 
     def evalMask(mask: Mask, stream: JsonStream): JsonStream
 
@@ -758,6 +806,8 @@ object ScalarStageSpec {
     protected final type Pivot = ScalarStage.Pivot
     protected final val Pivot = ScalarStage.Pivot
 
+    val pivotPendingExamples: Set[Int]
+
     "pivot" should {
       "shift an array" >> {
         val input = ldjson("""
@@ -769,7 +819,7 @@ object ScalarStageSpec {
           [12, 13]
           """)
 
-        "ExcludeId" >> {
+        "pivot-1 ExcludeId" >> {
           val expected = ldjson("""
             1
             2
@@ -789,7 +839,7 @@ object ScalarStageSpec {
           input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
         }
 
-        "IdOnly" >> {
+        "pivot-2 IdOnly" >> {
           val expected = ldjson("""
             0
             1
@@ -809,7 +859,7 @@ object ScalarStageSpec {
           input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(expected)
         }
 
-        "IncludeId" >> {
+        "pivot-3 IncludeId" >> {
           val expected = ldjson("""
             [0, 1]
             [1, 2]
@@ -840,7 +890,7 @@ object ScalarStageSpec {
           { "l": 12, "m": 13 }
           """)
 
-        "ExcludeId" >> {
+        "pivot-4 ExcludeId" >> {
           val expected = ldjson("""
             1
             2
@@ -860,7 +910,7 @@ object ScalarStageSpec {
           input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
         }
 
-        "IdOnly" >> {
+        "pivot-5 IdOnly" >> {
           val expected = ldjson("""
             "a"
             "b"
@@ -880,7 +930,7 @@ object ScalarStageSpec {
           input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(expected)
         }
 
-        "IncludeId" >> {
+        "pivot-6 IncludeId" >> {
           val expected = ldjson("""
             ["a", 1]
             ["b", 2]
@@ -901,7 +951,7 @@ object ScalarStageSpec {
         }
       }
 
-      "preserve empty arrays as values of an array pivot" in {
+      "pivot-7 preserve empty arrays as values of an array pivot" in {
         val input = ldjson("""
           [ 1, "two", [] ]
           [ [] ]
@@ -921,7 +971,7 @@ object ScalarStageSpec {
         input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
       }
 
-      "preserve empty objects as values of an object pivot" in {
+      "pivot-8 preserve empty objects as values of an object pivot" in {
         val input = ldjson("""
           { "1": 1, "2": "two", "3": {} }
           { "4": {} }
@@ -942,6 +992,9 @@ object ScalarStageSpec {
       }
     }
 
+    override def is: SpecStructure =
+      pendingFragments(super.is, pivotPendingExamples, "pivot")
+
     def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream
 
     def pivotInto(
@@ -955,13 +1008,14 @@ object ScalarStageSpec {
   }
 
   trait CartesianSpec extends JsonSpec {
-
     protected final type Cartesian = ScalarStage.Cartesian
     protected final val Cartesian = ScalarStage.Cartesian
 
+    val cartesianPendingExamples: Set[Int]
+
     "cartesian" should {
       // a0 as a1, b0 as b1, c0 as c1, d0 as d1
-      "cross fields with no parse instructions" in {
+      "cart-1 cross fields with no parse instructions" in {
         val input = ldjson("""
           { "a0": "hi", "b0": null, "c0": { "x": 42 }, "d0": [1, 2, 3] }
           """)
@@ -980,7 +1034,7 @@ object ScalarStageSpec {
       }
 
       // a0 as a1, b0 as b1
-      "cross fields with no parse instructions ignoring extra fields" in {
+      "cart-2 cross fields with no parse instructions ignoring extra fields" in {
         val input = ldjson("""
           { "a0": "hi", "b0": null, "c0": 42 }
           """)
@@ -997,7 +1051,7 @@ object ScalarStageSpec {
       }
 
       // a0 as a1, b0 as b1, d0 as d1
-      "cross fields with no parse instructions ignoring absent fields" in {
+      "cart-3 cross fields with no parse instructions ignoring absent fields" in {
         val input = ldjson("""
           { "a0": "hi", "b0": null }
           """)
@@ -1015,7 +1069,7 @@ object ScalarStageSpec {
       }
 
       // a0[_] as a1, b0 as b1, c0{_} as c1
-      "cross fields with single pivot" in {
+      "cart-4 cross fields with single pivot" in {
         import ScalarStage.Pivot
 
         val input = ldjson("""
@@ -1043,7 +1097,7 @@ object ScalarStageSpec {
       }
 
       // a[_].x0.y0{_} as y, a[_].x1[_] as z, b{_:} as b, c as c
-      "cross fields with multiple nested pivots" in {
+      "cart-5 cross fields with multiple nested pivots" in {
         import ScalarStage.{Pivot, Project}
 
         val input = ldjson("""
@@ -1090,7 +1144,7 @@ object ScalarStageSpec {
         input must cartesianInto(targets)(expected)
       }
 
-      "emit defined fields when some are undefined" in {
+      "cart-6 emit defined fields when some are undefined" in {
         import ScalarStage.{Mask, Pivot}
 
         val input = ldjson("""
@@ -1120,7 +1174,40 @@ object ScalarStageSpec {
 
         input must cartesianInto(targets)(expected)
       }
+
+      "cart-7 nested pivoting doesn't produce unnecessary empty fields" in {
+        import ScalarStage.{Mask, Pivot}
+
+        val input = ldjson("""
+          { "a": 1, "b": [[ "two", "three" ], 12, ["four"]] }
+          { "a": 2, "b": [{ "x": "four", "y": "five" }] }
+          { "a": 3, "b": 42 }
+          """)
+
+        val expected = ldjson("""
+          { "a": 1, "ba": "two" }
+          { "a": 1, "ba": "three" }
+          { "a": 1 }
+          { "a": 1, "ba": "four" }
+          { "a": 2 }
+          { "a": 3 }
+          """)
+
+        val targets = Map(
+          (CPathField("a"), (CPathField("a"), Nil)),
+
+          (CPathField("ba"), (CPathField("b"), List(
+            Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Array),
+            Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
+
+        input must cartesianInto(targets)(expected)
+      }
     }
+
+    override def is: SpecStructure =
+      pendingFragments(super.is, cartesianPendingExamples, "cart")
 
     def evalCartesian(cartesian: Cartesian, stream: JsonStream): JsonStream
 
