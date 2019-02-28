@@ -1177,7 +1177,7 @@ object ScalarStageSpec {
       }
 
       // a as a, b[_][_] as ba
-      "cart-7 nested array pivoting doesn't produce unnecessary empty fields" in {
+      "cart-7 nested array pivoting retains undefined values" in {
         import ScalarStage.{Mask, Pivot}
 
         val input = ldjson("""
@@ -1208,7 +1208,7 @@ object ScalarStageSpec {
       }
 
       // a as a, b{_}{_} as ba
-      "cart-8 nested object pivoting doesn't produce unnecessary empty fields" in {
+      "cart-7 nested object pivoting retains undefined values" in {
         import ScalarStage.{Mask, Pivot}
 
         val input = ldjson("""
