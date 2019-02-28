@@ -1144,6 +1144,7 @@ object ScalarStageSpec {
         input must cartesianInto(targets)(expected)
       }
 
+      // a as a, b[_] as ba, b{_} as bm
       "cart-6 emit defined fields when some are undefined" in {
         import ScalarStage.{Mask, Pivot}
 
@@ -1175,6 +1176,7 @@ object ScalarStageSpec {
         input must cartesianInto(targets)(expected)
       }
 
+      // a as a, b[_][_] as ba
       "cart-7 nested pivoting doesn't produce unnecessary empty fields" in {
         import ScalarStage.{Mask, Pivot}
 
@@ -1199,6 +1201,35 @@ object ScalarStageSpec {
           (CPathField("ba"), (CPathField("b"), List(
             Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
             Pivot(IdStatus.ExcludeId, ColumnType.Array),
+            Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
+
+        input must cartesianInto(targets)(expected)
+      }
+
+      // a[_] as a, b[_] as b
+      "cart-8 pivoting retains row alignment through undefineds" in {
+        import ScalarStage.{Mask, Pivot}
+
+        val input = ldjson("""
+          { "a": [1], "b": [4, 5] }
+          { "a": [2] }
+          { "a": [3], "b": [6] }
+          """)
+
+        val expected = ldjson("""
+          { "a": 1, "b": 4 }
+          { "a": 1, "b": 5 }
+          { "a": 2 }
+          { "a": 3, "b": 6 }
+          """)
+
+        val targets = Map(
+          (CPathField("a"), (CPathField("a"), List(
+            Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Array)))),
+
+          (CPathField("b"), (CPathField("b"), List(
             Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
             Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
 
