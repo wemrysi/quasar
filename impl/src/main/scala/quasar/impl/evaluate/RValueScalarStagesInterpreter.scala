@@ -214,6 +214,10 @@ object RValueScalarStagesInterpreter {
   def interpretWrap(wrap: Wrap, rvalue: RValue): RValue =
     RObject(wrap.name -> rvalue)
 
+  def interpretFocused(stagesf: NonEmptyList[ScalarStage.Focused], rvalue: RValue)
+      : Iterator[RValue] =
+    stagesf.foldMapLeft1(interpretFocused1(_, rvalue))((rvs, s) => rvs.flatMap(interpretFocused1(s, _)))
+
   ////
 
   private object FocusedPrefix {
@@ -246,10 +250,6 @@ object RValueScalarStagesInterpreter {
       case (c @ Cartesian(_)) :: rest =>
         interpretCartesian(parallelism, minUnit, c) andThen interpret(parallelism, minUnit, rest)
     }
-
-  private def interpretFocused(stagesf: NonEmptyList[ScalarStage.Focused], rvalue: RValue)
-      : Iterator[RValue] =
-    stagesf.foldMapLeft1(interpretFocused1(_, rvalue))((rvs, s) => rvs.flatMap(interpretFocused1(s, _)))
 
   private def interpretFocused1(stage: ScalarStage.Focused, rvalue: RValue)
       : Iterator[RValue] =
