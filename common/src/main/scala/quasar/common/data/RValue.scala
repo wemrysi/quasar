@@ -201,6 +201,41 @@ object RValue extends RValueInstances {
     case _              => None
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def removeUndefined(rvalue: RValue): Option[RValue] = rvalue match {
+    case rv @ RObject(obj) if obj.isEmpty => rv.some
+    case rv @ RArray(arr) if arr.isEmpty => rv.some
+
+    case RObject(obj) =>
+      val res = obj.foldLeft(Map[String, RValue]()) {
+        case (acc, (key, value)) =>
+          removeUndefined(value) match {
+            case Some(v) => acc + ((key, v))
+            case None => acc
+          }
+      }
+      if (res.isEmpty) None else Some(RObject(res))
+
+    case RArray(arr) =>
+      val res = arr.foldRight(List[RValue]()) {
+        case (value, acc) =>
+          removeUndefined(value) match {
+            case Some(v) => v :: acc
+            case None => acc
+          }
+      }
+      if (res.isEmpty) None else Some(RArray(res))
+
+    case RMeta(value, meta) =>
+      for {
+        v <- removeUndefined(value)
+        m <- removeUndefined(meta)
+      } yield RMeta(v, m.asInstanceOf[RObject])
+
+    case CUndefined => None
+    case rv => rv.some
+  }
+
   def unsafeInsert(rootTarget: RValue, rootPath: CPath, rootValue: RValue): RValue = {
 
     def arrayInsert(l: List[RValue], i: Int, rem: CPath, v: RValue): List[RValue] = {
