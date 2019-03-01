@@ -263,7 +263,7 @@ object ScalarStageSpec {
           {}
           """)
 
-        project(".", input) must resultIn(input)
+        input must projectInto(".")(input)
       }
 
       "prj-2 extract .a" in {
@@ -286,7 +286,7 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project(".a", input) must resultIn(expected)
+        input must projectInto(".a")(expected)
       }
 
       "prj-3 extract .a.b" in {
@@ -309,7 +309,7 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project(".a.b", input) must resultIn(expected)
+        input must projectInto(".a.b")(expected)
       }
 
       "prj-4 extract .a[1]" in {
@@ -332,7 +332,7 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project(".a[1]", input) must resultIn(expected)
+        input must projectInto(".a[1]")(expected)
       }
 
       "prj-5 extract [1]" in {
@@ -356,7 +356,7 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project("[1]", input) must resultIn(expected)
+        input must projectInto("[1]")(expected)
       }
 
       "prj-6 extract [1][0]" in {
@@ -380,7 +380,7 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project("[1][0]", input) must resultIn(expected)
+        input must projectInto("[1][0]")(expected)
       }
 
       "prj-7 extract [1].a" in {
@@ -404,7 +404,7 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project("[1].a", input) must resultIn(expected)
+        input must projectInto("[1].a")(expected)
       }
 
       "prj-8 elide rows not containing path" in {
@@ -428,7 +428,7 @@ object ScalarStageSpec {
           {}
           """)
 
-        project(".x", input) must resultIn(expected)
+        input must projectInto(".x")(expected)
       }
 
       "prj-9 only extract paths starting from root" in {
@@ -444,7 +444,35 @@ object ScalarStageSpec {
           1
           """)
 
-        project(".x.y", input) must resultIn(expected)
+        input must projectInto(".x.y")(expected)
+      }
+
+      "prj-10 elide rows not containing array path" in {
+        val input = ldjson("""
+          [0, 1, 2, -1, -2]
+          [3]
+          [4, 5]
+          { "y": 6, "z": 7 }
+          ["a", "b", "c"]
+          ["a", [8]]
+          ["a", { "x": 9 }]
+          4.8
+          "seven"
+          false
+          null
+          {}
+          []
+          """)
+
+        val expected = ldjson("""
+          1
+          5
+          "b"
+          [8]
+          { "x": 9 }
+          """)
+
+        input must projectInto("[1]")(expected)
       }
     }
 
@@ -453,11 +481,10 @@ object ScalarStageSpec {
 
     def evalProject(project: Project, stream: JsonStream): JsonStream
 
-    def project(path: String, stream: JsonStream): JsonStream =
-      evalProject(Project(CPath.parse(path)), stream)
-
-    def resultIn(expected: JsonStream): Matcher[JsonStream] =
-      bestSemanticEqual(expected)
+    def projectInto(path: String)(expected: JsonStream): Matcher[JsonStream] =
+      bestSemanticEqual(expected) ^^ { str: JsonStream =>
+        evalProject(Project(CPath.parse(path)), str)
+      }
   }
 
   trait MaskSpec extends JsonSpec {
