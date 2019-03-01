@@ -239,6 +239,11 @@ lazy val qscript = project
     api,
     frontend % BothScopes)
   .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.typelevel" %% "cats-laws"        % catsVersion       % Test,
+      "org.typelevel" %% "cats-kernel-laws" % catsVersion       % Test,
+      "org.typelevel" %% "discipline"       % disciplineVersion % Test))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qsu = project
