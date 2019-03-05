@@ -18,7 +18,7 @@ package quasar.impl.evaluate
 
 import slamdata.Predef.{Stream => _, _}
 
-import quasar.{IdStatus, ScalarStageSpec}
+import quasar.{IdStatus, ScalarStage, ScalarStageSpec}
 import quasar.common.data.RValue
 
 import scala.concurrent.ExecutionContext
@@ -27,9 +27,13 @@ import cats.effect.{ContextShift, IO}
 
 import fs2.Stream
 
-import qdata.json.QDataFacade
+import org.specs2.matcher.Matcher
 
 import org.typelevel.jawn.{AsyncParser, Facade}
+
+import qdata.json.QDataFacade
+
+import scalaz.NonEmptyList
 
 object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
   import quasar.impl.evaluate.{RValueScalarStagesInterpreter => Interpreter}
@@ -44,7 +48,14 @@ object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
   val projectPendingExamples: Set[Int] = Set()
   val maskPendingExamples: Set[Int] = Set()
   val pivotPendingExamples: Set[Int] = Set()
-  val cartesianPendingExamples: Set[Int] = Set(7, 8)
+  val focusedPendingExamples: Set[Int] = Set()
+  val cartesianPendingExamples: Set[Int] = Set()
+
+  override def bestSemanticEqual(js: JsonStream): Matcher[JsonStream] = {
+    containTheSameElementsAs(js) ^^ { str: JsonStream =>
+      str.map(RValue.removeUndefined) collect { case Some(v) => v }
+    }
+  }
 
   def evalIds(idStatus: IdStatus, stream: JsonStream): JsonStream =
     Stream.emits(stream)
@@ -52,7 +63,7 @@ object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
       .compile.toList
 
   def evalMask(mask: Mask, stream: JsonStream): JsonStream =
-    stream.flatMap(Interpreter.interpretMask(mask, _).toList)
+    stream.map(Interpreter.interpretMask(mask, _))
 
   def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream =
     stream.flatMap(Interpreter.interpretPivot(pivot, _))
@@ -61,7 +72,14 @@ object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
     stream.map(Interpreter.interpretWrap(wrap, _))
 
   def evalProject(project: Project, stream: JsonStream): JsonStream =
-    stream.flatMap(Interpreter.interpretProject(project, _))
+    stream.map(Interpreter.interpretProject(project, _))
+
+  def evalFocused(stages: List[ScalarStage.Focused], stream: JsonStream): JsonStream =
+    if (stages.isEmpty)
+      stream
+    else
+      stream.flatMap(Interpreter.interpretFocused(
+        NonEmptyList(stages.head, stages.tail:_*), _)).toList
 
   def evalCartesian(cartesian: Cartesian, stream: JsonStream): JsonStream = {
     val parallelism = java.lang.Runtime.getRuntime().availableProcessors()
