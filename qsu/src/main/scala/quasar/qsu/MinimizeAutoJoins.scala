@@ -57,10 +57,10 @@ sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: Re
 
   implicit def PEqual: Equal[P]
 
-  private lazy val Minimizers: List[Minimizer.Aux[T, P]] = List(
-    minimizers.MergeReductions[T](qprov),
-    minimizers.FilterToCond[T](qprov),
-    minimizers.CollapseShifts[T](qprov))
+  private val Minimizers = List(
+    minimizers.MergeReductions[T],
+    minimizers.FilterToCond[T],
+    minimizers.MergeCartoix[T])
 
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]

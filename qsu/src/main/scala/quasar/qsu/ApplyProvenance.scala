@@ -90,10 +90,10 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
           _ <- computeDims[X](g)
         } yield g.overwriteAtRoot(src.unfold map (_.root))
 
-      case g @ Extractors.Transpose(src, retain, rot) =>
+      /*case g @ Extractors.Transpose(src, retain, rot) =>
         computeDims[X](g) as g.overwriteAtRoot {
           LeftShift(src.root, recFunc.Hole, retain.fold[IdStatus](IdOnly, ExcludeId), OnUndefined.Omit, RightTarget[T], rot)
-        }
+        }*/
 
       case other =>
         computeDims[X](other) as other
