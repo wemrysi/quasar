@@ -815,6 +815,66 @@ object ScalarStageSpec {
         val input = ldjson("""{ "a": { "b": { "c": { "e": true }, "d": 42 } } }""")
         input must maskInto(".a.b" -> Set(Object))(input)
       }
+
+      "mask-23 disjunctively retain values in an array" in {
+        val input = ldjson("""
+          ["a", 13]
+          ["b", []]
+          ["c", {}]
+          ["d", [12]]
+          ["e", { "z": 14}]
+          """)
+
+        val expected = ldjson("""
+          ["a"]
+          ["b"]
+          ["c", {}]
+          ["d"]
+          ["e", { "z": 14}]
+          """)
+
+        input must maskInto("[0]" -> ColumnType.Top, "[1]" -> Set(ColumnType.Object))(expected)
+      }
+
+      "mask-24 disjunctively retain values in an array with compaction" in {
+        val input = ldjson("""
+          [13, "a"]
+          [[], "b"]
+          [{}, "c"]
+          [[12], "d"]
+          [{ "z": 14}, "e"]
+          """)
+
+        val expected = ldjson("""
+          ["a"]
+          ["b"]
+          [{}, "c"]
+          ["d"]
+          [{ "z": 14}, "e"]
+          """)
+
+        input must maskInto("[0]" -> Set(ColumnType.Object), "[1]" -> ColumnType.Top)(expected)
+      }
+
+      "mask-25 disjunctively retain values in an object" in {
+        val input = ldjson("""
+          { "v": "a", "w": 13 }
+          { "v": "b", "w": [] }
+          { "v": "c", "w": {} }
+          { "v": "d", "w": [12] }
+          { "v": "e", "w": { "z": 14} }
+          """)
+
+        val expected = ldjson("""
+          { "v": "a" }
+          { "v": "b" }
+          { "v": "c", "w": {} }
+          { "v": "d" }
+          { "v": "e", "w": { "z": 14} }
+          """)
+
+        input must maskInto(".v" -> ColumnType.Top, ".w" -> Set(ColumnType.Object))(expected)
+      }
     }
 
     override def is: SpecStructure =
