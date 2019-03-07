@@ -1650,6 +1650,131 @@ object ScalarStageSpec {
 
 	input must interpretInto(stages)(expected)
       }
+
+      "foc-21 Pivot . Pivot (IncludeId)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val expected = ldjson("""
+	  [0, "x"]
+	  [1, [12]]
+	  [0, "y"]
+          [1, { "z": false}]
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IncludeId, ColumnType.Object),
+          Pivot(IdStatus.IncludeId, ColumnType.Array))
+
+        input must interpretInto(stages)(expected)
+      }
+
+      "foc-22 Pivot . Wrap (IncludeId)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val expected = ldjson("""
+          { "foo": ["x", [12]] }
+          { "foo": ["y", { "z": false}] }
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IncludeId, ColumnType.Object),
+	  Wrap("foo"))
+
+        input must interpretInto(stages)(expected)
+      }
+
+      "foc-23 Pivot . Mask (IncludeId)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val expected = ldjson("""
+          ["x"]
+          ["y", { "z": false}]
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IncludeId, ColumnType.Object),
+          Mask(Map(
+            CPath.parse("[0]") -> ColumnType.Top,
+            CPath.parse("[1]") -> Set(ColumnType.Object))))
+
+        input must interpretInto(stages)(expected)
+      }
+
+      "foc-24 Pivot . Project (IncludeId)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IncludeId, ColumnType.Object),
+	  Project(CPath.parse("k")))
+
+        input must interpretInto(stages)(ldjson(""))
+      }
+
+      "foc-25 Pivot . Pivot (IdOnly)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IdOnly, ColumnType.Object),
+          Pivot(IdStatus.IncludeId, ColumnType.Array))
+
+        input must interpretInto(stages)(ldjson(""))
+      }
+
+      "foc-26 Pivot . Wrap (IdOnly)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val expected = ldjson("""
+          { "foo": "x" }
+          { "foo": "y" }
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IdOnly, ColumnType.Object),
+	  Wrap("foo"))
+
+        input must interpretInto(stages)(expected)
+      }
+
+      "foc-27 Pivot . Mask (IdOnly)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val expected = ldjson("""
+          "x"
+          "y"
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IdOnly, ColumnType.Object),
+          Mask(Map(CPath.parse(".") -> Set(ColumnType.String))))
+
+        input must interpretInto(stages)(expected)
+      }
+
+      "foc-28 Pivot . Project (IdOnly)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IdOnly, ColumnType.Object),
+	  Project(CPath.parse("k")))
+
+        input must interpretInto(stages)(ldjson(""))
+      }
     }
 
     override def is: SpecStructure =
