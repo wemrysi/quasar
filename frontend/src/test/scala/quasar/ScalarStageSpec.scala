@@ -1132,6 +1132,76 @@ object ScalarStageSpec {
         input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(ldjson(""))
         input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(ldjson(""))
       }
+
+      "omit undefined row in object pivot" >> {
+        val input = ldjson("""
+          { "a": 1 }
+          12
+          { "b": 2 }
+          """)
+
+        "pivot-12 ExcludeId" in {
+          val expected = ldjson("""
+            1
+            2
+            """)
+
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+        }
+
+        "pivot-13 IdOnly" in {
+          val expected = ldjson("""
+            "a"
+            "b"
+            """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(expected)
+        }
+
+        "pivot-14 IncludeId" in {
+          val expected = ldjson("""
+            ["a", 1]
+            ["b", 2]
+            """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(expected)
+        }
+      }
+
+      "omit undefined row in array pivot" >> {
+        val input = ldjson("""
+          [11]
+          12
+          [13]
+          """)
+
+        "pivot-15 ExcludeId" in {
+          val expected = ldjson("""
+            11
+            13
+            """)
+
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
+        }
+
+        "pivot-16 IdOnly" in {
+          val expected = ldjson("""
+            0
+            0
+            """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(expected)
+        }
+
+        "pivot-17 IncludeId" in {
+          val expected = ldjson("""
+            [0, 11]
+            [0, 13]
+            """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(expected)
+        }
+      }
     }
 
     override def is: SpecStructure =
