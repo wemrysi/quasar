@@ -1041,57 +1041,6 @@ object ScalarStageSpec {
         }
       }
 
-      "pivot-9 omit results when object pivoting a value of a different kind" in {
-        val input = ldjson("""
-          1
-          "three"
-          false
-          null
-          ["x", true, {}, []]
-          { "a": 1, "b": "two", "c": {}, "d": [] }
-          """)
-
-        val expected = ldjson("""
-          1
-          "two"
-          {}
-          []
-        """)
-
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
-      }
-
-      "pivot-10 omit results when array pivoting a value of a different kind" in {
-        val input = ldjson("""
-          1
-          "two"
-          false
-          null
-          ["x", true, {}, []]
-          { "a": 1, "b": "two", "c": {}, "d": [] }
-          """)
-
-        val expected = ldjson("""
-          "x"
-          true
-          {}
-          []
-        """)
-
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
-      }
-
-      "pivot-11 omit empty vector from pivot results" in {
-
-        val input = ldjson("""
-          {}
-          []
-        """)
-
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(ldjson(""))
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(ldjson(""))
-      }
-
       "omit undefined row in object pivot" >> {
         val input = ldjson("""
           { "a": 1 }
@@ -1259,6 +1208,116 @@ object ScalarStageSpec {
           """)
 
           input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(expected)
+        }
+      }
+
+      "omit results when object pivoting a value of a different kind" >> {
+        val input = ldjson("""
+          1
+          "three"
+          false
+          null
+          ["x", true, {}, []]
+          { "a": 1, "b": "two", "c": {}, "d": [] }
+          """)
+
+        "pivot-24 ExcludeId" in {
+          val expected = ldjson("""
+            1
+            "two"
+            {}
+            []
+          """)
+
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+        }
+
+        "pivot-25 IdOnly" in {
+          val expected = ldjson("""
+            "a"
+            "b"
+            "c"
+            "d"
+          """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(expected)
+        }
+
+        "pivot-26 IncludeId" in {
+          val expected = ldjson("""
+            ["a", 1]
+            ["b", "two"]
+            ["c", {}]
+            ["d", []]
+          """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(expected)
+        }
+      }
+
+      "pivot-10 omit results when array pivoting a value of a different kind" >> {
+        val input = ldjson("""
+          1
+          "two"
+          false
+          null
+          ["x", true, {}, []]
+          { "a": 1, "b": "two", "c": {}, "d": [] }
+          """)
+
+        "pivot-27 ExcludeId" in {
+          val expected = ldjson("""
+            "x"
+            true
+            {}
+            []
+          """)
+
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
+        }
+
+        "pivot-28 IdOnly" in {
+          val expected = ldjson("""
+            0
+            1
+            2
+            3
+          """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(expected)
+        }
+
+        "pivot-29 IncludeId" in {
+          val expected = ldjson("""
+            [0, "x"]
+            [1, true]
+            [2, {}]
+            [3, []]
+          """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(expected)
+        }
+      }
+
+      "omit empty vector from pivot results" >> {
+        val input = ldjson("""
+          {}
+          []
+        """)
+
+        "pivot-30 ExcludeId" in {
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(ldjson(""))
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(ldjson(""))
+        }
+
+        "pivot-31 IdOnly" in {
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(ldjson(""))
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(ldjson(""))
+        }
+
+        "pivot-32 IncludeId" in {
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(ldjson(""))
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(ldjson(""))
         }
       }
     }
