@@ -2157,6 +2157,28 @@ object ScalarStageSpec {
 
         input must cartesianInto(targets)(expected)
       }
+
+      // a0 as a1, b0 as b1
+      "cart-11 cross fields when some are undefined" in {
+        val input = ldjson("""
+            { "a0": 1 }
+            { "a0": 2, "b0": "foo" }
+            { "b0": "bar" }
+            { "c": 12 }
+            """)
+
+        val expected = ldjson("""
+            { "a1": 1 }
+            { "a1": 2, "b1": "foo" }
+            { "b1": "bar" }
+            """)
+
+        val targets = Map(
+          (CPathField("a1"), (CPathField("a0"), Nil)),
+          (CPathField("b1"), (CPathField("b0"), Nil)))
+
+        input must cartesianInto(targets)(expected)
+      }
     }
 
     override def is: SpecStructure =
