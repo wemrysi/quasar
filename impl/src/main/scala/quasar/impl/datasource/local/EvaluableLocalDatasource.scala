@@ -59,16 +59,17 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
 
   def evaluate(ir: InterpretedRead[ResourcePath]): F[QueryResult[F]] =
     for {
-      (jp, attrs) <- attributesOf(ir.path).getOrElseF(RE.raiseError(pathNotFound(ir.path)))
-      _ <- attrs.isRegularFile.unlessM(RE.raiseError(notAResource(ir.path)))
+      (jp, _) <- attributesOf(ir.path).getOrElseF(RE.raiseError(pathNotFound(ir.path)))
+      candidate <- isCandidate(jp)
+      _ <- candidate.unlessM(RE.raiseError(notAResource(ir.path)))
     } yield queryResult(InterpretedRead(jp, ir.stages))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
-    toNio[F](path) >>= (jp => F.delay(Files.isRegularFile(jp)))
+    toNio[F](path) >>= isCandidate
 
   def prefixedChildPaths(path: ResourcePath): F[Option[Stream[F, (ResourceName, ResourcePathType)]]] = {
     def withType(jp: JPath): F[(ResourceName, ResourcePathType)] =
-      F.delay(Files.isRegularFile(jp))
+      isCandidate(jp)
         .map(_.fold(ResourcePathType.leafResource, ResourcePathType.prefix))
         .strengthL(toResourceName(jp))
 
@@ -90,6 +91,9 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
         case _: NoSuchFileException => none
       }
     })
+
+  private def isCandidate(jp: JPath): F[Boolean] =
+    F.delay(Files.isRegularFile(jp) && !Files.isHidden(jp))
 
   private def toNio[F[_]: Effect](rp: ResourcePath): F[JPath] =
     Path.flatten("", "", "", ι, ι, rp.toPath).foldLeftM(root) { (p, n) =>
