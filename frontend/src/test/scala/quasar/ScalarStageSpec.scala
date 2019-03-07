@@ -815,6 +815,66 @@ object ScalarStageSpec {
         val input = ldjson("""{ "a": { "b": { "c": { "e": true }, "d": 42 } } }""")
         input must maskInto(".a.b" -> Set(Object))(input)
       }
+
+      "mask-23 disjunctively retain values in an array" in {
+        val input = ldjson("""
+          ["a", 13]
+          ["b", []]
+          ["c", {}]
+          ["d", [12]]
+          ["e", { "z": 14}]
+          """)
+
+        val expected = ldjson("""
+          ["a"]
+          ["b"]
+          ["c", {}]
+          ["d"]
+          ["e", { "z": 14}]
+          """)
+
+        input must maskInto("[0]" -> ColumnType.Top, "[1]" -> Set(ColumnType.Object))(expected)
+      }
+
+      "mask-24 disjunctively retain values in an array with compaction" in {
+        val input = ldjson("""
+          [13, "a"]
+          [[], "b"]
+          [{}, "c"]
+          [[12], "d"]
+          [{ "z": 14}, "e"]
+          """)
+
+        val expected = ldjson("""
+          ["a"]
+          ["b"]
+          [{}, "c"]
+          ["d"]
+          [{ "z": 14}, "e"]
+          """)
+
+        input must maskInto("[0]" -> Set(ColumnType.Object), "[1]" -> ColumnType.Top)(expected)
+      }
+
+      "mask-25 disjunctively retain values in an object" in {
+        val input = ldjson("""
+          { "v": "a", "w": 13 }
+          { "v": "b", "w": [] }
+          { "v": "c", "w": {} }
+          { "v": "d", "w": [12] }
+          { "v": "e", "w": { "z": 14} }
+          """)
+
+        val expected = ldjson("""
+          { "v": "a" }
+          { "v": "b" }
+          { "v": "c", "w": {} }
+          { "v": "d" }
+          { "v": "e", "w": { "z": 14} }
+          """)
+
+        input must maskInto(".v" -> ColumnType.Top, ".w" -> Set(ColumnType.Object))(expected)
+      }
     }
 
     override def is: SpecStructure =
@@ -981,48 +1041,177 @@ object ScalarStageSpec {
         }
       }
 
-      "pivot-7 preserve empty arrays as values of an array pivot" in {
+      "omit undefined row in object pivot" >> {
+        val input = ldjson("""
+          { "a": 1 }
+          12
+          { "b": 2 }
+          """)
+
+        "pivot-12 ExcludeId" in {
+          val expected = ldjson("""
+            1
+            2
+            """)
+
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+        }
+
+        "pivot-13 IdOnly" in {
+          val expected = ldjson("""
+            "a"
+            "b"
+            """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(expected)
+        }
+
+        "pivot-14 IncludeId" in {
+          val expected = ldjson("""
+            ["a", 1]
+            ["b", 2]
+            """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(expected)
+        }
+      }
+
+      "omit undefined row in array pivot" >> {
+        val input = ldjson("""
+          [11]
+          12
+          [13]
+          """)
+
+        "pivot-15 ExcludeId" in {
+          val expected = ldjson("""
+            11
+            13
+            """)
+
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
+        }
+
+        "pivot-16 IdOnly" in {
+          val expected = ldjson("""
+            0
+            0
+            """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(expected)
+        }
+
+        "pivot-17 IncludeId" in {
+          val expected = ldjson("""
+            [0, 11]
+            [0, 13]
+            """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(expected)
+        }
+      }
+
+      "preserve empty arrays as values of an array pivot" >> {
         val input = ldjson("""
           [ 1, "two", [] ]
           [ [] ]
           [ [], 3, "four" ]
           """)
 
-        val expected = ldjson("""
-          1
-          "two"
-          []
-          []
-          []
-          3
-          "four"
-        """)
+        "pivot-18 ExludeId" in {
+          val expected = ldjson("""
+            1
+            "two"
+            []
+            []
+            []
+            3
+            "four"
+          """)
 
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
+        }
+
+        "pivot-19 IdOnly" in {
+          val expected = ldjson("""
+            0
+            1
+            2
+            0
+            0
+            1
+            2
+          """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(expected)
+        }
+
+        "pivot-20 IncludeId" in {
+          val expected = ldjson("""
+            [0, 1]
+            [1, "two"]
+            [2, []]
+            [0, []]
+            [0, []]
+            [1, 3]
+            [2, "four"]
+          """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(expected)
+        }
       }
 
-      "pivot-8 preserve empty objects as values of an object pivot" in {
+      "preserve empty objects as values of an object pivot" >> {
         val input = ldjson("""
           { "1": 1, "2": "two", "3": {} }
           { "4": {} }
           { "5": {}, "6": 3, "7": "four" }
           """)
 
-        val expected = ldjson("""
-          1
-          "two"
-          {}
-          {}
-          {}
-          3
-          "four"
-        """)
+       "pivot-21 ExcludeId" in {
+          val expected = ldjson("""
+            1
+            "two"
+            {}
+            {}
+            {}
+            3
+            "four"
+          """)
 
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+        }
+
+       "pivot-22 IdOnly" in {
+          val expected = ldjson("""
+            "1"
+            "2"
+            "3"
+            "4"
+            "5"
+            "6"
+            "7"
+          """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(expected)
+        }
+
+       "pivot-23 IncludeId" in {
+          val expected = ldjson("""
+            ["1", 1]
+            ["2", "two"]
+            ["3", {}]
+            ["4", {}]
+            ["5", {}]
+            ["6", 3]
+            ["7", "four"]
+          """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(expected)
+        }
       }
 
-
-      "pivot-9 omit results when object pivoting a value of a different kind" in {
+      "omit results when object pivoting a value of a different kind" >> {
         val input = ldjson("""
           1
           "three"
@@ -1032,17 +1221,41 @@ object ScalarStageSpec {
           { "a": 1, "b": "two", "c": {}, "d": [] }
           """)
 
-        val expected = ldjson("""
-          1
-          "two"
-          {}
-          []
-        """)
+        "pivot-24 ExcludeId" in {
+          val expected = ldjson("""
+            1
+            "two"
+            {}
+            []
+          """)
 
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+        }
+
+        "pivot-25 IdOnly" in {
+          val expected = ldjson("""
+            "a"
+            "b"
+            "c"
+            "d"
+          """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(expected)
+        }
+
+        "pivot-26 IncludeId" in {
+          val expected = ldjson("""
+            ["a", 1]
+            ["b", "two"]
+            ["c", {}]
+            ["d", []]
+          """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(expected)
+        }
       }
 
-      "pivot-10 omit results when array pivoting a value of a different kind" in {
+      "pivot-10 omit results when array pivoting a value of a different kind" >> {
         val input = ldjson("""
           1
           "two"
@@ -1052,25 +1265,60 @@ object ScalarStageSpec {
           { "a": 1, "b": "two", "c": {}, "d": [] }
           """)
 
-        val expected = ldjson("""
-          "x"
-          true
-          {}
-          []
-        """)
+        "pivot-27 ExcludeId" in {
+          val expected = ldjson("""
+            "x"
+            true
+            {}
+            []
+          """)
 
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
+        }
+
+        "pivot-28 IdOnly" in {
+          val expected = ldjson("""
+            0
+            1
+            2
+            3
+          """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(expected)
+        }
+
+        "pivot-29 IncludeId" in {
+          val expected = ldjson("""
+            [0, "x"]
+            [1, true]
+            [2, {}]
+            [3, []]
+          """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(expected)
+        }
       }
 
-      "pivot-11 omit empty vector from pivot results" in {
-
+      "omit empty vector from pivot results" >> {
         val input = ldjson("""
           {}
           []
         """)
 
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(ldjson(""))
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(ldjson(""))
+        "pivot-30 ExcludeId" in {
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(ldjson(""))
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(ldjson(""))
+        }
+
+        "pivot-31 IdOnly" in {
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(ldjson(""))
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(ldjson(""))
+        }
+
+        "pivot-32 IncludeId" in {
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(ldjson(""))
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(ldjson(""))
+        }
       }
     }
 
@@ -1590,6 +1838,131 @@ object ScalarStageSpec {
 
 	input must interpretInto(stages)(expected)
       }
+
+      "foc-21 Pivot . Pivot (IncludeId)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val expected = ldjson("""
+	  [0, "x"]
+	  [1, [12]]
+	  [0, "y"]
+          [1, { "z": false}]
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IncludeId, ColumnType.Object),
+          Pivot(IdStatus.IncludeId, ColumnType.Array))
+
+        input must interpretInto(stages)(expected)
+      }
+
+      "foc-22 Pivot . Wrap (IncludeId)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val expected = ldjson("""
+          { "foo": ["x", [12]] }
+          { "foo": ["y", { "z": false}] }
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IncludeId, ColumnType.Object),
+	  Wrap("foo"))
+
+        input must interpretInto(stages)(expected)
+      }
+
+      "foc-23 Pivot . Mask (IncludeId)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val expected = ldjson("""
+          ["x"]
+          ["y", { "z": false}]
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IncludeId, ColumnType.Object),
+          Mask(Map(
+            CPath.parse("[0]") -> ColumnType.Top,
+            CPath.parse("[1]") -> Set(ColumnType.Object))))
+
+        input must interpretInto(stages)(expected)
+      }
+
+      "foc-24 Pivot . Project (IncludeId)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IncludeId, ColumnType.Object),
+	  Project(CPath.parse("k")))
+
+        input must interpretInto(stages)(ldjson(""))
+      }
+
+      "foc-25 Pivot . Pivot (IdOnly)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IdOnly, ColumnType.Object),
+          Pivot(IdStatus.IncludeId, ColumnType.Array))
+
+        input must interpretInto(stages)(ldjson(""))
+      }
+
+      "foc-26 Pivot . Wrap (IdOnly)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val expected = ldjson("""
+          { "foo": "x" }
+          { "foo": "y" }
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IdOnly, ColumnType.Object),
+	  Wrap("foo"))
+
+        input must interpretInto(stages)(expected)
+      }
+
+      "foc-27 Pivot . Mask (IdOnly)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val expected = ldjson("""
+          "x"
+          "y"
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IdOnly, ColumnType.Object),
+          Mask(Map(CPath.parse(".") -> Set(ColumnType.String))))
+
+        input must interpretInto(stages)(expected)
+      }
+
+      "foc-28 Pivot . Project (IdOnly)" in {
+        val input = ldjson("""
+          { "x": [12], "y": { "z": false } }
+          """)
+
+        val stages = List(
+          Pivot(IdStatus.IdOnly, ColumnType.Object),
+	  Project(CPath.parse("k")))
+
+        input must interpretInto(stages)(ldjson(""))
+      }
     }
 
     override def is: SpecStructure =
@@ -1899,6 +2272,28 @@ object ScalarStageSpec {
           (CPathField("b"), (CPathField("b"), List(
             Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
             Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
+
+        input must cartesianInto(targets)(expected)
+      }
+
+      // a0 as a1, b0 as b1
+      "cart-11 cross fields when some are undefined" in {
+        val input = ldjson("""
+            { "a0": 1 }
+            { "a0": 2, "b0": "foo" }
+            { "b0": "bar" }
+            { "c": 12 }
+            """)
+
+        val expected = ldjson("""
+            { "a1": 1 }
+            { "a1": 2, "b1": "foo" }
+            { "b1": "bar" }
+            """)
+
+        val targets = Map(
+          (CPathField("a1"), (CPathField("a0"), Nil)),
+          (CPathField("b1"), (CPathField("b0"), Nil)))
 
         input must cartesianInto(targets)(expected)
       }
