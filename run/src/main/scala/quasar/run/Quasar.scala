@@ -25,48 +25,32 @@ import quasar.api.table.{TableRef, Tables}
 import quasar.common.PhaseResultTell
 import quasar.connector.{Datasource, QueryResult}
 import quasar.contrib.std.uuid._
-import quasar.ejson.{EJson, Fixed}
+import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
-import quasar.impl.datasources.{
-  CompositeResourceSchema,
-  DefaultDatasources,
-  DefaultDatasourceErrors,
-  DefaultDatasourceManager,
-  ManagedDatasource
-}
+import quasar.impl.datasources._
 import quasar.impl.datasources.middleware._
 import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.storage.IndexedStore
 import quasar.impl.table.{DefaultTables, PreparationsManager}
-import quasar.qscript.{construction, Hole, Map => QSMap, QScriptEducated}
+import quasar.qscript.{QScriptEducated, construction, Map => QSMap}
 import quasar.run.implicits._
 
 import java.util.UUID
-
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import argonaut.JsonScalaz._
-
 import cats.Functor
 import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.syntax.functor._
-
 import fs2.Stream
-
 import matryoshka.data.Fix
-
 import org.slf4s.Logging
-
-import pathy.Path.posixCodec
-
-import scalaz.{~>, IMap}
+import scalaz.{IMap, ~>}
 import scalaz.syntax.show._
-
 import shims._
-
 import spire.std.double._
 
 final class Quasar[F[_], R, S](
@@ -119,7 +103,7 @@ object Quasar extends Logging {
 
       freshUUID = ConcurrentEffect[F].delay(UUID.randomUUID)
 
-      resourceSchema = CompositeResourceSchema[F, Fix[EJson], Double](sstEvalConfig)
+      resourceSchema = SimpleCompositeResourceSchema[F, Fix[EJson], Double](sstEvalConfig)
 
       datasources =
         DefaultDatasources(freshUUID, datasourceRefs, dsErrors, dsManager, resourceSchema)
@@ -139,10 +123,7 @@ object Quasar extends Logging {
 
   ////
 
-  import CompositeResourceSchema.{SourceKey, ValueKey}
-
   private val rec = construction.RecFunc[Fix]
-  private val ejs = Fixed[Fix[EJson]]
 
   private def reifiedAggregateDs[F[_]: Functor, G[_]]
       : Datasource[F, G, ?, CompositeResult[F, QueryResult[F]]] ~> Datasource[F, G, ?, EvalResult[F]] =
@@ -156,10 +137,6 @@ object Quasar extends Logging {
   private def reifyAggregateStructure[F[_], A](s: Stream[F, (ResourcePath, A)])
       : Stream[F, (ResourcePath, QSMap[Fix, A])] =
     s map { case (rp, a) =>
-      val fm = rec.StaticMapS(
-        SourceKey -> rec.Constant[Hole](ejs.str(posixCodec.printPath(rp.toPath))),
-        ValueKey -> rec.Hole)
-
-      (rp, QSMap(a, fm))
+      (rp, QSMap(a, rec.Hole))
     }
 }
