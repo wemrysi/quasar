@@ -1041,47 +1041,6 @@ object ScalarStageSpec {
         }
       }
 
-      "pivot-7 preserve empty arrays as values of an array pivot" in {
-        val input = ldjson("""
-          [ 1, "two", [] ]
-          [ [] ]
-          [ [], 3, "four" ]
-          """)
-
-        val expected = ldjson("""
-          1
-          "two"
-          []
-          []
-          []
-          3
-          "four"
-        """)
-
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
-      }
-
-      "pivot-8 preserve empty objects as values of an object pivot" in {
-        val input = ldjson("""
-          { "1": 1, "2": "two", "3": {} }
-          { "4": {} }
-          { "5": {}, "6": 3, "7": "four" }
-          """)
-
-        val expected = ldjson("""
-          1
-          "two"
-          {}
-          {}
-          {}
-          3
-          "four"
-        """)
-
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
-      }
-
-
       "pivot-9 omit results when object pivoting a value of a different kind" in {
         val input = ldjson("""
           1
@@ -1200,6 +1159,106 @@ object ScalarStageSpec {
             """)
 
           input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(expected)
+        }
+      }
+
+      "preserve empty arrays as values of an array pivot" >> {
+        val input = ldjson("""
+          [ 1, "two", [] ]
+          [ [] ]
+          [ [], 3, "four" ]
+          """)
+
+        "pivot-18 ExludeId" in {
+          val expected = ldjson("""
+            1
+            "two"
+            []
+            []
+            []
+            3
+            "four"
+          """)
+
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
+        }
+
+        "pivot-19 IdOnly" in {
+          val expected = ldjson("""
+            0
+            1
+            2
+            0
+            0
+            1
+            2
+          """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(expected)
+        }
+
+        "pivot-20 IncludeId" in {
+          val expected = ldjson("""
+            [0, 1]
+            [1, "two"]
+            [2, []]
+            [0, []]
+            [0, []]
+            [1, 3]
+            [2, "four"]
+          """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(expected)
+        }
+      }
+
+      "preserve empty objects as values of an object pivot" >> {
+        val input = ldjson("""
+          { "1": 1, "2": "two", "3": {} }
+          { "4": {} }
+          { "5": {}, "6": 3, "7": "four" }
+          """)
+
+       "pivot-21 ExcludeId" in {
+          val expected = ldjson("""
+            1
+            "two"
+            {}
+            {}
+            {}
+            3
+            "four"
+          """)
+
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+        }
+
+       "pivot-22 IdOnly" in {
+          val expected = ldjson("""
+            "1"
+            "2"
+            "3"
+            "4"
+            "5"
+            "6"
+            "7"
+          """)
+
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(expected)
+        }
+
+       "pivot-23 IncludeId" in {
+          val expected = ldjson("""
+            ["1", 1]
+            ["2", "two"]
+            ["3", {}]
+            ["4", {}]
+            ["5", {}]
+            ["6", 3]
+            ["7", "four"]
+          """)
+
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(expected)
         }
       }
     }
