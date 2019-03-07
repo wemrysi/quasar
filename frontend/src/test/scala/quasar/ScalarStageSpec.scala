@@ -2270,31 +2270,6 @@ object ScalarStageSpec {
           }
         }
       }
-
-      "TEMPLATE" >> {
-        "Object" >> {
-          "foc-* IncludeId" in {
-            ok
-          }
-          "foc-* ExcludeId" in {
-            ok
-          }
-          "foc-* IdOnly" in {
-            ok
-          }
-        }
-        "Array" >> {
-          "foc-* IncludeId" in {
-            ok
-          }
-          "foc-* ExcludeId" in {
-            ok
-          }
-          "foc-* IdOnly" in {
-            ok
-          }
-        }
-      }
     }
 
     override def is: SpecStructure =
