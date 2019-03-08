@@ -1347,113 +1347,10 @@ object ScalarStageSpec {
 
     "sequential focused stages" should {
 
-      "foc-1 Pivot . Pivot" in {
-        val stages = List(
-	  Pivot(ExcludeId, Object),
-	  Pivot(ExcludeId, Array))
-
-        val input = ldjson("""
-          1
-          "two"
-          false
-          null
-          [1, 2, 3]
-          { "a": 1, "b": "two" }
-          { "a": 1, "b": ["x", 1.1] }
-          []
-          {}
-          """)
-
-	val expected = ldjson("""
-          "x"
-          1.1
-	""")
-
-	input must interpretInto(stages)(expected)
-      }
-
-      "foc-2 Pivot . Wrap" in {
-        val stages = List(
-	  Pivot(ExcludeId, Object),
-	  Wrap("foo"))
-
-        val input = ldjson("""
-          1
-          "two"
-          false
-          null
-          [1, 2, 3]
-          { "a": 7, "b": "two" }
-          { "a": 8, "b": ["x", 1.1] }
-          []
-          {}
-          """)
-
-	val expected = ldjson("""
-          { "foo": 7 }
-          { "foo": "two" }
-          { "foo": 8 }
-          { "foo": ["x", 1.1] }
-	""")
-
-	input must interpretInto(stages)(expected)
-      }
-
-      "foc-3 Pivot . Project" in {
-        val stages = List(
-	  Pivot(ExcludeId, Object),
-	  project("c"))
-
-        val input = ldjson("""
-          1
-          "two"
-          false
-          null
-          [1, 2, 3]
-          { "a": 7, "b": "two" }
-          { "a": 7, "b": {} }
-          { "a": 8, "b": { "c": "cee" } }
-          []
-          {}
-          """)
-
-	val expected = ldjson("""
-          "cee"
-	""")
-
-	input must interpretInto(stages)(expected)
-      }
-
-      "foc-4 Pivot . Mask" in {
-        val stages = List(
-	  Pivot(ExcludeId, Object),
-	  mask("." -> Set(Object)))
-
-        val input = ldjson("""
-          1
-          "two"
-          false
-          null
-          [1, 2, 3]
-          { "a": 7, "b": "two" }
-          { "a": 7, "b": {} }
-          { "a": 8, "b": { "c": "cee" } }
-          []
-          {}
-          """)
-
-	val expected = ldjson("""
-          {}
-          { "c": "cee" }
-	""")
-
-	input must interpretInto(stages)(expected)
-      }
-
       "foc-5 Wrap . Pivot (no-op)" in {
         val stages = List(
-	  Wrap("foo"),
-	  Pivot(ExcludeId, Object))
+          Wrap("foo"),
+          Pivot(ExcludeId, Object))
 
         val input = ldjson("""
           1
@@ -1466,13 +1363,13 @@ object ScalarStageSpec {
           {}
           """)
 
-	input must interpretInto(stages)(input)
+        input must interpretInto(stages)(input)
       }
 
       "foc-6 Wrap . Pivot (empty set)" in {
         val stages = List(
-	  Wrap("foo"),
-	  Pivot(ExcludeId, Array))
+          Wrap("foo"),
+          Pivot(ExcludeId, Array))
 
         val input = ldjson("""
           1
@@ -1485,13 +1382,13 @@ object ScalarStageSpec {
           {}
           """)
 
-	input must interpretInto(stages)(ldjson(""))
+        input must interpretInto(stages)(ldjson(""))
       }
 
       "foc-7 Wrap . Wrap" in {
         val stages = List(
-	  Wrap("foo"),
-	  Wrap("bar"))
+          Wrap("foo"),
+          Wrap("bar"))
 
         val input = ldjson("""
           1
@@ -1515,13 +1412,13 @@ object ScalarStageSpec {
           { "bar": { "foo": {} } }
           """)
 
-	input must interpretInto(stages)(expected)
+        input must interpretInto(stages)(expected)
       }
 
       "foc-8 Wrap . Project (no-op)" in {
         val stages = List(
-	  Wrap("foo"),
-	  project("foo"))
+          Wrap("foo"),
+          project("foo"))
 
         val input = ldjson("""
           1
@@ -1534,13 +1431,13 @@ object ScalarStageSpec {
           {}
           """)
 
-	input must interpretInto(stages)(input)
+        input must interpretInto(stages)(input)
       }
 
       "foc-9 Wrap . Project (empty set)" in {
         val stages = List(
-	  Wrap("foo"),
-	  project("bar"))
+          Wrap("foo"),
+          project("bar"))
 
         val input = ldjson("""
           1
@@ -1553,13 +1450,13 @@ object ScalarStageSpec {
           {}
           """)
 
-	input must interpretInto(stages)(ldjson(""))
+        input must interpretInto(stages)(ldjson(""))
       }
 
       "foc-10 Wrap . Mask (identity)" in {
         val stages = List(
-	  Wrap("foo"),
-	  mask("." -> Set(Object)))
+          Wrap("foo"),
+          mask("." -> Set(Object)))
 
         val input = ldjson("""
           1
@@ -1583,13 +1480,13 @@ object ScalarStageSpec {
           { "foo": {} }
           """)
 
-	input must interpretInto(stages)(expected)
+        input must interpretInto(stages)(expected)
       }
 
       "foc-11 Wrap . Mask (empty set)" in {
         val stages = List(
-	  Wrap("foo"),
-	  mask("." -> Set(Array)))
+          Wrap("foo"),
+          mask("." -> Set(Array)))
 
         val input = ldjson("""
           1
@@ -1602,13 +1499,13 @@ object ScalarStageSpec {
           {}
           """)
 
-	input must interpretInto(stages)(ldjson(""))
+        input must interpretInto(stages)(ldjson(""))
       }
 
       "foc-12 Project . Pivot (object)" in {
         val stages = List(
-	  project("foo"),
-	  Pivot(ExcludeId, Object))
+          project("foo"),
+          Pivot(ExcludeId, Object))
 
         val input = ldjson("""
           { "foo": 1 }
@@ -1628,13 +1525,13 @@ object ScalarStageSpec {
           "two"
           """)
 
-	input must interpretInto(stages)(expected)
+        input must interpretInto(stages)(expected)
       }
 
       "foc-13 Project . Pivot (array)" in {
         val stages = List(
-	  project("foo"),
-	  Pivot(ExcludeId, Array))
+          project("foo"),
+          Pivot(ExcludeId, Array))
 
         val input = ldjson("""
           { "foo": 1 }
@@ -1655,13 +1552,13 @@ object ScalarStageSpec {
           3
           """)
 
-	input must interpretInto(stages)(expected)
+        input must interpretInto(stages)(expected)
       }
 
       "foc-14 Project . Wrap" in {
         val stages = List(
-	  project("foo"),
-	  Wrap("foo"))
+          project("foo"),
+          Wrap("foo"))
 
         val input = ldjson("""
           { "foo": 1 }
@@ -1687,13 +1584,13 @@ object ScalarStageSpec {
           { "foo": {} }
           """)
 
-	input must interpretInto(stages)(expected)
+        input must interpretInto(stages)(expected)
       }
 
       "foc-15 Project . Project" in {
         val stages = List(
-	  project("foo"),
-	  project("a"))
+          project("foo"),
+          project("a"))
 
         val input = ldjson("""
           { "foo": 1 }
@@ -1712,13 +1609,13 @@ object ScalarStageSpec {
           7
           """)
 
-	input must interpretInto(stages)(expected)
+        input must interpretInto(stages)(expected)
       }
 
       "foc-16 Project . Mask" in {
         val stages = List(
-	  project("foo"),
-	  mask("." -> Set(Object)))
+          project("foo"),
+          mask("." -> Set(Object)))
 
         val input = ldjson("""
           { "foo": 1 }
@@ -1738,13 +1635,13 @@ object ScalarStageSpec {
           {}
           """)
 
-	input must interpretInto(stages)(expected)
+        input must interpretInto(stages)(expected)
       }
 
       "foc-17 Mask . Pivot" in {
         val stages = List(
-	  mask("." -> Set(Object)),
-	  Pivot(ExcludeId, Object))
+          mask("." -> Set(Object)),
+          Pivot(ExcludeId, Object))
 
         val input = ldjson("""
           1
@@ -1757,18 +1654,18 @@ object ScalarStageSpec {
           {}
           """)
 
-	val expected = ldjson("""
-	  1
-	  "two"
-	""")
+        val expected = ldjson("""
+          1
+          "two"
+        """)
 
-	input must interpretInto(stages)(expected)
+        input must interpretInto(stages)(expected)
       }
 
       "foc-18 Mask . Wrap" in {
         val stages = List(
-	  mask("." -> Set(Object)),
-	  Wrap("foo"))
+          mask("." -> Set(Object)),
+          Wrap("foo"))
 
         val input = ldjson("""
           1
@@ -1782,18 +1679,18 @@ object ScalarStageSpec {
           {}
           """)
 
-	val expected = ldjson("""
+        val expected = ldjson("""
           { "foo": { "a": 1, "b": "two" } }
           { "foo": {} }
-	""")
+        """)
 
-	input must interpretInto(stages)(expected)
+        input must interpretInto(stages)(expected)
       }
 
       "foc-19 Mask . Project" in {
         val stages = List(
-	  mask("." -> Set(Object)),
-	  project("b"))
+          mask("." -> Set(Object)),
+          project("b"))
 
         val input = ldjson("""
           1
@@ -1807,17 +1704,17 @@ object ScalarStageSpec {
           {}
           """)
 
-	val expected = ldjson("""
+        val expected = ldjson("""
           "two"
-	""")
+        """)
 
-	input must interpretInto(stages)(expected)
+        input must interpretInto(stages)(expected)
       }
 
       "foc-20 Mask . Mask" in {
         val stages = List(
-	  mask("." -> Set(Object)),
-	  mask("." -> Set(Object)))
+          mask("." -> Set(Object)),
+          mask("." -> Set(Object)))
 
         val input = ldjson("""
           1
@@ -1831,137 +1728,547 @@ object ScalarStageSpec {
           {}
           """)
 
-	val expected = ldjson("""
+        val expected = ldjson("""
           { "a": 1, "b": "two" }
           {}
-	""")
-
-	input must interpretInto(stages)(expected)
-      }
-
-      "foc-21 Pivot . Pivot (IncludeId)" in {
-        val input = ldjson("""
-          { "x": [12], "y": { "z": false } }
-          """)
-
-        val expected = ldjson("""
-	  [0, "x"]
-	  [1, [12]]
-	  [0, "y"]
-          [1, { "z": false}]
-          """)
-
-        val stages = List(
-          Pivot(IdStatus.IncludeId, ColumnType.Object),
-          Pivot(IdStatus.IncludeId, ColumnType.Array))
+        """)
 
         input must interpretInto(stages)(expected)
       }
 
-      "foc-22 Pivot . Wrap (IncludeId)" in {
+      "Pivot . Wrap" >> {
         val input = ldjson("""
-          { "x": [12], "y": { "z": false } }
+          1
+          "two"
+          false
+          null
+          [2, "foo"]
+          [3, [2.2]]
+          [4, { "p": true }]
+          { "a": 5, "b": "bar" }
+          { "a": 6, "b": [1.1] }
+          { "a": 7, "b": { "z": false } }
+          []
+          {}
           """)
 
-        val expected = ldjson("""
-          { "foo": ["x", [12]] }
-          { "foo": ["y", { "z": false}] }
-          """)
-
-        val stages = List(
-          Pivot(IdStatus.IncludeId, ColumnType.Object),
-	  Wrap("foo"))
-
-        input must interpretInto(stages)(expected)
+        "Object" >> {
+          "foc-29 IncludeId" in {
+            val stages = List(Pivot(IncludeId, Object), Wrap("foo"))
+            val expected = ldjson("""
+              { "foo": ["a", 5] }
+              { "foo": ["b", "bar"] }
+              { "foo": ["a", 6] }
+              { "foo": ["b", [1.1]] }
+              { "foo": ["a", 7] }
+              { "foo": ["b", { "z": false }] }
+            """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-30 ExcludeId" in {
+            val stages = List(Pivot(ExcludeId, Object), Wrap("foo"))
+            val expected = ldjson("""
+              { "foo": 5 }
+              { "foo": "bar" }
+              { "foo": 6 }
+              { "foo": [1.1] }
+              { "foo": 7 }
+              { "foo": { "z": false } }
+            """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-31 IdOnly" in {
+            val stages = List(Pivot(IdOnly, Object), Wrap("foo"))
+            val expected = ldjson("""
+              { "foo": "a" }
+              { "foo": "b" }
+              { "foo": "a" }
+              { "foo": "b" }
+              { "foo": "a" }
+              { "foo": "b" }
+            """)
+            input must interpretInto(stages)(expected)
+          }
+        }
+        "Array" >> {
+          "foc-32 IncludeId" in {
+            val stages = List(Pivot(IncludeId, Array), Wrap("foo"))
+            val expected = ldjson("""
+              { "foo": [0, 2] }
+              { "foo": [1, "foo"] }
+              { "foo": [0, 3] }
+              { "foo": [1, [2.2]] }
+              { "foo": [0, 4] }
+              { "foo": [1, { "p": true }] }
+            """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-33 ExcludeId" in {
+            val stages = List(Pivot(ExcludeId, Array), Wrap("foo"))
+            val expected = ldjson("""
+              { "foo": 2 }
+              { "foo": "foo" }
+              { "foo": 3 }
+              { "foo": [2.2] }
+              { "foo": 4 }
+              { "foo": { "p": true } }
+            """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-34 IdOnly" in {
+            val stages = List(Pivot(IdOnly, Array), Wrap("foo"))
+            val expected = ldjson("""
+              { "foo": 0 }
+              { "foo": 1 }
+              { "foo": 0 }
+              { "foo": 1 }
+              { "foo": 0 }
+              { "foo": 1 }
+            """)
+            input must interpretInto(stages)(expected)
+          }
+        }
       }
 
-      "foc-23 Pivot . Mask (IncludeId)" in {
+      "Pivot . Mask" >> {
         val input = ldjson("""
-          { "x": [12], "y": { "z": false } }
+          1
+          "two"
+          false
+          null
+          [2, "foo"]
+          [3, [2.2]]
+          [4, { "p": true }]
+          [5, {}]
+          { "a": 6, "b": "bar" }
+          { "a": 7, "b": [1.1] }
+          { "a": 8, "b": { "z": false } }
+          { "a": 9, "b": {} }
+          []
+          {}
           """)
 
-        val expected = ldjson("""
-          ["x"]
-          ["y", { "z": false}]
-          """)
-
-        val stages = List(
-          Pivot(IdStatus.IncludeId, ColumnType.Object),
-          Mask(Map(
-            CPath.parse("[0]") -> ColumnType.Top,
-            CPath.parse("[1]") -> Set(ColumnType.Object))))
-
-        input must interpretInto(stages)(expected)
+        "Object" >> {
+          "foc-35 IncludeId" in {
+            val stages = List(
+              Pivot(IncludeId, Object),
+              Mask(Map(
+                CPath.parse("[0]") -> ColumnType.Top,
+                CPath.parse("[1]") -> Set(ColumnType.Object))))
+            val expected = ldjson("""
+              ["a"]
+              ["b"]
+              ["a"]
+              ["b"]
+              ["a"]
+              ["b", { "z": false }]
+              ["a"]
+              ["b", {}]
+            """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-36 ExcludeId" in {
+            val stages = List(Pivot(ExcludeId, Object), mask("." -> Set(Object)))
+            val expected = ldjson("""
+              { "z": false }
+              {}
+            """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-37 IdOnly" in {
+            val stages = List(Pivot(IdOnly, Object), mask("." -> Set(ColumnType.String)))
+            val expected = ldjson("""
+              "a"
+              "b"
+              "a"
+              "b"
+              "a"
+              "b"
+              "a"
+              "b"
+            """)
+            input must interpretInto(stages)(expected)
+          }
+        }
+        "Array" >> {
+          "foc-38 IncludeId" in {
+            val stages = List(
+              Pivot(IncludeId, Array),
+              Mask(Map(
+                CPath.parse("[0]") -> ColumnType.Top,
+                CPath.parse("[1]") -> Set(ColumnType.Object))))
+            val expected = ldjson("""
+              [0]
+              [1]
+              [0]
+              [1]
+              [0]
+              [1, { "p": true }]
+              [0]
+              [1, {}]
+            """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-39 ExcludeId" in {
+            val stages = List(Pivot(ExcludeId, Array), mask("." -> Set(Object)))
+            val expected = ldjson("""
+              { "p": true }
+              {}
+            """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-40 IdOnly" in {
+            val stages = List(Pivot(IdOnly, Array), mask("." -> Set(ColumnType.Number)))
+            val expected = ldjson("""
+              0
+              1
+              0
+              1
+              0
+              1
+              0
+              1
+            """)
+            input must interpretInto(stages)(expected)
+          }
+        }
       }
 
-      "foc-24 Pivot . Project (IncludeId)" in {
+      "Pivot . Project" >> {
         val input = ldjson("""
-          { "x": [12], "y": { "z": false } }
+          1
+          "two"
+          false
+          null
+          [2, "foo"]
+          [3, [2.2]]
+          [4, { "p": 10 }]
+          [5, {}]
+          { "a": 6, "b": "bar" }
+          { "a": 7, "b": [1.1] }
+          { "a": 8, "b": { "z": 11 } }
+          { "a": 9, "b": {} }
+          []
+          {}
           """)
 
-        val stages = List(
-          Pivot(IdStatus.IncludeId, ColumnType.Object),
-	  Project(CPath.parse("k")))
-
-        input must interpretInto(stages)(ldjson(""))
+        "Object" >> {
+          "foc-41 IncludeId" in {
+            val stages = List(Pivot(IncludeId, Object), project("z"))
+            val expected = ldjson("")
+            input must interpretInto(stages)(expected)
+          }
+          "foc-42 ExcludeId" in {
+            val stages = List(Pivot(ExcludeId, Object), project("z"))
+            val expected = ldjson("11")
+            input must interpretInto(stages)(expected)
+          }
+          "foc-43 IdOnly" in {
+            val stages = List(Pivot(IdOnly, Object), project("z"))
+            val expected = ldjson("")
+            input must interpretInto(stages)(expected)
+          }
+        }
+        "Array" >> {
+          "foc-44 IncludeId" in {
+            val stages = List(Pivot(IncludeId, Array), project("p"))
+            val expected = ldjson("")
+            input must interpretInto(stages)(expected)
+          }
+          "foc-45 ExcludeId" in {
+            val stages = List(Pivot(ExcludeId, Array), project("p"))
+            val expected = ldjson("10")
+            input must interpretInto(stages)(expected)
+          }
+          "foc-46 IdOnly" in {
+            val stages = List(Pivot(IdOnly, Array), project("p"))
+            val expected = ldjson("")
+            input must interpretInto(stages)(expected)
+          }
+        }
       }
 
-      "foc-25 Pivot . Pivot (IdOnly)" in {
+      "Pivot . Pivot" >> {
         val input = ldjson("""
-          { "x": [12], "y": { "z": false } }
+          1
+          "two"
+          false
+          null
+          [2, "foo"]
+          [3, [2.2]]
+          [4, { "p": 10 }]
+          [5, {}]
+          { "a": 6, "b": "bar" }
+          { "a": 7, "b": [1.1] }
+          { "a": 8, "b": { "z": 11 } }
+          { "a": 9, "b": {} }
+          []
+          {}
           """)
 
-        val stages = List(
-          Pivot(IdStatus.IdOnly, ColumnType.Object),
-          Pivot(IdStatus.IncludeId, ColumnType.Array))
+        "Object Object" >> {
+          "foc-47 IncludeId IncludeId" in {
+            val stages = List(Pivot(IncludeId, Object), Pivot(IncludeId, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-48 IncludeId ExcludeId" in {
+            val stages = List(Pivot(IncludeId, Object), Pivot(ExcludeId, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-49 IncludeId IdOnly" in {
+            val stages = List(Pivot(IncludeId, Object), Pivot(IdOnly, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-50 ExcludeId IncludeId" in {
+            val stages = List(Pivot(ExcludeId, Object), Pivot(IncludeId, Object))
+            input must interpretInto(stages)(ldjson("""["z", 11]"""))
+          }
+          "foc-51 ExcludeId ExcludeId" in {
+            val stages = List(Pivot(ExcludeId, Object), Pivot(ExcludeId, Object))
+            input must interpretInto(stages)(ldjson("11"))
+          }
+          "foc-52 ExcludeId IdOnly" in {
+            val stages = List(Pivot(ExcludeId, Object), Pivot(IdOnly, Object))
+            input must interpretInto(stages)(ldjson(""""z""""))
+          }
+          "foc-53 IdOnly IncludeId" in {
+            val stages = List(Pivot(IdOnly, Object), Pivot(IncludeId, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-54 IdOnly ExcludeId" in {
+            val stages = List(Pivot(IdOnly, Object), Pivot(ExcludeId, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-55 IdOnly IdOnly" in {
+            val stages = List(Pivot(IdOnly, Object), Pivot(IdOnly, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+        }
 
-        input must interpretInto(stages)(ldjson(""))
-      }
+        "Object Array" >> {
+          "foc-56 IncludeId IncludeId" in {
+            val stages = List(Pivot(IncludeId, Object), Pivot(IncludeId, Array))
+            val expected = ldjson("""
+              [0, "a"]
+              [1, 6]
+              [0, "b"]
+              [1, "bar"]
+              [0, "a"]
+              [1, 7]
+              [0, "b"]
+              [1, [1.1]]
+              [0, "a"]
+              [1, 8]
+              [0, "b"]
+              [1, { "z": 11 }]
+              [0, "a"]
+              [1, 9]
+              [0, "b"]
+              [1, {}]
+              """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-57 IncludeId ExcludeId" in {
+            val stages = List(Pivot(IncludeId, Object), Pivot(ExcludeId, Array))
+            val expected = ldjson("""
+              "a"
+              6
+              "b"
+              "bar"
+              "a"
+              7
+              "b"
+              [1.1]
+              "a"
+              8
+              "b"
+              { "z": 11 }
+              "a"
+              9
+              "b"
+              {}
+              """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-58 IncludeId IdOnly" in {
+            val stages = List(Pivot(IncludeId, Object), Pivot(IdOnly, Array))
+            val expected = ldjson("""
+              0
+              1
+              0
+              1
+              0
+              1
+              0
+              1
+              0
+              1
+              0
+              1
+              0
+              1
+              0
+              1
+              """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-59 ExcludeId IncludeId" in {
+            val stages = List(Pivot(ExcludeId, Object), Pivot(IncludeId, Array))
+            input must interpretInto(stages)(ldjson("[0, 1.1]"))
+          }
+          "foc-60 ExcludeId ExcludeId" in {
+            val stages = List(Pivot(ExcludeId, Object), Pivot(ExcludeId, Array))
+            input must interpretInto(stages)(ldjson("1.1"))
+          }
+          "foc-61 ExcludeId IdOnly" in {
+            val stages = List(Pivot(ExcludeId, Object), Pivot(IdOnly, Array))
+            input must interpretInto(stages)(ldjson("0"))
+          }
+          "foc-62 IdOnly IncludeId" in {
+            val stages = List(Pivot(IdOnly, Object), Pivot(IncludeId, Array))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-63 IdOnly ExcludeId" in {
+            val stages = List(Pivot(IdOnly, Object), Pivot(ExcludeId, Array))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-64 IdOnly IdOnly" in {
+            val stages = List(Pivot(IdOnly, Object), Pivot(IdOnly, Array))
+            input must interpretInto(stages)(ldjson(""))
+          }
+        }
 
-      "foc-26 Pivot . Wrap (IdOnly)" in {
-        val input = ldjson("""
-          { "x": [12], "y": { "z": false } }
-          """)
+        "Array Object" >> {
+          "foc-65 IncludeId IncludeId" in {
+            val stages = List(Pivot(IncludeId, Array), Pivot(IncludeId, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-66 IncludeId ExcludeId" in {
+            val stages = List(Pivot(IncludeId, Array), Pivot(ExcludeId, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-67 IncludeId IdOnly" in {
+            val stages = List(Pivot(IncludeId, Array), Pivot(IdOnly, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-68 ExcludeId IncludeId" in {
+            val stages = List(Pivot(ExcludeId, Array), Pivot(IncludeId, Object))
+            input must interpretInto(stages)(ldjson("""["p", 10]"""))
+          }
+          "foc-69 ExcludeId ExcludeId" in {
+            val stages = List(Pivot(ExcludeId, Array), Pivot(ExcludeId, Object))
+            input must interpretInto(stages)(ldjson("10"))
+          }
+          "foc-70 ExcludeId IdOnly" in {
+            val stages = List(Pivot(ExcludeId, Array), Pivot(IdOnly, Object))
+            input must interpretInto(stages)(ldjson(""""p""""))
+          }
+          "foc-71 IdOnly IncludeId" in {
+            val stages = List(Pivot(IdOnly, Array), Pivot(IncludeId, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-72 IdOnly ExcludeId" in {
+            val stages = List(Pivot(IdOnly, Array), Pivot(ExcludeId, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-73 IdOnly IdOnly" in {
+            val stages = List(Pivot(IdOnly, Array), Pivot(IdOnly, Object))
+            input must interpretInto(stages)(ldjson(""))
+          }
+        }
 
-        val expected = ldjson("""
-          { "foo": "x" }
-          { "foo": "y" }
-          """)
-
-        val stages = List(
-          Pivot(IdStatus.IdOnly, ColumnType.Object),
-	  Wrap("foo"))
-
-        input must interpretInto(stages)(expected)
-      }
-
-      "foc-27 Pivot . Mask (IdOnly)" in {
-        val input = ldjson("""
-          { "x": [12], "y": { "z": false } }
-          """)
-
-        val expected = ldjson("""
-          "x"
-          "y"
-          """)
-
-        val stages = List(
-          Pivot(IdStatus.IdOnly, ColumnType.Object),
-          Mask(Map(CPath.parse(".") -> Set(ColumnType.String))))
-
-        input must interpretInto(stages)(expected)
-      }
-
-      "foc-28 Pivot . Project (IdOnly)" in {
-        val input = ldjson("""
-          { "x": [12], "y": { "z": false } }
-          """)
-
-        val stages = List(
-          Pivot(IdStatus.IdOnly, ColumnType.Object),
-	  Project(CPath.parse("k")))
-
-        input must interpretInto(stages)(ldjson(""))
+        "Array Array" >> {
+          "foc-74 IncludeId IncludeId" in {
+            val stages = List(Pivot(IncludeId, Array), Pivot(IncludeId, Array))
+            val expected = ldjson("""
+              [0, 0]
+              [1, 2]
+              [0, 1]
+              [1, "foo"]
+              [0, 0]
+              [1, 3]
+              [0, 1]
+              [1, [2.2]]
+              [0, 0]
+              [1, 4]
+              [0, 1]
+              [1, { "p": 10 }]
+              [0, 0]
+              [1, 5]
+              [0, 1]
+              [1, {}]
+              """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-75 IncludeId ExcludeId" in {
+            val stages = List(Pivot(IncludeId, Array), Pivot(ExcludeId, Array))
+            val expected = ldjson("""
+              0
+              2
+              1
+              "foo"
+              0
+              3
+              1
+              [2.2]
+              0
+              4
+              1
+              { "p": 10 }
+              0
+              5
+              1
+              {}
+              """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-76 IncludeId IdOnly" in {
+            val stages = List(Pivot(IncludeId, Array), Pivot(IdOnly, Array))
+            val expected = ldjson("""
+              0
+              1
+              0
+              1
+              0
+              1
+              0
+              1
+              0
+              1
+              0
+              1
+              0
+              1
+              0
+              1
+              """)
+            input must interpretInto(stages)(expected)
+          }
+          "foc-77 ExcludeId IncludeId" in {
+            val stages = List(Pivot(ExcludeId, Array), Pivot(IncludeId, Array))
+            input must interpretInto(stages)(ldjson("[0, 2.2]"))
+          }
+          "foc-78 ExcludeId ExcludeId" in {
+            val stages = List(Pivot(ExcludeId, Array), Pivot(ExcludeId, Array))
+            input must interpretInto(stages)(ldjson("2.2"))
+          }
+          "foc-79 ExcludeId IdOnly" in {
+            val stages = List(Pivot(ExcludeId, Array), Pivot(IdOnly, Array))
+            input must interpretInto(stages)(ldjson("0"))
+          }
+          "foc-80 IdOnly IncludeId" in {
+            val stages = List(Pivot(IdOnly, Array), Pivot(IncludeId, Array))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-81 IdOnly ExcludeId" in {
+            val stages = List(Pivot(IdOnly, Array), Pivot(ExcludeId, Array))
+            input must interpretInto(stages)(ldjson(""))
+          }
+          "foc-82 IdOnly IdOnly" in {
+            val stages = List(Pivot(IdOnly, Array), Pivot(IdOnly, Array))
+            input must interpretInto(stages)(ldjson(""))
+          }
+        }
       }
     }
 
