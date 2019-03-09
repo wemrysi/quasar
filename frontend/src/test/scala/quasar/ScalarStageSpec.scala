@@ -816,6 +816,7 @@ object ScalarStageSpec {
         input must maskInto(".a.b" -> Set(Object))(input)
       }
 
+      // minimization of `multilevelFlatten.test`
       "mask-23 disjunctively retain values in an array" in {
         val input = ldjson("""
           ["a", 13]
@@ -2601,6 +2602,53 @@ object ScalarStageSpec {
         val targets = Map(
           (CPathField("a1"), (CPathField("a0"), Nil)),
           (CPathField("b1"), (CPathField("b0"), Nil)))
+
+        input must cartesianInto(targets)(expected)
+      }
+
+      // minimization of `multilevelFlatten.test`
+      // x[0] as x0, x[1] as x1
+      "cart-12 cross fields when some are undefined after array projection" in {
+        import ScalarStage.Project
+
+        val input = ldjson("""
+          { "x": ["foo"] }
+          { "x": ["bar", 42] }
+        """)
+
+        val expected = ldjson("""
+          { "x0": "foo" }
+          { "x0": "bar", "x1": 42 }
+        """)
+
+        val targets = Map(
+          (CPathField("x0"), (CPathField("x"), List(
+            Project(CPath.parse("[0]"))))),
+          (CPathField("x1"), (CPathField("x"), List(
+            Project(CPath.parse("[1]"))))))
+
+        input must cartesianInto(targets)(expected)
+      }
+
+      // x.a as xa, x.b as xb
+      "cart-13 cross fields when some are undefined after object projection" in {
+        import ScalarStage.Project
+
+        val input = ldjson("""
+          { "x": { "a": "foo" } }
+          { "x": { "a": "bar", "b": 42 } }
+        """)
+
+        val expected = ldjson("""
+          { "xa": "foo" }
+          { "xa": "bar", "xb": 42 }
+        """)
+
+        val targets = Map(
+          (CPathField("xa"), (CPathField("x"), List(
+            Project(CPath.parse(".a"))))),
+          (CPathField("xb"), (CPathField("x"), List(
+            Project(CPath.parse(".b"))))))
 
         input must cartesianInto(targets)(expected)
       }
