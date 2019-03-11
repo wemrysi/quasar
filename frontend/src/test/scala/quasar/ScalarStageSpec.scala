@@ -2665,12 +2665,12 @@ object ScalarStageSpec {
         val input = ldjson("""
           { "x": ["foo"] }
           { "x": ["bar", 42] }
-        """)
+          """)
 
         val expected = ldjson("""
           { "x0": "foo" }
           { "x0": "bar", "x1": 42 }
-        """)
+          """)
 
         val targets = Map(
           (CPathField("x0"), (CPathField("x"), List(
@@ -2688,18 +2688,77 @@ object ScalarStageSpec {
         val input = ldjson("""
           { "x": { "a": "foo" } }
           { "x": { "a": "bar", "b": 42 } }
-        """)
+          """)
 
         val expected = ldjson("""
           { "xa": "foo" }
           { "xa": "bar", "xb": 42 }
-        """)
+          """)
 
         val targets = Map(
           (CPathField("xa"), (CPathField("x"), List(
             Project(CPath.parse(".a"))))),
           (CPathField("xb"), (CPathField("x"), List(
             Project(CPath.parse(".b"))))))
+
+        input must cartesianInto(targets)(expected)
+      }
+
+      // minimization of `flattenArrayValueAndIndexWithField.test`
+      // a as x0, b[_] as x1
+      "cart-14 cross fields when some are undefined after array pivot" in {
+        import ScalarStage.Pivot
+
+         val input = ldjson("""
+          { "a": 1, "b": [true, true, true] }
+          { "a": 2, "b": [false, false] }
+          { "a": 3, "b": 42 }
+          { "a": 4 }
+          """)
+
+         val expected = ldjson("""
+          { "x0": 1, "x1": [0, true] }
+          { "x0": 1, "x1": [1, true] }
+          { "x0": 1, "x1": [2, true] }
+          { "x0": 2, "x1": [0, false] }
+          { "x0": 2, "x1": [1, false] }
+          { "x0": 3 }
+          { "x0": 4 }
+          """)
+
+          val targets = Map(
+            (CPathField("x0"), (CPathField("a"), Nil)),
+            (CPathField("x1"), (CPathField("b"), List(
+              Pivot(IdStatus.IncludeId, ColumnType.Array)))))
+
+        input must cartesianInto(targets)(expected)
+      }
+
+      // a as x0, b{_} as x1
+      "cart-15 cross fields when some are undefined after object pivot" in {
+        import ScalarStage.Pivot
+
+         val input = ldjson("""
+          { "a": 1, "b": {"x":true, "y":true, "z":true} }
+          { "a": 2, "b": {"x":false, "y":false} }
+          { "a": 3, "b": 42 }
+          { "a": 4 }
+          """)
+
+         val expected = ldjson("""
+          { "x0": 1, "x1": ["x", true] }
+          { "x0": 1, "x1": ["y", true] }
+          { "x0": 1, "x1": ["z", true] }
+          { "x0": 2, "x1": ["x", false] }
+          { "x0": 2, "x1": ["y", false] }
+          { "x0": 3 }
+          { "x0": 4 }
+          """)
+
+          val targets = Map(
+            (CPathField("x0"), (CPathField("a"), Nil)),
+            (CPathField("x1"), (CPathField("b"), List(
+              Pivot(IdStatus.IncludeId, ColumnType.Object)))))
 
         input must cartesianInto(targets)(expected)
       }
