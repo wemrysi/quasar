@@ -876,6 +876,54 @@ object ScalarStageSpec {
 
         input must maskInto(".v" -> ColumnType.Top, ".w" -> Set(ColumnType.Object))(expected)
       }
+
+      "mask all values at Top to themselves" >> {
+        // minimization of `arrayLengthHeterogeneous.test`
+        "mask-26 at identity path" in {
+          val input = ldjson("""
+            [[1], {"z":2}, [], {}, null, 42, 42.2, true]
+            {"a":[1], "b":{"z":2}, "c":[], "d":{}, "e":null, "f":42, "g":42.2, "h":true}
+            []
+            {}
+            null
+            42
+            42.2
+            true
+            """)
+
+          input must maskInto("." -> ColumnType.Top)(input)
+        }
+
+        "mask-27 at object projected path" in {
+          val input = ldjson("""
+            {"y": [[1], {"z":2}, [], {}, null, 42, 42.2, true]}
+            {"y": {"a":[1], "b":{"z":2}, "c":[], "d":{}, "e":null, "f":42, "g":42.2, "h":true}}
+            {"y": []}
+            {"y": {}}
+            {"y": null}
+            {"y": 42}
+            {"y": 42.2}
+            {"y": true}
+            """)
+
+          input must maskInto(".y" -> ColumnType.Top)(input)
+        }
+
+        "mask-28 at array projected path" in {
+          val input = ldjson("""
+            [[[1], {"z":2}, [], {}, null, 42, 42.2, true]]
+            [{"a":[1], "b":{"z":2}, "c":[], "d":{}, "e":null, "f":42, "g":42.2, "h":true}]
+            [[]]
+            [{}]
+            [null]
+            [42]
+            [42.2]
+            [true]
+            """)
+
+          input must maskInto("[0]" -> ColumnType.Top)(input)
+        }
+      }
     }
 
     override def is: SpecStructure =
