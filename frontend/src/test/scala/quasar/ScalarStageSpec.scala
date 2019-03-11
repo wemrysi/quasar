@@ -927,6 +927,49 @@ object ScalarStageSpec {
           input must maskInto("[0]" -> ColumnType.Top)(input)
         }
       }
+
+      "retain each non-temporal scalar type at identity" >> {
+        val input = ldjson("""
+          1
+          2.2
+          27182e-4
+          "hi"
+          true
+          false
+          null
+          []
+          {}
+          [1, 2, 3]
+          { "a": "hi", "b": null }
+          """)
+
+        "mask-29 Null" in {
+          val expected = ldjson("""null""")
+          input must maskInto("." -> Set(Null))(expected)
+        }
+
+        "mask-30 Boolean" in {
+          val expected = ldjson("""
+            true
+            false
+            """)
+          input must maskInto("." -> Set(Boolean))(expected)
+        }
+
+        "mask-31 Number" in {
+          val expected = ldjson("""
+            1
+            2.2
+            27182e-4
+            """)
+          input must maskInto("." -> Set(Number))(expected)
+	}
+
+        "mask-32 String" in {
+          val expected = ldjson(""""hi"""")
+          input must maskInto("." -> Set(ColumnType.String))(expected)
+        }
+      }
     }
 
     override def is: SpecStructure =
