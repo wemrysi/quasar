@@ -881,10 +881,11 @@ object ScalarStageSpec {
         // minimization of `arrayLengthHeterogeneous.test`
         "mask-26 at identity path" in {
           val input = ldjson("""
-            [[1], {"z":2}, [], {}, null, 42, 42.2, true]
-            {"a":[1], "b":{"z":2}, "c":[], "d":{}, "e":null, "f":42, "g":42.2, "h":true}
+            [[1], {"z":2}, [], {}, "foo", null, 42, 42.2, true]
+            {"a":[1], "b":{"z":2}, "c":[], "d":{}, "e":"foo", "f":null, "g":42, "h":42.2, "i":true}
             []
             {}
+            "foo"
             null
             42
             42.2
@@ -896,10 +897,11 @@ object ScalarStageSpec {
 
         "mask-27 at object projected path" in {
           val input = ldjson("""
-            {"y": [[1], {"z":2}, [], {}, null, 42, 42.2, true]}
-            {"y": {"a":[1], "b":{"z":2}, "c":[], "d":{}, "e":null, "f":42, "g":42.2, "h":true}}
+            {"y": [[1], {"z":2}, [], {}, "foo", null, 42, 42.2, true]}
+            {"y": {"a":[1], "b":{"z":2}, "c":[], "d":{}, "e":"foo", "f":null, "g":42, "h":42.2, "i":true}}
             {"y": []}
             {"y": {}}
+            {"y": "foo"}
             {"y": null}
             {"y": 42}
             {"y": 42.2}
@@ -911,10 +913,11 @@ object ScalarStageSpec {
 
         "mask-28 at array projected path" in {
           val input = ldjson("""
-            [[[1], {"z":2}, [], {}, null, 42, 42.2, true]]
-            [{"a":[1], "b":{"z":2}, "c":[], "d":{}, "e":null, "f":42, "g":42.2, "h":true}]
+            [[[1], {"z":2}, [], {}, "foo", null, 42, 42.2, true]]
+            [{"a":[1], "b":{"z":2}, "c":[], "d":{}, "e":"foo", "f":null, "g":42, "h":42.2, "i":true}]
             [[]]
             [{}]
+            ["foo"]
             [null]
             [42]
             [42.2]
