@@ -970,6 +970,19 @@ object ScalarStageSpec {
           input must maskInto("." -> Set(ColumnType.String))(expected)
         }
       }
+
+      "mask-33 mask multiple columns at Top" in {
+        val input = ldjson("""
+          { "x": "hi", "y": null }
+          [4, 5]
+          """)
+
+        input must maskInto(
+          ".x" -> ColumnType.Top,
+          ".y" -> ColumnType.Top,
+          "[0]" -> ColumnType.Top,
+          "[1]" -> ColumnType.Top)(input)
+      }
     }
 
     override def is: SpecStructure =
