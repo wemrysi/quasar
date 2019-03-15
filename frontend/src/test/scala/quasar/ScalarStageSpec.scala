@@ -37,6 +37,7 @@ abstract class ScalarStageSpec
     with ScalarStageSpec.PivotSpec
     with ScalarStageSpec.FocusedSpec
     with ScalarStageSpec.CartesianSpec
+    with ScalarStageSpec.FullSpec
 
 /*
  * Test names must begin with the prefix specified in their
@@ -3327,7 +3328,7 @@ object ScalarStageSpec {
 
             input must cartesianInto(targets)(expected)
           }
-            }
+        }
       }
     }
 
@@ -3342,6 +3343,24 @@ object ScalarStageSpec {
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>
         evalCartesian(Cartesian(cartouches), str)
+      }
+  }
+
+  trait FullSpec extends JsonSpec {
+
+    val fullPendingExamples: Set[Int]
+
+    override def is: SpecStructure =
+      pendingFragments(super.is, fullPendingExamples, "full")
+
+    def evalFull(stages: List[ScalarStage], stream: JsonStream): JsonStream
+
+    def interpretFullInto(
+        stages: List[ScalarStage])(
+        expected: JsonStream)
+        : Matcher[JsonStream] =
+      bestSemanticEqual(expected) ^^ { str: JsonStream =>
+        evalFull(stages, str)
       }
   }
 }
