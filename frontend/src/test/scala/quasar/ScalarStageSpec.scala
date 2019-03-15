@@ -963,7 +963,7 @@ object ScalarStageSpec {
             27182e-4
             """)
           input must maskInto("." -> Set(Number))(expected)
-	}
+        }
 
         "mask-32 String" in {
           val expected = ldjson(""""hi"""")
@@ -2765,7 +2765,7 @@ object ScalarStageSpec {
 
         "Pivot . Pivot" >> {
 
-          "cart-16 Array Array " in {
+          "Array Array " >> {
             import ScalarStage.Pivot
 
             val input = ldjson("""
@@ -2775,28 +2775,74 @@ object ScalarStageSpec {
               { "a": 4, "c": "nine" }
               """)
 
-            val expected = ldjson("""
-              { "a0": 1, "b0": "one" }
-              { "a0": 1, "b0": "two" }
-              { "a0": 1 }
-              { "a0": 1, "b0": "four" }
-              { "a0": 2 }
-              { "a0": 2 }
-              { "a0": 3 }
-              { "a0": 4 }
-              """)
+            "cart-24 ExcludeId" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": "one" }
+                { "a0": 1, "b0": "two" }
+                { "a0": 1 }
+                { "a0": 1, "b0": "four" }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
 
-            val targets = Map(
-              (CPathField("a0"), (CPathField("a"), Nil)),
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
 
-              (CPathField("b0"), (CPathField("b"), List(
-                Pivot(IdStatus.ExcludeId, ColumnType.Array),
-                Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
+                (CPathField("b0"), (CPathField("b"), List(
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
 
-            input must cartesianInto(targets)(expected)
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-25 IdOnly" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": 0 }
+                { "a0": 1, "b0": 1 }
+                { "a0": 1 }
+                { "a0": 1, "b0": 0 }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array),
+                  Pivot(IdStatus.IdOnly, ColumnType.Array)))))
+
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-26 IncludeId" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": [0, "one"] }
+                { "a0": 1, "b0": [1, "two"] }
+                { "a0": 1 }
+                { "a0": 1, "b0": [0, "four"] }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array),
+                  Pivot(IdStatus.IncludeId, ColumnType.Array)))))
+
+              input must cartesianInto(targets)(expected)
+            }
           }
 
-          "cart-17 Object Object" in {
+          "Object Object" >> {
             import ScalarStage.Pivot
 
             val input = ldjson("""
@@ -2806,31 +2852,77 @@ object ScalarStageSpec {
               { "a": 4, "c": "nine" }
               """)
 
-            val expected = ldjson("""
-              { "a0": 1, "b0": "one" }
-              { "a0": 1, "b0": "two" }
-              { "a0": 1 }
-              { "a0": 1, "b0": "four" }
-              { "a0": 2 }
-              { "a0": 2 }
-              { "a0": 3 }
-              { "a0": 4 }
-              """)
+            "cart-27 ExcludeId" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": "one" }
+                { "a0": 1, "b0": "two" }
+                { "a0": 1 }
+                { "a0": 1, "b0": "four" }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
 
-            val targets = Map(
-              (CPathField("a0"), (CPathField("a"), Nil)),
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
 
-              (CPathField("b0"), (CPathField("b"), List(
-                Pivot(IdStatus.ExcludeId, ColumnType.Object),
-                Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
+                (CPathField("b0"), (CPathField("b"), List(
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
 
-            input must cartesianInto(targets)(expected)
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-28 IdOnly" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": "q" }
+                { "a0": 1, "b0": "r" }
+                { "a0": 1 }
+                { "a0": 1, "b0": "s" }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object),
+                  Pivot(IdStatus.IdOnly, ColumnType.Object)))))
+
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-29 IncludeId" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": ["q", "one"] }
+                { "a0": 1, "b0": ["r", "two"] }
+                { "a0": 1 }
+                { "a0": 1, "b0": ["s", "four"] }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object),
+                  Pivot(IdStatus.IncludeId, ColumnType.Object)))))
+
+              input must cartesianInto(targets)(expected)
+            }
           }
         }
 
-	"Mask . Pivot . Mask . Pivot" >> {
+        "Mask . Pivot . Mask . Pivot" >> {
 
-          "cart-18 Array Array" in {
+          "Array Array" >> {
             import ScalarStage.{Mask, Pivot}
 
             val input = ldjson("""
@@ -2840,30 +2932,80 @@ object ScalarStageSpec {
               { "a": 4, "c": "nine" }
               """)
 
-            val expected = ldjson("""
-              { "a0": 1, "b0": "one" }
-              { "a0": 1, "b0": "two" }
-              { "a0": 1 }
-              { "a0": 1, "b0": "four" }
-              { "a0": 2 }
-              { "a0": 2 }
-              { "a0": 3 }
-              { "a0": 4 }
-              """)
+            "cart-30 ExcludeId" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": "one" }
+                { "a0": 1, "b0": "two" }
+                { "a0": 1 }
+                { "a0": 1, "b0": "four" }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
 
-            val targets = Map(
-              (CPathField("a0"), (CPathField("a"), Nil)),
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
 
-              (CPathField("b0"), (CPathField("b"), List(
-                Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
-                Pivot(IdStatus.ExcludeId, ColumnType.Array),
-                Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
-                Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
+                (CPathField("b0"), (CPathField("b"), List(
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array),
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
 
-            input must cartesianInto(targets)(expected)
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-31 IdOnly" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": 0 }
+                { "a0": 1, "b0": 1 }
+                { "a0": 1 }
+                { "a0": 1, "b0": 0 }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array),
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+                  Pivot(IdStatus.IdOnly, ColumnType.Array)))))
+
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-32 IncludeId" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": [0, "one"] }
+                { "a0": 1, "b0": [1, "two"] }
+                { "a0": 1 }
+                { "a0": 1, "b0": [0, "four"] }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array),
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+                  Pivot(IdStatus.IncludeId, ColumnType.Array)))))
+
+              input must cartesianInto(targets)(expected)
+            }
           }
 
-          "cart-19 Object Object" in {
+          "Object Object" >> {
             import ScalarStage.{Mask, Pivot}
 
             val input = ldjson("""
@@ -2873,33 +3015,83 @@ object ScalarStageSpec {
               { "a": 4, "c": "nine" }
               """)
 
-            val expected = ldjson("""
-              { "a0": 1, "b0": "one" }
-              { "a0": 1, "b0": "two" }
-              { "a0": 1 }
-              { "a0": 1, "b0": "four" }
-              { "a0": 2 }
-              { "a0": 2 }
-              { "a0": 3 }
-              { "a0": 4 }
-              """)
+            "cart-33 ExcludeId" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": "one" }
+                { "a0": 1, "b0": "two" }
+                { "a0": 1 }
+                { "a0": 1, "b0": "four" }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
 
-            val targets = Map(
-              (CPathField("a0"), (CPathField("a"), Nil)),
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
 
-              (CPathField("b0"), (CPathField("b"), List(
-                Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
-                Pivot(IdStatus.ExcludeId, ColumnType.Object),
-                Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
-                Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
+                (CPathField("b0"), (CPathField("b"), List(
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object),
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
 
-            input must cartesianInto(targets)(expected)
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-34 IdOnly" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": "q" }
+                { "a0": 1, "b0": "r" }
+                { "a0": 1 }
+                { "a0": 1, "b0": "s" }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object),
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
+                  Pivot(IdStatus.IdOnly, ColumnType.Object)))))
+
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-35 IncludeId" in {
+              val expected = ldjson("""
+                { "a0": 1, "b0": ["q", "one"] }
+                { "a0": 1, "b0": ["r", "two"] }
+                { "a0": 1 }
+                { "a0": 1, "b0": ["s", "four"] }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object),
+                  Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
+                  Pivot(IdStatus.IncludeId, ColumnType.Object)))))
+
+              input must cartesianInto(targets)(expected)
+            }
           }
         }
 
-	"Project . Pivot . Project . Pivot" >> {
+        "Project . Pivot . Project . Pivot" >> {
 
-          "cart-20 Array Array" in {
+          "Array Array" >> {
             import ScalarStage.{Pivot, Project}
 
             val input = ldjson("""
@@ -2910,31 +3102,83 @@ object ScalarStageSpec {
               { "a": 5, "c": "nine" }
               """)
 
-            val expected = ldjson("""
-              { "a0": 1 }
-              { "a0": 1 }
-              { "a0": 2, "b0": "three" }
-              { "a0": 2, "b0": "four" }
-              { "a0": 2 }
-              { "a0": 2 }
-              { "a0": 3 }
-              { "a0": 4 }
-              { "a0": 5 }
-              """)
+            "cart-36 ExcludeId" in {
+              val expected = ldjson("""
+                { "a0": 1 }
+                { "a0": 1 }
+                { "a0": 2, "b0": "three" }
+                { "a0": 2, "b0": "four" }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                { "a0": 5 }
+                """)
 
-            val targets = Map(
-              (CPathField("a0"), (CPathField("a"), Nil)),
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
 
-              (CPathField("b0"), (CPathField("b"), List(
-                Project(CPath.parse(".x")),
-                Pivot(IdStatus.ExcludeId, ColumnType.Array),
-                Project(CPath.parse(".q")),
-                Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
+                (CPathField("b0"), (CPathField("b"), List(
+                  Project(CPath.parse(".x")),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array),
+                  Project(CPath.parse(".q")),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
 
-            input must cartesianInto(targets)(expected)
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-37 IdOnly" in {
+              val expected = ldjson("""
+                { "a0": 1 }
+                { "a0": 1 }
+                { "a0": 2, "b0": 0 }
+                { "a0": 2, "b0": 1 }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                { "a0": 5 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Project(CPath.parse(".x")),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array),
+                  Project(CPath.parse(".q")),
+                  Pivot(IdStatus.IdOnly, ColumnType.Array)))))
+
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-38 IncludeId" in {
+              val expected = ldjson("""
+                { "a0": 1 }
+                { "a0": 1 }
+                { "a0": 2, "b0": [0, "three"] }
+                { "a0": 2, "b0": [1, "four"] }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                { "a0": 5 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Project(CPath.parse(".x")),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Array),
+                  Project(CPath.parse(".q")),
+                  Pivot(IdStatus.IncludeId, ColumnType.Array)))))
+
+              input must cartesianInto(targets)(expected)
+            }
           }
 
-          "cart-21 Object Object" in {
+          "Object Object" >> {
             import ScalarStage.{Pivot, Project}
 
             val input = ldjson("""
@@ -2945,34 +3189,86 @@ object ScalarStageSpec {
               { "a": 5, "c": "nine" }
               """)
 
-            val expected = ldjson("""
-              { "a0": 1 }
-              { "a0": 1 }
-              { "a0": 2, "b0": "three" }
-              { "a0": 2, "b0": "four" }
-              { "a0": 2 }
-              { "a0": 2 }
-              { "a0": 3 }
-              { "a0": 4 }
-              { "a0": 5 }
-              """)
+            "cart-39 ExcludeId" in {
+              val expected = ldjson("""
+                { "a0": 1 }
+                { "a0": 1 }
+                { "a0": 2, "b0": "three" }
+                { "a0": 2, "b0": "four" }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                { "a0": 5 }
+                """)
 
-            val targets = Map(
-              (CPathField("a0"), (CPathField("a"), Nil)),
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
 
-              (CPathField("b0"), (CPathField("b"), List(
-                Project(CPath.parse(".x")),
-                Pivot(IdStatus.ExcludeId, ColumnType.Object),
-                Project(CPath.parse(".q")),
-                Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
+                (CPathField("b0"), (CPathField("b"), List(
+                  Project(CPath.parse(".x")),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object),
+                  Project(CPath.parse(".q")),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
 
-            input must cartesianInto(targets)(expected)
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-40 IdOnly" in {
+              val expected = ldjson("""
+                { "a0": 1 }
+                { "a0": 1 }
+                { "a0": 2, "b0": "f" }
+                { "a0": 2, "b0": "g" }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                { "a0": 5 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Project(CPath.parse(".x")),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object),
+                  Project(CPath.parse(".q")),
+                  Pivot(IdStatus.IdOnly, ColumnType.Object)))))
+
+              input must cartesianInto(targets)(expected)
+            }
+
+            "cart-41 IncludeId" in {
+              val expected = ldjson("""
+                { "a0": 1 }
+                { "a0": 1 }
+                { "a0": 2, "b0": ["f", "three"] }
+                { "a0": 2, "b0": ["g", "four"] }
+                { "a0": 2 }
+                { "a0": 2 }
+                { "a0": 3 }
+                { "a0": 4 }
+                { "a0": 5 }
+                """)
+
+              val targets = Map(
+                (CPathField("a0"), (CPathField("a"), Nil)),
+
+                (CPathField("b0"), (CPathField("b"), List(
+                  Project(CPath.parse(".x")),
+                  Pivot(IdStatus.ExcludeId, ColumnType.Object),
+                  Project(CPath.parse(".q")),
+                  Pivot(IdStatus.IncludeId, ColumnType.Object)))))
+
+              input must cartesianInto(targets)(expected)
+            }
           }
         }
 
-	"Pivot . Wrap" >> {
+        "Pivot . Wrap" >> {
 
-          "cart-22 Array " in {
+          "cart-42 Array " in {
             import ScalarStage.{Pivot, Wrap}
 
             val input = ldjson("""
@@ -3002,7 +3298,7 @@ object ScalarStageSpec {
             input must cartesianInto(targets)(expected)
           }
 
-          "cart-23 Object " in {
+          "cart-43 Object " in {
             import ScalarStage.{Pivot, Wrap}
 
             val input = ldjson("""
@@ -3031,7 +3327,7 @@ object ScalarStageSpec {
 
             input must cartesianInto(targets)(expected)
           }
-	}
+            }
       }
     }
 
