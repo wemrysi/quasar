@@ -16,57 +16,79 @@
 
 package quasar.qscript.provenance
 
-import slamdata.Predef.StringContext
+import slamdata.Predef.{Boolean, List}
 
-import monocle.macros.Lenses
-import scalaz.{Equal, IList, Monoid, NonEmptyList, PlusEmpty, Show}
-import scalaz.std.tuple._
-import scalaz.syntax.show._
+import cats.{Eq, Order, Show}
+import cats.data.NonEmptySet
+import cats.kernel.{BoundedSemilattice, CommutativeMonoid}
+import cats.instances.list._
+import cats.syntax.eq._
+import cats.syntax.functor._
+import cats.syntax.show._
 
-@Lenses
-final case class JoinKey[I](left: I, right: I)
+import scalaz.@@
+import scalaz.Tags.{Conjunction, Disjunction}
+import scalaz.syntax.tag._
 
-object JoinKey extends JoinKeyInstances
+/** A sum of products of join keys. */
+final class JoinKeys[S, V] private (protected val uop: Uop[NonEmptySet[JoinKey[S, V]]]) {
+  def ∧ (that: JoinKeys[S, V])(implicit sord: Order[S], vord: Order[V]): JoinKeys[S, V] =
+    and(that)
 
-sealed abstract class JoinKeyInstances {
-  implicit def equal[I: Equal]: Equal[JoinKey[I]] =
-    Equal.equalBy(k => (k.left, k.right))
+  def ∨ (that: JoinKeys[S, V])(implicit sord: Order[S], vord: Order[V]): JoinKeys[S, V] =
+    or(that)
 
-  implicit def show[I: Show]: Show[JoinKey[I]] =
-    Show.shows(k => s"JoinKey(${k.left.shows}, ${k.right.shows})")
+  def and(that: JoinKeys[S, V])(implicit sord: Order[S], vord: Order[V]): JoinKeys[S, V] =
+    new JoinKeys(uop ∧ that.uop)
+
+  def isEmpty: Boolean =
+    uop.isEmpty
+
+  def mapKeys[T: Order, W: Order](f: JoinKey[S, V] => JoinKey[T, W]): JoinKeys[T, W] =
+    new JoinKeys(uop.map(_.map(f)))
+
+  def or(that: JoinKeys[S, V])(implicit sord: Order[S], vord: Order[V]): JoinKeys[S, V] =
+    new JoinKeys(uop ∨ that.uop)
+
+  def toList: List[NonEmptySet[JoinKey[S, V]]] =
+    uop.toList
+
+  def === (that: JoinKeys[S, V])(implicit S: Order[S], V: Order[V]): Boolean =
+    uop === that.uop
 }
 
-
-/** A disjunction of a conjunction of the intersection between two sets of
-  * identities (itself represented as a disjunction of `JoinKey`s).
-  */
-@Lenses
-final case class JoinKeys[I](keys: IList[NonEmptyList[NonEmptyList[JoinKey[I]]]])
-
 object JoinKeys extends JoinKeysInstances {
-  def empty[I]: JoinKeys[I] =
-    JoinKeys(IList())
+  def conj[S: Order, V: Order](k: JoinKey[S, V], ks: JoinKey[S, V]*): JoinKeys[S, V] =
+    new JoinKeys(Uop.one(NonEmptySet.of(k, ks: _*)))
 
-  def singleton[I](l: I, r: I): JoinKeys[I] =
-    JoinKeys(IList(NonEmptyList(NonEmptyList(JoinKey(l, r)))))
+  def empty[S, V]: JoinKeys[S, V] =
+    new JoinKeys(Uop.empty)
+
+  def one[S: Order, V: Order](k: JoinKey[S, V]): JoinKeys[S, V] =
+    conj(k)
 }
 
 sealed abstract class JoinKeysInstances {
-  implicit def plusEmpty: PlusEmpty[JoinKeys] =
-    new PlusEmpty[JoinKeys] {
-      def empty[A]: JoinKeys[A] =
-        JoinKeys.empty[A]
 
-      def plus[A](x: JoinKeys[A], y: => JoinKeys[A]): JoinKeys[A] =
-        JoinKeys(x.keys ++ y.keys)
+  implicit def conjCommutativeMonoid[S: Order, V: Order]: CommutativeMonoid[JoinKeys[S, V] @@ Conjunction] =
+    new CommutativeMonoid[JoinKeys[S, V] @@ Conjunction] {
+      val empty = Conjunction(JoinKeys.empty[S, V])
+
+      def combine(x: JoinKeys[S, V] @@ Conjunction, y: JoinKeys[S, V] @@ Conjunction) =
+        Conjunction(x.unwrap ∧ y.unwrap)
     }
 
-  implicit def monoid[I]: Monoid[JoinKeys[I]] =
-    plusEmpty.monoid[I]
+  implicit def disjBoundedSemilattice[S: Order, V: Order]: BoundedSemilattice[JoinKeys[S, V] @@ Disjunction] =
+    new BoundedSemilattice[JoinKeys[S, V] @@ Disjunction] {
+      val empty = Disjunction(JoinKeys.empty[S, V])
 
-  implicit def equal[I: Equal]: Equal[JoinKeys[I]] =
-    Equal.equalBy(jks => AsSet(jks.keys.map(conjs => AsSet(conjs.map(AsSet(_))))))
+      def combine(x: JoinKeys[S, V] @@ Disjunction, y: JoinKeys[S, V] @@ Disjunction) =
+        Disjunction(x.unwrap ∨ y.unwrap)
+    }
 
-  implicit def show[I: Show]: Show[JoinKeys[I]] =
-    Show.shows(jks => "JoinKeys" + jks.keys.shows)
+  implicit def equal[S: Order, V: Order]: Eq[JoinKeys[S, V]] =
+    Eq.instance(_ === _)
+
+  implicit def show[S: Show, V: Show]: Show[JoinKeys[S, V]] =
+    Show.show(jks => "JoinKeys" + jks.toList.show)
 }
