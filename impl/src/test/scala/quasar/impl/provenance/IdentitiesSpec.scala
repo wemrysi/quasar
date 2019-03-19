@@ -14,23 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.qscript.provenance
+package quasar.impl.provenance
 
-import slamdata.Predef.{Int, List, Set, Some, StringContext}
+import slamdata.Predef.{Int, None, Set, Some, StringContext}
 
 import quasar.Qspec
+import quasar.qscript.provenance.CatsNonEmptyListGenerator
 
 import scala.Predef.$conforms
 
 import cats.data.NonEmptyList
 import cats.instances.int._
-import cats.instances.list._
 import cats.instances.option._
-import cats.kernel.laws.discipline.{BoundedSemilatticeTests, EqTests}
+import cats.kernel.laws.discipline.{SemilatticeTests, EqTests}
 import cats.syntax.eq._
 import cats.syntax.foldable._
 import cats.syntax.list._
-import cats.syntax.show._
 
 import org.specs2.matcher._
 import org.specs2.mutable.SpecificationLike
@@ -48,7 +47,7 @@ object IdentitiesSpec extends Qspec
 
   implicit val params = Parameters(maxSize = 10)
 
-  type Vecs = List[NonEmptyList[NonEmptyList[Int]]]
+  type Vecs = NonEmptyList[NonEmptyList[NonEmptyList[Int]]]
 
   def beEquivalentToDistinct(vecs: Vecs): Matcher[Identities[Int]] =
     new Matcher[Identities[Int]] {
@@ -63,62 +62,51 @@ object IdentitiesSpec extends Qspec
       }
     }
 
-  def vecs(vs: NonEmptyList[Int]*): Vecs =
-    vs.toList.map(_.map(NonEmptyList.one(_)))
+  def vecs(v: NonEmptyList[Int], vs: NonEmptyList[Int]*): Vecs =
+    NonEmptyList.of(v, vs: _*).map(_.map(NonEmptyList.one(_)))
 
   "roundtrips distinct vectors" >> prop { vecs: Vecs =>
-    Identities.contracted(vecs) must beEquivalentToDistinct(vecs)
+    Identities.collapsed(vecs) must beEquivalentToDistinct(vecs)
   }
 
-  "breadth" >> {
-    "empty is zero" >> {
-      Identities.empty[Int].breadth must_=== 0
-    }
-
-    "number of distinct vectors" >> prop { vecs: Vecs =>
-      Identities.contracted(vecs).breadth must_=== vecs.distinct.length
-    }
+  "breadth is number of distinct vectors" >> prop { vecs: Vecs =>
+    Identities.collapsed(vecs).breadth must_=== vecs.distinct.length
   }
 
-  "depth" >> {
-    "empty is zero" >> {
-      Identities.empty[Int].depth must_=== 0
-    }
-
-    "length of longest vector" >> prop { vecs: Vecs =>
-      val depth = vecs.map(_.length).maximumOption getOrElse 0
-      Identities.contracted(vecs).depth must_=== depth
-    }
+  "depth is length of longest vector" >> prop { vecs: Vecs =>
+    val depth = vecs.map(_.length).maximumOption getOrElse 0
+    Identities.collapsed(vecs).depth must_=== depth
   }
 
   "init" >> {
-    "undefined on empty ids" >> {
-      Identities.empty[Int].init must beNone
-    }
-
-    "empty on singleton vector" >> {
-      Identities(42).init eqv Some(Identities.empty[Int])
+    "undefined on singleton vector" >> {
+      Identities(42).init must beNone
     }
 
     "elides singleton vectors from set" >> prop { (x: Int, y: Int, ys: NonEmptyList[Int]) =>
       val a = Identities(x)
-      val b = Identities(ys.toList: _*)
+      val b = Identities.fromReducible(ys)
 
       a.merge(b :+ y).init eqv Some(b)
     }
 
     "removes the last conjoined regions" >> prop { ids: Identities[Int] =>
-      val exp = ids.expanded.flatMap(_.init.toNel.toList)
-      val init = ids.init getOrElse Identities.empty
+      val exp = ids.expanded.toList.flatMap(_.init.toNel.toList).toNel
 
-      init must beEquivalentToDistinct(exp)
+      exp match {
+        case Some(xs) =>
+          ids.init must beSome(beEquivalentToDistinct(xs))
+
+        case None =>
+          ids.init must beNone
+      }
     }
   }
 
   "merge" >> {
     "elides duplicates" >> prop { ints: NonEmptyList[Int] =>
-      val ids = Identities(ints.toList: _*)
-      (ids merge ids).expanded === List(ints.map(NonEmptyList.one(_)))
+      val ids = Identities.fromReducible(ints)
+      (ids merge ids).expanded === NonEmptyList.one(ints.map(NonEmptyList.one(_)))
     }
 
     "preserves differences" >> prop { (ints: NonEmptyList[Int], x: Int, y: Int) => (x =!= y) ==> {
@@ -126,7 +114,7 @@ object IdentitiesSpec extends Qspec
         ints ::: x :: ints,
         ints ::: y :: ints)
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== (2 * ints.length + 2)
@@ -134,7 +122,7 @@ object IdentitiesSpec extends Qspec
 
     "preserves subsumes efficiently" >> prop { (ints: NonEmptyList[Int], x: Int) =>
       val vs = vecs(ints :+ x, ints)
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== (ints.length + 1)
@@ -142,14 +130,14 @@ object IdentitiesSpec extends Qspec
 
     "preserves subsumed efficiently" >> prop { (ints: NonEmptyList[Int], x: Int) =>
       val vs = vecs(ints, ints :+ x)
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== (ints.length + 1)
     }
 
     "treats conj and snoc distinctly" >> prop { (ints: NonEmptyList[Int], x: Int) =>
-      val ids = Identities(ints.toList: _*)
+      val ids = Identities.fromReducible(ints)
       val a = ids :+ x
       val b = ids :≻ x
 
@@ -159,7 +147,7 @@ object IdentitiesSpec extends Qspec
       }
 
       val exp =
-        List(
+        NonEmptyList.of(
           (ints :+ x).map(NonEmptyList.one(_)),
           conj)
 
@@ -167,10 +155,10 @@ object IdentitiesSpec extends Qspec
     }
 
     "is space efficient" >> prop { (init: NonEmptyList[Int], endh: Int, endt: Set[Int]) =>
-      val ends = (endt + endh).toList
+      val ends = NonEmptyList.fromListUnsafe((endt + endh).toList)
       val vecs = ends.map(i => (init :+ i :+ init.head).map(NonEmptyList.one(_)))
 
-      Identities.contracted(vecs).storageSize must_=== (init.length + ends.length + 1)
+      Identities.collapsed(vecs).storageSize must_=== (init.length + ends.length + 1)
     }
 
     "shares common prefix subgraphs" >> {
@@ -181,7 +169,7 @@ object IdentitiesSpec extends Qspec
         NonEmptyList.of(1, 2, 8, 9, 10),
         NonEmptyList.of(3, 4, 8, 9, 10))
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== 10
@@ -192,7 +180,7 @@ object IdentitiesSpec extends Qspec
         NonEmptyList.of(1, 2, 3, 4, 5),
         NonEmptyList.of(8, 9, 3, 4, 5))
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== 7
@@ -203,7 +191,7 @@ object IdentitiesSpec extends Qspec
         NonEmptyList.of(1, 2, 3, 4, 5),
         NonEmptyList.of(1, 2, 6, 4, 5))
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== 6
@@ -216,7 +204,7 @@ object IdentitiesSpec extends Qspec
         NonEmptyList.of(1, 2, 3, 4, 5),
         NonEmptyList.of(5, 4, 3, 2, 1))
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== 10
@@ -234,7 +222,7 @@ object IdentitiesSpec extends Qspec
         NonEmptyList.of(11, 12, 3, 13, 5),
         NonEmptyList.of(15, 17, 9, 4, 5))
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== 14
@@ -248,7 +236,7 @@ object IdentitiesSpec extends Qspec
 
         NonEmptyList.of(9, 10, 3, 4, 8))
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== 12
@@ -262,7 +250,7 @@ object IdentitiesSpec extends Qspec
         NonEmptyList.of(1, 2, 6, 9, 10),
         NonEmptyList.of(3, 4, 6, 9, 10))
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== 9
@@ -273,7 +261,7 @@ object IdentitiesSpec extends Qspec
         NonEmptyList.of(1, 2, 3, 4),
         NonEmptyList.of(6, 7, 3))
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== 7
@@ -284,7 +272,7 @@ object IdentitiesSpec extends Qspec
         NonEmptyList.of(1, 2, 3, 4, 5, 6),
         NonEmptyList.of(6, 7, 3, 4, 5))
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== 11
@@ -296,7 +284,7 @@ object IdentitiesSpec extends Qspec
         NonEmptyList.of(7, 2, 6, 8, 10),
         NonEmptyList.of(7, 2, 11, 13, 15))
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids must beEquivalentToDistinct(vs)
       ids.storageSize must_=== 13
@@ -304,20 +292,16 @@ object IdentitiesSpec extends Qspec
   }
 
   "submerge" >> {
-    "identity when empty" >> {
-      Identities.empty[Int].submerge(5) must beEmpty
-    }
-
     "properly replaces shared root node" >> {
-      val vs = List(
+      val vs = NonEmptyList.of(
         NonEmptyList.one(NonEmptyList.of(0, 1)),
         NonEmptyList.of(NonEmptyList.of(0, 1, 2), NonEmptyList.of(3, 4)))
 
-      val exp = List(
+      val exp = NonEmptyList.of(
         NonEmptyList.of(NonEmptyList.one(9), NonEmptyList.of(0, 1)),
         NonEmptyList.of(NonEmptyList.of(0, 1, 2), NonEmptyList.one(9), NonEmptyList.of(3, 4)))
 
-      val ids = Identities.contracted(vs)
+      val ids = Identities.collapsed(vs)
 
       ids.submerge(9) must beEquivalentToDistinct(exp)
     }
@@ -327,10 +311,26 @@ object IdentitiesSpec extends Qspec
         case NonEmptyList(l, i) => NonEmptyList(l, NonEmptyList.one(x) :: i).reverse
       })
 
-      Identities.contracted(vs).submerge(x) must beEquivalentToDistinct(exp)
+      Identities.collapsed(vs).submerge(x) must beEquivalentToDistinct(exp)
     }
   }
 
-  checkAll("Identities[Int]", EqTests[Identities[Int]].eqv)
-  checkAll("Identities[Int]", BoundedSemilatticeTests[Identities[Int]].boundedSemilattice)
+  "equality" >> {
+    "singleton components differentiate when all multi are equal" >> {
+      val as = vecs(
+        NonEmptyList.of(1),
+        NonEmptyList.of(2),
+        NonEmptyList.of(3, 4, 5))
+
+      val bs = vecs(
+        NonEmptyList.of(1),
+        NonEmptyList.of(7),
+        NonEmptyList.of(3, 4, 5))
+
+      Identities.collapsed(as) =!= Identities.collapsed(bs)
+    }
+  }
+
+  checkAll("Eq[Identities[Int]]", EqTests[Identities[Int]].eqv)
+  checkAll("Semilattice[Identities[Int]]", SemilatticeTests[Identities[Int]].semilattice)
 }

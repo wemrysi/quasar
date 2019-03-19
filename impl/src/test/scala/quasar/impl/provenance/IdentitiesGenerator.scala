@@ -14,17 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.qscript.provenance
-
-import slamdata.Predef.List
+package quasar.impl.provenance
 
 import quasar.pkg.tests._
-
-import scala.Predef.$conforms
+import quasar.qscript.provenance.CatsNonEmptyListGenerator
 
 import cats.Order
 import cats.data.NonEmptyList
-import cats.instances.list._
 
 import org.scalacheck.Cogen
 
@@ -32,10 +28,10 @@ trait IdentitiesGenerator {
   import CatsNonEmptyListGenerator._
 
   implicit def arbitraryIdentities[A: Arbitrary: Order]: Arbitrary[Identities[A]] =
-    Arbitrary(arbitrary[List[NonEmptyList[NonEmptyList[A]]]].map(Identities.contracted(_)))
+    Arbitrary(arbitrary[NonEmptyList[NonEmptyList[NonEmptyList[A]]]].map(Identities.collapsed(_)))
 
   implicit def cogenIdentities[A: Cogen]: Cogen[Identities[A]] =
-    Cogen[List[NonEmptyList[NonEmptyList[A]]]].contramap(_.expanded)
+    Cogen[NonEmptyList[NonEmptyList[NonEmptyList[A]]]].contramap(_.expanded)
 }
 
 object IdentitiesGenerator extends IdentitiesGenerator

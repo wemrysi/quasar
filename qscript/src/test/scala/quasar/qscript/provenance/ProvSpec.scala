@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+/*
 package quasar.qscript.provenance
 
 import slamdata.Predef.{Boolean, Char, Int, Option}
@@ -303,3 +304,4 @@ object ProvSpec {
   type I = Either[Char, Int]
   val P = Prov[Char, I, Boolean, Fix[ProvF[Char, I, Boolean, ?]]](stdLeft)
 }
+*/

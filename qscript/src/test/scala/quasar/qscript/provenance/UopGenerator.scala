@@ -16,23 +16,23 @@
 
 package quasar.qscript.provenance
 
+import slamdata.Predef.List
+
 import quasar.pkg.tests._
 
-import scalaz.{Equal, IList, NonEmptyList}
+import cats.Eq
 
-trait DimensionsGenerator {
-  implicit def arbitraryDimensions[A: Arbitrary: Equal]: Arbitrary[Dimensions[A]] =
+import org.scalacheck.Cogen
+
+trait UopGenerator {
+  implicit def arbitraryUop[A: Arbitrary: Eq]: Arbitrary[Uop[A]] =
     Arbitrary(for {
-      unionSize <- Gen.choose(0, 5)
-      union <- Gen.listOfN(unionSize, genJoin[A])
-    } yield Dimensions.normalize(Dimensions(IList.fromList(union))))
+      sz <- Gen.frequency((32, 1), (16, 2), (8, 3), (4, 4), (2, 5), (1, 0))
+      as <- Gen.listOfN(sz, arbitrary[A])
+    } yield Uop.of(as: _*))
 
-  private def genJoin[A: Arbitrary]: Gen[NonEmptyList[A]] =
-    for {
-      size <- Gen.choose(0, 4)
-      h <- arbitrary[A]
-      t <- Gen.listOfN(size, arbitrary[A])
-    } yield NonEmptyList.nel(h, IList.fromList(t))
+  implicit def cogenUop[A: Cogen]: Cogen[Uop[A]] =
+    Cogen[List[A]].contramap(_.toList)
 }
 
-object DimensionsGenerator extends DimensionsGenerator
+object UopGenerator extends UopGenerator

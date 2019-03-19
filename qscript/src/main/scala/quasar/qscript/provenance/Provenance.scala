@@ -18,44 +18,55 @@ package quasar.qscript.provenance
 
 import monocle.Traversal
 
-trait Provenance[S, V, T] {
+import cats.kernel.{BoundedSemilattice, CommutativeMonoid}
+
+import scalaz.@@
+import scalaz.Tags.{Disjunction, Conjunction}
+import scalaz.syntax.tag._
+
+trait Provenance[S, V, T] { self =>
   type P
 
-  def autojoinKeys(l: P, r: P): JoinKeys[V]
+  /** The set of identity comparisons describing an autojoin of `l` and `r`. */
+  def autojoin(l: P, r: P): JoinKeys[S, V]
 
-  /** The conjunction of two provenance. */
+  /** The conjunction of two provenance, representing a dataset where values
+    * have identities from both inputs.
+    */
   def and(l: P, r: P): P
 
   /** Provenance having a dimensionality of zero. */
   def empty: P
 
-  /** Append an identity, increasing dimensionality by 1. */
-  def inflate(vectorId: V, sort: T, p: P): P
-
   /** Append an identity, maintaining current dimensionality. */
   def inflateConjoin(vectorId: V, sort: T, p: P): P
+
+  /** Append an identity, increasing dimensionality by 1. */
+  def inflateExtend(vectorId: V, sort: T, p: P): P
 
   /** "Submerge" an identity, making it the second-highest dimension,
     * increasing dimensionality by 1.
     */
   def inflateSubmerge(vectorId: V, sort: T, p: P): P
 
-  /** Inject into a structure at an unknown field. */
+  /** Inject into a structure at an unknown field, maintains dimensionality. */
   def injectDynamic(p: P): P
 
-  /** Inject into a structure at the given field. */
+  /** Inject into a structure at the given field, maintains dimensionality. */
   def injectStatic(scalarId: S, sort: T, p: P): P
 
-  /** The disjunction of two provenance. */
+  /** The disjunction of two provenance, representing a dataset where values
+    * have identities from either of the inputs.
+    */
   def or(l: P, r: P): P
 
-  /** Project an unknown field. */
+  /** Project an unknown field, maintains dimensionality. */
   def projectDynamic(p: P): P
 
-  /** Project a statically known field. */
+  /** Project a statically known field, maintains dimensionality. */
   def projectStatic(scalarId: S, sort: T, p: P): P
 
-  /** Discard the highest dimension. */
+  /** Discard the highest dimension, reducing dimensionality by 1. */
   def reduce(p: P): P
 
   // Optics
@@ -63,6 +74,61 @@ trait Provenance[S, V, T] {
   def scalarIds: Traversal[P, (S, T)]
 
   def vectorIds: Traversal[P, (V, T)]
+
+  object instances {
+    implicit val pConjunctionCommutativeMonoid: CommutativeMonoid[P @@ Conjunction] =
+      new CommutativeMonoid[P @@ Conjunction] {
+        val empty = Conjunction(self.empty)
+
+        def combine(x: P @@ Conjunction, y: P @@ Conjunction) =
+          Conjunction(and(x.unwrap, y.unwrap))
+      }
+
+    implicit val pDisjunctionSemilattice: BoundedSemilattice[P @@ Disjunction] =
+      new BoundedSemilattice[P @@ Disjunction] {
+        val empty = Disjunction(self.empty)
+
+        def combine(x: P @@ Disjunction, y: P @@ Disjunction) =
+          Disjunction(or(x.unwrap, y.unwrap))
+      }
+  }
+
+  object syntax {
+    implicit final class ProvenanceOps(p: P) {
+      def ⋈ (that: P): JoinKeys[S, V] =
+        self.autojoin(p, that)
+
+      def ∧ (that: P): P =
+        self.and(p, that)
+
+      def ∨ (that: P): P =
+        self.or(p, that)
+
+      def inflateConjoin(vectorId: V, sort: T): P =
+        self.inflateConjoin(vectorId, sort, p)
+
+      def inflateExtend(vectorId: V, sort: T): P =
+        self.inflateExtend(vectorId, sort, p)
+
+      def inflateSubmerge(vectorId: V, sort: T): P =
+        self.inflateSubmerge(vectorId, sort, p)
+
+      def injectDynamic: P =
+        self.injectDynamic(p)
+
+      def injectStatic(scalarId: S, sort: T): P =
+        self.injectStatic(scalarId, sort, p)
+
+      def projectDynamic: P =
+        self.projectDynamic(p)
+
+      def projectStatic(scalarId: S, sort: T): P =
+        self.projectStatic(scalarId, sort, p)
+
+      def reduce: P =
+        self.reduce(p)
+    }
+  }
 }
 
 object Provenance {
