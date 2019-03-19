@@ -217,9 +217,7 @@ final class Identities[A] private (
     roots.isEmpty
 
   /** Merge with another set of identities. */
-  def merge(that: Identities[A])(implicit A: Order[A])
-      : Identities[A] = {
-
+  def merge(that: Identities[A])(implicit A: Order[A]): Identities[A] = {
     type F[X] = StateT[Eval, MergeState[A], X]
 
     val S = MonadState_[F, MergeState[A]]
