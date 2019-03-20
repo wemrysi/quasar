@@ -3353,10 +3353,10 @@ object ScalarStageSpec {
     override def is: SpecStructure =
       pendingFragments(super.is, fullPendingExamples, "full")
 
-    def evalFull(stages: List[ScalarStage], stream: JsonStream): JsonStream
+    def evalFull(stages: ScalarStages, stream: JsonStream): JsonStream
 
     def interpretFullInto(
-        stages: List[ScalarStage])(
+        stages: ScalarStages)(
         expected: JsonStream)
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>

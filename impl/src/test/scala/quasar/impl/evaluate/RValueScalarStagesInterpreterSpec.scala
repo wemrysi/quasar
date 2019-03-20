@@ -18,7 +18,7 @@ package quasar.impl.evaluate
 
 import slamdata.Predef.{Stream => _, _}
 
-import quasar.{IdStatus, ScalarStage, ScalarStageSpec}
+import quasar.{IdStatus, ScalarStage, ScalarStages, ScalarStageSpec}
 import quasar.common.data.RValue
 
 import scala.concurrent.ExecutionContext
@@ -92,12 +92,12 @@ object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
       .unsafeRunSync()
   }
 
-  def evalFull(stages: List[ScalarStage], stream: JsonStream): JsonStream = {
+  def evalFull(stages: ScalarStages, stream: JsonStream): JsonStream = {
     val parallelism = java.lang.Runtime.getRuntime().availableProcessors()
     val minUnit = 1024
 
     Stream.emits(stream)
-      .through(Interpreter.interpret[IO](parallelism, minUnit, stages))
+      .through(Interpreter[IO](parallelism, minUnit, stages))
       .compile.toList
       .unsafeRunSync()
   }

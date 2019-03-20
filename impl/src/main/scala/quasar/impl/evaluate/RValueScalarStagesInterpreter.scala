@@ -234,7 +234,7 @@ object RValueScalarStagesInterpreter {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def interpret[F[_]: Concurrent](
+  private def interpret[F[_]: Concurrent](
       parallelism: Int,
       minUnit: Int,
       stages: List[ScalarStage])
