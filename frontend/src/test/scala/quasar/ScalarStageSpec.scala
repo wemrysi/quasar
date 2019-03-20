@@ -3348,7 +3348,44 @@ object ScalarStageSpec {
 
   trait FullSpec extends JsonSpec {
 
+    import ScalarStage.{Cartesian, Pivot, Project}
+
     val fullPendingExamples: Set[Int]
+
+    "scalar stages" should {
+
+      "full-1 evaluate basic nested cartesians" in {
+
+        val targets = List(
+          Project(CPath.parse("a")),
+          Pivot(IdStatus.ExcludeId, ColumnType.Object),
+          Cartesian(Map(
+            (CPathField("b0"), (CPathField("b"), List(Pivot(IdStatus.ExcludeId, ColumnType.Object)))),
+            (CPathField("c0"), (CPathField("c"), Nil)))),
+          Cartesian(Map(
+            (CPathField("b1"), (CPathField("b0"), List(Pivot(IdStatus.ExcludeId, ColumnType.Array)))),
+            (CPathField("c1"), (CPathField("c0"), Nil)))))
+
+        val stages = ScalarStages(IdStatus.ExcludeId, targets)
+
+        val input = ldjson("""
+          {"a": {"x": {"b": {"k": [1, 2, 3], "j": 4}, "c": 5}, "y": {"b": {"k": [6, 7, 8], "j": 9}, "c": 10}}}
+          """)
+
+        val expected = ldjson("""
+          {"b1": 1, "c1": 5}
+          {"b1": 2, "c1": 5}
+          {"b1": 3, "c1": 5}
+          {"c1": 5}
+          {"b1": 6, "c1": 10}
+          {"b1": 7, "c1": 10}
+          {"b1": 8, "c1": 10}
+          {"c1": 10}
+          """)
+
+        input must interpretFullInto(stages)(expected)
+      }
+    }
 
     override def is: SpecStructure =
       pendingFragments(super.is, fullPendingExamples, "full")
