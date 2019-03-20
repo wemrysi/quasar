@@ -18,7 +18,7 @@ package quasar.impl.evaluate
 
 import slamdata.Predef.{Stream => _, _}
 
-import quasar.{IdStatus, ScalarStage, ScalarStageSpec}
+import quasar.{IdStatus, ScalarStage, ScalarStages, ScalarStageSpec}
 import quasar.common.data.RValue
 
 import scala.concurrent.ExecutionContext
@@ -50,6 +50,7 @@ object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
   val pivotPendingExamples: Set[Int] = Set()
   val focusedPendingExamples: Set[Int] = Set()
   val cartesianPendingExamples: Set[Int] = Set()
+  val fullPendingExamples: Set[Int] = Set()
 
   override def bestSemanticEqual(js: JsonStream): Matcher[JsonStream] = {
     containTheSameElementsAs(js) ^^ { str: JsonStream =>
@@ -87,6 +88,16 @@ object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
 
     Stream.emits(stream)
       .through(Interpreter.interpretCartesian[IO](parallelism, minUnit, cartesian))
+      .compile.toList
+      .unsafeRunSync()
+  }
+
+  def evalFull(stages: ScalarStages, stream: JsonStream): JsonStream = {
+    val parallelism = java.lang.Runtime.getRuntime().availableProcessors()
+    val minUnit = 1024
+
+    Stream.emits(stream)
+      .through(Interpreter[IO](parallelism, minUnit, stages))
       .compile.toList
       .unsafeRunSync()
   }
