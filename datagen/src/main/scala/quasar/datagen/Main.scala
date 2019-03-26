@@ -27,7 +27,7 @@ import quasar.sst._
 import java.io.File
 import scala.Console, Console.{RED, RESET}
 
-import cats.effect.{ContextShift, ExitCode, IO, IOApp, Sync}
+import cats.effect.{Concurrent, ContextShift, ExitCode, IO, IOApp, Sync}
 import cats.syntax.functor._
 import fs2.{RaiseThrowable, Stream}
 import fs2.text
@@ -68,12 +68,21 @@ object Main extends IOApp {
 
   // TODO: Should this be a CLI option?
   val MaxCollLength: Double = 10.0
+  val Parallelism = scala.math.min(java.lang.Runtime.getRuntime().availableProcessors() / 2, 4)
 
   /** A stream of JSON-encoded records generated from the input `SSTS`. */
-  def generatedJson[F[_]: Sync](ssts: SSTS): Stream[F, String] =
-    generate.ejson[F](MaxCollLength, ssts)
-      .getOrElse(failedStream("Unable to generate data from the provided SST."))
-      .through(codec.ejsonEncodePreciseData[F, EJ])
+  def generatedJson[F[_]: Concurrent](ssts: SSTS): Stream[F, String] = {
+    val msg = "Unable to generate data from the provided SST."
+
+    generate.ejson[F](MaxCollLength, ssts).fold(failedStream[F, String](msg)) { gen =>
+      val ejs = gen.through(codec.ejsonEncodePreciseData[F, EJ])
+
+      if (Parallelism > 1)
+        Stream.constant(ejs, 1).parJoin(Parallelism)
+      else
+        ejs
+    }
+  }
 
   /** A stream of `SSTS` decoded from the given file. */
   def sstsFromFile[F[_]: RaiseThrowable: Sync: ContextShift](
@@ -85,7 +94,7 @@ object Main extends IOApp {
     def decodingErr[A](t: RenderedTree, msg: String): Stream[F, A] =
       failedStream[F, A](s"Failed to decode SST: ${msg}\n\n${t.shows}")
 
-    file.readAll[F](src.toPath, blockingPool.unwrap, 4096)
+    file.readAll[F](src.toPath, blockingPool.unwrap, 32768)
       .through(text.utf8Decode)
       .through(text.lines)
       .take(1)
