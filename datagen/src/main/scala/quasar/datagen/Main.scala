@@ -105,7 +105,7 @@ object Main extends IOApp {
       printError(s"SST file not found: ${notFound.getFile}.")
 
     case other =>
-      printError(other.getMessage)
+      IO(other.printStackTrace(Console.err)).as(ExitCode.Error)
   }
 
   def printError(msg: String): IO[ExitCode] =
