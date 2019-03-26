@@ -18,7 +18,7 @@ package quasar.datagen
 
 import slamdata.Predef._
 import quasar.contrib.spire.random.dist._
-import quasar.ejson.{DecodeEJson, EJson, Type => EType}
+import quasar.ejson.{DecodeEJson, EJson, Fixed => EFixed, Type => EType, TypeTag}
 import quasar.fp.numeric.SampleStats
 import quasar.fp.ski.ι
 import quasar.contrib.iota.copkTraverse
@@ -35,7 +35,7 @@ import monocle.std.option.{some => someP}
 import scalaz.{-\/, \/-, ==>>, Bifunctor, Equal, IList, INil, NonEmptyList, Order, Tags}
 import scalaz.Scalaz._
 import scalaz.syntax.tag._
-import spire.algebra.{AdditiveMonoid, Field, IsReal, NRoot}
+import spire.algebra.{Field, IsReal, NRoot}
 import spire.math.ConvertableFrom
 import spire.random.{Dist, Gaussian}
 import spire.syntax.convertableFrom._
@@ -101,8 +101,10 @@ object dist {
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
       : Algebra[STF[J, (A, TypeStat[A]), ?], Option[(A, Dist[J])]] = {
+
     val TF = CopK.Inject[TypeF[J, ?], ST[J, ?]]
     val TA = CopK.Inject[Tagged, ST[J, ?]]
+    val J = EFixed[J]
 
     _.run.traverse {
       case TF(a) => \/-(a)
@@ -121,7 +123,7 @@ object dist {
         some((p, Dist.constant(EJson.arr[J]())))
 
       case ((p, s), TypeF.Arr(INil(), Some(x))) =>
-        val (minl, maxl) = collBounds(s, maxCollLen).umap(_.toInt)
+        val (minl, maxl) = collBounds(s, maxCollLen.toInt)
         x map { case (_, d) => (p, Dist.list(minl, maxl)(d) map (EJson.arr(_ : _*))) }
 
       case ((p, _), TypeF.Arr(xs, None)) =>
@@ -132,7 +134,9 @@ object dist {
 
         val unkDist = ux traverse { case (a, d) =>
           val cnt =
-            (collMax getOption s getOrElse maxCollLen).toInt - maxKnown
+            Order[Int].max(
+              1,
+              (collMax.getOption(s) getOrElse maxCollLen).toInt - maxKnown)
 
           Dist.weightedMix(
             a.toDouble -> Dist.list(1, cnt)(d),
@@ -157,7 +161,9 @@ object dist {
         val defkn = kn mapOption ι
 
         val unkct =
-          (collMax getOption s getOrElse maxCollLen).toInt - defkn.size
+          Order[Int].max(
+            1,
+            (collMax getOption s getOrElse maxCollLen).toInt - defkn.size)
 
         val unkDist =
           (k |@| v) { case ((a, kd), (_, vd)) =>
@@ -182,6 +188,15 @@ object dist {
             .fold((_, _) => j, EJson.str(_))
         }))
 
+      case Tagged(tt @ TypeTag.OffsetDateTime, dist) =>
+        dist.map(_.map(_.map {
+          case J.map(xs) =>
+            val z = xs.toZipper
+
+          case other =>
+            J.meta(other, EType(tt))
+        }))
+
       /** TODO: Inspect Tagged values for known types (esp. temporal) for
         *       more declarative generation.
         */
@@ -194,10 +209,10 @@ object dist {
   private def clamp[A: Order](min: A, max: A): A => A =
     _.min(max).max(min)
 
-  private def collBounds[A: AdditiveMonoid](ts: TypeStat[A], maxLen: A): (A, A) =
+  private def collBounds[A: ConvertableFrom](ts: TypeStat[A], maxLen: Int): (Int, Int) =
     (
-      collMin[A] getOption ts getOrElse AdditiveMonoid[A].zero,
-      collMax[A] getOption ts getOrElse maxLen
+      collMin[A].getOption(ts).fold(0)(x => Order[Int].min(x.toInt, maxLen)),
+      collMax[A].getOption(ts).fold(maxLen)(_.toInt)
     )
 
   private def collMin[A] = TypeStat.coll[A] composeLens _2 composePrism someP
