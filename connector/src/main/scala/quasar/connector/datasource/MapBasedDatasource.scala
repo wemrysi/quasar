@@ -88,4 +88,19 @@ object MapBasedDatasource {
         : Datasource[F, G, ResourcePath, R] =
       new MapBasedDatasource[F, G, R](kind, content)
   }
+
+  def pure[F[_], G[_]]: PartiallyAppliedPure[F, G] =
+    new PartiallyAppliedPure[F, G]
+
+  final class PartiallyAppliedPure[F[_], G[_]] {
+    def apply[R](
+        kind: DatasourceType, content: IMap[ResourcePath, R])(
+        implicit
+        F0: Applicative[F],
+        F1: MonadResourceErr[F],
+        G0: ApplicativePlus[G])
+    : Datasource[F, G, ResourcePath, R] =
+      new MapBasedDatasource[F, G, R](kind, content.map(_.point[F]))
+  }
+
 }

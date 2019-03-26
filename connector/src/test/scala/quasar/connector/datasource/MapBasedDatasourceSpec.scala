@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasource
+package quasar.connector.datasource
 
 import slamdata.Predef._
 
@@ -32,13 +32,13 @@ import scalaz.std.list._
 
 import shims._
 
-object PureDatasourceSpec extends DatasourceSpec[IO, List] {
+object MapBasedDatasourceSpec extends DatasourceSpec[IO, List] {
 
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
   val datasource =
-    PureDatasource[IO, List](
+    MapBasedDatasource.pure[IO, List](
       DatasourceType("pure-test", 1L),
       IMap(
         ResourcePath.root() / ResourceName("a") / ResourceName("b") -> 1,
