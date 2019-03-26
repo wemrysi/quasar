@@ -17,6 +17,7 @@
 package quasar.datagen
 
 import slamdata.Predef._
+import quasar.common.data.Data.DateTimeConstants
 import quasar.contrib.spire.random.dist._
 import quasar.ejson.{DecodeEJson, EJson, Fixed => EFixed, Type => EType, TypeTag}
 import quasar.fp.numeric.SampleStats
@@ -104,7 +105,6 @@ object dist {
 
     val TF = CopK.Inject[TypeF[J, ?], ST[J, ?]]
     val TA = CopK.Inject[Tagged, ST[J, ?]]
-    val J = EFixed[J]
 
     _.run.traverse {
       case TF(a) => \/-(a)
@@ -189,13 +189,16 @@ object dist {
         }))
 
       case Tagged(tt @ TypeTag.OffsetDateTime, dist) =>
-        dist.map(_.map(_.map {
-          case J.map(xs) =>
-            val z = xs.toZipper
+        dist.map(_.map(_.map(j => EJson.meta(fixupMonths(j), EType(tt)))))
 
-          case other =>
-            J.meta(other, EType(tt))
-        }))
+      case Tagged(tt @ TypeTag.OffsetDate, dist) =>
+        dist.map(_.map(_.map(j => EJson.meta(fixupMonths(j), EType(tt)))))
+
+      case Tagged(tt @ TypeTag.LocalDateTime, dist) =>
+        dist.map(_.map(_.map(j => EJson.meta(fixupMonths(j), EType(tt)))))
+
+      case Tagged(tt @ TypeTag.LocalDate, dist) =>
+        dist.map(_.map(_.map(j => EJson.meta(fixupMonths(j), EType(tt)))))
 
       /** TODO: Inspect Tagged values for known types (esp. temporal) for
         *       more declarative generation.
@@ -204,6 +207,7 @@ object dist {
         dist.map(_.map(_.map(EJson.meta(_, EType(t)))))
     }
   }
+
   ////
 
   private def clamp[A: Order](min: A, max: A): A => A =
@@ -217,6 +221,37 @@ object dist {
 
   private def collMin[A] = TypeStat.coll[A] composeLens _2 composePrism someP
   private def collMax[A] = TypeStat.coll[A] composeLens _3 composePrism someP
+
+  private def fixupMonths[J: Equal](
+      j: J)(
+      implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson])
+      : J = {
+
+    val J = EFixed[J]
+
+    val fixup = for {
+      xs <- J.map.getOption(j)
+
+      (_, v) <- xs.find(_._1 === J.str(DateTimeConstants.month))
+
+      i <- J.int.getOption(v)
+
+      ys = xs map {
+        case (k @ J.str(DateTimeConstants.day), J.int(d)) =>
+          val clampd = i.toInt match {
+            case 2 => d.min(28)
+            case 4 | 6 | 9 | 11 => d.min(30)
+            case _ => d
+          }
+
+          (k, J.int(clampd))
+
+        case other => other
+      }
+    } yield J.map(ys)
+
+    fixup getOrElse j
+  }
 
   private def knownElementsDist[J, A: ConvertableFrom: Equal](elts: IList[Option[(A, Dist[J])]]): Dist[List[J]] = {
     val probSpans = spansBy(elts.unite.toList)(_._1) map { dists =>
