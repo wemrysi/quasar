@@ -248,7 +248,9 @@ lazy val qscript = project
 
 lazy val qsu = project
   .settings(name := "quasar-qsu")
-  .dependsOn(qscript % BothScopes)
+  .dependsOn(
+    qscript % BothScopes,
+    impl % "compile->test")
   .settings(commonSettings)
   .settings(
     libraryDependencies += "org.slf4s" %% "slf4s-api" % slf4sVersion)

@@ -16,14 +16,19 @@
 
 package quasar.impl.provenance
 
-import slamdata.Predef.{None, Option, Some}
+import slamdata.Predef.{List, None, Option, Some}
 
 import quasar.qscript.provenance.{JoinKey, JoinKeys, Provenance, Uop}
 
-import cats.Order
+import cats.{Applicative, Order}
+import cats.data.NonEmptyList
 import cats.instances.list._
 import cats.syntax.eq._
 import cats.syntax.foldable._
+import cats.syntax.functor._
+import cats.syntax.list._
+import cats.syntax.reducible._
+import cats.syntax.traverse._
 
 import monocle.Traversal
 
@@ -41,6 +46,7 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
 
   type P = Uop[Identities[Dim[S, V, T]]]
 
+  // FIXME: We need to come up with a way to cross when independent components don't align.
   def autojoin(l: P, r: P): JoinKeys[S, V] = {
     import JoinKeys._
 
@@ -78,17 +84,23 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
   def inflateConjoin(vectorId: V, sort: T, p: P): P =
     p.map(_ :≻ D.inflate(vectorId, sort))
 
-  def inflateExtend(vectorId: V, sort: T, p: P): P =
-    createOrSnoc(D.inflate(vectorId, sort), p)
+  def inflateExtend(vectorId: V, sort: T, p: P): P = {
+    val n = D.inflate(vectorId, sort)
+
+    if (p.isEmpty)
+      Uop.one(Identities(n))
+    else
+      p.map(_ :+ n)
+  }
 
   def inflateSubmerge(vectorId: V, sort: T, p: P): P =
     p.map(_.submerge(D.inflate(vectorId, sort)))
 
   def injectDynamic(p: P): P =
-    p.map(_ :≻ D.fresh())
+    createOrConj(D.fresh(), p)
 
   def injectStatic(scalarId: S, sort: T, p: P): P =
-    p.map(_ :≻ D.inject(scalarId, sort))
+    createOrConj(D.inject(scalarId, sort), p)
 
   def or(l: P, r: P): P =
     l ∨ r
@@ -96,36 +108,81 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
   def projectDynamic(p: P): P =
     createOrConj(D.fresh(), p)
 
-  def projectStatic(scalarId: S, sort: T, p: P): P =
-    createOrConj(D.project(scalarId, sort), p)
+  def projectStatic(scalarId: S, sort: T, p: P): P = {
+    def applyVec(v: NonEmptyList[NonEmptyList[Dim[S, V, T]]]): Option[NonEmptyList[NonEmptyList[Dim[S, V, T]]]] = {
+      val r = v.reverse
+      val rh = r.head.reverse
+
+      val newh =
+        if (rh.head === D.inject(scalarId, sort))
+          rh.tail
+        else
+          rh.toList.dropWhile(D.inject.nonEmpty)
+
+      newh.reverse.toNel match {
+        case Some(h) => Some(NonEmptyList(h, r.tail).reverse)
+        case None => r.tail.reverse.toNel
+      }
+    }
+
+    def applyIds(ids: Identities[Dim[S, V, T]]): Option[Identities[Dim[S, V, T]]] =
+      if (ids.lastValues.forall(D.inject.isEmpty))
+        Some(ids :≻ D.project(scalarId, sort))
+      else
+        ids.expanded.toList
+          .flatMap(applyVec(_).toList)
+          .toNel
+          .map(Identities.collapsed(_))
+
+    if (p.isEmpty)
+      Uop.one(Identities(D.project(scalarId, sort)))
+    else
+      Uop.fromFoldable(p.toList.flatMap(applyIds(_).toList))
+  }
 
   def reduce(p: P): P =
-    Uop.of(p.toList.flatMap(_.init.toList): _*)
+    Uop.fromFoldable(p.toList.flatMap(_.initRegions.toList))
 
-  // Optics
+  def traverseComponents[F[_]: Applicative](f: P => F[P])(p: P): F[P] = {
+    import Uop._
+    p.toList
+      .traverse(ids => f(Uop.one(ids)))
+      .map(ps => Disjunction.subst(ps).combineAll.unwrap)
+  }
 
-  val scalarIds: Traversal[P, (S, T)] =
-    UopT composeTraversal Identities.values composeTraversal D.scalar
+  def traverseScalarIds[F[_]: Applicative](f: (S, T) => F[(S, T)])(p: P): F[P] = {
+    import shims._
+    scalarIds.modifyF[F](f.tupled)(p)
+  }
 
-  val vectorIds: Traversal[P, (V, T)] =
-    UopT composeTraversal Identities.values composePrism D.inflate
+  def traverseVectorIds[F[_]: Applicative](f: (V, T) => F[(V, T)])(p: P): F[P] = {
+    import shims._
+    vectorIds.modifyF[F](f.tupled)(p)
+  }
 
   ////
 
-  private def UopT =
-    Uop.values[Identities[Dim[S, V, T]], Identities[Dim[S, V, T]]]
+  private type J = Identities[Dim[S, V, T]]
+
+  // Not totally lawful, so private
+  private lazy val UopT =
+    new Traversal[P, J] {
+      import shims._
+      def modifyF[F[_]: scalaz.Applicative](f: J => F[J])(p: P): F[P] =
+        p.toList.traverse(f).map(Uop.fromFoldable(_))
+    }
+
+  private lazy val scalarIds: Traversal[P, (S, T)] =
+    UopT composeTraversal Identities.values composeTraversal D.scalar
+
+  private lazy val vectorIds: Traversal[P, (V, T)] =
+    UopT composeTraversal Identities.values composePrism D.inflate
 
   private def createOrConj(d: Dim[S, V, T], p: P): P =
     if (p.isEmpty)
-      Uop.of(Identities(d))
+      Uop.one(Identities(d))
     else
       p.map(_ :≻ d)
-
-  private def createOrSnoc(d: Dim[S, V, T], p: P): P =
-    if (p.isEmpty)
-      Uop.of(Identities(d))
-    else
-      p.map(_ :+ d)
 }
 
 object ProvImpl {

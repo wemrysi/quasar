@@ -19,8 +19,7 @@ package quasar.qsu
 import quasar.qscript.TTypes
 
 trait QSUTTypes[T[_[_]]] extends TTypes[T] {
-  type QAuth = quasar.qsu.QAuth[T]
-  type QDims = quasar.qsu.QDims[T]
+  type QAuth[P] = quasar.qsu.QAuth[T, P]
   type FreeAccess[A] = quasar.qsu.FreeAccess[T, A]
   type QSUGraph = quasar.qsu.QSUGraph[T]
   type RevIdx = quasar.qsu.QSUGraph.RevIdx[T]

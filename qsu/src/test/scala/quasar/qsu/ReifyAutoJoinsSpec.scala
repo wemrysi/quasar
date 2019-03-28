@@ -19,18 +19,25 @@ package quasar.qsu
 import slamdata.Predef._
 
 import quasar.{IdStatus, Qspec, TreeMatchers}
-import quasar.ejson.{EJson, Fixed}
-import quasar.fp._
 import quasar.contrib.iota._
+import quasar.ejson.{EJson, Fixed}
+import quasar.ejson.implicits._
+import quasar.fp._
+import quasar.impl.provenance.ProvImpl
 import quasar.qscript.{construction, MapFuncsCore, PlannerError}
 import quasar.qscript.provenance.JoinKeys
+
+import cats.syntax.eq._
 
 import matryoshka.data.Fix
 import matryoshka.data.freeEqual
 import matryoshka.delayEqual
+
 import pathy.Path
 import pathy.Path.Sandboxed
-import scalaz.{EitherT, INil, Need, StateT}
+import scalaz.{EitherT, Need, StateT}
+
+import shims.{eqToScalaz, orderToCats, orderToScalaz}
 
 object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
@@ -42,12 +49,17 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
   val recFunc = construction.RecFunc[Fix]
+  val qprov = ProvImpl[Fix[EJson], IdAccess, IdType]
+
+  type P = qprov.P
 
   val J = Fixed[Fix[EJson]]
 
   val afile1 = Path.rootDir[Sandboxed] </> Path.file("afile")
   val afile2 = Path.rootDir[Sandboxed] </> Path.file("afile2")
   val afile3 = Path.rootDir[Sandboxed] </> Path.file("afile3")
+
+  val emptyKeys = JoinKeys.empty[Fix[EJson], IdAccess]
 
   "autojoin reification" >> {
     "reify an autojoin2" >> {
@@ -65,8 +77,8 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
         case QSAutoJoin(
           Map(Read(`afile1`, ExcludeId), fmL),
           Map(Read(`afile2`, ExcludeId), fmR),
-          JoinKeys(INil()),
-          fmCombiner) =>
+          jks,
+          fmCombiner) if jks eqv emptyKeys =>
 
           fmL.linearize must beTreeEqual(
             func.ProjectKeyS(func.Hole, "foo"))
@@ -98,11 +110,11 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
           QSAutoJoin(
             Map(Read(`afile1`, ExcludeId), fmL),
             Map(Read(`afile2`, ExcludeId), fmC),
-            JoinKeys(INil()),
+            jksInner,
             fmInner),
           Map(Read(`afile3`, ExcludeId), fmR),
-          JoinKeys(INil()),
-          fmOuter) =>
+          jksOuter,
+          fmOuter) if (jksInner eqv emptyKeys) && (jksOuter eqv emptyKeys) =>
 
           fmL.linearize must beTreeEqual(
            func.ProjectKeyS(func.Hole, "foo"))
@@ -131,11 +143,9 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   def runOn(qgraph: QSUGraph): QSUGraph =
     runOn_(qgraph).graph
 
-  def runOn_(qgraph: QSUGraph): AuthenticatedQSU[Fix] = {
-    val resultsF = for {
-      prov <- ApplyProvenance[Fix, F](qgraph)
-      back <- ReifyAutoJoins[Fix, F](prov)
-    } yield back
+  def runOn_(qgraph: QSUGraph): AuthenticatedQSU[Fix, P] = {
+    val resultsF =
+      ApplyProvenance[Fix, F](qprov, qgraph).flatMap(ReifyAutoJoins[Fix, F](qprov))
 
     val results = resultsF.run.eval(0L).value.toEither
     results must beRight

@@ -17,6 +17,7 @@
 package quasar.qsu
 
 import slamdata.Predef._
+
 import quasar.{RenderTreeT, RenderTree}, RenderTree.ops._
 import quasar.common.{PhaseResult, PhaseResultTell}
 import quasar.common.effect.NameGenerator
@@ -24,23 +25,32 @@ import quasar.frontend.logicalplan.LogicalPlan
 import quasar.qscript.MonadPlannerErr
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
+
 import org.slf4s.Logging
+
 import cats.Eval
-import scalaz.{Cord, Functor, Kleisli => K, Monad, Show}
+
+import scalaz.{Cord, Equal, Functor, Kleisli => K, Monad, Show}
 import scalaz.syntax.functor._
 import scalaz.syntax.show._
 
-final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
+sealed abstract class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
     extends QSUTTypes[T]
     with Logging {
 
   import LPtoQS.MapSyntax
 
+  val qprov: QProv[T]
+  type P = qprov.P
+
+  implicit def PEqual: Equal[P]
+  implicit def PShow: Show[P]
+
   def apply[F[_]: Monad: MonadPlannerErr: PhaseResultTell: NameGenerator](lp: T[LogicalPlan])
       : F[T[QScriptEducated]] = {
 
     val agraph =
-      ApplyProvenance.AuthenticatedQSU.graph[T]
+      ApplyProvenance.AuthenticatedQSU.graph[T, P]
 
     val lpToQs =
       K(ReadLP[T, F])                        >==>
@@ -59,15 +69,15 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       debug("ExtractFreeMap")                >==>
       PruneSymmetricDimEdits[T, F]           >==>
       debug("PruneSymmetricDimEdits")        >==>
-      ApplyProvenance[T, F]                  >==>
+      (ApplyProvenance[T, F](qprov, _))      >==>
       debug("ApplyProvenance")               >==>
-      ReifyBuckets[T, F]                     >==>
+      ReifyBuckets[T, F](qprov)              >==>
       debug("ReifyBuckets")                  >==>
-      MinimizeAutoJoins[T, F]                >==>
+      MinimizeAutoJoins[T, F](qprov)         >==>
       debug("MinimizeAutoJoins")             >==>
-      ReifyAutoJoins[T, F]                   >==>
+      ReifyAutoJoins[T, F](qprov)            >==>
       debug("ReifyAutoJoins")                >==>
-      ExpandShifts[T, F]                     >==>
+      ExpandShifts[T, F](qprov)              >==>
       debug("ExpandShifts")                  >-
       agraph.modify(ResolveOwnIdentities[T]) >==>
       debug("ResolveOwnIdentities")          >==>
@@ -87,7 +97,15 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 }
 
 object LPtoQS {
-  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: LPtoQS[T] = new LPtoQS[T]
+  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
+      qp: QProv[T])(
+      implicit eqP: Equal[qp.P], showP: Show[qp.P])
+      : LPtoQS[T] =
+    new LPtoQS[T] {
+      val qprov: qp.type = qp
+      val PEqual = eqP
+      val PShow = showP
+    }
 
   final implicit class MapSyntax[F[_], A](val self: F[A]) extends AnyVal {
     def >-[B](f: A => B)(implicit F: Functor[F]): F[B] =

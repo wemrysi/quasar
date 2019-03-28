@@ -23,7 +23,9 @@ import cats.instances.option._
 import cats.instances.tuple._
 import cats.syntax.show._
 
-import monocle.Prism
+import monocle.{Prism, Traversal}
+
+import scalaz.Applicative
 
 sealed trait JoinKey[S, V] extends Product with Serializable {
   def flip: JoinKey[S, V] =
@@ -53,6 +55,17 @@ object JoinKey extends JoinKeyInstances {
     Prism.partial[JoinKey[S, V], (V, S)] {
       case StaticR(v, s) => (v, s)
     } { case (v, s) => StaticR(v, s) }
+
+  def vectorIds[S, V]: Traversal[JoinKey[S, V], V] =
+    new Traversal[JoinKey[S, V], V] {
+      import scalaz.syntax.applicative._
+      def modifyF[F[_]: Applicative](f: V => F[V])(jk: JoinKey[S, V]) =
+        jk match {
+          case Dynamic(l, r) => (f(l) |@| f(r))(JoinKey.dynamic(_, _))
+          case StaticL(s, v) => f(v).map(JoinKey.staticL(s, _))
+          case StaticR(v, s) => f(v).map(JoinKey.staticR(_, s))
+        }
+    }
 }
 
 sealed abstract class JoinKeyInstances extends JoinKeyInstances0 {

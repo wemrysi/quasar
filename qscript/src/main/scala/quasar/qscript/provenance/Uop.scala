@@ -21,25 +21,23 @@ import slamdata.Predef._
 import quasar.{NonTerminal, RenderTree, RenderedTree, Terminal}
 import quasar.RenderTree.ops._
 
-import cats.{Eq, Eval, Foldable, Show}
+import scala.collection.mutable.ListBuffer
+
+import cats.{Eq, Foldable, Show}
 import cats.kernel.{BoundedSemilattice, CommutativeMonoid, CommutativeSemigroup, Semigroup}
 import cats.instances.list._
 import cats.syntax.eq._
 import cats.syntax.foldable._
-import cats.syntax.functor._
 import cats.syntax.semigroup._
 import cats.syntax.show._
-import cats.syntax.traverse._
 
-import monocle.PTraversal
-
-import scalaz.{@@, Applicative}
+import scalaz.@@
 import scalaz.Tags.{Conjunction, Disjunction}
 import scalaz.syntax.tag._
 
 /** A distinct union of products. */
 final class Uop[A] private (val toList: List[A]) {
-  import Uop.distinctE
+  import Uop.{distinctE, fromFoldable}
 
   /** Alias for `and`. */
   def ∧ (that: Uop[A])(implicit asg: Semigroup[A], aeq: Eq[A]): Uop[A] =
@@ -61,10 +59,10 @@ final class Uop[A] private (val toList: List[A]) {
         thats <- that.toList
       } yield thiss |+| thats
 
-      if (hasMany(toList) || hasMany(that.toList))
-        new Uop(distinctE(as))
-      else
-        new Uop(as)
+      as match {
+        case a :: Nil => Uop.one(a)
+        case other => fromFoldable(other)
+      }
     }
 
   def isEmpty: Boolean =
@@ -75,21 +73,20 @@ final class Uop[A] private (val toList: List[A]) {
 
   /** The union of two `Uop`. */
   def or(that: Uop[A])(implicit A: Eq[A]): Uop[A] =
-    new Uop(distinctE(toList ::: that.toList))
+    if (isEmpty) {
+      that
+    } else if (that.isEmpty) {
+      this
+    } else {
+      val ts = that.toList.filterNot(a => toList.exists(_ === a))
+      new Uop(ts ::: toList)
+    }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   override def toString: String = {
     implicit val renderA = RenderTree.make[A](a => Terminal(List(a.toString), None))
     this.show
   }
-
-  ////
-
-  private def hasMany[X](xs: List[X]): Boolean =
-    xs match {
-      case _ :: _ :: _ => true
-      case _ => false
-    }
 }
 
 object Uop extends UopInstances {
@@ -105,25 +102,16 @@ object Uop extends UopInstances {
   def one[A](a: A): Uop[A] =
     new Uop(List(a))
 
-  def values[A, B: Eq]: PTraversal[Uop[A], Uop[B], A, B] =
-    new PTraversal[Uop[A], Uop[B], A, B] {
-      import shims._
-
-      def modifyF[F[_]: Applicative](f: A => F[B])(uop: Uop[A]): F[Uop[B]] =
-        uop.toList.traverse(f).map(fromFoldable(_))
-    }
-
   ////
 
+  @SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))
   private def distinctE[F[_]: Foldable, A: Eq](fa: F[A]): List[A] =
-    fa.foldr(Eval.now(List[A]())) { (a, ev) =>
-      ev map { seen =>
-        if (seen.exists(_ === a))
-          seen
-        else
-          a :: seen
-      }
-    }.value
+    fa.foldLeft(ListBuffer[A]()) { (as, a) =>
+      if (as.exists(_ === a))
+        as
+      else
+        as :+ a
+    }.toList
 }
 
 sealed abstract class UopInstances {
