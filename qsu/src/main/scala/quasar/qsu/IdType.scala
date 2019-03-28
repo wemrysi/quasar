@@ -16,7 +16,10 @@
 
 package quasar.qsu
 
-import scalaz.{Equal, Show}
+import slamdata.Predef.Int
+
+import scalaz.{Order, Show}
+import scalaz.std.anyVal._
 
 sealed trait IdType
 
@@ -33,8 +36,13 @@ object IdType {
     case Rotation.FlattenMap | Rotation.ShiftMap => Map
   }
 
-  implicit val equal: Equal[IdType] =
-    Equal.equalA
+  implicit val order: Order[IdType] =
+    Order[Int] contramap {
+      case Dataset => 0
+      case Array => 1
+      case Map => 2
+      case Expr => 3
+    }
 
   implicit val show: Show[IdType] =
     Show.showFromToString

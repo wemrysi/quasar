@@ -16,9 +16,13 @@
 
 package quasar.qscript.provenance
 
+import slamdata.Predef.List
+
 import quasar.Qspec
 
-import cats.{Eq, Order, Show}
+import cats.{Eq, Id, Order, Show}
+import cats.data.NonEmptyList
+import cats.instances.list._
 import cats.kernel.laws.discipline.{BoundedSemilatticeTests, CommutativeMonoidTests}
 import cats.syntax.eq._
 
@@ -55,6 +59,7 @@ abstract class ProvenanceSpec[
 
   type P = prov.P
 
+  import prov.applyComponentsN
   import prov.instances._
   import prov.syntax._
 
@@ -220,6 +225,24 @@ abstract class ProvenanceSpec[
     }
   }
 
+  "and" >> {
+    "consistent with applyComponentsN" >> prop { (p: P, q: P) =>
+      val res = applyComponentsN[Id, NonEmptyList](_.reduceLeft(_ ∧ _))(NonEmptyList.of(p, q))
+
+      res eqv (p ∧ q)
+    }
+  }
+
+  "or" >> {
+    "creates independent components" >> prop { (v: V, x: S, y: S, t: T) =>
+      val p = empty.inflateExtend(v, t).projectStatic(x, t)
+      val q = empty.inflateExtend(v, t).projectStatic(y, t)
+      val ps = (p ∨ q).foldMapComponents(List(_))
+
+      ps.exists(_ eqv p) && ps.exists(_ eqv q)
+    }
+  }
+
   "inflate submerge" >> {
     "id on empty" >> prop { (v: V, t: T) =>
       empty.inflateSubmerge(v, t) eqv empty
@@ -238,33 +261,65 @@ abstract class ProvenanceSpec[
   }
 
   "inject static" >> {
-    "distributes over conjunction" >> prop { (p: P, q: P, s: S, t: T) =>
+    "distributes over conjunction" >> prop { (p: P, q: P, s: S, t: T) => (p =!= empty && q =!= empty) ==> {
       (p ∧ q).injectStatic(s, t) eqv (p.injectStatic(s, t) ∧ q.injectStatic(s, t))
-    }
+    }}
 
-    "distributes over disjunction" >> prop { (p: P, q: P, s: S, t: T) =>
+    "distributes over disjunction" >> prop { (p: P, q: P, s: S, t: T) => (p =!= empty && q =!= empty) ==> {
       (p ∨ q).injectStatic(s, t) eqv (p.injectStatic(s, t) ∨ q.injectStatic(s, t))
-    }
+    }}
   }
 
   "project static" >> {
-    "distributes over conjunction" >> prop { (p: P, q: P, s: S, t: T) => (p =!= empty && q =!= empty) ==> {
-      (p ∧ q).projectStatic(s, t) eqv (p.projectStatic(s, t) ∧ q.projectStatic(s, t))
-    }}
-
     "distributes over disjunction" >> prop { (p: P, q: P, s: S, t: T) => (p =!= empty && q =!= empty) ==> {
       (p ∨ q).projectStatic(s, t) eqv (p.projectStatic(s, t) ∨ q.projectStatic(s, t))
     }}
 
+    "eliminates matching inject and all other contiguous injects" >> prop { (v: V, t: T, x: S, y: S, z: S) =>
+        (x =!= y && x =!= z && y =!= z) ==> {
+      val p = empty.inflateExtend(v, t)
+      val a = p.injectStatic(x, t).injectStatic(y, t)
+      val b = p.injectStatic(x, t).injectStatic(z, t)
+      val c = p.injectStatic(y, t).injectStatic(x, t)
+
+      val q = a ∧ b ∧ c
+      val r = p ∧ p.injectStatic(y, t)
+
+      q.projectStatic(x, t) eqv r
+    }}
+
+    "eliminates all contiguous injects when none match" >> prop { (v: V, t: T, x: S, y: S, z: S) =>
+        (x =!= y && x =!= z && y =!= z) ==> {
+      val p = empty.inflateExtend(v, t)
+      val a = p.injectStatic(x, t).injectStatic(y, t)
+      val b = p.injectStatic(x, t).injectStatic(z, t)
+      val c = p.injectStatic(y, t).injectStatic(y, t)
+
+      val q = a ∧ b ∧ c
+
+      q.projectStatic(x, t) eqv p
+    }}
+
     "eliminates inject of same id and type" >> prop { (p: P, s: S) =>
-      p.injectStatic(s, t1).projectStatic(s, t2) eqv p
+      p.injectStatic(s, t1).projectStatic(s, t1) eqv p
     }
 
-    "elimintates and extends individually" >> prop { (p: P, q: P, s: S, v: V, t: T) =>
+    "does not extend when any injects exist" >> prop { (p: P, s: S, v: V, t: T) =>
+      val q = empty.projectStatic(s1, t)
       val x = p.inflateExtend(v, t)
       val y = q.injectStatic(s, t)
 
-      (x ∧ y).projectStatic(s, t) eqv (x.projectStatic(s, t) ∧ q)
+      (x ∧ y).projectStatic(s, t) eqv (x ∧ q)
+    }
+
+    "affects unions independently" >> prop { (v: V, x: S, y: S, t: T) =>
+      val p = empty.inflateExtend(v, t)
+      val a = p.injectStatic(x, t)
+      val b = p.projectStatic(y, t)
+
+      val exp = (p ∨ b.projectStatic(x, t))
+
+      (a ∨ b).projectStatic(x, t) eqv exp
     }
   }
 

@@ -22,10 +22,13 @@ import quasar.api.QueryEvaluator
 import quasar.common.{phaseM, PhaseResultTell}
 import quasar.compile.queryPlan
 import quasar.contrib.iota._
+import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
+import quasar.impl.provenance.ProvImpl
 import quasar.qscript.QScriptEducated
-import quasar.qsu.LPtoQS
+import quasar.qsu.{IdAccess, IdType, LPtoQS}
 import quasar.run.implicits._
 import quasar.sql.parser
 
@@ -34,6 +37,8 @@ import matryoshka._
 import org.slf4s.Logging
 import scalaz.{Monad, StateT}
 import scalaz.syntax.bind._
+
+import shims._
 
 object Sql2QueryEvaluator extends Logging {
   def apply[
@@ -59,6 +64,8 @@ object Sql2QueryEvaluator extends Logging {
 
       lp  <- queryPlan[F, T, T[LP]](sql, sqlQuery.vars, sqlQuery.basePath, 0L, None)
 
-      qs  <- phaseM[F]("QScript (Educated)", LPtoQS[T].apply[StateT[F, Long, ?]](lp).eval(0))
+      qpImpl = ProvImpl[T[EJson], IdAccess, IdType]
+
+      qs  <- phaseM[F]("QScript (Educated)", LPtoQS[T](qpImpl).apply[StateT[F, Long, ?]](lp).eval(0))
     } yield qs
 }

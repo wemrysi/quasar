@@ -19,7 +19,7 @@ package quasar.qsu
 import slamdata.Predef._
 
 import quasar.common.effect.NameGenerator
-import quasar.ejson.implicits._
+import quasar.ejson.EJson
 import quasar.qscript.{
   construction,
   Center,
@@ -37,11 +37,17 @@ import matryoshka._
 import scalaz.{Monad, WriterT}
 import scalaz.Scalaz._
 
-final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
+sealed abstract class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
+
   import QSUGraph.Extractors._
 
-  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](qsu: AuthenticatedQSU[T])
-      : F[AuthenticatedQSU[T]] = {
+  val qprov: QProv[T]
+  type P = qprov.P
+
+  import qprov.syntax._
+
+  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](qsu: AuthenticatedQSU[T, P])
+      : F[AuthenticatedQSU[T, P]] = {
 
     qsu.graph.rewriteM(reifyAutoJoins[F](qsu.auth)).run map {
       case (additionalDims, newGraph) =>
@@ -52,25 +58,22 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
 
   ////
 
-  private val prov = QProv[T]
   private val qsu  = QScriptUniform.Optics[T]
   private val func = construction.Func[T]
 
   private type QSU[A] = QScriptUniform[A]
-  private type DimsT[F[_], A] = WriterT[F, List[(Symbol, QDims)], A]
+  private type DimsT[F[_], A] = WriterT[F, List[(Symbol, P)], A]
 
-  private def reifyAutoJoins[F[_]: Monad: NameGenerator: MonadPlannerErr](auth: QAuth)
+  private def reifyAutoJoins[F[_]: Monad: NameGenerator: MonadPlannerErr](auth: QAuth[P])
       : PartialFunction[QSUGraph, DimsT[F, QSUGraph]] = {
 
     case g @ AutoJoin2(left, right, combiner) =>
       val (l, r) = (left.root, right.root)
 
-      val keys: F[JoinKeys[IdAccess]] =
-        (auth.lookupDimsE[F](l) |@| auth.lookupDimsE[F](r))(prov.autojoinKeys(_, _))
+      val keys: F[JoinKeys[T[EJson], IdAccess]] =
+        (auth.lookupDimsE[F](l) |@| auth.lookupDimsE[F](r))(_ ⋈ _)
 
-      keys.map(ks =>
-        g.overwriteAtRoot(qsu.qsAutoJoin(
-          l, r, ks, combiner)))
+      keys.map(ks => g.overwriteAtRoot(qsu.qsAutoJoin(l, r, ks, combiner)))
         .liftM[DimsT]
 
     case g @ AutoJoin3(left, center, right, combiner3) =>
@@ -86,8 +89,8 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
 
         case (joinName, lName, cName, ldims, cdims, rdims) =>
 
-          val lcKeys: JoinKeys[IdAccess] =
-            prov.autojoinKeys(ldims, cdims)
+          val lcKeys: JoinKeys[T[EJson], IdAccess] =
+            ldims ⋈ cdims
 
           def lcCombiner: JoinFunc =
             func.StaticMapS(
@@ -109,11 +112,11 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
             case RightSide3 => RightSideF
           }
 
-          val lcDims: QDims =
-            prov.join(ldims, cdims)
+          val lcDims: P =
+            ldims ∧ cdims
 
-          val keys: JoinKeys[IdAccess] =
-            prov.autojoinKeys(lcDims, rdims)
+          val keys: JoinKeys[T[EJson], IdAccess] =
+            lcDims ⋈ rdims
 
           val lcName = Symbol(joinName)
           val lcG = QSUGraph.vertices[T].modify(_.updated(lcName, lcJoin))(g)
@@ -128,7 +131,13 @@ object ReifyAutoJoins {
   def apply[
       T[_[_]]: BirecursiveT: EqualT,
       F[_]: Monad: NameGenerator: MonadPlannerErr]
-      (qsu: AuthenticatedQSU[T])
-      : F[AuthenticatedQSU[T]] =
-    taggedInternalError("ReifyAutoJoins", new ReifyAutoJoins[T].apply[F](qsu))
+      (qp: QProv[T])(qsu: AuthenticatedQSU[T, qp.P])
+      : F[AuthenticatedQSU[T, qp.P]] = {
+
+    val raj = new ReifyAutoJoins[T] {
+      val qprov: qp.type = qp
+    }
+
+    taggedInternalError("ReifyAutoJoins", raj[F](qsu))
+  }
 }

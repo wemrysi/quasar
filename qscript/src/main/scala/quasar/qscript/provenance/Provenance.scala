@@ -16,9 +16,15 @@
 
 package quasar.qscript.provenance
 
-import monocle.Traversal
+import slamdata.Predef.{Boolean, Vector}
 
+import cats.{Applicative, Eq, Monoid, Reducible}
+import cats.data.{Const, NonEmptyVector}
 import cats.kernel.{BoundedSemilattice, CommutativeMonoid}
+import cats.instances.vector._
+import cats.syntax.apply._
+import cats.syntax.eq._
+import cats.syntax.reducible._
 
 import scalaz.@@
 import scalaz.Tags.{Disjunction, Conjunction}
@@ -26,6 +32,32 @@ import scalaz.syntax.tag._
 
 trait Provenance[S, V, T] { self =>
   type P
+
+  /** Apply `f` to cross product of the independent components of `ps`,
+    * 'or'-ing the results.
+    *
+    * Each argument to `f` will have the same size as `ps`, if any `ps` are
+    * empty, their corresponsing position in the `NonEmptyVector` will also be
+    * empty.
+    */
+  def applyComponentsN[F[_]: Applicative, G[_]: Reducible](
+      f: NonEmptyVector[P] => F[P])(
+      ps: G[P])
+      : F[P] = {
+
+    def nev(p: P): NonEmptyVector[P] =
+      NonEmptyVector.fromVector(foldMapComponents(Vector(_))(p))
+        .getOrElse(NonEmptyVector.one(empty))
+
+    def cross(in: NonEmptyVector[NonEmptyVector[P]], p: P)
+        : NonEmptyVector[NonEmptyVector[P]] =
+      nev(p).flatMap(p => in.map(_ :+ p))
+
+    val crossed =
+      ps.reduceLeftTo(p => nev(p).map(NonEmptyVector.one(_)))(cross)
+
+    crossed.reduceLeftTo(f)((x, y) => (x, f(y)).mapN(or))
+  }
 
   /** The set of identity comparisons describing an autojoin of `l` and `r`. */
   def autojoin(l: P, r: P): JoinKeys[S, V]
@@ -37,6 +69,18 @@ trait Provenance[S, V, T] { self =>
 
   /** Provenance having a dimensionality of zero. */
   def empty: P
+
+  /** Convert each component into `A` and combine using its monoid. */
+  def foldMapComponents[A: Monoid](f: P => A)(p: P): A =
+    traverseComponents[Const[A, ?]](p => Const(f(p)))(p).getConst
+
+  /** Convert each scalar id into `A` and combine using its monoid. */
+  def foldMapScalarIds[A: Monoid](f: (S, T) => A)(p: P): A =
+    traverseScalarIds[Const[A, ?]]((s, t) => Const(f(s, t)))(p).getConst
+
+  /** Convert each vector id into `A` and combine using its monoid. */
+  def foldMapVectorIds[A: Monoid](f: (V, T) => A)(p: P): A =
+    traverseVectorIds[Const[A, ?]]((v, t) => Const(f(v, t)))(p).getConst
 
   /** Append an identity, maintaining current dimensionality. */
   def inflateConjoin(vectorId: V, sort: T, p: P): P
@@ -69,11 +113,14 @@ trait Provenance[S, V, T] { self =>
   /** Discard the highest dimension, reducing dimensionality by 1. */
   def reduce(p: P): P
 
-  // Optics
+  /** Apply `f` to each independent component of `p`. */
+  def traverseComponents[F[_]: Applicative](f: P => F[P])(p: P): F[P]
 
-  def scalarIds: Traversal[P, (S, T)]
+  /** Apply `f` to each scalar id of `p`. */
+  def traverseScalarIds[F[_]: Applicative](f: (S, T) => F[(S, T)])(p: P): F[P]
 
-  def vectorIds: Traversal[P, (V, T)]
+  /** Apply `f` to each vector id of `p`. */
+  def traverseVectorIds[F[_]: Applicative](f: (V, T) => F[(V, T)])(p: P): F[P]
 
   object instances {
     implicit val pConjunctionCommutativeMonoid: CommutativeMonoid[P @@ Conjunction] =
@@ -104,6 +151,15 @@ trait Provenance[S, V, T] { self =>
       def ∨ (that: P): P =
         self.or(p, that)
 
+      def foldMapComponents[A: Monoid](f: P => A): A =
+        self.foldMapComponents(f)(p)
+
+      def foldMapScalarIds[A: Monoid](f: (S, T) => A): A =
+        self.foldMapScalarIds(f)(p)
+
+      def foldMapVectorIds[A: Monoid](f: (V, T) => A): A =
+        self.foldMapVectorIds(f)(p)
+
       def inflateConjoin(vectorId: V, sort: T): P =
         self.inflateConjoin(vectorId, sort, p)
 
@@ -119,6 +175,9 @@ trait Provenance[S, V, T] { self =>
       def injectStatic(scalarId: S, sort: T): P =
         self.injectStatic(scalarId, sort, p)
 
+      def isEmpty(implicit P: Eq[P]): Boolean =
+        p === self.empty
+
       def projectDynamic: P =
         self.projectDynamic(p)
 
@@ -127,6 +186,15 @@ trait Provenance[S, V, T] { self =>
 
       def reduce: P =
         self.reduce(p)
+
+      def traverseComponents[F[_]: Applicative](f: P => F[P]): F[P] =
+        self.traverseComponents(f)(p)
+
+      def traverseScalarIds[F[_]: Applicative](f: (S, T) => F[(S, T)]): F[P] =
+        self.traverseScalarIds(f)(p)
+
+      def traverseVectorIds[F[_]: Applicative](f: (V, T) => F[(V, T)]): F[P] =
+        self.traverseVectorIds(f)(p)
     }
   }
 }
