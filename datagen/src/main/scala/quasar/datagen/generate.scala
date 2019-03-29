@@ -24,7 +24,6 @@ import cats.effect.Sync
 import fs2.Stream
 import matryoshka.{Corecursive, Recursive}
 import scalaz.{\/, Equal, Order}
-import scalaz.Scalaz._
 import spire.algebra.{Field, IsReal, NRoot}
 import spire.math.ConvertableFrom
 import spire.random.{Gaussian, Generator}
