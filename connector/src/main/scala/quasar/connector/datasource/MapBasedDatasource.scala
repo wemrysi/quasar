@@ -16,13 +16,12 @@
 
 package quasar.connector.datasource
 
-import slamdata.Predef.{Boolean, Option}
-
+import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.{Datasource, MonadResourceErr, ResourceError}
 
-import scalaz.{Applicative, ApplicativePlus, IMap, Scalaz}, Scalaz._
+import scalaz.{Applicative, ApplicativePlus, ICons, IList, IMap, INil, ISet, Scalaz}, Scalaz._
 
 final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: ApplicativePlus, R] private(
     val kind: DatasourceType,
@@ -32,12 +31,11 @@ final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: Applic
   import ResourceError._
 
   def evaluate(rp: ResourcePath): F[R] =
-    if (prefixedChildPaths0(rp).isDefined)
-      content.lookup(rp) getOrElse {
-        MonadResourceErr[F].raiseError(notAResource(rp))
-      }
-    else
-      MonadResourceErr[F].raiseError(pathNotFound(rp))
+    content.lookup(rp) getOrElse {
+        MonadResourceErr[F].raiseError(
+          if (prefixes.contains(rp)) notAResource(rp)
+          else pathNotFound(rp))
+    }
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     content.member(path).point[F]
@@ -48,29 +46,50 @@ final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: Applic
 
   ////
 
+  private val prefixes =
+    content.keySet.foldLeft(ISet.empty[ResourcePath])
+      { case (acc, key) =>
+          acc union ancestors(key)
+      }
+
+  private def ancestors(p: ResourcePath): ISet[ResourcePath] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def go(ns: IList[ResourceName]): ISet[ResourcePath] = ns match {
+      case INil() => ISet.singleton(ResourcePath.root())
+      case l => ISet.singleton(ResourcePath.resourceNamesIso(l)) union go(l. dropRight(1))
+    }
+
+    go(ResourcePath.resourceNamesIso.get(p).dropRight(1))
+  }
+
+  private def children(s: ISet[ResourcePath], prefix: ResourcePath): ISet[ResourceName] =
+    ISet.fromFoldable {
+      s.toIList.flatMap(_.relativeTo(prefix).toIList).flatMap(p =>
+        ResourcePath.resourceNamesIso.get(p) match {
+          case ICons(h, INil()) => IList[ResourceName](h)
+          case _ => INil[ResourceName]()
+        })
+    }
+
   private def prefixedChildPaths0(pfx: ResourcePath)
       : Option[G[(ResourceName, ResourcePathType)]] =
-    if (content.member(pfx)) {
-      some(mempty[G, (ResourceName, ResourcePathType)])
-    } else {
-      val children =
-        content.keys
-          .flatMap(_.relativeTo(pfx).toList)
-          .toNel
+    if (!prefixes.contains(pfx))
+      if (content.keySet.contains(pfx)) some(mempty[G, (ResourceName, ResourcePathType)])
+      else None
+    else {
+      val childResources = children(content.keySet, pfx)
+      val childPrefixes = children(prefixes, pfx)
+      val both = childPrefixes intersection childResources
 
-      val results =
-        children.flatMap(_.traverse(_.uncons map {
-          case (n, _) =>
-            val tpe =
-              if (content.member(pfx / n))
-                ResourcePathType.leafResource
-              else
-                ResourcePathType.prefix
+      val res = both.map((_, ResourcePathType.prefixResource)) union
+        (childResources \\ both).map((_, ResourcePathType.leafResource)) union
+        (childPrefixes \\ both).map((_, ResourcePathType.prefix))
 
-            (n, tpe)
-        }))
-
-      results.map(_.collapse[G])
+      res.foldLeft(
+        ApplicativePlus[G].empty[(ResourceName, ResourcePathType)]) {
+        case (acc, p) =>
+          ApplicativePlus[G].plus(acc, p.pure[G])
+        }.some
     }
 }
 
