@@ -62,4 +62,26 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule {
 
     ds.run
   }
+
+  def destination[F[_]: Effect: ContextShift: MonadResourceErr](
+      config: Json)
+      : F[InitializationError[Json] \/ Disposable[F, Dest[F]]] = {
+    val F = Effect[F]
+    val dest = for {
+      lc <-
+        EitherT.fromEither(config.as[LocalDestinationConfig].toEither.point[F])
+          .leftMap[InitializationError[Json]] {
+            case (s, _) => MalformedConfiguration(kind, config, "Failed to decode LocalDestination config: " + s)
+          }
+
+      root <-
+        EitherT.fromEither(F.attempt(F.delay(Paths.get(lc.rootDir))))
+          .leftMap[InitializationError[Json]](
+            t => MalformedConfiguration(kind, config, "Invalid destination path: " + t.getMessage))
+
+      localDest: Dest[F] = LocalDestination[F](root, blockingPool)
+    } yield localDest.point[Disposable[F, ?]]
+
+    dest.run
+  }
 }

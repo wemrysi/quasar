@@ -16,6 +16,8 @@
 
 package quasar.connector
 
+import slamdata.Predef.Byte
+
 import quasar.Disposable
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
@@ -31,6 +33,7 @@ import scalaz.\/
 
 trait LightweightDatasourceModule {
   type DS[F[_]] = Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]]
+  type Dest[F[_]] = Destination[F, Stream[F, ?], Stream[F, Byte]]
 
   def kind: DatasourceType
 
@@ -40,4 +43,10 @@ trait LightweightDatasourceModule {
       config: Json)(
       implicit ec: ExecutionContext)
       : F[InitializationError[Json] \/ Disposable[F, DS[F]]]
+
+  // val capability: Capability
+
+  // def destination[F[_]: Effect: ContextShift: MonadResourceErr](
+  //     config: Json)
+  //     : F[InitializationError[Json] \/ Disposable[F, Dest[F]]]
 }
