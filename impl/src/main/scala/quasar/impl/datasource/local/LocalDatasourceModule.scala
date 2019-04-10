@@ -19,7 +19,7 @@ package quasar.impl.datasource.local
 import quasar.Disposable
 import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
 import quasar.concurrent.BlockingContext
-import quasar.connector.{LightweightDatasourceModule, MonadResourceErr}
+import quasar.connector.{Capability, ReadWrite, LightweightDatasourceModule, MonadResourceErr}
 
 import java.nio.file.Paths
 import scala.concurrent.ExecutionContext
@@ -36,6 +36,7 @@ object LocalDatasourceModule extends LightweightDatasourceModule {
     BlockingContext.cached("local-datasource")
 
   val kind: DatasourceType = LocalType
+  val capability: Capability = ReadWrite
 
   def sanitizeConfig(config: Json): Json = config
 
