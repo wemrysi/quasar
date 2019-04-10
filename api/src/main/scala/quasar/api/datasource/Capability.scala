@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.api.datasource
+
+import scalaz.{Equal, Show}
 
 sealed abstract class Capability
 
@@ -22,4 +24,13 @@ object Capability {
   case object ReadOnly extends Capability
   case object WriteOnly extends Capability
   case object ReadWrite extends Capability
+
+  implicit val show: Show[Capability] =
+    Show.shows {
+      case ReadOnly => "Capability(ReadOnly)"
+      case WriteOnly => "Capability(WriteOnly)"
+      case ReadWrite => "Capability(ReadWrite)"
+    }
+
+  implicit val equal: Equal[Capability] = Equal.equalA
 }
