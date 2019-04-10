@@ -22,12 +22,11 @@ import quasar.common.data.RValue
 import quasar.concurrent.BlockingContext
 import quasar.connector.{Capability, LightweightDatasourceModule, MonadResourceErr}
 
-import java.nio.file.Paths
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import cats.effect._
-import scalaz.{EitherT, \/}
+import scalaz.\/
 import scalaz.syntax.applicative._
 import shims._
 
@@ -45,20 +44,9 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule {
       config: Json)(
       implicit ec: ExecutionContext)
       : F[InitializationError[Json] \/ Disposable[F, DS[F]]] = {
-
-    val F = ConcurrentEffect[F]
-
     val ds = for {
-      lc <-
-        EitherT.fromEither(config.as[LocalConfig].toEither.point[F])
-          .leftMap[InitializationError[Json]] {
-            case (s, _) => MalformedConfiguration(kind, config, "Failed to decode LocalDatasource config: " + s)
-          }
-
-      root <-
-        EitherT.fromEither(F.attempt(F.delay(Paths.get(lc.rootDir))))
-          .leftMap[InitializationError[Json]](
-            t => MalformedConfiguration(kind, config, "Invalid path: " + t.getMessage))
+      lc <- attemptConfig[F, LocalConfig](config, "Failed to decode LocalDatasource config: ")
+      root <- validatePath(lc.rootDir, config, "Invalid path: ")
     } yield LocalParsedDatasource[F, RValue](root, lc.readChunkSizeBytes, blockingPool).point[Disposable[F, ?]]
 
     ds.run
@@ -67,18 +55,9 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule {
   def destination[F[_]: Effect: ContextShift: MonadResourceErr](
       config: Json)
       : F[InitializationError[Json] \/ Disposable[F, Dest[F]]] = {
-    val F = Effect[F]
     val dest = for {
-      lc <-
-        EitherT.fromEither(config.as[LocalDestinationConfig].toEither.point[F])
-          .leftMap[InitializationError[Json]] {
-            case (s, _) => MalformedConfiguration(kind, config, "Failed to decode LocalDestination config: " + s)
-          }
-
-      root <-
-        EitherT.fromEither(F.attempt(F.delay(Paths.get(lc.rootDir))))
-          .leftMap[InitializationError[Json]](
-            t => MalformedConfiguration(kind, config, "Invalid destination path: " + t.getMessage))
+      ld <- attemptConfig[F, LocalDestinationConfig](config, "Failed to decode LocalDestination config: ")
+      root <- validatePath(ld.rootDir, config, "Invalid destination path: ")
 
       localDest: Dest[F] = LocalDestination[F](root, blockingPool)
     } yield localDest.point[Disposable[F, ?]]
