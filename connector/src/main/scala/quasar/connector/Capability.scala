@@ -17,6 +17,9 @@
 package quasar.connector
 
 sealed abstract class Capability
-case object ReadOnly extends Capability
-case object WriteOnly extends Capability
-case object ReadWrite extends Capability
+
+object Capability {
+  case object ReadOnly extends Capability
+  case object WriteOnly extends Capability
+  case object ReadWrite extends Capability
+}

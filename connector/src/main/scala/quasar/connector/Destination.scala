@@ -24,9 +24,5 @@ import quasar.api.resource._
   * @tparam I destination input
   */
 trait Destination[F[_], G[_], I] {
-
-  /** Returns a function within F that can consume input of type I, producing
-    * side effects within G
-    */
   def writeToPath(path: ResourcePath): F[I => G[Unit]]
 }
