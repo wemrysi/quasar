@@ -14,23 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.api.datasource
+package quasar.connector
 
-import scalaz.{Equal, Show}
+import slamdata.Predef.Byte
 
-sealed abstract class Capability
+import quasar.Disposable
+import quasar.api.datasource.DatasourceError.InitializationError
 
-object Capability {
-  case object ReadOnly extends Capability
-  case object WriteOnly extends Capability
-  case object ReadWrite extends Capability
+import argonaut.Json
+import cats.effect.{Effect, ContextShift}
+import fs2.Stream
+import scalaz.\/
 
-  implicit val show: Show[Capability] =
-    Show.shows {
-      case ReadOnly => "Capability(ReadOnly)"
-      case WriteOnly => "Capability(WriteOnly)"
-      case ReadWrite => "Capability(ReadWrite)"
-    }
+trait DestinationModule {
+  type Dest[F[_]] = Destination[F, Stream[F, ?], Stream[F, Byte]]
 
-  implicit val equal: Equal[Capability] = Equal.equalA
+  def destination[F[_]: Effect: ContextShift: MonadResourceErr](
+      config: Json)
+      : F[InitializationError[Json] \/ Disposable[F, Dest[F]]]
 }

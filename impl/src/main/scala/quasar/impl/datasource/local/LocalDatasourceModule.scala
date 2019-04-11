@@ -17,9 +17,9 @@
 package quasar.impl.datasource.local
 
 import quasar.Disposable
-import quasar.api.datasource.{Capability, DatasourceError, DatasourceType}, DatasourceError._
+import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
 import quasar.concurrent.BlockingContext
-import quasar.connector.{LightweightDatasourceModule, MonadResourceErr}
+import quasar.connector.{LightweightDatasourceModule, DestinationModule, MonadResourceErr}
 
 import scala.concurrent.ExecutionContext
 
@@ -29,13 +29,12 @@ import scalaz.\/
 import scalaz.syntax.applicative._
 import shims._
 
-object LocalDatasourceModule extends LightweightDatasourceModule {
+object LocalDatasourceModule extends LightweightDatasourceModule with DestinationModule {
   // FIXME this is side effecting
   private lazy val blockingPool: BlockingContext =
     BlockingContext.cached("local-datasource")
 
   val kind: DatasourceType = LocalType
-  val capability: Capability = Capability.ReadWrite
 
   def sanitizeConfig(config: Json): Json = config
 
