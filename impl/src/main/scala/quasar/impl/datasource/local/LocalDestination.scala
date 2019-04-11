@@ -20,7 +20,7 @@ import slamdata.Predef.{Stream => _, _}
 
 import quasar.api.resource.ResourcePath
 import quasar.concurrent.BlockingContext
-import quasar.connector.Destination
+import quasar.connector.{Destination, ResultSet}
 
 import cats.effect.{ContextShift, Effect}
 import fs2.{io, Stream}
@@ -32,10 +32,16 @@ import java.nio.file.{Path => JPath}
 
 final class LocalDestination[F[_]: Effect: ContextShift] private (
   root: JPath,
-  blockingContext: BlockingContext) extends Destination[F, Stream[F, ?], Stream[F, Byte]] {
-  def writeToPath(path: ResourcePath): F[Stream[F, Byte] => Stream[F, Unit]] =
-    toNio[F](root, path).map(writePath =>
-      io.file.writeAll[F](writePath, blockingContext.unwrap))
+  blockingContext: BlockingContext) extends Destination[F, Stream[F, ?], ResultSet[F]] {
+  def writeToPath(path: ResourcePath): F[ResultSet[F] => Stream[F, Unit]] =
+    toNio[F](root, path).map(writePath => {
+      case ResultSet.Csv(_, data) => {
+        val writing: Stream[F, Byte] => Stream[F, Unit] =
+          io.file.writeAll[F](writePath, blockingContext.unwrap)
+
+        writing(data)
+      }
+    })
 }
 
 object LocalDestination {

@@ -16,18 +16,13 @@
 
 package quasar.connector
 
-import quasar.Disposable
-import quasar.api.datasource.DatasourceError.InitializationError
+import slamdata.Predef._
 
-import argonaut.Json
-import cats.effect.{Effect, ContextShift}
 import fs2.Stream
-import scalaz.\/
 
-trait DestinationModule {
-  type Dest[F[_]] = Destination[F, Stream[F, ?], ResultSet[F]]
+sealed trait ResultSet[F[_]] extends Product with Serializable
 
-  def destination[F[_]: Effect: ContextShift: MonadResourceErr](
-      config: Json)
-      : F[InitializationError[Json] \/ Disposable[F, Dest[F]]]
+object ResultSet {
+  // extend with other output formats we might want to support
+  final case class Csv[F[_]](columns: List[TableColumn], data: Stream[F, Byte]) extends ResultSet[F]
 }

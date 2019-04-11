@@ -16,18 +16,19 @@
 
 package quasar.connector
 
-import quasar.Disposable
-import quasar.api.datasource.DatasourceError.InitializationError
+import slamdata.Predef.String
 
-import argonaut.Json
-import cats.effect.{Effect, ContextShift}
-import fs2.Stream
-import scalaz.\/
+import scalaz.{Order, Show}
+import scalaz.std.string._
 
-trait DestinationModule {
-  type Dest[F[_]] = Destination[F, Stream[F, ?], ResultSet[F]]
+final case class TableColumn(value: String)
 
-  def destination[F[_]: Effect: ContextShift: MonadResourceErr](
-      config: Json)
-      : F[InitializationError[Json] \/ Disposable[F, Dest[F]]]
+object TableColumn extends TableColumnInstances
+
+sealed abstract class TableColumnInstances {
+  implicit val show: Show[TableColumn] =
+    Show.shows(_.value)
+
+  implicit val order: Order[TableColumn] =
+    Order.orderBy(_.value)
 }
