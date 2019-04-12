@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector._
+import quasar.connector.datasource.MapBasedDatasource
 import quasar.contrib.fs2.stream._
 import quasar.contrib.scalaz.MonadError_
 
@@ -49,7 +50,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
     MonadError_.facet[IO](ResourceError.throwableP)
 
   val underlying =
-    PureDatasource[IO, Stream[IO, ?]](
+    MapBasedDatasource.pure[IO, Stream[IO, ?]](
       DatasourceType("pure-test", 1L),
       IMap(
         ResourcePath.root() / ResourceName("a") / ResourceName("b") -> 1,

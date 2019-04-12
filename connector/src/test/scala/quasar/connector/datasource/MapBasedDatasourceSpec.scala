@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasource
+package quasar.connector.datasource
 
 import slamdata.Predef._
 
@@ -23,27 +23,28 @@ import quasar.api.resource._
 import quasar.connector.{DatasourceSpec, MonadResourceErr, ResourceError}
 import quasar.contrib.scalaz.MonadError_
 
+import cats.data.OptionT
 import cats.effect.IO
-
 import eu.timepit.refined.auto._
-
 import scalaz.IMap
 import scalaz.std.list._
-
 import shims._
 
-object PureDatasourceSpec extends DatasourceSpec[IO, List] {
+object MapBasedDatasourceSpec extends DatasourceSpec[IO, List] {
 
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
   val datasource =
-    PureDatasource[IO, List](
+    MapBasedDatasource.pure[IO, List](
       DatasourceType("pure-test", 1L),
       IMap(
+        ResourcePath.root() / ResourceName("a") -> 0,
         ResourcePath.root() / ResourceName("a") / ResourceName("b") -> 1,
         ResourcePath.root() / ResourceName("a") / ResourceName("c") -> 2,
-        ResourcePath.root() / ResourceName("d") -> 3))
+        ResourcePath.root() / ResourceName("a") / ResourceName("c") / ResourceName("d") -> 3,
+        ResourcePath.root() / ResourceName("d") / ResourceName("e") -> 4,
+        ResourcePath.root() / ResourceName("f") -> 5))
 
   def nonExistentPath: ResourcePath =
     ResourcePath.root() / ResourceName("x") / ResourceName("y")
@@ -51,15 +52,22 @@ object PureDatasourceSpec extends DatasourceSpec[IO, List] {
   def gatherMultiple[A](fga: List[A]): IO[List[A]] =
     IO.pure(fga)
 
+  def assertPrefixedChildPaths(path: ResourcePath, expected: Set[(ResourceName, ResourcePathType)]) =
+    for {
+      res <- OptionT(datasource.prefixedChildPaths(path))
+        .getOrElseF(IO.raiseError(new Exception(s"Failed to list resources under $path")))
+        .map(_.toSet).map(_ must_== expected)
+    } yield res
+
   "evaluation" >> {
     "known resource returns result" >>* {
       datasource
-        .evaluate(ResourcePath.root() / ResourceName("d"))
-        .map(_ must_=== 3)
+        .evaluate(ResourcePath.root() / ResourceName("d") / ResourceName("e"))
+        .map(_ must_=== 4)
     }
 
     "known prefix errors with 'not a resource'" >>* {
-      val pfx = ResourcePath.root() / ResourceName("a")
+      val pfx = ResourcePath.root() / ResourceName("d")
 
       MonadResourceErr[IO].attempt(datasource.evaluate(pfx)).map(_ must be_-\/.like {
         case ResourceError.NotAResource(p) => p must equal(pfx)
@@ -70,6 +78,23 @@ object PureDatasourceSpec extends DatasourceSpec[IO, List] {
       MonadResourceErr[IO].attempt(datasource.evaluate(nonExistentPath)).map(_ must be_-\/.like {
         case ResourceError.PathNotFound(p) => p must equal(nonExistentPath)
       })
+    }
+
+    "children of root is correct" >>* {
+      assertPrefixedChildPaths(
+        ResourcePath.root(),
+        Set(
+          ResourceName("a") -> ResourcePathType.prefixResource,
+          ResourceName("d") -> ResourcePathType.prefix,
+          ResourceName("f") -> ResourcePathType.leafResource))
+    }
+
+    "children of non-root is correct" >>* {
+      assertPrefixedChildPaths(
+        ResourcePath.root() / ResourceName("a"),
+        Set(
+          ResourceName("b") -> ResourcePathType.leafResource,
+          ResourceName("c") -> ResourcePathType.prefixResource))
     }
   }
 }
