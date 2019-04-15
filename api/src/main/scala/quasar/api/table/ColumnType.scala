@@ -22,25 +22,28 @@ import scalaz.{Order, Show}
 import scalaz.std.anyVal._
 import scalaz.syntax.order._
 
-sealed trait ColumnType extends Product with Serializable
+sealed abstract class ColumnType(final val ordinal: Int) extends Product with Serializable
 
 object ColumnType {
-  sealed trait Scalar extends ColumnType
-  final case object Null extends Scalar
-  final case object Boolean extends Scalar
-  final case object LocalTime extends Scalar
-  final case object OffsetTime extends Scalar
-  final case object LocalDate extends Scalar
-  final case object OffsetDate extends Scalar
-  final case object LocalDateTime extends Scalar
-  final case object OffsetDateTime extends Scalar
-  final case object Interval extends Scalar
-  final case object Number extends Scalar
-  final case object String extends Scalar
 
-  sealed trait Vector extends ColumnType
-  final case object Array extends Vector
-  final case object Object extends Vector
+  sealed abstract class Scalar(ordinal: Int) extends ColumnType(ordinal)
+
+  case object Null extends Scalar(0)
+  case object Boolean extends Scalar(1)
+  case object LocalTime extends Scalar(2)
+  case object OffsetTime extends Scalar(3)
+  case object LocalDate extends Scalar(4)
+  case object OffsetDate extends Scalar(5)
+  case object LocalDateTime extends Scalar(6)
+  case object OffsetDateTime extends Scalar(7)
+  case object Interval extends Scalar(8)
+  case object Number extends Scalar(9)
+  case object String extends Scalar(10)
+
+  sealed abstract class Vector(ordinal: Int) extends ColumnType(ordinal)
+
+  case object Array extends Vector(11)
+  case object Object extends Vector(12)
 
   val Top: Set[ColumnType] =
     Set(
@@ -59,26 +62,8 @@ object ColumnType {
       Object)
 
   implicit def columnTypeOrder[T <: ColumnType]: Order[T] =
-    Order.order((x, y) => asInt(x) ?|? asInt(y))
+    Order.order((x, y) => x.ordinal ?|? y.ordinal)
 
   implicit def columnTypeShow[T <: ColumnType]: Show[T] =
     Show.showFromToString
-
-  ////
-
-  private val asInt: ColumnType => Int = {
-    case Null => 0
-    case Boolean => 1
-    case LocalTime => 2
-    case OffsetTime => 3
-    case LocalDate => 4
-    case OffsetDate => 5
-    case LocalDateTime => 6
-    case OffsetDateTime => 7
-    case Interval => 8
-    case Number => 9
-    case String => 10
-    case Array => 11
-    case Object => 12
-  }
 }
