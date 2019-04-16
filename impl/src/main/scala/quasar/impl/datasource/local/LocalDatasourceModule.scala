@@ -17,7 +17,7 @@
 package quasar.impl.datasource.local
 
 import quasar.Disposable
-import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
+import quasar.api.datasource.{DatasourceError, DatasourceType, DestinationType}, DatasourceError._
 import quasar.concurrent.BlockingContext
 import quasar.connector.{LightweightDatasourceModule, DestinationModule, MonadResourceErr}
 
@@ -54,5 +54,5 @@ object LocalDatasourceModule extends LightweightDatasourceModule with Destinatio
 
   def destination[F[_]: Effect: ContextShift: MonadResourceErr](config: Json)
       : F[InitializationError[Json] \/ Disposable[F, Dest[F]]] =
-    mkDestination(config)
+    localDestination[F](config, blockingPool).run
 }
