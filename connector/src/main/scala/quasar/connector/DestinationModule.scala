@@ -18,6 +18,7 @@ package quasar.connector
 
 import quasar.Disposable
 import quasar.api.datasource.DatasourceError.InitializationError
+import quasar.api.datasource.DestinationType
 
 import argonaut.Json
 import cats.effect.{Effect, ContextShift}
@@ -28,7 +29,6 @@ trait DestinationModule {
   type Dest[F[_]] = Destination[F, Stream[F, ?], ResultSet[F]]
 
   def destinationKind: DestinationType
-
   def sanitizeDestinationConfig(config: Json): Json
 
   def destination[F[_]: Effect: ContextShift: MonadResourceErr](
