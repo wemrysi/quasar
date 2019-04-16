@@ -50,16 +50,7 @@ object LocalDatasourceModule extends LightweightDatasourceModule with Destinatio
     ds.run
   }
 
-  def destination[F[_]: Effect: ContextShift: MonadResourceErr](
-      config: Json)
-      : F[InitializationError[Json] \/ Disposable[F, Dest[F]]] = {
-    val dest = for {
-      ld <- attemptConfig[F, LocalDestinationConfig](config, "Failed to decode LocalDestination config: ")
-      root <- validatePath(ld.rootDir, config, "Invalid destination path: ")
-
-      localDest: Dest[F] = LocalDestination[F](root, blockingPool)
-    } yield localDest.point[Disposable[F, ?]]
-
-    dest.run
-  }
+  def destination[F[_]: Effect: ContextShift: MonadResourceErr](config: Json)
+      : F[InitializationError[Json] \/ Disposable[F, Dest[F]]] =
+    mkDestination(config)
 }

@@ -18,19 +18,21 @@ package quasar.impl.datasource
 
 import slamdata.Predef._
 
+import quasar.Disposable
 import quasar.api.datasource.DatasourceError.{
   InitializationError,
   MalformedConfiguration
 }
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource.ResourcePath
+import quasar.connector.MonadResourceErr
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
 
 import java.nio.file.{Paths, Path => JPath}
 
 import argonaut.{DecodeJson, Json}
-import cats.effect.Sync
+import cats.effect.{Effect, ContextShift, Sync}
 import eu.timepit.refined.auto._
 import pathy.Path
 import scalaz.{\/, EitherT}
@@ -61,4 +63,17 @@ package object local {
     EitherT.fromEither(Sync[F].attempt(Sync[F].delay(Paths.get(path))))
       .leftMap[InitializationError[Json]](
         t => MalformedConfiguration(LocalType, config, errorPrefix + t.getMessage))
+
+  def mkDestination[F[_]: Effect: ContextShift: MonadResourceErr](
+    config: Json)
+      : F[InitializationError[Json] \/ Disposable[F, Dest[F]]] = {
+    val dest = for {
+      ld <- attemptConfig[F, LocalDestinationConfig](config, "Failed to decode LocalDestination config: ")
+      root <- validatePath(ld.rootDir, config, "Invalid destination path: ")
+
+      localDest: Dest[F] = LocalDestination[F](root, blockingPool)
+    } yield localDest.point[Disposable[F, ?]]
+
+    dest.run
+  }
 }
