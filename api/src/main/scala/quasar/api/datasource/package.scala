@@ -14,24 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.api.datasource
 
-import quasar.Disposable
-import quasar.api.datasource.DatasourceError.InitializationError
+import slamdata.Predef._
 
-import argonaut.Json
-import cats.effect.{Effect, ContextShift}
-import fs2.Stream
-import scalaz.\/
+import quasar.fp.ski.κ
 
-trait DestinationModule {
-  type Dest[F[_]] = Destination[F, Stream[F, ?], ResultSet[F]]
+import eu.timepit.refined.refineV
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.string.MatchesRegex
+import monocle.Prism
+import shapeless.{Witness => W}
 
-  def destinationKind: DestinationType
+package object datasource {
+  type NameP = MatchesRegex[W.`"[a-zA-Z0-9-]+"`.T]
+  type Name = String Refined NameP
 
-  def sanitizeDestinationConfig(config: Json): Json
-
-  def destination[F[_]: Effect: ContextShift: MonadResourceErr](
-      config: Json)
-      : F[InitializationError[Json] \/ Disposable[F, Dest[F]]]
+  def stringName = Prism[String, Name](
+    refineV[NameP](_).fold(κ(None), Some(_)))(_.value)
 }

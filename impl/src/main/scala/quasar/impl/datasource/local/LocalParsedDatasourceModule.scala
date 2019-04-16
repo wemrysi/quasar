@@ -36,8 +36,10 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Dest
     BlockingContext.cached("local-parsed-datasource")
 
   val kind: DatasourceType = LocalParsedType
+  val destinationKind: DestinationType = LocalDestinationParsedType
 
   def sanitizeConfig(config: Json): Json = config
+  def sanitizeDestinationConfig(config: Json): Json = config
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json)(
