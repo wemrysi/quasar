@@ -24,15 +24,13 @@ import quasar.api.datasource.DatasourceError.{
 }
 import quasar.api.datasource.{DatasourceType, DestinationType}
 import quasar.api.resource.ResourcePath
-import quasar.concurrent.BlockingContext
-import quasar.connector.Destination
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
 
 import java.nio.file.{Paths, Path => JPath}
 
 import argonaut.{DecodeJson, Json}
-import cats.effect.{Effect, ContextShift, Resource, Sync}
+import cats.effect.Sync
 import eu.timepit.refined.auto._
 import pathy.Path
 import scalaz.{\/, EitherT}
@@ -44,8 +42,7 @@ package object local {
   val LocalType = DatasourceType("local", 1L)
   val LocalParsedType = DatasourceType("local-parsed", 1L)
 
-  val LocalDestinationType = DestinationType("local", 1L)
-  val LocalDestinationParsedType = DestinationType("local-parsed", 1L)
+  val LocalDestinationType = DestinationType("local", 1L, 1L)
 
   def toNio[F[_]: Sync](root: JPath, rp: ResourcePath): F[JPath] =
     Path.flatten("", "", "", ι, ι, rp.toPath).foldLeftM(root) { (p, n) =>
@@ -66,13 +63,4 @@ package object local {
     EitherT.fromEither(Sync[F].attempt(Sync[F].delay(Paths.get(path))))
       .leftMap[InitializationError[Json]](
         t => MalformedConfiguration(LocalType, config, errorPrefix + t.getMessage))
-
-  def localDestination[F[_]: Effect: ContextShift](config: Json, blockingPool: BlockingContext)
-      : EitherT[F, InitializationError[Json], Resource[F, Destination[F]]] =
-    for {
-      ld <- attemptConfig[F, LocalDestinationConfig](config, "Failed to decode LocalDestination config: ")
-      root <- validatePath(ld.rootDir, config, "Invalid destination path: ")
-
-      dest: Destination[F] = LocalDestination[F](root, blockingPool)
-    } yield dest.point[Resource[F, ?]]
 }

@@ -17,14 +17,9 @@
 package quasar.impl.datasource.local
 
 import quasar.Disposable
-import quasar.api.datasource.{DatasourceError, DatasourceType, DestinationType}, DatasourceError._
+import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
 import quasar.concurrent.BlockingContext
-import quasar.connector.{
-  Destination,
-  DestinationModule,
-  LightweightDatasourceModule,
-  MonadResourceErr
-}
+import quasar.connector.{LightweightDatasourceModule, MonadResourceErr}
 
 import scala.concurrent.ExecutionContext
 
@@ -34,16 +29,13 @@ import scalaz.\/
 import scalaz.syntax.applicative._
 import shims._
 
-object LocalDatasourceModule extends LightweightDatasourceModule with DestinationModule {
+object LocalDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
   private lazy val blockingPool: BlockingContext =
     BlockingContext.cached("local-datasource")
 
   val kind: DatasourceType = LocalType
-  val destinationKind: DestinationType = LocalDestinationType
-
   def sanitizeConfig(config: Json): Json = config
-  def sanitizeDestinationConfig(config: Json): Json = config
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json)(
@@ -56,8 +48,4 @@ object LocalDatasourceModule extends LightweightDatasourceModule with Destinatio
 
     ds.run
   }
-
-  def destination[F[_]: Effect: ContextShift: MonadResourceErr](config: Json)
-      : F[InitializationError[Json] \/ Resource[F, Destination[F]]] =
-    localDestination[F](config, blockingPool).run
 }

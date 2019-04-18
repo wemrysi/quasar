@@ -20,7 +20,7 @@ import slamdata.Predef.{Byte, List}
 
 import fs2.Stream
 
-trait ResultType[F[_]] {
+sealed trait ResultType[F[_]] {
   type T
 }
 
