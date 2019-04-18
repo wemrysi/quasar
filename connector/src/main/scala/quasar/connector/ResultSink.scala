@@ -16,13 +16,14 @@
 
 package quasar.connector
 
-import slamdata.Predef._
+import slamdata.Predef.Unit
+
+import quasar.api.resource.ResourcePath
 
 import fs2.Stream
 
-sealed trait ResultSet[F[_]] extends Product with Serializable
+trait ResultSink[F[_]] {
+  val resultType: ResultType[F]
 
-object ResultSet {
-  // extend with other output formats we might want to support
-  final case class Csv[F[_]](columns: List[TableColumn], data: Stream[F, Byte]) extends ResultSet[F]
+  def apply(dst: ResourcePath, result: resultType.T): F[Stream[F, Unit]]
 }

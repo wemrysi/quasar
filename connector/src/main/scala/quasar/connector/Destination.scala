@@ -16,13 +16,12 @@
 
 package quasar.connector
 
-import slamdata.Predef.Unit
-import quasar.api.resource._
+import quasar.api.datasource.DestinationType
 
-/** @tparam F effects
-  * @tparam G multiple results
-  * @tparam I destination input
-  */
-trait Destination[F[_], G[_], I] {
-  def writeToPath(path: ResourcePath): F[I => G[Unit]]
+import scalaz.NonEmptyList
+
+trait Destination[F[_]] {
+  def destinationKind: DestinationType
+
+  def sinks: NonEmptyList[ResultSink[F]]
 }

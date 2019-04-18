@@ -16,19 +16,20 @@
 
 package quasar.connector
 
-import quasar.api.datasource.DatasourceError.InitializationError
-import quasar.api.datasource.DestinationType
+import slamdata.Predef.{Byte, List}
 
-import argonaut.Json
-import cats.effect.{Effect, ContextShift, Resource}
-import scalaz.\/
+import fs2.Stream
 
-trait DestinationModule {
-  def destinationKind: DestinationType
+trait ResultType[F[_]] {
+  type T
+}
 
-  def sanitizeDestinationConfig(config: Json): Json
+object ResultType {
+  type Aux[F[_], A] = ResultType[F] {
+    type T = A
+  }
 
-  def destination[F[_]: Effect: ContextShift: MonadResourceErr](
-    config: Json)
-    : F[InitializationError[Json] \/ Resource[F, Destination[F]]]
+  final case class Csv[F[_]]() extends ResultType[F] {
+    type T = (List[TableColumn], Stream[F, Byte])
+  }
 }

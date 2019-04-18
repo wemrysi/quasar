@@ -20,10 +20,11 @@ import slamdata.Predef.{Stream => _, _}
 
 import quasar.api.resource.ResourcePath
 import quasar.concurrent.BlockingContext
-import quasar.connector.{Destination, ResultSet}
+import quasar.connector.{Destination, ResultSink, ResultType, TableColumn}
 
 import cats.effect.{ContextShift, Effect}
 import fs2.{io, Stream}
+import scalaz.NonEmptyList
 import scalaz.syntax.applicative._
 import scalaz.syntax.tag._
 import shims._
@@ -32,16 +33,11 @@ import java.nio.file.{Path => JPath}
 
 final class LocalDestination[F[_]: Effect: ContextShift] private (
   root: JPath,
-  blockingContext: BlockingContext) extends Destination[F, Stream[F, ?], ResultSet[F]] {
-  def writeToPath(path: ResourcePath): F[ResultSet[F] => Stream[F, Unit]] =
-    toNio[F](root, path).map(writePath => {
-      case ResultSet.Csv(_, data) => {
-        val writing: Stream[F, Byte] => Stream[F, Unit] =
-          io.file.writeAll[F](writePath, blockingContext.unwrap)
+  blockingContext: BlockingContext) extends Destination[F] {
+  val destinationKind = LocalDestinationType
 
-        writing(data)
-      }
-    })
+  def sinks: NonEmptyList[ResultSink[F]] =
+    NonEmptyList(LocalCsvSink(root, blockingContext))
 }
 
 object LocalDestination {
@@ -49,4 +45,26 @@ object LocalDestination {
       root: JPath,
       blockingContext: BlockingContext): LocalDestination[F] =
     new LocalDestination[F](root, blockingContext)
+}
+
+final class LocalCsvSink[F[_]: Effect: ContextShift] private (
+  root: JPath,
+  blockingContext: BlockingContext) extends ResultSink[F] {
+
+  val resultType: ResultType.Aux[F, ResultType.Csv[F]#T] = ResultType.Csv()
+
+  def apply(dst: ResourcePath, result: (List[TableColumn], Stream[F, Byte])): F[Stream[F, Unit]] =
+    toNio[F](root, dst) map { writePath =>
+      val (_, bytes) = result
+      val sink: Stream[F, Byte] => Stream[F, Unit] =
+        io.file.writeAll[F](writePath, blockingContext.unwrap)
+
+      sink(bytes)
+    }
+}
+
+object LocalCsvSink {
+  def apply[F[_]: Effect: ContextShift](
+    root: JPath,
+    blockingContext: BlockingContext): LocalCsvSink[F] = new LocalCsvSink(root, blockingContext)
 }
