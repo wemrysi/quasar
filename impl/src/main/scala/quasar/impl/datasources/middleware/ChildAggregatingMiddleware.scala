@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasources.middleware
+package quasar.impl
+package datasources.middleware
 
 import quasar.connector.{Datasource, MonadResourceErr, PhysicalDatasource}
-import quasar.impl.datasource.{AggregateResult, ChildAggregatingDatasource}
+import quasar.impl.datasource.{AggregateResult, ChildAggregatingDatasource, MonadCreateErr}
 import quasar.impl.datasources.ManagedDatasource
 import quasar.qscript.{InterpretedRead, QScriptEducated}
 
@@ -25,26 +26,24 @@ import scala.util.{Either, Left}
 
 import cats.Monad
 import cats.syntax.functor._
-
 import fs2.Stream
-
 import shims._
 
 object ChildAggregatingMiddleware {
-  def apply[T[_[_]], F[_]: Monad: MonadResourceErr, I, R](
+  def apply[T[_[_]], F[_]: Monad: MonadResourceErr: MonadCreateErr, I, R](
       datasourceId: I,
       mds: ManagedDatasource[T, F, Stream[F, ?], R])
       : F[ManagedDatasource[T, F, Stream[F, ?], Either[R, AggregateResult[F, R]]]] =
     Monad[F].pure(mds) map {
       case ManagedDatasource.ManagedLightweight(lw) =>
         ManagedDatasource.lightweight[T](
-          ChildAggregatingDatasource(PhysicalDatasource.fromDataSource(lw), InterpretedRead.path))
+          ChildAggregatingDatasource(datasource.toPhysicalDatasource(lw), InterpretedRead.path))
 
       // TODO: union all in QScript?
       case ManagedDatasource.ManagedHeavyweight(hw) =>
         type Q = T[QScriptEducated[T, ?]]
         ManagedDatasource.heavyweight(
           Datasource.pevaluator[F, Stream[F, ?], Q, R, Q, Either[R, AggregateResult[F, R]]]
-            .modify(_.map(Left(_)))(PhysicalDatasource.fromDataSource(hw)))
+            .modify(_.map(Left(_)))(datasource.toPhysicalDatasource(hw)))
     }
 }

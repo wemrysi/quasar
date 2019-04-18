@@ -21,11 +21,3 @@ import quasar.api.resource.ResourcePathType
 trait PhysicalDatasource[F[_], G[_], Q, R] extends Datasource[F, G, Q, R] {
   type PathType = ResourcePathType.Physical
 }
-
-object PhysicalDatasource {
-  def fromDataSource[F[_], G[_], Q, R](ds: Datasource[F, G, Q, R]): PhysicalDatasource[F, G, Q, R] =
-    ds match {
-      case p: PhysicalDatasource[F, G, Q, R] => p
-      case other => scala.Predef.??? // TODO failed datasource
-    }
-}

@@ -17,7 +17,6 @@
 package quasar.impl.datasources
 
 import slamdata.Predef._
-
 import quasar.{Condition, Disposable, RenderTreeT}
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported}
@@ -26,26 +25,22 @@ import quasar.connector.{MonadResourceErr, QueryResult}
 import quasar.contrib.scalaz._
 import quasar.fp.ski.κ2
 import quasar.impl.DatasourceModule
-import quasar.impl.datasource.{ByNeedDatasource, FailedDatasource}
+import quasar.impl.datasource.{ByNeedDatasource, FailedDatasource, MonadCreateErr}
 import quasar.qscript.{InterpretedRead, MonadPlannerErr}
 
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import argonaut.Argonaut.jEmptyObject
-
 import cats.ApplicativeError
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
 import cats.effect.concurrent.Ref
 import cats.effect.syntax.bracket._
 import cats.syntax.applicativeError._
-
 import fs2.Stream
-
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-
-import scalaz.{EitherT, IMap, ISet, OptionT, Order, Scalaz}, Scalaz._
-
+import scalaz.{EitherT, IMap, ISet, OptionT, Order, Scalaz}
+import Scalaz._
 import shims._
 
 final class DefaultDatasourceManager[
@@ -132,7 +127,6 @@ object DefaultDatasourceManager {
   type Modules = IMap[DatasourceType, DatasourceModule]
   type MDS[T[_[_]], F[_]] = ManagedDatasource[T, F, Stream[F, ?], QueryResult[F]]
   type Running[I, T[_[_]], F[_], G[_], R] = IMap[I, Disposable[F, ManagedDatasource[T, F, G, R]]]
-  type MonadCreateErr[F[_]] = MonadError_[F, CreateError[Json]]
 
   final case class IncompatibleDatasourceException(kind: DatasourceType) extends java.lang.RuntimeException {
     override def getMessage = s"Loaded datasource implementation with type $kind is incompatible with quasar"

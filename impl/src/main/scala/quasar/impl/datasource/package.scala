@@ -16,13 +16,28 @@
 
 package quasar.impl
 
+import quasar.api.datasource.DatasourceError.{CreateError, MalformedConfiguration}
 import quasar.api.resource.ResourcePath
+import quasar.connector.{Datasource, PhysicalDatasource}
+import quasar.contrib.scalaz.MonadError_
 
 import scala.util.Either
 
+import argonaut.Json
 import fs2.Stream
+import scalaz.Applicative
 
 package object datasource {
   type AggregateResult[F[_], A] = Stream[F, (ResourcePath, A)]
   type CompositeResult[F[_], A] = Either[A, AggregateResult[F, A]]
+
+  type MonadCreateErr[F[_]] = MonadError_[F, CreateError[Json]]
+
+  def toPhysicalDatasource[F[_]: Applicative: MonadCreateErr, G[_], Q, R](ds: Datasource[F, G, Q, R])
+      : PhysicalDatasource[F, G, Q, R] =
+    ds match {
+      case p: PhysicalDatasource[F, G, Q, R] => p
+      case other => FailedDatasource[CreateError[Json], F, G, Q, R](ds.kind,
+        MalformedConfiguration(ds.kind, Json.jEmptyObject, "Datasource is not PhysicalDatasource"))
+    }
 }

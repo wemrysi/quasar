@@ -25,8 +25,7 @@ import quasar.contrib.scalaz._
 
 import scala.util.{Left, Right}
 
-import cats.{Functor, Monad}
-import cats.instances.option._
+import cats.Monad
 import cats.syntax.applicative._
 import cats.syntax.eq._
 import cats.syntax.flatMap._
