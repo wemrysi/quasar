@@ -30,7 +30,7 @@ import fs2.Stream
 import scalaz.\/
 
 trait LightweightDatasourceModule {
-  type DS[F[_]] = Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]]
+  type DS[F[_]] = PhysicalDatasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]]
 
   def kind: DatasourceType
 

@@ -14,12 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.connector.datasource
+package quasar.connector
 
-import quasar.api.resource.ResourcePath
-import quasar.connector.{MonadResourceErr, PhysicalDatasource}
-import quasar.qscript.InterpretedRead
+import slamdata.Predef
+import quasar.api.datasource.DatasourceType
+import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 
-/** A Datasource capable of returning the contents of resources. */
-abstract class LightweightDatasource[F[_]: MonadResourceErr, G[_], R]
-    extends PhysicalDatasource[F, G, InterpretedRead[ResourcePath], R]
+trait PhysicalDatasource[F[_], G[_], Q, R] extends Datasource[F, G, Q, R] {
+  type PathType = ResourcePathType.Physical
+}
+
+object PhysicalDatasource {
+  def fromDataSource[F[_], G[_], Q, R](ds: Datasource[F, G, Q, R]): PhysicalDatasource[F, G, Q, R] =
+    ds match {
+      case p: PhysicalDatasource[F, G, Q, R] => p
+      case other => scala.Predef.??? // TODO failed datasource
+    }
+}

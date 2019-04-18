@@ -16,8 +16,7 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{Boolean, Option}
-
+import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.Datasource
@@ -41,11 +40,12 @@ sealed trait ManagedDatasource[T[_[_]], F[_], G[_], R] {
       case ManagedHeavyweight(hw) => hw.pathIsResource(path)
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def prefixedChildPaths(prefixPath: ResourcePath)
       : F[Option[G[(ResourceName, ResourcePathType)]]] =
     this match {
-      case ManagedLightweight(lw) => lw.prefixedChildPaths(prefixPath)
-      case ManagedHeavyweight(hw) => hw.prefixedChildPaths(prefixPath)
+      case ManagedLightweight(lw) => lw.prefixedChildPaths(prefixPath).asInstanceOf[F[Option[G[(ResourceName, ResourcePathType)]]]]
+      case ManagedHeavyweight(hw) => hw.prefixedChildPaths(prefixPath).asInstanceOf[F[Option[G[(ResourceName, ResourcePathType)]]]]
     }
 
   def modify[V[_], W[_], S](f: Datasource[F, G, ?, R] ~> Datasource[V, W, ?, S])

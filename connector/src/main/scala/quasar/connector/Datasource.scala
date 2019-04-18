@@ -29,6 +29,8 @@ import monocle.{Lens, PLens}
   */
 trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, Q, R] {
 
+  type PathType <: ResourcePathType
+
   /** The type of this datasource. */
   def kind: DatasourceType
 
@@ -41,7 +43,7 @@ trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, Q, R] {
     * each name to `prefixPath` or `None` if `prefixPath` does not exist.
     */
   def prefixedChildPaths(prefixPath: ResourcePath)
-      : F[Option[G[(ResourceName, ResourcePathType)]]]
+      : F[Option[G[(ResourceName, PathType)]]]
 }
 
 object Datasource {
@@ -52,6 +54,7 @@ object Datasource {
       : PLens[Datasource[F, G, Q1, R1], Datasource[F, G, Q2, R2], QueryEvaluator[F, Q1, R1], QueryEvaluator[F, Q2, R2]] =
     PLens((ds: Datasource[F, G, Q1, R1]) => ds: QueryEvaluator[F, Q1, R1]) { qe: QueryEvaluator[F, Q2, R2] => ds =>
       new Datasource[F, G, Q2, R2] {
+        type PathType = ds.PathType
         val kind = ds.kind
         def evaluate(q: Q2) = qe.evaluate(q)
         def pathIsResource(p: ResourcePath) = ds.pathIsResource(p)

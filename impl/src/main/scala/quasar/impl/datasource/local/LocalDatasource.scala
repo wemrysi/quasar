@@ -20,13 +20,13 @@ import slamdata.Predef._
 
 import quasar.api.resource.ResourcePath
 import quasar.concurrent.BlockingContext
-import quasar.connector.{Datasource, MonadResourceErr, ParsableType, QueryResult}
+import quasar.connector._
 import quasar.qscript.InterpretedRead
 
 import java.nio.file.{Path => JPath}
 
 import cats.effect.{ContextShift, Effect, Timer}
-import fs2.{io, Stream}
+import fs2.{Stream, io}
 import scalaz.syntax.tag._
 
 object LocalDatasource {
@@ -37,7 +37,7 @@ object LocalDatasource {
       root: JPath,
       readChunkSizeBytes: Int,
       blockingPool: BlockingContext)
-      : Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]] = {
+      : PhysicalDatasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]] = {
 
     import ParsableType.JsonVariant
 

@@ -19,7 +19,7 @@ package quasar.impl.datasource
 import slamdata.Predef.{Boolean, Option}
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.Datasource
+import quasar.connector.PhysicalDatasource
 import quasar.contrib.scalaz.MonadError_
 
 import scalaz.Applicative
@@ -30,7 +30,7 @@ final class FailedDatasource[
     G[_], Q, R] private (
     datasourceType: DatasourceType,
     error: E)
-    extends Datasource[F, G, Q, R] {
+    extends PhysicalDatasource[F, G, Q, R] {
 
   val kind: DatasourceType = datasourceType
 
@@ -41,7 +41,7 @@ final class FailedDatasource[
     MonadError_[F, E].raiseError(error)
 
   def prefixedChildPaths(path: ResourcePath)
-      : F[Option[G[(ResourceName, ResourcePathType)]]] =
+      : F[Option[G[(ResourceName, PathType)]]] =
     MonadError_[F, E].raiseError(error)
 }
 
@@ -52,6 +52,6 @@ object FailedDatasource {
       G[_], Q, R](
       kind: DatasourceType,
       error: E)
-      : Datasource[F, G, Q, R] =
+      : PhysicalDatasource[F, G, Q, R] =
     new FailedDatasource[E, F, G, Q, R](kind, error)
 }

@@ -104,8 +104,8 @@ final class MockDatasources[
             (
               t.rootLabel,
               t.subForest.isEmpty.fold(
-                ResourcePathType.leafResource,
-                ResourcePathType.prefix)
+                (ResourcePathType.leafResource : ResourcePathType),
+                (ResourcePathType.prefix : ResourcePathType))
             ).point[G])(ApplicativePlus[G].monoid))
 
         progeny \/> pathNotFound[DiscoveryError[Int]](prefixPath)

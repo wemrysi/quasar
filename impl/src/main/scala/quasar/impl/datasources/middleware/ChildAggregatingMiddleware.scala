@@ -16,7 +16,7 @@
 
 package quasar.impl.datasources.middleware
 
-import quasar.connector.{Datasource, MonadResourceErr}
+import quasar.connector.{Datasource, MonadResourceErr, PhysicalDatasource}
 import quasar.impl.datasource.{AggregateResult, ChildAggregatingDatasource}
 import quasar.impl.datasources.ManagedDatasource
 import quasar.qscript.{InterpretedRead, QScriptEducated}
@@ -38,13 +38,13 @@ object ChildAggregatingMiddleware {
     Monad[F].pure(mds) map {
       case ManagedDatasource.ManagedLightweight(lw) =>
         ManagedDatasource.lightweight[T](
-          ChildAggregatingDatasource(lw, InterpretedRead.path))
+          ChildAggregatingDatasource(PhysicalDatasource.fromDataSource(lw), InterpretedRead.path))
 
       // TODO: union all in QScript?
       case ManagedDatasource.ManagedHeavyweight(hw) =>
         type Q = T[QScriptEducated[T, ?]]
         ManagedDatasource.heavyweight(
           Datasource.pevaluator[F, Stream[F, ?], Q, R, Q, Either[R, AggregateResult[F, R]]]
-            .modify(_.map(Left(_)))(hw))
+            .modify(_.map(Left(_)))(PhysicalDatasource.fromDataSource(hw)))
     }
 }

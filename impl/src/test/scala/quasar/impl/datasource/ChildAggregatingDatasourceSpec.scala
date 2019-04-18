@@ -77,7 +77,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
       val paths = IMap(z -> 1, (z / x) -> 2, (z / y) -> 3)
 
       val uds =
-        new Datasource[IO, Stream[IO, ?], ResourcePath, Int] {
+        new PhysicalDatasource[IO, Stream[IO, ?], ResourcePath, Int] {
           val kind = DatasourceType("prefixed", 6L)
 
           def evaluate(rp: ResourcePath): IO[Int] =
@@ -87,7 +87,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
             IO.pure(paths.member(rp))
 
           def prefixedChildPaths(rp: ResourcePath)
-              : IO[Option[Stream[IO, (ResourceName, ResourcePathType)]]] =
+              : IO[Option[Stream[IO, (ResourceName, ResourcePathType.Physical)]]] =
             IO pure {
               if (rp ≟ ResourcePath.root())
                 Some(Stream(ResourceName("z") -> ResourcePathType.prefixResource))
@@ -109,7 +109,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
         meta <- dres.traverse(_.compile.to[List])
         qres <- ds.evaluate(z)
       } yield {
-        meta must beSome(equal(List(ResourceName("z") -> ResourcePathType.prefixResource)))
+        meta must beSome(equal(List(ResourceName("z") -> (ResourcePathType.prefixResource: ResourcePathType))))
         qres must beLeft(1)
       }
     }

@@ -28,10 +28,12 @@ import scalaz.Monad
 final class ConditionReportingDatasource[
     E, F[_]: Monad: MonadError_[?[_], E], G[_], Q, R] private (
     report: Condition[E] => F[Unit],
-    underlying: Datasource[F, G, Q, R])
+    val underlying: Datasource[F, G, Q, R])
     extends Datasource[F, G, Q, R] {
 
   val kind: DatasourceType = underlying.kind
+
+  type PathType = underlying.PathType
 
   def evaluate(query: Q): F[R] =
     reportCondition(underlying.evaluate(query))
@@ -40,7 +42,7 @@ final class ConditionReportingDatasource[
     reportCondition(underlying.pathIsResource(path))
 
   def prefixedChildPaths(path: ResourcePath)
-      : F[Option[G[(ResourceName, ResourcePathType)]]] =
+      : F[Option[G[(ResourceName, PathType)]]] =
     reportCondition(underlying.prefixedChildPaths(path))
 
   ////

@@ -61,12 +61,12 @@ abstract class DatasourceSpec[F[_]: Effect, G[_]]
           val path = pfx / n
 
           val tpeResult = tpe match {
-            case ResourcePathType.LeafResource | ResourcePathType.PrefixResource =>
+            case r if r.isResource =>
               datasource.pathIsResource(path).ifM(
                 checkAgreementUnder(path),
                 ko(s"Expected ${path.shows} to be a resource.").point[F])
 
-            case ResourcePathType.Prefix =>
+            case _ =>
               datasource.pathIsResource(path).ifM(
                 ko(s"Expected ${path.shows} not to be a resource.").point[F],
                 checkAgreementUnder(path))
