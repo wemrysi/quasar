@@ -25,7 +25,7 @@ import quasar.connector.{Destination, ResultSink, ResultType, TableColumn}
 import cats.effect.{ContextShift, Effect}
 import fs2.{io, Stream}
 import scalaz.NonEmptyList
-import scalaz.syntax.applicative._
+import scalaz.syntax.monad._
 import scalaz.syntax.tag._
 import shims._
 
@@ -53,13 +53,13 @@ final class LocalCsvSink[F[_]: Effect: ContextShift] private (
 
   val resultType = ResultType.Csv()
 
-  def apply(dst: ResourcePath, result: (List[TableColumn], Stream[F, Byte])): F[Stream[F, Unit]] =
-    toNio[F](root, dst) map { writePath =>
+  def apply(dst: ResourcePath, result: (List[TableColumn], Stream[F, Byte])): F[Unit] =
+    toNio[F](root, dst) >>= { writePath =>
       val (_, bytes) = result
       val sink: Stream[F, Byte] => Stream[F, Unit] =
         io.file.writeAll[F](writePath, blockingContext.unwrap)
 
-      sink(bytes)
+      sink(bytes).compile.drain
     }
 }
 

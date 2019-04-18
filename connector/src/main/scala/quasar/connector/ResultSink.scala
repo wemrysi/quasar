@@ -25,5 +25,5 @@ import fs2.Stream
 trait ResultSink[F[_]] {
   val resultType: ResultType[F]
 
-  def apply(dst: ResourcePath, result: resultType.T): F[Stream[F, Unit]]
+  def apply(dst: ResourcePath, result: resultType.T): F[Unit]
 }
