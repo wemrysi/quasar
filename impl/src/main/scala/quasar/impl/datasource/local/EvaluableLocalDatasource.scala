@@ -24,8 +24,6 @@ import quasar.connector._
 import quasar.connector.ResourceError._
 import quasar.connector.datasource.LightweightDatasource
 import quasar.contrib.fs2.convert
-import quasar.contrib.scalaz.MonadError_
-import quasar.fp.ski.ι
 import quasar.qscript.InterpretedRead
 
 import scala.Predef.classOf
@@ -35,8 +33,7 @@ import java.nio.file.attribute.BasicFileAttributes
 
 import cats.effect.{ContextShift, Effect, Timer}
 import fs2.Stream
-import pathy.Path
-import scalaz.{\/, OptionT, Scalaz}, Scalaz._
+import scalaz.{OptionT, Scalaz}, Scalaz._
 import shims._
 
 /** A Datasource backed by the underlying filesystem local to Quasar.
@@ -65,7 +62,7 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
     } yield queryResult(InterpretedRead(jp, ir.stages))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
-    toNio[F](path) >>= isCandidate
+    toNio[F](root, path) >>= isCandidate
 
   def prefixedChildPaths(path: ResourcePath): F[Option[Stream[F, (ResourceName, ResourcePathType)]]] = {
     def withType(jp: JPath): F[(ResourceName, ResourcePathType)] =
@@ -86,7 +83,7 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
   ////
 
   private def attributesOf(resourcePath: ResourcePath): OptionT[F, (JPath, BasicFileAttributes)] =
-    OptionT(toNio[F](resourcePath) flatMap { jpath =>
+    OptionT(toNio[F](root, resourcePath) flatMap { jpath =>
       F.recover(F.delay(some((jpath, Files.readAttributes(jpath, classOf[BasicFileAttributes]))))) {
         case _: NoSuchFileException => none
       }
@@ -94,12 +91,6 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
 
   private def isCandidate(jp: JPath): F[Boolean] =
     F.delay(Files.isRegularFile(jp) && !Files.isHidden(jp))
-
-  private def toNio[F[_]: Effect](rp: ResourcePath): F[JPath] =
-    Path.flatten("", "", "", ι, ι, rp.toPath).foldLeftM(root) { (p, n) =>
-      if (n.isEmpty) p.point[F]
-      else MonadError_[F, Throwable].unattempt_(\/.fromTryCatchNonFatal(p.resolve(n)))
-    }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private def toResourceName(jp: JPath): ResourceName =

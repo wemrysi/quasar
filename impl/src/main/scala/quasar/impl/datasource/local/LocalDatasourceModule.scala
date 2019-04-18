@@ -21,42 +21,29 @@ import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError.
 import quasar.concurrent.BlockingContext
 import quasar.connector.{LightweightDatasourceModule, MonadResourceErr}
 
-import java.nio.file.Paths
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import cats.effect._
-import scalaz.{EitherT, \/}
+import scalaz.\/
 import scalaz.syntax.applicative._
 import shims._
 
-object LocalDatasourceModule extends LightweightDatasourceModule {
+object LocalDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
-  private lazy val blockingPool: BlockingContext =
+  override lazy val blockingPool: BlockingContext =
     BlockingContext.cached("local-datasource")
 
   val kind: DatasourceType = LocalType
-
   def sanitizeConfig(config: Json): Json = config
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json)(
       implicit ec: ExecutionContext)
       : F[InitializationError[Json] \/ Disposable[F, DS[F]]] = {
-
-    val F = ConcurrentEffect[F]
-
     val ds = for {
-      lc <-
-        EitherT.fromEither(config.as[LocalConfig].toEither.point[F])
-          .leftMap[InitializationError[Json]] {
-            case (s, _) => MalformedConfiguration(kind, config, "Failed to decode LocalDatasource config: " + s)
-          }
-
-      root <-
-        EitherT.fromEither(F.attempt(F.delay(Paths.get(lc.rootDir))))
-          .leftMap[InitializationError[Json]](
-            t => MalformedConfiguration(kind, config, "Invalid path: " + t.getMessage))
+      lc <- attemptConfig[F, LocalConfig](config, "Failed to decode LocalDatasource config: ")
+      root <- validatePath(lc.rootDir, config, "Invalid path: ")
     } yield LocalDatasource[F](root, lc.readChunkSizeBytes, blockingPool).point[Disposable[F, ?]]
 
     ds.run

@@ -28,14 +28,14 @@ import scalaz.std.tuple._
 import scalaz.syntax.show._
 
 @Lenses
-final case class DatasourceType(name: DatasourceType.Name, version: Positive)
+final case class DestinationType(name: DestinationType.Name, version: Positive, minSupportedVersion: Positive)
 
-object DatasourceType extends DatasourceTypeInstances {
+object DestinationType extends DestinationTypeInstances {
   type Name = datasource.Name
   type NameP = datasource.NameP
 }
 
-sealed abstract class DatasourceTypeInstances {
+sealed abstract class DestinationTypeInstances {
   implicit val order: Order[DatasourceType] =
     Order.orderBy(t => (t.name, t.version))
 
