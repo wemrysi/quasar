@@ -20,8 +20,6 @@ import slamdata.Predef.Unit
 
 import quasar.api.resource.ResourcePath
 
-import fs2.Stream
-
 trait ResultSink[F[_]] {
   val resultType: ResultType[F]
 
