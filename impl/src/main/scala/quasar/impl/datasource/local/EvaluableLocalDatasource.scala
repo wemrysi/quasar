@@ -111,6 +111,6 @@ object EvaluableLocalDatasource {
       dsType: DatasourceType,
       root: JPath)(
       queryResult: InterpretedRead[JPath] => QueryResult[F])
-      : PhysicalDatasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]] =
+      : DS[F] =
     new EvaluableLocalDatasource[F](dsType, root, queryResult)
 }

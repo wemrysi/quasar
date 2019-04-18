@@ -18,15 +18,13 @@ package quasar.impl.datasource.local
 
 import slamdata.Predef._
 
-import quasar.api.resource.ResourcePath
 import quasar.concurrent.BlockingContext
-import quasar.connector.{MonadResourceErr, PhysicalDatasource, QueryResult}
-import quasar.qscript.InterpretedRead
+import quasar.connector._
 
 import java.nio.file.{Path => JPath}
 
 import cats.effect.{ContextShift, Effect, Timer}
-import fs2.{Stream, io}
+import fs2.io
 import jawnfs2._
 import org.typelevel.jawn.Facade
 import qdata.{QDataDecode, QDataEncode}
@@ -41,7 +39,7 @@ object LocalParsedDatasource {
       root: JPath,
       readChunkSizeBytes: Int,
       blockingPool: BlockingContext)
-      : PhysicalDatasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]] = {
+      : DS[F] = {
 
     implicit val facade: Facade[A] = QDataFacade(isPrecise = true)
 

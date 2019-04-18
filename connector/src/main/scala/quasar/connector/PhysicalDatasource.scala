@@ -16,9 +16,7 @@
 
 package quasar.connector
 
-import slamdata.Predef
-import quasar.api.datasource.DatasourceType
-import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
+import quasar.api.resource.ResourcePathType
 
 trait PhysicalDatasource[F[_], G[_], Q, R] extends Datasource[F, G, Q, R] {
   type PathType = ResourcePathType.Physical
