@@ -25,10 +25,6 @@ trait ResultType[F[_]] {
 }
 
 object ResultType {
-  type Aux[F[_], A] = ResultType[F] {
-    type T = A
-  }
-
   final case class Csv[F[_]]() extends ResultType[F] {
     type T = (List[TableColumn], Stream[F, Byte])
   }

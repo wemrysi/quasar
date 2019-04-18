@@ -51,7 +51,7 @@ final class LocalCsvSink[F[_]: Effect: ContextShift] private (
   root: JPath,
   blockingContext: BlockingContext) extends ResultSink[F] {
 
-  val resultType: ResultType.Aux[F, ResultType.Csv[F]#T] = ResultType.Csv()
+  val resultType = ResultType.Csv()
 
   def apply(dst: ResourcePath, result: (List[TableColumn], Stream[F, Byte])): F[Stream[F, Unit]] =
     toNio[F](root, dst) map { writePath =>
