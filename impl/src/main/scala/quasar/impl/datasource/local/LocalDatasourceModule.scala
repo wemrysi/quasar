@@ -31,7 +31,7 @@ import shims._
 
 object LocalDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
-  private lazy val blockingPool: BlockingContext =
+  override lazy val blockingPool: BlockingContext =
     BlockingContext.cached("local-datasource")
 
   val kind: DatasourceType = LocalType

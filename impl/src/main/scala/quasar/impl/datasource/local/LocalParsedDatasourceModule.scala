@@ -32,8 +32,8 @@ import shims._
 
 object LocalParsedDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
-  private lazy val blockingPool: BlockingContext =
-    BlockingContext.cached("local-parsed-datasource")
+  override lazy val blockingPool: BlockingContext =
+    BlockingContext.cached("local-datasource")
 
   val kind: DatasourceType = LocalParsedType
   def sanitizeConfig(config: Json): Json = config

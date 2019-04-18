@@ -27,8 +27,7 @@ import scalaz.syntax.applicative._
 import shims._
 
 trait LocalDestinationModule extends DestinationModule {
-  private lazy val blockingPool: BlockingContext =
-    BlockingContext.cached("local-parsed-datasource")
+  val blockingPool: BlockingContext
 
   val destinationType = LocalDestinationType
   def sanitizeDestinationConfig(config: Json): Json = config
