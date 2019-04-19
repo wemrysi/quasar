@@ -16,8 +16,28 @@
 
 package quasar.connector
 
-import quasar.api.resource.ResourcePathType
+import quasar.api.QueryEvaluator
+import quasar.api.resource.{ResourcePath, ResourcePathType}
+
+import monocle.{Lens, PLens}
 
 trait PhysicalDatasource[F[_], G[_], Q, R] extends Datasource[F, G, Q, R] {
   type PathType = ResourcePathType.Physical
 }
+
+object PhysicalDatasource {
+  def evaluator[F[_], G[_], Q, R]: Lens[PhysicalDatasource[F, G, Q, R], QueryEvaluator[F, Q, R]] =
+    pevaluator[F, G, Q, R, Q, R]
+
+  def pevaluator[F[_], G[_], Q1, R1, Q2, R2]
+      : PLens[PhysicalDatasource[F, G, Q1, R1], PhysicalDatasource[F, G, Q2, R2], QueryEvaluator[F, Q1, R1], QueryEvaluator[F, Q2, R2]] =
+    PLens((ds: PhysicalDatasource[F, G, Q1, R1]) => ds: QueryEvaluator[F, Q1, R1]) { qe: QueryEvaluator[F, Q2, R2] => ds =>
+      new PhysicalDatasource[F, G, Q2, R2] {
+        val kind = ds.kind
+        def evaluate(q: Q2) = qe.evaluate(q)
+        def pathIsResource(p: ResourcePath) = ds.pathIsResource(p)
+        def prefixedChildPaths(pfx: ResourcePath) = ds.prefixedChildPaths(pfx)
+      }
+    }
+}
+
