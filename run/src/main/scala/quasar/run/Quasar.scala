@@ -97,8 +97,8 @@ object Quasar extends Logging {
 
       dsManager <-
         Stream.resource(DefaultDatasourceManager.Builder[UUID, Fix, F]
-          .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
           .withMiddleware(ChildAggregatingMiddleware(_, _))
+          .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
           .build(moduleMap, configured))
 
       freshUUID = ConcurrentEffect[F].delay(UUID.randomUUID)

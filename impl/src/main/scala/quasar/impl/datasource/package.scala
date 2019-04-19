@@ -37,7 +37,8 @@ package object datasource {
       : PhysicalDatasource[F, G, Q, R] =
     ds match {
       case p: PhysicalDatasource[F, G, Q, R] => p
-      case other => FailedDatasource[CreateError[Json], F, G, Q, R](ds.kind,
-        MalformedConfiguration(ds.kind, Json.jEmptyObject, "Datasource is not PhysicalDatasource"))
+      case other =>
+        FailedDatasource[CreateError[Json], F, G, Q, R](ds.kind,
+          MalformedConfiguration(ds.kind, Json.jEmptyObject, "Datasource is not PhysicalDatasource"))
     }
 }
