@@ -17,7 +17,7 @@
 package quasar.impl
 package datasources.middleware
 
-import quasar.connector.{Datasource, MonadResourceErr, PhysicalDatasource}
+import quasar.connector.{Datasource, MonadResourceErr}
 import quasar.impl.datasource.{AggregateResult, ChildAggregatingDatasource, MonadCreateErr}
 import quasar.impl.datasources.ManagedDatasource
 import quasar.qscript.{InterpretedRead, QScriptEducated}
@@ -25,12 +25,13 @@ import quasar.qscript.{InterpretedRead, QScriptEducated}
 import scala.util.{Either, Left}
 
 import cats.Monad
+import cats.effect.Sync
 import cats.syntax.functor._
 import fs2.Stream
 import shims._
 
 object ChildAggregatingMiddleware {
-  def apply[T[_[_]], F[_]: Monad: MonadResourceErr: MonadCreateErr, I, R](
+  def apply[T[_[_]], F[_]: MonadResourceErr: MonadCreateErr: Sync, I, R](
       datasourceId: I,
       mds: ManagedDatasource[T, F, Stream[F, ?], R])
       : F[ManagedDatasource[T, F, Stream[F, ?], Either[R, AggregateResult[F, R]]]] =

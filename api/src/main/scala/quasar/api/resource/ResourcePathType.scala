@@ -71,27 +71,30 @@ sealed abstract class ResourcePathTypeInstances {
 
       def pred(t: ResourcePathType) =
         t match {
-          case ResourcePathType.Prefix => ResourcePathType.LeafResource
+          case ResourcePathType.Prefix => ResourcePathType.AggregateResource
           case ResourcePathType.PrefixResource => ResourcePathType.Prefix
           case ResourcePathType.LeafResource => ResourcePathType.PrefixResource
+          case ResourcePathType.AggregateResource => ResourcePathType.LeafResource
         }
 
       def succ(t: ResourcePathType) =
         t match {
           case ResourcePathType.Prefix => ResourcePathType.PrefixResource
           case ResourcePathType.PrefixResource => ResourcePathType.LeafResource
-          case ResourcePathType.LeafResource => ResourcePathType.Prefix
+          case ResourcePathType.LeafResource => ResourcePathType.AggregateResource
+          case ResourcePathType.AggregateResource => ResourcePathType.Prefix
         }
 
       override val min = Some(ResourcePathType.Prefix)
 
-      override val max = Some(ResourcePathType.LeafResource)
+      override val max = Some(ResourcePathType.AggregateResource)
 
       private def toInt(t: ResourcePathType): Int =
         t match {
           case ResourcePathType.Prefix => 0
           case ResourcePathType.PrefixResource => 1
           case ResourcePathType.LeafResource => 2
+          case ResourcePathType.AggregateResource => 3
         }
     }
 

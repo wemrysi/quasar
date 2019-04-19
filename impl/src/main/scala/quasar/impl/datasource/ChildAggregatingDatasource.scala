@@ -16,8 +16,7 @@
 
 package quasar.impl.datasource
 
-import slamdata.Predef.{Boolean, None, Option, Some}
-
+import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.connector.{Datasource, MonadResourceErr, PhysicalDatasource, ResourceError}
@@ -25,14 +24,14 @@ import quasar.contrib.scalaz._
 
 import scala.util.{Left, Right}
 
-import cats.Monad
+import cats.effect.Sync
 import cats.syntax.applicative._
 import cats.syntax.eq._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.syntax.option._
 
-import fs2.Stream
+import fs2.{Pull, Stream}
 
 import monocle.Lens
 
@@ -41,7 +40,7 @@ import shims._
 /** A datasource transformer that converts underlying prefix paths into prefix
   * resources by aggregating all child leaf resources of the prefix.
   */
-final class ChildAggregatingDatasource[F[_]: Monad: MonadResourceErr, Q, R] private (
+final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
     underlying: PhysicalDatasource[F, Stream[F, ?], Q, R],
     queryPath: Lens[Q, ResourcePath])
     extends Datasource[F, Stream[F, ?], Q, CompositeResult[F, R]] {
@@ -54,7 +53,10 @@ final class ChildAggregatingDatasource[F[_]: Monad: MonadResourceErr, Q, R] priv
   def evaluate(q: Q): F[CompositeResult[F, R]] = {
 
     def aggregate(p: ResourcePath): F[AggregateResult[F, R]] =
-      aggPrefixedChildPaths(p) flatMap {
+      aggPath(p).map(doAggregate).getOrElse(MonadResourceErr[F].raiseError(ResourceError.pathNotFound(p)))
+
+    def doAggregate(p: ResourcePath): F[AggregateResult[F, R]] =
+      underlying.prefixedChildPaths(p) flatMap {
         case Some(s) =>
           val agg =
             s.collect { case (n, ResourcePathType.LeafResource) => p / n }
@@ -78,10 +80,20 @@ final class ChildAggregatingDatasource[F[_]: Monad: MonadResourceErr, Q, R] priv
   def pathIsResource(path: ResourcePath): F[Boolean] =
     underlying.pathIsResource(path).ifM(true.pure[F], aggPathExists(path))
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def prefixedChildPaths(prefixPath: ResourcePath)
       : F[Option[Stream[F, (ResourceName, ResourcePathType)]]] =
-    underlying.prefixedChildPaths(prefixPath)
-      .map(_.map(s => Stream.emit((AggName, ResourcePathType.AggregateResource)) ++ s))
+    aggPath(prefixPath) match {
+      case None =>
+        underlying.prefixedChildPaths(prefixPath)
+          .flatMap(os => ofPrefix(os).ifM(
+            os.map(s => Stream.emit((AggName, ResourcePathType.AggregateResource)) ++ s).pure[F],
+            os.asInstanceOf[Option[Stream[F, (ResourceName, ResourcePathType)]]].pure[F]))
+      case Some(_) =>
+        pathIsResource(prefixPath).ifM(
+          Stream.empty.covary[F].covaryOutput[(ResourceName, ResourcePathType)].some.pure[F],
+          none.pure[F])
+    }
 
   ////
 
@@ -92,18 +104,22 @@ final class ChildAggregatingDatasource[F[_]: Monad: MonadResourceErr, Q, R] priv
       case (p, n) => if (n === AggName) Some(p) else None
     }
 
+  // `p / *` exists iff underlying `p` is prefix/prefixresource
   private def aggPathExists(path: ResourcePath): F[Boolean] =
     aggPath(path)
-      .map(p => underlying.prefixedChildPaths(p).map(_.isDefined))
+      .map(p => underlying.prefixedChildPaths(p).flatMap(ofPrefix))
       .getOrElse(false.pure[F])
 
-  private def aggPrefixedChildPaths(path: ResourcePath): F[Option[Stream[F, (ResourceName, ResourcePathType.Physical)]]] =
-    aggPath(path).map(p => underlying.prefixedChildPaths(p)).getOrElse(none.pure[F])
-
+  // checks whether the provided stream is that of a prefix/prefixresource
+  private def ofPrefix[A](os: Option[Stream[F, A]]): F[Boolean] =
+    os.map(s => s.pull.peek1.flatMap {
+      case None => Pull.output1(false)
+      case _ => Pull.output1(true)
+    }).getOrElse(Pull.output1(false)).stream.compile.lastOrError
 }
 
 object ChildAggregatingDatasource {
-  def apply[F[_]: Monad: MonadResourceErr, Q, R](
+  def apply[F[_]: MonadResourceErr: Sync, Q, R](
       underlying: PhysicalDatasource[F, Stream[F, ?], Q, R],
       queryPath: Lens[Q, ResourcePath])
       : Datasource[F, Stream[F, ?], Q, CompositeResult[F, R]] =

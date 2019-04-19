@@ -109,22 +109,28 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
         meta <- dres.traverse(_.compile.to[List])
         qres <- ds.evaluate(z)
       } yield {
-        meta must beSome(equal(List(ResourceName("z") -> (ResourcePathType.prefixResource: ResourcePathType))))
+        meta must beSome(equal[List[(ResourceName, ResourcePathType)]](List(
+          ResourceName("*") -> ResourcePathType.AggregateResource,
+          ResourceName("z") -> ResourcePathType.prefixResource)))
         qres must beLeft(1)
       }
     }
 
-    "underlying prefix paths are resources" >>* {
+    "agg resource is recognized via pathIsResource" >>* {
       datasource
-        .pathIsResource(ResourcePath.root() / ResourceName("a"))
+        .pathIsResource(ResourcePath.root() / ResourceName("a") / ResourceName("*"))
         .map(_ must beTrue)
     }
 
-    "underlying prefix paths are typed as prefix-resource" >>* {
+    "children of prefix = agg resource + underlying children" >>* {
       datasource
         .prefixedChildPaths(ResourcePath.root() / ResourceName("a"))
         .flatMap(_.cata(_.compile.to[List], IO.pure(Nil)))
-        .map(_ must contain(ResourceName("q") -> ResourcePathType.prefixResource))
+        .map(_ must equal[List[(ResourceName, ResourcePathType)]](List(
+          ResourceName("*") -> ResourcePathType.AggregateResource,
+          ResourceName("b") -> ResourcePathType.LeafResource,
+          ResourceName("c") -> ResourcePathType.LeafResource,
+          ResourceName("q") -> ResourcePathType.Prefix)))
     }
   }
 
@@ -141,12 +147,12 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
         .map(_ must beLeft(5))
     }
 
-    "querying an underlying prefix aggregates sibling leafs" >>* {
+    "querying an agg resource aggregates sibling leafs" >>* {
       val b = ResourcePath.root() / ResourceName("a") / ResourceName("b")
       val c = ResourcePath.root() / ResourceName("a") / ResourceName("c")
 
       datasource
-        .evaluate(ResourcePath.root() / ResourceName("a"))
+        .evaluate(ResourcePath.root() / ResourceName("a") / ResourceName("*"))
         .flatMap(_.traverse(_.compile.to[List]))
         .map(_ must beRight(contain(exactly((b, 1), (c, 2)))))
     }
