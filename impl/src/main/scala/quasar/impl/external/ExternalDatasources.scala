@@ -18,7 +18,7 @@ package quasar.impl.external
 
 import slamdata.Predef._
 import quasar.concurrent.BlockingContext
-import quasar.connector.{HeavyweightDatasourceModule, LightweightDatasourceModule}
+import quasar.connector.{DestinationModule, HeavyweightDatasourceModule, LightweightDatasourceModule}
 import quasar.contrib.fs2.convert
 import quasar.fp.ski.κ
 import quasar.impl.DatasourceModule
@@ -59,9 +59,9 @@ object ExternalDatasources extends Logging {
       config: ExternalConfig,
       blockingPool: BlockingContext)(
       implicit F: ConcurrentEffect[F])
-      : Stream[F, List[DatasourceModule]] = {
+      : Stream[F, (List[DatasourceModule], List[DestinationModule])] = {
 
-    val moduleStream: Stream[F, DatasourceModule] = config match {
+    val moduleStream: Stream[F, (Stream[F, DatasourceModule], Stream[F, DestinationModule])] = config match {
       case PluginDirectory(directory) =>
         Stream.eval(F.delay((Files.exists(directory), Files.isDirectory(directory)))) flatMap {
           case (true, true) =>
@@ -86,12 +86,17 @@ object ExternalDatasources extends Logging {
           (cn, cp) = exploded
 
           classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, cp))
-
-          module <- loadModule[F](cn.value, classLoader)
-        } yield module
+          datasourceModule = loadDatasourceModule[F](cn.value, classLoader)
+          destinationModule = loadDestinationModule[F](cn.value, classLoader)
+        } yield (datasourceModule, destinationModule)
     }
 
-    moduleStream.fold(List.empty[DatasourceModule])((m, d) => d :: m)
+    moduleStream flatMap {
+      case (datasources, destinations) => for {
+        sources <- datasources.fold(List.empty[DatasourceModule])((m, d) => d :: m)
+        dests <- destinations.fold(List.empty[DestinationModule])((m, d) => d :: m)
+      } yield (sources, dests)
+    }
   }
 
   ////
@@ -100,13 +105,45 @@ object ExternalDatasources extends Logging {
 
   private val PluginExtSuffix = "." + Plugin.FileExtension
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Null"))
-  private def loadModule[F[_]](
-    className: String, classLoader: ClassLoader)(
-    implicit F: Sync[F])
-      : Stream[F, DatasourceModule] = {
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
+  private def loadModule[A, F[_]: Sync](clazz: Class[_])(f: Object => A): Stream[F, A] =
+    Stream.eval(Sync[F].delay(f(clazz.getDeclaredField("MODULE$").get(null))))
 
-    def handleFailedLoad[A](s: Stream[F, A]): Stream[F, A] =
+  def loadClass[F[_]: Sync](cn: String, classLoader: ClassLoader): Stream[F, Class[_]] =
+    Stream.eval(Sync[F].delay(classLoader.loadClass(cn))) recoverWith {
+      case cnf: ClassNotFoundException =>
+        warnStream[F](s"Could not locate class for datasource module '$cn'", Some(cnf))
+    }
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  private def loadDestinationModule[F[_]: Sync](
+    className: String, classLoader: ClassLoader)
+      : Stream[F, DestinationModule] = {
+    def handleFailedDestination[A](s: Stream[F, A]): Stream[F, A] =
+      s recoverWith {
+        case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
+          warnStream[F](s"Destination module '$className' does not appear to be a singleton object", Some(e))
+
+        case e: ExceptionInInitializerError =>
+          warnStream[F](s"Destination module '$className' failed to load with exception", Some(e))
+
+        case _: ClassCastException =>
+          infoStream[F](s"Module '$className' does not support writeback") >> Stream.empty
+      }
+
+    def loadDestination(clazz: Class[_]): Stream[F, DestinationModule] =
+      loadModule(clazz)(_.asInstanceOf[DestinationModule])
+
+    for {
+      clazz <- loadClass(className, classLoader)
+      destination <- handleFailedDestination(loadDestination(clazz))
+    } yield destination
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  private def loadDatasourceModule[F[_]: Sync](
+    className: String, classLoader: ClassLoader): Stream[F, DatasourceModule] = {
+    def handleFailedDatasource[A](s: Stream[F, A]): Stream[F, A] =
       s recoverWith {
         case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
           warnStream[F](s"Datasource module '$className' does not appear to be a singleton object", Some(e))
@@ -118,33 +155,26 @@ object ExternalDatasources extends Logging {
           warnStream[F](s"Datasource module '$className' is not actually a subtype of LightweightDatasourceModule or HeavyweightDatasourceModule", None)
       }
 
-    def loadModule0(clazz: Class[_])(f: Object => DatasourceModule): Stream[F, DatasourceModule] =
-      Stream.eval(F.delay(f(clazz.getDeclaredField("MODULE$").get(null))))
-
     def loadLightweight(clazz: Class[_]): Stream[F, DatasourceModule] =
-      loadModule0(clazz) { o =>
+      loadModule(clazz) { o =>
         DatasourceModule.Lightweight(o.asInstanceOf[LightweightDatasourceModule])
       }
 
     def loadHeavyweight(clazz: Class[_]): Stream[F, DatasourceModule] =
-      loadModule0(clazz) { o =>
+      loadModule(clazz) { o =>
         DatasourceModule.Heavyweight(o.asInstanceOf[HeavyweightDatasourceModule])
       }
 
     for {
-      clazz <- Stream.eval(F.delay(classLoader.loadClass(className))) recoverWith {
-        case cnf: ClassNotFoundException =>
-          warnStream[F](s"Could not locate class for datasource module '$className'", Some(cnf))
-      }
-
-      module <- handleFailedLoad(loadLightweight(clazz) handleErrorWith κ(loadHeavyweight(clazz)))
-    } yield module
+      clazz <- loadClass(className, classLoader)
+      datasource <- handleFailedDatasource(loadLightweight(clazz) handleErrorWith κ(loadHeavyweight(clazz)))
+    } yield datasource
   }
 
   private def loadPlugin[F[_]: ContextShift: Effect: Timer](
     pluginFile: Path,
     blockingPool: BlockingContext)
-      : Stream[F, DatasourceModule] = {
+      : Stream[F, (Stream[F, DatasourceModule], Stream[F, DestinationModule])] = {
 
     for {
       js <-
@@ -184,8 +214,9 @@ object ExternalDatasources extends Logging {
       else
         Stream.chunk(Chunk.array(moduleClasses)).covary[F]
 
-      mod <- loadModule[F](moduleClass, classLoader)
-    } yield mod
+      datasourceModule = loadDatasourceModule[F](moduleClass, classLoader)
+      destinationModule = loadDestinationModule[F](moduleClass, classLoader)
+    } yield (datasourceModule, destinationModule)
   }
 
   private def jarAttribute[F[_]: Sync](j: JarFile, attr: String): Stream[F, Option[String]] =

@@ -36,12 +36,12 @@ object DestinationType extends DestinationTypeInstances {
 }
 
 sealed abstract class DestinationTypeInstances {
-  implicit val order: Order[DatasourceType] =
+  implicit val order: Order[DestinationType] =
     Order.orderBy(t => (t.name, t.version))
 
-  implicit val show: Show[DatasourceType] =
+  implicit val show: Show[DestinationType] =
     Show.show {
-      case DatasourceType(n, v) =>
-        Cord("DatasourceType(") ++ n.show ++ Cord(", ") ++ v.show ++ Cord(")")
+      case DestinationType(n, v, minV) =>
+        Cord("DestinationType(") ++ n.show ++ Cord(", ") ++ v.show ++ Cord(", ") ++ minV.show ++ Cord(")")
     }
 }
