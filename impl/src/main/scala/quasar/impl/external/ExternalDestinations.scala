@@ -18,9 +18,7 @@ package quasar.impl.external
 
 import slamdata.Predef._
 import quasar.concurrent.BlockingContext
-import quasar.connector.{HeavyweightDatasourceModule, LightweightDatasourceModule}
-import quasar.fp.ski.κ
-import quasar.impl.DatasourceModule
+import quasar.connector.DestinationModule
 
 import java.lang.{
   Class,
@@ -38,52 +36,46 @@ import cats.syntax.applicativeError._
 import fs2.Stream
 import org.slf4s.Logging
 
-object ExternalDatasources extends Logging {
+object ExternalDestinations extends Logging {
   def apply[F[_]: ContextShift: Timer](
       config: ExternalConfig,
       blockingPool: BlockingContext)(
       implicit F: ConcurrentEffect[F])
-      : Stream[F, List[DatasourceModule]] = {
-    val datasourceModuleStream: Stream[F, DatasourceModule] =
-      ExternalModules(config, blockingPool).flatMap((loadDatasourceModule[F](_, _)).tupled)
+      : Stream[F, List[DestinationModule]] = {
+    val destinationModuleStream: Stream[F, DestinationModule] =
+      ExternalModules(config, blockingPool).flatMap((loadDestinationModule[F](_, _)).tupled)
 
     for {
-      ds <- datasourceModuleStream.fold(List.empty[DatasourceModule])((m, d) => d :: m)
-      _ <- infoStream[F](s"Loaded ${ds.length} datasource(s)")
-    } yield ds
+      dts <- destinationModuleStream.fold(List.empty[DestinationModule])((m, d) => d :: m)
+      _ <- infoStream[F](s"Loaded ${dts.length} destination(s)")
+    } yield dts
   }
 
   ////
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  private def loadDatasourceModule[F[_]: Sync](
-    className: String, classLoader: ClassLoader): Stream[F, DatasourceModule] = {
-    def handleFailedDatasource[A](s: Stream[F, A]): Stream[F, A] =
+  private def loadDestinationModule[F[_]: Sync](
+    className: String, classLoader: ClassLoader)
+      : Stream[F, DestinationModule] = {
+    def handleFailedDestination[A](s: Stream[F, A]): Stream[F, A] =
       s recoverWith {
         case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
-          warnStream[F](s"Datasource module '$className' does not appear to be a singleton object", Some(e))
+          warnStream[F](s"Destination module '$className' does not appear to be a singleton object", Some(e))
 
         case e: ExceptionInInitializerError =>
-          warnStream[F](s"Datasource module '$className' failed to load with exception", Some(e))
+          warnStream[F](s"Destination module '$className' failed to load with exception", Some(e))
 
         case _: ClassCastException =>
-          warnStream[F](s"Datasource module '$className' is not actually a subtype of LightweightDatasourceModule or HeavyweightDatasourceModule", None)
+          infoStream[F](s"Module '$className' does not support writeback") >> Stream.empty
       }
 
-    def loadLightweight(clazz: Class[_]): Stream[F, DatasourceModule] =
-      ExternalModules.loadModule(clazz) { o =>
-        DatasourceModule.Lightweight(o.asInstanceOf[LightweightDatasourceModule])
-      }
-
-    def loadHeavyweight(clazz: Class[_]): Stream[F, DatasourceModule] =
-      ExternalModules.loadModule(clazz) { o =>
-        DatasourceModule.Heavyweight(o.asInstanceOf[HeavyweightDatasourceModule])
-      }
+    def loadDestination(clazz: Class[_]): Stream[F, DestinationModule] =
+      ExternalModules.loadModule(clazz)(_.asInstanceOf[DestinationModule])
 
     for {
       clazz <- ExternalModules.loadClass(className, classLoader)
-      datasource <- handleFailedDatasource(loadLightweight(clazz) handleErrorWith κ(loadHeavyweight(clazz)))
-    } yield datasource
+      destination <- handleFailedDestination(loadDestination(clazz))
+    } yield destination
   }
 
   private def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
