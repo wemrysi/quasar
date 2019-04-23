@@ -73,7 +73,7 @@ object MapDBIndexedStore {
     makeOrGetDB[F](path) flatMap { db => Sync[F].delay(new MapDBIndexedStore[F](db)) }
 
   def mkDb[F[_]: Sync](path: Path): F[DB] =
-    Sync[F].delay(DBMaker.fileDB(path.toFile).checksumHeaderBypass.closeOnJvmShutdown.fileLockDisable.make)
+    Sync[F].delay(DBMaker.fileDB(path.toFile).checksumHeaderBypass.transactionEnable.closeOnJvmShutdown.fileLockDisable.make)
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def makeOrGetDB[F[_]: Sync: LiftIO](path: Path): F[DB] =
