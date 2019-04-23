@@ -67,7 +67,8 @@ object ExternalDatasources extends Logging {
           case (true, true) =>
             convert.fromJavaStream(F.delay(Files.list(directory)))
               .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
-              .flatMap(loadDatasourcePlugin[F](_, blockingPool))
+              .flatMap(loadPlugin[F](_, blockingPool))
+              .flatMap((loadDatasourceModule[F](_, _)).tupled)
 
           case (true, false) =>
             warnStream[F](s"Unable to load plugins from '$directory', does not appear to be a directory", None)
@@ -77,7 +78,9 @@ object ExternalDatasources extends Logging {
         }
 
       case PluginFiles(files) =>
-        Stream.emits(files).flatMap(loadDatasourcePlugin[F](_, blockingPool))
+        Stream.emits(files)
+          .flatMap(loadPlugin[F](_, blockingPool))
+          .flatMap((loadDatasourceModule[F](_, _)).tupled)
 
       case ExplodedDirs(modules) =>
         for {
@@ -96,7 +99,8 @@ object ExternalDatasources extends Logging {
           case (true, true) =>
             convert.fromJavaStream(F.delay(Files.list(directory)))
               .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
-              .flatMap(loadDestinationPlugin[F](_, blockingPool))
+              .flatMap(loadPlugin[F](_, blockingPool))
+              .flatMap((loadDestinationModule[F](_, _)).tupled)
 
           case (true, false) =>
             warnStream[F](s"Unable to load plugins from '$directory', does not appear to be a directory", None)
@@ -106,7 +110,9 @@ object ExternalDatasources extends Logging {
         }
 
       case PluginFiles(files) =>
-        Stream.emits(files).flatMap(loadDestinationPlugin[F](_, blockingPool))
+        Stream.emits(files)
+          .flatMap(loadPlugin[F](_, blockingPool))
+          .flatMap((loadDestinationModule[F](_, _)).tupled)
 
       case ExplodedDirs(modules) =>
         for {
@@ -121,7 +127,9 @@ object ExternalDatasources extends Logging {
 
     for {
       ds <- datasourceModuleStream.fold(List.empty[DatasourceModule])((m, d) => d :: m)
+      _ <- infoStream[F](s"Loaded ${ds.length} datasource(s)")
       dts <- destinationModuleStream.fold(List.empty[DestinationModule])((m, d) => d :: m)
+      _ <- infoStream[F](s"Loaded ${dts.length} destination(s)")
     } yield (ds, dts)
   }
 
@@ -197,11 +205,10 @@ object ExternalDatasources extends Logging {
     } yield datasource
   }
 
-  private def loadDestinationPlugin[F[_]: ContextShift: Effect: Timer](
+  private def loadPlugin[F[_]: ContextShift: Effect: Timer](
     pluginFile: Path,
     blockingPool: BlockingContext)
-      : Stream[F, DestinationModule] = {
-
+      : Stream[F, (String, ClassLoader)] =
     for {
       js <-
         file.readAll[F](pluginFile, blockingPool.unwrap, PluginChunkSize)
@@ -239,56 +246,7 @@ object ExternalDatasources extends Logging {
         warnStream[F](s"No classes defined for '${Plugin.ManifestAttributeName}' attribute in Manifest from '$pluginFile'.", None)
       else
         Stream.chunk(Chunk.array(moduleClasses)).covary[F]
-      mod <- loadDestinationModule[F](moduleClass, classLoader)
-    } yield mod
-  }
-
-  private def loadDatasourcePlugin[F[_]: ContextShift: Effect: Timer](
-    pluginFile: Path,
-    blockingPool: BlockingContext)
-      : Stream[F, DatasourceModule] = {
-
-    for {
-      js <-
-        file.readAll[F](pluginFile, blockingPool.unwrap, PluginChunkSize)
-          .chunks
-          .map(_.toByteBuffer)
-          .parseJson[Json](AsyncParser.SingleValue)
-
-      pluginResult <- Stream.eval(Plugin.fromJson[F](js))
-
-      plugin <- pluginResult.fold(
-        (s, c) => warnStream[F](s"Failed to decode plugin from '$pluginFile': $s ($c)", None),
-        r => Stream.eval(r.withAbsolutePaths[F](pluginFile.getParent)))
-
-      classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, plugin.classPath))
-
-      mainJar = new JarFile(plugin.mainJar.toFile)
-
-      backendModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestAttributeName)
-      versionModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestVersionName)
-
-      _ <- versionModuleAttr match {
-        case None => warnStream[F](s"No '${Plugin.ManifestVersionName}' attribute found in Manifest for '$pluginFile'.", None)
-        case Some(version) => infoStream[F](s"Loading $pluginFile with version $version")
-      }
-
-      moduleClasses <- backendModuleAttr match {
-        case None =>
-          warnStream[F](s"No '${Plugin.ManifestAttributeName}' attribute found in Manifest for '$pluginFile'.", None)
-
-        case Some(attr) =>
-          Stream.emit(attr.split(" "))
-      }
-
-      moduleClass <- if (moduleClasses.isEmpty)
-        warnStream[F](s"No classes defined for '${Plugin.ManifestAttributeName}' attribute in Manifest from '$pluginFile'.", None)
-      else
-        Stream.chunk(Chunk.array(moduleClasses)).covary[F]
-
-      mod <- loadDatasourceModule[F](moduleClass, classLoader)
-    } yield mod
-  }
+    } yield (moduleClass, classLoader)
 
   private def jarAttribute[F[_]: Sync](j: JarFile, attr: String): Stream[F, Option[String]] =
     Stream.eval(Sync[F].delay(Option(j.getManifest.getMainAttributes.getValue(attr))))
