@@ -19,7 +19,7 @@ package quasar.impl.datasource
 import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
-import quasar.connector.{Datasource, MonadResourceErr, PhysicalDatasource, ResourceError}
+import quasar.connector.{Datasource, MonadResourceErr, ResourceError}
 import quasar.contrib.scalaz._
 
 import scala.util.{Left, Right}
@@ -41,7 +41,7 @@ import shims._
   * resources by aggregating all child leaf resources of the prefix.
   */
 final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
-    underlying: PhysicalDatasource[F, Stream[F, ?], Q, R],
+    underlying: Datasource.Aux[F, Stream[F, ?], Q, R, ResourcePathType.Physical],
     queryPath: Lens[Q, ResourcePath])
     extends Datasource[F, Stream[F, ?], Q, CompositeResult[F, R]] {
 
@@ -120,8 +120,8 @@ final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] priva
 
 object ChildAggregatingDatasource {
   def apply[F[_]: MonadResourceErr: Sync, Q, R](
-      underlying: PhysicalDatasource[F, Stream[F, ?], Q, R],
+      underlying: Datasource.Aux[F, Stream[F, ?], Q, R, ResourcePathType.Physical],
       queryPath: Lens[Q, ResourcePath])
-      : Datasource[F, Stream[F, ?], Q, CompositeResult[F, R]] =
+      : Datasource.Aux[F, Stream[F, ?], Q, CompositeResult[F, R], ResourcePathType] =
     new ChildAggregatingDatasource(underlying, queryPath)
 }

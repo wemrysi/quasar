@@ -21,6 +21,7 @@ import slamdata.Predef.{List, None, Option, Some, Unit}
 import quasar.Condition
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError._
+import quasar.api.resource.ResourcePathType
 import quasar.contrib.scalaz.{MonadState_, MonadTell_}
 import quasar.fp.ski.κ
 import quasar.impl.datasource.EmptyDatasource
@@ -63,7 +64,7 @@ final class MockDatasourceManager[I: Order, C, T[_[_]], F[_]: Monad, G[_]: PlusE
   def managedDatasource(datasourceId: I): F[Option[ManagedDatasource[T, F, G, R]]] =
     initd.gets(_.member(datasourceId)) map { exists =>
       supportedTypes.findMin.filter(κ(exists)) map { kind =>
-        ManagedDatasource.lightweight[T][F, G, R](EmptyDatasource(kind, emptyResult))
+        ManagedDatasource.lightweight[T][F, G, R, ResourcePathType](EmptyDatasource(kind, emptyResult))
       }
     }
 

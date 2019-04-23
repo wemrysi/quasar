@@ -16,11 +16,11 @@
 
 package quasar.impl.datasource.local
 
-import slamdata.Predef.{Stream => _, Seq => _, _}
+import slamdata.Predef.{Seq => _, Stream => _, _}
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector._
+import quasar.connector._, LightweightDatasourceModule.DS
 import quasar.connector.ResourceError._
 import quasar.connector.datasource.LightweightDatasource
 import quasar.contrib.fs2.convert

@@ -16,14 +16,9 @@
 
 package quasar
 
-import quasar.api.resource.ResourcePath
 import quasar.contrib.scalaz.MonadError_
-import quasar.qscript.InterpretedRead
-
-import fs2.Stream
 
 package object connector {
-  type DS[F[_]] = PhysicalDatasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]]
 
   type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
 

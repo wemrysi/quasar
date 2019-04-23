@@ -19,7 +19,7 @@ package quasar.impl.datasource.local
 import slamdata.Predef._
 
 import quasar.concurrent.BlockingContext
-import quasar.connector._
+import quasar.connector._, LightweightDatasourceModule.DS
 
 import java.nio.file.{Path => JPath}
 

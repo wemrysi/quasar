@@ -19,11 +19,14 @@ package quasar.connector
 import quasar.Disposable
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
+import quasar.api.resource.{ResourcePath, ResourcePathType}
+import quasar.qscript.InterpretedRead
 
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Timer}
+import fs2.Stream
 import scalaz.\/
 
 trait LightweightDatasourceModule {
@@ -34,5 +37,11 @@ trait LightweightDatasourceModule {
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json)(
       implicit ec: ExecutionContext)
-      : F[InitializationError[Json] \/ Disposable[F, DS[F]]]
+      : F[InitializationError[Json] \/ Disposable[F, LightweightDatasourceModule.DS[F]]]
+}
+
+object LightweightDatasourceModule {
+  type DSP[F[_], P <: ResourcePathType] = Datasource.Aux[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], P]
+  type DS[F[_]] = DSP[F, ResourcePathType.Physical]
+
 }

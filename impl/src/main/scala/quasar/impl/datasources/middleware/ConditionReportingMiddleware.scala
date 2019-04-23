@@ -17,14 +17,14 @@
 package quasar.impl.datasources.middleware
 
 import slamdata.Predef.{Exception, Unit}
-
 import quasar.Condition
+import quasar.api.resource.ResourcePathType
 import quasar.connector.Datasource
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.datasource.ConditionReportingDatasource
 import quasar.impl.datasources.ManagedDatasource
 
-import scalaz.{~>, Monad}
+import scalaz.{Monad, ~>}
 import scalaz.syntax.functor._
 
 object ConditionReportingMiddleware {
@@ -39,7 +39,7 @@ object ConditionReportingMiddleware {
         F1: MonadError_[F, Exception])
         : F[ManagedDatasource[T, F, G, R]] =
       onChange(id, Condition.normal()) as {
-        mds.modify(λ[Datasource[F, G, ?, R] ~> Datasource[F, G, ?, R]] { ds =>
+        mds.modify(λ[Datasource.Aux[F, G, ?, R, ResourcePathType] ~> Datasource.Aux[F, G, ?, R, ResourcePathType]] { ds =>
           ConditionReportingDatasource(onChange(id, _: Condition[Exception]), ds)
         })
       }

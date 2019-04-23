@@ -48,7 +48,8 @@ sealed trait ManagedDatasource[T[_[_]], F[_], G[_], R] {
       case ManagedHeavyweight(hw) => hw.prefixedChildPaths(prefixPath).asInstanceOf[F[Option[G[(ResourceName, ResourcePathType)]]]]
     }
 
-  def modify[V[_], W[_], S](f: Datasource[F, G, ?, R] ~> Datasource[V, W, ?, S])
+  def modify[V[_], W[_], S](
+      f: Datasource.Aux[F, G, ?, R, ResourcePathType] ~> Datasource.Aux[V, W, ?, S, ResourcePathType])
       : ManagedDatasource[T, V, W, S] =
     this match {
       case ManagedLightweight(lw) => ManagedLightweight(f(lw))
@@ -57,24 +58,24 @@ sealed trait ManagedDatasource[T[_[_]], F[_], G[_], R] {
 }
 
 object ManagedDatasource {
-  final case class ManagedLightweight[T[_[_]], F[_], G[_], R](
-      lw: Datasource[F, G, InterpretedRead[ResourcePath], R])
+  final case class ManagedLightweight[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
+      lw: Datasource.Aux[F, G, InterpretedRead[ResourcePath], R, P])
       extends ManagedDatasource[T, F, G, R]
 
-  final case class ManagedHeavyweight[T[_[_]], F[_], G[_], R](
-      hw: Datasource[F, G, T[QScriptEducated[T, ?]], R])
+  final case class ManagedHeavyweight[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
+      hw: Datasource.Aux[F, G, T[QScriptEducated[T, ?]], R, P])
       extends ManagedDatasource[T, F, G, R]
 
   def lightweight[T[_[_]]] = new PartiallyAppliedLw[T]
   final class PartiallyAppliedLw[T[_[_]]] {
-    def apply[F[_], G[_], R](
-        ds: Datasource[F, G, InterpretedRead[ResourcePath], R])
+    def apply[F[_], G[_], R, P <: ResourcePathType](
+        ds: Datasource.Aux[F, G, InterpretedRead[ResourcePath], R, P])
         : ManagedDatasource[T, F, G, R] =
       ManagedLightweight(ds)
   }
 
-  def heavyweight[T[_[_]], F[_], G[_], R](
-      ds: Datasource[F, G, T[QScriptEducated[T, ?]], R])
+  def heavyweight[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
+      ds: Datasource.Aux[F, G, T[QScriptEducated[T, ?]], R, P])
       : ManagedDatasource[T, F, G, R] =
     ManagedHeavyweight(ds)
 }

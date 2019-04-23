@@ -23,6 +23,7 @@ import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.connector._
+import quasar.connector.LightweightDatasourceModule.DS
 import quasar.connector.ParsableType.JsonVariant
 import quasar.contrib.fs2.stream._
 import quasar.contrib.scalaz.MonadError_
@@ -99,9 +100,9 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
   implicit val cs = IO.contextShift(global)
   implicit val tmr = IO.timer(global)
 
-  def mkDatasource[F[_]: Applicative, Q](kind: DatasourceType)
-      : PhysicalDatasource[F, Stream[F, ?], Q, QueryResult[F]] =
-    EmptyDatasource[F, Stream[F, ?], Q, QueryResult[F]](
+  def mkDatasource[F[_]: Applicative, Q, P <: ResourcePathType](kind: DatasourceType)
+      : Datasource.Aux[F, Stream[F, ?], Q, QueryResult[F], P] =
+    EmptyDatasource[F, Stream[F, ?], Q, QueryResult[F], P](
       kind,
       QueryResult.typed(
         ParsableType.Json(JsonVariant.LineDelimited, false),
@@ -121,7 +122,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
         implicit ec: ExecutionContext)
         : F[InitializationError[Json] \/ Disposable[F, DS[F]]] =
       Disposable(
-        mkDatasource[F, InterpretedRead[ResourcePath]](kind),
+        mkDatasource[F, InterpretedRead[ResourcePath], ResourcePathType.Physical](kind),
         ConcurrentEffect[F].liftIO(disposes.update(kind :: _)))
         .right.pure[F]
   }
@@ -136,9 +137,9 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
         F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
         config: Json)(
         implicit ec: ExecutionContext)
-        : F[InitializationError[Json] \/ Disposable[F, PhysicalDatasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F]]]] =
+        : F[InitializationError[Json] \/ Disposable[F, Datasource.Aux[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]] =
       Disposable(
-        mkDatasource[F, T[QScriptEducated[T, ?]]](kind),
+        mkDatasource[F, T[QScriptEducated[T, ?]], ResourcePathType.Physical](kind),
         ConcurrentEffect[F].liftIO(disposes.update(kind :: _)))
         .right.pure[F]
   }

@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.{Condition, Disposable, RenderTreeT}
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported}
-import quasar.api.resource.ResourcePath
+import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.connector.{MonadResourceErr, QueryResult}
 import quasar.contrib.scalaz._
 import quasar.fp.ski.κ2
@@ -152,7 +152,7 @@ object DefaultDatasourceManager {
               lazyDatasource[T, F](mod, ref)
 
             case None =>
-              val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]](
+              val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], ResourcePathType.Physical](
                 ref.kind,
                 DatasourceUnsupported(ref.kind, modules.keySet))
 

@@ -20,17 +20,19 @@ import slamdata.Predef.{Boolean, Option}
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.PhysicalDatasource
+import quasar.connector.Datasource
 
 import scalaz.{Applicative, PlusEmpty}
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.syntax.plusEmpty._
 
-final class EmptyDatasource[F[_]: Applicative, G[_]: PlusEmpty, Q, R] private (
+final class EmptyDatasource[F[_]: Applicative, G[_]: PlusEmpty, Q, R, P <: ResourcePathType] private (
     val kind: DatasourceType,
     emptyResult: R)
-    extends PhysicalDatasource[F, G, Q, R] {
+    extends Datasource[F, G, Q, R] {
+
+  type PathType = P
 
   def evaluate(q: Q): F[R] =
     emptyResult.pure[F]
@@ -39,17 +41,17 @@ final class EmptyDatasource[F[_]: Applicative, G[_]: PlusEmpty, Q, R] private (
     false.pure[F]
 
   def prefixedChildPaths(prefixPath: ResourcePath)
-      : F[Option[G[(ResourceName, ResourcePathType.Physical)]]] =
+      : F[Option[G[(ResourceName, P)]]] =
     ResourcePath.root
       .getOption(prefixPath)
-      .as(mempty[G, (ResourceName, ResourcePathType.Physical)])
+      .as(mempty[G, (ResourceName, P)])
       .pure[F]
 }
 
 object EmptyDatasource {
-  def apply[F[_]: Applicative, G[_]: PlusEmpty, Q, R](
+  def apply[F[_]: Applicative, G[_]: PlusEmpty, Q, R, P <: ResourcePathType](
       kind: DatasourceType,
       emptyResult: R)
-      : PhysicalDatasource[F, G, Q, R] =
-    new EmptyDatasource[F, G, Q, R](kind, emptyResult)
+      : Datasource.Aux[F, G, Q, R, P] =
+    new EmptyDatasource[F, G, Q, R, P](kind, emptyResult)
 }

@@ -47,12 +47,14 @@ trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, Q, R] {
 }
 
 object Datasource {
-  def evaluator[F[_], G[_], Q, R]: Lens[Datasource[F, G, Q, R], QueryEvaluator[F, Q, R]] =
-    pevaluator[F, G, Q, R, Q, R]
+  type Aux[F[_], G[_], Q, R, P <: ResourcePathType] = Datasource[F, G, Q, R] { type PathType = P }
 
-  def pevaluator[F[_], G[_], Q1, R1, Q2, R2]
-      : PLens[Datasource[F, G, Q1, R1], Datasource[F, G, Q2, R2], QueryEvaluator[F, Q1, R1], QueryEvaluator[F, Q2, R2]] =
-    PLens((ds: Datasource[F, G, Q1, R1]) => ds: QueryEvaluator[F, Q1, R1]) { qe: QueryEvaluator[F, Q2, R2] => ds =>
+  def evaluator[F[_], G[_], Q, R, P <: ResourcePathType]: Lens[Datasource.Aux[F, G, Q, R, P], QueryEvaluator[F, Q, R]] =
+    pevaluator[F, G, Q, R, Q, R, P]
+
+  def pevaluator[F[_], G[_], Q1, R1, Q2, R2, P <: ResourcePathType]
+      : PLens[Datasource.Aux[F, G, Q1, R1, P], Datasource.Aux[F, G, Q2, R2, P], QueryEvaluator[F, Q1, R1], QueryEvaluator[F, Q2, R2]] =
+    PLens((ds: Datasource.Aux[F, G, Q1, R1, P]) => ds: QueryEvaluator[F, Q1, R1]) { qe: QueryEvaluator[F, Q2, R2] => ds =>
       new Datasource[F, G, Q2, R2] {
         type PathType = ds.PathType
         val kind = ds.kind

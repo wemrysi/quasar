@@ -26,9 +26,9 @@ import quasar.contrib.scalaz.MonadError_
 import scalaz.Monad
 
 final class ConditionReportingDatasource[
-    E, F[_]: Monad: MonadError_[?[_], E], G[_], Q, R] private (
+    E, F[_]: Monad: MonadError_[?[_], E], G[_], Q, R, P <: ResourcePathType] private (
     report: Condition[E] => F[Unit],
-    val underlying: Datasource[F, G, Q, R])
+    val underlying: Datasource.Aux[F, G, Q, R, P])
     extends Datasource[F, G, Q, R] {
 
   val kind: DatasourceType = underlying.kind
@@ -55,9 +55,9 @@ final class ConditionReportingDatasource[
 }
 
 object ConditionReportingDatasource {
-  def apply[E, F[_]: Monad: MonadError_[?[_], E], G[_], Q, R](
+  def apply[E, F[_]: Monad: MonadError_[?[_], E], G[_], Q, R, P <: ResourcePathType](
       f: Condition[E] => F[Unit],
-      ds: Datasource[F, G, Q, R])
-      : Datasource[F, G, Q, R] =
-    new ConditionReportingDatasource[E, F, G, Q, R](f, ds)
+      ds: Datasource.Aux[F, G, Q, R, P])
+      : Datasource.Aux[F, G, Q, R, P] =
+    new ConditionReportingDatasource[E, F, G, Q, R, P](f, ds)
 }

@@ -19,7 +19,7 @@ package quasar.impl.datasource.local
 import quasar.Disposable
 import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
 import quasar.concurrent.BlockingContext
-import quasar.connector._
+import quasar.connector._, LightweightDatasourceModule.DS
 
 import scala.concurrent.ExecutionContext
 

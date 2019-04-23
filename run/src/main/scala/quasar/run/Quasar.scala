@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
-import quasar.api.resource.ResourcePath
+import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.table.{TableRef, Tables}
 import quasar.common.PhaseResultTell
 import quasar.connector.{Datasource, QueryResult}
@@ -125,11 +125,11 @@ object Quasar extends Logging {
 
   private val rec = construction.RecFunc[Fix]
 
-  private def reifiedAggregateDs[F[_]: Functor, G[_]]
-      : Datasource[F, G, ?, CompositeResult[F, QueryResult[F]]] ~> Datasource[F, G, ?, EvalResult[F]] =
-    new (Datasource[F, G, ?, CompositeResult[F, QueryResult[F]]] ~> Datasource[F, G, ?, EvalResult[F]]) {
-      def apply[A](ds: Datasource[F, G, A, CompositeResult[F, QueryResult[F]]]) = {
-        val l = Datasource.pevaluator[F, G, A, CompositeResult[F, QueryResult[F]], A, EvalResult[F]]
+  private def reifiedAggregateDs[F[_]: Functor, G[_], P <: ResourcePathType]
+      : Datasource.Aux[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource.Aux[F, G, ?, EvalResult[F], P] =
+    new (Datasource.Aux[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource.Aux[F, G, ?, EvalResult[F], P]) {
+      def apply[A](ds: Datasource.Aux[F, G, A, CompositeResult[F, QueryResult[F]], P]) = {
+        val l = Datasource.pevaluator[F, G, A, CompositeResult[F, QueryResult[F]], A, EvalResult[F], P]
         l.modify(_.map(_.map(reifyAggregateStructure)))(ds)
       }
     }

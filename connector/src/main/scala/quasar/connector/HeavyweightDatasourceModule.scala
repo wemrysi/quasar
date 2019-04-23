@@ -19,6 +19,7 @@ package quasar.connector
 import quasar.{Disposable, RenderTreeT}
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
+import quasar.api.resource.ResourcePathType
 import quasar.qscript.{MonadPlannerErr, QScriptEducated}
 
 import scala.concurrent.ExecutionContext
@@ -39,5 +40,5 @@ trait HeavyweightDatasourceModule {
       F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
       config: Json)(
       implicit ec: ExecutionContext)
-      : F[InitializationError[Json] \/ Disposable[F, PhysicalDatasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F]]]]
+      : F[InitializationError[Json] \/ Disposable[F, Datasource.Aux[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]]
 }

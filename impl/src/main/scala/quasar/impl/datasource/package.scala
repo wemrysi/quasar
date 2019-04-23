@@ -16,12 +16,14 @@
 
 package quasar.impl
 
+import slamdata.Predef.{Array, SuppressWarnings}
 import quasar.api.datasource.DatasourceError.{CreateError, MalformedConfiguration}
-import quasar.api.resource.ResourcePath
-import quasar.connector.{Datasource, PhysicalDatasource}
+import quasar.api.resource.{ResourcePath, ResourcePathType}
+import quasar.connector.Datasource
 import quasar.contrib.scalaz.MonadError_
 
 import scala.util.Either
+import scala.reflect.runtime.universe._
 
 import argonaut.Json
 import fs2.Stream
@@ -33,12 +35,14 @@ package object datasource {
 
   type MonadCreateErr[F[_]] = MonadError_[F, CreateError[Json]]
 
-  def toPhysicalDatasource[F[_]: Applicative: MonadCreateErr, G[_], Q, R](ds: Datasource[F, G, Q, R])
-      : PhysicalDatasource[F, G, Q, R] =
-    ds match {
-      case p: PhysicalDatasource[F, G, Q, R] => p
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def toPhysical[F[_]: Applicative: MonadCreateErr, G[_], Q, R, P <: ResourcePathType: TypeTag](
+      ds: Datasource.Aux[F, G, Q, R, P])
+      : Datasource.Aux[F, G, Q, R, ResourcePathType.Physical] =
+    typeTag[P] match {
+      case p: ResourcePathType.Physical => ds.asInstanceOf[Datasource.Aux[F, G, Q, R, ResourcePathType.Physical]]
       case other =>
-        FailedDatasource[CreateError[Json], F, G, Q, R](ds.kind,
+        FailedDatasource[CreateError[Json], F, G, Q, R, ResourcePathType.Physical](ds.kind,
           MalformedConfiguration(ds.kind, Json.jEmptyObject, "Datasource is not PhysicalDatasource"))
     }
 }
