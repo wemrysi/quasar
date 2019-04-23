@@ -73,7 +73,7 @@ object MapDBIndexedStore {
 
   private def mkDb(path: Path): DB = {
     val rawMaker = DBMaker.fileDB(path.toFile).checksumHeaderBypass.transactionEnable.closeOnJvmShutdown.fileLockDisable
-    val mmapedMaker = if (isWindows) rawMaker.fileMmapEnableIfSupported.fileMmapPreclearDisable.cleanerHackEnable else rawMaker
+    val mmapedMaker = if (isWindows) rawMaker else rawMaker.fileMmapEnableIfSupported.fileMmapPreclearDisable.cleanerHackEnable
     mmapedMaker.make
   }
 
