@@ -61,14 +61,13 @@ object ExternalDatasources extends Logging {
       implicit F: ConcurrentEffect[F])
       : Stream[F, (List[DatasourceModule], List[DestinationModule])] = {
 
-    val datasourceModuleStream: Stream[F, DatasourceModule] = config match {
+    val moduleStream: Stream[F, (String, ClassLoader)] = config match {
       case PluginDirectory(directory) =>
         Stream.eval(F.delay((Files.exists(directory), Files.isDirectory(directory)))) flatMap {
           case (true, true) =>
             convert.fromJavaStream(F.delay(Files.list(directory)))
               .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
               .flatMap(loadPlugin[F](_, blockingPool))
-              .flatMap((loadDatasourceModule[F](_, _)).tupled)
 
           case (true, false) =>
             warnStream[F](s"Unable to load plugins from '$directory', does not appear to be a directory", None)
@@ -80,7 +79,6 @@ object ExternalDatasources extends Logging {
       case PluginFiles(files) =>
         Stream.emits(files)
           .flatMap(loadPlugin[F](_, blockingPool))
-          .flatMap((loadDatasourceModule[F](_, _)).tupled)
 
       case ExplodedDirs(modules) =>
         for {
@@ -89,41 +87,14 @@ object ExternalDatasources extends Logging {
           (cn, cp) = exploded
 
           classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, cp))
-          mod <- loadDatasourceModule[F](cn.value, classLoader)
-        } yield mod
+        } yield (cn.value, classLoader)
     }
 
-    val destinationModuleStream: Stream[F, DestinationModule] = config match {
-      case PluginDirectory(directory) =>
-        Stream.eval(F.delay((Files.exists(directory), Files.isDirectory(directory)))) flatMap {
-          case (true, true) =>
-            convert.fromJavaStream(F.delay(Files.list(directory)))
-              .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
-              .flatMap(loadPlugin[F](_, blockingPool))
-              .flatMap((loadDestinationModule[F](_, _)).tupled)
+    val datasourceModuleStream: Stream[F, DatasourceModule] =
+      moduleStream.flatMap((loadDatasourceModule[F](_, _)).tupled)
 
-          case (true, false) =>
-            warnStream[F](s"Unable to load plugins from '$directory', does not appear to be a directory", None)
-
-          case _ =>
-            Stream.empty
-        }
-
-      case PluginFiles(files) =>
-        Stream.emits(files)
-          .flatMap(loadPlugin[F](_, blockingPool))
-          .flatMap((loadDestinationModule[F](_, _)).tupled)
-
-      case ExplodedDirs(modules) =>
-        for {
-          exploded <- Stream.emits(modules)
-
-          (cn, cp) = exploded
-
-          classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, cp))
-          mod <- loadDestinationModule[F](cn.value, classLoader)
-        } yield mod
-    }
+    val destinationModuleStream: Stream[F, DestinationModule] =
+      moduleStream.flatMap((loadDestinationModule[F](_, _)).tupled)
 
     for {
       ds <- datasourceModuleStream.fold(List.empty[DatasourceModule])((m, d) => d :: m)
