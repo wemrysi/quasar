@@ -16,7 +16,7 @@
 
 package quasar.impl.external
 
-import slamdata.Predef._
+import slamdata.Predef.{Stream => _, _}
 import quasar.concurrent.BlockingContext
 import quasar.connector.{HeavyweightDatasourceModule, LightweightDatasourceModule}
 import quasar.fp.ski.κ
@@ -36,9 +36,8 @@ import java.lang.{
 import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.syntax.applicativeError._
 import fs2.Stream
-import org.slf4s.Logging
 
-object ExternalDatasources extends Logging {
+object ExternalDatasources extends StreamLogging {
   def apply[F[_]: ContextShift: Timer](
       config: ExternalConfig,
       blockingPool: BlockingContext)(
@@ -85,10 +84,4 @@ object ExternalDatasources extends Logging {
       datasource <- handleFailedDatasource(loadLightweight(clazz) handleErrorWith κ(loadHeavyweight(clazz)))
     } yield datasource
   }
-
-  private def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
-    Stream.eval(Sync[F].delay(cause.fold(log.warn(msg))(log.warn(msg, _)))).drain
-
-  private def infoStream[F[_]: Sync](msg: => String): Stream[F, Unit] =
-    Stream.eval(Sync[F].delay(log.info(msg)))
 }
