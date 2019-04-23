@@ -18,18 +18,14 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import cats.effect.{LiftIO, Sync, IO}
-import cats.effect.concurrent.Ref
-import cats.instances.list._
-import cats.syntax.foldable._
-import cats.syntax.applicative._
-import cats.syntax.functor._
+import cats.effect.Sync
 import cats.syntax.flatMap._
 import cats.syntax.apply._
 import fs2.Stream
 import shims._
 
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.JavaConverters._
 
@@ -67,26 +63,31 @@ final class MapDBIndexedStore[F[_]: Sync] private(db: DB) extends IndexedStore[F
 object MapDBIndexedStore {
   val TREEMAP_NAME: String = "main"
 
-  val ref: Ref[IO, Map[String, DB]] = Ref.unsafe(Map.empty)
+  private val cache: ConcurrentHashMap[String, DB] = new ConcurrentHashMap()
 
-  def apply[F[_]: Sync: LiftIO](path: Path): F[IndexedStore[F, String, String]] =
+  private val isWindows: Boolean =
+    java.lang.System.getProperty("os.name").toLowerCase.indexOf("windows") > -1
+
+  def apply[F[_]: Sync](path: Path): F[IndexedStore[F, String, String]] =
     makeOrGetDB[F](path) flatMap { db => Sync[F].delay(new MapDBIndexedStore[F](db)) }
 
-  def mkDb[F[_]: Sync](path: Path): F[DB] =
-    Sync[F].delay(DBMaker.fileDB(path.toFile).checksumHeaderBypass.transactionEnable.closeOnJvmShutdown.fileLockDisable.make)
+  private def mkDb(path: Path): DB = {
+    val rawMaker = DBMaker.fileDB(path.toFile).checksumHeaderBypass.transactionEnable.closeOnJvmShutdown.fileLockDisable
+    val mmapedMaker = if (isWindows) rawMaker.fileMmapEnableIfSupported.fileMmapPreclearDisable.cleanerHackEnable else rawMaker
+    mmapedMaker.make
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def makeOrGetDB[F[_]: Sync: LiftIO](path: Path): F[DB] =
-    LiftIO[F].liftIO(ref.get) flatMap { (cache: Map[String, DB]) => cache.get(path.toString) match {
-      case Some(a) => a.pure[F]
-      case None => for {
-        db <- mkDb(path)
-        _ <- LiftIO[F].liftIO(ref.set(cache + ((path.toString, db))))
-      } yield db
-    }}
+  def makeOrGetDB[F[_]: Sync](path: Path): F[DB] = Sync[F].delay {
+    cache.compute(path.toString, (k: String, db: DB) => Option(db) match {
+      case Some(db) => db
+      case None => mkDb(path)
+    })}
 
-  def shutdownAll[F[_]: Sync: LiftIO]: F[Unit] =
-    LiftIO[F].liftIO(ref.get) flatMap { (cache: Map[String, DB]) => cache.toList.traverse_ { case (_, db) =>
-      Sync[F].delay(db.close)
-    }} productR { LiftIO[F].liftIO(ref.set(Map.empty)) }
+  def shutdownAll[F[_]: Sync]: F[Unit] = Sync[F].delay { cache.synchronized {
+    cache.forEach((k: String, db: DB) => {
+      cache.remove(k)
+      db.close
+    })
+  }}
 }
