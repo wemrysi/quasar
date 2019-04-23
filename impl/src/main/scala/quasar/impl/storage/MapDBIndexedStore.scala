@@ -61,8 +61,6 @@ final class MapDBIndexedStore[F[_]: Sync] private(db: DB) extends IndexedStore[F
     !Option(bmap.remove(k)).isEmpty
   }}
 
-  def unsafeClose: F[Unit] = Sync[F].delay(db.close)
-
   private def commit: F[Unit] = Sync[F].delay(db.commit)
 
 }
