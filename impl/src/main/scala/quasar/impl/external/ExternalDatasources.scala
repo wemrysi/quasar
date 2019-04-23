@@ -61,13 +61,13 @@ object ExternalDatasources extends Logging {
       implicit F: ConcurrentEffect[F])
       : Stream[F, (List[DatasourceModule], List[DestinationModule])] = {
 
-    val moduleStream: Stream[F, (Stream[F, DatasourceModule], Stream[F, DestinationModule])] = config match {
+    val datasourceModuleStream: Stream[F, DatasourceModule] = config match {
       case PluginDirectory(directory) =>
         Stream.eval(F.delay((Files.exists(directory), Files.isDirectory(directory)))) flatMap {
           case (true, true) =>
             convert.fromJavaStream(F.delay(Files.list(directory)))
               .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
-              .flatMap(loadPlugin[F](_, blockingPool))
+              .flatMap(loadDatasourcePlugin[F](_, blockingPool))
 
           case (true, false) =>
             warnStream[F](s"Unable to load plugins from '$directory', does not appear to be a directory", None)
@@ -77,7 +77,7 @@ object ExternalDatasources extends Logging {
         }
 
       case PluginFiles(files) =>
-        Stream.emits(files).flatMap(loadPlugin[F](_, blockingPool))
+        Stream.emits(files).flatMap(loadDatasourcePlugin[F](_, blockingPool))
 
       case ExplodedDirs(modules) =>
         for {
@@ -86,17 +86,43 @@ object ExternalDatasources extends Logging {
           (cn, cp) = exploded
 
           classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, cp))
-          datasourceModule = loadDatasourceModule[F](cn.value, classLoader)
-          destinationModule = loadDestinationModule[F](cn.value, classLoader)
-        } yield (datasourceModule, destinationModule)
+          mod <- loadDatasourceModule[F](cn.value, classLoader)
+        } yield mod
     }
 
-    moduleStream flatMap {
-      case (datasources, destinations) => for {
-        sources <- datasources.fold(List.empty[DatasourceModule])((m, d) => d :: m)
-        dests <- destinations.fold(List.empty[DestinationModule])((m, d) => d :: m)
-      } yield (sources, dests)
+    val destinationModuleStream: Stream[F, DestinationModule] = config match {
+      case PluginDirectory(directory) =>
+        Stream.eval(F.delay((Files.exists(directory), Files.isDirectory(directory)))) flatMap {
+          case (true, true) =>
+            convert.fromJavaStream(F.delay(Files.list(directory)))
+              .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
+              .flatMap(loadDestinationPlugin[F](_, blockingPool))
+
+          case (true, false) =>
+            warnStream[F](s"Unable to load plugins from '$directory', does not appear to be a directory", None)
+
+          case _ =>
+            Stream.empty
+        }
+
+      case PluginFiles(files) =>
+        Stream.emits(files).flatMap(loadDestinationPlugin[F](_, blockingPool))
+
+      case ExplodedDirs(modules) =>
+        for {
+          exploded <- Stream.emits(modules)
+
+          (cn, cp) = exploded
+
+          classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, cp))
+          mod <- loadDestinationModule[F](cn.value, classLoader)
+        } yield mod
     }
+
+    for {
+      ds <- datasourceModuleStream.fold(List.empty[DatasourceModule])((m, d) => d :: m)
+      dts <- destinationModuleStream.fold(List.empty[DestinationModule])((m, d) => d :: m)
+    } yield (ds, dts)
   }
 
   ////
@@ -171,10 +197,56 @@ object ExternalDatasources extends Logging {
     } yield datasource
   }
 
-  private def loadPlugin[F[_]: ContextShift: Effect: Timer](
+  private def loadDestinationPlugin[F[_]: ContextShift: Effect: Timer](
     pluginFile: Path,
     blockingPool: BlockingContext)
-      : Stream[F, (Stream[F, DatasourceModule], Stream[F, DestinationModule])] = {
+      : Stream[F, DestinationModule] = {
+
+    for {
+      js <-
+        file.readAll[F](pluginFile, blockingPool.unwrap, PluginChunkSize)
+          .chunks
+          .map(_.toByteBuffer)
+          .parseJson[Json](AsyncParser.SingleValue)
+
+      pluginResult <- Stream.eval(Plugin.fromJson[F](js))
+
+      plugin <- pluginResult.fold(
+        (s, c) => warnStream[F](s"Failed to decode plugin from '$pluginFile': $s ($c)", None),
+        r => Stream.eval(r.withAbsolutePaths[F](pluginFile.getParent)))
+
+      classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, plugin.classPath))
+
+      mainJar = new JarFile(plugin.mainJar.toFile)
+
+      backendModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestAttributeName)
+      versionModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestVersionName)
+
+      _ <- versionModuleAttr match {
+        case None => warnStream[F](s"No '${Plugin.ManifestVersionName}' attribute found in Manifest for '$pluginFile'.", None)
+        case Some(version) => infoStream[F](s"Loading $pluginFile with version $version")
+      }
+
+      moduleClasses <- backendModuleAttr match {
+        case None =>
+          warnStream[F](s"No '${Plugin.ManifestAttributeName}' attribute found in Manifest for '$pluginFile'.", None)
+
+        case Some(attr) =>
+          Stream.emit(attr.split(" "))
+      }
+
+      moduleClass <- if (moduleClasses.isEmpty)
+        warnStream[F](s"No classes defined for '${Plugin.ManifestAttributeName}' attribute in Manifest from '$pluginFile'.", None)
+      else
+        Stream.chunk(Chunk.array(moduleClasses)).covary[F]
+      mod <- loadDestinationModule[F](moduleClass, classLoader)
+    } yield mod
+  }
+
+  private def loadDatasourcePlugin[F[_]: ContextShift: Effect: Timer](
+    pluginFile: Path,
+    blockingPool: BlockingContext)
+      : Stream[F, DatasourceModule] = {
 
     for {
       js <-
@@ -214,9 +286,8 @@ object ExternalDatasources extends Logging {
       else
         Stream.chunk(Chunk.array(moduleClasses)).covary[F]
 
-      datasourceModule = loadDatasourceModule[F](moduleClass, classLoader)
-      destinationModule = loadDestinationModule[F](moduleClass, classLoader)
-    } yield (datasourceModule, destinationModule)
+      mod <- loadDatasourceModule[F](moduleClass, classLoader)
+    } yield mod
   }
 
   private def jarAttribute[F[_]: Sync](j: JarFile, attr: String): Stream[F, Option[String]] =
