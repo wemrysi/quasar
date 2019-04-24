@@ -49,7 +49,7 @@ object ExternalDatasources extends Logging {
 
     for {
       ds <- datasourceModuleStream.fold(List.empty[DatasourceModule])((m, d) => d :: m)
-      _ <- infoStream[F](s"Loaded ${ds.length} datasource(s)")
+      _ <- ExternalModules.infoStream[F](s"Loaded ${ds.length} datasource(s)")
     } yield ds
   }
 
@@ -61,13 +61,13 @@ object ExternalDatasources extends Logging {
     def handleFailedDatasource[A](s: Stream[F, A]): Stream[F, A] =
       s recoverWith {
         case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
-          warnStream[F](s"Datasource module '$className' does not appear to be a singleton object", Some(e))
+          ExternalModules.warnStream[F](s"Datasource module '$className' does not appear to be a singleton object", Some(e))
 
         case e: ExceptionInInitializerError =>
-          warnStream[F](s"Datasource module '$className' failed to load with exception", Some(e))
+          ExternalModules.warnStream[F](s"Datasource module '$className' failed to load with exception", Some(e))
 
         case _: ClassCastException =>
-          warnStream[F](s"Datasource module '$className' is not actually a subtype of LightweightDatasourceModule or HeavyweightDatasourceModule", None)
+          ExternalModules.warnStream[F](s"Datasource module '$className' is not actually a subtype of LightweightDatasourceModule or HeavyweightDatasourceModule", None)
       }
 
     def loadLightweight(clazz: Class[_]): Stream[F, DatasourceModule] =
@@ -85,10 +85,4 @@ object ExternalDatasources extends Logging {
       datasource <- handleFailedDatasource(loadLightweight(clazz) handleErrorWith κ(loadHeavyweight(clazz)))
     } yield datasource
   }
-
-  private def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
-    Stream.eval(Sync[F].delay(cause.fold(log.warn(msg))(log.warn(msg, _)))).drain
-
-  private def infoStream[F[_]: Sync](msg: => String): Stream[F, Unit] =
-    Stream.eval(Sync[F].delay(log.info(msg)))
 }

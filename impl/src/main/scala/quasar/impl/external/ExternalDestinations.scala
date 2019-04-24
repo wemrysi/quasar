@@ -47,7 +47,7 @@ object ExternalDestinations extends Logging {
 
     for {
       dts <- destinationModuleStream.fold(List.empty[DestinationModule])((m, d) => d :: m)
-      _ <- infoStream[F](s"Loaded ${dts.length} destination(s)")
+      _ <- ExternalModules.infoStream[F](s"Loaded ${dts.length} destination(s)")
     } yield dts
   }
 
@@ -60,13 +60,13 @@ object ExternalDestinations extends Logging {
     def handleFailedDestination[A](s: Stream[F, A]): Stream[F, A] =
       s recoverWith {
         case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
-          warnStream[F](s"Destination module '$className' does not appear to be a singleton object", Some(e))
+          ExternalModules.warnStream[F](s"Destination module '$className' does not appear to be a singleton object", Some(e))
 
         case e: ExceptionInInitializerError =>
-          warnStream[F](s"Destination module '$className' failed to load with exception", Some(e))
+          ExternalModules.warnStream[F](s"Destination module '$className' failed to load with exception", Some(e))
 
         case _: ClassCastException =>
-          infoStream[F](s"Module '$className' does not support writeback") >> Stream.empty
+          ExternalModules.infoStream[F](s"Module '$className' does not support writeback") >> Stream.empty
       }
 
     def loadDestination(clazz: Class[_]): Stream[F, DestinationModule] =
@@ -77,10 +77,4 @@ object ExternalDestinations extends Logging {
       destination <- handleFailedDestination(loadDestination(clazz))
     } yield destination
   }
-
-  private def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
-    Stream.eval(Sync[F].delay(cause.fold(log.warn(msg))(log.warn(msg, _)))).drain
-
-  private def infoStream[F[_]: Sync](msg: => String): Stream[F, Unit] =
-    Stream.eval(Sync[F].delay(log.info(msg)))
 }

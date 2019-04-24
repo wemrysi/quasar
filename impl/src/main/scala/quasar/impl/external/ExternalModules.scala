@@ -88,6 +88,12 @@ object ExternalModules extends Logging {
         warnStream[F](s"Could not locate class for datasource module '$cn'", Some(cnf))
     }
 
+  def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
+    Stream.eval(Sync[F].delay(cause.fold(log.warn(msg))(log.warn(msg, _)))).drain
+
+  def infoStream[F[_]: Sync](msg: => String): Stream[F, Unit] =
+    Stream.eval(Sync[F].delay(log.info(msg)))
+
   ////
 
   private def loadPlugin[F[_]: ContextShift: Effect: Timer](
@@ -140,10 +146,4 @@ object ExternalModules extends Logging {
 
   private def jarAttribute[F[_]: Sync](j: JarFile, attr: String): Stream[F, Option[String]] =
     Stream.eval(Sync[F].delay(Option(j.getManifest.getMainAttributes.getValue(attr))))
-
-  private def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
-    Stream.eval(Sync[F].delay(cause.fold(log.warn(msg))(log.warn(msg, _)))).drain
-
-  private def infoStream[F[_]: Sync](msg: => String): Stream[F, Unit] =
-    Stream.eval(Sync[F].delay(log.info(msg)))
 }
