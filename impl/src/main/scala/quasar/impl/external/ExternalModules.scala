@@ -35,11 +35,12 @@ import cats.syntax.applicativeError._
 import fs2.io.file
 import fs2.{Chunk, Stream}
 import jawnfs2._
+import org.slf4s.Logging
 import org.typelevel.jawn.AsyncParser
 import org.typelevel.jawn.support.argonaut.Parser._
 import scalaz.syntax.tag._
 
-object ExternalModules extends StreamLogging {
+object ExternalModules extends Logging {
   import ExternalConfig._
 
   val PluginChunkSize = 8192
@@ -139,4 +140,10 @@ object ExternalModules extends StreamLogging {
 
   private def jarAttribute[F[_]: Sync](j: JarFile, attr: String): Stream[F, Option[String]] =
     Stream.eval(Sync[F].delay(Option(j.getManifest.getMainAttributes.getValue(attr))))
+
+  private def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
+    Stream.eval(Sync[F].delay(cause.fold(log.warn(msg))(log.warn(msg, _)))).drain
+
+  private def infoStream[F[_]: Sync](msg: => String): Stream[F, Unit] =
+    Stream.eval(Sync[F].delay(log.info(msg)))
 }
