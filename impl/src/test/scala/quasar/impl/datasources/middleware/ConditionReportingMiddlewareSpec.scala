@@ -55,7 +55,7 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
       IO.pure(false)
 
     def prefixedChildPaths(path: ResourcePath)
-        : IO[Option[List[(ResourceName,PathType)]]] =
+        : IO[Option[List[(ResourceName, PathType)]]] =
       IO.pure(None)
   }
 

@@ -86,7 +86,7 @@ final class DefaultDatasourceManager[
 
       mds <- createDatasource(mod)
 
-      ds: ManagedDatasource[T,F,G,R,P] <- EitherT.rightT(onCreate(datasourceId, mds.unsafeValue) onError {
+      ds <- EitherT.rightT(onCreate(datasourceId, mds.unsafeValue) onError {
         case _ => mds.dispose
       })
 
