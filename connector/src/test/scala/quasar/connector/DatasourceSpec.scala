@@ -60,17 +60,15 @@ abstract class DatasourceSpec[F[_]: Effect, G[_]]
         xs.foldLeftM(ok) { case (mr, (n, tpe)) =>
           val path = pfx / n
 
-          val tpeResult = tpe match {
-            case r if r.isResource =>
+          val tpeResult =
+            if (tpe.isResource)
               datasource.pathIsResource(path).ifM(
                 checkAgreementUnder(path),
                 ko(s"Expected ${path.shows} to be a resource.").point[F])
-
-            case _ =>
+            else
               datasource.pathIsResource(path).ifM(
                 ko(s"Expected ${path.shows} not to be a resource.").point[F],
                 checkAgreementUnder(path))
-          }
 
           tpeResult.map(mr and _)
         }
