@@ -53,8 +53,8 @@ import scalaz.syntax.show._
 import shims._
 import spire.std.double._
 
-final class Quasar[F[_], R, S, P <: ResourcePathType](
-    val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double], P],
+final class Quasar[F[_], R, S](
+    val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double], ResourcePathType],
     val tables: Tables[F, UUID, SqlQuery, R, S],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, R])
 
@@ -77,7 +77,7 @@ object Quasar extends Logging {
       sstEvalConfig: SstEvalConfig)(
       implicit
       ec: ExecutionContext)
-      : Stream[F, Quasar[F, R, S, ResourcePathType]] = {
+      : Stream[F, Quasar[F, R, S]] = {
 
     for {
       configured <- datasourceRefs.entries.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _)
