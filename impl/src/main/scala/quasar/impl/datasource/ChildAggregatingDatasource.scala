@@ -25,11 +25,13 @@ import quasar.contrib.scalaz._
 import scala.util.{Left, Right}
 
 import cats.effect.Sync
+import cats.instances.option._
 import cats.syntax.applicative._
 import cats.syntax.eq._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.syntax.option._
+import cats.syntax.traverse._
 
 import fs2.{Pull, Stream}
 
@@ -111,10 +113,10 @@ final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] priva
 
   // checks whether the provided stream is that of a prefix/prefixresource
   private def ofPrefix[A](os: Option[Stream[F, A]]): F[Boolean] =
-    os.map(s => s.pull.peek1.flatMap {
+    os.traverse(s => s.pull.peek1.flatMap {
       case None => Pull.output1(false)
       case _ => Pull.output1(true)
-    }).getOrElse(Pull.output1(false)).stream.compile.lastOrError
+    }.stream.compile.last).map(_.flatten getOrElse false)
 }
 
 object ChildAggregatingDatasource {
