@@ -45,7 +45,8 @@ object ExternalDatasources extends Logging {
       implicit F: ConcurrentEffect[F])
       : Stream[F, List[DatasourceModule]] = {
     val datasourceModuleStream: Stream[F, DatasourceModule] =
-      ExternalModules(config, blockingPool).flatMap((loadDatasourceModule[F](_, _)).tupled)
+      ExternalModules(config, PluginType.Datasource, blockingPool)
+        .flatMap((loadDatasourceModule[F](_, _)).tupled)
 
     for {
       ds <- datasourceModuleStream.fold(List.empty[DatasourceModule])((m, d) => d :: m)

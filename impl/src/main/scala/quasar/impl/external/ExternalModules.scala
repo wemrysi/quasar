@@ -48,6 +48,7 @@ object ExternalModules extends Logging {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def apply[F[_]: ConcurrentEffect: ContextShift: Timer](
     config: ExternalConfig,
+    pluginType: PluginType,
     blockingPool: BlockingContext)
       : Stream[F, (String, ClassLoader)] = config match {
       case PluginDirectory(directory) =>
@@ -55,7 +56,7 @@ object ExternalModules extends Logging {
           case (true, true) =>
             convert.fromJavaStream(ConcurrentEffect[F].delay(Files.list(directory)))
               .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
-              .flatMap(loadPlugin[F](_, blockingPool))
+              .flatMap(loadPlugin[F](_, pluginType, blockingPool))
 
           case (true, false) =>
             warnStream[F](s"Unable to load plugins from '$directory', does not appear to be a directory", None)
@@ -66,7 +67,7 @@ object ExternalModules extends Logging {
 
       case PluginFiles(files) =>
         Stream.emits(files)
-          .flatMap(loadPlugin[F](_, blockingPool))
+          .flatMap(loadPlugin[F](_, pluginType, blockingPool))
 
       case ExplodedDirs(modules) =>
         for {
@@ -85,7 +86,7 @@ object ExternalModules extends Logging {
   def loadClass[F[_]: Sync](cn: String, classLoader: ClassLoader): Stream[F, Class[_]] =
     Stream.eval(Sync[F].delay(classLoader.loadClass(cn))) recoverWith {
       case cnf: ClassNotFoundException =>
-        warnStream[F](s"Could not locate class for datasource module '$cn'", Some(cnf))
+        warnStream[F](s"Could not locate class for module '$cn'", Some(cnf))
     }
 
   def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
@@ -98,6 +99,7 @@ object ExternalModules extends Logging {
 
   private def loadPlugin[F[_]: ContextShift: Effect: Timer](
     pluginFile: Path,
+    pluginType: PluginType,
     blockingPool: BlockingContext)
       : Stream[F, (String, ClassLoader)] =
     for {
@@ -117,7 +119,12 @@ object ExternalModules extends Logging {
 
       mainJar = new JarFile(plugin.mainJar.toFile)
 
-      backendModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestAttributeName)
+      moduleName = pluginType match {
+        case PluginType.Datasource => Plugin.ManifestAttributeName
+        case PluginType.Destination => Plugin.ManifestAttributeDestinationName
+      }
+
+      backendModuleAttr <- jarAttribute[F](mainJar, moduleName)
       versionModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestVersionName)
 
       _ <- versionModuleAttr match {
@@ -127,14 +134,14 @@ object ExternalModules extends Logging {
 
       moduleClasses <- backendModuleAttr match {
         case None =>
-          warnStream[F](s"No '${Plugin.ManifestAttributeName}' attribute found in Manifest for '$pluginFile'.", None)
+          warnStream[F](s"No '$moduleName' attribute found in Manifest for '$pluginFile'.", None)
 
         case Some(attr) =>
           Stream.emit(attr.split(" "))
       }
 
       moduleClass <- if (moduleClasses.isEmpty)
-        warnStream[F](s"No classes defined for '${Plugin.ManifestAttributeName}' attribute in Manifest from '$pluginFile'.", None)
+        warnStream[F](s"No classes defined for '$moduleName' attribute in Manifest from '$pluginFile'.", None)
       else
         Stream.chunk(Chunk.array(moduleClasses)).covary[F]
     } yield (moduleClass, classLoader)

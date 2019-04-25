@@ -43,7 +43,8 @@ object ExternalDestinations extends Logging {
       implicit F: ConcurrentEffect[F])
       : Stream[F, List[DestinationModule]] = {
     val destinationModuleStream: Stream[F, DestinationModule] =
-      ExternalModules(config, blockingPool).flatMap((loadDestinationModule[F](_, _)).tupled)
+      ExternalModules(config, PluginType.Destination, blockingPool)
+        .flatMap((loadDestinationModule[F](_, _)).tupled)
 
     for {
       dts <- destinationModuleStream.fold(List.empty[DestinationModule])((m, d) => d :: m)
@@ -66,7 +67,7 @@ object ExternalDestinations extends Logging {
           ExternalModules.warnStream[F](s"Destination module '$className' failed to load with exception", Some(e))
 
         case _: ClassCastException =>
-          ExternalModules.infoStream[F](s"Module '$className' does not support writeback") >> Stream.empty
+          ExternalModules.warnStream[F](s"Datasource module '$className' is not actually a subtype of DestinationModule", None)
       }
 
     def loadDestination(clazz: Class[_]): Stream[F, DestinationModule] =

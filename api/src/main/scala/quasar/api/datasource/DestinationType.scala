@@ -37,7 +37,7 @@ object DestinationType extends DestinationTypeInstances {
 
 sealed abstract class DestinationTypeInstances {
   implicit val order: Order[DestinationType] =
-    Order.orderBy(t => (t.name, t.version))
+    Order.orderBy(t => (t.name, t.version, t.minSupportedVersion))
 
   implicit val show: Show[DestinationType] =
     Show.show {
