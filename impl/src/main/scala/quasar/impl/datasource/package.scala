@@ -43,6 +43,6 @@ package object datasource {
       case p: ResourcePathType.Physical => ds.asInstanceOf[Datasource.Aux[F, G, Q, R, ResourcePathType.Physical]]
       case other =>
         FailedDatasource[CreateError[Json], F, G, Q, R, ResourcePathType.Physical](ds.kind,
-          MalformedConfiguration(ds.kind, Json.jEmptyObject, "Datasource is not PhysicalDatasource"))
+          MalformedConfiguration(ds.kind, Json.jEmptyObject, "ResourcePathType of datasource is not Physical"))
     }
 }

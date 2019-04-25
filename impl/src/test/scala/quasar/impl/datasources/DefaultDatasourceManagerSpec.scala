@@ -63,7 +63,7 @@ import shims.{eqToScalaz => _, orderToScalaz => _, _}
 
 object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers {
 
-  type Mgr = DatasourceManager[Int, Json, Fix, IO, Stream[IO, ?], QueryResult[IO]]
+  type Mgr = DatasourceManager[Int, Json, Fix, IO, Stream[IO, ?], QueryResult[IO], ResourcePathType.Physical]
   type Disposes = Ref[IO, List[DatasourceType]]
 
   final case class PlannerErrorException(pe: PlannerError)

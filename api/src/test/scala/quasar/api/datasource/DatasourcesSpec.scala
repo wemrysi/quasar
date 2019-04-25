@@ -19,7 +19,7 @@ package quasar.api.datasource
 import slamdata.Predef._
 import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
 import quasar.api.SchemaConfig
-import quasar.api.resource.ResourcePath
+import quasar.api.resource.{ResourcePath, ResourcePathType}
 
 import scala.Predef.assert
 import scala.concurrent.ExecutionContext
@@ -32,20 +32,20 @@ import cats.syntax.flatMap._
 import cats.syntax.functor._
 import eu.timepit.refined.auto._
 import org.specs2.matcher.Matcher
-import scalaz.{\/, Equal, IMap, Order, Show}
+import scalaz.{Equal, IMap, Order, Show, \/}
 import scalaz.syntax.equal._
 import scalaz.syntax.foldable._
 import scalaz.std.list._
 
 abstract class DatasourcesSpec[
-    F[_], G[_], I: Order: Show, C: Equal: Show, S <: SchemaConfig](
+    F[_], G[_], I: Order: Show, C: Equal: Show, S <: SchemaConfig, P <: ResourcePathType](
     implicit F: Effect[F], ec: ExecutionContext)
     extends EffectfulQSpec[F]
     with ConditionMatchers {
 
   import DatasourceError._
 
-  def datasources: Datasources[F, G, I, C, S]
+  def datasources: Datasources[F, G, I, C, S, P]
 
   def supportedType: DatasourceType
 

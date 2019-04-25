@@ -16,7 +16,7 @@
 
 package quasar.connector
 
-import slamdata.Predef.{Boolean, Option}
+import slamdata.Predef.{Array, Boolean, Option, SuppressWarnings}
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
@@ -49,12 +49,17 @@ trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, Q, R] {
 object Datasource {
   type Aux[F[_], G[_], Q, R, P <: ResourcePathType] = Datasource[F, G, Q, R] { type PathType = P }
 
-  def evaluator[F[_], G[_], Q, R, P <: ResourcePathType]: Lens[Datasource.Aux[F, G, Q, R, P], QueryEvaluator[F, Q, R]] =
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def widenPathType[F[_], G[_], Q, R, PI <: ResourcePathType, PO >: PI <: ResourcePathType](
+      ds: Aux[F, G, Q, R, PI]): Aux[F, G, Q, R, PO] =
+    ds.asInstanceOf[Aux[F, G, Q, R, PO]]
+
+  def evaluator[F[_], G[_], Q, R, P <: ResourcePathType]: Lens[Aux[F, G, Q, R, P], QueryEvaluator[F, Q, R]] =
     pevaluator[F, G, Q, R, Q, R, P]
 
   def pevaluator[F[_], G[_], Q1, R1, Q2, R2, P <: ResourcePathType]
-      : PLens[Datasource.Aux[F, G, Q1, R1, P], Datasource.Aux[F, G, Q2, R2, P], QueryEvaluator[F, Q1, R1], QueryEvaluator[F, Q2, R2]] =
-    PLens((ds: Datasource.Aux[F, G, Q1, R1, P]) => ds: QueryEvaluator[F, Q1, R1]) { qe: QueryEvaluator[F, Q2, R2] => ds =>
+      : PLens[Aux[F, G, Q1, R1, P], Aux[F, G, Q2, R2, P], QueryEvaluator[F, Q1, R1], QueryEvaluator[F, Q2, R2]] =
+    PLens((ds: Aux[F, G, Q1, R1, P]) => ds: QueryEvaluator[F, Q1, R1]) { qe: QueryEvaluator[F, Q2, R2] => ds =>
       new Datasource[F, G, Q2, R2] {
         type PathType = ds.PathType
         val kind = ds.kind

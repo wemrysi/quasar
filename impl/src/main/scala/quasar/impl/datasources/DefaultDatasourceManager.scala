@@ -48,18 +48,19 @@ final class DefaultDatasourceManager[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: Timer,
     G[_],
-    R] private (
+    R,
+    P <: ResourcePathType] private (
     modules: DefaultDatasourceManager.Modules,
-    running: Ref[F, DefaultDatasourceManager.Running[I, T, F, G, R]],
-    onCreate: (I, DefaultDatasourceManager.MDS[T, F]) => F[ManagedDatasource[T, F, G, R]])(
+    running: Ref[F, DefaultDatasourceManager.Running[I, T, F, G, R, P]],
+    onCreate: (I, DefaultDatasourceManager.MDS[T, F, ResourcePathType.Physical]) => F[ManagedDatasource[T, F, G, R, P]])(
     implicit
     ec: ExecutionContext)
-    extends DatasourceManager[I, Json, T, F, G, R] { self =>
+    extends DatasourceManager[I, Json, T, F, G, R, P] { self =>
 
   import DefaultDatasourceManager._
 
-  type MDS = DefaultDatasourceManager.MDS[T, F]
-  type Running = DefaultDatasourceManager.Running[I, T, F, G, R]
+  type MDS = DefaultDatasourceManager.MDS[T, F, ResourcePathType.Physical]
+  type Running = DefaultDatasourceManager.Running[I, T, F, G, R, P]
 
   def initDatasource(datasourceId: I, ref: DatasourceRef[Json])
       : F[Condition[CreateError[Json]]] = {
@@ -85,7 +86,7 @@ final class DefaultDatasourceManager[
 
       mds <- createDatasource(mod)
 
-      ds <- EitherT.rightT(onCreate(datasourceId, mds.unsafeValue) onError {
+      ds: ManagedDatasource[T,F,G,R,P] <- EitherT.rightT(onCreate(datasourceId, mds.unsafeValue) onError {
         case _ => mds.dispose
       })
 
@@ -99,7 +100,7 @@ final class DefaultDatasourceManager[
     inited.run.map(Condition.disjunctionIso.reverseGet(_))
   }
 
-  def managedDatasource(datasourceId: I): F[Option[ManagedDatasource[T, F, G, R]]] =
+  def managedDatasource(datasourceId: I): F[Option[ManagedDatasource[T, F, G, R, P]]] =
     running.get.map(_.lookup(datasourceId).map(_.unsafeValue))
 
   def sanitizedRef(ref: DatasourceRef[Json]): DatasourceRef[Json] =
@@ -117,16 +118,16 @@ final class DefaultDatasourceManager[
 
   private val configL = DatasourceRef.config[Json]
 
-  private def modifyAndShutdown(
-      f: Running => (Running, Option[Disposable[F, ManagedDatasource[T, F, G, R]]]))
+  private def modifyAndShutdown(f: Running => (Running, Option[Disposable[F, ManagedDatasource[T, F, G, R, P]]]))
       : F[Unit] =
     running.modify(f).flatMap(_.traverse_(_.dispose))
 }
 
 object DefaultDatasourceManager {
   type Modules = IMap[DatasourceType, DatasourceModule]
-  type MDS[T[_[_]], F[_]] = ManagedDatasource[T, F, Stream[F, ?], QueryResult[F]]
-  type Running[I, T[_[_]], F[_], G[_], R] = IMap[I, Disposable[F, ManagedDatasource[T, F, G, R]]]
+  type MDS[T[_[_]], F[_], P <: ResourcePathType] = ManagedDatasource[T, F, Stream[F, ?], QueryResult[F], P]
+  type Running[I, T[_[_]], F[_], G[_], R, P <: ResourcePathType] =
+    IMap[I, Disposable[F, ManagedDatasource[T, F, G, R, P]]]
 
   final case class IncompatibleDatasourceException(kind: DatasourceType) extends java.lang.RuntimeException {
     override def getMessage = s"Loaded datasource implementation with type $kind is incompatible with quasar"
@@ -137,15 +138,16 @@ object DefaultDatasourceManager {
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: MonadCreateErr: Timer,
       G[_],
-      R] private (
-      onCreate: (I, MDS[T, F]) => F[ManagedDatasource[T, F, G, R]]) {
+      R,
+      P <: ResourcePathType] private (
+      onCreate: (I, MDS[T, F, ResourcePathType.Physical]) => F[ManagedDatasource[T, F, G, R, P]]) {
 
     def build(modules: Modules, configured: IMap[I, DatasourceRef[Json]])(
         implicit
         ec: ExecutionContext)
-        : Resource[F, DatasourceManager[I, Json, T, F, G, R]] = {
+        : Resource[F, DatasourceManager[I, Json, T, F, G, R, P]] = {
 
-      val init = for {
+      val init: F[(DefaultDatasourceManager[I, T, F, G, R, P], F[ISet[I]])] = for {
         bases <- configured traverse { ref =>
           modules.lookup(ref.kind) match {
             case Some(mod) =>
@@ -183,10 +185,10 @@ object DefaultDatasourceManager {
       resource.map(_._1)
     }
 
-    def withMiddleware[H[_], S](
-        f: (I, ManagedDatasource[T, F, G, R]) => F[ManagedDatasource[T, F, H, S]])
-        : Builder[I, T, F, H, S] =
-      new Builder[I, T, F, H, S]((i, mds) => onCreate(i, mds).flatMap(f(i, _)))
+    def withMiddleware[H[_], S, Q <: ResourcePathType](
+        f: (I, ManagedDatasource[T, F, G, R, P]) => F[ManagedDatasource[T, F, H, S, Q]])
+        : Builder[I, T, F, H, S, Q] =
+      new Builder[I, T, F, H, S, Q]((i, mds) => onCreate(i, mds).flatMap(f(i, _)))
   }
 
   object Builder {
@@ -194,8 +196,9 @@ object DefaultDatasourceManager {
         I: Order,
         T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
         F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: MonadCreateErr: Timer]
-        : Builder[I, T, F, Stream[F, ?], QueryResult[F]] =
-      new Builder[I, T, F, Stream[F, ?], QueryResult[F]]((_, mds) => mds.point[F])
+        : Builder[I, T, F, Stream[F, ?], QueryResult[F], ResourcePathType.Physical] =
+      new Builder[I, T, F, Stream[F, ?], QueryResult[F], ResourcePathType.Physical](
+        (_, mds) => mds.point[F])
   }
 
   ////
@@ -206,7 +209,7 @@ object DefaultDatasourceManager {
       module: DatasourceModule,
       ref: DatasourceRef[Json])(
       implicit ec: ExecutionContext)
-      : F[Disposable[F, MDS[T, F]]] =
+      : F[Disposable[F, MDS[T, F, ResourcePathType.Physical]]] =
     module match {
       case DatasourceModule.Lightweight(lw) =>
         val mklw = MonadError_[F, CreateError[Json]] unattempt {

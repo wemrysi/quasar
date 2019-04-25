@@ -30,7 +30,7 @@ import scalaz.{\/, ISet}
   * @tparam I identity
   * @tparam C configuration
   */
-trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
+trait Datasources[F[_], G[_], I, C, S <: SchemaConfig, P <: ResourcePathType] {
   import DatasourceError._
 
   /** Adds the datasource described by the given `DatasourceRef` to the
@@ -62,7 +62,7 @@ trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
     * datasource implied by concatenating each name to `prefixPath`.
     */
   def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
-      : F[DiscoveryError[I] \/ G[(ResourceName, ResourcePathType)]]
+      : F[DiscoveryError[I] \/ G[(ResourceName, P)]]
 
   /** Removes the specified datasource, making its resources unavailable. */
   def removeDatasource(datasourceId: I): F[Condition[ExistentialError[I]]]

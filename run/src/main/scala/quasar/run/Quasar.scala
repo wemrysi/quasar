@@ -53,8 +53,8 @@ import scalaz.syntax.show._
 import shims._
 import spire.std.double._
 
-final class Quasar[F[_], R, S](
-    val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
+final class Quasar[F[_], R, S, P <: ResourcePathType](
+    val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double], P],
     val tables: Tables[F, UUID, SqlQuery, R, S],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, R])
 
@@ -63,7 +63,7 @@ object Quasar extends Logging {
 
   type EvalResult[F[_]] = Either[QueryResult[F], AggregateResult[F, QSMap[Fix, QueryResult[F]]]]
 
-  type LookupRunning[F[_]] = UUID => F[Option[ManagedDatasource[Fix, F, Stream[F, ?], EvalResult[F]]]]
+  type LookupRunning[F[_]] = UUID => F[Option[ManagedDatasource[Fix, F, Stream[F, ?], EvalResult[F], ResourcePathType]]]
 
   /** What it says on the tin. */
   def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer, R, S](
@@ -77,7 +77,7 @@ object Quasar extends Logging {
       sstEvalConfig: SstEvalConfig)(
       implicit
       ec: ExecutionContext)
-      : Stream[F, Quasar[F, R, S]] = {
+      : Stream[F, Quasar[F, R, S, ResourcePathType]] = {
 
     for {
       configured <- datasourceRefs.entries.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _)

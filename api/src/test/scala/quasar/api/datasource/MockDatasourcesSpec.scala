@@ -33,18 +33,18 @@ import scalaz.std.anyVal._
 import scalaz.std.list._
 import scalaz.std.string._
 import shims._
-
 import MockDatasourcesSpec._
+import quasar.api.resource.ResourcePathType
 
 final class MockDatasourcesSpec
-  extends DatasourcesSpec[MockM, List, Int, String, MockSchemaConfig.type] {
+  extends DatasourcesSpec[MockM, List, Int, String, MockSchemaConfig.type, ResourcePathType] {
 
   val s3: DatasourceType    = DatasourceType("s3", 1L)
   val azure: DatasourceType = DatasourceType("azure", 1L)
   val mongo: DatasourceType = DatasourceType("mongodb", 1L)
   val acceptedSet: ISet[DatasourceType] = ISet.fromList(List(s3, azure, mongo))
 
-  def datasources: Datasources[MockM, List, Int, String, MockSchemaConfig.type] =
+  def datasources: Datasources[MockM, List, Int, String, MockSchemaConfig.type, ResourcePathType] =
     MockDatasources[String, MockM, List](
       acceptedSet, _ => Condition.normal(), SStream.empty)
 

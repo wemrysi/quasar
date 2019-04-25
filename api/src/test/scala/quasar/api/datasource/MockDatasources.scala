@@ -46,7 +46,7 @@ final class MockDatasources[
     supportedTypes: ISet[DatasourceType],
     errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
     structure: SStream[Tree[ResourceName]])
-  extends Datasources[F, G, Int, C, MockSchemaConfig.type] {
+  extends Datasources[F, G, Int, C, MockSchemaConfig.type, ResourcePathType] {
 
   import DatasourceError._
 
@@ -221,6 +221,6 @@ object MockDatasources {
       supportedTypes: ISet[DatasourceType],
       errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
       structure: SStream[Tree[ResourceName]])
-      : Datasources[F, G, Int, C, MockSchemaConfig.type] =
+      : Datasources[F, G, Int, C, MockSchemaConfig.type, ResourcePathType] =
     new MockDatasources[C, F, G](supportedTypes, errorCondition, structure)
 }

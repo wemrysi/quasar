@@ -80,7 +80,6 @@ final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] priva
   def pathIsResource(path: ResourcePath): F[Boolean] =
     underlying.pathIsResource(path).ifM(true.pure[F], aggPathExists(path))
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def prefixedChildPaths(prefixPath: ResourcePath)
       : F[Option[Stream[F, (ResourceName, ResourcePathType)]]] =
     aggPath(prefixPath) match {
@@ -88,7 +87,7 @@ final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] priva
         underlying.prefixedChildPaths(prefixPath)
           .flatMap(os => ofPrefix(os).ifM(
             os.map(s => Stream.emit((AggName, ResourcePathType.AggregateResource)) ++ s).pure[F],
-            os.asInstanceOf[Option[Stream[F, (ResourceName, ResourcePathType)]]].pure[F]))
+            os.map(_.covaryOutput[(ResourceName, ResourcePathType)]).pure[F]))
       case Some(_) =>
         pathIsResource(prefixPath).ifM(
           Stream.empty.covary[F].covaryOutput[(ResourceName, ResourcePathType)].some.pure[F],

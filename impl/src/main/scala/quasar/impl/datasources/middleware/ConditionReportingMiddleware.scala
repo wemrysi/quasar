@@ -32,14 +32,14 @@ object ConditionReportingMiddleware {
     new PartiallyApplied(onChange)
 
   final class PartiallyApplied[F[_], I](onChange: (I, Condition[Exception]) => F[Unit]) {
-    def apply[T[_[_]], G[_], R](
-        id: I, mds: ManagedDatasource[T, F, G, R])(
+    def apply[T[_[_]], G[_], R, P <: ResourcePathType](
+        id: I, mds: ManagedDatasource[T, F, G, R, P])(
         implicit
         F0: Monad[F],
         F1: MonadError_[F, Exception])
-        : F[ManagedDatasource[T, F, G, R]] =
+        : F[ManagedDatasource[T, F, G, R, P]] =
       onChange(id, Condition.normal()) as {
-        mds.modify(λ[Datasource.Aux[F, G, ?, R, ResourcePathType] ~> Datasource.Aux[F, G, ?, R, ResourcePathType]] { ds =>
+        mds.modify(λ[Datasource.Aux[F, G, ?, R, P] ~> Datasource.Aux[F, G, ?, R, P]] { ds =>
           ConditionReportingDatasource(onChange(id, _: Condition[Exception]), ds)
         })
       }

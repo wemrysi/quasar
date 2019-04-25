@@ -25,7 +25,7 @@ import quasar.qscript.{InterpretedRead, QScriptEducated}
 import scalaz.~>
 
 /** An active datasource with a lifecycle under the control of a `DatasourceManager`. */
-sealed trait ManagedDatasource[T[_[_]], F[_], G[_], R] {
+sealed trait ManagedDatasource[T[_[_]], F[_], G[_], R, P <: ResourcePathType] {
   import ManagedDatasource._
 
   def kind: DatasourceType =
@@ -40,17 +40,16 @@ sealed trait ManagedDatasource[T[_[_]], F[_], G[_], R] {
       case ManagedHeavyweight(hw) => hw.pathIsResource(path)
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def prefixedChildPaths(prefixPath: ResourcePath)
-      : F[Option[G[(ResourceName, ResourcePathType)]]] =
+      : F[Option[G[(ResourceName, P)]]] =
     this match {
-      case ManagedLightweight(lw) => lw.prefixedChildPaths(prefixPath).asInstanceOf[F[Option[G[(ResourceName, ResourcePathType)]]]]
-      case ManagedHeavyweight(hw) => hw.prefixedChildPaths(prefixPath).asInstanceOf[F[Option[G[(ResourceName, ResourcePathType)]]]]
+      case ManagedLightweight(lw) => lw.prefixedChildPaths(prefixPath)
+      case ManagedHeavyweight(hw) => hw.prefixedChildPaths(prefixPath)
     }
 
   def modify[V[_], W[_], S](
-      f: Datasource.Aux[F, G, ?, R, ResourcePathType] ~> Datasource.Aux[V, W, ?, S, ResourcePathType])
-      : ManagedDatasource[T, V, W, S] =
+      f: Datasource.Aux[F, G, ?, R, P] ~> Datasource.Aux[V, W, ?, S, P])
+      : ManagedDatasource[T, V, W, S, P] =
     this match {
       case ManagedLightweight(lw) => ManagedLightweight(f(lw))
       case ManagedHeavyweight(hw) => ManagedHeavyweight(f(hw))
@@ -60,22 +59,22 @@ sealed trait ManagedDatasource[T[_[_]], F[_], G[_], R] {
 object ManagedDatasource {
   final case class ManagedLightweight[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
       lw: Datasource.Aux[F, G, InterpretedRead[ResourcePath], R, P])
-      extends ManagedDatasource[T, F, G, R]
+      extends ManagedDatasource[T, F, G, R, P]
 
   final case class ManagedHeavyweight[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
       hw: Datasource.Aux[F, G, T[QScriptEducated[T, ?]], R, P])
-      extends ManagedDatasource[T, F, G, R]
+      extends ManagedDatasource[T, F, G, R, P]
 
   def lightweight[T[_[_]]] = new PartiallyAppliedLw[T]
   final class PartiallyAppliedLw[T[_[_]]] {
     def apply[F[_], G[_], R, P <: ResourcePathType](
         ds: Datasource.Aux[F, G, InterpretedRead[ResourcePath], R, P])
-        : ManagedDatasource[T, F, G, R] =
+        : ManagedDatasource[T, F, G, R, P] =
       ManagedLightweight(ds)
   }
 
   def heavyweight[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
       ds: Datasource.Aux[F, G, T[QScriptEducated[T, ?]], R, P])
-      : ManagedDatasource[T, F, G, R] =
+      : ManagedDatasource[T, F, G, R, P] =
     ManagedHeavyweight(ds)
 }
