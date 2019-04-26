@@ -48,15 +48,14 @@ object ExternalModules extends Logging {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def apply[F[_]: ConcurrentEffect: ContextShift: Timer](
     config: ExternalConfig,
-    pluginType: PluginType,
     blockingPool: BlockingContext)
-      : Stream[F, (ClassName, ClassLoader)] = config match {
+      : Stream[F, (ClassName, ClassLoader, PluginType)] = config match {
       case PluginDirectory(directory) =>
         Stream.eval(ConcurrentEffect[F].delay((Files.exists(directory), Files.isDirectory(directory)))) flatMap {
           case (true, true) =>
             convert.fromJavaStream(ConcurrentEffect[F].delay(Files.list(directory)))
               .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
-              .flatMap(loadPlugin[F](_, pluginType, blockingPool))
+              .flatMap(loadPlugin[F](_, blockingPool))
 
           case (true, false) =>
             warnStream[F](s"Unable to load plugins from '$directory', does not appear to be a directory", None)
@@ -67,7 +66,7 @@ object ExternalModules extends Logging {
 
       case PluginFiles(files) =>
         Stream.emits(files)
-          .flatMap(loadPlugin[F](_, pluginType, blockingPool))
+          .flatMap(loadPlugin[F](_, blockingPool))
 
       case ExplodedDirs(modules) =>
         for {
@@ -76,7 +75,7 @@ object ExternalModules extends Logging {
           (cn, cp) = exploded
 
           classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, cp))
-        } yield (cn, classLoader)
+        } yield (cn, classLoader, PluginType.Datasource)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
@@ -99,19 +98,14 @@ object ExternalModules extends Logging {
 
   private def loadPlugin[F[_]: ContextShift: Effect: Timer](
     pluginFile: Path,
-    pluginType: PluginType,
     blockingPool: BlockingContext)
-      : Stream[F, (ClassName, ClassLoader)] =
+      : Stream[F, (ClassName, ClassLoader, PluginType)] =
     for {
       plugin <- readPlugin(pluginFile, blockingPool)
       mainJar = new JarFile(plugin.mainJar.toFile)
 
-      moduleName = pluginType match {
-        case PluginType.Datasource => Plugin.ManifestAttributeName
-        case PluginType.Destination => Plugin.ManifestAttributeDestinationName
-      }
-
-      backendModuleAttr <- jarAttribute[F](mainJar, moduleName)
+      datasourceModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestAttributeName)
+      destinationModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestAttributeDestinationName)
       versionModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestVersionName)
 
       _ <- versionModuleAttr match {
@@ -119,20 +113,29 @@ object ExternalModules extends Logging {
         case Some(version) => infoStream[F](s"Loading $pluginFile with version $version")
       }
 
-      moduleClasses <- backendModuleAttr match {
-        case None =>
-          warnStream[F](s"No '$moduleName' attribute found in Manifest for '$pluginFile'.", None)
+      moduleClasses <- (datasourceModuleAttr, destinationModuleAttr) match {
+        case (Some(sourceModules), Some(destinationModules)) => {
+          val datasourceClasses =
+            sourceModules.split(" ").map((_, PluginType.Datasource))
 
-        case Some(attr) =>
-          Stream.emit(attr.split(" "))
+          val destinationClasses =
+            destinationModules.split(" ").map((_, PluginType.Destination))
+
+          Stream.emit(datasourceClasses ++ destinationClasses)
+        }
+        case (Some(sourceModules), None) =>
+          Stream.emit(sourceModules.split(" ").map((_, PluginType.Datasource)))
+        case (None, Some(destinationModules)) =>
+          Stream.emit(destinationModules.split(" ").map((_, PluginType.Destination)))
+        case _ => warnStream[F](s"No '${Plugin.ManifestAttributeName}' or '${Plugin.ManifestAttributeDestinationName}' attribute found in Manifest for '$pluginFile'.", None)
       }
 
-      moduleClass <- if (moduleClasses.isEmpty)
-        warnStream[F](s"No classes defined for '$moduleName' attribute in Manifest from '$pluginFile'.", None)
+      (moduleClass, pluginType) <- if (moduleClasses.isEmpty)
+        warnStream[F](s"No classes defined for '${Plugin.ManifestAttributeName}' or '${Plugin.ManifestAttributeDestinationName}' attributes in Manifest from '$pluginFile'.", None)
       else
         Stream.chunk(Chunk.array(moduleClasses)).covary[F]
       classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, plugin.classPath))
-    } yield (ClassName(moduleClass), classLoader)
+    } yield (ClassName(moduleClass), classLoader, pluginType)
 
   private def readPlugin[F[_]: ContextShift: Effect: Timer](
     pluginFile: Path,

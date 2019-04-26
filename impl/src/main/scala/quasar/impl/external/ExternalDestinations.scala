@@ -43,10 +43,18 @@ object ExternalDestinations extends Logging {
       implicit F: ConcurrentEffect[F])
       : Stream[F, List[DestinationModule]] = {
     val destinationModuleStream: Stream[F, DestinationModule] =
-      ExternalModules(config, PluginType.Destination, blockingPool)
+      ExternalModules(config, blockingPool)
+        .filter {
+          case (_, _, PluginType.Destination) => true
+          case _ => false
+        }
+        .map {
+          case (name, loader, _) => (name, loader)
+        }
         .flatMap((loadDestinationModule[F](_, _)).tupled)
 
     for {
+      _ <- ExternalModules.infoStream[F]("Loading destinations")
       dts <- destinationModuleStream.fold(List.empty[DestinationModule])((m, d) => d :: m)
       _ <- ExternalModules.infoStream[F](s"Loaded ${dts.length} destination(s)")
     } yield dts
