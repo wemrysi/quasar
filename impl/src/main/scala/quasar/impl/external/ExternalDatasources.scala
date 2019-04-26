@@ -58,17 +58,17 @@ object ExternalDatasources extends Logging {
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def loadDatasourceModule[F[_]: Sync](
-    className: String, classLoader: ClassLoader): Stream[F, DatasourceModule] = {
+    className: ClassName, classLoader: ClassLoader): Stream[F, DatasourceModule] = {
     def handleFailedDatasource[A](s: Stream[F, A]): Stream[F, A] =
       s recoverWith {
         case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
-          ExternalModules.warnStream[F](s"Datasource module '$className' does not appear to be a singleton object", Some(e))
+          ExternalModules.warnStream[F](s"Datasource module '${className.value}' does not appear to be a singleton object", Some(e))
 
         case e: ExceptionInInitializerError =>
-          ExternalModules.warnStream[F](s"Datasource module '$className' failed to load with exception", Some(e))
+          ExternalModules.warnStream[F](s"Datasource module '${className.value}' failed to load with exception", Some(e))
 
         case _: ClassCastException =>
-          ExternalModules.warnStream[F](s"Datasource module '$className' is not actually a subtype of LightweightDatasourceModule or HeavyweightDatasourceModule", None)
+          ExternalModules.warnStream[F](s"Datasource module '${className.value}' is not actually a subtype of LightweightDatasourceModule or HeavyweightDatasourceModule", None)
       }
 
     def loadLightweight(clazz: Class[_]): Stream[F, DatasourceModule] =

@@ -56,7 +56,7 @@ object ExternalDestinations extends Logging {
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def loadDestinationModule[F[_]: Sync](
-    className: String, classLoader: ClassLoader)
+    className: ClassName, classLoader: ClassLoader)
       : Stream[F, DestinationModule] = {
     def handleFailedDestination[A](s: Stream[F, A]): Stream[F, A] =
       s recoverWith {
