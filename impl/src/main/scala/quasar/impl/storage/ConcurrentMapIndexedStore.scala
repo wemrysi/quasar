@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import quasar.concurrent.BlockingContext
 
+import cats.arrow.FunctionK
 import cats.effect.{ContextShift, Sync}
 import cats.syntax.applicative._
 import cats.syntax.flatMap._
@@ -40,9 +41,15 @@ final class ConcurrentMapIndexedStore[F[_]: Sync: ContextShift, K, V](
   private def evalOnPool[A](fa: F[A]): F[A] =
     ContextShift[F].evalOn[A](blockingPool.unwrap)(fa)
 
+  private def evalStreamOnPool[A](s: Stream[F, A]): Stream[F, A] =
+    s translate new FunctionK[F, F] {
+      def apply[A](fa: F[A]): F[A] = evalOnPool(fa)
+    }
+
   def entries: Stream[F, (K, V)] = for {
     iterator <- Stream.eval(evalOnPool(F.delay(mp.entrySet.iterator.asScala)))
-    entry <- Stream.fromIterator[F, java.util.Map.Entry[K, V]](iterator)
+    entry <- evalStreamOnPool(
+      Stream.fromIterator[F, java.util.Map.Entry[K, V]](iterator))
   } yield (entry.getKey, entry.getValue)
 
   def lookup(k: K): F[Option[V]] =
