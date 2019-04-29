@@ -32,11 +32,9 @@ import ByNeedDatasource.NeedState
 
 final class ByNeedDatasource[F[_], G[_], Q, R, P <: ResourcePathType] private (
     datasourceType: DatasourceType,
-    mvar: MVar[F, NeedState[F, Disposable[F, Datasource.Aux[F, G, Q, R, P]]]])(
+    mvar: MVar[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R, P]]]])(
     implicit F: Async[F])
-    extends Datasource[F, G, Q, R] {
-
-  type PathType = P
+    extends Datasource[F, G, Q, R, P] {
 
   val kind: DatasourceType = datasourceType
 
@@ -52,7 +50,7 @@ final class ByNeedDatasource[F[_], G[_], Q, R, P <: ResourcePathType] private (
 
   ////
 
-  private def getDatasource: F[Datasource.Aux[F, G, Q, R, P]] =
+  private def getDatasource: F[Datasource[F, G, Q, R, P]] =
     for {
       needState <- mvar.read
 
@@ -65,7 +63,7 @@ final class ByNeedDatasource[F[_], G[_], Q, R, P <: ResourcePathType] private (
       }
     } yield ds
 
-  private def initAndGet: F[Datasource.Aux[F, G, Q, R, P]] =
+  private def initAndGet: F[Datasource[F, G, Q, R, P]] =
     mvar.tryTake flatMap {
       case Some(s @ NeedState.Uninitialized(init)) =>
         val doInit = for {
@@ -95,16 +93,16 @@ object ByNeedDatasource {
 
   def apply[F[_]: Async, G[_], Q, R, P <: ResourcePathType](
       kind: DatasourceType,
-      init: F[Disposable[F, Datasource.Aux[F, G, Q, R, P]]])
-      : F[Disposable[F, Datasource.Aux[F, G, Q, R, P]]] = {
+      init: F[Disposable[F, Datasource[F, G, Q, R, P]]])
+      : F[Disposable[F, Datasource[F, G, Q, R, P]]] = {
 
-    def dispose(m: MVar[F, NeedState[F, Disposable[F, Datasource.Aux[F, G, Q, R, P]]]]): F[Unit] =
+    def dispose(m: MVar[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R, P]]]]): F[Unit] =
       m.take flatMap {
         case NeedState.Initialized(ds) => ds.dispose
         case _ => ().pure[F]
       }
 
-    MVar.uncancelableOf[F, NeedState[F, Disposable[F, Datasource.Aux[F, G, Q, R, P]]]](
+    MVar.uncancelableOf[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R, P]]]](
       NeedState.Uninitialized(init))
       .map(mv => Disposable(new ByNeedDatasource(kind, mv), dispose(mv)))
   }

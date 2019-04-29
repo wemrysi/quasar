@@ -30,9 +30,7 @@ final class FailedDatasource[
     G[_], Q, R, P <: ResourcePathType] private (
     datasourceType: DatasourceType,
     error: E)
-    extends Datasource[F, G, Q, R] {
-
-  type PathType = P
+    extends Datasource[F, G, Q, R, P] {
 
   val kind: DatasourceType = datasourceType
 
@@ -54,6 +52,6 @@ object FailedDatasource {
       G[_], Q, R, P <: ResourcePathType](
       kind: DatasourceType,
       error: E)
-      : Datasource.Aux[F, G, Q, R, P] =
+      : Datasource[F, G, Q, R, P] =
     new FailedDatasource[E, F, G, Q, R, P](kind, error)
 }

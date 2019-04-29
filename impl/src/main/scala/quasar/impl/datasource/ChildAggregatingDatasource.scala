@@ -43,11 +43,9 @@ import shims._
   * resources by aggregating all child leaf resources of the prefix.
   */
 final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
-    underlying: Datasource.Aux[F, Stream[F, ?], Q, R, ResourcePathType.Physical],
+    underlying: Datasource[F, Stream[F, ?], Q, R, ResourcePathType.Physical],
     queryPath: Lens[Q, ResourcePath])
-    extends Datasource[F, Stream[F, ?], Q, CompositeResult[F, R]] {
-
-  type PathType = ResourcePathType
+    extends Datasource[F, Stream[F, ?], Q, CompositeResult[F, R], ResourcePathType] {
 
   def kind: DatasourceType =
     underlying.kind
@@ -121,8 +119,8 @@ final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] priva
 
 object ChildAggregatingDatasource {
   def apply[F[_]: MonadResourceErr: Sync, Q, R](
-      underlying: Datasource.Aux[F, Stream[F, ?], Q, R, ResourcePathType.Physical],
+      underlying: Datasource[F, Stream[F, ?], Q, R, ResourcePathType.Physical],
       queryPath: Lens[Q, ResourcePath])
-      : Datasource.Aux[F, Stream[F, ?], Q, CompositeResult[F, R], ResourcePathType] =
+      : Datasource[F, Stream[F, ?], Q, CompositeResult[F, R], ResourcePathType] =
     new ChildAggregatingDatasource(underlying, queryPath)
 }

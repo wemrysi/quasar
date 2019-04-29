@@ -42,7 +42,7 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
 
   val thatsRoot = new IllegalArgumentException("THAT'S ROOT!")
 
-  object TestDs extends Datasource[IO, List, InterpretedRead[ResourcePath], Unit] {
+  object TestDs extends Datasource[IO, List, InterpretedRead[ResourcePath], Unit, ResourcePathType] {
     val kind: DatasourceType = DatasourceType("tester", 7L)
 
     def evaluate(query: InterpretedRead[ResourcePath]): IO[Unit] =
@@ -55,7 +55,7 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
       IO.pure(false)
 
     def prefixedChildPaths(path: ResourcePath)
-        : IO[Option[List[(ResourceName, PathType)]]] =
+        : IO[Option[List[(ResourceName, ResourcePathType)]]] =
       IO.pure(None)
   }
 

@@ -31,10 +31,10 @@ import scalaz.Scalaz._
 
 import shims._
 
-abstract class DatasourceSpec[F[_]: Effect, G[_]]
+abstract class DatasourceSpec[F[_]: Effect, G[_], P <: ResourcePathType]
     extends EffectfulQSpec[F] {
 
-  def datasource: Datasource[F, G, _, _]
+  def datasource: Datasource[F, G, _, _, P]
 
   def nonExistentPath: ResourcePath
 

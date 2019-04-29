@@ -126,9 +126,9 @@ object Quasar extends Logging {
   private val rec = construction.RecFunc[Fix]
 
   private def reifiedAggregateDs[F[_]: Functor, G[_], P <: ResourcePathType]
-      : Datasource.Aux[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource.Aux[F, G, ?, EvalResult[F], P] =
-    new (Datasource.Aux[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource.Aux[F, G, ?, EvalResult[F], P]) {
-      def apply[A](ds: Datasource.Aux[F, G, A, CompositeResult[F, QueryResult[F]], P]) = {
+      : Datasource[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource[F, G, ?, EvalResult[F], P] =
+    new (Datasource[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource[F, G, ?, EvalResult[F], P]) {
+      def apply[A](ds: Datasource[F, G, A, CompositeResult[F, QueryResult[F]], P]) = {
         val l = Datasource.pevaluator[F, G, A, CompositeResult[F, QueryResult[F]], A, EvalResult[F], P]
         l.modify(_.map(_.map(reifyAggregateStructure)))(ds)
       }

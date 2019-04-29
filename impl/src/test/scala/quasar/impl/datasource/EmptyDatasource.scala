@@ -30,9 +30,7 @@ import scalaz.syntax.plusEmpty._
 final class EmptyDatasource[F[_]: Applicative, G[_]: PlusEmpty, Q, R, P <: ResourcePathType] private (
     val kind: DatasourceType,
     emptyResult: R)
-    extends Datasource[F, G, Q, R] {
-
-  type PathType = P
+    extends Datasource[F, G, Q, R, P] {
 
   def evaluate(q: Q): F[R] =
     emptyResult.pure[F]
@@ -52,6 +50,6 @@ object EmptyDatasource {
   def apply[F[_]: Applicative, G[_]: PlusEmpty, Q, R, P <: ResourcePathType](
       kind: DatasourceType,
       emptyResult: R)
-      : Datasource.Aux[F, G, Q, R, P] =
+      : Datasource[F, G, Q, R, P] =
     new EmptyDatasource[F, G, Q, R, P](kind, emptyResult)
 }

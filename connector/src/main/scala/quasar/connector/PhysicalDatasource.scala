@@ -18,6 +18,4 @@ package quasar.connector
 
 import quasar.api.resource.ResourcePathType
 
-trait PhysicalDatasource[F[_], G[_], Q, R] extends Datasource[F, G, Q, R] {
-  type PathType = ResourcePathType.Physical
-}
+trait PhysicalDatasource[F[_], G[_], Q, R] extends Datasource[F, G, Q, R, ResourcePathType.Physical]

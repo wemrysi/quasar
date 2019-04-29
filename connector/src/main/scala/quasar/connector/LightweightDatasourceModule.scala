@@ -41,7 +41,7 @@ trait LightweightDatasourceModule {
 }
 
 object LightweightDatasourceModule {
-  type DSP[F[_], P <: ResourcePathType] = Datasource.Aux[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], P]
+  type DSP[F[_], P <: ResourcePathType] = Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], P]
   type DS[F[_]] = DSP[F, ResourcePathType.Physical]
 
 }

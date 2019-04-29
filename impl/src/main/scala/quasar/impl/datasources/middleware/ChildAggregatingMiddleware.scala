@@ -38,14 +38,14 @@ object ChildAggregatingMiddleware {
       : F[ManagedDatasource[T, F, Stream[F, ?], Either[R, AggregateResult[F, R]], ResourcePathType]] =
     Monad[F].pure(mds) map {
       case ManagedDatasource.ManagedLightweight(lw) =>
-        val ds: Datasource.Aux[F, Stream[F, ?], InterpretedRead[ResourcePath], R, ResourcePathType.Physical] = lw
+        val ds: Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], R, ResourcePathType.Physical] = lw
         ManagedDatasource.lightweight[T](
           ChildAggregatingDatasource(ds, InterpretedRead.path))
 
       // TODO: union all in QScript?
       case ManagedDatasource.ManagedHeavyweight(hw) =>
         type Q = T[QScriptEducated[T, ?]]
-        val ds: Datasource.Aux[F, Stream[F, ?], Q, Either[R, AggregateResult[F, R]], ResourcePathType.Physical] =
+        val ds: Datasource[F, Stream[F, ?], Q, Either[R, AggregateResult[F, R]], ResourcePathType.Physical] =
           Datasource.pevaluator[F, Stream[F, ?], Q, R, Q, Either[R, AggregateResult[F, R]], ResourcePathType.Physical]
           .modify(_.map(Left(_)))(hw)
         ManagedDatasource.heavyweight(Datasource.widenPathType(ds))

@@ -101,7 +101,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
   implicit val tmr = IO.timer(global)
 
   def mkDatasource[F[_]: Applicative, Q, P <: ResourcePathType](kind: DatasourceType)
-      : Datasource.Aux[F, Stream[F, ?], Q, QueryResult[F], P] =
+      : Datasource[F, Stream[F, ?], Q, QueryResult[F], P] =
     EmptyDatasource[F, Stream[F, ?], Q, QueryResult[F], P](
       kind,
       QueryResult.typed(
@@ -137,7 +137,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
         F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
         config: Json)(
         implicit ec: ExecutionContext)
-        : F[InitializationError[Json] \/ Disposable[F, Datasource.Aux[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]] =
+        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]] =
       Disposable(
         mkDatasource[F, T[QScriptEducated[T, ?]], ResourcePathType.Physical](kind),
         ConcurrentEffect[F].liftIO(disposes.update(kind :: _)))

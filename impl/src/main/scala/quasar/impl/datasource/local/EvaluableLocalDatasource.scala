@@ -64,8 +64,8 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
   def pathIsResource(path: ResourcePath): F[Boolean] =
     toNio[F](root, path) >>= isCandidate
 
-  def prefixedChildPaths(path: ResourcePath): F[Option[Stream[F, (ResourceName, PathType)]]] = {
-    def withType(jp: JPath): F[(ResourceName, PathType)] =
+  def prefixedChildPaths(path: ResourcePath): F[Option[Stream[F, (ResourceName, ResourcePathType.Physical)]]] = {
+    def withType(jp: JPath): F[(ResourceName, ResourcePathType.Physical)] =
       isCandidate(jp)
         .map(_.fold(ResourcePathType.leafResource, ResourcePathType.prefix))
         .strengthL(toResourceName(jp))

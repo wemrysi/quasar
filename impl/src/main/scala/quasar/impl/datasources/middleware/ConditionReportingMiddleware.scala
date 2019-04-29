@@ -39,7 +39,7 @@ object ConditionReportingMiddleware {
         F1: MonadError_[F, Exception])
         : F[ManagedDatasource[T, F, G, R, P]] =
       onChange(id, Condition.normal()) as {
-        mds.modify(λ[Datasource.Aux[F, G, ?, R, P] ~> Datasource.Aux[F, G, ?, R, P]] { ds =>
+        mds.modify(λ[Datasource[F, G, ?, R, P] ~> Datasource[F, G, ?, R, P]] { ds =>
           ConditionReportingDatasource(onChange(id, _: Condition[Exception]), ds)
         })
       }

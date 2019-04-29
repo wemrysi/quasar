@@ -44,7 +44,7 @@ import scalaz.syntax.std.option._
 
 import shims._
 
-object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] {
+object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], ResourcePathType] {
 
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)

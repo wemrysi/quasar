@@ -40,5 +40,5 @@ trait HeavyweightDatasourceModule {
       F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
       config: Json)(
       implicit ec: ExecutionContext)
-      : F[InitializationError[Json] \/ Disposable[F, Datasource.Aux[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]]
+      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]]
 }

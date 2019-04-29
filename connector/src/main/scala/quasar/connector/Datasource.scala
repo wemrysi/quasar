@@ -27,9 +27,7 @@ import monocle.{Lens, PLens}
   * @tparam G multiple results
   * @tparam Q query
   */
-trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, Q, R] {
-
-  type PathType <: ResourcePathType
+trait Datasource[F[_], G[_], Q, R, P <: ResourcePathType] extends QueryEvaluator[F, Q, R] {
 
   /** The type of this datasource. */
   def kind: DatasourceType
@@ -43,25 +41,22 @@ trait Datasource[F[_], G[_], Q, R] extends QueryEvaluator[F, Q, R] {
     * each name to `prefixPath` or `None` if `prefixPath` does not exist.
     */
   def prefixedChildPaths(prefixPath: ResourcePath)
-      : F[Option[G[(ResourceName, PathType)]]]
+      : F[Option[G[(ResourceName, P)]]]
 }
 
 object Datasource {
-  type Aux[F[_], G[_], Q, R, P <: ResourcePathType] = Datasource[F, G, Q, R] { type PathType = P }
-
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def widenPathType[F[_], G[_], Q, R, PI <: ResourcePathType, PO >: PI <: ResourcePathType](
-      ds: Aux[F, G, Q, R, PI]): Aux[F, G, Q, R, PO] =
-    ds.asInstanceOf[Aux[F, G, Q, R, PO]]
+      ds: Datasource[F, G, Q, R, PI]): Datasource[F, G, Q, R, PO] =
+    ds.asInstanceOf[Datasource[F, G, Q, R, PO]]
 
-  def evaluator[F[_], G[_], Q, R, P <: ResourcePathType]: Lens[Aux[F, G, Q, R, P], QueryEvaluator[F, Q, R]] =
+  def evaluator[F[_], G[_], Q, R, P <: ResourcePathType]: Lens[Datasource[F, G, Q, R, P], QueryEvaluator[F, Q, R]] =
     pevaluator[F, G, Q, R, Q, R, P]
 
   def pevaluator[F[_], G[_], Q1, R1, Q2, R2, P <: ResourcePathType]
-      : PLens[Aux[F, G, Q1, R1, P], Aux[F, G, Q2, R2, P], QueryEvaluator[F, Q1, R1], QueryEvaluator[F, Q2, R2]] =
-    PLens((ds: Aux[F, G, Q1, R1, P]) => ds: QueryEvaluator[F, Q1, R1]) { qe: QueryEvaluator[F, Q2, R2] => ds =>
-      new Datasource[F, G, Q2, R2] {
-        type PathType = ds.PathType
+      : PLens[Datasource[F, G, Q1, R1, P], Datasource[F, G, Q2, R2, P], QueryEvaluator[F, Q1, R1], QueryEvaluator[F, Q2, R2]] =
+    PLens((ds: Datasource[F, G, Q1, R1, P]) => ds: QueryEvaluator[F, Q1, R1]) { qe: QueryEvaluator[F, Q2, R2] => ds =>
+      new Datasource[F, G, Q2, R2, P] {
         val kind = ds.kind
         def evaluate(q: Q2) = qe.evaluate(q)
         def pathIsResource(p: ResourcePath) = ds.pathIsResource(p)
