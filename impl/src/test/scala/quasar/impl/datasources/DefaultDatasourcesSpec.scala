@@ -52,7 +52,9 @@ import scalaz.syntax.std.option._
 import shims._
 
 final class DefaultDatasourcesSpec
-    extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type, ResourcePathType] {
+    extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] {
+
+  type PathType = ResourcePathType
 
   val monadIdx: MonadState_[DefaultM, Int] =
     MonadState_.zoom[DefaultM](DefaultState.idx)
@@ -77,7 +79,7 @@ final class DefaultDatasourcesSpec
   def mkDatasources(
       errs: IMap[Int, Exception], sanitize: String => String)(
       init: String => Option[InitializationError[String]])
-      : Datasources[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type, ResourcePathType] = {
+      : Datasources[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] = {
 
     val freshId =
       for {

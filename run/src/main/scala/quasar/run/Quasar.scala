@@ -54,7 +54,7 @@ import shims._
 import spire.std.double._
 
 final class Quasar[F[_], R, S](
-    val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double], ResourcePathType],
+    val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
     val tables: Tables[F, UUID, SqlQuery, R, S],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, R])
 

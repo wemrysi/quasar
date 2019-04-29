@@ -47,14 +47,15 @@ import shims._
 final class DefaultDatasources[
     F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig,
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    R,
-    P <: ResourcePathType] private (
+    R] private (
     freshId: F[I],
     refs: IndexedStore[F, I, DatasourceRef[C]],
     errors: DatasourceErrors[F, I],
-    manager: DatasourceManager[I, C, T, F, Stream[F, ?], R, P],
+    manager: DatasourceManager[I, C, T, F, Stream[F, ?], R, ResourcePathType],
     schema: ResourceSchema[F, S, (ResourcePath, R)])
-    extends Datasources[F, Stream[F, ?], I, C, S, P] {
+    extends Datasources[F, Stream[F, ?], I, C, S] {
+
+  type PathType = ResourcePathType
 
   def addDatasource(ref: DatasourceRef[C]): F[CreateError[C] \/ I] =
     for {
@@ -85,8 +86,8 @@ final class DefaultDatasources[
     withDatasource[ExistentialError[I], Boolean](datasourceId)(_.pathIsResource(path))
 
   def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
-      : F[DiscoveryError[I] \/ Stream[F, (ResourceName, P)]] =
-    withDatasource[DiscoveryError[I], Option[Stream[F, (ResourceName, P)]]](
+      : F[DiscoveryError[I] \/ Stream[F, (ResourceName, ResourcePathType)]] =
+    withDatasource[DiscoveryError[I], Option[Stream[F, (ResourceName, ResourcePathType)]]](
       datasourceId)(
       _.prefixedChildPaths(prefixPath))
       .map(_.flatMap(_ \/> DatasourceError.pathNotFound[DiscoveryError[I]](prefixPath)))
@@ -194,7 +195,7 @@ final class DefaultDatasources[
 
   private def withDatasource[E >: ExistentialError[I] <: DatasourceError[I, C], A](
       datasourceId: I)(
-      f: ManagedDatasource[T, F, Stream[F, ?], R, P] => F[A])
+      f: ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType] => F[A])
       : F[E \/ A] =
     manager.managedDatasource(datasourceId) flatMap {
       case Some(ds) =>
@@ -210,13 +211,12 @@ object DefaultDatasources {
   def apply[
       F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig,
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      R,
-      P <: ResourcePathType](
+      R](
       freshId: F[I],
       refs: IndexedStore[F, I, DatasourceRef[C]],
       errors: DatasourceErrors[F, I],
-      manager: DatasourceManager[I, C, T, F, Stream[F, ?], R, P],
+      manager: DatasourceManager[I, C, T, F, Stream[F, ?], R, ResourcePathType],
       schema: ResourceSchema[F, S, (ResourcePath, R)])
-      : Datasources[F, Stream[F, ?], I, C, S, P] =
+      : Datasources[F, Stream[F, ?], I, C, S] =
     new DefaultDatasources(freshId, refs, errors, manager, schema)
 }

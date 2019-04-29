@@ -46,9 +46,11 @@ final class MockDatasources[
     supportedTypes: ISet[DatasourceType],
     errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
     structure: SStream[Tree[ResourceName]])
-  extends Datasources[F, G, Int, C, MockSchemaConfig.type, ResourcePathType] {
+  extends Datasources[F, G, Int, C, MockSchemaConfig.type] {
 
   import DatasourceError._
+
+  type PathType = ResourcePathType
 
   val mockState = MonadState_[F, MockState[C]]
 
@@ -221,6 +223,6 @@ object MockDatasources {
       supportedTypes: ISet[DatasourceType],
       errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
       structure: SStream[Tree[ResourceName]])
-      : Datasources[F, G, Int, C, MockSchemaConfig.type, ResourcePathType] =
+      : Datasources[F, G, Int, C, MockSchemaConfig.type] =
     new MockDatasources[C, F, G](supportedTypes, errorCondition, structure)
 }
