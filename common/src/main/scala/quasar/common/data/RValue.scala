@@ -708,7 +708,7 @@ final case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal] {
 }
 
 final case object CNum extends CNumericType[BigDecimal] {
-  val bigDecimalOrder: scalaz.Order[BigDecimal] =
+  def bigDecimalOrder: scalaz.Order[BigDecimal] =
     scalaz.Order.order((x, y) => Ordering.fromInt(x compare y))
 
   val classTag: ClassTag[BigDecimal] = implicitly[ClassTag[BigDecimal]]
