@@ -16,12 +16,17 @@
 
 package quasar.impl.storage
 
-import slamdata.Predef.{Boolean, Option, Unit}
-import quasar.higher.HFunctor
+import slamdata.Predef._
 
 import cats.arrow.FunctionK
+
+import monocle.Prism
+
+import quasar.contrib.scalaz.MonadError_
+import quasar.higher.HFunctor
+
 import fs2.Stream
-import scalaz.{~>, Bind, Functor, InvariantFunctor, Monad, Scalaz}, Scalaz._
+import scalaz.{~>, Bind, Functor, InvariantFunctor, Monad, Scalaz, Applicative}, Scalaz._
 
 trait IndexedStore[F[_], I, V] {
   /** All values in the store paired with their index. */
@@ -107,6 +112,33 @@ object IndexedStore extends IndexedStoreInstances {
       def delete(i: I): F[Boolean] =
         s.delete(i)
     }
+
+  private def decodeP[F[_]: Applicative, A, B, E](
+      mkError: A => E)(
+      prism: Prism[A, B])(
+      implicit F: MonadError_[F, E]): A => F[B] =
+    a => prism.getOption(a) match {
+      case None => F.raiseError(mkError(a))
+      case Some(b) => b.point[F]
+    }
+
+  def transformIndex[F[_]: Monad: MonadError_[?[_], E], I, II, V, E](
+      mkError: I => E)(
+      s: IndexedStore[F, I, V],
+      prism: Prism[I, II])
+      : IndexedStore[F, II, V] =
+    xmapIndexF(s)(
+      decodeP[F, I, II, E](mkError)(prism))(
+      i => prism(i).point[F])
+
+  def transformValue[F[_]: Monad: MonadError_[?[_], E], I, V, VV, E](
+      mkError: V => E)(
+      s: IndexedStore[F, I, V],
+      prism: Prism[V, VV])
+      : IndexedStore[F, I, VV] =
+    xmapValueF(s)(
+      decodeP[F, V, VV, E](mkError)(prism))(
+      v => prism(v).point[F])
 }
 
 sealed abstract class IndexedStoreInstances {
