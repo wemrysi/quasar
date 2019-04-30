@@ -43,7 +43,6 @@ import cats.syntax.semigroup._
 import cats.syntax.show._
 
 import scalaz.Applicative
-import shims._
 
 /** A set of vectors where new items may be added to, or conjoined with, the end
   * of all vectors.
@@ -210,8 +209,15 @@ final class Identities[A] private (
 
   /** Merge with another set of identities. */
   def merge(that: Identities[A])(implicit A: Order[A]): Identities[A] = {
-//  println(s"MERGE_START\nthis = $debug\nthat = ${that.debug}")
-//  println(s"THIS $this\nTHAT $that")
+    // State = index, seen?
+    // DFS method, leveraging seen?
+    //
+    // 0. Have we seen that.v? If so, next.
+    // 1. Otherwise, find all this.vertices with the same value as that.v
+    // 2. for each find the one that has the same set of incoming edges.
+    // 3. If exists, add remapping, note we've seen that.v, update the out edges of all incoming vertices.
+
+    //println(s"MERGING START\nTHIS $debug\n$this\nTHAT ${that.debug}\n$that")
 
     val zmap = SortedMap.empty[Node[A], NonEmptyList[Int]](Order[Node[A]].toOrdering)
 
@@ -222,176 +228,55 @@ final class Identities[A] private (
       }
 
     @tailrec
-    def mergeLvl(thisLvl: Set[Int], thatLvl: Set[Int], lvl: Int, rg: G, s: MergeState[A]): (MergeState[A], G) = {
-//    println(s"MERGE_LVL(thislvl = $thisLvl, thatlvl = $thatLvl, lvl = $lvl)")
-
+    @SuppressWarnings(Array("org.wartremover.warts.Option2Iterable"))
+    def mergeLvl(thisLvl: Set[Int], thatLvl: Set[Int], s: MergeState, rg: G): (MergeState, G) =
       if (thatLvl.isEmpty) {
         (s, rg)
       } else {
-        val snapped =
-          MergeState.lvlSnap[A]
-            .modify(_.updated(lvl, (s.remap, thisLvl, thatLvl, rg)))(s)
-
         val thisNodes = nodeMap(thisLvl, g)
 
-        val (snext, mergeRes) = thatLvl.foldLeft((snapped, Right(rg): Either[Int, G])) {
-          case ((ns, Right(ng)), thatV) => mergeThat(thisNodes, lvl, ng, thatV, ns)
-          case (acc, _) => acc
-        }
+        val (ns, ng) = thatLvl.foldLeft((s, rg)) {
+          case ((accs, accg), thatV) =>
+            val IVert(n, l, o, i) = that.g(thatV)
+            val remappedIn = i.flatMap(v => accs.remap.get(v).toSet)
 
-        mergeRes match {
-          case Left(restartFrom) =>
-            val (rmap, thiss, thats, lg) = snapped.lvlSnap(restartFrom)
-            val srestart = MergeState.remap[A].set(rmap)(snext)
-            mergeLvl(thiss, thats, restartFrom, lg, srestart)
+            val candidate = thisNodes.get(n) flatMap { candidates =>
+              candidates.find(c => vin(c).get(g) === remappedIn)
+            }
 
-          case Right(ng) =>
-            val nextThis = thisLvl.unorderedFoldMap(vout(_).get(g))
-            val nextThat = thatLvl.unorderedFoldMap(vout(_).get(that.g))
-            mergeLvl(nextThis, nextThat, lvl + 1, ng, snext)
-        }
-      }
-    }
-
-    // `thatV` represents a divergence, so check if there is a converged
-    // region that doesn't start at the root
-    def backtrackRequired(thatV: Int, s: MergeState[A]): Boolean =
-      s.convergedRegions.get(thatV).exists(_.firstKey > 0)
-
-    def evenOrSubsumed(thisV: Int, thatV: Int, s: MergeState[A]): Boolean =
-      that.roots(thatV) ||
-      !(ends(thisV) ^ that.ends(thatV)) ||
-      s.convergedRegions.get(thatV).exists(_.firstKey === 0)
-
-    @SuppressWarnings(Array("org.wartremover.warts.Option2Iterable"))
-    def mergeThat(
-        thisNodes: SortedMap[Node[A], NonEmptyList[Int]],
-        lvl: Int,
-        ing: G,
-        thatV: Int,
-        s: MergeState[A])
-        : (MergeState[A], Either[Int, G]) =
-      s.remap.get(thatV) match {
-        case Some(remappedV) =>
-          val remappedIn =
-            vin(thatV).get(that.g).flatMap(iv => s.remap.get(iv).toSet)
-
-          val nextg = remappedIn.foldLeft(vin(remappedV).modify(_ ++ remappedIn)(ing)) {
-            case (ng, v) => vout(v).modify(_ + remappedV)(ng)
-          }
-
-          (s, Right(nextg))
-
-        case None =>
-          val thatN = vnode(thatV).get(that.g)
-
-          val mergeCandidates = thisNodes.get(thatN) map { thisVs =>
-            val valids = thisVs.filterNot(v => s.invalidMerges(v -> thatV))
-
-            s.convergedRegions.get(thatV) match {
-              case Some(merges) =>
-                // Converged region exists, limit candidates to those that would
-                //extend it.
-                val maxMerge = merges(merges.lastKey)._1
-                valids.filter(v => vin(v).get(g)(maxMerge)).sortBy(vlvl(_).get(g))
+            candidate match {
+              case Some(thisV) =>
+                (MergeState.remap.modify(_.updated(thatV, thisV))(accs), accg)
 
               case None =>
-                // Creating a new converged region, elide candidates "lower" than
-                // thatV in the graph and sort the remainder by level
-                val thatLvl = vlvl(thatV).get(that.g)
-                valids.filter(tv => vlvl(tv).get(g) >= thatLvl).sortBy(vlvl(_).get(g))
-            }
-          }
-
-//        println(s"MERGE_THAT(lvl = $lvl, thisNodes = $thisNodes, thatV = $thatV, candidates = $mergeCandidates(")
-//        println(s"MERGE_THAT[$thatV](convergedRegions = ${s.convergedRegions.get(thatV)})")
-
-          mergeCandidates match {
-            // Found candidates for merge
-            case x @ Some(thisV :: _) if evenOrSubsumed(thisV, thatV, s) =>
-//            println(s"MERGING($thatV -> $thisV)")
-
-              val updateConverged = { s: MergeState[A] =>
-                val cstate =
-                  s.convergedRegions
-                    .get(thatV)
-                    .fold(SortedMap((lvl, thisV -> thatV)))(_.updated(lvl, thisV -> thatV))
-
-                val toUpd = vout(thatV).get(that.g) + thatV
-
-                MergeState.convergedRegions[A]
-                  .modify(rs => toUpd.foldLeft(rs)(_.updated(_, cstate)))(s)
-              }
-
-              val updateRemap =
-                MergeState.remap[A].modify(_ + (thatV -> thisV))
-
-              val remappedIn =
-                vin(thatV).get(that.g).flatMap(iv => s.remap.get(iv).toSet)
-
-              val nextg = remappedIn.foldLeft(vin(thisV).modify(_ ++ remappedIn)(ing)) {
-                case (ng, v) => vout(v).modify(_ + thisV)(ng)
-              }
-
-              ((updateConverged andThen updateRemap)(s), Right(nextg))
-
-            // Diverged and need to backtrack
-            case _ if backtrackRequired(thatV, s) =>
-              val converged = s.convergedRegions(thatV)
-              val backLvl = converged.firstKey
-              val badMerges = converged.values
-
-              val clearConverged =
-                MergeState.convergedRegions[A] modify { m =>
-                  badMerges.foldLeft(m - thatV) {
-                    case (m1, (_, v)) => m1 - v
-                  }
+                val nextg = remappedIn.foldLeft(accg.updated(accs.nextV, IVert(n, l, Set[Int](), remappedIn))) {
+                  case (ng, v) => vout(v).modify(_ + accs.nextV)(ng)
                 }
 
-              val updateInvalid =
-                MergeState.invalidMerges[A].modify(_ ++ badMerges)
+                val nexts = MergeState(accs.nextV + 1, accs.remap.updated(thatV, accs.nextV))
 
-              ((clearConverged andThen updateInvalid)(s), Left(backLvl))
+                (nexts, nextg)
+            }
+        }
 
-            // Diverged, add a new entry for thatV
-            case _ =>
-              val remappedIn =
-                vin(thatV).get(that.g).flatMap(iv => s.remap.get(iv).toSet)
+        val nextThis = thisLvl.unorderedFoldMap(vout(_).get(g))
+        val nextThat = thatLvl.unorderedFoldMap(vout(_).get(that.g))
 
-              val nextg = remappedIn.foldLeft(ing.updated(s.nextV, IVert(thatN, vlvl(thatV).get(that.g), Set[Int](), remappedIn))) {
-                case (ng, v) => vout(v).modify(_ + s.nextV)(ng)
-              }
-
-              val incNextV =
-                MergeState.nextV[A].modify(_ + 1)
-
-              val updateRemap =
-                MergeState.remap[A].modify(_ + (thatV -> s.nextV))
-
-              val unsetConverged =
-                MergeState.convergedRegions[A].modify(_ - thatV)
-
-              ((incNextV andThen updateRemap andThen unsetConverged)(s), Right(nextg))
-          }
+        mergeLvl(nextThis, nextThat, ns, ng)
       }
 
-    val (s, mergedG) =
-      mergeLvl(roots, that.roots, 0, g, MergeState.init[A](nextV))
+    val (s1, g1) = mergeLvl(roots, that.roots, MergeState(nextV, Map()), g)
 
-//  println("MERGE_END")
-
-    val nextIds =
+    val r =
       new Identities(
-        s.nextV,
-        roots ++ that.roots.map(s.remap),
-        ends ++ that.ends.map(s.remap),
-        mergedG)
+        s1.nextV,
+        roots ++ that.roots.map(s1.remap),
+        ends ++ that.ends.map(s1.remap),
+        g1)
 
-    if (mergedG.exists { case (v, IVert(_, _, o, i)) => o(v) || i(v) }) {
-      scala.sys.error(s"CYCLE_DETECTED: ${nextIds.debug}")
-    }
+    //println(s"MERGING END\n${r.debug}\n$r")
 
-    nextIds
+    r
   }
 
   /** Append a value to all vectors. */
@@ -572,6 +457,8 @@ object Identities extends IdentitiesInstances {
   /** NB: Linear in the size of the fully expanded representation. */
   def values[A, B: Order]: PTraversal[Identities[A], Identities[B], A, B] =
     new PTraversal[Identities[A], Identities[B], A, B] {
+      import shims._
+
       val T = Traverse[NonEmptyList].compose[NonEmptyList].compose[NonEmptyList]
 
       def modifyF[F[_]: Applicative](f: A => F[B])(ids: Identities[A]) =
@@ -582,35 +469,14 @@ object Identities extends IdentitiesInstances {
 
   private type G[A] = Map[Int, Vert[A]]
 
-  private final case class MergeState[A](
-      nextV: Int,
-      // thatV -> thisV
-      remap: Map[Int, Int],
-      // Set[(thisV, thatV)]
-      invalidMerges: Set[(Int, Int)],
-      // thatV -> (level -> merge)
-      convergedRegions: Map[Int, SortedMap[Int, (Int, Int)]],
-      // level -> (thisVs, thatVs, G)
-      lvlSnap: Map[Int, (Map[Int, Int], Set[Int], Set[Int], G[A])])
+  private final case class MergeState(nextV: Int, remap: Map[Int, Int])
 
   private object MergeState {
-    def init[A](nextV: Int): MergeState[A] =
-      MergeState(nextV, Map(), Set(), Map(), Map())
+    val nextV: Lens[MergeState, Int] =
+      Lens((_: MergeState).nextV)(v => _.copy(nextV = v))
 
-    def nextV[A]: Lens[MergeState[A], Int] =
-      Lens((_: MergeState[A]).nextV)(v => _.copy(nextV = v))
-
-    def remap[A]: Lens[MergeState[A], Map[Int, Int]] =
-      Lens((_: MergeState[A]).remap)(v => _.copy(remap = v))
-
-    def invalidMerges[A]: Lens[MergeState[A], Set[(Int, Int)]] =
-      Lens((_: MergeState[A]).invalidMerges)(v => _.copy(invalidMerges = v))
-
-    def convergedRegions[A]: Lens[MergeState[A], Map[Int, SortedMap[Int, (Int, Int)]]] =
-      Lens((_: MergeState[A]).convergedRegions)(v => _.copy(convergedRegions = v))
-
-    def lvlSnap[A]: Lens[MergeState[A], Map[Int, (Map[Int, Int], Set[Int], Set[Int], G[A])]] =
-      Lens((_: MergeState[A]).lvlSnap)(v => _.copy(lvlSnap = v))
+    val remap: Lens[MergeState, Map[Int, Int]] =
+      Lens((_: MergeState).remap)(v => _.copy(remap = v))
   }
 
   protected sealed trait Node[A] extends Product with Serializable {
