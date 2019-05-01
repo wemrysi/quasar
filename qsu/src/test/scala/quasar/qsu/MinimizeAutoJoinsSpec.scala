@@ -487,7 +487,7 @@ object MinimizeAutoJoinsSpec
           val expDims =
             qprov.empty
               .projectStatic(J.str("afile"), IdType.Dataset)
-              .inflateExtend(IdAccess.bucket(r.root, 0), IdType.Dataset)
+              .inflateExtend(IdAccess.bucket(r.root, 0), IdType.Expr)
 
           auth.dims(m.root) must_= expDims
       }

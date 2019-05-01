@@ -20,11 +20,12 @@ package minimizers
 import slamdata.Predef._
 import quasar.{IdStatus, RenderTreeT}, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.common.effect.NameGenerator
-import quasar.contrib.std.errorImpossible
+import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
+import quasar.contrib.scalaz.free.FreeF
+import quasar.contrib.std.errorImpossible
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,
@@ -45,9 +46,10 @@ import quasar.qscript.{
 import quasar.qscript.RecFreeS._
 import quasar.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 
-import matryoshka.{delayEqual, delayShow, BirecursiveT, Corecursive, EqualT, Recursive, ShowT}
+import matryoshka.{delayEqual, delayShow, Algebra, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._
-import matryoshka.patterns.CoEnv
+import matryoshka.implicits._
+import matryoshka.patterns.interpret
 import scalaz.{
   -\/,
   \/-,
@@ -84,8 +86,8 @@ sealed abstract class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: Rende
 
   @SuppressWarnings(Array("org.wartremover.warts.LeakingSealed"))
   private[this] object ShiftGraph {
-    case class Single(pattern: QSU.LeftShift[T, QSUGraph], dims: P) extends ShiftGraph
-    case class Multi(pattern: QSU.MultiLeftShift[T, QSUGraph], dims: List[P]) extends ShiftGraph
+    case class Single(pattern: QSU.LeftShift[T, QSUGraph], focus: Option[FreeMap]) extends ShiftGraph
+    case class Multi(pattern: QSU.MultiLeftShift[T, QSUGraph], focii: Option[List[FreeMap]]) extends ShiftGraph
 
     implicit val show: Show[ShiftGraph] = Show shows {
       case Single(pattern, _) => s"Single(${QScriptUniform.traverse[T].map(pattern)(_.root).shows})"
@@ -497,9 +499,9 @@ sealed abstract class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: Rende
       (left, right) match {
         case
             (
-              (lshift @ ShiftGraph.Single(QSU.LeftShift(fakeParent, structL, idStatusL, onUndefinedL, repairL, rotL), dimsL)) :: tailL,
-              (rshift @ ShiftGraph.Single(QSU.LeftShift(_, _, idStatusR, onUndefinedR, repairR, rotR), dimsR)) :: tailR)
-            if dimsL === dimsR && rotL === rotR =>
+              (lshift @ ShiftGraph.Single(QSU.LeftShift(fakeParent, structL, idStatusL, onUndefinedL, repairL, rotL), focusL)) :: tailL,
+              (rshift @ ShiftGraph.Single(QSU.LeftShift(_, _, idStatusR, onUndefinedR, repairR, rotR), focusR)) :: tailR)
+            if focusL === focusR && rotL === rotR =>
 
           val idStatusAdj = idStatusL |+| idStatusR
 
@@ -788,15 +790,6 @@ sealed abstract class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: Rende
       case _ => none
     }
 
-    def elideGuards(fm: FreeMap)(
-      implicit R: Recursive.Aux[FreeMap, CoEnv[Hole, MapFunc, ?]],
-      C: Corecursive.Aux[FreeMap, CoEnv[Hole, MapFunc, ?]]): FreeMap =
-      R.cata[FreeMap](fm) {
-        case CoEnv(\/-(MFD(MapFuncsDerived.Typecheck(result, _)))) => result
-        case CoEnv(\/-(MFC(MapFuncsCore.Guard(_, _, result, _)))) => result
-        case otherwise => C.embed(otherwise)
-      }
-
     def coalesceWrapped(wrapped: List[(QSUGraph, Set[Int])]): G[(QSUGraph, Set[Int])] = {
       wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
         case ((graphL @ ConsecutiveBounded(_, shifts1), leftIndices), (graphR @ ConsecutiveBounded(_, shifts2), rightIndices)) =>
@@ -922,11 +915,12 @@ sealed abstract class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: Rende
         val struct2 = struct >> fm.asRec
 
         val from = inners.head match {
-          case ShiftGraph.Single(_, dims) => dims
-          case ShiftGraph.Multi(_, _) => qprov.projectDynamic(qprov.empty)   // completely disable compatible shift collapse under MultiLeftShift (TODO do better)
+          case ShiftGraph.Single(_, focus) => focus
+          // completely disable compatible shift collapse under MultiLeftShift (TODO do better)
+          case ShiftGraph.Multi(_, _) => None
         }
 
-        val dims = computeStructProv(from, Some(inners.head), struct2.linearize)
+        val focus = from.map(computeFocus(_, Some(inners.head), struct2.linearize))
 
         val repair2 = repair flatMap {
           case alt @ ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
@@ -935,11 +929,11 @@ sealed abstract class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: Rende
           case t => Free.pure[MapFunc, ShiftTarget](t)
         }
 
-        Some((parent, ShiftGraph.Single(QSU.LeftShift[T, QSUGraph](oparent, struct2, idStatus, onUndefined, repair2, rot), dims) <:: inners))
+        Some((parent, ShiftGraph.Single(QSU.LeftShift[T, QSUGraph](oparent, struct2, idStatus, onUndefined, repair2, rot), focus) <:: inners))
 
       case LeftShift(parent, struct, idStatus, onUndefined, repair, rot) =>
-        val dims = computeStructProv(qprov.empty, None, struct.linearize)
-        Some((parent, NEL(ShiftGraph.Single(QSU.LeftShift[T, QSUGraph](parent, struct, idStatus, onUndefined, repair, rot), dims))))
+        val focus = computeFocus(HoleF, None, struct.linearize)
+        Some((parent, NEL(ShiftGraph.Single(QSU.LeftShift[T, QSUGraph](parent, struct, idStatus, onUndefined, repair, rot), Some(focus)))))
 
       case
         MultiLeftShift(
@@ -954,13 +948,14 @@ sealed abstract class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: Rende
         }
 
         val from = inners.head match {
-          case ShiftGraph.Single(_, dims) => dims
-          case ShiftGraph.Multi(_, _) => qprov.projectDynamic(qprov.empty)   // completely disable compatible shift collapse under MultiLeftShift (TODO do better)
+          case ShiftGraph.Single(_, focus) => focus
+          // completely disable compatible shift collapse under MultiLeftShift (TODO do better)
+          case ShiftGraph.Multi(_, _) => None
         }
 
-        val dims = shifts2 map {
-          case (struct, _, _) => computeStructProv(from, Some(inners.head), struct)
-        }
+        val focus = from.map(frm => shifts2 map {
+          case (struct, _, _) => computeFocus(frm, Some(inners.head), struct)
+        })
 
         val repair2 = repair flatMap {
           case l @ -\/(Access.Value(_)) =>
@@ -969,46 +964,55 @@ sealed abstract class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: Rende
           case r => Free.pure[MapFunc, Access[Hole] \/ Int](r)
         }
 
-        Some((parent, ShiftGraph.Multi(QSU.MultiLeftShift[T, QSUGraph](oparent, shifts2, onUndefined, repair2), dims) <:: inners))
+        Some((parent, ShiftGraph.Multi(QSU.MultiLeftShift[T, QSUGraph](oparent, shifts2, onUndefined, repair2), focus) <:: inners))
 
       case MultiLeftShift(parent, shifts, onUndefined, repair) =>
-        val dims = shifts map {
-          case (struct, _, _) => computeStructProv(qprov.empty, None, struct)
+        val focus = shifts map {
+          case (struct, _, _) => computeFocus(HoleF, None, struct)
         }
 
-        Some((parent, NEL(ShiftGraph.Multi(QSU.MultiLeftShift[T, QSUGraph](parent, shifts, onUndefined, repair), dims))))
+        Some((parent, NEL(ShiftGraph.Multi(QSU.MultiLeftShift[T, QSUGraph](parent, shifts, onUndefined, repair), Some(focus)))))
 
       case _ =>
         None
     }
 
-    // TODO can we use the parent dims?
-    private[this] def computeStructProv(from: P, wrt: Option[ShiftGraph], struct: FreeMap): P = wrt match {
-      case Some(ShiftGraph.Single(QSU.LeftShift(_, _, idStatus, _, repair, _), _)) =>
-        // we normalize the provenance to pretend that every shift is IncludeId
-        // this enables comparisons between IncludeId repairs and ExcludeId/IdOnly
-        val adjustment = idStatus match {
-          case IdStatus.IdOnly => Some(0)
-          case IdStatus.ExcludeId => Some(1)
-          case IdStatus.IncludeId => None
-        }
-
-        val repair2 = adjustment map { i =>
-          repair flatMap {
-            case t @ ShiftTarget.RightTarget => func.ProjectIndexI(t.point[FreeMapA], i)
-            case other => other.point[FreeMapA]
+    private[this] def computeFocus(from: FreeMap, wrt: Option[ShiftGraph], struct: FreeMap): FreeMap =
+      wrt match {
+        case Some(ShiftGraph.Single(QSU.LeftShift(_, _, idStatus, _, repair, _), _)) =>
+          // We normalize the expr to pretend that every shift is IncludeId
+          // this enables comparisons between IncludeId repairs and ExcludeId/IdOnly
+          val adjustment = idStatus match {
+            case IdStatus.IdOnly => Some(0)
+            case IdStatus.ExcludeId => Some(1)
+            case IdStatus.IncludeId => None
           }
-        } getOrElse repair
 
-        ApplyProvenance.computeFuncDims(qprov, struct >> repair2)(κ(from)).getOrElse(from)
+          val adjRepair = adjustment.fold(repair)(i =>
+            repair flatMap {
+              case t @ ShiftTarget.RightTarget => func.ProjectIndexI(t.point[FreeMapA], i)
+              case other => other.point[FreeMapA]
+            })
 
-      // TODO apply adjustments to multi shifts
-      case Some(ShiftGraph.Multi(QSU.MultiLeftShift(_, _, _, repair), _)) =>
-        ApplyProvenance.computeFuncDims(qprov, struct >> repair)(κ(from)).getOrElse(from)
+          MapFuncCore.normalized(elideGuards(struct >> adjRepair >> from))
 
-      case None =>
-        ApplyProvenance.computeFuncDims(qprov, struct)(κ(from)).getOrElse(from)
+        // TODO apply adjustments to multi shifts
+        case Some(ShiftGraph.Multi(QSU.MultiLeftShift(_, _, _, repair), _)) =>
+          MapFuncCore.normalized(elideGuards(struct >> repair >> from))
+
+        case None =>
+          MapFuncCore.normalized(elideGuards(struct >> from))
+      }
+  }
+
+  private[this] def elideGuards(fm: FreeMap): FreeMap = {
+    val f: Algebra[MapFunc, FreeMap] = {
+      case MFD(MapFuncsDerived.Typecheck(result, _)) => result
+      case MFC(MapFuncsCore.Guard(_, _, result, _)) => result
+      case other => FreeF(other)
     }
+
+    fm.cata(interpret(κ(HoleF[T]), f))
   }
 
   private[this] def subsetObject[A](fm: FreeMapA[A], field: String): FreeMapA[A] =
