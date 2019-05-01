@@ -68,12 +68,12 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, Strin
       def evaluate(query: String): IO[String] = IO(query)
     }
 
-  val manager: List[PreparationsManager[IO, UUID, String, String]] =
+  val manager: PreparationsManager[IO, UUID, String, String] =
     PreparationsManager[IO, UUID, String, String](evaluator)(runToStore)
-      .compile.toList.unsafeRunSync
+      .allocated.map(_._1).unsafeRunSync
 
   val tables: Tables[IO, UUID, String, String, String] =
-    DefaultTables[IO, UUID, String, String, String](freshId, tableStore, evaluator, manager(0), lookup, lookupSchema)
+    DefaultTables[IO, UUID, String, String, String](freshId, tableStore, evaluator, manager, lookup, lookupSchema)
 
   val columns1: List[TableColumn] =
     List(TableColumn("foo1", ColumnType.Number),

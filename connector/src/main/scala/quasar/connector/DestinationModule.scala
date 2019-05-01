@@ -19,14 +19,16 @@ package quasar.connector
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.datasource.DestinationType
 
+import scala.util.Either
+
 import argonaut.Json
+
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
-import scalaz.\/
 
 trait DestinationModule {
   def destinationType: DestinationType
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-    config: Json)
-    : F[InitializationError[Json] \/ Resource[F, Destination[F]]]
+      config: Json)
+      : Resource[F, Either[InitializationError[Json], Destination[F]]]
 }
