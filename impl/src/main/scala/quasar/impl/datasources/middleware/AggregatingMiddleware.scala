@@ -19,7 +19,7 @@ package datasources.middleware
 
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.connector.{Datasource, MonadResourceErr}
-import quasar.impl.datasource.{AggregateResult, ChildAggregatingDatasource, MonadCreateErr}
+import quasar.impl.datasource.{AggregateResult, AggregatingDatasource, MonadCreateErr}
 import quasar.impl.datasources.ManagedDatasource
 import quasar.qscript.{InterpretedRead, QScriptEducated}
 
@@ -31,7 +31,7 @@ import cats.syntax.functor._
 import fs2.Stream
 import shims._
 
-object ChildAggregatingMiddleware {
+object AggregatingMiddleware {
   def apply[T[_[_]], F[_]: MonadResourceErr: MonadCreateErr: Sync, I, R](
       datasourceId: I,
       mds: ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType.Physical])
@@ -40,7 +40,7 @@ object ChildAggregatingMiddleware {
       case ManagedDatasource.ManagedLightweight(lw) =>
         val ds: Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], R, ResourcePathType.Physical] = lw
         ManagedDatasource.lightweight[T](
-          ChildAggregatingDatasource(ds, InterpretedRead.path))
+          AggregatingDatasource(ds, InterpretedRead.path))
 
       // TODO: union all in QScript?
       case ManagedDatasource.ManagedHeavyweight(hw) =>

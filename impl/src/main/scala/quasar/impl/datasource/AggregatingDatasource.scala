@@ -43,7 +43,7 @@ import shims._
   * `p / **` for every prefix `p`. An aggregate resource `p / **` will aggregate
   * all descendant resources of the prefix `p`.
   */
-final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
+final class AggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
     underlying: Datasource[F, Stream[F, ?], Q, R, ResourcePathType.Physical],
     queryPath: Lens[Q, ResourcePath])
     extends Datasource[F, Stream[F, ?], Q, CompositeResult[F, R], ResourcePathType] {
@@ -127,10 +127,10 @@ final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] priva
     }.stream.compile.last).map(_.flatten getOrElse false)
 }
 
-object ChildAggregatingDatasource {
+object AggregatingDatasource {
   def apply[F[_]: MonadResourceErr: Sync, Q, R](
       underlying: Datasource[F, Stream[F, ?], Q, R, ResourcePathType.Physical],
       queryPath: Lens[Q, ResourcePath])
       : Datasource[F, Stream[F, ?], Q, CompositeResult[F, R], ResourcePathType] =
-    new ChildAggregatingDatasource(underlying, queryPath)
+    new AggregatingDatasource(underlying, queryPath)
 }

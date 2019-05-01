@@ -44,7 +44,7 @@ import scalaz.syntax.std.option._
 
 import shims._
 
-object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], ResourcePathType] {
+object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], ResourcePathType] {
 
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
@@ -61,7 +61,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], 
         ResourcePath.root() / ResourceName("d") -> 6))
 
   val datasource =
-    ChildAggregatingDatasource(underlying, Lens.id)
+    AggregatingDatasource(underlying, Lens.id)
 
   def nonExistentPath: ResourcePath =
     ResourcePath.root() / ResourceName("x") / ResourceName("y")
@@ -103,7 +103,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], 
             }
         }
 
-      val ds = ChildAggregatingDatasource(uds, Lens.id)
+      val ds = AggregatingDatasource(uds, Lens.id)
 
       for {
         dres <- ds.prefixedChildPaths(ResourcePath.root())

@@ -97,7 +97,7 @@ object Quasar extends Logging {
 
       dsManager <-
         Stream.resource(DefaultDatasourceManager.Builder[UUID, Fix, F]
-          .withMiddleware(ChildAggregatingMiddleware(_, _))
+          .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
           .build(moduleMap, configured))
 
