@@ -39,8 +39,9 @@ import monocle.Lens
 
 import shims._
 
-/** A datasource transformer that converts underlying prefix paths into prefix
-  * resources by aggregating all child leaf resources of the prefix.
+/** A datasource transformer that augments underlying datasources by adding an aggregate resource
+  * `p / **` for every prefix `p`. An aggregate resource `p / **` will aggregate
+  * all descendant resources of the prefix `p`.
   */
 final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
     underlying: Datasource[F, Stream[F, ?], Q, R, ResourcePathType.Physical],
@@ -55,16 +56,25 @@ final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] priva
     def aggregate(p: ResourcePath): F[AggregateResult[F, R]] =
       aggPath(p).map(doAggregate).getOrElse(MonadResourceErr[F].raiseError(ResourceError.pathNotFound(p)))
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def doAggregate(p: ResourcePath): F[AggregateResult[F, R]] =
       underlying.prefixedChildPaths(p) flatMap {
         case Some(s) =>
-          val agg =
-            s.collect { case (n, ResourcePathType.LeafResource) => p / n }
-              .evalMap(r => underlying.evaluate(queryPath.set(r)(q)).tupleLeft(r).attempt)
+          val children: AggregateResult[F, R] =
+            s.collect {
+              case (n, ResourcePathType.LeafResource) => p / n
+              case (n, ResourcePathType.PrefixResource) => p / n
+            } .evalMap(r => underlying.evaluate(queryPath.set(r)(q)).tupleLeft(r).attempt)
               .map(_.toOption)
               .unNone
 
-          agg.pure[F]
+          val nested: AggregateResult[F, R] =
+            s.collect {
+              case (n, ResourcePathType.Prefix) => p / n
+              case (n, ResourcePathType.PrefixResource) => p / n
+            } .evalMap(doAggregate).flatten
+
+          (children ++ nested).pure[F]
 
         case None =>
           MonadResourceErr[F].raiseError(ResourceError.pathNotFound(p))
@@ -96,7 +106,7 @@ final class ChildAggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] priva
 
   ////
 
-  private val AggName: ResourceName = ResourceName("*")
+  private val AggName: ResourceName = ResourceName("**")
 
   private def aggPath(path: ResourcePath): Option[ResourcePath] =
     path.unsnoc.flatMap {

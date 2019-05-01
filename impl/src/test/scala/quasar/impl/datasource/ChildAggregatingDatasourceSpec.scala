@@ -57,7 +57,8 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], 
         ResourcePath.root() / ResourceName("a") / ResourceName("c") -> 2,
         ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("r") -> 3,
         ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s") -> 4,
-        ResourcePath.root() / ResourceName("d") -> 5))
+        ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s") / ResourceName("t") -> 5,
+        ResourcePath.root() / ResourceName("d") -> 6))
 
   val datasource =
     ChildAggregatingDatasource(underlying, Lens.id)
@@ -110,7 +111,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], 
         qres <- ds.evaluate(z)
       } yield {
         meta must beSome(equal[List[(ResourceName, ResourcePathType)]](List(
-          ResourceName("*") -> ResourcePathType.AggregateResource,
+          ResourceName("**") -> ResourcePathType.AggregateResource,
           ResourceName("z") -> ResourcePathType.prefixResource)))
         qres must beLeft(1)
       }
@@ -118,7 +119,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], 
 
     "agg resource is recognized via pathIsResource" >>* {
       datasource
-        .pathIsResource(ResourcePath.root() / ResourceName("a") / ResourceName("*"))
+        .pathIsResource(ResourcePath.root() / ResourceName("a") / ResourceName("**"))
         .map(_ must beTrue)
     }
 
@@ -127,7 +128,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], 
         .prefixedChildPaths(ResourcePath.root() / ResourceName("a"))
         .flatMap(_.cata(_.compile.to[List], IO.pure(Nil)))
         .map(_ must equal[List[(ResourceName, ResourcePathType)]](List(
-          ResourceName("*") -> ResourcePathType.AggregateResource,
+          ResourceName("**") -> ResourcePathType.AggregateResource,
           ResourceName("b") -> ResourcePathType.LeafResource,
           ResourceName("c") -> ResourcePathType.LeafResource,
           ResourceName("q") -> ResourcePathType.Prefix)))
@@ -144,17 +145,20 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], 
     "querying an underlying resource is unaffected" >>* {
       datasource
         .evaluate(ResourcePath.root() / ResourceName("d"))
-        .map(_ must beLeft(5))
+        .map(_ must beLeft(6))
     }
 
-    "querying an agg resource aggregates sibling leafs" >>* {
+    "querying an agg resource aggregates descendant leafs" >>* {
       val b = ResourcePath.root() / ResourceName("a") / ResourceName("b")
       val c = ResourcePath.root() / ResourceName("a") / ResourceName("c")
+      val r = ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("r")
+      val s = ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s")
+      val t = ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s") / ResourceName("t")
 
       datasource
-        .evaluate(ResourcePath.root() / ResourceName("a") / ResourceName("*"))
+        .evaluate(ResourcePath.root() / ResourceName("a") / ResourceName("**"))
         .flatMap(_.traverse(_.compile.to[List]))
-        .map(_ must beRight(contain(exactly((b, 1), (c, 2)))))
+        .map(_ must beRight(contain(exactly((b, 1), (c, 2), (r, 3), (s, 4), (t, 5)))))
     }
   }
 }
