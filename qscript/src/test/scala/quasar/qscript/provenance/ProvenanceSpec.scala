@@ -345,6 +345,12 @@ abstract class ProvenanceSpec[
     }
   }
 
+  "squash" >> {
+    "conjoins all dimensions" >> prop { p: P =>
+      p.squash.reduce eqv empty
+    }
+  }
+
   checkAll("CommutativeMonoid[P @@ Conjunction]", CommutativeMonoidTests[P @@ Conjunction].commutativeMonoid)
   checkAll("BoundedSemilattice[P @@ Disjunction]", BoundedSemilatticeTests[P @@ Disjunction].boundedSemilattice)
 }

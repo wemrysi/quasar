@@ -143,6 +143,9 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
   def reduce(p: P): P =
     Uop.fromFoldable(p.toList.flatMap(_.initRegions.toList))
 
+  def squash(p: P): P =
+    p.map(_.squash)
+
   def traverseComponents[F[_]: Applicative](f: P => F[P])(p: P): F[P] = {
     import Uop._
     p.toList

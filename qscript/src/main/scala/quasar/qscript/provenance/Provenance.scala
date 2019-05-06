@@ -113,6 +113,9 @@ trait Provenance[S, V, T] { self =>
   /** Discard the highest dimension, reducing dimensionality by 1. */
   def reduce(p: P): P
 
+  /** Conjoin all dimensions into a single one. */
+  def squash(p: P): P
+
   /** Apply `f` to each independent component of `p`. */
   def traverseComponents[F[_]: Applicative](f: P => F[P])(p: P): F[P]
 
@@ -186,6 +189,9 @@ trait Provenance[S, V, T] { self =>
 
       def reduce: P =
         self.reduce(p)
+
+      def squash: P =
+        self.squash(p)
 
       def traverseComponents[F[_]: Applicative](f: P => F[P]): F[P] =
         self.traverseComponents(f)(p)

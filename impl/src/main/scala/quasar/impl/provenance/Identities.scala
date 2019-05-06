@@ -51,7 +51,6 @@ final class Identities[A] private (
     protected val nextV: Int,
     protected val roots: Set[Int],
     protected val ends: Set[Int],
-    // vertex -> (node, edges out, edges in)
     protected val g: Identities.G[A]) {
 
     import Identities.{G => IG, MergeState, Node, Vert => IVert}
@@ -121,7 +120,7 @@ final class Identities[A] private (
       Eval.always(NonEmptyList.fromList(vs.toList)) flatMap {
         case Some(nel) =>
           nel reduceMapM { v =>
-            val IVert(n, _, _, i) = g(v)
+            val IVert(n, _, i) = g(v)
             expand(i, Node.conj.nonEmpty(n), updateVecs(xs, conj, n.value))
           }
 
@@ -164,7 +163,7 @@ final class Identities[A] private (
       val (toDrop1, acce1, accr1, accg1) =
         toDrop.foldLeft((Set[Int](), acce, accr, accg)) {
           case ((td, ae, ar, ag), v) =>
-            val IVert(n, _, o, i) = ag(v)
+            val IVert(n, o, i) = ag(v)
 
             val (nexttd, nextae, nextar) =
               if (Node.snoc.nonEmpty(n))
@@ -201,7 +200,7 @@ final class Identities[A] private (
 
   def debug: String = {
     val reachable = g.filter {
-      case (v, IVert(_, _, o, _)) => o.nonEmpty || ends(v)
+      case (v, IVert(_, o, _)) => o.nonEmpty || ends(v)
     }
 
     s"(nextV = $nextV, roots = $roots, ends = $ends)\n${reachable.toList.sortBy(_._1).mkString("\n")}"
@@ -209,16 +208,6 @@ final class Identities[A] private (
 
   /** Merge with another set of identities. */
   def merge(that: Identities[A])(implicit A: Order[A]): Identities[A] = {
-    // State = index, seen?
-    // DFS method, leveraging seen?
-    //
-    // 0. Have we seen that.v? If so, next.
-    // 1. Otherwise, find all this.vertices with the same value as that.v
-    // 2. for each find the one that has the same set of incoming edges.
-    // 3. If exists, add remapping, note we've seen that.v, update the out edges of all incoming vertices.
-
-    //println(s"MERGING START\nTHIS $debug\n$this\nTHAT ${that.debug}\n$that")
-
     val zmap = SortedMap.empty[Node[A], NonEmptyList[Int]](Order[Node[A]].toOrdering)
 
     def nodeMap(vs: Set[Int], m: G): SortedMap[Node[A], NonEmptyList[Int]] =
@@ -237,7 +226,7 @@ final class Identities[A] private (
 
         val (ns, ng) = thatLvl.foldLeft((s, rg)) {
           case ((accs, accg), thatV) =>
-            val IVert(n, l, o, i) = that.g(thatV)
+            val IVert(n, o, i) = that.g(thatV)
             val remappedIn = i.flatMap(v => accs.remap.get(v).toSet)
 
             val candidate = thisNodes.get(n) flatMap { candidates =>
@@ -249,7 +238,7 @@ final class Identities[A] private (
                 (MergeState.remap.modify(_.updated(thatV, thisV))(accs), accg)
 
               case None =>
-                val nextg = remappedIn.foldLeft(accg.updated(accs.nextV, IVert(n, l, Set[Int](), remappedIn))) {
+                val nextg = remappedIn.foldLeft(accg.updated(accs.nextV, IVert(n, Set[Int](), remappedIn))) {
                   case (ng, v) => vout(v).modify(_ + accs.nextV)(ng)
                 }
 
@@ -267,16 +256,26 @@ final class Identities[A] private (
 
     val (s1, g1) = mergeLvl(roots, that.roots, MergeState(nextV, Map()), g)
 
-    val r =
-      new Identities(
-        s1.nextV,
-        roots ++ that.roots.map(s1.remap),
-        ends ++ that.ends.map(s1.remap),
-        g1)
+    new Identities(
+      s1.nextV,
+      roots ++ that.roots.map(s1.remap),
+      ends ++ that.ends.map(s1.remap),
+      g1)
+  }
 
-    //println(s"MERGING END\n${r.debug}\n$r")
+  /** Convert each vector to a single conjoined region. */
+  def squash: Identities[A] = {
+    val g1 = g map {
+      case x @ (v, IVert(Node.Snoc(_), _, _)) if roots(v) =>
+        x
 
-    r
+      case (v, IVert(Node.Snoc(a), o, i)) =>
+        (v, IVert(Node.conj(a), o, i))
+
+      case other => other
+    }
+
+    new Identities(nextV, roots, ends, g1)
   }
 
   /** Append a value to all vectors. */
@@ -405,9 +404,6 @@ final class Identities[A] private (
   private def vnode[X](i: Int): Lens[IG[X], Node[X]] =
     vert(i) composeLens IVert.node
 
-  private def vlvl[X](i: Int): Lens[IG[X], Int] =
-    vert(i) composeLens IVert.lvl
-
   private def vout[X](i: Int): Lens[IG[X], Set[Int]] =
     vert(i) composeLens IVert.out
 
@@ -415,17 +411,16 @@ final class Identities[A] private (
     vert(i) composeLens IVert.in[X]
 
   private def add(node: Node[A]): Identities[A] = {
-    val (maxLvl, nextG) =
-      ends.foldLeft((0, g)) {
-        case ((l1, g1), i) =>
-          (scala.math.max(l1, vlvl(i).get(g1)), vout(i).modify(_ + nextV)(g1))
+    val nextG =
+      ends.foldLeft(g) {
+        case (g1, i) => vout(i).modify(_ + nextV)(g1)
       }
 
     new Identities(
       nextV + 1,
       roots,
       Set(nextV),
-      nextG.updated(nextV, IVert(node, maxLvl + 1, Set(), ends)))
+      nextG.updated(nextV, IVert(node, Set(), ends)))
   }
 }
 
@@ -452,7 +447,7 @@ object Identities extends IdentitiesInstances {
     fa.reduceLeftTo(one(_))(_ :+ _)
 
   def one[A](a: A): Identities[A] =
-    new Identities(1, Set(0), Set(0), Map(0 -> Vert(Node.snoc(a), 0, Set(), Set())))
+    new Identities(1, Set(0), Set(0), Map(0 -> Vert(Node.snoc(a), Set(), Set())))
 
   /** NB: Linear in the size of the fully expanded representation. */
   def values[A, B: Order]: PTraversal[Identities[A], Identities[B], A, B] =
@@ -533,14 +528,11 @@ object Identities extends IdentitiesInstances {
       }
   }
 
-  protected final case class Vert[A](node: Node[A], lvl: Int, out: Set[Int], in: Set[Int])
+  protected final case class Vert[A](node: Node[A], out: Set[Int], in: Set[Int])
 
   protected object Vert {
     def node[A]: Lens[Vert[A], Node[A]] =
       Lens((_: Vert[A]).node)(n => _.copy(node = n))
-
-    def lvl[A]: Lens[Vert[A], Int] =
-      Lens((_: Vert[A]).lvl)(l => _.copy(lvl = l))
 
     def out[A]: Lens[Vert[A], Set[Int]] =
       Lens((_: Vert[A]).out)(o => _.copy(out = o))

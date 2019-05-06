@@ -134,9 +134,8 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
       case QSAutoJoin(left, right, _, combine) =>
         computeJoin2[F](g, left, right, combine)
 
-      // FIXME: Still necessary?
       case DimEdit(src, DTrans.Squash()) =>
-        compute1[F](g, src)(ι)
+        compute1[F](g, src)(_.squash)
 
       case DimEdit(src, DTrans.Group(k)) =>
         handleMissingDims(dimsFor[F](src)) flatMap { sdims =>
