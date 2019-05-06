@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers, Type}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
+import quasar.common.SortDir
 import quasar.contrib.iota._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
@@ -470,6 +471,9 @@ object MinimizeAutoJoinsSpec
             DTrans.Group(func.ProjectKeyS(func.Hole, "label")))),
           recFunc.Negate(recFunc.ProjectKeyS(recFunc.Hole, "metric"))))
 
+      // FIXME: This works as the autojoin is rewritten and is the final
+      //        node, it wouldn't rewrite any child nodes, affecting
+      //        further reductions.
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2(((
           qsu.lpReduce((
@@ -491,6 +495,108 @@ object MinimizeAutoJoinsSpec
 
           auth.dims(m.root) must_= expDims
       }
+    }
+
+    "remap coalesced bucket references up to the root" in {
+      // SELECT AVG(cnt) as measure, state as category FROM (
+      //   SELECT COUNT(*) as cnt, state, gender FROM `otherpatients.data`
+      //     WHERE codes[*].desc LIKE "%flu%"
+      //     GROUP BY state, gender
+      //     ORDER BY COUNT(*) DESC, state ASC)
+      val filtered =
+        qsu.map(
+          qsu.qsFilter(
+            qsu._autojoin2(
+              qsu.read(afile, ExcludeId),
+              qsu.transpose(
+                qsu.map(
+                  qsu.read(afile, ExcludeId),
+                  recFunc.ProjectKeyS(recFunc.Hole, "codes")),
+                Retain.Values,
+                Rotation.FlattenArray),
+              func.StaticMapS(
+                "filter_source" -> func.LeftSide,
+                "filter_predicate_0" -> func.RightSide)),
+            recFunc.Like(
+              recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "filter_predicate_0"), "desc"),
+              recFunc.Constant(J.str("%flu%")),
+              recFunc.Constant(J.str("\\")))),
+          recFunc.ProjectKeyS(recFunc.Hole, "filter_source"))
+
+      val grouped =
+        qsu.dimEdit(
+          qsu.dimEdit(
+            filtered,
+            DTrans.Group(func.ProjectKeyS(func.Hole, "state"))),
+          DTrans.Group(func.ProjectKeyS(func.Hole, "gender")))
+
+      val arbGender =
+        qsu.lpReduce(
+          qsu.map(
+            grouped,
+            recFunc.ProjectKeyS(recFunc.Hole, "gender")),
+          ReduceFuncs.Arbitrary(()))
+
+      val arbState =
+        qsu.lpReduce(
+          qsu.map(
+            grouped,
+            recFunc.ProjectKeyS(recFunc.Hole, "state")),
+          ReduceFuncs.Arbitrary(()))
+
+      val count =
+        qsu.lpReduce(
+          grouped,
+          ReduceFuncs.Count(()))
+
+      val innerReductions =
+        qsu._autojoin2(
+          qsu._autojoin2(
+            count,
+            arbState,
+            func.StaticMapS(
+              "cnt" -> func.LeftSide,
+              "state" -> func.RightSide)),
+          arbGender,
+          func.ConcatMaps(
+            func.LeftSide,
+            func.MakeMapS("gender", func.RightSide)))
+
+      val innerQuery =
+        qsu.qsSort(
+          innerReductions,
+          List[FreeAccess[Hole]](),
+          NonEmptyList(
+            (func.ProjectKeyS(func.Hole, "cnt"), SortDir.Descending),
+            (func.ProjectKeyS(func.Hole, "state"), SortDir.Ascending)))
+
+      val outerQuery =
+        qsu._autojoin2(
+          qsu.lpReduce(
+            qsu.map(
+              innerQuery,
+              recFunc.ProjectKeyS(recFunc.Hole, "cnt")),
+            ReduceFuncs.Avg(())),
+          innerQuery,
+          func.StaticMapS(
+            "measure" -> func.LeftSide,
+            "category" -> func.ProjectKeyS(func.RightSide, "state")))
+
+      val AuthenticatedQSU(agraph, auth) = runOn_(QSUGraph.fromTree[Fix](outerQuery))
+
+      val expDims =
+        qprov.and(
+          qprov.empty
+            .projectStatic(J.str("afile"), IdType.Dataset)
+            .inflateExtend(IdAccess.bucket('foo, 0), IdType.Expr)
+            .injectStatic(J.str("measure"), IdType.Map),
+          qprov.empty
+            .projectStatic(J.str("afile"), IdType.Dataset)
+            .inflateExtend(IdAccess.bucket('foo, 0), IdType.Expr)
+            .inflateExtend(IdAccess.bucket('foo, 1), IdType.Expr)
+            .injectStatic(J.str("category"), IdType.Map))
+
+      auth.dims(agraph.root) must_= expDims
     }
 
     "leave uncoalesced reductions of different bucketing" in {

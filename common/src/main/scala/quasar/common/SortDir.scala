@@ -16,11 +16,13 @@
 
 package quasar.common
 
+import slamdata.Predef.{Product, Serializable}
+
 import quasar.RenderTree
 
 import scalaz._
 
-sealed abstract class SortDir
+sealed abstract class SortDir extends Product with Serializable
 
 object SortDir {
   final case object Ascending extends SortDir

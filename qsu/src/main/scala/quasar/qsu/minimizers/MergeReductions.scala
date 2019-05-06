@@ -38,6 +38,8 @@ import matryoshka.data.free._
 
 import scalaz.{Equal, Free, Monad, Scalaz}, Scalaz._
 
+// FIXME: Need to rewrite bucket references to point to the collapsed node
+// FIXME: May need to reorder `ReifyBuckets` until after MAJ
 sealed abstract class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] extends Minimizer[T] {
 
   import MinimizeAutoJoins._
@@ -48,6 +50,7 @@ sealed abstract class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
 
   implicit def PEqual: Equal[P]
 
+  private lazy val B = Bucketing(qprov)
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
 
@@ -90,20 +93,21 @@ sealed abstract class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
 
     val reducerAttempt = candidates collect {
       case g @ QSReduce(source, buckets, reducers, repair) =>
-        (source, buckets, reducers, repair)
+        (g.root, source, buckets, reducers, repair)
     }
 
-    val (_, buckets, _, _) = reducerAttempt.head
+    val (_, _, buckets, _, _) = reducerAttempt.head
 
     val sourceCheck = reducerAttempt filter {
-      case (cSrc, cBuckets, _, _) =>
+      case (_, cSrc, cBuckets, _, _) =>
         cSrc.root === source.root && cBuckets === buckets
     }
 
     if (sourceCheck.lengthCompare(candidates.length) === 0) {
       val lifted = reducerAttempt.zipWithIndex map {
-        case ((_, buckets, reducers, repair), i) =>
+        case ((root, _, buckets, reducers, repair), i) =>
           (
+            root,
             buckets,
             reducers,
             // we use maps here to avoid definedness issues in reduction results
@@ -112,12 +116,12 @@ sealed abstract class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
 
       // this is fine, because we can't be here if candidates is empty
       // doing it this way avoids an extra (and useless) Option state in the fold
-      val (_, lhreducers, lhrepair) = lifted.head
+      val (lhroot, _, lhreducers, lhrepair) = lifted.head
 
       // squish all the reducers down into lhead
-      val (_, (reducers, repair)) =
-        lifted.tail.foldLeft((lhreducers.length, (lhreducers, lhrepair))) {
-          case ((roffset, (lreducers, lrepair)), (_, rreducers, rrepair)) =>
+      val (_, (roots, reducers, repair)) =
+        lifted.tail.foldLeft((lhreducers.length, (Set(lhroot), lhreducers, lhrepair))) {
+          case ((roffset, (lroots, lreducers, lrepair)), (rroot, _, rreducers, rrepair)) =>
             val reducers = lreducers ::: rreducers
 
             val roffset2 = roffset + rreducers.length
@@ -129,7 +133,7 @@ sealed abstract class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
                   ReduceIndex(e.rightMap(_ + roffset))
               })
 
-            (roffset2, (reducers, repair))
+            (roffset2, (lroots + rroot, reducers, repair))
         }
 
       // 107.7, All chiropractors, all the time
@@ -140,11 +144,23 @@ sealed abstract class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
 
       val redPat = QSU.QSReduce[T, Symbol](source.root, buckets, reducers, repair)
 
-      updateGraph[T, G](qprov, redPat) map { rewritten =>
-        val back = qgraph.overwriteAtRoot(QSU.Map[T, Symbol](rewritten.root, adjustedFM)) :++ rewritten
+      for {
+        rewritten <- updateGraph[T, G](qprov, redPat)
 
-        Some((rewritten, back))
-      }
+        QAuth(dims, gkeys) <- MinStateM[T, P, G].gets(_.auth)
+
+        //foo = println(s"ROOTS: $roots")
+
+        dims2 = dims mapValues { p =>
+          roots.foldLeft(p)((p, frm) => B.rename(frm, rewritten.root, p))
+        }
+
+        //bar = println(s"RENAMED DIMS: $dims2")
+
+        _ <- MinStateM[T, P, G].put(MinimizationState(QAuth(dims2, gkeys)))
+
+        back = qgraph.overwriteAtRoot(QSU.Map[T, Symbol](rewritten.root, adjustedFM)) :++ rewritten
+      } yield Some((rewritten, back))
     } else {
       (None: Option[(QSUGraph, QSUGraph)]).point[G]
     }
