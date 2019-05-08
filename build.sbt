@@ -294,6 +294,8 @@ lazy val impl = project
       "org.slf4s"      %% "slf4s-api"      % slf4sVersion,
       "org.typelevel"  %% "jawn-argonaut"  % jawnVersion,
       "org.typelevel"  %% "jawn-util"      % jawnVersion,
+      "io.atomix"       % "atomix"         % atomixVersion,
+      "io.atomix"       % "atomix-gossip"  % atomixVersion,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
       "com.fasterxml.woodstox" % "woodstox-core" % "5.0.3"))
