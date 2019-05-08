@@ -139,9 +139,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       case QSU.QSSort(source, buckets, order) =>
         recordAccesses(g.root, bucketIdAccess(source, buckets))
 
-      case QSU.QSAutoJoin(left, right, joinKeys, combiner) =>
+      case QSU.QSAutoJoin(left, right, autojoin, combiner) =>
         val keysAccess = for {
-          conj <- joinKeys.toList
+          conj <- autojoin.keys.toList
           key <- conj.toNonEmptyList.toList
           keyAccess <- joinKeyAccess(g.root, key)
         } yield keyAccess
@@ -365,7 +365,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
           } else g
         }
 
-      case g @ E.QSAutoJoin(left, right, keys, combiner) =>
+      case g @ E.QSAutoJoin(left, right, autojoin, combiner) =>
         (emitsIVMap(left) |@| emitsIVMap(right)).tupled flatMap {
           case (true, true) =>
             onNeedsIV(g) as {
@@ -376,7 +376,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
                     lookupIdentities >> func.RightSide),
                   rebaseV(combiner))
 
-              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, keys, newCombiner))
+              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, autojoin, newCombiner))
             }
 
           case (true, false) =>
@@ -386,7 +386,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
                   lookupIdentities >> func.LeftSide,
                   combiner >>= (_.fold(rebaseV(func.LeftSide), func.RightSide)))
 
-              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, keys, newCombiner))
+              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, autojoin, newCombiner))
             }
 
           case (false, true) =>
@@ -396,7 +396,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
                   lookupIdentities >> func.RightSide,
                   combiner >>= (_.fold(func.LeftSide, rebaseV(func.RightSide))))
 
-              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, keys, newCombiner))
+              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, autojoin, newCombiner))
             }
 
           case (false, false) =>

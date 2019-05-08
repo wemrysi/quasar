@@ -19,6 +19,7 @@ package quasar.qscript.provenance
 import slamdata.Predef.List
 
 import quasar.Qspec
+import quasar.qscript.OnUndefined
 
 import cats.{Eq, Id, Order, Show}
 import cats.data.NonEmptyList
@@ -106,83 +107,88 @@ abstract class ProvenanceSpec[
     "extend :: T ⋈ extend :: T" >> prop { (vx: V, vy: V) =>
       val exp = JoinKeys.one(JoinKey.dynamic[S, V](vx, vy))
 
-      (empty.inflateExtend(vx, t1) ⋈ empty.inflateExtend(vy, t1)) eqv exp
+      (empty.inflateExtend(vx, t1) ⋈ empty.inflateExtend(vy, t1)).keys eqv exp
     }
 
     "extend :: T ⋈ extend :: U" >> prop { (vx: V, vy: V) =>
-      (empty.inflateExtend(vx, t1) ⋈ empty.inflateExtend(vy, t2)).isEmpty
+      (empty.inflateExtend(vx, t1) ⋈ empty.inflateExtend(vy, t2)).keys.isEmpty
     }
 
     "extend :: T ⋈ conjoin :: T" >> prop { (vx: V, vy: V, s: S) =>
       val exp = JoinKeys.one(JoinKey.dynamic[S, V](vx, vy))
       val b = empty.projectStatic(s, t2)
 
-      (b.inflateExtend(vx, t1) ⋈ b.inflateConjoin(vy, t1)) eqv exp
+      (b.inflateExtend(vx, t1) ⋈ b.inflateConjoin(vy, t1)).keys eqv exp
     }
 
     "extend :: T ⋈ conjoin :: U" >> prop { (vx: V, vy: V, s: S) =>
       val b = empty.projectStatic(s, t2)
-      (b.inflateExtend(vx, t1) ⋈ b.inflateConjoin(vy, t2)).isEmpty
+      (b.inflateExtend(vx, t1) ⋈ b.inflateConjoin(vy, t2)).keys.isEmpty
     }
 
     "conjoin :: T ⋈ conjoin :: T" >> prop { (vx: V, vy: V, s: S) =>
       val exp = JoinKeys.one(JoinKey.dynamic[S, V](vx, vy))
       val b = empty.projectStatic(s, t2)
 
-      (b.inflateConjoin(vx, t1) ⋈ b.inflateConjoin(vy, t1)) eqv exp
+      (b.inflateConjoin(vx, t1) ⋈ b.inflateConjoin(vy, t1)).keys eqv exp
     }
 
     "conjoin :: T ⋈ conjoin :: U" >> prop { (vx: V, vy: V, s: S) =>
       val b = empty.projectStatic(s, t1)
-      (b.inflateConjoin(vx, t1) ⋈ b.inflateConjoin(vy, t2)).isEmpty
+      (b.inflateConjoin(vx, t1) ⋈ b.inflateConjoin(vy, t2)).keys.isEmpty
     }
 
     "project :: T ⋈ extend :: T" >> prop { (s: S, v: V) =>
       val exp = JoinKeys.one(JoinKey.staticL(s, v))
-      (empty.projectStatic(s, t1) ⋈ empty.inflateExtend(v, t1)) eqv exp
+      (empty.projectStatic(s, t1) ⋈ empty.inflateExtend(v, t1)).keys eqv exp
     }
 
     "project :: T ⋈ extend :: U" >> prop { (s: S, v: V) =>
-      (empty.projectStatic(s, t1) ⋈ empty.inflateExtend(v, t2)).isEmpty
+      (empty.projectStatic(s, t1) ⋈ empty.inflateExtend(v, t2)).keys.isEmpty
     }
 
     "project :: T ⋈ conjoin :: T" >> prop { (sx: S, sy: S, v: V) =>
       val exp = JoinKeys.one(JoinKey.staticL(sy, v))
       val b = empty.projectStatic(sx, t1)
 
-      (b.projectStatic(sy, t2) ⋈ b.inflateConjoin(v, t2)) eqv exp
+      (b.projectStatic(sy, t2) ⋈ b.inflateConjoin(v, t2)).keys eqv exp
     }
 
     "project :: T ⋈ conjoin :: U" >> prop { (sx: S, sy: S, v: V) =>
       val exp = JoinKeys.one(JoinKey.staticL(sy, v))
       val b = empty.projectStatic(sx, t1)
 
-      (b.projectStatic(sy, t2) ⋈ b.inflateConjoin(v, t1)).isEmpty
+      (b.projectStatic(sy, t2) ⋈ b.inflateConjoin(v, t1)).keys.isEmpty
     }
 
     "commutativity" >> prop { (p: P, q: P) =>
-      (p ⋈ q) eqv (q ⋈ p).mapKeys(_.flip)
+      (p ⋈ q) eqv AutoJoin.keys[S, V].modify(_.mapKeys(_.flip))(q ⋈ p)
     }
 
     "mismatched project id halts joining" >> {
       val p = empty.projectStatic(s1, t1).inflateExtend(v1, t2)
       val q = empty.projectStatic(s2, t1).inflateExtend(v1, t2)
 
-      (p ⋈ q).isEmpty
+      (p ⋈ q).keys.isEmpty
     }
 
     "mismatched project type halts joining" >> {
       val p = empty.projectStatic(s1, t1).inflateExtend(v1, t2)
       val q = empty.projectStatic(s1, t2).inflateExtend(v1, t2)
 
-      (p ⋈ q).isEmpty
+      (p ⋈ q).keys.isEmpty
     }
 
     "conjunction of keys when joining conjunctions" >> {
       val p = empty.projectStatic(s1, t1).inflateExtend(v1, t1).inflateExtend(v2, t1)
       val q = empty.projectStatic(s1, t1).projectStatic(s2, t1).inflateExtend(v3, t1)
 
-      (p ⋈ q) eqv JoinKeys.conj(JoinKey.staticR(v1, s2), JoinKey.dynamic(v2, v3))
+      val exp =
+        AutoJoin[S, V](
+          JoinKeys.conj(JoinKey.staticR(v1, s2), JoinKey.dynamic(v2, v3)),
+          OnUndefined.Omit)
+
+      (p ⋈ q) eqv exp
     }
 
     "join keys for all members of conjunction" >> {
@@ -191,12 +197,15 @@ abstract class ProvenanceSpec[
 
       val r = empty.inflateExtend(v2, t1).inflateExtend(v3, t1)
 
-      val keys = JoinKeys.conj[S, V](
-        JoinKey.dynamic(v1, v2),
-        JoinKey.staticL(s2, v2),
-        JoinKey.staticL(s1, v3))
+      val exp =
+        AutoJoin(
+          JoinKeys.conj[S, V](
+            JoinKey.dynamic(v1, v2),
+            JoinKey.staticL(s2, v2),
+            JoinKey.staticL(s1, v3)),
+          OnUndefined.Omit)
 
-      ((p ∧ q) ⋈ r) eqv keys
+      ((p ∧ q) ⋈ r) eqv exp
     }
 
     "disjunction of conjunction of keys when join involves union" >> {
@@ -208,7 +217,9 @@ abstract class ProvenanceSpec[
       val pkeys = JoinKeys.conj[S, V](JoinKey.staticL(s1, v1), JoinKey.dynamic(v3, v3))
       val qkeys = JoinKeys.conj[S, V](JoinKey.dynamic(v1, v1), JoinKey.dynamic(v2, v3))
 
-      ((p ∨ q) ⋈ r) eqv (pkeys ∨ qkeys)
+      val exp = AutoJoin(pkeys ∨ qkeys, OnUndefined.Omit)
+
+      ((p ∨ q) ⋈ r) eqv exp
     }
 
     "halt join for one member of conjunction while continuing with other" >> {
@@ -221,7 +232,22 @@ abstract class ProvenanceSpec[
         JoinKey.dynamic(v2, v3),
         JoinKey.staticR(v1, s1))
 
-      ((p ∧ q) ⋈ r) eqv keys
+      val exp = AutoJoin(keys, OnUndefined.Omit)
+
+      ((p ∧ q) ⋈ r) eqv exp
+    }
+
+    "emit on undefined when only joining with part of a union" >> {
+      val p = empty.inflateExtend(v1, t1).inflateExtend(v2, t1)
+      val q = empty.inflateExtend(v1, t2).inflateExtend(v3, t2)
+
+      val keys = JoinKeys.conj[S, V](
+        JoinKey.dynamic(v1, v1),
+        JoinKey.dynamic(v2, v2))
+
+      val exp = AutoJoin(keys, OnUndefined.Emit)
+
+      ((p ∨ q) ⋈ p) eqv exp
     }
   }
 

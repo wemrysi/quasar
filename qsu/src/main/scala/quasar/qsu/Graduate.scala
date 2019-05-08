@@ -38,6 +38,7 @@ import quasar.qscript.{
   JoinSide,
   Map,
   MonadPlannerErr,
+  OnUndefined,
   QCE,
   QScriptEducated,
   Read,
@@ -259,10 +260,10 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
         case QSU.Unreferenced() =>
           QCE(Unreferenced[T, QSUGraph]()).point[F]
 
-        case QSU.QSAutoJoin(left, right, joinKeys, combiner) =>
+        case QSU.QSAutoJoin(left, right, autojoin, combiner) =>
           val t = func.Constant[JoinSide](EJson.bool(true))
 
-          val condition = joinKeys.toList.toNel.fold(t.point[F]) { jks =>
+          val condition = autojoin.keys.toList.toNel.fold(t.point[F]) { jks =>
             val mkEq = eqCond(left.root, right.root)
 
             val mkConj =
@@ -273,7 +274,10 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
             val cond =
               jks.foldMapRight1(mkConj)((l, r) => (mkConj(l) |@| r)(func.Or(_, _)))
 
-            cond.map(func.IfUndefined(_, t))
+            if (autojoin.onUndefined === OnUndefined.Emit)
+              cond.map(func.IfUndefined(_, t))
+            else
+              cond
           }
 
           (mergeSources[F](left, right) |@| condition) {

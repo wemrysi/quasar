@@ -18,11 +18,13 @@ package quasar.impl.provenance
 
 import slamdata.Predef.{List, None, Option, Some}
 
-import quasar.qscript.provenance.{JoinKey, JoinKeys, Provenance, Uop}
+import quasar.qscript.OnUndefined
+import quasar.qscript.provenance.{AutoJoin, JoinKey, JoinKeys, Provenance, Uop}
 
 import cats.{Applicative, Order}
 import cats.data.NonEmptyList
 import cats.instances.list._
+import cats.instances.tuple._
 import cats.syntax.eq._
 import cats.syntax.foldable._
 import cats.syntax.functor._
@@ -46,9 +48,10 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
 
   type P = Uop[Identities[Dim[S, V, T]]]
 
-  // FIXME: We need to come up with a way to cross when independent components don't align.
-  def autojoin(l: P, r: P): JoinKeys[S, V] = {
+  def autojoin(l: P, r: P): AutoJoin[S, V] = {
     import JoinKeys._
+    import scalaz.std.anyVal._
+    import shims.monoidToCats
 
     def join(x: Dim[S, V, T], y: Dim[S, V, T]): Option[JoinKeys[S, V] @@ Conjunction] =
       Conjunction.subst((x, y) match {
@@ -72,7 +75,15 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
       rids <- r.toList
     } yield lids.zipWithDefined(rids)(join)
 
-    joins.foldMap(jks => Disjunction(jks.unwrap)).unwrap
+    val (Disjunction(keys), Disjunction(shouldEmit)) =
+      joins foldMap {
+        case Conjunction(jks) => (Disjunction(jks), Disjunction(jks.isEmpty))
+      }
+
+    if (shouldEmit && !keys.isEmpty)
+      AutoJoin(keys, OnUndefined.Emit)
+    else
+      AutoJoin(keys, OnUndefined.Omit)
   }
 
   def and(l: P, r: P): P =

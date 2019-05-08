@@ -29,7 +29,7 @@ import quasar.qscript.{
   MonadPlannerErr,
   RightSide3,
   RightSideF}
-import quasar.qscript.provenance.JoinKeys
+import quasar.qscript.provenance.AutoJoin
 import quasar.qscript.MapFuncsCore.StrLit
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
 
@@ -70,7 +70,7 @@ sealed abstract class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] extends QSUT
     case g @ AutoJoin2(left, right, combiner) =>
       val (l, r) = (left.root, right.root)
 
-      val keys: F[JoinKeys[T[EJson], IdAccess]] =
+      val keys: F[AutoJoin[T[EJson], IdAccess]] =
         (auth.lookupDimsE[F](l) |@| auth.lookupDimsE[F](r))(_ ⋈ _)
 
       keys.map(ks => g.overwriteAtRoot(qsu.qsAutoJoin(l, r, ks, combiner)))
@@ -89,7 +89,7 @@ sealed abstract class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] extends QSUT
 
         case (joinName, lName, cName, ldims, cdims, rdims) =>
 
-          val lcKeys: JoinKeys[T[EJson], IdAccess] =
+          val lcKeys: AutoJoin[T[EJson], IdAccess] =
             ldims ⋈ cdims
 
           def lcCombiner: JoinFunc =
@@ -115,7 +115,7 @@ sealed abstract class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] extends QSUT
           val lcDims: P =
             ldims ∧ cdims
 
-          val keys: JoinKeys[T[EJson], IdAccess] =
+          val keys: AutoJoin[T[EJson], IdAccess] =
             lcDims ⋈ rdims
 
           val lcName = Symbol(joinName)

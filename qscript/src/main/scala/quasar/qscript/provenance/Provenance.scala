@@ -60,7 +60,7 @@ trait Provenance[S, V, T] { self =>
   }
 
   /** The set of identity comparisons describing an autojoin of `l` and `r`. */
-  def autojoin(l: P, r: P): JoinKeys[S, V]
+  def autojoin(l: P, r: P): AutoJoin[S, V]
 
   /** The conjunction of two provenance, representing a dataset where values
     * have identities from both inputs.
@@ -145,7 +145,7 @@ trait Provenance[S, V, T] { self =>
 
   object syntax {
     implicit final class ProvenanceOps(p: P) {
-      def ⋈ (that: P): JoinKeys[S, V] =
+      def ⋈ (that: P): AutoJoin[S, V] =
         self.autojoin(p, that)
 
       def ∧ (that: P): P =
