@@ -16,8 +16,8 @@
 
 package quasar.connector
 
-import quasar.api.datasource.DatasourceError.InitializationError
-import quasar.api.datasource.DestinationType
+import quasar.api.destination.DestinationError.InitializationError
+import quasar.api.destination.DestinationType
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
@@ -25,6 +25,8 @@ import scalaz.\/
 
 trait DestinationModule {
   def destinationType: DestinationType
+
+  def sanitizeDestinationConfig(config: Json): Json
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
     config: Json)
