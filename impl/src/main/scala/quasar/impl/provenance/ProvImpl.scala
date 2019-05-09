@@ -16,7 +16,7 @@
 
 package quasar.impl.provenance
 
-import slamdata.Predef.{List, None, Option, Some}
+import slamdata.Predef.{None, Option, Some}
 
 import quasar.qscript.OnUndefined
 import quasar.qscript.provenance.{AutoJoin, JoinKey, JoinKeys, Provenance, Uop}
@@ -29,7 +29,6 @@ import cats.syntax.eq._
 import cats.syntax.foldable._
 import cats.syntax.functor._
 import cats.syntax.list._
-import cats.syntax.reducible._
 import cats.syntax.traverse._
 
 import monocle.Traversal
