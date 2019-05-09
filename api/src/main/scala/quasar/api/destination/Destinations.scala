@@ -29,9 +29,9 @@ import scalaz.{\/, ISet}
 trait Destinations[F[_], G[_], I, C] {
   import DestinationError._
 
-  /** Adds the destination described by the given `DestinationRef` to
-    * the set of destinations, returning its identifier or an error if
-    * it could not be added.
+  /** Adds the destination described by the given `DestinationRef` to the
+    * set of destinations, returning its identifier or an error if it could
+    * not be added.
     */
   def addDestination(ref: DestinationRef[C]): F[CreateError[C] \/ I]
 
