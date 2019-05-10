@@ -44,7 +44,7 @@ object IdentitiesSpec extends Qspec
     with CatsNonEmptyListGenerator
     with Discipline {
 
-  implicit val params = Parameters(maxSize = 10)
+  implicit val params = Parameters(maxSize = 10, workers = 2)
 
   type Vecs = NonEmptyList[NonEmptyList[NonEmptyList[Int]]]
 
