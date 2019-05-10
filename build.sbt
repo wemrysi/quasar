@@ -111,7 +111,7 @@ lazy val foundation = project
     buildInfoPackage := "quasar.build",
 
     libraryDependencies ++= Seq(
-      "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
+      "com.slamdata"               %% "slamdata-predef"           % "0.0.7",
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
       "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
       "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
