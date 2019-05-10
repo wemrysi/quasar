@@ -55,7 +55,7 @@ lazy val buildSettings = Seq(
    * Slice#allFromRValues to not free memory, so it's not just a convenience or
    * an optimization.
    */
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4"))
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0"))
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
