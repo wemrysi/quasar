@@ -19,9 +19,13 @@ package quasar.qsu
 import quasar.contrib.scalaz.foldable._
 
 import cats.{Eq, Foldable => CFoldable}
+import cats.data.NonEmptyList
 import scalaz.{Equal, Foldable, Tag, @@}
 
 package object mra {
+  type Dimensions[A] = NonEmptyList[A]
+  type Region[A] = NonEmptyList[A]
+
   sealed trait AsSet
   val AsSet = Tag.of[AsSet]
 

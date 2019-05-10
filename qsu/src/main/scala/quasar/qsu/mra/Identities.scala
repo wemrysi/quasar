@@ -104,8 +104,8 @@ final class Identities[A] private (
   }
 
   /** A view of these identities as a set of lists of conjoined regions. */
-  def expanded: NonEmptyList[NonEmptyList[NonEmptyList[A]]] = {
-    def updateVecs(xs: List[NonEmptyList[NonEmptyList[A]]], conj: Boolean, a: A)
+  def expanded: NonEmptyList[Dimensions[Region[A]]] = {
+    def updateVecs(xs: List[Dimensions[Region[A]]], conj: Boolean, a: A)
         : List[NonEmptyList[NonEmptyList[A]]] =
       if (xs.isEmpty)
         List(NonEmptyList.one(NonEmptyList.one(a)))
@@ -115,8 +115,8 @@ final class Identities[A] private (
         xs.map(NonEmptyList.one(a) :: _)
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def expand(vs: Set[Int], conj: Boolean, xs: List[NonEmptyList[NonEmptyList[A]]])
-        : Eval[List[NonEmptyList[NonEmptyList[A]]]] =
+    def expand(vs: Set[Int], conj: Boolean, xs: List[Dimensions[Region[A]]])
+        : Eval[List[Dimensions[Region[A]]]] =
       Eval.always(NonEmptyList.fromList(vs.toList)) flatMap {
         case Some(nel) =>
           nel reduceMapM { v =>
