@@ -230,7 +230,7 @@ lazy val sql = project
   .settings(
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
-      "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6"))
+      "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.7"))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qscript = project
