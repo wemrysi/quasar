@@ -15,7 +15,7 @@ object Versions {
   val scalacheckVersion   = "1.14.0"
   val scalazVersion       = "7.2.26"
   val scalazStreamVersion = "0.8.6a"
-  val scoptVersion        = "3.5.0"
+  val scoptVersion        = "3.7.1"
   val shapelessVersion    = "2.3.3"
   val simulacrumVersion   = "0.10.0"
   val specsVersion        = "4.3.3"
