@@ -113,8 +113,6 @@ lazy val foundation = project
     libraryDependencies ++= Seq(
       "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
-      "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
-      "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
       "com.codecommit"             %% "shims"                     % "1.7.0",
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
       "co.fs2"                     %% "fs2-core"                  % fs2Version,
