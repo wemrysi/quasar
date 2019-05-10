@@ -19,7 +19,7 @@ object Versions {
   val shapelessVersion    = "2.3.3"
   val simulacrumVersion   = "0.10.0"
   val specsVersion        = "4.3.3"
-  val spireVersion        = "0.16.0"
+  val spireVersion        = "0.16.1"
   val akkaVersion         = "2.5.1"
   val fs2Version          = "1.0.2"
   val slf4sVersion        = "1.7.25"
