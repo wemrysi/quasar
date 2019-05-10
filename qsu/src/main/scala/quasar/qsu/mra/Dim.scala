@@ -131,7 +131,7 @@ sealed abstract class DimInstances extends DimInstances0 {
     Show show {
       case Fresh() => "∃"
       case Project(s, t) => s"∏[${s.show} :: ${t.show}]"
-      case Inject(s, t) => s"I[${s.show} :: ${t.show}]"
+      case Inject(s, t) => s"∐[${s.show} :: ${t.show}]"
       case Inflate(v, t) => s"∆[${v.show} :: ${t.show}]"
     }
 }
