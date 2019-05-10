@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.impl.provenance
+package quasar.qsu.mra
 
 import slamdata.Predef.{Int, None, Set, Some, StringContext}
 
 import quasar.Qspec
-import quasar.qscript.provenance.CatsNonEmptyListGenerator
 
 import scala.Predef.$conforms
 

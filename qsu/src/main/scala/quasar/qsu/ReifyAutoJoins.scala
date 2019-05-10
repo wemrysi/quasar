@@ -29,9 +29,9 @@ import quasar.qscript.{
   MonadPlannerErr,
   RightSide3,
   RightSideF}
-import quasar.qscript.provenance.AutoJoin
 import quasar.qscript.MapFuncsCore.StrLit
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
+import quasar.qsu.mra.AutoJoin
 
 import matryoshka._
 import scalaz.{Monad, WriterT}

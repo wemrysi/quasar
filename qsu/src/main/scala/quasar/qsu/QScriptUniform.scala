@@ -29,7 +29,7 @@ import quasar.fp.ski.{ι, κ}
 import quasar.fp._
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
-import quasar.qscript.provenance.AutoJoin
+import quasar.qsu.mra.AutoJoin
 
 import matryoshka.{Hole => _, birecursiveIso => _, _} // {delayEqual, equalTEqual, delayShow, showTShow, BirecursiveT, Delay, Embed, EqualT, ShowT}
 import matryoshka.data._

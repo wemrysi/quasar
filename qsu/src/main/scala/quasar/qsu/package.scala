@@ -22,8 +22,8 @@ import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript._, PlannerError.InternalError
-import quasar.qscript.provenance.Provenance
 import quasar.qsu.QScriptUniform.ShiftTarget
+import quasar.qsu.mra.Provenance
 
 import matryoshka.{Hole => _}
 import scalaz.{Free, Functor, Show, Traverse}

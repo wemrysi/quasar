@@ -23,8 +23,8 @@ import quasar.IdStatus.ExcludeId
 import quasar.contrib.iota.{copkEqual, copkTraverse}
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
-import quasar.impl.provenance.ProvImpl
 import quasar.qscript.{construction, Hole, MapFuncsCore, PlannerError, ReduceFuncs, SrcHole}
+import quasar.qsu.mra.ProvImpl
 
 import matryoshka.{delayEqual, Embed}
 import matryoshka.data.Fix

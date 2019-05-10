@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-package quasar.impl.provenance
+package quasar.qsu.mra
 
 import slamdata.Predef.{Boolean, Char, Int}
-
-import quasar.qscript.provenance.{Provenance, ProvenanceSpec, Uop, UopGenerator}
 
 import scala.Predef.implicitly
 

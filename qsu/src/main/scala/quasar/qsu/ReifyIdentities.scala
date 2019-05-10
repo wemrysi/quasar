@@ -34,9 +34,9 @@ import quasar.qscript.{
   ReduceFunc}
 import quasar.qscript.RecFreeS._
 import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
-import quasar.qscript.provenance.JoinKey
 import quasar.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
+import quasar.qsu.mra.JoinKey
 
 import matryoshka.{BirecursiveT, ShowT}
 import monocle.{Lens, Optional}

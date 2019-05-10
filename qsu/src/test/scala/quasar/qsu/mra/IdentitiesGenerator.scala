@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package quasar.impl.provenance
+package quasar.qsu.mra
 
 import quasar.pkg.tests._
-import quasar.qscript.provenance.CatsNonEmptyListGenerator
 
 import cats.Order
 import cats.data.NonEmptyList

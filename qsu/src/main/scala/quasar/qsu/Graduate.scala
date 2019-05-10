@@ -54,10 +54,10 @@ import quasar.qscript.{
   Unreferenced
 }
 import quasar.qscript.PlannerError.InternalError
-import quasar.qscript.provenance.JoinKey
 import quasar.qsu.{QScriptUniform => QSU}
 import quasar.qsu.QSUGraph.QSUPattern
 import quasar.qsu.ReifyIdentities.ResearchedQSU
+import quasar.qsu.mra.JoinKey
 
 import cats.data.NonEmptySet
 import cats.syntax.reducible._

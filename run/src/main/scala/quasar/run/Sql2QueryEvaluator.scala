@@ -26,9 +26,9 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
-import quasar.impl.provenance.ProvImpl
 import quasar.qscript.QScriptEducated
 import quasar.qsu.{IdAccess, IdType, LPtoQS}
+import quasar.qsu.mra.ProvImpl
 import quasar.run.implicits._
 import quasar.sql.parser
 

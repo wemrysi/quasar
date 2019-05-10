@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.qscript.provenance
+package quasar.qsu.mra
 
 import slamdata.Predef.{Boolean, Vector}
 

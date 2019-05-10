@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.impl.provenance
+package quasar.qsu.mra
 
 import slamdata.Predef._
 import quasar.fp.ski.κ

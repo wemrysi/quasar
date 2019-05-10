@@ -23,9 +23,8 @@ import quasar.contrib.iota._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.impl.provenance.ProvImpl
 import quasar.qscript.{construction, MapFuncsCore, OnUndefined, PlannerError}
-import quasar.qscript.provenance.AutoJoin
+import quasar.qsu.mra.{AutoJoin, ProvImpl}
 
 import matryoshka.data.Fix
 import matryoshka.data.freeEqual

@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qsu
 
 import quasar.contrib.scalaz.foldable._
 
 import cats.{Eq, Foldable => CFoldable}
 import scalaz.{Equal, Foldable, Tag, @@}
 
-package object provenance {
+package object mra {
   sealed trait AsSet
   val AsSet = Tag.of[AsSet]
 

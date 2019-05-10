@@ -14,32 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.qscript.provenance
+package quasar.qsu.mra
 
 import slamdata.Predef.List
 
 import quasar.pkg.tests._
 
-import scala.Predef.$conforms
-
-import cats.data.NonEmptyList
+import cats.Eq
 
 import org.scalacheck.Cogen
 
-// Copied from cats-laws due to the scalacheck version incompatibility between
-// cats-1.5.0 and quasar, using the instances from `cats` results in
-// NoSuchMethodErrors at runtime.
-//
-// FIXME: Remove once cats upgrades to scalacheck-1.14.x
-trait CatsNonEmptyListGenerator {
-  implicit def catsArbitraryNel[A: Arbitrary]: Arbitrary[NonEmptyList[A]] =
+trait UopGenerator {
+  implicit def arbitraryUop[A: Arbitrary: Eq]: Arbitrary[Uop[A]] =
     Arbitrary(for {
-      h <- arbitrary[A]
-      t <- arbitrary[List[A]]
-    } yield NonEmptyList(h, t))
+      sz <- Gen.frequency((32, 1), (16, 2), (8, 3), (4, 4), (2, 5), (1, 0))
+      as <- Gen.listOfN(sz, arbitrary[A])
+    } yield Uop.of(as: _*))
 
-  implicit def catsCogenNel[A: Cogen]: Cogen[NonEmptyList[A]] =
+  implicit def cogenUop[A: Cogen]: Cogen[Uop[A]] =
     Cogen[List[A]].contramap(_.toList)
 }
 
-object CatsNonEmptyListGenerator extends CatsNonEmptyListGenerator
+object UopGenerator extends UopGenerator

@@ -29,9 +29,9 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanHelpers}
-import quasar.impl.provenance.ProvImpl
 import quasar.qscript.construction
 import quasar.qscript.{educatedToTotal, HoleF, LeftShift, PlannerError, ReduceFuncs, ReduceIndex}
+import quasar.qsu.mra.ProvImpl
 import quasar.std.{AggLib, IdentityLib, StructuralLib}
 
 import iotaz.CopK

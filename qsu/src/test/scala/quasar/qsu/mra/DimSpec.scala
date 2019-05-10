@@ -14,25 +14,31 @@
  * limitations under the License.
  */
 
-package quasar.qscript.provenance
+package quasar.qsu.mra
 
 import slamdata.Predef.{Char, Int}
 
 import quasar.Qspec
 
-import cats.instances.char._
-import cats.instances.int._
+import cats.{Eq, Order}
 import cats.instances.option._
-import cats.kernel.laws.discipline.OrderTests
+import cats.kernel.laws.discipline.{EqTests, OrderTests}
 
 import org.specs2.mutable.SpecificationLike
 
 import org.typelevel.discipline.specs2.mutable.Discipline
 
-object JoinKeySpec extends Qspec
+object DimSpec extends Qspec
     with SpecificationLike
-    with JoinKeyGenerator
+    with DimGenerator
     with Discipline {
 
-  checkAll("Order[JoinKey[Char, Int]]", OrderTests[JoinKey[Char, Int]].order)
+  implicit val charEq: Eq[Char] =
+    new cats.kernel.instances.CharOrder
+
+  implicit val intOrd: Order[Int] =
+    new cats.kernel.instances.IntOrder
+
+  checkAll("Eq[Dim[Char, Char, Char]]", EqTests[Dim[Char, Char, Char]].eqv)
+  checkAll("Order[Dim[Int, Int, Int]]", OrderTests[Dim[Int, Int, Int]].order)
 }

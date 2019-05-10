@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.qscript.provenance
+package quasar.qsu.mra
 
-import slamdata.Predef.{Char, Int}
+import slamdata.Predef.Int
 
 import quasar.Qspec
 
 import scala.Predef.implicitly
 
 import cats.Eq
-import cats.instances.char._
 import cats.instances.int._
 import cats.kernel.laws.discipline.{BoundedSemilatticeTests, CommutativeMonoidTests, EqTests}
 
@@ -37,28 +36,28 @@ import org.typelevel.discipline.specs2.mutable.Discipline
 import scalaz.@@
 import scalaz.Tags.{Conjunction, Disjunction}
 
-object JoinKeysSpec extends Qspec
+object UopSpec extends Qspec
     with SpecificationLike
-    with JoinKeysGenerator
+    with UopGenerator
     with Discipline {
 
-  import JoinKeys._
+  import Uop._
 
   implicit val params = Parameters(maxSize = 10)
 
-  implicit def ConjArb: Arbitrary[JoinKeys[Char, Int] @@ Conjunction] =
-    Conjunction.subst(implicitly[Arbitrary[JoinKeys[Char, Int]]])
+  implicit def IntConjArb: Arbitrary[Uop[Int] @@ Conjunction] =
+    Conjunction.subst(implicitly[Arbitrary[Uop[Int]]])
 
-  implicit def ConjEq: Eq[JoinKeys[Char, Int] @@ Conjunction] =
-    Conjunction.subst(Eq[JoinKeys[Char, Int]])
+  implicit def IntConjEq: Eq[Uop[Int] @@ Conjunction] =
+    Conjunction.subst(Eq[Uop[Int]])
 
-  implicit def DisjArb: Arbitrary[JoinKeys[Char, Int] @@ Disjunction] =
-    Disjunction.subst(implicitly[Arbitrary[JoinKeys[Char, Int]]])
+  implicit def DisjArb: Arbitrary[Uop[Int] @@ Disjunction] =
+    Disjunction.subst(implicitly[Arbitrary[Uop[Int]]])
 
-  implicit def DisjEq: Eq[JoinKeys[Char, Int] @@ Disjunction] =
-    Disjunction.subst(Eq[JoinKeys[Char, Int]])
+  implicit def DisjEq: Eq[Uop[Int] @@ Disjunction] =
+    Disjunction.subst(Eq[Uop[Int]])
 
-  checkAll("Eq[JoinKeys[Char, Int]]", EqTests[JoinKeys[Char, Int]].eqv)
-  checkAll("CommutativeMonoid[JoinKeys[Char, Int] @@ Conjunction]", CommutativeMonoidTests[JoinKeys[Char, Int] @@ Conjunction].commutativeMonoid)
-  checkAll("BoundedSemilattice[JoinKeys[Char, Int] @@ Disjunction]", BoundedSemilatticeTests[JoinKeys[Char, Int] @@ Disjunction].boundedSemilattice)
+  checkAll("Eq[Uop[Int]]", EqTests[Uop[Int]].eqv)
+  checkAll("CommutativeMonoid[Uop[Int] @@ Conjunction]", CommutativeMonoidTests[Uop[Int] @@ Conjunction].commutativeMonoid)
+  checkAll("BoundedSemilattice[Uop[Int] @@ Disjunction]", BoundedSemilatticeTests[Uop[Int] @@ Disjunction].boundedSemilattice)
 }

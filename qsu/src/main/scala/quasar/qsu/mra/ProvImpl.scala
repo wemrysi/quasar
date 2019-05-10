@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.impl.provenance
+package quasar.qsu.mra
 
 import slamdata.Predef.{None, Option, Some}
 
 import quasar.qscript.OnUndefined
-import quasar.qscript.provenance.{AutoJoin, JoinKey, JoinKeys, Provenance, Uop}
 
 import cats.{Applicative, Order}
 import cats.data.NonEmptyList

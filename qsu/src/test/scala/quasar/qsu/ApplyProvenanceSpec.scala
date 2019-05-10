@@ -26,7 +26,6 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.κ
-import quasar.impl.provenance.ProvImpl
 import quasar.qscript.{
   construction,
   LeftSide,
@@ -36,6 +35,7 @@ import quasar.qscript.{
   RightSide
 }
 import quasar.qscript.MapFuncsCore.RecIntLit
+import quasar.qsu.mra.ProvImpl
 
 import cats.instances.list._
 

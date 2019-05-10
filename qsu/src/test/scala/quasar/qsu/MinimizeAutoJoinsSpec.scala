@@ -23,7 +23,6 @@ import quasar.contrib.iota._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.impl.provenance.ProvImpl
 import quasar.qscript.{
   construction,
   Hole,
@@ -36,6 +35,7 @@ import quasar.qscript.{
   RightSide,
   SrcHole
 }
+import quasar.qsu.mra.ProvImpl
 
 import matryoshka._
 import matryoshka.data.Fix

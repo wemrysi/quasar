@@ -239,21 +239,18 @@ lazy val qscript = project
     api,
     frontend % BothScopes)
   .settings(commonSettings)
-  .settings(
-    libraryDependencies ++= Seq(
-      "org.typelevel" %% "cats-laws"        % catsVersion       % Test,
-      "org.typelevel" %% "cats-kernel-laws" % catsVersion       % Test,
-      "org.typelevel" %% "discipline"       % disciplineVersion % Test))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qsu = project
   .settings(name := "quasar-qsu")
-  .dependsOn(
-    qscript % BothScopes,
-    impl % "compile->test")
+  .dependsOn(qscript % BothScopes)
   .settings(commonSettings)
   .settings(
-    libraryDependencies += "org.slf4s" %% "slf4s-api" % slf4sVersion)
+    libraryDependencies ++= Seq(
+      "org.slf4s" %% "slf4s-api" % slf4sVersion,
+      "org.typelevel" %% "cats-laws"        % catsVersion       % Test,
+      "org.typelevel" %% "cats-kernel-laws" % catsVersion       % Test,
+      "org.typelevel" %% "discipline"       % disciplineVersion % Test))
   .settings(scalacOptions ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, 12)) => Seq("-Ypatmat-exhaust-depth", "40")
@@ -290,21 +287,17 @@ lazy val impl = project
     common % "test->test",
     connector % BothScopes,
     frontend % "test->test",
-    qscript % BothScopes,
     sst)
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "com.slamdata"   %% "fs2-gzip"         % fs2GzipVersion.value,
-      "com.slamdata"   %% "qdata-tectonic"   % qdataVersion.value,
-      "com.slamdata"   %% "tectonic-fs2"     % tectonicVersion.value,
-      "org.http4s"     %% "jawn-fs2"         % jawnfs2Version,
-      "org.slf4s"      %% "slf4s-api"        % slf4sVersion,
-      "org.typelevel"  %% "cats-laws"        % catsVersion       % Test,
-      "org.typelevel"  %% "cats-kernel-laws" % catsVersion       % Test,
-      "org.typelevel"  %% "discipline"       % disciplineVersion % Test,
-      "org.typelevel"  %% "jawn-argonaut"    % jawnVersion,
-      "org.typelevel"  %% "jawn-util"        % jawnVersion,
+      "com.slamdata"   %% "fs2-gzip"       % fs2GzipVersion.value,
+      "com.slamdata"   %% "qdata-tectonic" % qdataVersion.value,
+      "com.slamdata"   %% "tectonic-fs2"   % tectonicVersion.value,
+      "org.http4s"     %% "jawn-fs2"       % jawnfs2Version,
+      "org.slf4s"      %% "slf4s-api"      % slf4sVersion,
+      "org.typelevel"  %% "jawn-argonaut"  % jawnVersion,
+      "org.typelevel"  %% "jawn-util"      % jawnVersion,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
       "com.fasterxml.woodstox" % "woodstox-core" % "5.0.3"))
