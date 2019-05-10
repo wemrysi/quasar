@@ -38,13 +38,12 @@ import matryoshka.data.free._
 
 import scalaz.{Equal, Free, Monad, Scalaz}, Scalaz._
 
-sealed abstract class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] extends Minimizer[T] {
+sealed abstract class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT]
+    extends Minimizer[T]
+    with MraPhase[T] {
 
   import MinimizeAutoJoins._
   import QSUGraph.Extractors._
-
-  val qprov: QProv[T]
-  type P = qprov.P
 
   implicit def PEqual: Equal[P]
 

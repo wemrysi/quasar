@@ -28,11 +28,8 @@ import ApplyProvenance.AuthenticatedQSU
 import matryoshka._
 import scalaz.{Equal, ISet, Monad, NonEmptyList, Scalaz, StateT}, Scalaz._
 
-sealed abstract class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
+sealed abstract class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] extends MraPhase[T] {
   import QSUGraph.Extractors._
-
-  val qprov: QProv[T]
-  type P = qprov.P
 
   implicit def PEqual: Equal[P]
 

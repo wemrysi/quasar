@@ -31,7 +31,6 @@ import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.construction
 import quasar.qscript.{educatedToTotal, HoleF, LeftShift, PlannerError, ReduceFuncs, ReduceIndex}
-import quasar.qsu.mra.ProvImpl
 import quasar.std.{AggLib, IdentityLib, StructuralLib}
 
 import iotaz.CopK
@@ -54,8 +53,7 @@ import shims.{eqToScalaz, orderToCats, showToCats, showToScalaz}
 object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
   type F[A] = WriterT[EitherT[StateT[Need, Long, ?], PlannerError, ?], PhaseResults, A]
 
-  val qprov = ProvImpl[Fix[EJson], IdAccess, IdType]
-  val qsu = LPtoQS(qprov)
+  val qsu = LPtoQS[Fix]
 
   val defaults = construction.mkDefaults[Fix, QScriptEducated]
 

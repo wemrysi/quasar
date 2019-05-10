@@ -39,10 +39,7 @@ import scalaz._
 import scalaz.Scalaz._
 import StateT.stateTMonadState
 
-sealed abstract class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
-
-  val qprov: QProv[T]
-  type P = qprov.P
+sealed abstract class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends MraPhase[T] {
 
   implicit def PEqual: Equal[P]
 

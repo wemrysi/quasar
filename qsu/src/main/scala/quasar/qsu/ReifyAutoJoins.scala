@@ -37,13 +37,9 @@ import matryoshka._
 import scalaz.{Monad, WriterT}
 import scalaz.Scalaz._
 
-sealed abstract class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
+sealed abstract class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] extends MraPhase[T] {
 
   import QSUGraph.Extractors._
-
-  val qprov: QProv[T]
-  type P = qprov.P
-
   import qprov.syntax._
 
   def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](qsu: AuthenticatedQSU[T, P])

@@ -59,13 +59,10 @@ import scalaz.Scalaz._
 
 import shims.{eqToScalaz, equalToCats}
 
-sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
+sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] extends MraPhase[T] {
   import ApplyProvenance._
   import QScriptUniform._
   import QSUGraph.Extractors
-
-  val qprov: QProv[T]
-  type P = qprov.P
 
   implicit def PEqual: Equal[P]
 

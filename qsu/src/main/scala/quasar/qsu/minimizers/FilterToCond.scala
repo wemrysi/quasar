@@ -41,12 +41,12 @@ import scalaz.syntax.monad._
 import scala.collection
 import scala.sys
 
-sealed abstract class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends Minimizer[T] {
+sealed abstract class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
+    extends Minimizer[T]
+    with MraPhase[T] {
+
   import MinimizeAutoJoins._
   import QSUGraph.Extractors._
-
-  val qprov: QProv[T]
-  type P = qprov.P
 
   implicit def PEqual: Equal[P]
 

@@ -51,12 +51,9 @@ import scalaz.{@@, Bind, Equal, Monad, OptionT, Scalaz, StateT}, Scalaz._   // s
 import scalaz.Tags.Disjunction
 import scalaz.syntax.tag._
 
-sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QSUTTypes[T] {
+sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends MraPhase[T] {
   import MinimizeAutoJoins._
   import QSUGraph.Extractors._
-
-  val qprov: QProv[T]
-  type P = qprov.P
 
   implicit def PEqual: Equal[P]
 
