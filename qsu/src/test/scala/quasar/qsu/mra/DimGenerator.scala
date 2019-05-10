@@ -20,6 +20,8 @@ import slamdata.Predef._
 
 import quasar.pkg.tests._
 
+import java.lang.System
+
 import org.scalacheck.Cogen
 
 trait DimGenerator {
@@ -35,7 +37,7 @@ trait DimGenerator {
 
   implicit def cogenDim[S: Cogen, V: Cogen, T: Cogen]: Cogen[Dim[S, V, T]] =
     Cogen((k, dim) => dim match {
-      case d @ Dim.Fresh() => Cogen[Int].perturb(k, d.hashCode)
+      case d @ Dim.Fresh() => Cogen[Int].perturb(k, System.identityHashCode(d))
       case Dim.Inflate(v, t) => Cogen[(Int, V, T)].perturb(k, (1, v, t))
       case Dim.Inject(s, t) => Cogen[(Int, S, T)].perturb(k, (2, s, t))
       case Dim.Project(s, t) => Cogen[(Int, S, T)].perturb(k, (3, s, t))
