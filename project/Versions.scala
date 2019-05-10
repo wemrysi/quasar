@@ -6,7 +6,7 @@ object Versions {
   val catsEffectVersion   = "1.3.0"
   val disciplineVersion   = "0.7.2"
   val jawnVersion         = "0.14.1"
-  val jawnfs2Version      = "0.14.1"
+  val jawnfs2Version      = "0.14.2"
   val matryoshkaVersion   = "0.18.3"
   val monocleVersion      = "1.5.0"
   val pathyVersion        = "0.2.13"
