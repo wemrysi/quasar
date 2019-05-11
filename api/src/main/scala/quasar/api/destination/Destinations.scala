@@ -17,9 +17,10 @@
 package quasar.api.destination
 
 import slamdata.Predef.Exception
+
 import quasar.Condition
 
-import scalaz.{\/, ISet}
+import scalaz.{\/, IMap, ISet}
 
 /** @tparam F effects
   * @tparam G multiple results
@@ -56,4 +57,7 @@ trait Destinations[F[_], G[_], I, C] {
 
   /** The set of supported destination types. */
   def supportedDestinationTypes: F[ISet[DestinationType]]
+
+  /** Destinations that have errored */
+  def errored: F[IMap[I, Exception]]
 }

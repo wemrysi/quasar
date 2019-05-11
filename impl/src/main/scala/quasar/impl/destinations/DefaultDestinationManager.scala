@@ -37,7 +37,8 @@ import shims._
 
 class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer] (
   modules: IMap[DestinationType, DestinationModule],
-  running: Ref[F, IMap[I, (Destination[F], F[Unit])]]) extends DestinationManager[I, Json, F] {
+  running: Ref[F, IMap[I, (Destination[F], F[Unit])]],
+  errors: Ref[F, IMap[I, Exception]]) extends DestinationManager[I, Json, F] {
 
   def initDestination(destinationId: I, ref: DestinationRef[Json])
       : F[Condition[CreateError[Json]]] =
@@ -45,7 +46,8 @@ class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: 
       supported <- EitherT.rightT(supportedDestinationTypes)
       mod0 = OptionT(
         Traverse[Option].sequence(
-          modules.lookup(ref.kind).map(m => linkDestination(ref.kind, m.destination[F](ref.config)))))
+          modules.lookup(ref.kind).map(m =>
+            linkDestination(ref.kind, m.destination[F](ref.config)))))
 
       mod <- mod0.toRight(
         DestinationError.destinationUnsupported[CreateError[Json]](ref.kind, supported)) >>= (EitherT.either(_))
@@ -60,6 +62,9 @@ class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: 
   def destinationOf(destinationId: I): F[Option[Destination[F]]] =
     running.get.map(_.lookup(destinationId).firsts)
 
+  def errorsOf(destinationId: I): F[Option[Exception]] =
+    errors.get.map(_.lookup(destinationId))
+
   def sanitizedRef(ref: DestinationRef[Json]): DestinationRef[Json] =
     // return an empty object in case we don't find an appropriate
     // sanitizeDestinationConfig implementation
@@ -70,7 +75,7 @@ class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: 
     OptionT(
       running.modify(r =>
         (r.delete(destinationId), r.lookup(destinationId).seconds)))
-      .getOrElseF(().point[F].point[F]).join
+      .getOrElse(().point[F]).join
 
   def supportedDestinationTypes: F[ISet[DestinationType]] =
     modules.keySet.point[F]
@@ -79,6 +84,7 @@ class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: 
 object DefaultDestinationManager {
   def apply[I: Order, F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
     modules: IMap[DestinationType, DestinationModule],
-    running: Ref[F, IMap[I, (Destination[F], F[Unit])]]): DefaultDestinationManager[I, F] =
-    new DefaultDestinationManager[I, F](modules, running)
+    running: Ref[F, IMap[I, (Destination[F], F[Unit])]],
+    errors: Ref[F, IMap[I, Exception]]): DefaultDestinationManager[I, F] =
+    new DefaultDestinationManager[I, F](modules, running, errors)
 }

@@ -16,7 +16,7 @@
 
 package quasar.impl.destinations
 
-import slamdata.Predef.{Option, Unit}
+import slamdata.Predef.{Exception, Option, Unit}
 
 import quasar.Condition
 import quasar.api.destination.DestinationError.CreateError
@@ -38,6 +38,8 @@ trait DestinationManager[I, C, F[_]] {
 
   /** Returns `ref` devoid of any sensitive information (credentials and the like). */
   def sanitizedRef(ref: DestinationRef[C]): DestinationRef[C]
+
+  def errorsOf(destinationId: I): F[Option[Exception]]
 
   /** Stop the destination, discarding it and freeing any resources it may
     * be using.
