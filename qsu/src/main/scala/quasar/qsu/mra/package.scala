@@ -16,15 +16,24 @@
 
 package quasar.qsu
 
-import quasar.qscript.TTypes
+import quasar.contrib.scalaz.foldable._
 
-trait QSUTTypes[T[_[_]]] extends TTypes[T] {
-  type QAuth[P] = quasar.qsu.QAuth[T, P]
-  type QProv = quasar.qsu.QProv[T]
-  type FreeAccess[A] = quasar.qsu.FreeAccess[T, A]
-  type QSUGraph = quasar.qsu.QSUGraph[T]
-  type RevIdx = quasar.qsu.QSUGraph.RevIdx[T]
-  type RevIdxM[F[_]] = quasar.qsu.RevIdxM[T, F]
-  type References = quasar.qsu.References[T]
-  type QScriptUniform[A] = quasar.qsu.QScriptUniform[T, A]
+import cats.{Eq, Foldable => CFoldable}
+import cats.data.NonEmptyList
+import scalaz.{Equal, Foldable, Tag, @@}
+
+package object mra {
+  type Dimensions[A] = NonEmptyList[A]
+  type Region[A] = NonEmptyList[A]
+
+  sealed trait AsSet
+  val AsSet = Tag.of[AsSet]
+
+  implicit def asSetEqual[F[_]: Foldable, A: Equal]: Equal[F[A] @@ AsSet] =
+    Equal.equal((x, y) => Tag.unwrap(x).equalsAsSets(Tag.unwrap(y)))
+
+  implicit def asSetEq[F[_]: CFoldable, A: Eq]: Eq[F[A] @@ AsSet] = {
+    import shims._
+    Eq.instance((x, y) => Tag.unwrap(x).equalsAsSets(Tag.unwrap(y)))
+  }
 }

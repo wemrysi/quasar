@@ -14,17 +14,23 @@
  * limitations under the License.
  */
 
-package quasar.qsu
+package quasar.qsu.mra
 
-import quasar.qscript.TTypes
+import quasar.pkg.tests._
 
-trait QSUTTypes[T[_[_]]] extends TTypes[T] {
-  type QAuth[P] = quasar.qsu.QAuth[T, P]
-  type QProv = quasar.qsu.QProv[T]
-  type FreeAccess[A] = quasar.qsu.FreeAccess[T, A]
-  type QSUGraph = quasar.qsu.QSUGraph[T]
-  type RevIdx = quasar.qsu.QSUGraph.RevIdx[T]
-  type RevIdxM[F[_]] = quasar.qsu.RevIdxM[T, F]
-  type References = quasar.qsu.References[T]
-  type QScriptUniform[A] = quasar.qsu.QScriptUniform[T, A]
+import cats.Order
+import cats.data.NonEmptyList
+
+import org.scalacheck.Cogen
+
+trait IdentitiesGenerator {
+  import CatsNonEmptyListGenerator._
+
+  implicit def arbitraryIdentities[A: Arbitrary: Order]: Arbitrary[Identities[A]] =
+    Arbitrary(arbitrary[NonEmptyList[NonEmptyList[NonEmptyList[A]]]].map(Identities.collapsed(_)))
+
+  implicit def cogenIdentities[A: Cogen]: Cogen[Identities[A]] =
+    Cogen[NonEmptyList[NonEmptyList[NonEmptyList[A]]]].contramap(_.expanded)
 }
+
+object IdentitiesGenerator extends IdentitiesGenerator
