@@ -32,10 +32,10 @@ import fs2.Stream
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
-import scalaz.{\/, Equal, ISet, OptionT}
+import scalaz.{\/, Equal, IMap, ISet, OptionT, Order}
 import shims._
 
-class DefaultDestinations[F[_]: Sync, I: Equal, C: Equal] private (
+class DefaultDestinations[F[_]: Sync, I: Equal: Order, C: Equal] private (
     freshId: F[I],
     refs: IndexedStore[F, I, DestinationRef[C]],
     manager: DestinationManager[I, C, F])
@@ -58,8 +58,9 @@ class DefaultDestinations[F[_]: Sync, I: Equal, C: Equal] private (
       } yield result)
 
   def allDestinationMetadata: F[Stream[F, (I, DestinationMeta)]] =
-    (refs.entries.map {
-      case (i, ref) => (i, DestinationMeta.fromOption(ref.kind, ref.name, None))
+    (refs.entries.evalMap {
+      case (i, ref) =>
+        manager.errorsOf(i).map(ex => (i, DestinationMeta.fromOption(ref.kind, ref.name, ex)))
     }).point[F]
 
   def destinationRef(destinationId: I): F[ExistentialError[I] \/ DestinationRef[C]] =
@@ -82,8 +83,9 @@ class DefaultDestinations[F[_]: Sync, I: Equal, C: Equal] private (
 
   def replaceDestination(destinationId: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] =
     refs.lookup(destinationId) >>= {
-      case Some(existingRef) => for {
+      case Some(_) => for {
         _ <- manager.shutdownDestination(destinationId)
+        _ <- refs.insert(destinationId, ref)
         destStatus <- manager.initDestination(destinationId, ref)
       } yield Condition.abnormal.getOption(destStatus) match {
         case Some(ex) => Condition.abnormal[DestinationError[I, C]](ex)
@@ -96,4 +98,15 @@ class DefaultDestinations[F[_]: Sync, I: Equal, C: Equal] private (
 
   def supportedDestinationTypes: F[ISet[DestinationType]] =
     manager.supportedDestinationTypes
+
+  def errors: F[IMap[I, Exception]] =
+    manager.errors
+}
+
+object DefaultDestinations {
+  def apply[F[_]: Sync, I: Equal: Order, C: Equal](
+    freshId: F[I],
+    refs: IndexedStore[F, I, DestinationRef[C]],
+    manager: DestinationManager[I, C, F]): DefaultDestinations[F, I, C] =
+    new DefaultDestinations[F, I, C](freshId, refs, manager)
 }

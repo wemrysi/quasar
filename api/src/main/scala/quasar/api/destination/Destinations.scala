@@ -59,5 +59,5 @@ trait Destinations[F[_], G[_], I, C] {
   def supportedDestinationTypes: F[ISet[DestinationType]]
 
   /** Destinations that have errored */
-  def errored: F[IMap[I, Exception]]
+  def errors: F[IMap[I, Exception]]
 }

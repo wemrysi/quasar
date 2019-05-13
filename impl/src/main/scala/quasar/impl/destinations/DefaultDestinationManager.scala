@@ -38,7 +38,7 @@ import shims._
 class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer] (
   modules: IMap[DestinationType, DestinationModule],
   running: Ref[F, IMap[I, (Destination[F], F[Unit])]],
-  errors: Ref[F, IMap[I, Exception]]) extends DestinationManager[I, Json, F] {
+  currentErrors: Ref[F, IMap[I, Exception]]) extends DestinationManager[I, Json, F] {
 
   def initDestination(destinationId: I, ref: DestinationRef[Json])
       : F[Condition[CreateError[Json]]] =
@@ -62,8 +62,11 @@ class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: 
   def destinationOf(destinationId: I): F[Option[Destination[F]]] =
     running.get.map(_.lookup(destinationId).firsts)
 
-  def errorsOf(destinationId: I): F[Option[Exception]] =
-    errors.get.map(_.lookup(destinationId))
+  def errors: F[IMap[I, Exception]] =
+    currentErrors.get
+
+  def errorsOf(i: I): F[Option[Exception]] =
+    errors.map(_.lookup(i))
 
   def sanitizedRef(ref: DestinationRef[Json]): DestinationRef[Json] =
     // return an empty object in case we don't find an appropriate
@@ -85,6 +88,6 @@ object DefaultDestinationManager {
   def apply[I: Order, F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
     modules: IMap[DestinationType, DestinationModule],
     running: Ref[F, IMap[I, (Destination[F], F[Unit])]],
-    errors: Ref[F, IMap[I, Exception]]): DefaultDestinationManager[I, F] =
-    new DefaultDestinationManager[I, F](modules, running, errors)
+    currentErrors: Ref[F, IMap[I, Exception]]): DefaultDestinationManager[I, F] =
+    new DefaultDestinationManager[I, F](modules, running, currentErrors)
 }

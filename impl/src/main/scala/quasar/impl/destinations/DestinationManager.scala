@@ -23,7 +23,7 @@ import quasar.api.destination.DestinationError.CreateError
 import quasar.api.destination.{DestinationRef, DestinationType}
 import quasar.connector.Destination
 
-import scalaz.ISet
+import scalaz.{IMap, ISet}
 
 /** A primitive facility for managing the lifecycle of destinations. */
 trait DestinationManager[I, C, F[_]] {
@@ -39,12 +39,16 @@ trait DestinationManager[I, C, F[_]] {
   /** Returns `ref` devoid of any sensitive information (credentials and the like). */
   def sanitizedRef(ref: DestinationRef[C]): DestinationRef[C]
 
-  def errorsOf(destinationId: I): F[Option[Exception]]
-
   /** Stop the destination, discarding it and freeing any resources it may
     * be using.
     */
   def shutdownDestination(destinationId: I): F[Unit]
+
+  /** Retrieve all errors */
+  def errors: F[IMap[I, Exception]]
+
+  /** Returns errors related to the given id */
+  def errorsOf(destinationId: I): F[Option[Exception]]
 
   /** The types of destinations supported. */
   def supportedDestinationTypes: F[ISet[DestinationType]]
