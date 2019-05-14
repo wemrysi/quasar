@@ -28,14 +28,13 @@ import cats.syntax.applicative._
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-
 import ByNeedDatasource.NeedState
 
-final class ByNeedDatasource[F[_], G[_], Q, R] private (
+final class ByNeedDatasource[F[_], G[_], Q, R, P <: ResourcePathType] private (
     datasourceType: DatasourceType,
-    mvar: MVar[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]])(
+    mvar: MVar[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R, P]]]])(
     implicit F: Async[F])
-    extends Datasource[F, G, Q, R] {
+    extends Datasource[F, G, Q, R, P] {
 
   val kind: DatasourceType = datasourceType
 
@@ -46,12 +45,12 @@ final class ByNeedDatasource[F[_], G[_], Q, R] private (
     getDatasource.flatMap(_.pathIsResource(path))
 
   def prefixedChildPaths(path: ResourcePath)
-      : F[Option[G[(ResourceName, ResourcePathType)]]] =
+      : F[Option[G[(ResourceName, P)]]] =
     getDatasource.flatMap(_.prefixedChildPaths(path))
 
   ////
 
-  private def getDatasource: F[Datasource[F, G, Q, R]] =
+  private def getDatasource: F[Datasource[F, G, Q, R, P]] =
     for {
       needState <- mvar.read
 
@@ -64,7 +63,7 @@ final class ByNeedDatasource[F[_], G[_], Q, R] private (
       }
     } yield ds
 
-  private def initAndGet: F[Datasource[F, G, Q, R]] =
+  private def initAndGet: F[Datasource[F, G, Q, R, P]] =
     mvar.tryTake flatMap {
       case Some(s @ NeedState.Uninitialized(init)) =>
         val doInit = for {
@@ -92,18 +91,18 @@ object ByNeedDatasource {
     final case class Initialized[F[_], A](a: A) extends NeedState[F, A]
   }
 
-  def apply[F[_]: Async, G[_], Q, R](
+  def apply[F[_]: Async, G[_], Q, R, P <: ResourcePathType](
       kind: DatasourceType,
-      init: F[Disposable[F, Datasource[F, G, Q, R]]])
-      : F[Disposable[F, Datasource[F, G, Q, R]]] = {
+      init: F[Disposable[F, Datasource[F, G, Q, R, P]]])
+      : F[Disposable[F, Datasource[F, G, Q, R, P]]] = {
 
-    def dispose(m: MVar[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]]): F[Unit] =
+    def dispose(m: MVar[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R, P]]]]): F[Unit] =
       m.take flatMap {
         case NeedState.Initialized(ds) => ds.dispose
         case _ => ().pure[F]
       }
 
-    MVar.uncancelableOf[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R]]]](
+    MVar.uncancelableOf[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R, P]]]](
       NeedState.Uninitialized(init))
       .map(mv => Disposable(new ByNeedDatasource(kind, mv), dispose(mv)))
   }

@@ -44,7 +44,7 @@ import scalaz.syntax.std.option._
 
 import shims._
 
-object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] {
+object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], ResourcePathType] {
 
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
@@ -57,10 +57,11 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
         ResourcePath.root() / ResourceName("a") / ResourceName("c") -> 2,
         ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("r") -> 3,
         ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s") -> 4,
-        ResourcePath.root() / ResourceName("d") -> 5))
+        ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s") / ResourceName("t") -> 5,
+        ResourcePath.root() / ResourceName("d") -> 6))
 
   val datasource =
-    ChildAggregatingDatasource(underlying, Lens.id)
+    AggregatingDatasource(underlying, Lens.id)
 
   def nonExistentPath: ResourcePath =
     ResourcePath.root() / ResourceName("x") / ResourceName("y")
@@ -77,7 +78,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
       val paths = IMap(z -> 1, (z / x) -> 2, (z / y) -> 3)
 
       val uds =
-        new Datasource[IO, Stream[IO, ?], ResourcePath, Int] {
+        new PhysicalDatasource[IO, Stream[IO, ?], ResourcePath, Int] {
           val kind = DatasourceType("prefixed", 6L)
 
           def evaluate(rp: ResourcePath): IO[Int] =
@@ -87,7 +88,7 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
             IO.pure(paths.member(rp))
 
           def prefixedChildPaths(rp: ResourcePath)
-              : IO[Option[Stream[IO, (ResourceName, ResourcePathType)]]] =
+              : IO[Option[Stream[IO, (ResourceName, ResourcePathType.Physical)]]] =
             IO pure {
               if (rp ≟ ResourcePath.root())
                 Some(Stream(ResourceName("z") -> ResourcePathType.prefixResource))
@@ -102,29 +103,35 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
             }
         }
 
-      val ds = ChildAggregatingDatasource(uds, Lens.id)
+      val ds = AggregatingDatasource(uds, Lens.id)
 
       for {
         dres <- ds.prefixedChildPaths(ResourcePath.root())
         meta <- dres.traverse(_.compile.to[List])
         qres <- ds.evaluate(z)
       } yield {
-        meta must beSome(equal(List(ResourceName("z") -> ResourcePathType.prefixResource)))
+        meta must beSome(equal[List[(ResourceName, ResourcePathType)]](List(
+          ResourceName("**") -> ResourcePathType.AggregateResource,
+          ResourceName("z") -> ResourcePathType.prefixResource)))
         qres must beLeft(1)
       }
     }
 
-    "underlying prefix paths are resources" >>* {
+    "agg resource is recognized via pathIsResource" >>* {
       datasource
-        .pathIsResource(ResourcePath.root() / ResourceName("a"))
+        .pathIsResource(ResourcePath.root() / ResourceName("a") / ResourceName("**"))
         .map(_ must beTrue)
     }
 
-    "underlying prefix paths are typed as prefix-resource" >>* {
+    "children of prefix = agg resource + underlying children" >>* {
       datasource
         .prefixedChildPaths(ResourcePath.root() / ResourceName("a"))
         .flatMap(_.cata(_.compile.to[List], IO.pure(Nil)))
-        .map(_ must contain(ResourceName("q") -> ResourcePathType.prefixResource))
+        .map(_ must equal[List[(ResourceName, ResourcePathType)]](List(
+          ResourceName("**") -> ResourcePathType.AggregateResource,
+          ResourceName("b") -> ResourcePathType.LeafResource,
+          ResourceName("c") -> ResourcePathType.LeafResource,
+          ResourceName("q") -> ResourcePathType.Prefix)))
     }
   }
 
@@ -138,17 +145,20 @@ object ChildAggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?]] 
     "querying an underlying resource is unaffected" >>* {
       datasource
         .evaluate(ResourcePath.root() / ResourceName("d"))
-        .map(_ must beLeft(5))
+        .map(_ must beLeft(6))
     }
 
-    "querying an underlying prefix aggregates sibling leafs" >>* {
+    "querying an agg resource aggregates descendant leafs" >>* {
       val b = ResourcePath.root() / ResourceName("a") / ResourceName("b")
       val c = ResourcePath.root() / ResourceName("a") / ResourceName("c")
+      val r = ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("r")
+      val s = ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s")
+      val t = ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s") / ResourceName("t")
 
       datasource
-        .evaluate(ResourcePath.root() / ResourceName("a"))
+        .evaluate(ResourcePath.root() / ResourceName("a") / ResourceName("**"))
         .flatMap(_.traverse(_.compile.to[List]))
-        .map(_ must beRight(contain(exactly((b, 1), (c, 2)))))
+        .map(_ must beRight(contain(exactly((b, 1), (c, 2), (r, 3), (s, 4), (t, 5)))))
     }
   }
 }

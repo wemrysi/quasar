@@ -20,7 +20,7 @@ import quasar.Disposable
 import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
 import quasar.common.data.RValue
 import quasar.concurrent.BlockingContext
-import quasar.connector.{LightweightDatasourceModule, MonadResourceErr}
+import quasar.connector._, LightweightDatasourceModule.DS
 
 import scala.concurrent.ExecutionContext
 

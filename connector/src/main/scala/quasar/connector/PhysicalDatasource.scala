@@ -14,14 +14,8 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.connector
 
-import quasar.contrib.scalaz.MonadError_
+import quasar.api.resource.ResourcePathType
 
-package object connector {
-
-  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
-
-  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
-      : MonadResourceErr[F] = ev
-}
+trait PhysicalDatasource[F[_], G[_], Q, R] extends Datasource[F, G, Q, R, ResourcePathType.Physical]
