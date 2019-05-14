@@ -54,13 +54,13 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
 
   class NullDestination[F[_]: Applicative] extends Destination[F] {
     def destinationKind: DestinationType = NullDestinationType
-    def sinks = NonEmptyList(new NullCsvSink[F]())
+    def sinks = NonEmptyList(new NullCsvSink[F])
   }
 
   object NullDestinationModule extends DestinationModule {
     def destinationType = NullDestinationType
     def sanitizeDestinationConfig(config: Json) =
-      Json.jString("foobar")
+      Json.jString("sanitized")
 
     def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](config: Json)
         : F[InitializationError[Json] \/ Resource[F, Destination[F]]] =
@@ -71,67 +71,138 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
   val modules: IMap[DestinationType, DestinationModule] =
     IMap(NullDestinationType -> NullDestinationModule)
 
-  val manager: IO[DestinationManager[Int, Json, IO]] = {
-    val running = Ref.of[IO, IMap[Int, (Destination[IO], IO[Unit])]](IMap.empty)
-    val currentErrors = Ref.of[IO, IMap[Int, Exception]](IMap.empty)
+  val runningManager: IMap[Int, (Destination[IO], IO[Unit])] => IO[DestinationManager[Int, Json, IO]] =
+    running =>
+      (Ref[IO].of(running) |@| Ref.of[IO, IMap[Int, Exception]](IMap.empty))((run, errs) =>
+        (DefaultDestinationManager[Int, IO](modules, run, errs)))
 
-    (running |@| currentErrors)(DefaultDestinationManager[Int, IO](modules, _, _))
-  }
+  val emptyManager: IO[DestinationManager[Int, Json, IO]] = runningManager(IMap.empty)
+
+  val testRef = DestinationRef(NullDestinationType, DestinationName("foo_null"), Json.jEmptyString)
 
   "default destination manager" >> {
-    "returns configured destination types" >> {
-      manager.flatMap(_.supportedDestinationTypes).unsafeRunSync must_== ISet.singleton(NullDestinationType)
-    }
+    "initialization" >> {
+      "returns configured destination types" >> {
+        emptyManager.flatMap(_.supportedDestinationTypes).unsafeRunSync must_== ISet.singleton(NullDestinationType)
+      }
 
-    "initializes a destination" >> {
-      val ref = DestinationRef(NullDestinationType, DestinationName("foo_null"), Json.jEmptyString)
+      "initializes a destination" >> {
+        val inited = for {
+          mgr <- emptyManager
+          _ <- mgr.initDestination(1, testRef)
+          justSaved <- mgr.destinationOf(1)
+        } yield justSaved
 
-      val inited = for {
-        mgr <- manager
-        _ <- mgr.initDestination(1, ref)
-        justSaved <- mgr.destinationOf(1)
-      } yield justSaved
+        inited.unsafeRunSync.map(_.destinationKind) must beSome(NullDestinationType)
+      }
 
-      inited.unsafeRunSync.map(_.destinationKind) must beSome(NullDestinationType)
-    }
+      "rejects a destination of an unknown type" >> {
+        val notKnown = DestinationType("notknown", 1L, 1L)
+        val ref = DestinationRef(notKnown, DestinationName("notknown"), Json.jEmptyString)
 
-    "rejects a destination of an unknown type" >> {
-      val notKnown = DestinationType("notknown", 1L, 1L)
-      val ref = DestinationRef(notKnown, DestinationName("notknown"), Json.jEmptyString)
+        emptyManager.flatMap(_.initDestination(1, ref)).unsafeRunSync must beLike {
+          case Condition.Abnormal(DestinationError.DestinationUnsupported(k, s)) =>
+            k must_== notKnown
+            s must_== ISet.singleton(NullDestinationType)
+        }
+      }
 
-      manager.flatMap(_.initDestination(1, ref)).unsafeRunSync must beLike {
-        case Condition.Abnormal(DestinationError.DestinationUnsupported(k, s)) =>
-          k must_== notKnown
-          s must_== ISet.singleton(NullDestinationType)
+      "disposes existing destination when initializing a new destination with the same id" >> {
+        val DestId = 42
+
+        val runningDest: Ref[IO, List[Int]] => IMap[Int, (Destination[IO], IO[Unit])] =
+          r => IMap(DestId -> ((new NullDestination, r.set(List(DestId)))))
+
+        val testRun = for {
+          disposed <- Ref.of[IO, List[Int]](List.empty)
+          running = runningDest(disposed)
+          mgr <- runningManager(running)
+          before <- disposed.get
+          _ <- mgr.initDestination(DestId, testRef)
+          after <- disposed.get
+        } yield (before, after)
+
+        val (beforeInit, afterInit) = testRun.unsafeRunSync
+
+        beforeInit must_== List()
+        afterInit must_== List(DestId)
       }
     }
 
-    "removes a destination on shutdown" >> {
-      val ref = DestinationRef(NullDestinationType, DestinationName("foo_null"), Json.jEmptyString)
+    "shutdown" >> {
+      "removes a destination on shutdown" >> {
+        val shutdown = for {
+          mgr <- emptyManager
+          _ <- mgr.initDestination(1, testRef)
+          beforeShutdown <- mgr.destinationOf(1)
+          _ <- mgr.shutdownDestination(1)
+          afterShutdown <- mgr.destinationOf(1)
+        } yield (beforeShutdown, afterShutdown)
 
-      val shutdown = for {
-        mgr <- manager
-        _ <- mgr.initDestination(1, ref)
-        beforeShutdown <- mgr.destinationOf(1)
-        _ <- mgr.shutdownDestination(1)
-        afterShutdown <- mgr.destinationOf(1)
-      } yield (beforeShutdown, afterShutdown)
+        val (before, after) = shutdown.unsafeRunSync
 
-      val (before, after) = shutdown.unsafeRunSync
+        before must beSome
+        after must beNone
+      }
 
-      before must beSome
-      after must beNone
+      "disposes a destination on shutdown" >> {
+        val DestId = 42
+
+        val runningDest: Ref[IO, List[Int]] => IMap[Int, (Destination[IO], IO[Unit])] =
+          r => IMap(DestId -> ((new NullDestination, r.set(List(DestId)))))
+
+        val testRun = for {
+          disposed <- Ref.of[IO, List[Int]](List.empty)
+          running = runningDest(disposed)
+          mgr <- runningManager(running)
+          beforeShutdown <- disposed.get
+          _ <- mgr.shutdownDestination(DestId)
+          afterShutdown <- disposed.get
+        } yield (beforeShutdown, afterShutdown)
+
+        val (beforeDispose, afterDispose) = testRun.unsafeRunSync
+
+        beforeDispose must_== List()
+        afterDispose must_== List(DestId)
+      }
+
+      "nop with non-existent destination" >> {
+        val DestId = 1000
+        val testRun = for {
+          mgr <- emptyManager
+          before <- mgr.destinationOf(1000)
+          _ <- mgr.shutdownDestination(1000)
+          after <- mgr.destinationOf(1000)
+        } yield (before, after)
+
+        val (before, after) = testRun.unsafeRunSync
+
+        before must beNone
+        after must beNone
+      }
     }
 
-    "calls module implementation of sanitizedRef" >> {
-      val ref = DestinationRef(NullDestinationType, DestinationName("foo_null"), Json.jEmptyString)
+    "sanitize refs" >> {
+      "returns an empty object when the destination is unknown" >> {
+        val notKnown = DestinationType("notknown", 1L, 1L)
+        val notKnownRef = DestinationRef(notKnown, DestinationName("notknown"), Json.jString("baz"))
 
-      val sanitized = for {
-        mgr <- manager
-        sanitized = mgr.sanitizedRef(ref)
-      } yield sanitized
+        val sanitized = for {
+          mgr <- emptyManager
+          s = mgr.sanitizedRef(notKnownRef)
+        } yield s
 
-      sanitized.unsafeRunSync must_== DestinationRef(NullDestinationType, DestinationName("foo_null"), Json.jString("foobar"))
+        sanitized.unsafeRunSync must_== DestinationRef(notKnown, DestinationName("notknown"), Json.jEmptyObject)
+      }
+
+      "uses module-specific implementation to sanitize references" >> {
+        val sanitized = for {
+          mgr <- emptyManager
+          s = mgr.sanitizedRef(testRef)
+        } yield s
+
+        sanitized.unsafeRunSync must_== DestinationRef(NullDestinationType, DestinationName("foo_null"), Json.jString("sanitized"))
+      }
     }
   }
 }

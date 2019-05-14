@@ -52,6 +52,9 @@ class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: 
       mod <- mod0.toRight(
         DestinationError.destinationUnsupported[CreateError[Json]](ref.kind, supported)) >>= (EitherT.either(_))
 
+      runningNow <- EitherT.rightT(running.get)
+      _ <- EitherT.rightT(runningNow.lookup(destinationId).fold(().point[F]) { case (_, shutdown) => shutdown })
+
       added0 = mod.allocated >>= {
         case (m, disposeM) =>
           running.update(r => r.insert(destinationId, (m, disposeM)))
@@ -61,12 +64,6 @@ class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: 
 
   def destinationOf(destinationId: I): F[Option[Destination[F]]] =
     running.get.map(_.lookup(destinationId).firsts)
-
-  def errors: F[IMap[I, Exception]] =
-    currentErrors.get
-
-  def errorsOf(i: I): F[Option[Exception]] =
-    errors.map(_.lookup(i))
 
   def sanitizedRef(ref: DestinationRef[Json]): DestinationRef[Json] =
     // return an empty object in case we don't find an appropriate
@@ -82,6 +79,12 @@ class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: 
 
   def supportedDestinationTypes: F[ISet[DestinationType]] =
     modules.keySet.point[F]
+
+  def errors: F[IMap[I, Exception]] =
+    currentErrors.get
+
+  def errorsOf(i: I): F[Option[Exception]] =
+    errors.map(_.lookup(i))
 }
 
 object DefaultDestinationManager {

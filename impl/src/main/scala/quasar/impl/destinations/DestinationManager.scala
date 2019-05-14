@@ -44,12 +44,13 @@ trait DestinationManager[I, C, F[_]] {
     */
   def shutdownDestination(destinationId: I): F[Unit]
 
+  /** The types of destinations supported. */
+  def supportedDestinationTypes: F[ISet[DestinationType]]
+
   /** Retrieve all errors */
   def errors: F[IMap[I, Exception]]
 
   /** Returns errors related to the given id */
   def errorsOf(destinationId: I): F[Option[Exception]]
 
-  /** The types of destinations supported. */
-  def supportedDestinationTypes: F[ISet[DestinationType]]
 }
