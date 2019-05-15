@@ -19,23 +19,19 @@ package quasar.impl.destinations
 import slamdata.Predef._
 
 import quasar.Condition
-import quasar.api.destination.DestinationError.InitializationError
 import quasar.api.destination.{DestinationError, DestinationName, DestinationRef, DestinationType}
-import quasar.api.resource.ResourcePath
-import quasar.connector.{Destination, DestinationModule, MonadResourceErr, ResourceError, ResultSink, ResultType, TableColumn}
+import quasar.connector.{Destination, DestinationModule, ResourceError}
 import quasar.contrib.scalaz.MonadError_
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import argonaut.Json
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Resource, Timer}
+import cats.effect.IO
 import cats.effect.concurrent.Ref
 import eu.timepit.refined.auto._
-import fs2.Stream
-import scalaz.{\/, Applicative, IMap, ISet, NonEmptyList}
+import scalaz.{IMap, ISet}
 import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
-import scalaz.syntax.either._
 import shims._
 
 object DefaultDestinationManagerSpec extends quasar.Qspec {
@@ -44,32 +40,10 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
-  val NullDestinationType = DestinationType("null", 1L, 1L)
-
-  class NullCsvSink[F[_]: Applicative] extends ResultSink[F] {
-    val resultType = ResultType.Csv()
-    def apply(dst: ResourcePath, result: (List[TableColumn], Stream[F, Byte])): F[Unit] =
-      ().point[F]
-  }
-
-  class NullDestination[F[_]: Applicative] extends Destination[F] {
-    def destinationKind: DestinationType = NullDestinationType
-    def sinks = NonEmptyList(new NullCsvSink[F])
-  }
-
-  object NullDestinationModule extends DestinationModule {
-    def destinationType = NullDestinationType
-    def sanitizeDestinationConfig(config: Json) =
-      Json.jString("sanitized")
-
-    def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](config: Json)
-        : F[InitializationError[Json] \/ Resource[F, Destination[F]]] =
-      (new NullDestination[F]: Destination[F])
-        .point[Resource[F, ?]].right[InitializationError[Json]].point[F]
-  }
+  val MockDestinationType = MockDestinationModule.destinationType
 
   val modules: IMap[DestinationType, DestinationModule] =
-    IMap(NullDestinationType -> NullDestinationModule)
+    IMap(MockDestinationModule.destinationType -> MockDestinationModule)
 
   val runningManager: IMap[Int, (Destination[IO], IO[Unit])] => IO[DestinationManager[Int, Json, IO]] =
     running =>
@@ -78,12 +52,12 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
 
   val emptyManager: IO[DestinationManager[Int, Json, IO]] = runningManager(IMap.empty)
 
-  val testRef = DestinationRef(NullDestinationType, DestinationName("foo_null"), Json.jEmptyString)
+  val testRef = DestinationRef(MockDestinationType, DestinationName("foo_null"), Json.jEmptyString)
 
   "default destination manager" >> {
     "initialization" >> {
       "returns configured destination types" >> {
-        emptyManager.flatMap(_.supportedDestinationTypes).unsafeRunSync must_== ISet.singleton(NullDestinationType)
+        emptyManager.flatMap(_.supportedDestinationTypes).unsafeRunSync must_== ISet.singleton(MockDestinationType)
       }
 
       "initializes a destination" >> {
@@ -93,7 +67,7 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
           justSaved <- mgr.destinationOf(1)
         } yield justSaved
 
-        inited.unsafeRunSync.map(_.destinationKind) must beSome(NullDestinationType)
+        inited.unsafeRunSync.map(_.destinationKind) must beSome(MockDestinationType)
       }
 
       "rejects a destination of an unknown type" >> {
@@ -103,7 +77,7 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
         emptyManager.flatMap(_.initDestination(1, ref)).unsafeRunSync must beLike {
           case Condition.Abnormal(DestinationError.DestinationUnsupported(k, s)) =>
             k must_== notKnown
-            s must_== ISet.singleton(NullDestinationType)
+            s must_== ISet.singleton(MockDestinationType)
         }
       }
 
@@ -111,7 +85,7 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
         val DestId = 42
 
         val runningDest: Ref[IO, List[Int]] => IMap[Int, (Destination[IO], IO[Unit])] =
-          r => IMap(DestId -> ((new NullDestination, r.set(List(DestId)))))
+          r => IMap(DestId -> ((new MockDestination, r.set(List(DestId)))))
 
         val testRun = for {
           disposed <- Ref.of[IO, List[Int]](List.empty)
@@ -149,7 +123,7 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
         val DestId = 42
 
         val runningDest: Ref[IO, List[Int]] => IMap[Int, (Destination[IO], IO[Unit])] =
-          r => IMap(DestId -> ((new NullDestination, r.set(List(DestId)))))
+          r => IMap(DestId -> ((new MockDestination, r.set(List(DestId)))))
 
         val testRun = for {
           disposed <- Ref.of[IO, List[Int]](List.empty)
@@ -201,7 +175,7 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
           s = mgr.sanitizedRef(testRef)
         } yield s
 
-        sanitized.unsafeRunSync must_== DestinationRef(NullDestinationType, DestinationName("foo_null"), Json.jString("sanitized"))
+        sanitized.unsafeRunSync must_== DestinationRef(MockDestinationType, DestinationName("foo_null"), Json.jString("sanitized"))
       }
     }
   }

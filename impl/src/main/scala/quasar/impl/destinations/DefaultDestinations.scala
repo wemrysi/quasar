@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasources
+package quasar.impl.destinations
 
 import slamdata.Predef._
 
@@ -25,7 +25,6 @@ import quasar.api.destination.DestinationError.{
 }
 import quasar.Condition
 import quasar.impl.storage.IndexedStore
-import quasar.impl.destinations.DestinationManager
 
 import cats.effect.Sync
 import fs2.Stream
@@ -35,7 +34,7 @@ import scalaz.syntax.monad._
 import scalaz.{\/, Equal, IMap, ISet, OptionT, Order}
 import shims._
 
-class DefaultDestinations[F[_]: Sync, I: Equal: Order, C: Equal] private (
+class DefaultDestinations[F[_]: Sync, I: Equal: Order, C] private (
     freshId: F[I],
     refs: IndexedStore[F, I, DestinationRef[C]],
     manager: DestinationManager[I, C, F])
@@ -104,7 +103,7 @@ class DefaultDestinations[F[_]: Sync, I: Equal: Order, C: Equal] private (
 }
 
 object DefaultDestinations {
-  def apply[F[_]: Sync, I: Equal: Order, C: Equal](
+  def apply[F[_]: Sync, I: Equal: Order, C](
     freshId: F[I],
     refs: IndexedStore[F, I, DestinationRef[C]],
     manager: DestinationManager[I, C, F]): DefaultDestinations[F, I, C] =
