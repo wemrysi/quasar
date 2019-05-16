@@ -44,7 +44,7 @@ object MockDestinationModule extends DestinationModule {
 }
 
 class MockDestination[F[_]: Applicative] extends Destination[F] {
-  def destinationKind: DestinationType =
+  def destinationType: DestinationType =
     MockDestinationModule.destinationType
   def sinks = NonEmptyList(new MockCsvSink[F])
 }

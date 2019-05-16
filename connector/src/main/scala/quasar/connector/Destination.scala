@@ -21,7 +21,7 @@ import quasar.api.destination.DestinationType
 import scalaz.NonEmptyList
 
 trait Destination[F[_]] {
-  def destinationKind: DestinationType
+  def destinationType: DestinationType
 
   def sinks: NonEmptyList[ResultSink[F]]
 }

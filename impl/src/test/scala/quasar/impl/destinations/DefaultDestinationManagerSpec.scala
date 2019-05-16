@@ -67,7 +67,7 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
           justSaved <- mgr.destinationOf(1)
         } yield justSaved
 
-        inited.unsafeRunSync.map(_.destinationKind) must beSome(MockDestinationType)
+        inited.unsafeRunSync.map(_.destinationType) must beSome(MockDestinationType)
       }
 
       "rejects a destination of an unknown type" >> {
