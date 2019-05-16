@@ -77,10 +77,7 @@ object DefaultDestinationsSpec extends quasar.Qspec {
   val MockDestinationType = MockDestinationModule.destinationType
 
   val testRef =
-    DestinationRef(
-      MockDestinationType,
-      DestinationName("foo_mock"),
-      Json.jEmptyString)
+    DestinationRef(MockDestinationType, DestinationName("foo-mock"), Json.jEmptyString)
 
   "destinations" >> {
     "add destination" >> {
@@ -108,7 +105,7 @@ object DefaultDestinationsSpec extends quasar.Qspec {
 
         original.toEither must beRight
         duplicate.toEither must beLeft(
-          DestinationError.destinationNameExists(DestinationName("foo_mock")))
+          DestinationError.destinationNameExists(DestinationName("foo-mock")))
       }
 
       "rejects unknown destination" >> {
@@ -122,6 +119,49 @@ object DefaultDestinationsSpec extends quasar.Qspec {
 
         testRun.unsafeRunSync.toEither must beLeft(
           DestinationError.destinationUnsupported(unknownType, ISet.singleton(MockDestinationType)))
+      }
+    }
+
+    "replace destination" >> {
+      "replaces a destination" >> {
+        val newRef = DestinationRef.name.set(DestinationName("foo-mock-2"))(testRef)
+        val testRun = for {
+          dests <- mkDestinations(
+            IMap(1 -> testRef),
+            IMap(1 -> ((new MockDestination, ().point[IO]))),
+            IMap.empty)
+          beforeReplace <- dests.destinationRef(1)
+          replaceResult <- dests.replaceDestination(1, newRef)
+          afterReplace <- dests.destinationRef(1)
+        } yield (beforeReplace, replaceResult, afterReplace)
+
+        val (beforeReplace, replaceResult, afterReplace) = testRun.unsafeRunSync
+
+        val sanitize = DestinationRef.config.set(Json.jString("sanitized"))
+
+        beforeReplace.toEither must beRight(sanitize(testRef))
+        replaceResult must_== Condition.normal()
+        afterReplace.toEither must beRight(sanitize(newRef))
+      }
+
+      "shuts down replaced destination" >> {
+        def mkRunning(ref: Ref[IO, List[Int]], id: Int): IMap[Int, (Destination[IO], IO[Unit])] =
+          IMap(id -> ((new MockDestination[IO], ref.set(List(id)))))
+
+        val testRun = for {
+          disposes <- Ref.of[IO, List[Int]](List.empty)
+          running = mkRunning(disposes, 1)
+          dests <- mkDestinations(IMap(1 -> testRef), running, IMap.empty)
+          beforeReplace <- disposes.get
+          replaceResult <- dests.replaceDestination(1, testRef)
+          afterReplace <- disposes.get
+        } yield (beforeReplace, replaceResult, afterReplace)
+
+        val (beforeReplace, replaceResult, afterReplace) = testRun.unsafeRunSync
+
+        beforeReplace must_== List()
+        replaceResult must_== Condition.normal()
+        afterReplace must_== List(1)
       }
     }
 
@@ -168,7 +208,7 @@ object DefaultDestinationsSpec extends quasar.Qspec {
         testRun.unsafeRunSync must_== List(
           DestinationMeta(
             MockDestinationModule.destinationType,
-            DestinationName("foo_mock"),
+            DestinationName("foo-mock"),
             Condition.abnormal(ex)))
       }
     }
