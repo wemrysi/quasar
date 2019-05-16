@@ -52,7 +52,7 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
 
   val emptyManager: IO[DestinationManager[Int, Json, IO]] = runningManager(IMap.empty)
 
-  val testRef = DestinationRef(MockDestinationType, DestinationName("foo_null"), Json.jEmptyString)
+  val testRef = DestinationRef(MockDestinationType, DestinationName("foo_mock"), Json.jEmptyString)
 
   "default destination manager" >> {
     "initialization" >> {
@@ -175,7 +175,7 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
           s = mgr.sanitizedRef(testRef)
         } yield s
 
-        sanitized.unsafeRunSync must_== DestinationRef(MockDestinationType, DestinationName("foo_null"), Json.jString("sanitized"))
+        sanitized.unsafeRunSync must_== DestinationRef(MockDestinationType, DestinationName("foo_mock"), Json.jString("sanitized"))
       }
     }
   }

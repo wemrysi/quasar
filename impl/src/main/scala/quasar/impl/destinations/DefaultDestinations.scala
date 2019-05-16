@@ -64,6 +64,7 @@ class DefaultDestinations[F[_]: Sync, I: Equal: Order, C] private (
 
   def destinationRef(destinationId: I): F[ExistentialError[I] \/ DestinationRef[C]] =
     OptionT(refs.lookup(destinationId))
+      .map(manager.sanitizedRef(_))
       .toRight(DestinationError.destinationNotFound(destinationId))
       .run
 
@@ -76,14 +77,17 @@ class DefaultDestinations[F[_]: Sync, I: Equal: Order, C] private (
 
   def removeDestination(destinationId: I): F[Condition[ExistentialError[I]]] =
     OptionT(refs.lookup(destinationId)).fold(
-      _ => manager.shutdownDestination(destinationId) *> Condition.normal[ExistentialError[I]]().pure[F],
+      _ => for {
+        _ <- refs.delete(destinationId)
+        _ <- manager.shutdownDestination(destinationId)
+      } yield Condition.normal[ExistentialError[I]](),
       Condition.abnormal(
         DestinationError.destinationNotFound(destinationId)).pure[F]).join
 
   def replaceDestination(destinationId: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] =
     refs.lookup(destinationId) >>= {
       case Some(_) => for {
-        _ <- manager.shutdownDestination(destinationId)
+        _ <- removeDestination(destinationId)
         _ <- refs.insert(destinationId, ref)
         destStatus <- manager.initDestination(destinationId, ref)
       } yield Condition.abnormal.getOption(destStatus) match {
