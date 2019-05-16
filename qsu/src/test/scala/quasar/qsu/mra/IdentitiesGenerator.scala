@@ -14,21 +14,23 @@
  * limitations under the License.
  */
 
-package quasar.contrib.scalaz
+package quasar.qsu.mra
 
-import slamdata.Predef._
+import quasar.pkg.tests._
 
-import scalaz.\/-
-import scalaz.concurrent.{Strategy, Task}
+import cats.Order
+import cats.data.NonEmptyList
 
-package object concurrent {
+import org.scalacheck.Cogen
 
-  // cribbed from cats-effect
-  def shift(implicit S: Strategy): Task[Unit] = {
-    Task async { cb =>
-      val _ = S(cb(\/-(())))
+trait IdentitiesGenerator {
+  import CatsNonEmptyListGenerator._
 
-      ()
-    }
-  }
+  implicit def arbitraryIdentities[A: Arbitrary: Order]: Arbitrary[Identities[A]] =
+    Arbitrary(arbitrary[NonEmptyList[NonEmptyList[NonEmptyList[A]]]].map(Identities.collapsed(_)))
+
+  implicit def cogenIdentities[A: Cogen]: Cogen[Identities[A]] =
+    Cogen[NonEmptyList[NonEmptyList[NonEmptyList[A]]]].contramap(_.expanded)
 }
+
+object IdentitiesGenerator extends IdentitiesGenerator

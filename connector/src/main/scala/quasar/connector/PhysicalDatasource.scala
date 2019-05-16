@@ -14,21 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.contrib.scalaz
+package quasar.connector
 
-import slamdata.Predef._
-import quasar.contrib.scalaz.eitherT._
+import quasar.api.resource.ResourcePathType
 
-import scalaz._
-import scalaz.stream.Process
-
-package object stream {
-
-  implicit class AugmentedProcess[M[_], A](p: Process[M, A]) {
-    def runLogCatch(implicit monad: Monad[M]): M[Throwable \/ Vector[A]] = {
-      val right = λ[M ~> EitherT[M, Throwable, ?]](EitherT.rightT(_))
-      p.translate(right).runLog.run
-    }
-  }
-
-}
+trait PhysicalDatasource[F[_], G[_], Q, R] extends Datasource[F, G, Q, R, ResourcePathType.Physical]

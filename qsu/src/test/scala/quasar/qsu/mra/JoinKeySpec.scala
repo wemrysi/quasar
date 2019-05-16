@@ -14,16 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qsu.mra
 
-import quasar.contrib.scalaz.foldable._
+import slamdata.Predef.{Char, Int}
 
-import scalaz.{Equal, Foldable, Tag, @@}
+import quasar.Qspec
 
-package object provenance {
-  sealed trait AsSet
-  val AsSet = Tag.of[AsSet]
+import cats.instances.char._
+import cats.instances.int._
+import cats.instances.option._
+import cats.kernel.laws.discipline.OrderTests
 
-  implicit def asSetEqual[F[_]: Foldable, A: Equal]: Equal[F[A] @@ AsSet] =
-    Equal.equal((x, y) => Tag.unwrap(x).equalsAsSets(Tag.unwrap(y)))
+import org.specs2.mutable.SpecificationLike
+
+import org.typelevel.discipline.specs2.mutable.Discipline
+
+object JoinKeySpec extends Qspec
+    with SpecificationLike
+    with JoinKeyGenerator
+    with Discipline {
+
+  checkAll("Order[JoinKey[Char, Int]]", OrderTests[JoinKey[Char, Int]].order)
 }

@@ -81,7 +81,7 @@ object convert {
             .attempt
             .interruptWhen(i)
             .noneTerminate
-            .to(q.enqueue)
+            .through(q.enqueue)
             .handleErrorWith(t => Stream.eval(q.enqueue1(Some(Left(t)))))
 
         _ <- F.start(enqueue.compile.drain)
