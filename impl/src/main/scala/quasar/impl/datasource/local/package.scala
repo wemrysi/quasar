@@ -30,7 +30,7 @@ import argonaut.{DecodeJson, Json}
 import cats.effect.Sync
 import eu.timepit.refined.auto._
 import pathy.Path
-import scalaz.{\/, EitherT}
+import scalaz.{\/, Applicative, EitherT}
 import scalaz.syntax.applicative._
 import scalaz.syntax.foldable._
 import shims._
@@ -47,7 +47,7 @@ package object local {
       else MonadError_[F, Throwable].unattempt_(\/.fromTryCatchNonFatal(p.resolve(n)))
     }
 
-  def attemptConfig[F[_]: Sync, A: DecodeJson, B](
+  def attemptConfig[F[_]: Applicative, A: DecodeJson, B](
     config: Json,
     errorPrefix: String)(onError: (Json, String) => B)
       : EitherT[F, B, A] =
