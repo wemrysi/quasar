@@ -47,7 +47,7 @@ object DefaultDestinationsSpec extends quasar.Qspec {
     MonadError_.facet[IO](ResourceError.throwableP)
 
   def freshId(ref: Ref[IO, Int]): IO[Int] =
-    ref.get.map(_ + 1)
+    ref.modify(i => (i + 1, i + 1))
 
   val mockModules: IMap[DestinationType, DestinationModule] =
     IMap(MockDestinationModule.destinationType -> MockDestinationModule)
