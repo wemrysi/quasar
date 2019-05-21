@@ -23,12 +23,6 @@ import scala.util.Either
 import cats.{Monad, MonadError}
 
 object monadError {
-  implicit def catsMonadErrorMonadError_[F[_], E](implicit F: MonadError[F, E]): MonadError_[F, E] =
-    new MonadError_[F, E] {
-      def raiseError[A](e: E): F[A] = F.raiseError(e)
-      def handleError[A](fa: F[A])(f: E => F[A]): F[A] = F.handleErrorWith(fa)(f)
-    }
-
   // Not implicit as can easily introduce ambiguity
   def monadError_CatsMonadError[F[_], E](
       implicit m: Monad[F], me: MonadError_[F, E])

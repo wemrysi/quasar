@@ -24,7 +24,6 @@ import quasar.api.datasource.DatasourceError.{
 }
 import quasar.api.datasource.{DatasourceType, DestinationType}
 import quasar.api.resource.ResourcePath
-import quasar.contrib.cats.monadError._
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
 
