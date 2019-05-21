@@ -14,21 +14,28 @@
  * limitations under the License.
  */
 
-package quasar.api.datasource
+package quasar.impl.storage
 
-import slamdata.Predef.String
+import slamdata.Predef.{Int, String}
 
-import scalaz.{Order, Show}
+import scala.concurrent.ExecutionContext.Implicits.global
+
+import cats.effect.IO
+import cats.effect.concurrent.Ref
+import scalaz.IMap
+import scalaz.std.anyVal._
 import scalaz.std.string._
+import shims._
 
-final case class DestinationName(value: String)
+object RefIndexedStoreSpec extends RefSpec(Ref.unsafe[IO, Int](0))
 
-object DestinationName extends DestinationNameInstances
+abstract class RefSpec(idxRef: Ref[IO, Int]) extends IndexedStoreSpec[IO, Int, String] {
+  val emptyStore =
+    Ref.of[IO, IMap[Int, String]](IMap.empty).map(RefIndexedStore(_))
 
-sealed abstract class DestinationNameInstances {
-  implicit val order: Order[DestinationName] =
-    Order.orderBy(_.value)
+  val freshIndex = idxRef.modify(i => (i + 1, i + 1))
 
-  implicit val show: Show[DestinationName] =
-    Show.shows(_.value)
+  val valueA = "A"
+
+  val valueB = "B"
 }

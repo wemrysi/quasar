@@ -18,11 +18,8 @@ package quasar.impl.datasource
 
 import slamdata.Predef._
 
-import quasar.api.datasource.DatasourceError.{
-  InitializationError,
-  MalformedConfiguration
-}
-import quasar.api.datasource.{DatasourceType, DestinationType}
+import quasar.api.datasource.DatasourceType
+import quasar.api.destination.DestinationType
 import quasar.api.resource.ResourcePath
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
@@ -56,16 +53,20 @@ package object local {
       else MonadError_[F, Throwable].unattempt_(\/.fromTryCatchNonFatal(p.resolve(n)))
     }
 
-  def attemptConfig[F[_]: Sync, A: DecodeJson](config: Json, errorPrefix: String)
-      : EitherT[F, InitializationError[Json], A] =
-    EitherT.fromEither[F](config.as[A].toEither)
-      .leftMap[InitializationError[Json]] {
-        case (s, _) => MalformedConfiguration(LocalType, config, errorPrefix + s)
+  def attemptConfig[F[_]: Sync, A: DecodeJson, B](
+    config: Json,
+    errorPrefix: String)(onError: (Json, String) => B)
+      : EitherT[F, B, A] =
+    EitherT.fromEither(config.as[A].toEither)
+      .leftMap[B] {
+        case (s, _) => onError(config, errorPrefix + s)
       }
 
-  def validatePath[F[_]: Sync](path: String, config: Json, errorPrefix: String)
-      : EitherT[F, InitializationError[Json], JPath] =
+  def validatePath[F[_]: Sync, B](
+    path: String,
+    config: Json,
+    errorPrefix: String)(onError: (Json, String) => B)
+      : EitherT[F, B, JPath] =
     EitherT(Sync[F].attempt(Sync[F].delay(Paths.get(path))))
-      .leftMap[InitializationError[Json]](t =>
-        MalformedConfiguration(LocalType, config, errorPrefix + t.getMessage))
+      .leftMap[B](t => onError(config, errorPrefix + t.getMessage))
 }

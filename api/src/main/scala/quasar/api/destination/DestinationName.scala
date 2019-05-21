@@ -14,14 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.api.destination
 
-import quasar.api.destination.DestinationType
+import slamdata.Predef.String
 
-import scalaz.NonEmptyList
+import scalaz.{Order, Show}
+import scalaz.std.string._
 
-trait Destination[F[_]] {
-  def destinationType: DestinationType
+final case class DestinationName(value: String)
 
-  def sinks: NonEmptyList[ResultSink[F]]
+object DestinationName extends DestinationNameInstances
+
+sealed abstract class DestinationNameInstances {
+  implicit val order: Order[DestinationName] =
+    Order.orderBy(_.value)
+
+  implicit val show: Show[DestinationName] =
+    Show.shows(_.value)
 }

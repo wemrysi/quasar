@@ -17,7 +17,10 @@
 package quasar.impl.datasource.local
 
 import quasar.api.datasource.DatasourceType
-import quasar.api.datasource.DatasourceError.InitializationError
+import quasar.api.datasource.DatasourceError.{
+  InitializationError,
+  malformedConfiguration
+}
 import quasar.concurrent.BlockingContext
 import quasar.connector._, LightweightDatasourceModule.DS
 
@@ -42,8 +45,9 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], DS[F]]] = {
     val ds = for {
-      lc <- attemptConfig[F, LocalConfig](config, "Failed to decode LocalDatasource config: ")
-      root <- validatePath(lc.rootDir, config, "Invalid path: ")
+      lc <- attemptConfig[F, LocalConfig, InitializationError[Json]](
+        config, "Failed to decode LocalDatasource config: ")((c, d) => malformedConfiguration((LocalType, c, d)))
+      root <- validatePath(lc.rootDir, config, "Invalid path: ")((c, d) => malformedConfiguration((LocalType, c, d)))
     } yield LocalDatasource[F](root, lc.readChunkSizeBytes, blockingPool)
 
     Resource.liftF(ds.value)

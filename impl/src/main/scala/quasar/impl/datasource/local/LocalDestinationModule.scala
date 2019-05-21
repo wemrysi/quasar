@@ -16,7 +16,10 @@
 
 package quasar.impl.datasource.local
 
-import quasar.api.datasource.DatasourceError.InitializationError
+import quasar.api.destination.DestinationError.{
+  InitializationError,
+  malformedConfiguration
+}
 import quasar.concurrent.BlockingContext
 import quasar.connector.{Destination, DestinationModule, MonadResourceErr}
 
@@ -33,11 +36,13 @@ trait LocalDestinationModule extends DestinationModule {
   def sanitizeDestinationConfig(config: Json): Json = config
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-      config: Json)
+    config: Json)
       : Resource[F, Either[InitializationError[Json], Destination[F]]] = {
     val dest = for {
-      ld <- attemptConfig[F, LocalDestinationConfig](config, "Failed to decode LocalDestination config: ")
-      root <- validatePath(ld.rootDir, config, "Invalid destination path: ")
+      ld <- attemptConfig[F, LocalDestinationConfig, InitializationError[Json]](
+        config, "Failed to decode LocalDestination config: ")((c, d) => malformedConfiguration((destinationType, c, d)))
+      root <- validatePath(
+        ld.rootDir, config, "Invalid destination path: ")((c, d) => malformedConfiguration((destinationType, c, d)))
     } yield LocalDestination[F](root, blockingPool): Destination[F]
 
     Resource.liftF(dest.value)
