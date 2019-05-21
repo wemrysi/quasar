@@ -14,23 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.contrib.cats.data
 
-import quasar.api.destination.DestinationError.InitializationError
-import quasar.api.destination.DestinationType
+import cats.Order
+import cats.data.NonEmptySet
+import cats.instances.sortedSet._
 
-import scala.util.Either
-
-import argonaut.Json
-
-import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
-
-trait DestinationModule {
-  def destinationType: DestinationType
-
-  def sanitizeDestinationConfig(config: Json): Json
-
-  def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-      config: Json)
-      : Resource[F, Either[InitializationError[Json], Destination[F]]]
+object nonEmptySet {
+  implicit def catsNonEmptySetOrder[A: Order]: Order[NonEmptySet[A]] =
+    Order.by(_.toSortedSet)
 }

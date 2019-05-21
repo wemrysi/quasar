@@ -14,23 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.contrib.cats
 
-import quasar.api.destination.DestinationError.InitializationError
-import quasar.api.destination.DestinationType
+import slamdata.Predef.Boolean
 
-import scala.util.Either
+import cats.kernel.BoundedSemilattice
 
-import argonaut.Json
+import scalaz.@@
+import scalaz.Tags.Disjunction
+import scalaz.syntax.tag._
 
-import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
+object boolean {
+  implicit def catsBooleanDisjBoundedSemilattice: BoundedSemilattice[Boolean @@ Disjunction] =
+    new BoundedSemilattice[Boolean @@ Disjunction] {
+      def combine(x: Boolean @@ Disjunction, y: Boolean @@ Disjunction) =
+        Disjunction(x.unwrap || y.unwrap)
 
-trait DestinationModule {
-  def destinationType: DestinationType
-
-  def sanitizeDestinationConfig(config: Json): Json
-
-  def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-      config: Json)
-      : Resource[F, Either[InitializationError[Json], Destination[F]]]
+      val empty = Disjunction(false)
+    }
 }

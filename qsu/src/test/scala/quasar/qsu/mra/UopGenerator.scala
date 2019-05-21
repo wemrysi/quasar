@@ -16,23 +16,25 @@
 
 package quasar.qsu.mra
 
-import slamdata.Predef.List
+import slamdata.Predef.Set
 
 import quasar.pkg.tests._
 
-import cats.Eq
+import cats.Order
 
 import org.scalacheck.Cogen
 
 trait UopGenerator {
-  implicit def arbitraryUop[A: Arbitrary: Eq]: Arbitrary[Uop[A]] =
+  implicit def arbitraryUop[A: Arbitrary: Order]: Arbitrary[Uop[A]] =
     Arbitrary(for {
       sz <- Gen.frequency((32, 1), (16, 2), (8, 3), (4, 4), (2, 5), (1, 0))
       as <- Gen.listOfN(sz, arbitrary[A])
     } yield Uop.of(as: _*))
 
-  implicit def cogenUop[A: Cogen]: Cogen[Uop[A]] =
-    Cogen[List[A]].contramap(_.toList)
+  implicit def cogenUop[A: Cogen: Order]: Cogen[Uop[A]] = {
+    implicit val ording = Order[A].toOrdering
+    Cogen[Set[A]].contramap(_.toSortedSet)
+  }
 }
 
 object UopGenerator extends UopGenerator
