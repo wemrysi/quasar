@@ -18,8 +18,6 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import cats.{Monad => CMonad}
-import cats.effect.{Sync, Concurrent}
 import cats.arrow.FunctionK
 import cats.syntax.functor._
 
@@ -27,11 +25,9 @@ import monocle.Prism
 
 import quasar.contrib.scalaz.MonadError_
 import quasar.higher.HFunctor
-import quasar.concurrent.BlockingContext
 
 import fs2.Stream
 import scalaz.{~>, Bind, Functor, InvariantFunctor, Monad, Scalaz, Applicative}, Scalaz._
-import scalaz.syntax.tag._
 
 trait IndexedStore[F[_], I, V] {
   /** All values in the store paired with their index. */
