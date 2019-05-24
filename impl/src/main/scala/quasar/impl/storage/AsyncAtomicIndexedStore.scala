@@ -26,34 +26,38 @@ import cats.syntax.flatMap._
 
 import fs2.Stream
 
-import io.atomix.core.map.AsyncDistributedMap
+import io.atomix.core.map.AsyncAtomicMap
 import io.atomix.core.iterator.AsyncIterator
+import io.atomix.utils.time.Versioned
 
 import java.util.concurrent.CompletableFuture
 
-final class AsyncDistributedMapStore[F[_]: Async: ContextShift, K, V](
-    mp: AsyncDistributedMap[K, V])
+final class AsyncAtomicIndexedStore[F[_]: Async: ContextShift, K, V](
+    mp: AsyncAtomicMap[K, V])
     extends IndexedStore[F, K, V] {
 
-  import AsyncDistributedMapStore._
+  import AsyncAtomicIndexedStore._
 
   def entries: Stream[F, (K, V)] = for {
     iterator <- Stream.bracket(Sync[F].delay(mp.entrySet.iterator))(
-      (it: AsyncIterator[java.util.Map.Entry[K, V]]) => toF(it.close()) as (()))
-    entry <- fromIterator[F, java.util.Map.Entry[K, V]](iterator)
-  } yield (entry.getKey, entry.getValue)
+      (it: AsyncIterator[java.util.Map.Entry[K, Versioned[V]]]) => toF(it.close()) as (()))
+    entry <- fromIterator[F, java.util.Map.Entry[K, Versioned[V]]](iterator)
+  } yield (entry.getKey, entry.getValue.value)
 
   def lookup(k: K): F[Option[V]] =
-    toF(mp get k) map (Option(_))
+    toF(mp get k) map ((v: Versioned[V]) => Option(v.value))
 
   def insert(k: K, v: V): F[Unit] =
     toF(mp.put(k, v)) as (())
 
   def delete(k: K): F[Boolean] =
-    toF(mp.remove(k)) map { (x: V) => Option(x).nonEmpty }
+    toF(mp.remove(k)) map { (x: Versioned[V]) => Option(x.value).nonEmpty }
 }
 
-object AsyncDistributedMapStore {
+object AsyncAtomicIndexedStore {
+  def apply[F[_]: Async: ContextShift, K, V](mp: AsyncAtomicMap[K, V]): IndexedStore[F, K, V] =
+    new AsyncAtomicIndexedStore(mp)
+
   def fromIterator[F[_]: ContextShift: Async, A](iterator: AsyncIterator[A]): Stream[F, A] = {
     def getNext(i: AsyncIterator[A]): F[Option[(A, AsyncIterator[A])]] = for {
       hasNext <- toF(i.hasNext())
