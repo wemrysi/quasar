@@ -19,7 +19,6 @@ package quasar.impl.storage
 import slamdata.Predef._
 
 import cats.arrow.FunctionK
-import cats.syntax.functor._
 
 import monocle.Prism
 
