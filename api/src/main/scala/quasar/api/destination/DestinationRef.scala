@@ -16,11 +16,13 @@
 
 package quasar.api.destination
 
-import monocle.PLens
+import slamdata.Predef._
+
 import monocle.macros.Lenses
-import scalaz.{Apply, Cord, Equal, Order, Show, Traverse1}
+import monocle.PLens
 import scalaz.std.tuple._
 import scalaz.syntax.show._
+import scalaz.{Apply, Cord, Equal, Order, Show, Traverse1}
 
 @Lenses
 final case class DestinationRef[C](kind: DestinationType, name: DestinationName, config: C)
