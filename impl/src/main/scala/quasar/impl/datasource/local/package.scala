@@ -48,7 +48,7 @@ package object local {
   val LocalType = DatasourceType("local", 1L)
   val LocalParsedType = DatasourceType("local-parsed", 1L)
 
-  val LocalDestinationType = DestinationType("local", 1L, 1L)
+  val LocalDestinationType = DestinationType("local", 1L)
 
   private val ParentDir = ".."
 
