@@ -16,8 +16,6 @@
 
 package quasar.api.destination
 
-import slamdata.Predef._
-
 import monocle.macros.Lenses
 import monocle.PLens
 import scalaz.std.tuple._
