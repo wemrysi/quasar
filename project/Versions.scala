@@ -21,7 +21,7 @@ object Versions {
   val specsVersion        = "4.5.1"
   val spireVersion        = "0.16.2"
   val akkaVersion         = "2.5.1"
-  val fs2Version          = "1.0.4"
+  val fs2Version          = "1.0.5"
   val slf4sVersion        = "1.7.25"
   val atomixVersion       = "3.1.5"
 }
