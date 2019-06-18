@@ -23,7 +23,7 @@ import quasar.api.destination.DestinationType
 import quasar.api.resource.ResourcePath
 import quasar.fp.ski.ι
 
-import java.nio.file.{Paths, Path => JPath}
+import java.nio.file.{InvalidPathException, Paths, Path => JPath}
 
 import argonaut.{DecodeJson, Json}
 
@@ -66,19 +66,23 @@ package object local {
       rp: ResourcePath)(
       implicit F: Sync[F])
       : F[Option[JPath]] =
-    for {
-      cur <- F.delay(Paths.get(""))
+    F.recover {
+      for {
+        cur <- F.delay(Paths.get(""))
 
-      jp <- Path.flatten("", "", "", ι, ι, rp.toPath).foldLeftM(cur) { (p, n) =>
-        if (n.isEmpty) p.pure[F]
-        else F.delay(p.resolve(n))
-      }
+        jp <- Path.flatten("", "", "", ι, ι, rp.toPath).foldLeftM(cur) { (p, n) =>
+          if (n.isEmpty) p.pure[F]
+          else F.delay(p.resolve(n))
+        }
 
-      resolved <-
-        Some(jp.normalize)
-          .filterNot(_.startsWith(ParentDir))
-          .traverse(norm => F.delay(root.resolve(norm)))
-    } yield resolved
+        resolved <-
+          Some(jp.normalize)
+            .filterNot(_.startsWith(ParentDir))
+            .traverse(norm => F.delay(root.resolve(norm)))
+      } yield resolved
+    } {
+      case _: InvalidPathException => None
+    }
 
   def validatedPath[F[_]: Sync, B](
       path: String,
