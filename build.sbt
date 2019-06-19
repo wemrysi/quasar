@@ -150,7 +150,9 @@ lazy val api = project
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro"      % monocleVersion,
       "eu.timepit"                 %% "refined-scalaz"     % refinedVersion,
-      "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test))
+      "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test,
+      "org.scodec"                 %% "scodec-core"        % "1.11.4"
+    ))
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
