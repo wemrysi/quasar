@@ -36,4 +36,7 @@ object implicits {
 
   implicit def planningMonadError[F[_]: MonadQuasarErr]: MonadError_[F, PlannerError] =
     MonadError_.facet[F](QuasarError.planning)
+
+  implicit def storingMonadError[F[_]: MonadQuasarErr]: MonadError_[F, StoreError] =
+    MonadError_.facet[F](QuasarError.storing)
 }

@@ -37,6 +37,7 @@ object QuasarError {
   final case class Evaluating(error: ResourceError) extends QuasarError
   final case class Parsing(error: ParsingError) extends QuasarError
   final case class Planning(error: PlannerError) extends QuasarError
+  final case class Storing(error: StoreError) extends QuasarError
 
   val compiling: Prism[QuasarError, SemanticErrors] =
     Prism.partial[QuasarError, SemanticErrors] {
@@ -62,6 +63,11 @@ object QuasarError {
     Prism.partial[QuasarError, PlannerError] {
       case Planning(err) => err
     } (Planning(_))
+
+  val storing: Prism[QuasarError, StoreError] =
+    Prism.partial[QuasarError, StoreError] {
+      case Storing(err) => err
+    } (Storing(_))
 
   val throwableP: Prism[Throwable, QuasarError] =
     Prism.partial[Throwable, QuasarError] {

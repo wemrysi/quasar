@@ -24,4 +24,5 @@ object Versions {
   val fs2Version          = "1.0.5"
   val slf4sVersion        = "1.7.25"
   val atomixVersion       = "3.1.5"
+  val mapdbVersion        = "3.0.7"
 }
