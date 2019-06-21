@@ -21,6 +21,7 @@ import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
 import quasar.contrib.scalaz.MonadError_
 import quasar.qscript.PlannerError
+import quasar.run.store.StoreError
 
 import argonaut.Json
 

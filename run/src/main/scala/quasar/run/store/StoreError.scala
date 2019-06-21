@@ -19,6 +19,7 @@ package quasar.run.store
 import slamdata.Predef._
 
 import monocle.Prism
+import scalaz.{Cord, Show}
 
 sealed abstract trait StoreError extends Product with Serializable {
   def detail: String
@@ -36,6 +37,10 @@ object StoreError {
     Prism.partial[Throwable, StoreError] {
       case StoreErrorException(re) => re
     } (StoreErrorException(_))
+
+  implicit val show: Show[StoreError] = Show.show {
+    case Corrupt(detail) => Cord("StoreError.Corrupt(") ++ Cord(detail) ++ Cord(")")
+  }
 
   ////
 

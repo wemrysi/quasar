@@ -17,10 +17,12 @@
 package quasar.run
 
 import slamdata.Predef.{Exception, Product, Serializable, Throwable}
+
 import quasar.api.datasource.DatasourceError.CreateError
 import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
 import quasar.qscript.PlannerError
+import quasar.run.store.StoreError
 import quasar.sql.ParsingError
 
 import argonaut.Json
@@ -81,6 +83,7 @@ object QuasarError {
       case Evaluating(e) => e.show
       case Parsing(e) => e.show
       case Planning(e) => e.show
+      case Storing(e) => e.show
     }
 
   ////
