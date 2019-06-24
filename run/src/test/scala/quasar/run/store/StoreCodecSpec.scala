@@ -48,15 +48,6 @@ final class StoreCodecSpec extends SpecificationLike with Discipline {
         Json.jNumber(42L),
         Json.array(Json.jString("one"), Json.jString("two"))))
 
-  def modifyGen: Gen[DestinationRef[Json] => DestinationRef[Json]] =
-    for {
-      typ <- destinationTypeGen
-      name <- destinationNameGen
-      config <- jsonGen
-      modify <- Gen.oneOf(List[DestinationRef[Json] => DestinationRef[Json]](
-        DestinationRef.kind.set(typ), DestinationRef.name.set(name), DestinationRef.config.set(config)))
-    } yield modify
-
   implicit def destinationRefArbitrary: Arbitrary[DestinationRef[Json]] =
     Arbitrary(for {
       typ <- destinationTypeGen

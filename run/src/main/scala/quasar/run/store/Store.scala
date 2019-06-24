@@ -42,7 +42,7 @@ object Store {
     path: Path,
     codec: CodecJson[A],
     pool: BlockingContext)
-      : Resource[F, IndexedStore[F, UUID, A]] =
+    : Resource[F, IndexedStore[F, UUID, A]] =
     for {
       db <- mapDB[F](path)
       table <- Resource.liftF(uuidTable[F](db))
