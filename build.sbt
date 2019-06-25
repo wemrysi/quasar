@@ -309,4 +309,8 @@ lazy val runp = (project in file("run"))
     impl,
     qsu)
   .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.mapdb" %  "mapdb"  % mapdbVersion,
+      "eu.timepit" %% "refined-scalacheck" % refinedVersion % Test))
   .enablePlugins(AutomateHeaderPlugin)
