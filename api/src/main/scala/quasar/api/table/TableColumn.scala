@@ -14,21 +14,23 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.api.table
 
-import slamdata.Predef.String
+import slamdata.Predef._
 
-import scalaz.{Order, Show}
+import scalaz.{Cord, Equal, Show}
+import scalaz.std.tuple._
 import scalaz.std.string._
+import scalaz.syntax.show._
 
-final case class TableColumn(value: String)
+final case class TableColumn(name: String, tpe: ColumnType.Scalar)
 
-object TableColumn extends TableColumnInstances
+object TableColumn {
+  implicit val equalTableColumn: Equal[TableColumn] =
+    Equal.equalBy(c => (c.name, c.tpe))
 
-sealed abstract class TableColumnInstances {
-  implicit val show: Show[TableColumn] =
-    Show.shows(_.value)
-
-  implicit val order: Order[TableColumn] =
-    Order.orderBy(_.value)
+  implicit val showTableColumn: Show[TableColumn] =
+    Show show { tc =>
+      Cord("TableColumn(") ++ tc.name ++ Cord(", ") ++ tc.tpe.show ++ Cord(")")
+    }
 }

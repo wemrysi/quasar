@@ -19,8 +19,9 @@ package quasar.impl.datasource.local
 import slamdata.Predef.{Stream => _, _}
 
 import quasar.api.resource.ResourcePath
+import quasar.api.table.TableColumn
 import quasar.concurrent.BlockingContext
-import quasar.connector.{Destination, MonadResourceErr, ResourceError, ResultSink, ResultType, TableColumn}
+import quasar.connector.{Destination, MonadResourceErr, ResourceError, ResultSink, ResultType}
 
 import cats.effect.{ContextShift, Effect}
 import fs2.{io, Stream}
