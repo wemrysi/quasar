@@ -18,7 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
+import quasar.IdStatus, IdStatus.IncludeId
 import quasar.contrib.matryoshka.ginterpret
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
@@ -38,7 +38,6 @@ import quasar.qscript.{
   MapFuncsCore,
   MFC,
   MonadPlannerErr,
-  OnUndefined,
   PlannerError,
   RightSide,
   RightSide3
@@ -86,14 +85,9 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
 
     val authGraph = graph.rewriteM[X] {
       case g @ Extractors.DimEdit(src, _) =>
-        for {
-          _ <- computeDims[X](g)
-        } yield g.overwriteAtRoot(src.unfold map (_.root))
-
-      /*case g @ Extractors.Transpose(src, retain, rot) =>
-        computeDims[X](g) as g.overwriteAtRoot {
-          LeftShift(src.root, recFunc.Hole, retain.fold[IdStatus](IdOnly, ExcludeId), OnUndefined.Omit, RightTarget[T], rot)
-        }*/
+        computeDims[X](g) as {
+          g.overwriteAtRoot(src.unfold map (_.root))
+        }
 
       case other =>
         computeDims[X](other) as other

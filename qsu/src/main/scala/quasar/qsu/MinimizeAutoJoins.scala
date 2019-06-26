@@ -57,10 +57,10 @@ sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: Re
 
   implicit def PEqual: Equal[P]
 
-  private val Minimizers = List(
-    minimizers.MergeReductions[T],
-    minimizers.FilterToCond[T],
-    minimizers.MergeCartoix[T])
+  private lazy val Minimizers: List[Minimizer.Aux[T, P]] = List(
+    minimizers.MergeReductions[T](qprov),
+    minimizers.FilterToCond[T](qprov),
+    minimizers.MergeCartoix[T](qprov))
 
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
@@ -143,7 +143,7 @@ sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: Re
   private def coalesceRoots[
       G[_]: Monad: NameGenerator: RevIdxM: MinStateM[T, P, ?[_]]: MonadPlannerErr](
       qgraph: QSUGraph,
-      fm: => FreeMapA[Int],
+      fm: FreeMapA[Int],
       candidates: List[QSUGraph]): G[Option[QSUGraph]] = candidates match {
 
     case Nil =>

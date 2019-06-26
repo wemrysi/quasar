@@ -16,11 +16,12 @@
 
 package quasar
 
+import slamdata.Predef.{Product, Serializable}
 import scalaz.{Equal, Semigroup, Show}
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.equal._
 
-sealed abstract class IdStatus
+sealed abstract class IdStatus extends Product with Serializable
 
 object IdStatus {
   case object IdOnly extends IdStatus

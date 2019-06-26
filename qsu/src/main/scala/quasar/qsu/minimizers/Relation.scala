@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,32 +21,40 @@ import slamdata.Predef._
 
 import scala.collection.mutable
 
+import cats.Foldable
+import cats.syntax.foldable._
+
 private[minimizers] final case class Relation(index: Map[Symbol, Set[Symbol]]) {
-  private[this] val memo = mutable.Map[Symbol, Set[Symbol]]
+  @SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))
+  private[this] val memo = mutable.Map.empty[Symbol, Set[Symbol]]
+  @SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))
+  private[this] val computed = mutable.Set.empty[Symbol]
 
   /**
    * Produces the reflexive transitive closure of the directed
    * relation represented by `index`.
    */
   def closure(ref: Symbol): Set[Symbol] = {
-    def loop(ref: Symbol): Set[Symbol] = {
-      if (memo.contains(ref)) {
-        memo(ref)
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def compute(start: Symbol, reach: Symbol): Unit =
+      if (computed(reach)) {
+        memo += (start -> (memo.getOrElse(start, Set()) ++ memo(reach)))
       } else {
-        index.get(ref) match {
-          case Some(refs) if !refs.isEmpty =>
-            val results = refs.flatMap(loop)
-            memo += (ref -> results)
-            results
+        val updated = memo.getOrElse(start, Set()) + reach
 
-          case _ =>
-            memo += (ref -> Set())
-            Set()
-        }
+        memo += (start -> updated)
+
+        index.getOrElse(reach, Set())
+          .filterNot(updated)
+          .foreach(compute(start, _))
       }
+
+    if (!computed(ref)) {
+      compute(ref, ref)
+      computed += ref
     }
 
-    loop(ref)
+    memo(ref)
   }
 
   def +(pair: (Symbol, Symbol)): Relation = {
@@ -59,11 +67,17 @@ private[minimizers] final case class Relation(index: Map[Symbol, Set[Symbol]]) {
   }
 
   def closures: Set[Set[Symbol]] = {
-    def loop(remaining: Set[Symbol]): Set[Set[Symbol]] = {
-      val sym = remaining.head    // axiom of choice ftw
-      val cl = closure(sym)
-      loop(remaining -- cl) + cl
-    }
+    @SuppressWarnings(Array(
+      "org.wartremover.warts.Recursion",
+      "org.wartremover.warts.TraversableOps"))
+    def loop(remaining: Set[Symbol]): Set[Set[Symbol]] =
+      if (remaining.isEmpty) {
+        Set()
+      } else {
+        val sym = remaining.head    // axiom of choice ftw
+        val cl = closure(sym)
+        loop(remaining -- cl) + cl
+      }
 
     loop(index.keys.toSet)
   }
@@ -73,10 +87,12 @@ private[minimizers] object Relation extends (Map[Symbol, Set[Symbol]] => Relatio
 
   val Empty: Relation = Relation(Map())
 
-  def allPairs[F[_]: Foldable, A](fa: F[A])(p: (A, A) => Boolean): Relation = {
+  def allPairs[F[_]: Foldable, A](fa: F[A])(sym: A => Symbol)(p: (A, A) => Boolean): Relation = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(pairs: List[A], acc: Relation): Relation = pairs match {
       case hd :: tail =>
-        tail.filter(p(hd, _)).foldLeft(acc)((acc, a) => acc + (hd -> a))
+        val acc1 = tail.filter(p(hd, _)).foldLeft(acc)((acc, a) => acc + (sym(hd) -> sym(a)))
+        loop(tail, acc1)
 
       case Nil => acc
     }

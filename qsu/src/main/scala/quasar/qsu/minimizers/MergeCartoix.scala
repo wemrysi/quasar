@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,26 +19,47 @@ package minimizers
 
 import slamdata.Predef._
 
-import matryoshka.{BirecursiveT, EqualT, ShowT}
+import cats.MonoidK
+import cats.instances.map._
 
-import quasar.common.CPathNode
+import matryoshka._
+import matryoshka.data.free._
+
+import quasar.{IdStatus, RenderTreeT}
+//import quasar.RenderTree.ops._
 import quasar.common.effect.NameGenerator
-import quasar.qscript.{construction, MonadPlannerErr, RecFreeS}
-import quasar.qsu.{QScriptUniform => QSU}
+import quasar.contrib.iota._
+import quasar.contrib.scalaz.free._
+import quasar.fp._
+import quasar.fp.ski.κ2
+import quasar.qscript.{construction, Hole, MapFuncCore, MonadPlannerErr, OnUndefined, RecFreeS}
+import quasar.qsu.{QScriptUniform => QSU}, QSU.{Rotation, ShiftTarget}
 
-import scalaz.{Monad, Scalaz}, Scalaz._
+import scalaz.{~>, Equal, Foldable, Forall, Monad, NonEmptyList, Scalaz}, Scalaz._
 
-import scala.collection
-import scala.collection.{Map => SMap}
+import scala.collection.immutable.{Map => SMap}
 
-final class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends Minimizer[T] {
+import shims._
+
+sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT]
+    extends Minimizer[T]
+    with MraPhase[T] {
+
+  import IdStatus._
   import MinimizeAutoJoins.MinStateM
-  import QSUGraph.withName
   import QSUGraph.Extractors._
   import RecFreeS.RecOps
 
-  private val AboveKey = "above"
+  type Cartouche = quasar.qsu.minimizers.Cartouche[T]
+  type CStage = quasar.qsu.minimizers.CStage[T]
+  type ∀[P[_]] = Forall[P]
 
+  implicit def PEqual: Equal[P]
+
+  private val FM = Foldable[FreeMapA]
+  private implicit val MM = MonoidK[SMap[Symbol, ?]].algebra[Cartouche]
+
+  private val SourceKey = "source"
   private val func = construction.Func[T]
 
   def couldApplyTo(candidates: List[QSUGraph]): Boolean =
@@ -46,468 +67,539 @@ final class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def extract[
-      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
       candidate: QSUGraph)
       : Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = {
 
     candidate match {
-      case qgraph @ Transpose(parent, retain, rotations) =>
+      // handle a shift candidate
+      case Transpose(parent, retain, rotations) =>
         extract[G](parent) map {
           _ rightMap {
             _ andThen {
               _ flatMap { parent2 =>
-                derive[G](parent2)(QSU.LeftShift(_, retain, rotations))
+                updateGraph[G](parent2)(QSU.Transpose(_, retain, rotations))
               }
             }
           }
         }
 
+      // handle a transformed shift candidate
       case MappableRegion.MaximalUnary(Transpose(parent, retain, rotations), fm) =>
         extract[G](parent) map {
           _ rightMap {
-            _ andThen {
-              _ flatMap { parent2 =>
-                derive[G](parent2)(QSU.LeftShift(_, retain, rotations))
-              }
+            _ andThen { p2 =>
+              for {
+                parent2 <- p2
+                tpose <- updateGraph[G](parent2)(QSU.Transpose(_, retain, rotations))
+                res <- updateGraph[G](tpose)(QSU.Map(_, fm.asRec))
+              } yield res
             }
           }
         }
 
+      // handle a FreeMap
       case MappableRegion.MaximalUnary(parent, fm) =>
-        Some((
-          parent,
-          (parent2, fm2) => derive[G](parent2)(QSU.Map(_, (fm >> fm2).asRec))))
+        Some((parent, (parent2, fm2) => {
+          val f = MapFuncCore.normalized(fm >> fm2)
+
+          if (f === func.Hole)
+            parent2.point[G]
+          else
+            updateGraph[G](parent2)(QSU.Map(_, f.asRec))
+        }))
+
+      // handle the rest
+      case qgraph =>
+        Some((qgraph, (src, fm) => {
+          if (fm === func.Hole)
+            src.point[G]
+          else
+            updateGraph[G](src)(QSU.Map(_, fm.asRec))
+        }))
     }
   }
 
-  // the first component of the tuple is the rewrite target on any provenance association
-  // the second component is the root of the resulting graph
   def apply[
-      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
       original: QSUGraph,
       singleSource: QSUGraph,
       candidates: List[QSUGraph],
       fm: FreeMapA[Int])
       : G[Option[(QSUGraph, QSUGraph)]] = {
 
-    val optJoin: Option[CStage.Join[T]] =
-      candidates.traverse(readCandidate) map { cartoix =>
-        val mapped: SMap[Symbol, Cartouche[T]] = cartoix.zipWithIndex.map({
-          case (c, i) => Symbol(s"cart$i") -> c
-        })(collection.breakOut)
+    val maybeJoin: Option[CStage.Join[T]] =
+      candidates.traverse(readCandidate(singleSource, _)) map { cartoix =>
+        val cs = cartoix.zipWithIndex map {
+          case (c, i) => Symbol(s"cart$i") -> Cartouche.fromFoldable(c.reverse)
+        }
 
-        CStage.Join[T](func.Hole, mapped, fm.map(i => CartoucheRef.Final(Symbol(s"cart$i"))))
+        CStage.Join(cs.toMap, fm.map(i => CartoucheRef.Final(Symbol(s"cart$i"))))
       }
 
-    optJoin.map(simpifyJoin).traverse(reifyStage[G](_)).map(_.map(g => (g, g)))
+    maybeJoin
+      .map(simplifyJoin(_))
+      .traverse(j => reifyJoin[G](j, singleSource, StructLens.init(j.cartoix.size > 1), false))
+      .map(_.map(_.squared))
   }
 
-  // returns the list of stages in reverse order
+  private final class FuncOf(src: Symbol) {
+    def unapply(qgraph: QSUGraph): Option[FreeMap] =
+      MappableRegion.unaryOf(src, qgraph).filterNot(_ === func.Hole)
+  }
+
+  // returns the list of stages in reverse order, Nil represents the source
   // ignores projection
-  private def readCandidates(
-      dims: SMap[Symbol, QDims[T]],
-      singleSource: QSUGraph,
-      qgraph: QSUGraph)
-      : List[CStage] = qgraph match {
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def readCandidate(singleSource: QSUGraph, qgraph: QSUGraph): Option[List[CStage]] = {
+    val MapSrc = new FuncOf(singleSource.root)
 
-    case Transpose(src, retain, rot) =>
-      val above = MappableRegion[T](singleSource.root ===, src)
-      val cartoix = above.map(g => (g.root, readCandidate(singleSource, g)))
-      val realCount = cartoix.foldMap(_._2.length)
+    qgraph match {
+      case Transpose(src, retain, rot) =>
+        // struct
+        val above: FreeMapA[QSUGraph] =
+          MappableRegion[T](singleSource.root === _, src)
 
-      if (realCount > 1) {
-        val cmap = cartoix.foldMap(pair => Map(pair)) map {
-          case (root, stages) =>
-            Cartouche(stages.reverse, dims(root))
+        val maybeCartoix: Option[FreeMapA[(Symbol, List[CStage])]] =
+          above.traverse(g => readCandidate(singleSource, g).strengthL(g.root))
+
+        maybeCartoix map {
+          case FreeA((_, parent)) =>
+            CStage.Shift[T](func.Hole, retain.fold(IdOnly, ExcludeId), rot) :: parent
+
+          case cartoix =>
+            val roots = FM.foldMap(cartoix) { case (root, _) => Set(root) }
+
+            if (roots.size > 1) {
+              val cmap = FM.foldMap(cartoix) {
+                case (root, stages) => SMap(root -> Cartouche.fromFoldable(stages.reverse))
+              }
+
+              val joiner = cartoix map { case (root, _) => CartoucheRef.Final(root): CartoucheRef }
+              val join = CStage.Join(cmap, joiner)
+              val current = CStage.Shift[T](func.Hole, retain.fold(IdOnly, ExcludeId), rot)
+
+              // this is an interesting discovery: joins are fully subsuming during read
+              // it's justified because we haven't (yet) collapsed above, so there can be
+              // no common parents yet. in other words, we read as a tree and collapse to
+              // a dag
+              current :: join :: Nil
+            } else {
+              val parent = cartoix.toList.take(1).flatMap { case (_, s) => s }
+              val struct = cartoix.as(Hole())
+              val current = CStage.Shift[T](struct, retain.fold(IdOnly, ExcludeId), rot)
+
+              current :: parent
+            }
         }
 
-        val joiner = cartoix.map(_._1).map(CartoucheRef.Final)
-        val join = CStage.Join(cmap, joiner)
-        val current = CStage.Shift(func.Hole, retain.fold(IdOnly, ExcludeId), rot)
+      case MapSrc(f) =>
+        Some(List(CStage.Expr(f)))
 
-        // this is an interesting discovery: joins are fully subsuming during read
-        // it's justified because we haven't (yet) collapsed above, so there can be
-        // no common parents yet. in other words, we read as a tree and collapse to
-        // a dag
-        current :: join :: Nil
-      } else {
-        val incoming = cartoix.as(Hole())
-        val parent = cartoix.toList.flatMap(_._2)
-        val current = CStage.Shift(incoming, retain.fold(IdOnly, ExcludeId), rot)
+      case qgraph if qgraph.root === singleSource.root =>
+        Some(Nil)
 
-        current :: parent
-      }
-
-    case qgraph =>
-      assert(qgraph.root === singleSource.root)
-      Nil
+      case _ => None
+    }
   }
 
-  /*private def factorProjections(stage: CStage): List[CStage] = ???
+  private case class Buckets(
+      joins: SMap[Symbol, CStage.Join[T]],
+      shifts: SMap[Rotation, SMap[Symbol, CStage.Shift[T]]],
+      projects: SMap[Either[Int, String], Set[Symbol]],
+      exprs: SMap[Symbol, CStage.Expr[T]])
 
-  private def extractProjections[A](
-      fm: FreeMapA[A])
-      : FreeMapA[A \/ (CPathNode, FreeMapA[A])] = {
+  private object Buckets {
+    val Empty = Buckets(SMap(), SMap(), SMap(), SMap())
 
-    /*
-     * - extractProjectionsƒ has the type FreeMapA[A] => FreeMapA[A \/ (CPathNode, FreeMapA[A])] \/ CoEnv[MapFunc, FreeMapA[A]]
-     * - Stick it into elgotApo with fm as the A
-     * - With each stage, manually call .project on
-     *   the freemap
-     * - If you find a projection, make the cpath node,
-     *   pair it up with the other side of .project and
-     *   point it into FreeMapA
-     * - If you find an A, make a left, and point it
-     * - If it's something else, throw it into CoEnv
-     *   and return it on the right
-     */
+    /** Bucket each cartouche based on potential compatibility, distinguishing
+      * between kind of stage and subgrouping based on attributes (like `Rotation`)
+      *
+      * Note that being in the same bucket doesn't guarantee compatible, just possible
+      */
+    def fromCartoix(cartoix: SMap[Symbol, Cartouche]): Buckets = {
+      import CStage._
 
-    interpret(fm, ...).project
-  }*/
+      cartoix.foldLeft(Empty) {
+        case (buckets, (ref, Cartouche.Stages(NonEmptyList(head, _)))) =>
+          head match {
+            case j @ Join(_, _) =>
+              buckets.copy(joins = buckets.joins + (ref -> j))
 
-  private def simpifyJoin(join: CStage.Join[T]): Either[Cartouche, CStage.Join[T]] = {
-    case class Buckets(
-        joins: Set[Symbol],
-        shifts: SMap[Rotation, Set[Symbol]],
-        projects: SMap[CPathNode, Symbol])
+            case s @ Shift(_, _, rot) =>
+              val shiftsMap = buckets.shifts.getOrElse(rot, SMap()) + (ref -> s)
+              buckets.copy(shifts = buckets.shifts + (rot -> shiftsMap))
 
-    object Buckets {
-      val Empty = Buckets(Set(), SMap(), SMap())
+            case Project(n) =>
+              val prjsSet = buckets.projects.getOrElse(n, Set()) + ref
+              buckets.copy(projects = buckets.projects + (n -> prjsSet))
 
-      // get the sets from above and bucket all the cartoix referenced
-      // everything else goes in a separate bucket
-      // within each bucket, subgroup by compatibility potential
-      //   1. Node type
-      //   2. Project ref
-      //   3. Shift rotation
-      // note that subgrouping doesn't mean guaranteed compatible
-      def fromStages(incomplete: SMap[Symbol, Cartouche[T]]): Buckets = {
-        import CStage._
+            case e @ Expr(_) =>
+              buckets.copy(exprs = buckets.exprs + (ref -> e))
 
-        incomplete.foldLeft(Empty) {
-          case (buckets, (ref, Cartouche(head :: _, _))) =>
-            import CStage._
+            case Cartesian(_) => buckets
+          }
 
-            head match {
-              case Join(_, _, _) =>
-                buckets.copy(joins = buckets.joins + ref)
-
-              case Shift(_, _, rot) =>
-                val shiftsSet = buckets.shifts.getOrElse(rot, Set()) + ref
-                buckets.copy(shifts = buckets.shifts + (rot -> shiftsSet))
-
-              case Project(_, n) =>
-                buckets.copy(projects = buckets.projects + (n -> ref))
-            }
-
-          case (_, (_, Cartouche(Nil, _))) =>
-            sys.error("empty cartouche spotted (impossible)")
-        }
+        case (buckets, _) => buckets
       }
     }
+  }
 
-    case class Residual(stages: List[CStage], rewrites: Map[Symbol, Option[Int]])
-
-    def step(
-        incomplete: Map[Symbol, Cartouche],
-        above: List[CStage],
-        rewrites: Map[Symbol, Option[Int]]): Residual = {
+  /** Attempts to simplify a CStage.Join by coalescing compatible stages. */
+  @SuppressWarnings(Array(
+    "org.wartremover.warts.Recursion",
+    "org.wartremover.warts.TraversableOps"))
+  private def simplifyJoin(join: CStage.Join[T]): CStage.Join[T] = {
+    def step(cartoix: SMap[Symbol, Cartouche], depth: Int)
+        : (Either[Cartouche, SMap[Symbol, Cartouche]], SMap[Symbol, CartoucheRef]) = {
 
       import CStage._
-      import state._
 
-      val buckets = Buckets.fromStages(incomplete)
+      val buckets = {
+        val bs = Buckets.fromCartoix(cartoix)
+        bs.copy(joins = bs.joins.map { case (s, j) => (s, simplifyJoin(j)) })
+      }
 
       // within subgroups, compare all possible pairs and build final subsubgroups
       // this process is O(n^3) in the size of each bucket, since computing the set
       // of disjoint reflexive transitive closures is O(n) with memoization
-      val joinRelation = Relation.allPairs(buckets.joins) { (js1, js2) =>
-        // can't merge joins at all, so they have to be fully equal
-        incomplete(js1) === incomplete(js2)
-      }
-
-      val shiftRelations = buckets.shifts mapValues { syms =>
-        Relation.allPairs(syms) { (ss1, ss2) =>
-          incomplete(ss1).incoming === incomplete(ss2).incoming
+      val joinRelation =
+        Relation.allPairs(buckets.joins.toList)(_._1) {
+          case ((_, l), (_, r)) =>
+            // can't merge joins at all, so they have to be fully equal
+            (l: CStage) === r
         }
-      }
+
+      val shiftRelations =
+        buckets.shifts mapValues { syms =>
+          Relation.allPairs(syms.toList)(_._1) {
+            case ((_, l), (_, r)) => l.struct === r.struct
+          }
+        }
 
       val projectRelations = buckets.projects mapValues { syms =>
-        Relation.allPairs(syms) { (ps1, ps2) =>
-          incomplete(ps1).incoming === incomplete(ps2).incoming
+        Relation.allPairs(syms)(s => s)(κ2(true))
+      }
+
+      val exprRelation =
+        Relation.allPairs(buckets.exprs.toList)(_._1) {
+          case ((_, l), (_, r)) => l.f === r.f
         }
-      }
 
-      /*
-       * The tuple represents the resolution of a closure: an optional
-       * collapsee and the set of cartouche identifiers which "went into"
-       * it. The second component of the outer tuple is the set of
-       * identifiers that were "left over", and couldn't be merged.
-       * This set of leftovers is only relevant when the computation of
-       * the reflexive transitive closure is not sufficient to fully
-       * determine mergeability. In other words, it applies when the
-       * mapping process could determine that related stages are not in
-       * fact mergeable (i.e. making a decision).
-       */
-      type States = Set[(Option[(CStage, Set[Symbo])], Set[Symbol])]
+      /** The tuple represents the resolution of a closure: an optional
+        * collapsee and the set of cartouche identifiers that collapsed.
+        */
+      type Resolved = List[(CStage, Set[Symbol])]
 
-      // collapse final subsubgroups
+      val resolvedJoins: Resolved =
+        joinRelation.closures.toList map { cl =>
+          // just arbitrarily pick a join; we know by construction they're all equal
+          (buckets.joins(cl.head), cl)
+        }
 
-      val joinStates: States = joinRelation.closures map { cl =>
-        // just arbitrarily pick a join; we know by construction they're all equal
-        (Some((incomplete(cl.head).head, cl)), Set())
-      }
+      val resolvedShifts: Resolved = shiftRelations.toList flatMap {
+        case (rot, rel) =>
+          rel.closures.toList map { cl =>
+            val shifts = cl.map(ref => ref -> buckets.shifts(rot)(ref)).toMap
 
-      val shiftStates: States = shiftRelations.values flatMap { rel =>
-        rel.closures flatMap { cl =>
-          val shifts = cl flatMap { ref =>
-            incomplete.get(ref) collect {
-              case s @ Shift(_, _, _) => ref -> s
+            val (ido, eid, iid) = shifts.foldLeft((Set[Symbol](), Set[Symbol](), Set[Symbol]())) {
+              case ((ido, eid, iid), (ref, Shift(_, ids, _))) =>
+                ids match {
+                  case IdStatus.IdOnly => (ido + ref, eid, iid)
+                  case IdStatus.IncludeId => (ido, eid, iid + ref)
+                  case IdStatus.ExcludeId => (ido, eid + ref, iid)
+                }
             }
-          } toMap
 
-          val (ido, eid, iid) = shifts.foldLeft((Set[Symbol](), Set[Symbol](), Set[Symbol]())) {
-            case ((ido, eid, iid), (ref, Shift(_, ids, _))) =>
-              ids match {
-                case IdStatus.IdOnly => (ido + ref, eid, iid)
-                case IdStatus.IncludeId => (ido, eid, iid + ref)
-                case IdStatus.ExcludeId => (ido, eid + ref, iid)
+            val idStatus = if (!iid.isEmpty)
+              IdStatus.IncludeId
+            else if (ido.isEmpty)
+              IdStatus.ExcludeId
+            else if (eid.isEmpty)
+              IdStatus.IdOnly
+            else    // this is the case where we have both ido and eid
+              IdStatus.IncludeId
+
+            (Shift(shifts.values.head.struct, idStatus, rot), cl)
+          }
+      }
+
+      val resolvedProjects: Resolved =
+        projectRelations.toList flatMap {
+          case (idx, rel) => rel.closures.toList.map((Project[T](idx), _))
+        }
+
+      val resolvedExprs: Resolved =
+        exprRelation.closures.toList map { cl =>
+          (buckets.exprs(cl.head), cl)
+        }
+
+      val allResolved =
+        resolvedJoins ::: resolvedShifts ::: resolvedProjects ::: resolvedExprs
+
+      // Returns whether the original cartouche that was collapsed into `stage`
+      // referenced identities.
+      def referencesId(stage: CStage, ref: Symbol): Boolean =
+        (stage, cartoix(ref)) match {
+          case (CStage.Shift(_, IncludeId, _), Cartouche.Stages(NonEmptyList(CStage.Shift(_, IdOnly, _), _))) =>
+            true
+
+          case _ =>
+            false
+        }
+
+      def remapResolved(stage: CStage, from: Symbol, to: Symbol): CartoucheRef =
+        if (referencesId(stage, from))
+          CartoucheRef.Offset(to, depth)
+        else
+          CartoucheRef.Final(to)
+
+      val (simplified, remap) =
+        allResolved.foldLeft((cartoix, SMap.empty[Symbol, CartoucheRef])) {
+          case ((cx, remap0), (stage, syms)) =>
+            val h = syms.head
+
+            val nestedCartoix =
+              cx.filterKeys(syms) map {
+                case (s, cart) => (s, cart.dropHead)
               }
-          }
 
-          val (_, Shift(incoming, _, rot)) = shifts.head
+            if (nestedCartoix forall { case (_, c) => c.isEmpty }) {
+              // Everything merged, so remap all references
+              val rm1 = syms.map(fm => (fm, remapResolved(stage, fm, h))).toMap
+              ((cx -- syms).updated(h, Cartouche.stages(NonEmptyList(stage))), remap0 ++ rm1)
+            } else {
+              // Extract any source references of identities, removing their cartouche
+              val (cx1, ids) = nestedCartoix.toList.foldLeft((SMap[Symbol, Cartouche](), Set[Symbol]())) {
+                case ((c, i), (ref, Cartouche.Source())) if referencesId(stage, ref) =>
+                  (c, i + ref)
 
-          val idStatus = if (!iid.isEmpty)
-            IdStatus.IncludeId
-          else if (ido.isEmpty)
-            IdStatus.ExcludeId
-          else if (eid.isEmpty)
-            IdStatus.IdOnly
-          else    // this is the case where we have both ido and eid
-            IdStatus.IncludeId
+                case ((c, r), kv) => (c + kv, r)
+              }
 
-          // these are the IdOnly cartoix which will go to Undefined because they're wrong
-          // we don't have an undefined expression here though, so we just don't collapse
-          val undefineds = ido.filter(ref => incomplete(ref).stages.nonEmpty)
-          val ido2 = ido - undefineds
+              val (res, rmTail) = step(cx1, depth + 1)
 
-          val reduced = incomplete.filterKeys(eid ++ iid) flatMap {
-            case (ref, Cartouche(hd :: Nil, dims)) =>
-              None
+              res match {
+                case Right(cts) =>
+                  val id = Symbol(s"${h.name}:$depth")
+                  val rmIds = ids.map((_, CartoucheRef.Offset(id, depth))).toMap
+                  val tail = Cartouche.stages(NonEmptyList[CStage](CStage.Cartesian(cts)))
+                  ((cx -- syms).updated(id, stage :: tail), remap0 ++ rmIds ++ rmTail)
 
-            case (ref, Cartouche(hd :: tail, dims)) =>
-              Some(ref -> Cartouche(tail, dims))
-          }
-
-          val collapsed = State.init(
-            incomplete.filterKeys(reduced),
-            Shift(incoming, idStatus, rot))
-
-          val uncollapsed = undefineds map { ref =>
-            State.init(SMap(ref -> incomplete(ref)), )
-          }
-
-          uncollapsed ++ collapsed
-        }
-      }
-
-      val projectStates: Set[State] = projectRelations.values flatMap { rel =>
-        rel.closures flatMap { cl =>
-          val projects = cl flatMap { ref =>
-            incomplete.get(ref) collect {
-              case p @ Project(_, ) => ref -> p
+                case Left(ct) =>
+                  val rmIds = ids.map((_, CartoucheRef.Offset(h, depth))).toMap
+                  ((cx -- syms).updated(h, stage :: ct), remap0 ++ rmIds ++ rmTail)
+              }
             }
-          } toMap
-
-
         }
-      }
 
-      val states = joinStates ++ shiftStates ++ projectStates
-
-      val residuals = if (states.size === 1) {
-        states.head match {
-          case (Some((collapsed, from)), remainder) =>
-
-
-          case (None, remainder) =>
-            // ok the problem here is `above`!
-            // the Join representation conflates common prefix
-            // with resolvable common suffix (which doesn't exist)
-            // we probably need to add a CStage.Residual or something
-            remainder.map(step)
-        }
-      } else {
-
-      }
+      if (simplified.size === 1)
+        (Left(simplified.head._2), remap)
+      else
+        (Right(simplified), remap)
     }
 
-    step(State.fromJoin(join)).toJoin
+    step(join.cartoix, 0) match {
+      case (Left(cartouche), remap) =>
+        CStage.Join(
+          SMap('cart0 -> cartouche),
+          join.joiner.map(cr => remap.getOrElse(cr.ref, cr).setRef('cart0)))
+
+      case (Right(cartoix), remap) =>
+        CStage.Join(cartoix, join.joiner.map(cr => remap.getOrElse(cr.ref, cr)))
+    }
   }
 
-  private def eliminateSingletonJoins(join: CStage.Join[T]): CStage.Join[T] =
-    join    // TODO traverse up the hierarchy and eliminate joins with a single cartouche
+  private def idsKey(ref: Symbol, offset: Int): String =
+    ref.name + "_" + offset.toString
 
-  private def reifyStage[
-      G[_]: Monad: NameGenerator: RevIdxM](
-      stage: CStage[T],
+  private def reifyJoin[
+      G[_]: Monad: MonadPlannerErr: NameGenerator: RevIdxM: MinStateM[T, P, ?[_]]](
+      join: CStage.Join[T],
       parent: QSUGraph,
-      lens: StructLens)
+      lens: StructLens,
+      isNested: Boolean)
       : G[QSUGraph] = {
 
-    import lens._
-
-    def idsKey(ref: Symbol, offset: Int): CPathField =
-      CPathField(ref.name + "_" + offset.toString)
-
-    def reifyFirstCartouche(
-        parent: QSUGraph,
-        cartoix: List[(Symbol, Cartouche[T])])
-        : G[QSUGraph] = cartoix match {
-
-      case (s @ Symbol(cname), Cartouche(stages, _)) :: rest =>
-        stages match {
-          case hd :: tail =>
-            // we can ignore parent inject for now since we're preserving the "above"
-            def inject2(offset: Int) =
-              new ∀[λ[α => (FreeMapA[α], FreeMapA[α], Option[FreeMapA[α]]) => FreeMapA[α]]] {
-                def apply[α] = { (results, above, maybeIds) =>
-                  val core = func.StaticMapS(
-                    cname -> results,
-                    AboveKey -> above)
-
-                  maybeIds map { ids =>
-                    func.ConcatMaps(
-                      core,
-                      func.StaticMapS(idsKey(s, offset).value -> ids))
-                  } getOrElse core
-                }
-              }
-
-            val lens2 = StructLens(project, inject2(0), true)
-            val resultsM = reifyStage[G](hd, parent, lens2) flatMap { parent =>
-              val project2 = func.ProjectKeyS(func.Hole, cname)
-
-              tail.zipWithIndex.foldLeftM(parent) {
-                case (parent, (stage, i)) =>
-                  reifyStage[G](stage, parent, StructLens(project2, inject2(i + 1), true))
-              }
-            }
-
-            resultsM.flatMap(reifyMiddleCartoix(CPathField(cname), _, rest))
-
-          case Nil =>
-            sys.error("empty cartouche should be impossible")
-        }
-
-      case Nil =>
-        sys.error("empty join should be impossible")
+    val (srcRefs, rest) = join.cartoix.toList.foldRight((Set[Symbol](), List[(Symbol, NonEmptyList[CStage])]())) {
+      case ((s, Cartouche.Source()), (as, r)) => (as + s, r)
+      case ((s, Cartouche.Stages(ss)), (as, r)) => (as, (s, ss) :: r)
     }
 
-    // TODO manage dims
-    def reifyMiddleCartoix(
-        previous: CPathField,
-        parent: QSUGraph,
-        cartoix: List[(Symbol, Cartouche[T])])
-        : G[QSUGraph] = cartoix match {
+    for {
+      results <- reifyCartoix[G](parent, rest, lens, isNested)
 
-      case (Symbol(cname), Cartouche(stages, _)) :: rest =>
-        val project2 = func.ProjectKeyS(func.Hole, previous.value)
+      f = join.joiner flatMap {
+        case CartoucheRef.Final(s) if srcRefs(s) =>
+          func.ProjectKeyS(func.Hole, SourceKey)
 
-        def inject2(offset: Int) =
-          new ∀[λ[α => (FreeMapA[α], FreeMapA[α], Option[FreeMapA[α]]) => FreeMapA[α]]] {
-            def apply[α] = { (results, above, maybeIds) =>
+        case CartoucheRef.Final(s) =>
+          func.ProjectKeyS(func.Hole, s.name)
+
+        case CartoucheRef.Offset(s, off) =>
+          func.ProjectKeyS(func.Hole, idsKey(s, off))
+      }
+
+      mapped <- results match {
+        case LeftShift(src, struct, idStatus, onUndef, repair, rot) =>
+          val joinRep = MapFuncCore.normalized(f >> repair)
+          updateGraph[G](src)(QSU.LeftShift(_, struct, idStatus, onUndef, joinRep, rot))
+
+        case other =>
+          updateGraph[G](other)(QSU.Map(_, f.asRec))
+      }
+    } yield mapped
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def reifyCartoix[
+      G[_]: Monad: MonadPlannerErr: NameGenerator: RevIdxM: MinStateM[T, P, ?[_]]](
+      parent: QSUGraph,
+      cartoix: List[(Symbol, NonEmptyList[CStage])],
+      lens0: StructLens,
+      isNested: Boolean)
+      : G[QSUGraph] =
+    cartoix match {
+      case (s, NonEmptyList(hd, tail)) :: rest =>
+        def inj(offset: Int) =
+          new ∀[λ[α => (Symbol, FreeMapA[α], FreeMapA[α], Option[FreeMapA[α]]) => FreeMapA[α]]] {
+            def apply[α] = { (id, results, above, maybeIds) =>
               val core = func.ConcatMaps(
                 above,
-                func.StaticMapS(cname -> results))
+                func.MakeMapS(id.name, results))
 
-              maybeIds map { ids =>
+              maybeIds.fold(core) { ids =>
                 func.ConcatMaps(
                   core,
-                  func.StaticMapS(idsKey(s, offset).value -> ids))
-              } getOrElse core
+                  func.MakeMapS(idsKey(id, offset), ids))
+              }
             }
           }
 
-        stages match {
-          case hd :: tail =>
-            val lens2 = StructLens(project2, inject2(0), true)
-            val resultsM = reifyStage[G](hd, parent, lens2) flatMap { parent =>
-              val project2 = func.ProjectKeyS(func.Hole, cname)
+        val prj =
+          if (isNested)
+            lens0.project
+          else
+            func.ProjectKeyS(func.Hole, SourceKey)
 
-              tail.zipWithIndex.foldLeftM(parent) {
-                case (parent, (stage, i)) =>
-                  reifyStage[G](stage, parent, StructLens(project2, inject2(i + 1), true))
-              }
-            }
+        val resultsM = reifyStage[G](s, hd, parent, lens0, true) flatMap { parent =>
+          val projectPrev = func.ProjectKeyS(func.Hole, s.name)
 
-            resultsM.flatMap(reifyMiddleCartoix(CPathField(cname), _, rest))
-
-          case Nil =>
-            sys.error("empty cartouche should be impossible")
+          tail.zipWithIndex.foldLeftM(parent) {
+            case (parent, (stage, i)) =>
+              reifyStage[G](s, stage, parent, StructLens(projectPrev, inj(i + 1), true), true)
+          }
         }
+
+        resultsM.flatMap(reifyCartoix[G](_, rest, StructLens(prj, inj(0), true), isNested))
 
       case Nil =>
         parent.point[G]
     }
 
-    stage match {
-      case CStage.Project(incoming, CPathField(field)) =>
-        derive[G](parent)(
-          QSU.Map(
-            _,
-            inject[Hole](func.ProjectKeyS(incoming >> project, field), func.Hole, None)))
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def reifyStage[
+      G[_]: Monad: MonadPlannerErr: NameGenerator: RevIdxM: MinStateM[T, P, ?[_]]](
+      id: Symbol,
+      stage: CStage,
+      parent: QSUGraph,
+      lens: StructLens,
+      isNested: Boolean)
+      : G[QSUGraph] = {
 
-      case CStage.Project(incoming, CPathIndex(idx)) =>
-        derive[G](parent)(
-          QSU.Map(
-            _,
-            inject[Hole](func.ProjectIndexI(incoming >> project, idx), func.Hole, None)))
+    def applyToIncoming(in: QSUGraph, f: FreeMapA ~> FreeMapA): G[QSUGraph] =
+      in match {
+        case LeftShift(src, struct, idStatus, onUndef, repair, rot) =>
+          updateGraph[G](src)(
+            QSU.LeftShift(
+              _,
+              struct,
+              idStatus,
+              onUndef,
+              lens.inject[ShiftTarget](
+                id,
+                MapFuncCore.normalized(f(repair)),
+                repair,
+                None),
+              rot))
 
-      case CStage.Shift(incoming, idStatus, rot) =>
-        derive[G](parent)(
-          QSU.LeftShift(
-            _,
-            incoming >> project,
-            idStatus,
-            if (outer) OnUndefined.Emit else OnUnefined.Omit,
-            inject[JoinSide](
-              idStatus match {
-                case IncludeId => func.ProjectIndexI(func.RightSide, 1)
-                case _ => func.RightSide
-              },
-              func.LeftSide,
-              idStatus match {
-                case IncludeId => Some(func.ProjectIndexI(func.RightSide, 0))
-                case _ => None
-              })))
-
-      // safe to assume cartoix is non-empty
-      case CStage.Join(incoming, cartoix, joiner) =>
-        for {
-          wrappedParent <- if (incoming === func.Hole)
-            parent.point[G]
-          else
-            derive[G](parent)(QSU.Map(_, inject[Hole](incoming >> project, func.Hole, None)))
-
-          results <- reifyFirstCartouche(wrappedParent, cartoix)
-
-          mapped <- derive[G](results)(
+        case Map(src, rfm) =>
+          updateGraph[G](src)(
             QSU.Map(
               _,
-              inject[Hole](
-                joiner flatMap {
-                  case CartoucheRef.Final(s) =>
-                    func.ProjectKeyS(func.Hole, s.name)
+              lens.inject[Hole](
+                id,
+                MapFuncCore.normalized(f(rfm.linearize)),
+                func.Hole,
+                None).asRec))
 
-                  case CartoucheRef.Offset(s, off) =>
-                    func.ProjectKeyS(func.Hole, idsKey(ref, off).value)
-                },
-                func.ProjectKeyS(func.Hole, AboveKey),
-                None)))
-        } yield mapped
+        case src =>
+          updateGraph[G](src)(
+            QSU.Map(
+              _,
+              lens.inject[Hole](
+                id,
+                MapFuncCore.normalized(f(func.Hole)),
+                func.Hole,
+                None).asRec))
+      }
+
+    stage match {
+      case CStage.Project(path) =>
+        val projected =
+          λ[FreeMapA ~> FreeMapA] { incoming =>
+            path.fold(
+              func.ProjectIndexI(lens.project >> incoming, _),
+              func.ProjectKeyS(lens.project >> incoming, _))
+          }
+
+        applyToIncoming(parent, projected)
+
+      case CStage.Expr(f) =>
+        applyToIncoming(parent, λ[FreeMapA ~> FreeMapA](f >> lens.project >> _))
+
+      case CStage.Shift(struct, idStatus, rot) =>
+        updateGraph[G](parent)(
+          QSU.LeftShift(
+            _,
+            (struct >> lens.project).asRec,
+            idStatus,
+            if (lens.outer) OnUndefined.Emit else OnUndefined.Omit,
+            lens.inject[ShiftTarget](
+              id,
+              idStatus match {
+                case IncludeId => func.ProjectIndexI(RightTarget[T], 1)
+                case _ => RightTarget[T]
+              },
+              AccessLeftTarget[T](Access.value(_)),
+              idStatus match {
+                case IncludeId => Some(func.ProjectIndexI(RightTarget[T], 0))
+                case _ => None
+              }),
+            rot))
+
+      case CStage.Cartesian(cartoix) =>
+        val cartoix2 = cartoix.toList map {
+          case (k, Cartouche.Stages(ss)) => (k, ss)
+          case (k, Cartouche.Source()) => (k, NonEmptyList[CStage](CStage.Expr(func.Hole)))
+        }
+
+        reifyCartoix[G](parent, cartoix2, lens, isNested)
+
+      case j @ CStage.Join(_, _) =>
+        reifyJoin[G](j, parent, lens, isNested)
     }
   }
+
+  private def updateGraph[
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
+      parent: QSUGraph)(
+      nodeF: Symbol => QSU[T, Symbol])
+      : G[QSUGraph] =
+    for {
+      g <- derive[G](parent)(nodeF)
+      _ <- MinimizeAutoJoins.updateProvenance[T, G](qprov, g)
+    } yield g
 
   private def derive[
       G[_]: Monad: NameGenerator: RevIdxM](
@@ -530,12 +622,44 @@ final class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
 
   private case class StructLens(
       project: FreeMap,
-      inject: ∀[λ[α => (FreeMapA[α], FreeMap[α], Option[FreeMapA[α]]) => FreeMapA[α]]],
+      // (cartouche id, result access, incoming value, identity access)
+      inject: ∀[λ[α => (Symbol, FreeMapA[α], FreeMapA[α], Option[FreeMapA[α]]) => FreeMapA[α]]],
       outer: Boolean)
+
+  private object StructLens {
+    def init(includeSource: Boolean): StructLens = {
+      val inj =
+        new ∀[λ[α => (Symbol, FreeMapA[α], FreeMapA[α], Option[FreeMapA[α]]) => FreeMapA[α]]] {
+          def apply[α] = { (id, results, above, maybeIds) =>
+            val core =
+              if (includeSource)
+                func.StaticMapS(
+                  SourceKey -> above,
+                  id.name -> results)
+              else
+                func.MakeMapS(id.name, results)
+
+            maybeIds.fold(core) { ids =>
+              func.ConcatMaps(
+                core,
+                func.MakeMapS(idsKey(id, 0), ids))
+            }
+          }
+        }
+
+      StructLens(func.Hole, inj, true)
+    }
+  }
 }
 
 object MergeCartoix {
 
-  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT]: MergeCartoix[T] =
-    new MergeCartoix[T]
+  def apply[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT](
+      qp: QProv[T])(
+      implicit eqP: Equal[qp.P])
+      : Minimizer.Aux[T, qp.P] =
+    new MergeCartoix[T] {
+      val qprov: qp.type = qp
+      val PEqual = eqP
+    }
 }
