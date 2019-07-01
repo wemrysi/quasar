@@ -103,6 +103,73 @@ final class Identities[A] private (
     go(roots, 0).value
   }
 
+  /** Drops the longest suffix satisfying the predicate from all vectors. */
+  def dropRightWhile(p: A => Boolean): Option[Identities[A]] =
+    dropRightWhileS(())((_, a) => ((), p(a)))
+
+  /** Drops the longest suffix satisfying the stateful predicate from all vectors.
+    *
+    * State values are maintained per logical vector.
+    */
+  def dropRightWhileS[S](init: S)(p: (S, A) => (S, Boolean)): Option[Identities[A]] = {
+    @tailrec
+    def loop(s0: Map[Int, (S, Boolean)], g0: G, r0: Set[Int], e0: Set[Int]): (G, Set[Int], Set[Int]) = {
+      val (cont, s1, g1, e1) = e0.foldLeft((false, s0, g0, Set[Int]())) {
+        case ((accc, accs, accg, acce), e) =>
+          val v = accg(e)
+          val (s, halt) = accs(e)
+
+          if (halt) {
+            (accc, accs, accg, acce + e)
+          } else {
+            val (compS, drop) = p(s, v.node.value)
+
+            val (nextS, nextG, nextE) =
+              if (drop) {
+                val (ns, ng) =
+                  v.in.foldLeft((accs, accg)) {
+                    case ((as, ag), i) =>
+                      val ag1 =
+                        if (v.out.isEmpty)
+                          vout(i).modify(_ - e)(ag)
+                        else
+                          ag
+
+                      (as.updated(i, (compS, false)), ag1)
+                  }
+
+                (ns, ng, acce ++ v.in)
+              } else {
+                (accs.updated(e, (compS, true)), accg, acce + e)
+              }
+
+            (accc || drop, nextS, nextG, nextE)
+          }
+      }
+
+      val r1 = (e0 &~ e1).foldLeft(r0) {
+        case (rs, e) =>
+          if (rs(e) && vout(e).exist(_.isEmpty)(g1))
+            rs - e
+          else
+            rs
+      }
+
+      if (cont)
+        loop(s1, g1, r1, e1)
+      else
+        (g1, r1, e1)
+    }
+
+    val (g1, r1, e1) =
+      loop(ends.iterator.map((_, (init, false))).toMap, g, roots, ends)
+
+    if (r1.isEmpty)
+      None
+    else
+      Some(new Identities(nextV, r1, e1, g1))
+  }
+
   /** A view of these identities as a set of lists of conjoined regions. */
   def expanded: NonEmptyList[Dimensions[Region[A]]] = {
     def updateVecs(xs: List[Dimensions[Region[A]]], conj: Boolean, a: A)

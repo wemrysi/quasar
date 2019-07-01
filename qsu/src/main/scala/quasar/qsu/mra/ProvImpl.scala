@@ -16,20 +16,18 @@
 
 package quasar.qsu.mra
 
-import slamdata.Predef.{None, Option, Some}
+import slamdata.Predef.{Boolean, None, Option, Some}
 
 import quasar.contrib.cats.boolean._
 import quasar.qscript.OnUndefined
 
 import cats.{Applicative, Order}
-import cats.data.NonEmptyList
 import cats.instances.list._
 import cats.instances.set._
 import cats.instances.tuple._
 import cats.syntax.eq._
 import cats.syntax.foldable._
 import cats.syntax.functor._
-import cats.syntax.list._
 import cats.syntax.traverse._
 
 import monocle.Traversal
@@ -119,30 +117,19 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
     createOrConj(D.fresh(), p)
 
   def projectStatic(scalarId: S, sort: T, p: P): P = {
-    def applyVec(v: NonEmptyList[NonEmptyList[Dim[S, V, T]]]): Option[NonEmptyList[NonEmptyList[Dim[S, V, T]]]] = {
-      val r = v.reverse
-      val rh = r.head.reverse
-
-      val newh =
-        if (rh.head === D.inject(scalarId, sort))
-          rh.tail
-        else
-          rh.toList.dropWhile(D.inject.nonEmpty)
-
-      newh.reverse.toNel match {
-        case Some(h) => Some(NonEmptyList(h, r.tail).reverse)
-        case None => r.tail.reverse.toNel
-      }
-    }
-
     def applyIds(ids: Identities[Dim[S, V, T]]): Option[Identities[Dim[S, V, T]]] =
-      if (ids.lastValues.forall(D.inject.isEmpty))
+      if (ids.lastValues.forall(D.inject.isEmpty)) {
         Some(ids :≻ D.project(scalarId, sort))
-      else
-        ids.expanded.toList
-          .flatMap(applyVec(_).toList)
-          .toNel
-          .map(Identities.collapsed(_))
+      } else {
+        val inj = D.inject(scalarId, sort)
+
+        ids.dropRightWhileS[Option[Boolean]](None) {
+          case (Some(false), _) => (Some(false), false)
+          case (None, d) if d === inj => (Some(false), true)
+          case (_, D.inject(_, _)) => (Some(true), true)
+          case _ => (Some(false), false)
+        }
+      }
 
     if (p.isEmpty)
       Uop.one(Identities(D.project(scalarId, sort)))

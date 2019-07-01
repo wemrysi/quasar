@@ -16,7 +16,7 @@
 
 package quasar.qsu.mra
 
-import slamdata.Predef.{Int, None, Set, Some, StringContext}
+import slamdata.Predef._
 
 import quasar.Qspec
 
@@ -46,7 +46,7 @@ object IdentitiesSpec extends Qspec
 
   implicit val params = Parameters(maxSize = 10, workers = 2)
 
-  type Vecs = NonEmptyList[NonEmptyList[NonEmptyList[Int]]]
+  type Vecs = NonEmptyList[Dimensions[Region[Int]]]
 
   def beEquivalentToDistinct(vecs: Vecs): Matcher[Identities[Int]] =
     new Matcher[Identities[Int]] {
@@ -75,6 +75,30 @@ object IdentitiesSpec extends Qspec
   "depth is length of longest vector" >> prop { vecs: Vecs =>
     val depth = vecs.map(_.length).maximumOption getOrElse 0
     Identities.collapsed(vecs).depth must_=== depth
+  }
+
+  "dropRightWhile drops from the end of each individual vector" >> prop { vecs: Vecs =>
+    val p: Int => Boolean = _ % 2 == 1
+    val ids = Identities.collapsed(vecs)
+
+    def drop(vs: List[Region[Int]]): List[Region[Int]] =
+      vs match {
+        case r :: rs =>
+          val r1 = r.toList.reverse.dropWhile(p)
+
+          r1.toNel match {
+            case Some(h) => h.reverse :: rs
+            case None => drop(rs)
+          }
+
+        case Nil => Nil
+      }
+
+    val exp = vecs.toList flatMap { v =>
+      drop(v.toList.reverse).reverse.toNel.toList
+    }
+
+    ids.dropRightWhile(p) eqv exp.toNel.map(Identities.collapsed(_))
   }
 
   "initRegions" >> {
