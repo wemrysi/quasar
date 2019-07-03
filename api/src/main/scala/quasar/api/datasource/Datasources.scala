@@ -29,8 +29,10 @@ import scalaz.{\/, ISet}
   * @tparam G multple results
   * @tparam I identity
   * @tparam C configuration
+  * @tparam OldS old schema configuration
+  * @tparam S schema configuration
   */
-trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
+trait Datasources[F[_], G[_], I, C, OldS <: SchemaConfig, S <: SchemaConfig] {
   import DatasourceError._
 
   type PathType <: ResourcePathType
@@ -86,8 +88,14 @@ trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
   def oldResourceSchema(
       datasourceId: I,
       path: ResourcePath,
-      schemaConfig: S,
+      schemaConfig: OldS,
       timeLimit: FiniteDuration)
+      : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]]
+
+  def resourceSchema(
+      datasourceId: I,
+      path: ResourcePath,
+      schemaConfig: S)
       : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]]
 
   /** The set of supported datasource types. */
