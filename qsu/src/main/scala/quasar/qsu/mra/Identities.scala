@@ -277,6 +277,8 @@ final class Identities[A] private (
   def merge(that: Identities[A])(implicit A: Order[A]): Identities[A] = {
     val zmap = SortedMap.empty[Node[A], NonEmptyList[Int]](Order[Node[A]].toOrdering)
 
+    println(s"MERGING\nLEFT\n----\n${debug}\nRIGHT\n-----\n${that.debug}")
+
     def nodeMap(vs: Set[Int], m: G): SortedMap[Node[A], NonEmptyList[Int]] =
       vs.foldLeft(zmap) { (ns, v) =>
         val n = vnode(v).get(m)

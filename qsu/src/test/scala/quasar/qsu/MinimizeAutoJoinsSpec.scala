@@ -2167,6 +2167,7 @@ object MinimizeAutoJoinsSpec
         RightTarget[Fix],
         Rotation.ShiftMap)
 
+      // SUCCESS
       val rlp13 = qsu._autojoin2((
         rlp8,
         rlp11,
@@ -2174,6 +2175,7 @@ object MinimizeAutoJoinsSpec
           "0" -> func.LeftSide,
           "1" -> func.RightSide)))
 
+      // SUCCESS
       val rlp17 = qsu._autojoin2((
         rlp13,
         rlp15,
@@ -2181,6 +2183,7 @@ object MinimizeAutoJoinsSpec
           func.LeftSide,
           func.MakeMapS("2", func.RightSide))))
 
+      // HANG BEGINS
       val rlp21 = qsu._autojoin2((
         rlp17,
         rlp19,
@@ -2195,7 +2198,7 @@ object MinimizeAutoJoinsSpec
           func.LeftSide,
           func.MakeMapS("4", func.RightSide))))
 
-      val qgraph = QSUGraph.fromTree[Fix](rlp26)
+      val qgraph = QSUGraph.fromTree[Fix](rlp21)
 
       runOn(qgraph) must beLike {
         case
