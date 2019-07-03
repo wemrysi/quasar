@@ -245,7 +245,7 @@ abstract class DatasourcesSpec[
   }
 
   "resource schema" >> {
-    discoveryExamples(datasources.resourceSchema(_, _, schemaConfig, 30.seconds))
+    discoveryExamples(datasources.oldResourceSchema(_, _, schemaConfig, 30.seconds))
   }
 
   ////

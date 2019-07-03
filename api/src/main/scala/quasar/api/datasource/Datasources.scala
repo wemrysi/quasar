@@ -83,7 +83,7 @@ trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
     *
     * Returns `None` if the resource exists but a schema is not available.
     */
-  def resourceSchema(
+  def oldResourceSchema(
       datasourceId: I,
       path: ResourcePath,
       schemaConfig: S,

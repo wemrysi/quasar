@@ -107,7 +107,7 @@ final class DefaultDatasources[
       case -\/(err) => Condition.abnormal(err).point[F]
     }
 
-  def resourceSchema(
+  def oldResourceSchema(
       datasourceId: I,
       path: ResourcePath,
       schemaConfig: S,

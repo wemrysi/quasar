@@ -135,7 +135,7 @@ final class MockDatasources[
         Condition.abnormal(datasourceNotFound[Int, ExistentialError[Int]](id)).point[F]
     }
 
-  def resourceSchema(
+  def oldResourceSchema(
       id: Int,
       path: ResourcePath,
       cfg: MockSchemaConfig.type,
