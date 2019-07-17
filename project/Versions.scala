@@ -14,7 +14,7 @@ object Versions {
   val refinedVersion      = "0.9.7"
   val scodecBitsVersion   = "1.1.2"
   val scalacheckVersion   = "1.14.0"
-  val scalazVersion       = "7.2.27"
+  val scalazVersion       = "7.2.28"
   val scoptVersion        = "3.7.1"
   val shapelessVersion    = "2.3.3"
   val simulacrumVersion   = "0.19.0"
