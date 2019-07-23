@@ -118,7 +118,7 @@ package object matryoshka {
     (φ: G[U] => M[H[U]], ψ: F[T] => M[G[T]])
     (implicit T: Recursive.Aux[T, F], U: Corecursive.Aux[U, H], BF: Traverse[F])
   : M[U] =
-    T.traverseR(t)(ψ(_) >>= (_.traverse(transHyloM(_)(φ, ψ))) >>= φ)
+    (ψ(T.project(t)) >>= (_.traverse(transHyloM(_)(φ, ψ))) >>= φ) ∘ (U.embed(_))
 
   implicit def freeEqualT[A: Equal]: EqualT[Free[?[_], A]] = new EqualT[Free[?[_], A]] {
     def equal[F[_]: Functor]

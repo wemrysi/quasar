@@ -69,7 +69,7 @@ object JsonCodec {
 
     case ExtEJson(Map(entries)) =>
       val sigildEntries =
-        entries.map(_.leftMap(_.mapR(sigildJs)))
+        entries.map(_.leftMap(k => sigildJs(k.project).embed))
 
       val maybeObj =
         sigildEntries.traverse({

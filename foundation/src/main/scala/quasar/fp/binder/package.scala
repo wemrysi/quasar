@@ -18,6 +18,7 @@ package quasar.fp
 
 import slamdata.Predef._
 import matryoshka._
+import matryoshka.data.cofree._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
@@ -38,7 +39,7 @@ package object binder {
         val m: F[(T, Cofree[F, A])] = t.map(x => loop(x.project, newB))
         val t1 = m.map(_._1).embed
         (t1, Cofree(f(t1), m.map(_._2)))
-      } { case (x, _) => (x, t.embed.cata(attrK(f(x)))) }
+      } { case (x, _) => (x, t.embed.cata(attrK[Cofree[F, A]][F, A](f(x)) andThen (_.embed))) }
     }
     loop(t.project, B.initial)._2
   }
@@ -48,7 +49,7 @@ package object binder {
     (f: F[A] => A)
     (implicit T: Recursive.Aux[T, F], B: Binder[F])
       : A = {
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))  
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(t: F[T], b: B.G[A]): A = {
       val newB = B.bindings(t, b)(loop(_, b))
       B.subst(t, newB).getOrElse(f(t.map(x => loop(x.project, newB))))
