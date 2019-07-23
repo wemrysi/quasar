@@ -22,6 +22,10 @@ import contextual._
 import scalaz._
 
 trait StaticInterpolator[A] extends Interpolator {
+
+  type Input = String
+  type Output = A
+
   def parse(s: String): String \/ A
 
   def contextualize(interpolation: StaticInterpolation) = {
