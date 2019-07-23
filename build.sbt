@@ -299,7 +299,7 @@ lazy val impl = project
       "io.atomix"       % "atomix"         % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
-      "com.fasterxml.woodstox" % "woodstox-core" % "5.2.1"))
+      "com.fasterxml.woodstox" % "woodstox-core" % "5.3.0"))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))
