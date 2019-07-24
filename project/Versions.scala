@@ -12,7 +12,7 @@ object Versions {
   val monocleVersion      = "1.6.0"
   val pathyVersion        = "0.2.13"
   val refinedVersion      = "0.9.8"
-  val scodecBitsVersion   = "1.1.2"
+  val scodecBitsVersion   = "1.1.6"
   val scalacheckVersion   = "1.14.0"
   val scalazVersion       = "7.2.28"
   val scoptVersion        = "3.7.1"
@@ -23,6 +23,7 @@ object Versions {
   val akkaVersion         = "2.5.1"
   val fs2Version          = "1.0.5"
   val slf4sVersion        = "1.7.25"
-  val atomixVersion       = "3.1.5"
+  val atomixVersion       = "3.0.11" // This is freezed, because atomix changed discovery service somehow
   val mapdbVersion        = "3.0.7"
+  val nettyVersion        = "4.1.36.Final"
 }

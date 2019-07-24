@@ -19,6 +19,7 @@ package quasar.impl.storage
 import slamdata.Predef._
 
 import cats.arrow.FunctionK
+import cats.syntax.apply._
 
 import monocle.Prism
 
@@ -139,6 +140,17 @@ object IndexedStore extends IndexedStoreInstances {
     xmapValueF(s)(
       decodeP[F, V, VV, E](mkError)(prism))(
       v => prism(v).point[F])
+
+  def hooked[F[_]: Monad, I, V](
+      store: IndexedStore[F, I, V],
+      updateHook: (I, V) => F[Unit],
+      deleteHook: (I, Boolean) => F[Unit])
+      : IndexedStore[F, I, V] = new IndexedStore[F, I, V] {
+    def entries = store.entries
+    def lookup(k: I): F[Option[V]] = store.lookup(k)
+    def insert(k: I, v: V): F[Unit] = store.insert(k, v) *> updateHook(k, v)
+    def delete(k: I): F[Boolean] = store.delete(k) flatMap { x => deleteHook(k, x) as x }
+  }
 }
 
 sealed abstract class IndexedStoreInstances {
