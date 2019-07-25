@@ -54,7 +54,7 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
   } yield NodeInfo(id, "localhost", port)
 
   val pool = BlockingContext.cached("antientropy-spec-pool")
-  val sleep: IO[Unit] = timer.sleep(new FiniteDuration(1000, MILLISECONDS))
+  val sleep: IO[Unit] = timer.sleep(new FiniteDuration(2000, MILLISECONDS))
 
   type Persistence = ConcurrentHashMap[String, Timestamped[String]]
   type UnderlyingStore = IndexedStore[IO, String, Timestamped[String]]

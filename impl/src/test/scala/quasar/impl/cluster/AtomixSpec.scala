@@ -48,8 +48,8 @@ class AtomixSpec (implicit ec: ExecutionContext) extends EffectfulQSpec[IO]{
 
   def memberId(m: Member): String = m.id.id
 
-  val waitABit: IO[Unit] = timer.sleep(new FiniteDuration(100, MILLISECONDS))
-  val waitMore: IO[Unit] = timer.sleep(new FiniteDuration(1000, MILLISECONDS))
+  val waitABit: IO[Unit] = timer.sleep(new FiniteDuration(300, MILLISECONDS))
+  val waitMore: IO[Unit] = timer.sleep(new FiniteDuration(2000, MILLISECONDS))
 
   val portRef: Ref[IO, Int] = Ref.unsafe[IO, Int](6000)
 
