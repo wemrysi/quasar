@@ -22,7 +22,9 @@ import quasar.concurrent.BlockingContext
 import quasar.impl.cluster.{Timestamped, Atomix, Message}, Atomix.NodeInfo, Message._
 
 import cats.effect.{IO, Resource, Timer}
+import cats.effect.concurrent.Ref
 import cats.syntax.contravariant._
+import cats.syntax.flatMap._
 import cats.syntax.parallel._
 import cats.syntax.traverse._
 import cats.instances.list._
@@ -42,15 +44,16 @@ import scala.util.Random
 import shims._
 
 final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
-  sequential
-
   implicit val ec: ExecutionContext = ExecutionContext.global
   implicit val strCodec: Codec[String] = utf8_32
   implicit val timer: Timer[IO] = IO.timer(ec)
 
-  val pool = BlockingContext.cached("antientropy-spec-pool")
-  val defaultNode = NodeInfo("default", "localhost", 6000)
+  val portRef: Ref[IO, Int] = Ref.unsafe[IO, Int](7000)
+  def mkNode(id: String): IO[NodeInfo] = for {
+    port <- portRef.modify((x: Int) => (x + 1, x + 1))
+  } yield NodeInfo(id, "localhost", port)
 
+  val pool = BlockingContext.cached("antientropy-spec-pool")
   val sleep: IO[Unit] = timer.sleep(new FiniteDuration(1000, MILLISECONDS))
 
   type Persistence = ConcurrentHashMap[String, Timestamped[String]]
@@ -84,17 +87,17 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
     rawRes.map(_.map(_._1))
   }
 
-  val emptyStore: Resource[IO, Store] = mkStore(defaultNode, List())
+  val emptyStore: Resource[IO, Store] = Resource.liftF(mkNode("default")).flatMap(mkStore(_, List()))
   val valueA = "A"
   val valueB = "B"
   val freshIndex = IO(Random.nextInt().toString)
 
   "clustering" >> {
     "data propagated" >>* {
-      val node0: NodeInfo = NodeInfo("0", "localhost", 6000)
-      val node1: NodeInfo = NodeInfo("1", "localhost", 6001)
-      val node2: NodeInfo = NodeInfo("2", "localhost", 6002)
       for {
+        node0 <- mkNode("0")
+        node1 <- mkNode("1")
+        node2 <- mkNode("2")
         (store0, finish0) <- mkStore(node0, List(node0, node1)).allocated
         _ <- store0.insert("a", "b")
         (store1, finish1) <- mkStore(node1, List(node0, node1)).allocated
@@ -115,8 +118,8 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
       }
     }
     "persistence" >>* {
-      val node0: NodeInfo = NodeInfo("0", "localhost", 6000)
       underlyingResource.use { (underlying: UnderlyingStore) => for {
+        node0 <- mkNode("0")
         (store0, finish0) <- clusterify(node0, List())(underlying).allocated
         _ <- store0.insert("a", "b")
         _ <- finish0
@@ -128,22 +131,24 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
       }}
     }
     "1234 - 12 - 34 - 1234" >>* {
-      val node0: NodeInfo = NodeInfo("0", "localhost", 6000)
-      val node1: NodeInfo = NodeInfo("1", "localhost", 6001)
-      val node2: NodeInfo = NodeInfo("2", "localhost", 6002)
-      val node3: NodeInfo = NodeInfo("3", "localhost", 6003)
-      val nodes: List[NodeInfo] = List(node0, node1, node2, node3)
+      val underlying: Resource[IO, List[(UnderlyingStore, NodeInfo)]] = {
+        val nodesR: Resource[IO, List[NodeInfo]] =
+          Resource.liftF(List("0", "1", "2", "3").traverse(mkNode(_)))
+        val underlyingsR: Resource[IO, List[UnderlyingStore]] =
+          List(underlyingResource, underlyingResource, underlyingResource, underlyingResource)
+            .sequence
+        for {
+          underlyings <- underlyingsR
+          nodes <- nodesR
+        } yield underlyings.zip(nodes)
+      }
 
-      val underlying: Resource[IO, List[(UnderlyingStore, NodeInfo)]] =
-        List(underlyingResource, underlyingResource, underlyingResource, underlyingResource)
-          .sequence
-          .map(_.zip(nodes))
-
-      val resourceFromPair: (UnderlyingStore, NodeInfo) => Resource[IO, Store] = {
+      val mkResource: (List[NodeInfo]) => (UnderlyingStore, NodeInfo) => Resource[IO, Store] = nodes => {
         case (s, i) => clusterify(i, nodes)(s)
       }
 
       underlying.use { (underlyings: List[(UnderlyingStore, NodeInfo)]) => for {
+        resourceFromPair <- IO(mkResource(underlyings.map(_._2)))
         (stores, finish) <- parallelResource(underlyings.map(resourceFromPair)).allocated
         _ <- stores(0).insert("foo", "bar")
         _ <- sleep
@@ -177,16 +182,16 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
       }}
     }
     "seed list might be incomplete" >>* {
-      val node0: NodeInfo = NodeInfo("0", "localhost", 6000)
-      val node1: NodeInfo = NodeInfo("1", "localhost", 6001)
-      val node2: NodeInfo = NodeInfo("2", "localhost", 6002)
-
-      val seeds: List[NodeInfo] =
-        List(node0)
-      val nodes: List[NodeInfo] =
-        List(node0, node1, node2)
-      val storesR: Resource[IO, List[Store]] =
-        parallelResource(nodes.map(mkStore(_, seeds)))
+      val storesR: Resource[IO, List[Store]] = {
+        val ioRes: IO[Resource[IO, List[Store]]] = for {
+          node0 <- mkNode("0")
+          node1 <- mkNode("1")
+          node2 <- mkNode("2")
+          seeds = List(node0)
+          nodes = List(node0, node1, node2)
+        } yield parallelResource(nodes.map(mkStore(_, seeds)))
+        Resource.liftF(ioRes).flatten
+      }
 
       storesR.use { (stores: List[Store]) => for {
         _ <- stores(0).insert("0", "0")

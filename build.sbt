@@ -280,7 +280,6 @@ lazy val core = project
 /** Implementations of the Quasar API. */
 lazy val impl = project
   .settings(name := "quasar-impl")
-  .settings(parallelExecution in Test := false)
   .dependsOn(
     api % BothScopes,
     common % "test->test",

@@ -24,6 +24,7 @@ import quasar.EffectfulQSpec
 import cats.effect.{IO, Resource, Timer, Concurrent}
 import cats.effect.concurrent.Ref
 import cats.syntax.functor._
+import cats.syntax.flatMap._
 import cats.syntax.traverse._
 import cats.instances.list._
 
@@ -50,15 +51,24 @@ class AtomixSpec (implicit ec: ExecutionContext) extends EffectfulQSpec[IO]{
   val waitABit: IO[Unit] = timer.sleep(new FiniteDuration(100, MILLISECONDS))
   val waitMore: IO[Unit] = timer.sleep(new FiniteDuration(1000, MILLISECONDS))
 
+  val portRef: Ref[IO, Int] = Ref.unsafe[IO, Int](6000)
+
+  def mkNode(id: String): IO[NodeInfo] = for {
+    port <- portRef.modify((x: Int) => (x + 1, x + 1))
+  } yield NodeInfo(id, "localhost", port)
+
   "atomix resource" >> {
     "nodes discovery should work" >>* {
-      val node0 = NodeInfo("0", "localhost", 6000)
-      val node1 = NodeInfo("1", "localhost", 6001)
-      val node2 = NodeInfo("2", "localhost", 6002)
-      val seeds = List(node0)
-      val nodes = List(node0, node1, node2)
-      val clusterRes: Resource[IO, List[AtomixCluster]] =
-        nodes.map(Atomix.resource[IO](_, seeds)).sequence
+      val clusterRes: Resource[IO, List[AtomixCluster]] = {
+        val ioRes: IO[Resource[IO, List[AtomixCluster]]] =for {
+          node0 <- mkNode("0")
+          node1 <- mkNode("1")
+          node2 <- mkNode("2")
+          seeds = List(node0)
+          nodes = List(node0, node1, node2)
+        } yield nodes.map(Atomix.resource[IO](_, seeds)).sequence
+        Resource.liftF(ioRes).flatten
+      }
 
       clusterRes.use { (cs: List[AtomixCluster]) => for {
         _ <- waitABit
@@ -77,11 +87,13 @@ class AtomixSpec (implicit ec: ExecutionContext) extends EffectfulQSpec[IO]{
     def resource(me: NodeInfo, seeds: List[NodeInfo]): Resource[IO, Cluster[IO, String]] =
       Atomix.resource[IO](me, seeds).map(Atomix.cluster(_, pool))
     def threeNodeCluster: Resource[IO, List[Cluster[IO, String]]] = {
-      val node0 = NodeInfo("0", "localhost", 6000)
-      val node1 = NodeInfo("1", "localhost", 6001)
-      val node2 = NodeInfo("2", "localhost", 6002)
-      val nodes = List(node0, node1, node2)
-      nodes.map(resource(_, nodes)).sequence.evalMap { (x: List[Cluster[IO, String]]) =>
+      val ioRes: IO[Resource[IO, List[Cluster[IO, String]]]] = for {
+        node0 <- mkNode("0")
+        node1 <- mkNode("1")
+        node2 <- mkNode("2")
+        nodes = List(node0, node1, node2)
+      } yield nodes.map(resource(_, nodes)).sequence
+      Resource.liftF(ioRes).flatten.evalMap { (x: List[Cluster[IO, String]]) =>
         waitABit as x
       }
     }
