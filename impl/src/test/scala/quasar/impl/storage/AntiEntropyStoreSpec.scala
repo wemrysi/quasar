@@ -97,19 +97,18 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
       for {
         node0 <- mkNode("0")
         node1 <- mkNode("1")
-        node2 <- mkNode("2")
-        (store0, finish0) <- mkStore(node0, List(node0, node1)).allocated
-        _ <- store0.insert("a", "b")
-        (store1, finish1) <- mkStore(node1, List(node0, node1)).allocated
-        _ <- sleep
-        a0 <- store0.lookup("a")
-        a1 <- store1.lookup("a")
-        _ <- store0.insert("b", "c")
-        _ <- sleep
-        b0 <- store0.lookup("b")
-        b1 <- store1.lookup("b")
-        _ <- finish0
-        _ <- finish1
+        (a0, a1, b0, b1) <- mkStore(node0, List(node0, node1)).use { store0 => for {
+          _ <- store0.insert("a", "b")
+          (a0, a1, b0, b1) <- mkStore(node1, List(node0, node1)).use { store1 => for {
+            _ <- sleep
+            a0 <- store0.lookup("a")
+            a1 <- store1.lookup("a")
+            _ <- store0.insert("b", "c")
+            _ <- sleep
+            b0 <- store0.lookup("b")
+            b1 <- store1.lookup("b")
+          } yield (a0, a1, b0, b1) }
+        } yield (a0, a1, b0, b1) }
       } yield {
         a0 mustEqual Some("b")
         a1 mustEqual Some("b")
@@ -120,12 +119,8 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
     "persistence" >>* {
       underlyingResource.use { (underlying: UnderlyingStore) => for {
         node0 <- mkNode("0")
-        (store0, finish0) <- clusterify(node0, List())(underlying).allocated
-        _ <- store0.insert("a", "b")
-        _ <- finish0
-        (store0, finish0) <- clusterify(node0, List())(underlying).allocated
-        someB <- store0.lookup("a")
-        _ <- finish0
+        _ <- clusterify(node0, List())(underlying).use { store => store.insert("a", "b") }
+        someB <- clusterify(node0, List())(underlying).use { store => store.lookup("a") }
       } yield {
         someB mustEqual Some("b")
       }}
@@ -149,28 +144,28 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
 
       underlying.use { (underlyings: List[(UnderlyingStore, NodeInfo)]) => for {
         resourceFromPair <- IO(mkResource(underlyings.map(_._2)))
-        (stores, finish) <- parallelResource(underlyings.map(resourceFromPair)).allocated
-        _ <- stores(0).insert("foo", "bar")
-        _ <- sleep
-        foos0 <- stores.parTraverse(_.lookup("foo"))
-        _ <- finish
-        (stores, finish) <- parallelResource(List(underlyings(0), underlyings(1)).map(resourceFromPair)).allocated
-        _ <- stores(0).insert("bar", "baz")
-        _ <- sleep
-        foos1 <- stores.parTraverse(_.lookup("foo"))
-        bars1 <- stores.parTraverse(_.lookup("bar"))
-        _ <- finish
-        (stores, finish) <- parallelResource(List(underlyings(2), underlyings(3)).map(resourceFromPair)).allocated
-        _ <- stores(0).insert("bar", "quux")
-        _ <- sleep
-        foos2 <- stores.parTraverse(_.lookup("foo"))
-        bars2 <- stores.parTraverse(_.lookup("bar"))
-        _ <- finish
-        (stores, finish) <- parallelResource(underlyings.map(resourceFromPair)).allocated
-        _ <- sleep
-        foos3 <- stores.parTraverse(_.lookup("foo"))
-        bars3 <- stores.parTraverse(_.lookup("bar"))
-        _ <- finish
+        foos0 <- parallelResource(underlyings.map(resourceFromPair)).use { stores => for {
+          _ <- stores(0).insert("foo", "bar")
+          _ <- sleep
+          foos <- stores.parTraverse(_.lookup("foo"))
+        } yield foos }
+        (foos1, bars1) <- parallelResource(List(underlyings(0), underlyings(1)).map(resourceFromPair)).use { stores => for {
+          _ <- stores(0).insert("bar", "baz")
+          _ <- sleep
+          foos <- stores.parTraverse(_.lookup("foo"))
+          bars <- stores.parTraverse(_.lookup("bar"))
+        } yield (foos, bars) }
+        (foos2, bars2) <- parallelResource(List(underlyings(2), underlyings(3)).map(resourceFromPair)).use { stores => for {
+          _ <- stores(0).insert("bar", "quux")
+          _ <- sleep
+          foos <- stores.parTraverse(_.lookup("foo"))
+          bars <- stores.parTraverse(_.lookup("bar"))
+        } yield (foos, bars) }
+        (foos3, bars3) <- parallelResource(underlyings.map(resourceFromPair)).use { stores => for {
+          _ <- sleep
+          foos <- stores.parTraverse(_.lookup("foo"))
+          bars <- stores.parTraverse(_.lookup("bar"))
+        } yield (foos, bars) }
       } yield {
         foos0 mustEqual List(Some("bar"), Some("bar"), Some("bar"), Some("bar"))
         foos1 mustEqual List(Some("bar"), Some("bar"))
@@ -181,6 +176,52 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
         bars3 mustEqual List(Some("quux"), Some("quux"), Some("quux"), Some("quux"))
       }}
     }
+    "1234 - 12 - 34 - 1234 -- deletion" >>* {
+      val underlying: Resource[IO, List[(UnderlyingStore, NodeInfo)]] = {
+        val nodesR: Resource[IO, List[NodeInfo]] =
+          Resource.liftF(List("0", "1", "2", "3").traverse(mkNode(_)))
+        val underlyingsR: Resource[IO, List[UnderlyingStore]] =
+          List(underlyingResource, underlyingResource, underlyingResource, underlyingResource)
+            .sequence
+        for {
+          underlyings <- underlyingsR
+          nodes <- nodesR
+        } yield underlyings.zip(nodes)
+      }
+
+      val mkResource: (List[NodeInfo]) => (UnderlyingStore, NodeInfo) => Resource[IO, Store] = nodes => {
+        case (s, i) => clusterify(i, nodes)(s)
+      }
+
+      underlying.use { (underlyings: List[(UnderlyingStore, NodeInfo)]) => for {
+        resourceFromPair <- IO(mkResource(underlyings.map(_._2)))
+        foos0 <- parallelResource(underlyings.map(resourceFromPair)).use { stores => for {
+          _ <- stores(0).insert("foo", "bar")
+          _ <- sleep
+          foos <- stores.parTraverse(_.lookup("foo"))
+        } yield foos }
+        foos1 <- parallelResource(List(underlyings(0), underlyings(1)).map(resourceFromPair)).use { stores => for {
+          _ <- stores(0).insert("foo", "quux")
+          _ <- sleep
+          foos <- stores.parTraverse(_.lookup("foo"))
+        } yield foos }
+        foos2 <- parallelResource(List(underlyings(2), underlyings(3)).map(resourceFromPair)).use { stores => for {
+          _ <- stores(0).delete("foo")
+          _ <- sleep
+          foos <- stores.parTraverse(_.lookup("foo"))
+        } yield foos }
+        foos3 <- parallelResource(underlyings.map(resourceFromPair)).use { stores => for {
+          _ <- sleep
+          foos <- stores.parTraverse(_.lookup("foo"))
+        } yield foos }
+      } yield {
+        foos0 mustEqual List(Some("bar"), Some("bar"), Some("bar"), Some("bar"))
+        foos1 mustEqual List(Some("quux"), Some("quux"))
+        foos2 mustEqual List(None, None)
+        foos3 mustEqual List(None, None, None, None)
+      }}
+    }
+
     "seed list might be incomplete" >>* {
       val storesR: Resource[IO, List[Store]] = {
         val ioRes: IO[Resource[IO, List[Store]]] = for {

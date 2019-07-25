@@ -50,6 +50,7 @@ import java.util.concurrent.{CompletableFuture, Executor}
 import java.util.function.BiConsumer
 
 import scala.collection.JavaConverters._
+import scala.util.Random
 
 object Atomix extends Logging {
   final case class NodeInfo(id: String, host: String, port: Int)
@@ -92,8 +93,12 @@ object Atomix extends Logging {
     def peers: F[Set[MemberId]] =
       F.delay(service.getMembers.asScala.to[Set].map(_.id))
 
-    def random: F[Set[MemberId]] =
-      peers
+    def random: F[Set[MemberId]] = for {
+      ps <- peers
+      size = ps.size
+      ix0 <- Sync[F].delay(Random.nextInt(size))
+      ix1 <- Sync[F].delay(Random.nextInt(size))
+    } yield ps.slice(ix0, ix0 + 1) ++ ps.slice(ix1, ix1 + 1)
 
     @SuppressWarnings(Array("org.wartremover.warts.Equals"))
     def byAddress(addr: InetAddress, port: Int): F[Option[MemberId]] = {
@@ -119,7 +124,7 @@ object Atomix extends Logging {
           b.toByteArray,
           target)).void
       }).getOrElse(F.delay {
-        log.warn(s"incorrect message was sent by unicast ::: ${payload}, to ::: ${target}")
+        log.warn(s"malformed payload was sent by unicast ::: ${payload}, to ::: ${target}")
       })
 
     def multicast[P: Codec](tag: String, payload: P, targets: Set[MemberId]): F[Unit] =
@@ -131,7 +136,7 @@ object Atomix extends Logging {
             b.toByteArray,
             targets.asJava))
         }).getOrElse(F.delay {
-          log.warn(s"incorrect message sent by multicast ::: ${payload}, to ::: ${targets}")
+          log.warn(s"malformed payload sent by multicast ::: ${payload}, to ::: ${targets}")
         })
 
     def subscribe[P: Codec](tag: String, limit: Int): F[Stream[F, (MemberId, P)]] =
@@ -140,24 +145,32 @@ object Atomix extends Logging {
         .map(_.onFinalize(F.delay(service.unsubscribe(tag))))
 
     private def enqueue[P: Codec](q: InspectableQueue[F, (MemberId, P)], eventType: String, maxItems: Int): Stream[F, Unit] = {
-      Stream.eval(handler(eventType, { (addr: Address, a: BitVector) => Codec[P].decode(a) match {
-        case Attempt.Failure(_) => ()
-        case Attempt.Successful(d) => run(for {
-          netAddr <- F.delay(addr.address(true))
-          port <- F.delay(addr.port)
-          mid <- membership.byAddress(netAddr, port)
-          size <- q.getSize
-          _ <- mid match {
-            case None => F.delay {
-              log.warn(s"incorrect message received\neventType ::: ${eventType}\nsource ::: ${addr}\nbits ::: ${a.toHex}")
-            }
-            case Some(_) if size >= maxItems => F.delay {
-              log.warn(s"there are too much events in subscription queue\neventType ::: ${eventType}\nsize ::: ${size}")
-            }
-            case Some(id) => q.enqueue1((id, d.value))
+      def decodeBits(a: BitVector, cont: P => F[Unit]): F[Unit] = Codec[P].decode(a) match {
+        case Attempt.Failure(_) =>
+          F.delay(log.warn(s"malformed payload received\neventType ::: ${eventType}\nbits ::: ${a.toHex}"))
+        case Attempt.Successful(d) =>
+          cont(d.value)
+      }
+      def getMemberId(addr: Address): F[Option[MemberId]] = for {
+        netAddr <- F.delay(addr.address(true))
+        port <- F.delay(addr.port)
+        mid <- membership.byAddress(netAddr, port)
+      } yield mid
+
+      Stream.eval(handler(eventType, { (addr: Address, a: BitVector) => run {
+        getMemberId(addr).flatMap {
+          case None => F.delay {
+            log.warn(s"(impossible) the message sent from unknown node ::: ${addr}")
           }
-        } yield())
-      }}))
+          case Some(id) => for {
+            size <- q.getSize
+            _ <- if (size >= maxItems) F.delay {
+              log.warn(s"subscription queue is full\neventType ::: ${eventType}\nsize ::: ${size}")
+            } else {
+              decodeBits(a, x => q.enqueue1((id, x)))
+            }
+          } yield ()
+        }}}))
     }
     private def handler(eventName: String, cb: (Address, BitVector) => Unit): F[Unit] = {
       val biconsumer: BiConsumer[Address, Array[Byte]] = (addr, bytes) => {
