@@ -233,8 +233,8 @@ object AntiEntropyStore {
     val default: AntiEntropyStoreConfig = AntiEntropyStoreConfig(
       maxEvents = 50L,
       adTimeoutMillis = 30L,
-      purgeTimeoutMillis = 30L,
-      tombstoneLiveForMillis = 1000L,
+      purgeTimeoutMillis = 1000L,
+      tombstoneLiveForMillis = 300000L,
       updateRequestLimit = 128,
       updateLimit = 128,
       adLimit = 128)
