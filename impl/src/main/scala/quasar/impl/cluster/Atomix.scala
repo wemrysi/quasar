@@ -101,7 +101,8 @@ object Atomix extends Logging {
       size = ps.size
       ix0 <- Sync[F].delay(Random.nextInt(size))
       ix1 <- Sync[F].delay(Random.nextInt(size))
-    } yield ps.slice(ix0, ix0 + 1) ++ ps.slice(ix1, ix1 + 1)
+      vec = ps.toVector
+    } yield Set(vec(ix0), vec(ix1))
 
     @SuppressWarnings(Array("org.wartremover.warts.Equals"))
     def byAddress(addr: InetAddress, port: Int): F[Option[MemberId]] = {
@@ -150,7 +151,7 @@ object Atomix extends Logging {
     private def enqueue[P: Codec](q: InspectableQueue[F, (MemberId, P)], eventType: String, maxItems: Int): Stream[F, Unit] = {
       def decodeBits(a: BitVector, cont: P => F[Unit]): F[Unit] = Codec[P].decode(a) match {
         case Attempt.Failure(_) =>
-          F.delay(log.warn(s"malformed payload received\neventType ::: ${eventType}\nbits ::: ${a.toHex}"))
+          F.delay(log.warn(s"malformed payload received: eventType ::: ${eventType}, bits ::: ${a.toHex}"))
         case Attempt.Successful(d) =>
           cont(d.value)
       }
@@ -168,7 +169,7 @@ object Atomix extends Logging {
           case Some(id) => for {
             size <- q.getSize
             _ <- if (size >= maxItems) F.delay {
-              log.warn(s"subscription queue is full\neventType ::: ${eventType}\nsize ::: ${size}")
+              log.warn(s"subscription queue is full: eventType ::: ${eventType}, size ::: ${size}")
             } else {
               decodeBits(a, x => q.enqueue1((id, x)))
             }
