@@ -185,6 +185,7 @@ object AntiEntropyStore {
     listOfN(int32, k ~ v).xmap(_.toMap, _.toList)
 
   def apply[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
+      config: AntiEntropyStoreConfig,
       name: String,
       cluster: Cluster[F, Message],
       underlying: TimestampedStore[F, K, V],
@@ -200,7 +201,7 @@ object AntiEntropyStore {
         cluster,
         underlying,
         gates,
-        AntiEntropyStoreConfig.default))
+        config))
       adReceiver <- store.advertisementHandled
       updates <- store.updateHandled
       updateRequester <- store.updateRequestHandled
@@ -219,24 +220,12 @@ object AntiEntropyStore {
       def apply[A](fa: F[A]): F[A] = ContextShift[F].evalOn(pool.unwrap)(fa)
     })
   }
-
-  final case class AntiEntropyStoreConfig(
-    maxEvents: Long,
-    adTimeoutMillis: Long,
-    purgeTimeoutMillis: Long,
-    tombstoneLiveForMillis: Long,
-    updateRequestLimit: Int,
-    updateLimit: Int,
-    adLimit: Int)
-
-  object AntiEntropyStoreConfig {
-    val default: AntiEntropyStoreConfig = AntiEntropyStoreConfig(
-      maxEvents = 50L,
-      adTimeoutMillis = 30L,
-      purgeTimeoutMillis = 1000L,
-      tombstoneLiveForMillis = 300000L,
-      updateRequestLimit = 128,
-      updateLimit = 128,
-      adLimit = 128)
-  }
+  def default[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
+      name: String,
+      cluster: Cluster[F, Message],
+      underlying: TimestampedStore[F, K, V],
+      pool: BlockingContext)(
+      implicit timer: Timer[F])
+      : Resource[F, IndexedStore[F, K, V]] =
+    apply[F, K, V](AntiEntropyStoreConfig.default, name, cluster, underlying, pool)
 }
