@@ -64,7 +64,7 @@ class AtomixSpec (implicit ec: ExecutionContext) extends EffectfulQSpec[IO]{
           node0 <- mkNode("0")
           node1 <- mkNode("1")
           node2 <- mkNode("2")
-          seeds = List(node0.copy(id = "00"))
+          seeds = List(node0)
           nodes = List(node0, node1, node2)
         } yield nodes.map(Atomix.resource[IO](_, seeds.map(_.address))).sequence
         Resource.liftF(ioRes).flatten
