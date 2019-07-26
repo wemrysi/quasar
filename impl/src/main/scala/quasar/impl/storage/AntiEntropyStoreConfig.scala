@@ -16,26 +16,24 @@
 
 package quasar.impl.storage
 
-import slamdata.Predef.{Int, String}
+import slamdata.Predef._
 
-import scala.concurrent.ExecutionContext.Implicits.global
+final case class AntiEntropyStoreConfig(
+  maxEvents: Long,
+  adTimeoutMillis: Long,
+  purgeTimeoutMillis: Long,
+  tombstoneLiveForMillis: Long,
+  updateRequestLimit: Int,
+  updateLimit: Int,
+  adLimit: Int)
 
-import cats.effect.{IO, Resource}
-import cats.effect.concurrent.Ref
-import scalaz.IMap
-import scalaz.std.anyVal._
-import scalaz.std.string._
-import shims._
-
-object RefIndexedStoreSpec extends RefSpec(Ref.unsafe[IO, Int](0))
-
-abstract class RefSpec(idxRef: Ref[IO, Int]) extends IndexedStoreSpec[IO, Int, String] {
-  val emptyStore =
-    Resource.liftF(Ref.of[IO, IMap[Int, String]](IMap.empty).map(RefIndexedStore(_)))
-
-  val freshIndex = idxRef.modify(i => (i + 1, i + 1))
-
-  val valueA = "A"
-
-  val valueB = "B"
+object AntiEntropyStoreConfig {
+  val default: AntiEntropyStoreConfig = AntiEntropyStoreConfig(
+    maxEvents = 50L,
+    adTimeoutMillis = 30L,
+    purgeTimeoutMillis = 1000L,
+    tombstoneLiveForMillis = 300000L,
+    updateRequestLimit = 128,
+    updateLimit = 128,
+    adLimit = 128)
 }
