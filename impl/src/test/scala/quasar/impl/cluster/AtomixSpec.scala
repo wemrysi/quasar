@@ -64,9 +64,9 @@ class AtomixSpec (implicit ec: ExecutionContext) extends EffectfulQSpec[IO]{
           node0 <- mkNode("0")
           node1 <- mkNode("1")
           node2 <- mkNode("2")
-          seeds = List(node0)
+          seeds = List(node0.copy(id = "00"))
           nodes = List(node0, node1, node2)
-        } yield nodes.map(Atomix.resource[IO](_, seeds)).sequence
+        } yield nodes.map(Atomix.resource[IO](_, seeds.map(_.address))).sequence
         Resource.liftF(ioRes).flatten
       }
 
@@ -84,7 +84,7 @@ class AtomixSpec (implicit ec: ExecutionContext) extends EffectfulQSpec[IO]{
   }
   "atomix cluster" >> {
     val pool = BlockingContext.cached("atomix-spec-pool")
-    def resource(me: NodeInfo, seeds: List[NodeInfo]): Resource[IO, Cluster[IO, String]] =
+    def resource(me: NodeInfo, seeds: List[NodeAddress]): Resource[IO, Cluster[IO, String]] =
       Atomix.resource[IO](me, seeds).map(Atomix.cluster(_, pool))
     def threeNodeCluster: Resource[IO, List[Cluster[IO, String]]] = {
       val ioRes: IO[Resource[IO, List[Cluster[IO, String]]]] = for {
@@ -92,7 +92,7 @@ class AtomixSpec (implicit ec: ExecutionContext) extends EffectfulQSpec[IO]{
         node1 <- mkNode("1")
         node2 <- mkNode("2")
         nodes = List(node0, node1, node2)
-      } yield nodes.map(resource(_, nodes)).sequence
+      } yield nodes.map(resource(_, nodes.map(_.address))).sequence
       Resource.liftF(ioRes).flatten.evalMap { (x: List[Cluster[IO, String]]) =>
         waitABit as x
       }

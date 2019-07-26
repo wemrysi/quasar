@@ -53,15 +53,18 @@ import scala.collection.JavaConverters._
 import scala.util.Random
 
 object Atomix extends Logging {
-  final case class NodeInfo(id: String, host: String, port: Int)
+  final case class NodeAddress(host: String, port: Int)
+  final case class NodeInfo(id: String, host: String, port: Int) {
+    def address: NodeAddress = NodeAddress(host, port)
+  }
 
-  private def atomixNode(node: NodeInfo): Node =
-    Node.builder.withAddress(node.host, node.port).withId(node.id).build()
+  private def atomixNode(node: NodeAddress): Node =
+    Node.builder.withAddress(node.host, node.port).build()
 
-  def resource[F[_]: Async: ContextShift](me: NodeInfo, seeds: List[NodeInfo]): Resource[F, AtomixCluster] =
+  def resource[F[_]: Async: ContextShift](me: NodeInfo, seeds: List[NodeAddress]): Resource[F, AtomixCluster] =
     Resource.make(atomix[F](me, seeds).flatMap((ax: AtomixCluster) => start(ax) as ax))(stop(_))
 
-  private def atomix[F[_]: Sync](me: NodeInfo, seeds: List[NodeInfo]): F[AtomixCluster] = Sync[F].delay {
+  private def atomix[F[_]: Sync](me: NodeInfo, seeds: List[NodeAddress]): F[AtomixCluster] = Sync[F].delay {
     AtomixCluster.builder(new ClusterConfig())
       .withMemberId(me.id)
       .withAddress(me.host, me.port)
