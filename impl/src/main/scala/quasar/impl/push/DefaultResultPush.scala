@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.resource.ResourcePath
 import quasar.api.QueryEvaluator
-import quasar.api.destination.Destinations
+import quasar.api.destination.{Destinations, ResultFormat}
 import quasar.api.table.Tables
 import quasar.api.push.ResultPush
 import quasar.api.push.ResultPushError
@@ -40,7 +40,7 @@ abstract class DefaultResultPush[
     extends ResultPush[F, TableId, DestinationId] {
   import ResultPushError._
 
-  def start(tableId: TableId, destinationId: DestinationId, path: ResourcePath)
+  def start(tableId: TableId, destinationId: DestinationId, path: ResourcePath, format: ResultFormat, limit: Option[Long])
       : F[ExistentialError[TableId, DestinationId] \/ Condition[Exception]]
 
   def cancel(tableId: TableId): F[ExistentialError[TableId, DestinationId] \/ Condition[Exception]]

@@ -14,15 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.api.destination
 
-import slamdata.Predef.Unit
+import slamdata.Predef.{Byte, List}
 
-import quasar.api.destination.ResultType
-import quasar.api.resource.ResourcePath
+import quasar.api.table.TableColumn
 
-trait ResultSink[F[_]] {
-  val resultType: ResultType[F]
+import fs2.Stream
 
-  def apply(dst: ResourcePath, result: resultType.T): F[Unit]
+sealed trait ResultType[F[_]] {
+  type T
+}
+
+object ResultType {
+  final case class Csv[F[_]]() extends ResultType[F] {
+    type T = (List[TableColumn], Stream[F, Byte])
+  }
 }

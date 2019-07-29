@@ -19,10 +19,10 @@ package quasar.impl.destinations
 import slamdata.Predef._
 
 import quasar.api.destination.DestinationError.InitializationError
-import quasar.api.destination.DestinationType
+import quasar.api.destination.{DestinationType, ResultType}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableColumn
-import quasar.connector.{Destination, DestinationModule, MonadResourceErr, ResultSink, ResultType}
+import quasar.connector.{Destination, DestinationModule, MonadResourceErr, ResultSink}
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}

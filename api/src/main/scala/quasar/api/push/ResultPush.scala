@@ -16,10 +16,11 @@
 
 package quasar.api.push
 
-import slamdata.Predef.Exception
+import slamdata.Predef.{Exception, Option, Long}
 
-import quasar.api.resource.ResourcePath
 import quasar.Condition
+import quasar.api.destination.ResultFormat
+import quasar.api.resource.ResourcePath
 
 import scalaz.\/
 
@@ -30,7 +31,7 @@ import scalaz.\/
 trait ResultPush[F[_], TableId, DestinationId] {
   import ResultPushError._
 
-  def start(tableId: TableId, destinationId: DestinationId, path: ResourcePath)
+  def start(tableId: TableId, destinationId: DestinationId, path: ResourcePath, format: ResultFormat, limit: Option[Long])
       : F[ExistentialError[TableId, DestinationId] \/ Condition[Exception]]
 
   def cancel(tableId: TableId)
