@@ -173,15 +173,19 @@ class AtomixSpec (implicit ec: ExecutionContext) extends EffectfulQSpec[IO]{
       threeNodeCluster.use { (clusters: List[Cluster[IO, String]]) => for {
         stream <- clusters(0).subscribe[String]("limited", 2).map(oneSecondStream(_))
         _ <- clusters(1).broadcast("limited", "foo")
+        _ <- waitABit
         _ <- clusters(1).broadcast("limited", "bar")
+        _ <- waitABit
         _ <- clusters(2).broadcast("limited", "baz")
+        _ <- waitABit
         _ <- clusters(2).broadcast("limited", "quux")
+        _ <- waitABit
         _ <- clusters(0).broadcast("limited", "ololo")
+        _ <- waitABit
         _ <- clusters(0).broadcast("limited", "trololo")
         _ <- waitMore
         res <- stream.compile.toList
       } yield {
-        // It is not guaranteed to be exactly 2 (e.g. it can be `1 + numOfSimultaneousEvents`), but in most cases it is 2
         res.length mustEqual 2
       }}
     }
