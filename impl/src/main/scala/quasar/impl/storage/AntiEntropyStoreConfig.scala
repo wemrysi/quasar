@@ -19,7 +19,6 @@ package quasar.impl.storage
 import slamdata.Predef._
 
 final case class AntiEntropyStoreConfig(
-  maxEvents: Long,
   adTimeoutMillis: Long,
   purgeTimeoutMillis: Long,
   tombstoneLiveForMillis: Long,
@@ -29,7 +28,6 @@ final case class AntiEntropyStoreConfig(
 
 object AntiEntropyStoreConfig {
   val default: AntiEntropyStoreConfig = AntiEntropyStoreConfig(
-    maxEvents = 50L,
     adTimeoutMillis = 30L,
     purgeTimeoutMillis = 1000L,
     tombstoneLiveForMillis = 300000L,
