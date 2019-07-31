@@ -18,6 +18,8 @@ package quasar.api.destination
 
 import slamdata.Predef._
 
+import scalaz.Equal
+
 sealed trait ResultFormat extends Product with Serializable
 
 object ResultFormat {
@@ -26,4 +28,6 @@ object ResultFormat {
   def fromResultType[F[_]](rt: ResultType[F]): ResultFormat = rt match {
     case ResultType.Csv() => ResultFormat.Csv
   }
+
+  implicit def equalResultFormat: Equal[ResultFormat] = Equal.equalA[ResultFormat]
 }
