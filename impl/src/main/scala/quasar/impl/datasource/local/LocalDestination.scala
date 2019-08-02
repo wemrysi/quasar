@@ -55,7 +55,8 @@ final class LocalCsvSink[F[_]: Effect: ContextShift: MonadResourceErr] private (
     root: JPath,
     blockingContext: BlockingContext) extends ResultSink[F] {
 
-  val resultType = ResultType.Csv()
+  type RT = ResultType.Csv[F]
+  val resultType = ResultType.Csv[F]()
 
   def apply(dst: ResourcePath, result: (List[TableColumn], Stream[F, Byte])): F[Unit] =
     resolvedResourcePath[F](root, dst) >>= {

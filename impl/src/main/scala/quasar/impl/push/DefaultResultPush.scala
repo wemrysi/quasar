@@ -25,7 +25,7 @@ import quasar.api.destination.{ResultFormat, ResultType}
 import quasar.api.push.ResultPush
 import quasar.api.push.ResultPushError
 import quasar.api.resource.ResourcePath
-import quasar.api.table.{Tables, TableRef}
+import quasar.api.table.{TableColumn, Tables, TableRef}
 import quasar.impl.destinations.DestinationManager
 
 import cats.effect.{Concurrent, Timer}
@@ -60,10 +60,16 @@ abstract class DefaultResultPush[
         tables.table(tableId).map(_.toOption),
         ResultPushError.TableNotFound(tableId))
 
+      sink: ResultSink.Aux[F, ResultType.Csv[F]] <-
+        liftOptionF[F, ResultPushError[TableId, DestinationId], ResultSink.Aux[F, ResultType.Csv[F]]](
+          findCsvSink(dest.sinks).point[F],
+          ResultPushError.FormatNotSupported(destinationId, ResultFormat.fromResultType(format)))
+
       query = tableRef.query
       columns = tableRef.columns
 
-      evaluated = evaluator.evaluate(query).map(convertToFormat(_, format))
+      evaluated <- EitherT.rightT(evaluator.evaluate(query).map(convertToFormat(_, format)))
+      sinked = Stream.eval(sink(path, (columns, evaluated)))
 
     } yield evaluated
 
@@ -75,6 +81,11 @@ abstract class DefaultResultPush[
   def status(tableId: TableId): F[ExistentialError[TableId, DestinationId] \/ Condition[Exception]]
 
   def cancelAll: F[Condition[Exception]]
+
+  private def findCsvSink(sinks: NonEmptyList[ResultSink[F]]): Option[ResultSink.Aux[F, ResultType.Csv[F]]] =
+    sinks.list.filter(_.resultType match {
+      case ResultType.Csv() => true
+    }).headOption.asInstanceOf[Option[ResultSink.Aux[F, ResultType.Csv[F]]]]
 
   private def liftOptionF[F[_]: Functor, E, A](oa: F[Option[A]], err: E): EitherT[F, E, A] =
     OptionT(oa).toRight[E](err)

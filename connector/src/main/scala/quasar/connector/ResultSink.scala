@@ -22,7 +22,14 @@ import quasar.api.destination.ResultType
 import quasar.api.resource.ResourcePath
 
 trait ResultSink[F[_]] {
-  val resultType: ResultType[F]
+  type RT <: ResultType[F]
+  val resultType: RT
 
   def apply(dst: ResourcePath, result: resultType.T): F[Unit]
+}
+
+object ResultSink {
+  type Aux[F[_], RT0 <: ResultType[F]] = ResultSink[F] {
+    type RT = RT0
+  }
 }
