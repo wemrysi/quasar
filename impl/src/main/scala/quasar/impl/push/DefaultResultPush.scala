@@ -22,70 +22,91 @@ import quasar.Condition
 import quasar.connector.{Destination, ResultSink}
 import quasar.api.QueryEvaluator
 import quasar.api.destination.{ResultFormat, ResultType}
-import quasar.api.push.ResultPush
-import quasar.api.push.ResultPushError
+import quasar.api.push.{ResultPush, ResultPushError, Status}
 import quasar.api.resource.ResourcePath
-import quasar.api.table.{TableColumn, Tables, TableRef}
-import quasar.impl.destinations.DestinationManager
+import quasar.api.table.TableRef
 
 import cats.effect.{Concurrent, Timer}
 import fs2.Stream
-import fs2.job.JobManager
+import fs2.job.{JobManager, Job, Status => JobStatus}
 import scalaz.std.option._
-import scalaz.syntax.equal._
+import scalaz.std.list._
+import scalaz.syntax.either._
 import scalaz.syntax.applicative._
-import scalaz.syntax.unzip._
-import scalaz.{\/, \/-, Applicative, EitherT, Functor, NonEmptyList, OptionT, Traverse}
+import scalaz.syntax.foldable._
+import scalaz.syntax.std.option._
+import scalaz.{EitherT, Functor, Id, NonEmptyList, OptionT, Traverse, \/}
 import shims._
 
-abstract class DefaultResultPush[
-  F[_]: Concurrent: Timer, TableId, DestinationId, DestinationConfig, Query, Result, TableSchema] private (
-    tables: Tables[F, TableId, Query, Result, TableSchema],
-    evaluator: QueryEvaluator[F, Query, Result],
-    destManager: DestinationManager[DestinationId, DestinationConfig, F],
-    jobManager: JobManager[F, TableId, Nothing],
-    convertToFormat: (Result, ResultType[F]) => Stream[F, Byte])
-    extends ResultPush[F, TableId, DestinationId] {
+class DefaultResultPush[
+  F[_]: Concurrent: Timer, T, D, Q, R] private (
+    lookupTable: T => F[Option[TableRef[Q]]],
+    evaluator: QueryEvaluator[F, Q, R],
+    lookupDestination: D => F[Option[Destination[F]]],
+    jobManager: JobManager[F, T, Nothing],
+    convertToCsv: R => Stream[F, Byte])
+    extends ResultPush[F, T, D] {
   import ResultPushError._
 
-  def start(tableId: TableId, destinationId: DestinationId, path: ResourcePath, format: ResultType[F], limit: Option[Long])
-      : F[ResultPushError[TableId, DestinationId] \/ Condition[Exception]] = {
+  def start(tableId: T, destinationId: D, path: ResourcePath, format: ResultType[F], limit: Option[Long])
+      : F[Condition[ResultPushError[T, D]]] = {
 
-    for {
-      dest <- liftOptionF[F, ResultPushError[TableId, DestinationId], Destination[F]](
-        destManager.destinationOf(destinationId),
+    val writing = for {
+      dest <- liftOptionF[F, ResultPushError[T, D], Destination[F]](
+        lookupDestination(destinationId),
         ResultPushError.DestinationNotFound(destinationId))
 
-      tableRef <- liftOptionF[F, ResultPushError[TableId, DestinationId], TableRef[Query]](
-        tables.table(tableId).map(_.toOption),
+      tableRef <- liftOptionF[F, ResultPushError[T, D], TableRef[Q]](
+        lookupTable(tableId),
         ResultPushError.TableNotFound(tableId))
 
       sink: ResultSink.Aux[F, ResultType.Csv[F]] <-
-        liftOptionF[F, ResultPushError[TableId, DestinationId], ResultSink.Aux[F, ResultType.Csv[F]]](
+        liftOptionF[F, ResultPushError[T, D], ResultSink.Aux[F, ResultType.Csv[F]]](
           findCsvSink(dest.sinks).point[F],
           ResultPushError.FormatNotSupported(destinationId, ResultFormat.fromResultType(format)))
 
       query = tableRef.query
       columns = tableRef.columns
 
-      evaluated <- EitherT.rightT(evaluator.evaluate(query).map(convertToFormat(_, format)))
-      sinked = Stream.eval(sink(path, (columns, evaluated)))
+      evaluated <- EitherT.rightT(evaluator.evaluate(query).map(convertToCsv))
+      sinked = Stream.eval(sink(path, (columns, evaluated))).map(Right(_))
 
-    } yield evaluated
+      _ <- EitherT.rightT(jobManager.submit(Job(tableId, sinked)))
 
-    Concurrent[F].pure(\/-(Condition.normal[Exception]()))
+    } yield ()
+
+    writing.run.map(Condition.disjunctionIso.reverseGet(_))
   }
 
-  def cancel(tableId: TableId): F[ExistentialError[TableId, DestinationId] \/ Condition[Exception]]
+  def cancel(tableId: T): F[Condition[ExistentialError[T, D]]] =
+    (ensureTableExists(tableId) *> (EitherT.rightT(jobManager.cancel(tableId))))
+      .run.map(Condition.disjunctionIso.reverseGet(_))
 
-  def status(tableId: TableId): F[ExistentialError[TableId, DestinationId] \/ Condition[Exception]]
+  def status(tableId: T): F[ResultPushError[T, D] \/ Status] =
+    (ensureTableExists(tableId) *> EitherT.rightT(jobManager.status(tableId))).fold(_.left, {
+      case Some(JobStatus.Running | JobStatus.Pending) =>
+        Status.Started.right[ResultPushError[T, D]]
+      case Some(JobStatus.Canceled) =>
+        Status.Canceled.right[ResultPushError[T, D]]
+      case None =>
+        ResultPushError.PushNotRunning(tableId).left[Status]
+    })
 
-  def cancelAll: F[Condition[Exception]]
+  def cancelAll: F[Unit] =
+    jobManager.jobIds
+      .map(Traverse[List].traverse(_)(jobManager.cancel(_))).void
 
   private def findCsvSink(sinks: NonEmptyList[ResultSink[F]]): Option[ResultSink.Aux[F, ResultType.Csv[F]]] =
-    sinks.list.filter(_.resultType match {
-      case ResultType.Csv() => true
-    }).headOption.asInstanceOf[Option[ResultSink.Aux[F, ResultType.Csv[F]]]]
+    sinks.findMapM[Id.Id, ResultSink.Aux[F, ResultType.Csv[F]]] {
+      // TODO: make @unchecked unnecessary
+      case (rs: ResultSink.Aux[F, ResultType.Csv[F]] @unchecked) => rs.some
+      case _ => none
+    }
+
+  private def ensureTableExists(tableId: T): EitherT[F, ExistentialError[T, D], Unit] =
+    OptionT(lookupTable(tableId))
+      .toRight[ExistentialError[T, D]](ResultPushError.TableNotFound(tableId))
+      .void
 
   private def liftOptionF[F[_]: Functor, E, A](oa: F[Option[A]], err: E): EitherT[F, E, A] =
     OptionT(oa).toRight[E](err)

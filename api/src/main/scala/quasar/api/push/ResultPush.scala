@@ -16,7 +16,7 @@
 
 package quasar.api.push
 
-import slamdata.Predef.{Exception, Option, Long}
+import slamdata.Predef.{Exception, Option, Long, Unit}
 
 import quasar.Condition
 import quasar.api.destination.ResultType
@@ -32,13 +32,13 @@ trait ResultPush[F[_], TableId, DestinationId] {
   import ResultPushError._
 
   def start(tableId: TableId, destinationId: DestinationId, path: ResourcePath, format: ResultType[F], limit: Option[Long])
-      : F[ResultPushError[TableId, DestinationId] \/ Condition[Exception]]
+      : F[Condition[ResultPushError[TableId, DestinationId]]]
 
   def cancel(tableId: TableId)
-      : F[ExistentialError[TableId, DestinationId] \/ Condition[Exception]]
+      : F[Condition[ExistentialError[TableId, DestinationId]]]
 
   def status(tableId: TableId)
-      : F[ExistentialError[TableId, DestinationId] \/ Condition[Exception]]
+      : F[ResultPushError[TableId, DestinationId] \/ Status]
 
-  def cancelAll: F[Condition[Exception]]
+  def cancelAll: F[Unit]
 }
