@@ -98,8 +98,7 @@ class DefaultResultPush[
 
   private def findCsvSink(sinks: NonEmptyList[ResultSink[F]]): Option[ResultSink.Aux[F, ResultType.Csv[F]]] =
     sinks.findMapM[Id.Id, ResultSink.Aux[F, ResultType.Csv[F]]] {
-      // TODO: make @unchecked unnecessary
-      case (rs: ResultSink.Aux[F, ResultType.Csv[F]] @unchecked) => rs.some
+      case ResultSink.Csv(sink) => sink.some
       case _ => none
     }
 

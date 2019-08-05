@@ -16,7 +16,7 @@
 
 package quasar.connector
 
-import slamdata.Predef.Unit
+import slamdata.Predef._
 
 import quasar.api.destination.ResultType
 import quasar.api.resource.ResourcePath
@@ -31,5 +31,16 @@ trait ResultSink[F[_]] {
 object ResultSink {
   type Aux[F[_], RT0 <: ResultType[F]] = ResultSink[F] {
     type RT = RT0
+  }
+
+  object Csv {
+    // TODO: make @unchecked unnecessary
+    def unapply[F[_]](sink: ResultSink[F]): Option[ResultSink.Aux[F, ResultType.Csv[F]]] =
+      (sink, sink.resultType) match {
+        case (rs: ResultSink.Aux[F, ResultType.Csv[F]] @unchecked, ResultType.Csv()) =>
+          Some(rs)
+        case _ =>
+          None
+      }
   }
 }
