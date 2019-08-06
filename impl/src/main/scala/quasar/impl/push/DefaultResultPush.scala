@@ -110,3 +110,13 @@ class DefaultResultPush[
   private def liftOptionF[F[_]: Functor, E, A](oa: F[Option[A]], err: E): EitherT[F, E, A] =
     OptionT(oa).toRight[E](err)
 }
+
+object DefaultResultPush {
+  def apply[F[_]: Concurrent: Timer, T, D, Q, R](
+    lookupTable: T => F[Option[TableRef[Q]]],
+    evaluator: QueryEvaluator[F, Q, R],
+    lookupDestination: D => F[Option[Destination[F]]],
+    jobManager: JobManager[F, T, Nothing],
+    convertToCsv: R => Stream[F, Byte]): DefaultResultPush[F, T, D, Q, R] =
+    new DefaultResultPush(lookupTable, evaluator, lookupDestination, jobManager, convertToCsv)
+}

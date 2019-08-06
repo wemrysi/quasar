@@ -51,7 +51,10 @@ class MockDestination[F[_]: Applicative] extends Destination[F] {
 }
 
 class MockCsvSink[F[_]: Applicative] extends ResultSink[F] {
+  type RT = ResultType.Csv[F]
+
   val resultType = ResultType.Csv()
+
   def apply(dst: ResourcePath, result: (List[TableColumn], Stream[F, Byte])): F[Unit] =
     ().point[F]
 }
