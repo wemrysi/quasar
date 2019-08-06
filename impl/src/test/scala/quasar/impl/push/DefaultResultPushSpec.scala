@@ -18,11 +18,13 @@ package quasar.impl.push
 
 import slamdata.Predef._
 
+import quasar.Condition
 import quasar.api.QueryEvaluator
 import quasar.api.destination.DestinationType
 import quasar.api.destination.ResultType
 import quasar.api.push.ResultPush
-import quasar.api.table.{TableColumn, TableRef}
+import quasar.api.resource.{ResourcePath, ResourceName}
+import quasar.api.table.{TableColumn, TableName, TableRef}
 import quasar.connector.{Destination, ResultSink}
 import quasar.api.resource.ResourcePath
 
@@ -32,6 +34,7 @@ import eu.timepit.refined.auto._
 import fs2.{Stream, text}
 import fs2.job.JobManager
 
+import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import scalaz.NonEmptyList
@@ -47,16 +50,26 @@ object DefaultResultPushSpec extends quasar.Qspec {
   def streamToString(s: Stream[IO, Byte]): IO[String] =
     s.chunks.flatMap(Stream.chunk).through(text.utf8Decode).compile.toList.map(_.mkString)
 
-  final class RefCsvSink(ref: Ref[IO, Map[ResourcePath, IO[String]]]) extends ResultSink[IO] {
+  type Filesystem = Map[ResourcePath, String]
+
+  val emptyFilesystem: Filesystem = Map.empty[ResourcePath, String]
+
+  final class RefCsvSink(ref: Ref[IO, Filesystem]) extends ResultSink[IO] {
     type RT = ResultType.Csv[IO]
 
     val resultType = ResultType.Csv()
 
-    def apply(dst: ResourcePath, result: (List[TableColumn], Stream[IO, Byte])): IO[Unit] =
-      ref.modify(currentState => (currentState + (dst -> streamToString(result._2)), ()))
+    def apply(dst: ResourcePath, result: (List[TableColumn], Stream[IO, Byte])): IO[Unit] = {
+      val (columns, data) = result
+
+      for {
+        stringData <- streamToString(data)
+        update <- ref.update(currentFs => (currentFs + (dst -> stringData)))
+      } yield update
+    }
   }
 
-  final class RefDestination(ref: Ref[IO, Map[ResourcePath, IO[String]]]) extends Destination[IO] {
+  final class RefDestination(ref: Ref[IO, Filesystem]) extends Destination[IO] {
     def destinationType: DestinationType = RefDestinationType
 
     def sinks = NonEmptyList(new RefCsvSink(ref))
@@ -73,14 +86,14 @@ object DefaultResultPushSpec extends quasar.Qspec {
   val jobManager: IO[JobManager[IO, Int, Nothing]] =
     JobManager[IO, Int, Nothing]().compile.lastOrError
 
-  def mkResultPush(table: TableRef[String], filesystem: IO[Ref[IO, Map[ResourcePath, IO[String]]]]): IO[ResultPush[IO, Int, Int]] = {
-    val lookupTable: Int => IO[Option[TableRef[String]]] = _ match {
+  def mkResultPush(table: TableRef[String], destination: Destination[IO]): IO[ResultPush[IO, Int, Int]] = {
+    val lookupTable: Int => IO[Option[TableRef[String]]] = {
       case 42 => IO(Some(table))
       case _ => IO(None)
     }
 
-    val lookupDestination: Int => IO[Option[Destination[IO]]] = _ match {
-      case 42 => filesystem.flatMap(ref => IO(Some(new RefDestination(ref))))
+    val lookupDestination: Int => IO[Option[Destination[IO]]] = {
+      case 42 => IO(Some(destination))
       case _ => IO(None)
     }
 
@@ -91,5 +104,27 @@ object DefaultResultPushSpec extends quasar.Qspec {
         lookupDestination,
         jm,
         convert))
+  }
+
+  "result push" >> {
+    "push a table to a destination" >> {
+      val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
+
+      val testRun = for {
+        filesystem <- Ref.of[IO, Filesystem](emptyFilesystem)
+        table = TableRef(TableName("foo"), "query something", List())
+        destination = new RefDestination(filesystem)
+        push <- mkResultPush(table, destination)
+        startRes <- push.start(42, 42, pushPath, ResultType.Csv[IO](), None)
+        _ <- IO.sleep(Duration(1, SECONDS))
+        filesystemAfterPush <- filesystem.get
+      } yield (startRes, filesystemAfterPush)
+
+      val (startRes, filesystemAfterPush) = testRun.unsafeRunSync
+
+      filesystemAfterPush.keys mustEqual(Set(pushPath))
+      filesystemAfterPush(pushPath) mustEqual("query something evaluated")
+      startRes mustEqual Condition.normal()
+    }
   }
 }

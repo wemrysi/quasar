@@ -290,7 +290,7 @@ lazy val impl = project
   .settings(
     libraryDependencies ++= Seq(
       "com.slamdata"   %% "fs2-gzip"       % fs2GzipVersion.value,
-      "com.slamdata"   %% "fs2-job"        % "0.0.5",
+      "com.slamdata"   %% "fs2-job"        % "0.0.6",
       "com.slamdata"   %% "qdata-tectonic" % qdataVersion.value,
       "com.slamdata"   %% "tectonic-fs2"   % tectonicVersion.value,
       "org.http4s"     %% "jawn-fs2"       % jawnfs2Version,

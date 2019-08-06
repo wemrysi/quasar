@@ -25,6 +25,7 @@ import quasar.api.destination.{ResultFormat, ResultType}
 import quasar.api.push.{ResultPush, ResultPushError, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
+import scala.concurrent.duration._
 
 import cats.effect.{Concurrent, Timer}
 import fs2.Stream
@@ -71,7 +72,7 @@ class DefaultResultPush[
       evaluated <- EitherT.rightT(evaluator.evaluate(query).map(convertToCsv))
       sinked = Stream.eval(sink(path, (columns, evaluated))).map(Right(_))
 
-      _ <- EitherT.rightT(jobManager.submit(Job(tableId, sinked)))
+      _ <- EitherT.rightT(jobManager.tap(Job(tableId, sinked)).compile.lastOrError)
 
     } yield ()
 
