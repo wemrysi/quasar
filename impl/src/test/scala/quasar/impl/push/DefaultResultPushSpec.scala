@@ -64,6 +64,7 @@ object DefaultResultPushSpec extends quasar.Qspec {
 
       for {
         stringData <- streamToString(data)
+        _ = println("Sequenced")
         update <- ref.update(currentFs => (currentFs + (dst -> stringData)))
       } yield update
     }
@@ -75,18 +76,16 @@ object DefaultResultPushSpec extends quasar.Qspec {
     def sinks = NonEmptyList(new RefCsvSink(ref))
   }
 
-  val evaluator = new QueryEvaluator[IO, String, String] {
-    def evaluate(query: String): IO[String] =
-      IO(query ++ " evaluated")
+  val evaluator = new QueryEvaluator[IO, String, Stream[IO, String]] {
+    def evaluate(query: String): IO[Stream[IO, String]] =
+      IO(Stream.emit(query ++ " evaluated"))
   }
 
-  val convert: String => Stream[IO, Byte] =
-    result => Stream.emit(result).covary[IO].through(text.utf8Encode)
+  val convert: Stream[IO, String] => Stream[IO, Byte] =
+    _.through(text.utf8Encode)
 
-  val jobManager: IO[JobManager[IO, Int, Nothing]] =
-    JobManager[IO, Int, Nothing]().compile.lastOrError
-
-  def mkResultPush(table: TableRef[String], destination: Destination[IO]): IO[ResultPush[IO, Int, Int]] = {
+  def mkResultPush(table: TableRef[String], destination: Destination[IO], manager: JobManager[IO, Int, Nothing])
+      : ResultPush[IO, Int, Int] = {
     val lookupTable: Int => IO[Option[TableRef[String]]] = {
       case 42 => IO(Some(table))
       case _ => IO(None)
@@ -97,24 +96,25 @@ object DefaultResultPushSpec extends quasar.Qspec {
       case _ => IO(None)
     }
 
-    jobManager.map(jm =>
-      DefaultResultPush[IO, Int, Int, String, String](
-        lookupTable,
-        evaluator,
-        lookupDestination,
-        jm,
-        convert))
+    DefaultResultPush[IO, Int, Int, String, Stream[IO, String]](
+      lookupTable,
+      evaluator,
+      lookupDestination,
+      manager,
+      convert)
   }
 
   "result push" >> {
     "push a table to a destination" >> {
       val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
+      val query = "query something"
+      val testTable = TableRef(TableName("foo"), query, List())
 
       val testRun = for {
         filesystem <- Ref.of[IO, Filesystem](emptyFilesystem)
-        table = TableRef(TableName("foo"), "query something", List())
+        jm <- JobManager[IO, Int, Nothing]().compile.lastOrError
         destination = new RefDestination(filesystem)
-        push <- mkResultPush(table, destination)
+        push = mkResultPush(testTable, destination, jm)
         startRes <- push.start(42, 42, pushPath, ResultType.Csv[IO](), None)
         _ <- IO.sleep(Duration(1, SECONDS))
         filesystemAfterPush <- filesystem.get
