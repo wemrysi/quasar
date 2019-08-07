@@ -72,7 +72,7 @@ class DefaultResultPush[
       evaluated <- EitherT.rightT(evaluator.evaluate(query).map(convertToCsv))
       sinked = Stream.eval(sink(path, (columns, evaluated))).map(Right(_))
 
-      _ <- EitherT.rightT(jobManager.tap(Job(tableId, sinked)).compile.lastOrError)
+      _ <- EitherT.rightT(jobManager.submit(Job(tableId, sinked)))
 
     } yield ()
 
