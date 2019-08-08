@@ -49,7 +49,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   val RefDestinationType = DestinationType("ref", 1L)
 
   def streamToString(s: Stream[IO, Byte]): IO[String] =
-    s.chunks.flatMap(Stream.chunk).through(text.utf8Decode).compile.toList.map(_.mkString)
+    s.through(text.utf8Decode).compile.toList.map(_.mkString)
 
   type Filesystem = Map[ResourcePath, String]
 
@@ -84,12 +84,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         IO(fn(query))
     }
 
-  def mockEvaluate(q: String): String =
-    s"evaluated($q)"
-
-  val mockEvaluator = mkEvaluator(q => Stream.emit(mockEvaluate(q)))
-  def constantEvaluator(result: Stream[IO, String]) = mkEvaluator(_ => result)
-
   def mkResultPush(
     table: TableRef[String],
     destination: Destination[IO],
@@ -114,6 +108,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       convert)
   }
 
+  def mockEvaluate(q: String): String =
+    s"evaluated($q)"
+
   def latchGet(s: SignallingRef[IO, String], expected: String): IO[Unit] =
     s.discrete.filter(Equal[String].equal(_, expected)).take(1).compile.drain
 
@@ -127,15 +124,46 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         filesystem <- Ref.of[IO, Filesystem](emptyFilesystem)
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         destination = new RefDestination(filesystem)
-        push = mkResultPush(testTable, destination, jm, mockEvaluator)
+        ref <- SignallingRef[IO, String]("Not started")
+        evaluator = mkEvaluator(q => Stream.emit(mockEvaluate(q)) ++ Stream.eval_(ref.set("Finished")))
+
+        push = mkResultPush(testTable, destination, jm, evaluator)
         startRes <- push.start(42, 42, pushPath, ResultType.Csv[IO](), None)
-        _ <- IO.sleep(Duration(100, MILLISECONDS))
+        _ <- latchGet(ref, "Finished")
         filesystemAfterPush <- filesystem.get
         _ <- cleanup
       } yield {
         filesystemAfterPush.keySet must equal(Set(pushPath))
         filesystemAfterPush(pushPath) must equal(mockEvaluate(query))
         startRes must beNormal
+      }
+    }
+
+    "cancel a table push" >>* {
+      val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
+      val query = "query something"
+      val testTable = TableRef(TableName("foo"), query, List())
+
+      def testStream(ref: SignallingRef[IO, String]): Stream[IO, String] =
+        Stream.eval(ref.set("Started")).as("foo") ++ Stream.sleep_(Duration(100, MILLISECONDS)) ++ Stream.eval(ref.set("Finished")).as("bar")
+
+      for {
+        filesystem <- Ref.of[IO, Filesystem](emptyFilesystem)
+        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        destination = new RefDestination(filesystem)
+        ref <- SignallingRef[IO, String]("Not started")
+        push = mkResultPush(testTable, destination, jm, mkEvaluator(_ => testStream(ref)))
+        startRes <- push.start(42, 42, pushPath, ResultType.Csv[IO](), None)
+        _ <- latchGet(ref, "Started")
+        cancelRes <- push.cancel(42)
+        filesystemAfterPush <- filesystem.get
+        refAfter <- ref.get
+        _ <- cleanup
+      } yield {
+        filesystemAfterPush.keySet must equal(Set.empty[ResourcePath])
+        startRes must beNormal
+        cancelRes must beNormal
+        refAfter must equal("Started")
       }
     }
   }
