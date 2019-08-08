@@ -18,7 +18,7 @@ package quasar.impl.push
 
 import slamdata.Predef._
 
-import quasar.Condition
+import quasar.{ConditionMatchers, EffectfulQSpec}
 import quasar.api.QueryEvaluator
 import quasar.api.destination.DestinationType
 import quasar.api.destination.ResultType
@@ -28,19 +28,20 @@ import quasar.api.table.{TableColumn, TableName, TableRef}
 import quasar.connector.{Destination, ResultSink}
 import quasar.api.resource.ResourcePath
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+
 import cats.effect.IO
 import cats.effect.concurrent.Ref
 import eu.timepit.refined.auto._
-import fs2.{Stream, text}
+import fs2.concurrent.SignallingRef
 import fs2.job.JobManager
+import fs2.{Stream, text}
+import scalaz.{Equal, NonEmptyList}
+import scalaz.std.set._
+import scalaz.std.string._
 
-import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
-
-import scalaz.NonEmptyList
-
-object DefaultResultPushSpec extends quasar.Qspec {
-  implicit val cs = IO.contextShift(global)
+object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   implicit val tmr = IO.timer(global)
 
   val TableId = 42
@@ -64,7 +65,6 @@ object DefaultResultPushSpec extends quasar.Qspec {
 
       for {
         stringData <- streamToString(data)
-        _ = println("Sequenced")
         update <- ref.update(currentFs => (currentFs + (dst -> stringData)))
       } yield update
     }
@@ -72,19 +72,29 @@ object DefaultResultPushSpec extends quasar.Qspec {
 
   final class RefDestination(ref: Ref[IO, Filesystem]) extends Destination[IO] {
     def destinationType: DestinationType = RefDestinationType
-
     def sinks = NonEmptyList(new RefCsvSink(ref))
   }
 
-  val evaluator = new QueryEvaluator[IO, String, Stream[IO, String]] {
-    def evaluate(query: String): IO[Stream[IO, String]] =
-      IO(Stream.emit(query ++ " evaluated"))
-  }
+  def convert(st: Stream[IO, String]): Stream[IO, Byte] =
+    st.through(text.utf8Encode)
 
-  val convert: Stream[IO, String] => Stream[IO, Byte] =
-    _.through(text.utf8Encode)
+  def mkEvaluator(fn: String => Stream[IO, String]): QueryEvaluator[IO, String, Stream[IO, String]] =
+    new QueryEvaluator[IO, String, Stream[IO, String]] {
+      def evaluate(query: String): IO[Stream[IO, String]] =
+        IO(fn(query))
+    }
 
-  def mkResultPush(table: TableRef[String], destination: Destination[IO], manager: JobManager[IO, Int, Nothing])
+  def mockEvaluate(q: String): String =
+    s"evaluated($q)"
+
+  val mockEvaluator = mkEvaluator(q => Stream.emit(mockEvaluate(q)))
+  def constantEvaluator(result: Stream[IO, String]) = mkEvaluator(_ => result)
+
+  def mkResultPush(
+    table: TableRef[String],
+    destination: Destination[IO],
+    manager: JobManager[IO, Int, Nothing],
+    evaluator: QueryEvaluator[IO, String, Stream[IO, String]])
       : ResultPush[IO, Int, Int] = {
     val lookupTable: Int => IO[Option[TableRef[String]]] = {
       case 42 => IO(Some(table))
@@ -104,27 +114,29 @@ object DefaultResultPushSpec extends quasar.Qspec {
       convert)
   }
 
+  def latchGet(s: SignallingRef[IO, String], expected: String): IO[Unit] =
+    s.discrete.filter(Equal[String].equal(_, expected)).take(1).compile.drain
+
   "result push" >> {
-    "push a table to a destination" >> {
+    "push a table to a destination" >>* {
       val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
       val query = "query something"
       val testTable = TableRef(TableName("foo"), query, List())
 
-      val testRun = for {
+      for {
         filesystem <- Ref.of[IO, Filesystem](emptyFilesystem)
-        jm <- JobManager[IO, Int, Nothing]().compile.lastOrError
+        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         destination = new RefDestination(filesystem)
-        push = mkResultPush(testTable, destination, jm)
+        push = mkResultPush(testTable, destination, jm, mockEvaluator)
         startRes <- push.start(42, 42, pushPath, ResultType.Csv[IO](), None)
-        _ <- IO.sleep(Duration(1, SECONDS))
+        _ <- IO.sleep(Duration(100, MILLISECONDS))
         filesystemAfterPush <- filesystem.get
-      } yield (startRes, filesystemAfterPush)
-
-      val (startRes, filesystemAfterPush) = testRun.unsafeRunSync
-
-      filesystemAfterPush.keys mustEqual(Set(pushPath))
-      filesystemAfterPush(pushPath) mustEqual("query something evaluated")
-      startRes mustEqual Condition.normal()
+        _ <- cleanup
+      } yield {
+        filesystemAfterPush.keySet must equal(Set(pushPath))
+        filesystemAfterPush(pushPath) must equal(mockEvaluate(query))
+        startRes must beNormal
+      }
     }
   }
 }
