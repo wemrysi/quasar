@@ -24,7 +24,7 @@ import monocle.Prism
 import matryoshka.Coalgebra
 import matryoshka.patterns.EnvT
 import matryoshka.implicits._
-import scalaz.{@@, Bifunctor, Cord, Equal, Order, Show}
+import scalaz.{@@, Bifunctor, Equal, Order, Show}
 import scalaz.syntax.order._
 import scalaz.syntax.show._
 import scalaz.syntax.tag._
@@ -106,12 +106,12 @@ sealed abstract class SstSchemaInstances {
   implicit def show[J: Show, A: Equal: Field: NRoot: Show]: Show[SstSchema[J, A]] = {
     type T[X] = StructuralType[J, Occurred[A, X]]
 
-    Show.show {
+    Show.shows {
       case PopulationSchema(s) =>
-        Cord("Population(") ++ Population.unsubst[T, TypeStat[A]](s).show ++ Cord(")")
+        "Population(" + Population.unsubst[T, TypeStat[A]](s).shows + ")"
 
       case SampleSchema(x) =>
-        Cord("Sample(") ++ x.show ++ Cord(")")
+        "Sample(" + x.shows + ")"
     }
   }
 }

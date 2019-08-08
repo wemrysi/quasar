@@ -470,33 +470,33 @@ private[quasar] sealed abstract class TypeFInstances {
       def apply[A](show: Show[A]): Show[TypeF[J, A]] = {
         implicit val showA: Show[A] = show
 
-        def showJ(j: J): Cord =
-          Cord("`") ++ j.show ++ Cord("`")
+        def showJ(j: J): String =
+          "`" ++ j.shows ++ "`"
 
-        def showKnown(kn: IMap[J, A]): Cord =
+        def showKnown(kn: IMap[J, A]): String =
           kn.toList map {
-            case (j, a) => showJ(j) ++ Cord(" : ") ++ a.show
-          } intercalate Cord(", ")
+            case (j, a) => showJ(j) + " : " + a.shows
+          } intercalate ", "
 
-        Show.show {
-          case Bottom() => Cord("⊥")
-          case Simple(t) => t.show
+        Show.shows {
+          case Bottom() => "⊥"
+          case Simple(t) => t.shows
           case Const(j) => showJ(j)
 
-          case Arr(k, None) => k.show
-          case Arr(INil(), Some(u)) => u.show ++ Cord("[]")
+          case Arr(k, None) => k.shows
+          case Arr(INil(), Some(u)) => u.shows + "[]"
           case Arr(k, Some(u)) =>
-            Cord("[") ++ k.map(_.show).intercalate(Cord(", ")) ++ Cord(" ? ") ++ u.show ++ Cord("]")
+            "[" + k.map(_.shows).intercalate(", ") + " ? " + u.shows + "]"
 
           case Map(kn, Some((k, v))) =>
-            Cord("{") ++ showKnown(kn) ++ Cord(" ? ") ++ k.show ++ Cord(" : ") ++ v.show ++ Cord("}")
+            "{" + showKnown(kn) + " ? " + k.shows + " : " + v.shows + "}"
 
-          case Map(kn, None) => Cord("{") ++ showKnown(kn) ++ Cord("}")
+          case Map(kn, None) => "{" + showKnown(kn) + "}"
 
           case Unioned(xs) =>
-            Cord("(") ++ (xs map (_.show) intercalate Cord(" | ")) ++ Cord(")")
+            "(" + (xs map (_.shows) intercalate " | ") + ")"
 
-          case Top() => Cord("⊤")
+          case Top() => "⊤"
         }
       }
     }

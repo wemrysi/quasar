@@ -35,7 +35,7 @@ import matryoshka._
 
 import org.slf4s.Logging
 
-import scalaz.{Cord, Functor, Kleisli => K, Monad, Show}
+import scalaz.{Functor, Kleisli => K, Monad, Show}
 import scalaz.syntax.functor._
 import scalaz.syntax.show._
 
@@ -94,7 +94,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
   }
 
   private def debug[F[_]: Functor: PhaseResultTell, A: Show](name: String): A => F[A] = { a =>
-    log.debug((Cord(name + "\n") ++ a.show).shows)
+    log.debug(name ++ "\n" ++ a.shows)
     PhaseResultTell[F].tell(Vector(Eval.later(PhaseResult.detail(s"QSU ($name)", a.shows)))).as(a)
   }
 }

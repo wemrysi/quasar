@@ -18,7 +18,7 @@ package quasar.api.table
 
 import slamdata.Predef._
 
-import scalaz.{Cord, Equal, Order, Show}
+import scalaz.{Equal, Order, Show}
 import scalaz.std.list._
 import scalaz.std.tuple._
 import scalaz.std.string._
@@ -38,7 +38,7 @@ object TableRef {
     Equal.equalBy(t => (t.name, t.query, t.columns))
 
   implicit def showTableRef[Q: Show]: Show[TableRef[Q]] =
-    Show show { t =>
-      Cord("TableRef(") ++ t.name.show ++ Cord(", ") ++ t.query.show ++ Cord(", ") ++ t.columns.show ++ Cord(")")
+    Show shows { t =>
+      "TableRef(" ++ t.name.shows ++ ", " ++ t.query.shows ++ ", " ++ t.columns.shows ++ ")"
     }
 }

@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.api.resource.ResourcePath
 
 import monocle.Prism
-import scalaz.{Cord, Equal, ISet, NonEmptyList, Show}
+import scalaz.{Equal, ISet, NonEmptyList, Show}
 import scalaz.std.option._
 import scalaz.std.string._
 import scalaz.std.tuple._
@@ -139,47 +139,47 @@ sealed abstract class DatasourceErrorInstances {
   }
 
   implicit def show[I: Show, C: Show]: Show[DatasourceError[I, C]] =
-    Show.show {
-      case e: CreateError[C]    => showCreateError[C].show(e)
-      case e: DiscoveryError[I] => showDiscoveryError[I].show(e)
+    Show.shows {
+      case e: CreateError[C]    => showCreateError[C].shows(e)
+      case e: DiscoveryError[I] => showDiscoveryError[I].shows(e)
     }
 
   implicit def showExistentialError[I: Show]: Show[ExistentialError[I]] =
-    Show.show {
+    Show.shows {
       case DatasourceNotFound(i) =>
-        Cord("DatasourceNotFound(") ++ i.show ++ Cord(")")
+        "DatasourceNotFound(" ++ i.shows ++ ")"
     }
 
   implicit def showDiscoveryError[I: Show]: Show[DiscoveryError[I]] =
-    Show.show {
+    Show.shows {
       case PathNotAResource(p) =>
-        Cord("PathNotAResource(") ++ p.show ++ Cord(")")
+        "PathNotAResource(" ++ p.shows ++ ")"
 
       case PathNotFound(p) =>
-        Cord("PathNotFound(") ++ p.show ++ Cord(")")
+        "PathNotFound(" ++ p.shows ++ ")"
 
       case e: ExistentialError[I] =>
-        showExistentialError[I].show(e)
+        showExistentialError[I].shows(e)
     }
 
   implicit def showCreateError[C: Show]: Show[CreateError[C]] =
-    Show.show {
+    Show.shows {
       case DatasourceNameExists(n) =>
-        Cord("DatasourceNameExists(") ++ n.show ++ Cord(")")
+        "DatasourceNameExists(" ++ n.shows ++ ")"
 
       case DatasourceUnsupported(k, s) =>
-        Cord("DatasourceUnsupported(") ++ k.show ++ Cord(", ") ++ s.show ++ Cord(")")
+        "DatasourceUnsupported(" ++ k.shows ++ ", " ++ s.shows ++ ")"
 
       case InvalidConfiguration(k, c, rs) =>
-        Cord("InvalidConfiguration(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ rs.show ++ Cord(")")
+        "InvalidConfiguration(" ++ k.shows ++ ", " ++ c.shows ++ ", " ++ rs.shows ++ ")"
 
       case MalformedConfiguration(k, c, r) =>
-        Cord("MalformedConfiguration(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ r.show ++ Cord(")")
+        "MalformedConfiguration(" ++ k.shows ++ ", " ++ c.shows ++ ", " ++ r.shows ++ ")"
 
       case ConnectionFailed(k, c, e) =>
-        Cord("ConnectionFailed(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(s")\n\n$e")
+        "ConnectionFailed(" ++ k.shows ++ ", " ++ c.shows ++ s")\n\n$e"
 
       case AccessDenied(k, c, r) =>
-        Cord("AccessDenied(") ++ k.show ++ Cord(", ") ++ c.show ++ Cord(", ") ++ r.show ++ Cord(")")
+        "AccessDenied(" ++ k.shows ++ ", " ++ c.shows ++ ", " ++ r.shows ++ ")"
     }
 }

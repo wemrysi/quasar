@@ -20,7 +20,7 @@ import quasar.Condition
 import slamdata.Predef.{Exception, Option}
 
 import monocle.macros.Lenses
-import scalaz.{Cord, Show}
+import scalaz.Show
 import scalaz.syntax.show._
 
 @Lenses
@@ -43,9 +43,9 @@ sealed abstract class DestinationMetaInstances {
     implicit val exShow: Show[Exception] =
       Show.shows(_.getMessage)
 
-    Show.show {
+    Show.shows {
       case DestinationMeta(n, k, s) =>
-        Cord("DestinationMeta(") ++ k.show ++ Cord(", ") ++ n.show ++ Cord(", ") ++ s.show ++ Cord(")")
+        "DestinationMeta(" + k.shows + ", " + n.shows + ", " + s.shows + ")"
     }
   }
 }

@@ -18,7 +18,7 @@ package quasar.common
 
 import slamdata.Predef._
 
-import scalaz.{Cord, Order, Show}
+import scalaz.{Order, Show}
 import scalaz.Ordering._
 import scalaz.std.anyVal._
 import scalaz.std.string._
@@ -160,11 +160,11 @@ object CPath {
     apply(parse0(PathPattern.split(properPath).toList, Nil).reverse: _*)
   }
 
-  implicit val cpathNodeShow: Show[CPathNode] = Show.show {
-    case CPathField(name) => Cord("CPathField(") ++ name.show ++ Cord(")")
-    case CPathIndex(idx) => Cord("CPathIndex(") ++ idx.show ++ Cord(")")
-    case CPathArray => Cord("CPathArray()")
-    case CPathMeta(name) => Cord("CPathMeta(") ++ name.show ++ Cord(")")
+  implicit val cpathNodeShow: Show[CPathNode] = Show.shows {
+    case CPathField(name) => "CPathField(" ++ name.shows ++ ")"
+    case CPathIndex(idx) => "CPathIndex(" ++ idx.shows ++ ")"
+    case CPathArray => "CPathArray()"
+    case CPathMeta(name) => "CPathMeta(" ++ name.shows ++ ")"
   }
 
   implicit val cPathShow: Show[CPath] =
