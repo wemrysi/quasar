@@ -161,10 +161,10 @@ object CPath {
   }
 
   implicit val cpathNodeShow: Show[CPathNode] = Show.shows {
-    case CPathField(name) => "CPathField(" ++ name.shows ++ ")"
-    case CPathIndex(idx) => "CPathIndex(" ++ idx.shows ++ ")"
+    case CPathField(name) => "CPathField(" + name.shows + ")"
+    case CPathIndex(idx) => "CPathIndex(" + idx.shows + ")"
     case CPathArray => "CPathArray()"
-    case CPathMeta(name) => "CPathMeta(" ++ name.shows ++ ")"
+    case CPathMeta(name) => "CPathMeta(" + name.shows + ")"
   }
 
   implicit val cPathShow: Show[CPath] =

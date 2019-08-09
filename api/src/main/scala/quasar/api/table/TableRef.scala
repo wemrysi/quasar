@@ -39,6 +39,6 @@ object TableRef {
 
   implicit def showTableRef[Q: Show]: Show[TableRef[Q]] =
     Show shows { t =>
-      "TableRef(" ++ t.name.shows ++ ", " ++ t.query.shows ++ ", " ++ t.columns.shows ++ ")"
+      "TableRef(" + t.name.shows + ", " + t.query.shows + ", " + t.columns.shows + ")"
     }
 }

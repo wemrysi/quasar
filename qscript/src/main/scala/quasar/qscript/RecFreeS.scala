@@ -123,7 +123,7 @@ object RecFreeS {
         case Suspend(fa) => S.apply(sh).show(fa)
         case Fix(form, body) => {
           def mkLet(f: String, b: String): String =
-            "Let(" ++ f ++ " = " ++ b ++ ")"
+            "Let(" + f + " = " + b + ")"
 
           val alg: Algebra[CoEnv[Hole, RecFreeS[F, ?], ?], String] =
             interpret[RecFreeS[F, ?], Hole, String](_.shows, RecFreeS.recInterpret(_.shows, frm => ("SrcHole", c => mkLet(frm, c))))

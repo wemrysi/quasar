@@ -151,7 +151,7 @@ object LogicalPlan {
             func.shows + "(" +
             values.foldLeft("") { case (acc, v) => acc + sa.shows(v) + ", " } + ")"
           case JoinSideName(n) =>
-            "JoinSideName(" + n.toString ++ ")"
+            "JoinSideName(" + n.toString + ")"
           case Join(l, r, tpe, JoinCondition(lName, rName, v)) =>
             "Join(" +
             l.shows + ", " +

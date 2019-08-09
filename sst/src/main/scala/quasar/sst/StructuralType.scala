@@ -359,7 +359,7 @@ sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
   }
 
   implicit def show[L: Show, V: Show]: Show[StructuralType[L, V]] =
-    Show.shows(st => "StructuralType" ++ st.toCofree.shows)
+    Show.shows(st => "StructuralType" + st.toCofree.shows)
 }
 
 sealed abstract class StructuralTypeInstances0 {

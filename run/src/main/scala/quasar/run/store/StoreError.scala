@@ -39,7 +39,7 @@ object StoreError {
     } (StoreErrorException(_))
 
   implicit val show: Show[StoreError] = Show.shows {
-    case Corrupt(detail) => "StoreError.Corrupt(" ++ detail ++ ")"
+    case Corrupt(detail) => "StoreError.Corrupt(" + detail + ")"
   }
 
   ////

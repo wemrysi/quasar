@@ -143,31 +143,31 @@ object DestinationError {
         Show[InitializationError[C]].shows(e)
 
       case DestinationUnsupported(kind, supported) =>
-        "DestinationUnsupported(" ++ kind.shows ++ ", " ++ supported.shows ++ ")"
+        "DestinationUnsupported(" + kind.shows + ", " + supported.shows + ")"
 
       case DestinationNameExists(name) =>
-        "DestinationNameExists(" ++ name.shows ++ ")"
+        "DestinationNameExists(" + name.shows + ")"
     }
 
   implicit def showInitializationError[C: Show]: Show[InitializationError[C]] =
     Show.shows {
       case MalformedConfiguration(kind, config, reason) =>
-        "MalformedConfiguration(" ++ kind.shows ++ ", " ++ config.shows ++ ", " ++ reason ++ ")"
+        "MalformedConfiguration(" + kind.shows + ", " + config.shows + ", " + reason + ")"
 
       case InvalidConfiguration(kind, config, reasons) =>
-        "InvalidConfiguration(" ++ kind.shows ++ ", " ++ config.shows ++ ", " ++ reasons.shows ++ ")"
+        "InvalidConfiguration(" + kind.shows + ", " + config.shows + ", " + reasons.shows + ")"
 
       case ConnectionFailed(kind, config, ex) =>
-        "ConnectionFailed(" ++ kind.shows ++ ", " ++ config.shows ++ s")\n$ex"
+        "ConnectionFailed(" + kind.shows + ", " + config.shows + s")\n$ex"
 
       case AccessDenied(kind, config, reason) =>
-        "AccessDenied(" ++ kind.shows ++ ", " ++ config.shows ++ ", " ++ reason.shows ++ ")"
+        "AccessDenied(" + kind.shows + ", " + config.shows + ", " + reason.shows + ")"
     }
 
   implicit def showExistentialError[I: Show]: Show[ExistentialError[I]] =
     Show.shows {
       case DestinationNotFound(id) =>
-        "DestinationNotFound(" ++ id.shows ++ ")"
+        "DestinationNotFound(" + id.shows + ")"
     }
 
   implicit def show[I: Show, C: Show]: Show[DestinationError[I, C]] =
@@ -180,7 +180,7 @@ object DestinationError {
       }
       case e: ExistentialError[I] => e match {
         case DestinationNotFound(id) =>
-          "DestinationNotFound(" ++ id.shows ++ ")"
+          "DestinationNotFound(" + id.shows + ")"
       }
     }
 }

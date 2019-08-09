@@ -71,13 +71,13 @@ object ThetaJoin {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](showA: Show[A]): Show[ThetaJoin[T, A]] = Show.shows {
         case ThetaJoin(src, lBr, rBr, on, f, combine) =>
-          "ThetaJoin(" ++
-          showA.shows(src) ++ "," ++
-          lBr.shows ++ "," ++
-          rBr.shows ++ "," ++
-          on.shows ++ "," ++
-          f.shows ++ "," ++
-          combine.shows ++ ")"
+          "ThetaJoin(" +
+          showA.shows(src) + "," +
+          lBr.shows + "," +
+          rBr.shows + "," +
+          on.shows + "," +
+          f.shows + "," +
+          combine.shows + ")"
       }
     }
 

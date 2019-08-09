@@ -202,36 +202,36 @@ object QScriptCore {
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
         Show.shows {
           case Map(src, mf) => "Map(" +
-            s.shows(src) + ", " ++
+            s.shows(src) + ", " +
             mf.shows     + ")"
-          case LeftShift(src, struct, id, stpe, undef, repair) => "LeftShift(" ++
-            s.shows(src) ++ ", " ++
-            struct.shows ++ ", " ++
-            id.shows ++ ", " ++
-            stpe.shows ++ ", " ++
-            undef.shows ++ ", " ++
-            repair.shows ++ ")"
-          case Reduce(a, b, red, rep) => "Reduce(" ++
-            s.shows(a) ++ ", " ++
-            b.shows ++ ", " ++
-            red.shows ++ ", " ++
-            rep.shows ++ ")"
-          case Sort(a, b, o) => "Sort(" ++
-            s.shows(a) ++ ", " ++
-            b.shows ++ ", " ++
-            o.shows ++ ")"
-          case Union(src, l, r) => "Union(" ++
-            s.shows(src) ++ ", " ++
-            l.shows ++ ", " ++
-            r.shows ++ ")"
-          case Filter(a, func) => "Filter(" ++
+          case LeftShift(src, struct, id, stpe, undef, repair) => "LeftShift(" +
+            s.shows(src) + ", " +
+            struct.shows + ", " +
+            id.shows + ", " +
+            stpe.shows + ", " +
+            undef.shows + ", " +
+            repair.shows + ")"
+          case Reduce(a, b, red, rep) => "Reduce(" +
+            s.shows(a) + ", " +
+            b.shows + ", " +
+            red.shows + ", " +
+            rep.shows + ")"
+          case Sort(a, b, o) => "Sort(" +
+            s.shows(a) + ", " +
+            b.shows + ", " +
+            o.shows + ")"
+          case Union(src, l, r) => "Union(" +
+            s.shows(src) + ", " +
+            l.shows + ", " +
+            r.shows + ")"
+          case Filter(a, func) => "Filter(" +
             s.shows(a) + ", " +
             func.shows + ")"
-          case Subset(a, f, sel, c) => "Subset(" ++
-            s.shows(a) ++ ", " +
-            f.shows ++ ", " +
-            sel.shows ++ ", " +
-            c.shows ++ ")"
+          case Subset(a, f, sel, c) => "Subset(" +
+            s.shows(a) + ", " +
+            f.shows + ", " +
+            sel.shows + ", " +
+            c.shows + ")"
           case Unreferenced() => "Unreferenced"
         }
     }

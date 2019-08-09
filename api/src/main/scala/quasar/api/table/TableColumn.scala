@@ -31,6 +31,6 @@ object TableColumn {
 
   implicit val showTableColumn: Show[TableColumn] =
     Show shows { tc =>
-      "TableColumn(" ++ tc.name ++ ", " ++ tc.tpe.shows ++ ")"
+      "TableColumn(" + tc.name + ", " + tc.tpe.shows + ")"
     }
 }

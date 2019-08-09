@@ -94,7 +94,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
   }
 
   private def debug[F[_]: Functor: PhaseResultTell, A: Show](name: String): A => F[A] = { a =>
-    log.debug(name ++ "\n" ++ a.shows)
+    log.debug(name + "\n" + a.shows)
     PhaseResultTell[F].tell(Vector(Eval.later(PhaseResult.detail(s"QSU ($name)", a.shows)))).as(a)
   }
 }

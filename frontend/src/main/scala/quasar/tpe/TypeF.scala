@@ -471,7 +471,7 @@ private[quasar] sealed abstract class TypeFInstances {
         implicit val showA: Show[A] = show
 
         def showJ(j: J): String =
-          "`" ++ j.shows ++ "`"
+          "`" + j.shows + "`"
 
         def showKnown(kn: IMap[J, A]): String =
           kn.toList map {

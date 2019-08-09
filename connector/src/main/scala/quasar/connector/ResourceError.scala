@@ -98,10 +98,10 @@ sealed abstract class ResourceErrorInstances {
   implicit val show: Show[ResourceError] =
     Show.shows {
       case ResourceError.NotAResource(p) =>
-        "NotAResource(" ++ p.shows ++ ")"
+        "NotAResource(" + p.shows + ")"
 
       case ResourceError.PathNotFound(p) =>
-        "PathNotFound(" ++ p.shows ++ ")"
+        "PathNotFound(" + p.shows + ")"
 
       case ResourceError.MalformedResource(p, e, d, t) =>
         s"MalformedResource(path: ${p.show}, expected: $e, detail: ${d.show})${printThrowable(t)}"

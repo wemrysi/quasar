@@ -147,16 +147,16 @@ sealed abstract class DatasourceErrorInstances {
   implicit def showExistentialError[I: Show]: Show[ExistentialError[I]] =
     Show.shows {
       case DatasourceNotFound(i) =>
-        "DatasourceNotFound(" ++ i.shows ++ ")"
+        "DatasourceNotFound(" + i.shows + ")"
     }
 
   implicit def showDiscoveryError[I: Show]: Show[DiscoveryError[I]] =
     Show.shows {
       case PathNotAResource(p) =>
-        "PathNotAResource(" ++ p.shows ++ ")"
+        "PathNotAResource(" + p.shows + ")"
 
       case PathNotFound(p) =>
-        "PathNotFound(" ++ p.shows ++ ")"
+        "PathNotFound(" + p.shows + ")"
 
       case e: ExistentialError[I] =>
         showExistentialError[I].shows(e)
@@ -165,21 +165,21 @@ sealed abstract class DatasourceErrorInstances {
   implicit def showCreateError[C: Show]: Show[CreateError[C]] =
     Show.shows {
       case DatasourceNameExists(n) =>
-        "DatasourceNameExists(" ++ n.shows ++ ")"
+        "DatasourceNameExists(" + n.shows + ")"
 
       case DatasourceUnsupported(k, s) =>
-        "DatasourceUnsupported(" ++ k.shows ++ ", " ++ s.shows ++ ")"
+        "DatasourceUnsupported(" + k.shows + ", " + s.shows + ")"
 
       case InvalidConfiguration(k, c, rs) =>
-        "InvalidConfiguration(" ++ k.shows ++ ", " ++ c.shows ++ ", " ++ rs.shows ++ ")"
+        "InvalidConfiguration(" + k.shows + ", " + c.shows + ", " + rs.shows + ")"
 
       case MalformedConfiguration(k, c, r) =>
-        "MalformedConfiguration(" ++ k.shows ++ ", " ++ c.shows ++ ", " ++ r.shows ++ ")"
+        "MalformedConfiguration(" + k.shows + ", " + c.shows + ", " + r.shows + ")"
 
       case ConnectionFailed(k, c, e) =>
-        "ConnectionFailed(" ++ k.shows ++ ", " ++ c.shows ++ s")\n\n$e"
+        "ConnectionFailed(" + k.shows + ", " + c.shows + s")\n\n$e"
 
       case AccessDenied(k, c, r) =>
-        "AccessDenied(" ++ k.shows ++ ", " ++ c.shows ++ ", " ++ r.shows ++ ")"
+        "AccessDenied(" + k.shows + ", " + c.shows + ", " + r.shows + ")"
     }
 }
