@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.api.QueryEvaluator
 import quasar.api.destination.DestinationType
 import quasar.api.destination.ResultType
-import quasar.api.push.{ResultPush, ResultPushError}
+import quasar.api.push.{ResultPush, ResultPushError, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
 import quasar.api.table.{TableColumn, TableName, TableRef}
@@ -120,8 +120,10 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   val await = IO.sleep(WorkTime)
   val awaitS = Stream.sleep_(WorkTime)
 
-  def verifyTimeout[A](io: IO[A], msg: String): IO[MatchResult[Any]] =
-    (io >> IO(ko(msg))).timeoutTo(Timeout, IO(ok))
+  /* Runs `io` with a timeout, producing a failing expectation if `io`
+     completes before the timeout. errMsg is included with the failing expectation. */
+  def verifyTimeout[A](io: IO[A], errMsg: String): IO[MatchResult[Any]] =
+    (io >> IO(ko(errMsg))).timeoutTo(Timeout, IO(ok))
 
   "result push" >> {
     "push a table to a destination" >>* {
@@ -182,10 +184,84 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
-    // "retrieves the status of a running push" >>* {}
-    // "retrieves the status of a cancelled push" >>* {}
-    // "retrieves the status of a completed push" >>* {}
-    // "rejects an already running push" >>* {}
+    "retrieves the status of a started push" >>* {
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      for {
+        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        sync <- SignallingRef[IO, String]("Not started")
+        (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        destination = new RefDestination(filesystem)
+        push = mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
+          Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2")))
+        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
+        _ <- latchGet(sync, "Started")
+        pushStatus <- push.status(TableId)
+      } yield {
+        pushStatus must be_\/-(equal[Status](Status.Started))
+      }
+    }
+
+    "retrieves the status of a cancelled push" >>* {
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      for {
+        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        sync <- SignallingRef[IO, String]("Not started")
+        (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        destination = new RefDestination(filesystem)
+        push = mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
+          Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2")))
+        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
+        _ <- latchGet(sync, "Started")
+        _ <- push.cancel(TableId)
+        _ <- await
+        pushStatus <- push.status(TableId)
+      } yield {
+        pushStatus must be_\/-(equal[Status](Status.Canceled))
+      }
+    }
+
+    "retrieves the status of a completed push" >>* {
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      for {
+        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        sync <- SignallingRef[IO, String]("Not started")
+        (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        destination = new RefDestination(filesystem)
+        push = mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
+          Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2")))
+        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
+        _ <- latchGet(sync, "Finished")
+        _ <- await
+        pushStatus <- push.status(TableId)
+      } yield {
+        pushStatus must be_\/-(equal[Status](Status.Finished))
+      }
+    }
+
+    "rejects an already running push" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      for {
+        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        sync <- SignallingRef[IO, String]("Not started")
+        (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        destination = new RefDestination(filesystem)
+        push = mkResultPush(
+          Map(TableId -> testTable),
+          Map(DestinationId -> destination),
+          jm,
+          mkEvaluator(_ => Stream.eval(sync.set("Started")).as("1") ++ awaitS.as("2") ++ Stream.eval(sync.set("Finished")).as("3")))
+        firstStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv[IO], None)
+        secondStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv[IO], None)
+      } yield {
+        firstStartStatus must beNormal
+        secondStartStatus must beAbnormal(ResultPushError.PushAlreadyRunning(TableId))
+      }
+    }
 
     "cancel all pushes" >>* {
       val path1 = ResourcePath.root() / ResourceName("foo")
@@ -202,17 +278,17 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         destination = new RefDestination(filesystem)
         push = mkResultPush(Map(1 -> testTable1, 2 -> testTable2), Map(DestinationId -> destination), jm, mkEvaluator {
           case "queryFoo" =>
-            Stream.eval_(refFoo.set("Started")) ++ Stream("resultFoo") ++ awaitS ++ Stream.eval_(refFoo.set("Finished"))
+            Stream.eval_(refFoo.set("Started")) ++ awaitS ++ Stream.eval_(refFoo.set("Finished"))
           case "queryBar" =>
-            Stream.eval_(refBar.set("Started")) ++ Stream("resultBar") ++ awaitS ++ Stream.eval_(refBar.set("Finished"))
+            Stream.eval_(refBar.set("Started")) ++ awaitS ++ Stream.eval_(refBar.set("Finished"))
         })
         _ <- push.start(1, DestinationId, path1, ResultType.Csv[IO](), None)
         _ <- push.start(2, DestinationId, path2, ResultType.Csv[IO](), None)
         _ <- latchGet(refFoo, "Started") >> latchGet(refBar, "Started")
         _ <- push.cancelAll
-        barCanceled <- verifyTimeout(latchGet(refBar, "Finished"), "queryBar not cancelled")
         fooCanceled <- verifyTimeout(latchGet(refFoo, "Finished"), "queryFoo not cancelled")
-      } yield barCanceled and fooCanceled
+        barCanceled <- verifyTimeout(latchGet(refBar, "Finished"), "queryBar not cancelled")
+      } yield ok
     }
 
     "fails with ResultPush.DestinationNotFound with an unknown destination id" >>* {

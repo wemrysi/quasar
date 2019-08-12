@@ -18,10 +18,21 @@ package quasar.api.push
 
 import slamdata.Predef._
 
+import scalaz.{Equal, Show}
+
 sealed trait Status extends Product with Serializable
 
 object Status {
   case object Finished extends Status
   case object Started extends Status
   case object Canceled extends Status
+
+  implicit val equal: Equal[Status] =
+    Equal.equalA
+
+  implicit val show: Show[Status] = Show.shows {
+    case Finished => "Finished"
+    case Started => "Started"
+    case Canceled => "Canceled"
+  }
 }

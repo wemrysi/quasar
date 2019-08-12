@@ -25,7 +25,6 @@ import quasar.api.destination.{ResultFormat, ResultType}
 import quasar.api.push.{ResultPush, ResultPushError, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
-import scala.concurrent.duration._
 
 import cats.effect.{Concurrent, Timer}
 import fs2.Stream
@@ -69,6 +68,8 @@ class DefaultResultPush[
       query = tableRef.query
       columns = tableRef.columns
 
+      _ <- verifyNotRunning(tableId)
+
       evaluated <- EitherT.rightT(evaluator.evaluate(query).map(convertToCsv))
       sinked = Stream.eval(sink(path, (columns, evaluated))).map(Right(_))
 
@@ -110,6 +111,14 @@ class DefaultResultPush[
 
   private def liftOptionF[F[_]: Functor, E, A](oa: F[Option[A]], err: E): EitherT[F, E, A] =
     OptionT(oa).toRight[E](err)
+
+  private def verifyNotRunning(i: T): EitherT[F, ResultPushError[T, D], Unit] =
+    EitherT(jobManager.status(i).map {
+      case Some(JobStatus.Running | JobStatus.Pending) =>
+        ResultPushError.PushAlreadyRunning(i).left
+      case _ =>
+        ().right
+    })
 }
 
 object DefaultResultPush {

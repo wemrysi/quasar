@@ -16,7 +16,7 @@
 
 package quasar.api.push
 
-import slamdata.Predef.{Exception, Option, Long, Unit}
+import slamdata.Predef.{Option, Long, Unit}
 
 import quasar.Condition
 import quasar.api.destination.ResultType
