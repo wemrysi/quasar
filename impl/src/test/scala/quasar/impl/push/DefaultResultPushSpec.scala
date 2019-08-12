@@ -39,7 +39,9 @@ import fs2.job.JobManager
 import fs2.{Stream, text}
 import scalaz.std.set._
 import scalaz.std.string._
+import scalaz.syntax.bind._
 import scalaz.{Equal, NonEmptyList}
+import shims._
 
 object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   implicit val tmr = IO.timer(global)
@@ -116,6 +118,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   def latchGet(s: SignallingRef[IO, String], expected: String): IO[Unit] =
     s.discrete.filter(Equal[String].equal(_, expected)).take(1).compile.drain
 
+  val WorkTime = Duration(100, MILLISECONDS)
+  val await = IO.sleep(WorkTime)
+
   "result push" >> {
     "push a table to a destination" >>* {
       val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
@@ -147,7 +152,12 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val testTable = TableRef(TableName("foo"), query, List())
 
       def testStream(ref: SignallingRef[IO, String]): Stream[IO, String] =
-        Stream.eval(ref.set("Started")).as("foo ") ++ Stream.sleep_(Duration(100, MILLISECONDS)) ++ Stream.eval(ref.set("Finished")).as("bar")
+        Stream.eval_(ref.set("Started")) ++
+          Stream("foo") ++
+          Stream(" ") ++ // chunk delimiter
+          Stream.sleep_(WorkTime) ++
+          Stream("bar") ++
+          Stream.eval_(ref.set("Finished"))
 
       for {
         filesystem <- Ref.of[IO, Filesystem](emptyFilesystem)
@@ -157,9 +167,10 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         push = mkResultPush(testTable, destination, jm, mkEvaluator(_ => testStream(ref)))
         startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv[IO](), None)
         _ <- latchGet(ref, "Started")
-        cancelRes <- push.cancel(42)
+        cancelRes <- push.cancel(TableId)
         filesystemAfterPush <- filesystem.get
-        refAfter <- ref.get
+        // fail the test if push evaluation was not cancelled
+        evaluationFinished <- (latchGet(ref, "Finished") >> IO(ko("Push not cancelled"))).timeoutTo(WorkTime * 2, IO(ok))
         _ <- cleanup
       } yield {
         filesystemAfterPush.keySet must equal(Set(pushPath))
@@ -167,7 +178,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         filesystemAfterPush(pushPath) must equal("foo")
         startRes must beNormal
         cancelRes must beNormal
-        refAfter must equal("Started")
+        evaluationFinished
       }
     }
   }
