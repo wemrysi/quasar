@@ -33,8 +33,8 @@ import fs2.job.{JobManager, Job, Status => JobStatus}
 import scalaz.std.option._
 import scalaz.std.list._
 import scalaz.syntax.either._
-import scalaz.syntax.applicative._
 import scalaz.syntax.foldable._
+import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 import scalaz.{EitherT, Functor, Id, NonEmptyList, OptionT, Traverse, \/}
 import shims._
@@ -95,7 +95,7 @@ class DefaultResultPush[
 
   def cancelAll: F[Unit] =
     jobManager.jobIds
-      .map(Traverse[List].traverse(_)(jobManager.cancel(_))).void
+      .flatMap(Traverse[List].traverse(_)(jobManager.cancel(_))).void
 
   private def findCsvSink(sinks: NonEmptyList[ResultSink[F]]): Option[ResultSink.Aux[F, ResultType.Csv[F]]] =
     sinks.findMapM[Id.Id, ResultSink.Aux[F, ResultType.Csv[F]]] {
