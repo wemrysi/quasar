@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.api.QueryEvaluator
 import quasar.api.destination.DestinationType
 import quasar.api.destination.ResultType
-import quasar.api.push.ResultPush
+import quasar.api.push.{ResultPush, ResultPushError}
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
 import quasar.api.table.{TableColumn, TableName, TableRef}
@@ -56,8 +56,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
   type Filesystem = Map[ResourcePath, String]
 
-  val emptyFilesystem: Filesystem = Map.empty[ResourcePath, String]
-
   // a sink that writes to a Ref
   final class RefCsvSink(ref: Ref[IO, Filesystem]) extends ResultSink[IO] {
     type RT = ResultType.Csv[IO]
@@ -89,20 +87,17 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
 
   def mkResultPush(
-    table: TableRef[String],
-    destination: Destination[IO],
+    tables: Map[Int, TableRef[String]],
+    destinations: Map[Int, Destination[IO]],
     manager: JobManager[IO, Int, Nothing],
     evaluator: QueryEvaluator[IO, String, Stream[IO, String]])
       : ResultPush[IO, Int, Int] = {
-    val lookupTable: Int => IO[Option[TableRef[String]]] = {
-      case 42 => IO(Some(table))
-      case _ => IO(None)
-    }
 
-    val lookupDestination: Int => IO[Option[Destination[IO]]] = {
-      case 42 => IO(Some(destination))
-      case _ => IO(None)
-    }
+    val lookupTable: Int => IO[Option[TableRef[String]]] =
+      tableId => IO(tables.get(tableId))
+
+    val lookupDestination: Int => IO[Option[Destination[IO]]] =
+      destinationId => IO(destinations.get(destinationId))
 
     DefaultResultPush[IO, Int, Int, String, Stream[IO, String]](
       lookupTable,
@@ -120,6 +115,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
   val WorkTime = Duration(100, MILLISECONDS)
   val await = IO.sleep(WorkTime)
+  val awaitS = Stream.sleep_(WorkTime)
 
   "result push" >> {
     "push a table to a destination" >>* {
@@ -128,17 +124,16 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val testTable = TableRef(TableName("foo"), query, List())
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](emptyFilesystem)
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         destination = new RefDestination(filesystem)
         ref <- SignallingRef[IO, String]("Not started")
         evaluator = mkEvaluator(q => Stream.emit(mockEvaluate(q)) ++ Stream.eval_(ref.set("Finished")))
 
-        push = mkResultPush(testTable, destination, jm, evaluator)
+        push = mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, evaluator)
         startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv[IO](), None)
         _ <- latchGet(ref, "Finished")
         filesystemAfterPush <- filesystem.get
-        _ <- cleanup
       } yield {
         filesystemAfterPush.keySet must equal(Set(pushPath))
         filesystemAfterPush(pushPath) must equal(mockEvaluate(query))
@@ -160,18 +155,17 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           Stream.eval_(ref.set("Finished"))
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](emptyFilesystem)
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         destination = new RefDestination(filesystem)
         ref <- SignallingRef[IO, String]("Not started")
-        push = mkResultPush(testTable, destination, jm, mkEvaluator(_ => testStream(ref)))
+        push = mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ => testStream(ref)))
         startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv[IO](), None)
         _ <- latchGet(ref, "Started")
         cancelRes <- push.cancel(TableId)
         filesystemAfterPush <- filesystem.get
         // fail the test if push evaluation was not cancelled
         evaluationFinished <- (latchGet(ref, "Finished") >> IO(ko("Push not cancelled"))).timeoutTo(WorkTime * 2, IO(ok))
-        _ <- cleanup
       } yield {
         filesystemAfterPush.keySet must equal(Set(pushPath))
         // check if a *partial* result was pushed
@@ -179,6 +173,70 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         startRes must beNormal
         cancelRes must beNormal
         evaluationFinished
+      }
+    }
+
+    // "retrieves the status of a running push" >>* {}
+    // "retrieves the status of a cancelled push" >>* {}
+    // "retrieves the status of a completed push" >>* {}
+    // "rejects an already running push" >>* {}
+
+    "cancel all pushes" >>* {
+      val path1 = ResourcePath.root() / ResourceName("foo")
+      val testTable1 = TableRef(TableName("foo"), "queryFoo", List())
+
+      val path2 = ResourcePath.root() / ResourceName("bar")
+      val testTable2 = TableRef(TableName("bar"), "queryBar", List())
+
+      for {
+        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        refFoo <- SignallingRef[IO, String]("Not started")
+        refBar <- SignallingRef[IO, String]("Not started")
+        (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        destination = new RefDestination(filesystem)
+        push = mkResultPush(Map(1 -> testTable1, 2 -> testTable2), Map(DestinationId -> destination), jm, mkEvaluator {
+          case "queryFoo" =>
+            Stream.eval_(refFoo.set("Started")) ++ Stream("resultFoo") ++ awaitS ++ Stream.eval_(refFoo.set("Finished"))
+          case "queryBar" =>
+            Stream.eval_(refBar.set("Started")) ++ Stream("resultBar") ++ awaitS ++ Stream.eval_(refBar.set("Finished"))
+        })
+        _ <- push.start(1, DestinationId, path1, ResultType.Csv[IO](), None)
+        _ <- push.start(2, DestinationId, path2, ResultType.Csv[IO](), None)
+        _ <- latchGet(refFoo, "Started")
+        _ <- latchGet(refBar, "Started")
+        _ <- push.cancelAll
+        barCanceled <- (latchGet(refBar, "Finished") >> IO(ko("queryBar not cancelled"))).timeoutTo(WorkTime * 2, IO(ok))
+        fooCanceled <- (latchGet(refFoo, "Finished") >> IO(ko("queryFoo not cancelled"))).timeoutTo(WorkTime * 2, IO(ok))
+      } yield barCanceled and fooCanceled
+    }
+
+    "fails with ResultPush.DestinationNotFound with an unknown destination id" >>* {
+      val testTable = TableRef(TableName("foo"), "query", List())
+      val UnknownDestinationId = 99
+
+      for {
+        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        destination = new RefDestination(filesystem)
+        push = mkResultPush(Map(TableId -> testTable), Map(), jm, mkEvaluator(_ => Stream.empty))
+        pushRes <- push.start(TableId, UnknownDestinationId, ResourcePath.root(), ResultType.Csv[IO](), None)
+      } yield {
+        pushRes must beAbnormal(ResultPushError.DestinationNotFound(UnknownDestinationId))
+      }
+    }
+
+    "fails with ResultPush.TableNotFound with an unknown table id" >>* {
+      val testTable = TableRef(TableName("foo"), "query", List())
+      val UnknownTableId = 99
+
+      for {
+        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        destination = new RefDestination(filesystem)
+        push = mkResultPush(Map(), Map(DestinationId -> destination), jm, mkEvaluator(_ => Stream.empty))
+        pushRes <- push.start(UnknownTableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO](), None)
+      } yield {
+        pushRes must beAbnormal(ResultPushError.TableNotFound(UnknownTableId))
       }
     }
   }
