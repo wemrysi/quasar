@@ -37,6 +37,7 @@ import eu.timepit.refined.auto._
 import fs2.concurrent.SignallingRef
 import fs2.job.JobManager
 import fs2.{Stream, text}
+import org.specs2.matcher.MatchResult
 import scalaz.std.set._
 import scalaz.std.string._
 import scalaz.syntax.bind._
@@ -114,8 +115,13 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     s.discrete.filter(Equal[String].equal(_, expected)).take(1).compile.drain
 
   val WorkTime = Duration(100, MILLISECONDS)
+  val Timeout = 5 * WorkTime
+
   val await = IO.sleep(WorkTime)
   val awaitS = Stream.sleep_(WorkTime)
+
+  def verifyTimeout[A](io: IO[A], msg: String): IO[MatchResult[Any]] =
+    (io >> IO(ko(msg))).timeoutTo(Timeout, IO(ok))
 
   "result push" >> {
     "push a table to a destination" >>* {
@@ -165,7 +171,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         cancelRes <- push.cancel(TableId)
         filesystemAfterPush <- filesystem.get
         // fail the test if push evaluation was not cancelled
-        evaluationFinished <- (latchGet(ref, "Finished") >> IO(ko("Push not cancelled"))).timeoutTo(WorkTime * 2, IO(ok))
+        evaluationFinished <- verifyTimeout(latchGet(ref, "Finished"), "Push not cancelled")
       } yield {
         filesystemAfterPush.keySet must equal(Set(pushPath))
         // check if a *partial* result was pushed
@@ -202,11 +208,10 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         })
         _ <- push.start(1, DestinationId, path1, ResultType.Csv[IO](), None)
         _ <- push.start(2, DestinationId, path2, ResultType.Csv[IO](), None)
-        _ <- latchGet(refFoo, "Started")
-        _ <- latchGet(refBar, "Started")
+        _ <- latchGet(refFoo, "Started") >> latchGet(refBar, "Started")
         _ <- push.cancelAll
-        barCanceled <- (latchGet(refBar, "Finished") >> IO(ko("queryBar not cancelled"))).timeoutTo(WorkTime * 2, IO(ok))
-        fooCanceled <- (latchGet(refFoo, "Finished") >> IO(ko("queryFoo not cancelled"))).timeoutTo(WorkTime * 2, IO(ok))
+        barCanceled <- verifyTimeout(latchGet(refBar, "Finished"), "queryBar not cancelled")
+        fooCanceled <- verifyTimeout(latchGet(refFoo, "Finished"), "queryFoo not cancelled")
       } yield barCanceled and fooCanceled
     }
 
