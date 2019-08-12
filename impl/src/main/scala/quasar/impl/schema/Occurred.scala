@@ -22,7 +22,7 @@ import quasar.ejson.implicits._
 
 import matryoshka.{Corecursive, Recursive}
 import monocle.macros.Lenses
-import scalaz.{Cord, Equal, IMap, Show}
+import scalaz.{Equal, IMap, Show}
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 
@@ -51,9 +51,9 @@ object Occurred {
     }
 
   implicit def show[N: Show, A: Show]: Show[Occurred[N, A]] =
-    Show.show {
+    Show.shows {
       case Occurred(n, a) =>
-        Cord("Occurred(") ++ n.show ++ Cord(", ") ++ a.show ++ Cord(")")
+        "Occurred(" + n.shows + ", " + a.shows + ")"
     }
 
   ////

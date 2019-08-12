@@ -23,7 +23,7 @@ import quasar.fp._
 
 import matryoshka._
 import monocle.{Iso, Prism}
-import scalaz.{Applicative, Cord, Equal, IMap, Order, Scalaz, Show, Traverse}, Scalaz._
+import scalaz.{Applicative, Equal, IMap, Order, Scalaz, Show, Traverse}, Scalaz._
 
 /** This is an extension to JSON that allows arbitrary expressions as map (née
   * object) keys and adds additional primitive types, including characters
@@ -117,10 +117,10 @@ sealed abstract class ExtensionInstances {
   implicit val show: Delay[Show, Extension] =
     new Delay[Show, Extension] {
       def apply[α](eq: Show[α]) = Show.show(a => a match {
-        case Meta(v, m) => Cord(s"Meta($v, $m)")
-        case Map(v)     => Cord(s"Map($v)")
-        case Char(v)    => Cord(s"Char($v)")
-        case Int(v)     => Cord(s"Int($v)")
+        case Meta(v, m) => s"Meta($v, $m)"
+        case Map(v)     => s"Map($v)"
+        case Char(v)    => s"Char($v)"
+        case Int(v)     => s"Int($v)"
       })
     }
 

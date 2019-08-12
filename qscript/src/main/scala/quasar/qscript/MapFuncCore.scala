@@ -577,17 +577,17 @@ object MapFuncCore {
     new Delay[Show, MapFuncCore[T, ?]] {
       def apply[A](sh: Show[A]): Show[MapFuncCore[T, A]] = {
         def shz(label: String, a: A*) =
-          Cord(label) ++ Cord("(") ++ a.map(sh.show).toList.intercalate(Cord(", ")) ++ Cord(")")
+          label + "(" + a.map(sh.shows).toList.intercalate(", ") + ")"
 
-        Show.show {
+        Show.shows {
           // nullary
-          case Constant(v) => Cord("Constant(") ++ v.show ++ Cord(")")
-          case Undefined() => Cord("Undefined()")
-          case JoinSideName(n) => Cord("JoinSideName(") ++ n.show ++ Cord(")")
-          case Now() => Cord("Now()")
-          case NowTime() => Cord("NowTime()")
-          case NowDate() => Cord("NowDate()")
-          case CurrentTimeZone() => Cord("CurrentTimeZone()")
+          case Constant(v) => "Constant(" + v.shows + ")"
+          case Undefined() => "Undefined()"
+          case JoinSideName(n) => "JoinSideName(" + n.shows + ")"
+          case Now() => "Now()"
+          case NowTime() => "NowTime()"
+          case NowDate() => "NowDate()"
+          case CurrentTimeZone() => "CurrentTimeZone()"
 
           // unary
           case ExtractCentury(a1) => shz("ExtractCentury", a1)
@@ -619,7 +619,7 @@ object MapFuncCore {
           case LocalDate(a1) => shz("LocalDate", a1)
           case Interval(a1) => shz("Interval", a1)
           case StartOfDay(a1) => shz("StartOfDay", a1)
-          case TemporalTrunc(a1, a2) => Cord("TemporalTrunc(", a1.show, ", ", sh.show(a2), ")")
+          case TemporalTrunc(a1, a2) => "TemporalTrunc(" + a1.shows + ", " + sh.shows(a2) + ")"
           case TimeOfDay(a1) => shz("TimeOfDay", a1)
           case ToTimestamp(a1) => shz("ToTimestamp", a1)
           case ToLocal(a1) => shz("ToLocal", a1)
@@ -676,11 +676,11 @@ object MapFuncCore {
           case Like(a1, a2, a3) => shz("Like", a1, a2, a3)
           case Substring(a1, a2, a3) => shz("Substring", a1, a2, a3)
           case Guard(a1, tpe, a2, a3) =>
-            Cord("Guard(") ++
-              sh.show(a1) ++ Cord(", ") ++
-              tpe.show ++ Cord(", ") ++
-              sh.show(a2) ++ Cord(", ") ++
-              sh.show(a3) ++ Cord(")")
+            "Guard(" +
+              sh.shows(a1) + ", " +
+              tpe.shows + ", " +
+              sh.shows(a2) + ", " +
+              sh.shows(a3) + ")"
         }
       }
     }

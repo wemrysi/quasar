@@ -64,15 +64,15 @@ object EquiJoin {
   implicit def show[T[_[_]]: ShowT]: Delay[Show, EquiJoin[T, ?]] =
     new Delay[Show, EquiJoin[T, ?]] {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      def apply[A](showA: Show[A]): Show[EquiJoin[T, A]] = Show.show {
+      def apply[A](showA: Show[A]): Show[EquiJoin[T, A]] = Show.shows {
         case EquiJoin(src, lBr, rBr, key, f, combine) =>
-          Cord("EquiJoin(") ++
-          showA.show(src) ++ Cord(",") ++
-          lBr.show ++ Cord(",") ++
-          rBr.show ++ Cord(",") ++
-          key.show ++ Cord(",") ++
-          f.show ++ Cord(",") ++
-          combine.show ++ Cord(")")
+          "EquiJoin(" +
+          showA.shows(src) + "," +
+          lBr.shows + "," +
+          rBr.shows + "," +
+          key.shows + "," +
+          f.shows + "," +
+          combine.shows + ")"
       }
     }
 

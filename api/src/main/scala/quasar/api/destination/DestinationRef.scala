@@ -20,7 +20,7 @@ import monocle.macros.Lenses
 import monocle.PLens
 import scalaz.std.tuple._
 import scalaz.syntax.show._
-import scalaz.{Apply, Cord, Equal, Order, Show, Traverse1}
+import scalaz.{Apply, Equal, Order, Show, Traverse1}
 
 @Lenses
 final case class DestinationRef[C](kind: DestinationType, name: DestinationName, config: C)
@@ -37,9 +37,9 @@ sealed abstract class DestinationRefInstances extends DestinationRefInstances0 {
     Order.orderBy(c => (c.kind, c.name, c.config))
 
   implicit def show[C: Show]: Show[DestinationRef[C]] =
-    Show.show {
+    Show.shows {
       case DestinationRef(t, n, c) =>
-        Cord("DestinationRef(") ++ t.show ++ Cord(", ") ++ n.show ++ Cord(", ") ++ c.show ++ Cord(")")
+        "DestinationRef(" + t.shows + ", " + n.shows + ", " + c.shows + ")"
     }
 
   implicit val traverse1: Traverse1[DestinationRef] =

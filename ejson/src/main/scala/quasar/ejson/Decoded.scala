@@ -22,7 +22,7 @@ import quasar.fp.ski.κ
 import quasar.contrib.iota.copkTraverse
 
 import matryoshka.Recursive
-import scalaz.{\/, -\/, \/-, Applicative, Cord, Equal, Monad, Plus, Show, Traverse}
+import scalaz.{\/, -\/, \/-, Applicative, Equal, Monad, Plus, Show, Traverse}
 import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.syntax.functor._
@@ -97,7 +97,7 @@ sealed abstract class DecodedInstances {
     }
 
   implicit def show[A: Show]: Show[Decoded[A]] =
-    Show.show(d => Cord("Decoded") ++ d.fold(
-      (t, m) => (t, m).show,
-      a => Cord("(") ++ a.show ++ Cord(")")))
+    Show.show(d => "Decoded" + d.fold(
+      (t, m) => (t, m).shows,
+      a => "(" + a.shows + ")"))
 }
