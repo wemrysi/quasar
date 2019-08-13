@@ -25,7 +25,6 @@ import scalaz.{Enum, Equal, Show}
 import scalaz.std.anyVal._
 import scalaz.std.option._
 import scalaz.std.tuple._
-//import scalaz.syntax.equal._
 import scalaz.syntax.order._
 
 import argonaut.{DecodeResult, CodecJson, Argonaut}, Argonaut._
