@@ -26,7 +26,7 @@ object Status {
   case object Finished extends Status
   case object Started extends Status
   case object Canceled extends Status
-  case object Failed extends Status
+  final case class Failed(th: Throwable) extends Status
 
   implicit val equal: Equal[Status] =
     Equal.equalA
@@ -35,7 +35,7 @@ object Status {
     case Finished => "Finished"
     case Started => "Started"
     case Canceled => "Canceled"
-    case Failed => "Failed"
+    case Failed(ex) => "Failed(" + ex.getMessage + ")" + "\n\n" + s"$ex"
   }
 
   def finished: Status =
@@ -47,6 +47,6 @@ object Status {
   def canceled: Status =
     Canceled
 
-  def failed: Status =
-    Failed
+  def failed(ex: Throwable): Status =
+    Failed(ex)
 }

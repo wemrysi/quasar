@@ -140,7 +140,7 @@ object DefaultResultPush {
       pushStatus <- Ref.of[F, Map[T, Status]](Map.empty[T, Status])
       _ <- Concurrent[F].start((jobManager.events.evalMap {
         case JobEvent.Completed(ti, _, _) => pushStatus.update(_ + (ti -> Status.finished))
-        case JobEvent.Failed(ti, _, _, _) => pushStatus.update(_ + (ti -> Status.failed))
+        case JobEvent.Failed(ti, _, _, ex) => pushStatus.update(_ + (ti -> Status.failed(ex)))
       }).compile.drain)
     } yield new DefaultResultPush(lookupTable, evaluator, lookupDestination, jobManager, convertToCsv, pushStatus)
   }

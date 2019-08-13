@@ -198,7 +198,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- latchGet(sync, "Started")
         pushStatus <- push.status(TableId)
       } yield {
-        pushStatus must be_\/-(equal[Status](Status.Started))
+        pushStatus must be_\/-(equal(Status.started))
       }
     }
 
@@ -218,7 +218,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- await
         pushStatus <- push.status(TableId)
       } yield {
-        pushStatus must be_\/-(equal[Status](Status.Canceled))
+        pushStatus must be_\/-(equal(Status.canceled))
       }
     }
 
@@ -237,8 +237,28 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- await
         pushStatus <- push.status(TableId)
       } yield {
-        pushStatus must be_\/-(equal[Status](Status.Finished))
+        pushStatus must be_\/-(equal(Status.finished))
       }
+    }
+
+    "retrieves the status of an errored push" >>* {
+      val testTable = TableRef(TableName("baz"), "query", List())
+      val ex = new Exception("boom")
+
+      for {
+        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        sync <- SignallingRef[IO, String]("Not started")
+        (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        destination = new RefDestination(filesystem)
+        push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
+          Stream.raiseError[IO](ex)))
+        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
+        _ <- await
+        pushStatus <- push.status(TableId)
+      } yield {
+        pushStatus must be_\/-(equal(Status.failed(ex)))
+      }
+
     }
 
     "rejects an already running push" >>* {
