@@ -35,7 +35,14 @@ object TectonicResourceError {
     }
 
   val typeSummary: ParsableType => String = {
+    case ParsableType.SeparatedValues(cfg) =>
+      "separated values"
     case ParsableType.Json(vnt, isPrecise) =>
-      JsonVariant.stringP(vnt) + (if (isPrecise) " (precise)" else "")
+      variantString(vnt) + (if (isPrecise) " (precise)" else "")
+  }
+
+  private val variantString: ParsableType.JsonVariant => String = {
+    case JsonVariant.ArrayWrapped => "json"
+    case JsonVariant.LineDelimited => "ldjson"
   }
 }

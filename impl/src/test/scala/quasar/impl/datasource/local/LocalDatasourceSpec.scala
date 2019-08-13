@@ -30,6 +30,7 @@ import quasar.connector._, ParsableType.JsonVariant
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.κ
 import quasar.qscript.InterpretedRead
+import tectonic.csv.Parser.Config
 
 import shims._
 
@@ -124,6 +125,21 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
 
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.gz"), ScalarStages.Id)
+
+    ds.evaluate(iread)
+      .flatMap(_.data.foldMap(κ(1)).compile.lastOrError)
+      .map(_ must_=== 100)
+  }
+
+  "parses csv" >>* {
+    val ds = LocalParsedDatasource[IO, RValue](
+      Paths.get("./impl/src/test/resources"),
+      1024,
+      ParsableType.separatedValues(Config()),
+      None,
+      blockingPool)
+    val iread =
+      InterpretedRead(ResourcePath.root() / ResourceName("smallZips.csv"), ScalarStages.Id)
 
     ds.evaluate(iread)
       .flatMap(_.data.foldMap(κ(1)).compile.lastOrError)

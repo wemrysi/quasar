@@ -20,15 +20,13 @@ import slamdata.Predef._
 
 import quasar.concurrent.BlockingContext
 import quasar.connector._, LightweightDatasourceModule.DS
+import quasar.impl.parsing.ResultParser
 
 import java.nio.file.{Path => JPath}
 
 import cats.effect.{ContextShift, Effect, Timer}
-import fs2.{gzip, io, Pipe}
-import jawnfs2._
-import org.typelevel.jawn.Facade
+import fs2.{gzip, io}
 import qdata.{QDataDecode, QDataEncode}
-import qdata.json.QDataFacade
 import scalaz.syntax.tag._
 
 object LocalParsedDatasource {
@@ -45,23 +43,6 @@ object LocalParsedDatasource {
       blockingPool: BlockingContext)
       : DS[F] = {
 
-    import ParsableType.JsonVariant
-
-    def parsedJson(
-        variant: JsonVariant,
-        precise: Boolean)
-        : Pipe[F, Byte, A] = {
-
-      implicit val facade: Facade[A] = QDataFacade(isPrecise = precise)
-
-      val parser = variant match {
-        case JsonVariant.ArrayWrapped => unwrapJsonArray[F, ByteBuffer, A]
-        case JsonVariant.LineDelimited => parseJsonStream[F, ByteBuffer, A]
-      }
-
-      _.chunks.map(_.toByteBuffer).through(parser)
-    }
-
     EvaluableLocalDatasource[F](LocalParsedType, root) { iRead =>
       val rawBytes =
         io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes)
@@ -74,10 +55,7 @@ object LocalParsedDatasource {
           rawBytes
       }
 
-      val parsedValues = format match {
-        case ParsableType.Json(variant, isPrecise) =>
-          decompressedBytes.through(parsedJson(variant, isPrecise))
-      }
+      val parsedValues = decompressedBytes.through(ResultParser.parsableTypePipe(format))
 
       QueryResult.parsed[F, A](QDataDecode[A], parsedValues, iRead.stages)
     }

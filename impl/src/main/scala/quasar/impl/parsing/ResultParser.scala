@@ -28,7 +28,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import cats.effect.Sync
 
-import fs2.{gzip, Chunk, Stream}
+import fs2.{gzip, Chunk, Stream, Pipe}
 
 import qdata.{QData, QDataEncode}
 import qdata.tectonic.QDataPlate
@@ -37,16 +37,31 @@ import scalaz.syntax.equal._
 
 import tectonic.fs2.StreamParser
 import tectonic.json.{Parser => TParser}
+import tectonic.csv.{Parser => SVParser}
 
 object ResultParser {
   val DefaultDecompressionBufferSize: Int = 32768
 
-  def apply[F[_]: Sync, A: QDataEncode](queryResult: QueryResult[F]): Stream[F, A] = {
-    def concatArrayBufs(bufs: List[ArrayBuffer[A]]): ArrayBuffer[A] = {
-      val totalSize = bufs.foldLeft(0)(_ + _.length)
-      bufs.foldLeft(new ArrayBuffer[A](totalSize))(_ ++= _)
-    }
+  private def concatArrayBufs[A](bufs: List[ArrayBuffer[A]]): ArrayBuffer[A] = {
+    val totalSize = bufs.foldLeft(0)(_ + _.length)
+    bufs.foldLeft(new ArrayBuffer[A](totalSize))(_ ++= _)
+  }
 
+  def parsableTypePipe[F[_]: Sync, A: QDataEncode](pt: ParsableType): Pipe[F, Byte, A] = {
+    val parser = pt match {
+      case ParsableType.Json(vnt, isPrecise) =>
+        val mode: TParser.Mode = vnt match {
+          case JsonVariant.ArrayWrapped => TParser.UnwrapArray
+          case JsonVariant.LineDelimited => TParser.ValueStream
+        }
+        TParser(QDataPlate[F, A, ArrayBuffer[A]](isPrecise), mode)
+      case ParsableType.SeparatedValues(cfg) =>
+        SVParser(QDataPlate[F, A, ArrayBuffer[A]](false), cfg)
+    }
+    StreamParser(parser)(Chunk.buffer, bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+  }
+
+  def apply[F[_]: Sync, A: QDataEncode](queryResult: QueryResult[F]): Stream[F, A] = {
     @tailrec
     def parsedStream(qr: QueryResult[F]): Stream[F, A] =
       qr match {
@@ -56,21 +71,10 @@ object ResultParser {
         case QueryResult.Compressed(CompressionScheme.Gzip, content) =>
           parsedStream(content.modifyBytes(gzip.decompress[F](DefaultDecompressionBufferSize)))
 
-        case QueryResult.Typed(js @ ParsableType.Json(vnt, isPrecise), data, _) =>
-          val mode: TParser.Mode = vnt match {
-            case JsonVariant.ArrayWrapped => TParser.UnwrapArray
-            case JsonVariant.LineDelimited => TParser.ValueStream
-          }
+        case QueryResult.Typed(pt, data, _) =>
+          data.through(parsableTypePipe[F, A](pt))
 
-          val parser =
-            TParser(QDataPlate[F, A, ArrayBuffer[A]](isPrecise), mode)
-
-          val parserPipe =
-            StreamParser(parser)(Chunk.buffer, bufs => Chunk.buffer(concatArrayBufs(bufs)))
-
-          data.through(parserPipe)
       }
-
     if (queryResult.stages === ScalarStages.Id)
       parsedStream(queryResult)
     else
