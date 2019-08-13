@@ -16,7 +16,7 @@
 
 package quasar.impl.datasource.local
 
-import slamdata.Predef.{Boolean, Int, Option, String, StringContext}
+import slamdata.Predef.{Int, Option, String, StringContext}
 
 import quasar.connector.{CompressionScheme, ParsableType}
 
@@ -50,24 +50,6 @@ object LocalConfig {
       DecodeJson(c => c.as[String] flatMap {
         case "gzip" => DecodeResult.ok(CompressionScheme.Gzip)
         case _ => DecodeResult.fail("CompressionScheme", c.history)
-      })
-
-    implicit val decodeJsonVariant: DecodeJson[JsonVariant] =
-      DecodeJson(c => c.as[String] flatMap {
-        case "array-wrapped" => DecodeResult.ok(JsonVariant.ArrayWrapped)
-        case "line-delimited" => DecodeResult.ok(JsonVariant.LineDelimited)
-        case _ => DecodeResult.fail("JsonVariant", c.history)
-      })
-
-    implicit val decodeParsableType: DecodeJson[ParsableType] =
-      DecodeJson(c => (c --\ "type").as[String] flatMap {
-        case "json" =>
-          for {
-            variant <- (c --\ "variant").as[JsonVariant]
-            precise <- (c --\ "precise").as[Option[Boolean]]
-          } yield ParsableType.json(variant, precise getOrElse false)
-
-        case _ => DecodeResult.fail("ParsableType", c.history)
       })
 
     DecodeJson(c => for {

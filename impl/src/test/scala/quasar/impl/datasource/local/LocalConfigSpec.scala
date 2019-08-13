@@ -26,6 +26,8 @@ import cats.instances.either._
 import cats.instances.string._
 import cats.syntax.either._
 
+import tectonic.csv.Parser.Config
+
 import shims._
 
 object LocalConfigSpec extends quasar.Qspec {
@@ -124,6 +126,23 @@ object LocalConfigSpec extends quasar.Qspec {
           None)
 
       Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
+    }
+
+    "can handle csv format" >> {
+      val js = """
+        {
+          "rootDir": "/data",
+          "format": { "type": "separated-values", "header": true, "row1": "\r", "row2": "", "record": ",", "openQuote": "\"", "closeQuote": "\"", "escape": "\"" }
+        }
+      """.stripMargin
+      val exp =
+        LocalConfig(
+          "/data",
+          LocalConfig.DefaultReadChunkSizeBytes,
+          ParsableType.separatedValues(Config()),
+          None)
+      Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
+
     }
   }
 }

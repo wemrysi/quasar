@@ -25,6 +25,7 @@ import scalaz.{Enum, Equal, Show}
 import scalaz.std.anyVal._
 import scalaz.std.option._
 import scalaz.std.tuple._
+//import scalaz.syntax.equal._
 import scalaz.syntax.order._
 
 import argonaut.{DecodeResult, CodecJson, Argonaut}, Argonaut._
@@ -82,41 +83,44 @@ object ParsableType extends ParsableTypeInstances {
       case Json(v, precise) =>
         ("type" := "json") ->:
         ("variant" := v) ->:
-        ("isPrecise" := precise) ->:
+        ("precise" := precise) ->:
         jEmptyObject
       case SeparatedValues(config) =>
         ("type" := "separated-values") ->:
         ("header" := config.header) ->:
-        ("row1" := config.row1) ->:
-        ("row2" := config.row2) ->:
-        ("record" := config.record) ->:
-        ("openQuote" := config.openQuote) ->:
-        ("closeQuote" := config.closeQuote) ->:
-        ("escape" := config.escape) ->:
+        ("row1" := config.row1.toChar) ->:
+        ("row2" := (if (config.row2 === 0.toByte) "" else config.row2.toChar.toString)) ->:
+        ("record" := config.record.toChar) ->:
+        ("openQuote" := config.openQuote.toChar) ->:
+        ("closeQuote" := config.closeQuote.toChar) ->:
+        ("escape" := config.escape.toChar) ->:
         jEmptyObject
     }, (c => (c --\ "type").as[String].flatMap {
       case "json" =>
         for {
           variant <- (c --\ "variant").as[JsonVariant]
-          isPrecise <- (c --\ "isPrecise").as[Boolean]
-        } yield Json(variant, isPrecise)
+          isPrecise <- (c --\ "precise").as[Option[Boolean]]
+        } yield Json(variant, isPrecise.getOrElse(false))
       case "separated-values" =>
         for {
           header <- (c --\ "header").as[Boolean]
-          row1 <- (c --\ "row1").as[Byte]
-          row2 <- (c --\ "row2").as[Byte]
-          record <- (c --\ "record").as[Byte]
-          openQuote <- (c --\ "openQuote").as[Byte]
-          closeQuote <- (c --\ "closeQuote").as[Byte]
-          escape <- (c --\ "escape").as[Byte]
+          row1 <- (c --\ "row1").as[Char]
+          row2 <- (c --\ "row2").as[String]
+          record <- (c --\ "record").as[Char]
+          openQuote <- (c --\ "openQuote").as[Char]
+          closeQuote <- (c --\ "closeQuote").as[Char]
+          escape <- (c --\ "escape").as[Char]
         } yield SeparatedValues(Config(
           header = header,
-          row1 = row1,
-          row2 = row2,
-          record = record,
-          openQuote = openQuote,
-          closeQuote = closeQuote,
-          escape = escape
+          row1 = row1.toByte,
+          row2 = row2.headOption match {
+            case None => 0.toByte
+            case Some(h) => h.toByte
+          },
+          record = record.toByte,
+          openQuote = openQuote.toByte,
+          closeQuote = closeQuote.toByte,
+          escape = escape.toByte
         ))
       case _ => DecodeResult.fail("tololo", c.history)
     }))
