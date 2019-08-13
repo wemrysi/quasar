@@ -41,7 +41,7 @@ import org.specs2.matcher.MatchResult
 import scalaz.std.set._
 import scalaz.std.string._
 import scalaz.syntax.bind._
-import scalaz.{Equal, NonEmptyList}
+import scalaz.{\/-, Equal, NonEmptyList}
 import shims._
 
 object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
@@ -76,6 +76,14 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   final class RefDestination(ref: Ref[IO, Filesystem]) extends Destination[IO] {
     def destinationType: DestinationType = RefDestinationType
     def sinks = NonEmptyList(new RefCsvSink(ref))
+  }
+
+  object RefDestination {
+    def apply(): IO[(Destination[IO], Ref[IO, Filesystem])] =
+      for {
+        fs <- Ref.of[IO, Filesystem](Map.empty)
+        destination = new RefDestination(fs)
+      } yield (destination, fs)
   }
 
   def convert(st: Stream[IO, String]): Stream[IO, Byte] =
@@ -132,9 +140,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val testTable = TableRef(TableName("foo"), query, List())
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](Map.empty)
         (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        destination = new RefDestination(filesystem)
+        (destination, filesystem) <- RefDestination()
         ref <- SignallingRef[IO, String]("Not started")
         evaluator = mkEvaluator(q => Stream.emit(mockEvaluate(q)) ++ Stream.eval_(ref.set("Finished")))
 
@@ -163,9 +170,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           Stream.eval_(ref.set("Finished"))
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](Map.empty)
         (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        destination = new RefDestination(filesystem)
+        (destination, filesystem) <- RefDestination()
         ref <- SignallingRef[IO, String]("Not started")
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ => testStream(ref)))
         startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv[IO](), None)
@@ -188,10 +194,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val testTable = TableRef(TableName("baz"), "query", List())
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (destination, filesystem) <- RefDestination()
         sync <- SignallingRef[IO, String]("Not started")
         (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        destination = new RefDestination(filesystem)
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2")))
         _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
@@ -206,10 +211,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val testTable = TableRef(TableName("baz"), "query", List())
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (destination, filesystem) <- RefDestination()
         sync <- SignallingRef[IO, String]("Not started")
         (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        destination = new RefDestination(filesystem)
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2")))
         _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
@@ -226,10 +230,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val testTable = TableRef(TableName("baz"), "query", List())
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (destination, filesystem) <- RefDestination()
         sync <- SignallingRef[IO, String]("Not started")
         (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        destination = new RefDestination(filesystem)
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2")))
         _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
@@ -246,19 +249,19 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val ex = new Exception("boom")
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (destination, filesystem) <- RefDestination()
         sync <- SignallingRef[IO, String]("Not started")
         (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        destination = new RefDestination(filesystem)
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           Stream.raiseError[IO](ex)))
         _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
         _ <- await
         pushStatus <- push.status(TableId)
       } yield {
-        pushStatus must be_\/-(equal(Status.failed(ex)))
+        pushStatus must beLike {
+          case \/-(Status.Failed(ex)) => ex.getMessage must equal("boom")
+        }
       }
-
     }
 
     "rejects an already running push" >>* {
@@ -266,10 +269,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val testTable = TableRef(TableName("baz"), "query", List())
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (destination, filesystem) <- RefDestination()
         sync <- SignallingRef[IO, String]("Not started")
         (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        destination = new RefDestination(filesystem)
         push <- mkResultPush(
           Map(TableId -> testTable),
           Map(DestinationId -> destination),
@@ -291,11 +293,10 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val testTable2 = TableRef(TableName("bar"), "queryBar", List())
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (destination, filesystem) <- RefDestination()
         refFoo <- SignallingRef[IO, String]("Not started")
         refBar <- SignallingRef[IO, String]("Not started")
         (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        destination = new RefDestination(filesystem)
         push <- mkResultPush(Map(1 -> testTable1, 2 -> testTable2), Map(DestinationId -> destination), jm, mkEvaluator {
           case "queryFoo" =>
             Stream.eval_(refFoo.set("Started")) ++ awaitS ++ Stream.eval_(refFoo.set("Finished"))
@@ -316,9 +317,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val UnknownDestinationId = 99
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (destination, filesystem) <- RefDestination()
         (jm, _) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        destination = new RefDestination(filesystem)
         push <- mkResultPush(Map(TableId -> testTable), Map(), jm, mkEvaluator(_ => Stream.empty))
         pushRes <- push.start(TableId, UnknownDestinationId, ResourcePath.root(), ResultType.Csv[IO](), None)
       } yield {
@@ -331,9 +331,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val UnknownTableId = 99
 
       for {
-        filesystem <- Ref.of[IO, Filesystem](Map.empty)
+        (destination, filesystem) <- RefDestination()
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        destination = new RefDestination(filesystem)
         push <- mkResultPush(Map(), Map(DestinationId -> destination), jm, mkEvaluator(_ => Stream.empty))
         pushRes <- push.start(UnknownTableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO](), None)
       } yield {
