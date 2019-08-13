@@ -26,9 +26,10 @@ import quasar.api.push.{ResultPush, ResultPushError, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
 
+import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Timer}
 import fs2.Stream
-import fs2.job.{JobManager, Job, Status => JobStatus}
+import fs2.job.{JobManager, Job, Status => JobStatus, Event => JobEvent}
 import scalaz.std.option._
 import scalaz.std.list._
 import scalaz.syntax.either._
@@ -44,7 +45,8 @@ class DefaultResultPush[
     evaluator: QueryEvaluator[F, Q, R],
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, T, Nothing],
-    convertToCsv: R => Stream[F, Byte])
+    convertToCsv: R => Stream[F, Byte],
+    pushStatus: Ref[F, Map[T, Status]])
     extends ResultPush[F, T, D] {
   import ResultPushError._
 
@@ -81,18 +83,23 @@ class DefaultResultPush[
   }
 
   def cancel(tableId: T): F[Condition[ExistentialError[T, D]]] =
-    (ensureTableExists(tableId) *> (EitherT.rightT(jobManager.cancel(tableId))))
-      .run.map(Condition.disjunctionIso.reverseGet(_))
+    (for {
+      _ <- ensureTableExists(tableId)
+      _ <- EitherT.rightT(pushStatus.update(_ + (tableId -> Status.canceled)))
+      result <- EitherT.rightT(jobManager.cancel(tableId))
+    } yield result).run.map(Condition.disjunctionIso.reverseGet(_))
 
   def status(tableId: T): F[ResultPushError[T, D] \/ Status] =
-    (ensureTableExists(tableId) *> EitherT.rightT(jobManager.status(tableId))).fold(_.left, {
-      case Some(JobStatus.Running | JobStatus.Pending) =>
-        Status.Started.right[ResultPushError[T, D]]
-      case Some(JobStatus.Canceled) =>
-        Status.Canceled.right[ResultPushError[T, D]]
-      case None =>
-        ResultPushError.PushNotRunning(tableId).left[Status]
-    })
+    (ensureTableExists(tableId) *> EitherT.rightT(jobManager.status(tableId)))
+      .foldM((e: ResultPushError[T, D]) => e.left[Status].point[F], {
+        case Some(JobStatus.Running | JobStatus.Pending) =>
+          Status.started.right.point[F]
+        case Some(JobStatus.Canceled) =>
+          Status.canceled.right.point[F]
+        case None =>
+          OptionT(pushStatus.get.map(_.get(tableId))).toRight[ResultPushError[T, D]](
+            ResultPushError.StatusUnknown(tableId)).run
+      })
 
   def cancelAll: F[Unit] =
     jobManager.jobIds
@@ -127,6 +134,14 @@ object DefaultResultPush {
     evaluator: QueryEvaluator[F, Q, R],
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, T, Nothing],
-    convertToCsv: R => Stream[F, Byte]): DefaultResultPush[F, T, D, Q, R] =
-    new DefaultResultPush(lookupTable, evaluator, lookupDestination, jobManager, convertToCsv)
+    convertToCsv: R => Stream[F, Byte]
+  ): F[DefaultResultPush[F, T, D, Q, R]] = {
+    for {
+      pushStatus <- Ref.of[F, Map[T, Status]](Map.empty[T, Status])
+      _ <- Concurrent[F].start((jobManager.events.evalMap {
+        case JobEvent.Completed(ti, _, _) => pushStatus.update(_ + (ti -> Status.finished))
+        case JobEvent.Failed(ti, _, _, _) => pushStatus.update(_ + (ti -> Status.failed))
+      }).compile.drain)
+    } yield new DefaultResultPush(lookupTable, evaluator, lookupDestination, jobManager, convertToCsv, pushStatus)
+  }
 }
