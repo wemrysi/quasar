@@ -190,7 +190,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
-    "retrieves the status of a started push" >>* {
+    "retrieves the status of a running push" >>* {
       val testTable = TableRef(TableName("baz"), "query", List())
 
       for {
@@ -203,7 +203,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- latchGet(sync, "Started")
         pushStatus <- push.status(TableId)
       } yield {
-        pushStatus must be_\/-(equal(Status.started))
+        pushStatus must be_\/-(equal(Status.running))
       }
     }
 
@@ -240,7 +240,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- await
         pushStatus <- push.status(TableId)
       } yield {
-        pushStatus must be_\/-(equal(Status.finished))
+        pushStatus must beLike {
+          case \/-(Status.Finished(_, _)) => ok
+        }
       }
     }
 
@@ -258,8 +260,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- await
         pushStatus <- push.status(TableId)
       } yield {
+
         pushStatus must beLike {
-          case \/-(Status.Failed(ex)) => ex.getMessage must equal("boom")
+          case \/-(Status.Failed(ex, _, _)) => ex.getMessage must equal("boom")
         }
       }
     }

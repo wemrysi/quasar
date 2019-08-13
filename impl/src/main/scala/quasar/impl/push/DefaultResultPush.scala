@@ -26,6 +26,10 @@ import quasar.api.push.{ResultPush, ResultPushError, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
 
+import java.time.Instant
+
+import scala.concurrent.duration.FiniteDuration
+
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Timer}
 import fs2.Stream
@@ -93,7 +97,7 @@ class DefaultResultPush[
     (ensureTableExists(tableId) *> EitherT.rightT(jobManager.status(tableId)))
       .foldM((e: ResultPushError[T, D]) => e.left[Status].point[F], {
         case Some(JobStatus.Running | JobStatus.Pending) =>
-          Status.started.right.point[F]
+          Status.running.right.point[F]
         case Some(JobStatus.Canceled) =>
           Status.canceled.right.point[F]
         case None =>
@@ -139,9 +143,14 @@ object DefaultResultPush {
     for {
       pushStatus <- Ref.of[F, Map[T, Status]](Map.empty[T, Status])
       _ <- Concurrent[F].start((jobManager.events.evalMap {
-        case JobEvent.Completed(ti, _, _) => pushStatus.update(_ + (ti -> Status.finished))
-        case JobEvent.Failed(ti, _, _, ex) => pushStatus.update(_ + (ti -> Status.failed(ex)))
+        case JobEvent.Completed(ti, start, duration) =>
+          pushStatus.update(_ + (ti -> Status.finished(epochToInstant(start.epoch), epochToInstant(start.epoch + duration))))
+        case JobEvent.Failed(ti, start, duration, ex) =>
+          pushStatus.update(_ + (ti -> Status.failed(ex, epochToInstant(start.epoch), epochToInstant(start.epoch + duration))))
       }).compile.drain)
     } yield new DefaultResultPush(lookupTable, evaluator, lookupDestination, jobManager, convertToCsv, pushStatus)
   }
+
+  private def epochToInstant(e: FiniteDuration): Instant =
+    Instant.ofEpochMilli(e.toMillis)
 }

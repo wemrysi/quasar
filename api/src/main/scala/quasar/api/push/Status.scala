@@ -18,35 +18,41 @@ package quasar.api.push
 
 import slamdata.Predef._
 
+import java.time.Instant
+
 import scalaz.{Equal, Show}
 
 sealed trait Status extends Product with Serializable
 
 object Status {
-  case object Finished extends Status
-  case object Started extends Status
+  final case class Finished(startedAt: Instant, finishedAt: Instant) extends Status
+  case object Running extends Status
   case object Canceled extends Status
-  final case class Failed(th: Throwable) extends Status
+  final case class Failed(th: Throwable, startedAt: Instant, failedAt: Instant) extends Status
 
   implicit val equal: Equal[Status] =
     Equal.equalA
 
   implicit val show: Show[Status] = Show.shows {
-    case Finished => "Finished"
-    case Started => "Started"
-    case Canceled => "Canceled"
-    case Failed(ex) => "Failed(" + ex.getMessage + ")" + "\n\n" + s"$ex"
+    case Finished(startedAt, finishedAt) =>
+      s"Finished($startedAt, $finishedAt)"
+    case Running =>
+      "Running"
+    case Canceled =>
+      "Canceled"
+    case Failed(ex, startedAt, finishedAt) =>
+      s"Failed(${ex.getMessage}, $startedAt, $finishedAt)" + "\n\n" + s"$ex"
   }
 
-  def finished: Status =
-    Finished
+  def finished(startedAt: Instant, finishedAt: Instant): Status =
+    Finished(startedAt, finishedAt)
 
-  def started: Status =
-    Started
+  def running: Status =
+    Running
 
   def canceled: Status =
     Canceled
 
-  def failed(ex: Throwable): Status =
-    Failed(ex)
+  def failed(ex: Throwable, startedAt: Instant, failedAt: Instant): Status =
+    Failed(ex, startedAt, failedAt)
 }
