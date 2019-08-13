@@ -17,14 +17,21 @@
 package quasar.api.datasource
 
 import slamdata.Predef._
-import quasar.api.resource.ResourcePath
+
+import cats.{Eq, Show}
+import cats.instances.option._
+import cats.instances.string._
+import cats.instances.tuple._
+import cats.instances.unit._
+import cats.syntax.show._
 
 import monocle.Prism
-import scalaz.{Equal, ISet, NonEmptyList, Show}
-import scalaz.std.option._
-import scalaz.std.string._
-import scalaz.std.tuple._
-import scalaz.syntax.show._
+
+import quasar.api.resource.ResourcePath
+
+import scalaz.{ISet, NonEmptyList}
+
+import shims._
 
 sealed trait DatasourceError[+I, +C] extends Product with Serializable
 
@@ -122,11 +129,11 @@ object DatasourceError extends DatasourceErrorInstances {
 sealed abstract class DatasourceErrorInstances {
   import DatasourceError._
 
-  implicit def equal[I: Equal, C: Equal]: Equal[DatasourceError[I, C]] = {
-    implicit val ignoreExceptions: Equal[Exception] =
-      Equal.equal((_, _) => true)
+  implicit def equal[I: Eq, C: Eq]: Eq[DatasourceError[I, C]] = {
+    implicit val ignoreExceptions: Eq[Exception] =
+      Eq.by(_ => ())
 
-    Equal.equalBy { de => (
+    Eq by { de => (
       connectionFailed[C, DatasourceError[I, C]].getOption(de),
       datasourceNameExists[DatasourceError[I, C]].getOption(de),
       datasourceNotFound[I, DatasourceError[I, C]].getOption(de),
@@ -139,47 +146,47 @@ sealed abstract class DatasourceErrorInstances {
   }
 
   implicit def show[I: Show, C: Show]: Show[DatasourceError[I, C]] =
-    Show.shows {
-      case e: CreateError[C]    => showCreateError[C].shows(e)
-      case e: DiscoveryError[I] => showDiscoveryError[I].shows(e)
+    Show show {
+      case e: CreateError[C]    => showCreateError[C].show(e)
+      case e: DiscoveryError[I] => showDiscoveryError[I].show(e)
     }
 
   implicit def showExistentialError[I: Show]: Show[ExistentialError[I]] =
-    Show.shows {
+    Show show {
       case DatasourceNotFound(i) =>
-        "DatasourceNotFound(" + i.shows + ")"
+        "DatasourceNotFound(" + i.show + ")"
     }
 
   implicit def showDiscoveryError[I: Show]: Show[DiscoveryError[I]] =
-    Show.shows {
+    Show show {
       case PathNotAResource(p) =>
-        "PathNotAResource(" + p.shows + ")"
+        "PathNotAResource(" + p.show + ")"
 
       case PathNotFound(p) =>
-        "PathNotFound(" + p.shows + ")"
+        "PathNotFound(" + p.show + ")"
 
       case e: ExistentialError[I] =>
-        showExistentialError[I].shows(e)
+        showExistentialError[I].show(e)
     }
 
   implicit def showCreateError[C: Show]: Show[CreateError[C]] =
-    Show.shows {
+    Show show {
       case DatasourceNameExists(n) =>
-        "DatasourceNameExists(" + n.shows + ")"
+        "DatasourceNameExists(" + n.show + ")"
 
       case DatasourceUnsupported(k, s) =>
-        "DatasourceUnsupported(" + k.shows + ", " + s.shows + ")"
+        "DatasourceUnsupported(" + k.show + ", " + s.show + ")"
 
       case InvalidConfiguration(k, c, rs) =>
-        "InvalidConfiguration(" + k.shows + ", " + c.shows + ", " + rs.shows + ")"
+        "InvalidConfiguration(" + k.show + ", " + c.show + ", " + rs.show + ")"
 
       case MalformedConfiguration(k, c, r) =>
-        "MalformedConfiguration(" + k.shows + ", " + c.shows + ", " + r.shows + ")"
+        "MalformedConfiguration(" + k.show + ", " + c.show + ", " + r.show + ")"
 
       case ConnectionFailed(k, c, e) =>
-        "ConnectionFailed(" + k.shows + ", " + c.shows + s")\n\n$e"
+        "ConnectionFailed(" + k.show + ", " + c.show + s")\n\n$e"
 
       case AccessDenied(k, c, r) =>
-        "AccessDenied(" + k.shows + ", " + c.shows + ", " + r.shows + ")"
+        "AccessDenied(" + k.show + ", " + c.show + ", " + r.show + ")"
     }
 }
