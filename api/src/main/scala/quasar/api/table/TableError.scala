@@ -18,7 +18,7 @@ package quasar.api.table
 
 import slamdata.Predef.{Product, Serializable}
 
-import scalaz.{Cord, Show}
+import scalaz.Show
 import scalaz.syntax.show._
 
 sealed trait TableError extends Product with Serializable
@@ -39,35 +39,35 @@ object TableError {
   final case class TableNotFound[I](tableId: I) extends ExistenceError[I]
 
   implicit def showPreparationNotInProgress[I: Show]: Show[PreparationNotInProgress[I]] =
-    Show.show {
+    Show.shows {
       case PreparationNotInProgress(id) =>
-        Cord("PreparationNotInProgress(") ++ id.show ++ Cord(")")
+        "PreparationNotInProgress(" + id.shows + ")"
     }
 
   implicit def showModificationError[I: Show]: Show[ModificationError[I]] =
-    Show.show {
+    Show.shows {
       case PreparationExists(id) =>
-        Cord("PreparationExists(") ++ id.show ++ Cord(")")
-      case e:CreateError[I] => e.show
-      case e:PrePreparationError[I] => e.show
+        "PreparationExists(" + id.shows + ")"
+      case e:CreateError[I] => e.shows
+      case e:PrePreparationError[I] => e.shows
     }
 
   implicit def showCreateError[I]: Show[CreateError[I]] =
-    Show.show {
+    Show.shows {
       case NameConflict(n) =>
-        Cord("NameConflict(") ++ n.show ++ Cord(")")
+        "NameConflict(" + n.shows + ")"
     }
 
   implicit def showPrePreparationError[I: Show]: Show[PrePreparationError[I]] =
-    Show.show {
+    Show.shows {
       case PreparationInProgress(id) =>
-        Cord("PreparationInProgress(") ++ id.show ++ Cord(")")
-      case e:ExistenceError[I] => e.show
+        "PreparationInProgress(" + id.shows + ")"
+      case e:ExistenceError[I] => e.shows
     }
 
   implicit def showExistenceError[I: Show]: Show[ExistenceError[I]] =
-    Show.show {
+    Show.shows {
       case TableNotFound(id) =>
-        Cord("TableNotFound(") ++ id.show ++ Cord(")")
+        "TableNotFound(" + id.shows + ")"
     }
 }

@@ -14,23 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.impl.storage
 
 import slamdata.Predef._
 
-import scalaz.{Equal, Show}
-import scalaz.std.tuple._
-import scalaz.std.string._
-import scalaz.syntax.show._
+final case class AntiEntropyStoreConfig(
+  adTimeoutMillis: Long,
+  purgeTimeoutMillis: Long,
+  tombstoneLiveForMillis: Long,
+  updateRequestLimit: Int,
+  updateLimit: Int,
+  adLimit: Int)
 
-final case class TableColumn(name: String, tpe: ColumnType.Scalar)
-
-object TableColumn {
-  implicit val equalTableColumn: Equal[TableColumn] =
-    Equal.equalBy(c => (c.name, c.tpe))
-
-  implicit val showTableColumn: Show[TableColumn] =
-    Show shows { tc =>
-      "TableColumn(" + tc.name + ", " + tc.tpe.shows + ")"
-    }
+object AntiEntropyStoreConfig {
+  val default: AntiEntropyStoreConfig = AntiEntropyStoreConfig(
+    adTimeoutMillis = 30L,
+    purgeTimeoutMillis = 1000L,
+    tombstoneLiveForMillis = 300000L,
+    updateRequestLimit = 128,
+    updateLimit = 128,
+    adLimit = 128)
 }

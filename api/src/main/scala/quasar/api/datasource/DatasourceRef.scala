@@ -18,7 +18,7 @@ package quasar.api.datasource
 
 import monocle.PLens
 import monocle.macros.Lenses
-import scalaz.{Apply, Cord, Equal, Order, Show, Traverse1}
+import scalaz.{Apply, Equal, Order, Show, Traverse1}
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 
@@ -37,9 +37,9 @@ sealed abstract class DatasourceRefInstances extends DatasourceRefInstances0 {
     Order.orderBy(c => (c.kind, c.name, c.config))
 
   implicit def show[C: Show]: Show[DatasourceRef[C]] =
-    Show.show {
+    Show.shows {
       case DatasourceRef(t, n, c) =>
-        Cord("DatasourceRef(") ++ t.show ++ Cord(", ") ++ n.show ++ Cord(", ") ++ c.show ++ Cord(")")
+        "DatasourceRef(" + t.shows + ", " + n.shows + ", " + c.shows + ")"
     }
 
   implicit val traverse1: Traverse1[DatasourceRef] =

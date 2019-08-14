@@ -54,7 +54,7 @@ import monocle.macros.Lenses
 
 import pathy.Path
 
-import scalaz.{-\/, \/-, Applicative, Cord, Equal, Free, Functor, IList, Monad, Show, StateT, ValidationNel}
+import scalaz.{-\/, \/-, Applicative, Equal, Free, Functor, IList, Monad, Show, StateT, ValidationNel}
 import scalaz.Scalaz._
 
 import shims.{eqToScalaz, equalToCats}
@@ -462,11 +462,11 @@ object ApplyProvenance {
   object AuthenticatedQSU {
     implicit def show[T[_[_]]: ShowT, P: Show]: Show[AuthenticatedQSU[T, P]] =
       Show.show { case AuthenticatedQSU(g, d) =>
-        Cord("AuthenticatedQSU {\n") ++
-        g.show ++
-        Cord("\n\n") ++
-        d.filterVertices(g.foldMapDown(sg => Set(sg.root))).show ++
-        Cord("\n}")
+        "AuthenticatedQSU {\n" +
+        g.shows +
+        "\n\n" +
+        d.filterVertices(g.foldMapDown(sg => Set(sg.root))).shows +
+        "\n}"
       }
   }
 

@@ -22,7 +22,7 @@ import quasar.fp.ski.κ
 
 import matryoshka._
 import monocle.Prism
-import scalaz.{Applicative, Cord, Equal, Order, Scalaz, Show, Traverse}, Scalaz._
+import scalaz.{Applicative, Equal, Order, Scalaz, Show, Traverse}, Scalaz._
 
 sealed abstract class Common[A]
 final case class Arr[A](value: List[A])    extends Common[A]
@@ -76,12 +76,12 @@ sealed abstract class CommonInstances extends CommonInstances0 {
 
   implicit val show: Delay[Show, Common] =
     new Delay[Show, Common] {
-      def apply[α](eq: Show[α]) = Show.show(a => a match {
-        case Arr(v)  => Cord(s"Arr($v)")
-        case Null()  => Cord("Null()")
-        case Bool(v) => Cord(s"Bool($v)")
-        case Str(v)  => Cord(s"Str($v)")
-        case Dec(v)  => Cord(s"Dec($v)")
+      def apply[α](eq: Show[α]) = Show.shows(a => a match {
+        case Arr(v)  => s"Arr($v)"
+        case Null()  => "Null()"
+        case Bool(v) => s"Bool($v)"
+        case Str(v)  => s"Str($v)"
+        case Dec(v)  => s"Dec($v)"
       })
     }
 

@@ -37,6 +37,8 @@ import scalaz.syntax.equal._
 import scalaz.syntax.foldable._
 import scalaz.std.list._
 
+import shims._
+
 abstract class DatasourcesSpec[
     F[_], G[_], I: Order: Show, C: Equal: Show, OldS <: SchemaConfig, S <: SchemaConfig](
     implicit F: Effect[F], ec: ExecutionContext)

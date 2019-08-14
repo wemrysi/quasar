@@ -14,23 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.impl.cluster
 
 import slamdata.Predef._
+import java.net.InetAddress
 
-import scalaz.{Equal, Show}
-import scalaz.std.tuple._
-import scalaz.std.string._
-import scalaz.syntax.show._
-
-final case class TableColumn(name: String, tpe: ColumnType.Scalar)
-
-object TableColumn {
-  implicit val equalTableColumn: Equal[TableColumn] =
-    Equal.equalBy(c => (c.name, c.tpe))
-
-  implicit val showTableColumn: Show[TableColumn] =
-    Show shows { tc =>
-      "TableColumn(" + tc.name + ", " + tc.tpe.shows + ")"
-    }
+abstract class Membership[F[_], Id] {
+  def localId: F[Id]
+  def peers: F[Set[Id]]
+  def random: F[Set[Id]]
+  def byAddress(addr: InetAddress, port: Int): F[Option[Id]]
 }

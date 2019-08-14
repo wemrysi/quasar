@@ -30,6 +30,7 @@ import argonaut.JsonScalaz._
 import monocle.Prism
 import scalaz.Show
 import scalaz.syntax.show._
+import shims._
 
 sealed abstract trait QuasarError extends Product with Serializable
 

@@ -41,7 +41,7 @@ import quasar.qsu.mra.JoinKey
 import matryoshka.{BirecursiveT, ShowT}
 import monocle.{Lens, Optional}
 import monocle.syntax.fields._1
-import scalaz.{Cord, Foldable, Free, Functor, IList, IMap, ISet, Monad, NonEmptyList, Show, StateT, Traverse}
+import scalaz.{Foldable, Free, Functor, IList, IMap, ISet, Monad, NonEmptyList, Show, StateT, Traverse}
 import scalaz.Scalaz._
 
 /** TODO
@@ -621,12 +621,12 @@ object ReifyIdentities {
 
   object ResearchedQSU {
     implicit def show[T[_[_]]: ShowT]: Show[ResearchedQSU[T]] =
-      Show.show { rqsu =>
-        Cord("ResearchedQSU\n======\n") ++
-        rqsu.graph.show ++
-        Cord("\n\n") ++
-        rqsu.refs.show ++
-        Cord("\n======")
+      Show.shows { rqsu =>
+        "ResearchedQSU\n======\n" +
+        rqsu.graph.shows +
+        "\n\n" +
+        rqsu.refs.shows +
+        "\n======"
       }
   }
 

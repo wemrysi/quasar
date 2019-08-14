@@ -23,17 +23,17 @@ import quasar.concurrent.BlockingContext
 import cats.arrow.FunctionK
 import cats.effect.{ContextShift, Sync}
 import cats.syntax.applicative._
-import cats.syntax.flatMap._
 import cats.syntax.functor._
-import cats.syntax.apply._
 import fs2.Stream
 import scalaz.syntax.tag._
 
 import java.util.concurrent.ConcurrentMap
 import scala.collection.JavaConverters._
 
+import shims._
+
 final class ConcurrentMapIndexedStore[F[_]: Sync: ContextShift, K, V](
-    mp: ConcurrentMap[K, V], commit: F[Unit], blockingPool: BlockingContext)
+    mp: ConcurrentMap[K, V], blockingPool: BlockingContext)
     extends IndexedStore[F, K, V] {
 
   private val F = Sync[F]
@@ -53,15 +53,13 @@ final class ConcurrentMapIndexedStore[F[_]: Sync: ContextShift, K, V](
   } yield (entry.getKey, entry.getValue)
 
   def lookup(k: K): F[Option[V]] =
-    evalOnPool(F.delay { Option( mp get k ) })
+    evalOnPool(F.delay(Option( mp get k )))
 
-  def insert(k: K, v: V): F[Unit] = evalOnPool (F.delay {
-    mp.put(k, v)
-  } productR commit)
+  def insert(k: K, v: V): F[Unit] =
+    evalOnPool(F.delay(mp.put(k, v))).void
 
-  def delete(k: K): F[Boolean] = evalOnPool(F.delay {
-    !Option(mp.remove(k)).isEmpty
-  } flatMap { a => commit.whenA(a) as a })
+  def delete(k: K): F[Boolean] =
+    evalOnPool(F.delay(Option(mp.remove(k)).nonEmpty))
 }
 
 object ConcurrentMapIndexedStore {
@@ -69,6 +67,16 @@ object ConcurrentMapIndexedStore {
       mp: ConcurrentMap[K, V],
       commit: F[Unit],
       blockingPool: BlockingContext)
-      : IndexedStore[F, K, V] =
-    new ConcurrentMapIndexedStore(mp, commit, blockingPool)
+      : IndexedStore[F, K, V] = {
+    val pure = new ConcurrentMapIndexedStore(mp, blockingPool)
+    def onUpdate(k: K, v: V): F[Unit] = ContextShift[F].evalOn[Unit](blockingPool.unwrap)(commit)
+    def onDelete(k: K, a: Boolean): F[Unit] = ContextShift[F].evalOn[Unit](blockingPool.unwrap)(commit.whenA(a))
+    IndexedStore.hooked(pure, onUpdate, onDelete)
+  }
+  def unhooked[F[_]: Sync: ContextShift, K, V](
+      mp: ConcurrentMap[K, V],
+      blockingPool: BlockingContext)
+      : IndexedStore[F, K, V] = {
+    new ConcurrentMapIndexedStore(mp, blockingPool)
+  }
 }

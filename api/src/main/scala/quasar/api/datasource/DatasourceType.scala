@@ -28,7 +28,7 @@ import eu.timepit.refined.scalaz._
 import eu.timepit.refined.string.MatchesRegex
 import monocle.Prism
 import monocle.macros.Lenses
-import scalaz.{Cord, Order, Show}
+import scalaz.{Order, Show}
 import scalaz.std.anyVal._
 import scalaz.std.string._
 import scalaz.std.tuple._
@@ -51,8 +51,8 @@ sealed abstract class DatasourceTypeInstances {
     Order.orderBy(t => (t.name, t.version))
 
   implicit val show: Show[DatasourceType] =
-    Show.show {
+    Show.shows {
       case DatasourceType(n, v) =>
-        Cord("DatasourceType(") ++ n.show ++ Cord(", ") ++ v.show ++ Cord(")")
+        "DatasourceType(" + n.shows + ", " + v.shows + ")"
     }
 }

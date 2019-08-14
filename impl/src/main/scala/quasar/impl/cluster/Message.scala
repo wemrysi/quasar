@@ -14,23 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.impl.cluster
 
 import slamdata.Predef._
 
-import scalaz.{Equal, Show}
-import scalaz.std.tuple._
-import scalaz.std.string._
-import scalaz.syntax.show._
+trait Message extends Product with Serializable
 
-final case class TableColumn(name: String, tpe: ColumnType.Scalar)
+object Message {
+  final case class RequestUpdate(name: String) extends Message
+  final case class Update(name: String) extends Message
+  final case class Advertisement(name: String) extends Message
 
-object TableColumn {
-  implicit val equalTableColumn: Equal[TableColumn] =
-    Equal.equalBy(c => (c.name, c.tpe))
-
-  implicit val showTableColumn: Show[TableColumn] =
-    Show shows { tc =>
-      "TableColumn(" + tc.name + ", " + tc.tpe.shows + ")"
-    }
+  def printMessage(m: Message): String = m match {
+    case RequestUpdate(n) => s"aestore::requestUpdate::${n}"
+    case Update(n) => s"aestore::update::${n}"
+    case Advertisement(n) => s"aestore::advertisement::${n}"
+  }
 }

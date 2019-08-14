@@ -25,7 +25,7 @@ import scalaz.std.option._
 import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.syntax.show._
-import scalaz.{Cord, Equal, Show}
+import scalaz.{Equal, Show}
 
 sealed trait ResourceError extends Product with Serializable {
   def path: ResourcePath
@@ -96,20 +96,20 @@ sealed abstract class ResourceErrorInstances {
   }
 
   implicit val show: Show[ResourceError] =
-    Show.show {
+    Show.shows {
       case ResourceError.NotAResource(p) =>
-        Cord("NotAResource(") ++ p.show ++ Cord(")")
+        "NotAResource(" + p.shows + ")"
 
       case ResourceError.PathNotFound(p) =>
-        Cord("PathNotFound(") ++ p.show ++ Cord(")")
+        "PathNotFound(" + p.shows + ")"
 
       case ResourceError.MalformedResource(p, e, d, t) =>
-        Cord(s"MalformedResource(path: ${p.show}, expected: $e, detail: ${d.show})${printThrowable(t)}")
+        s"MalformedResource(path: ${p.show}, expected: $e, detail: ${d.show})${printThrowable(t)}"
 
       case ResourceError.ConnectionFailed(p, d, t) =>
-        Cord(s"ConnectionFailed(path: ${p.show}, detail: ${d.show})${printThrowable(t)}")
+        s"ConnectionFailed(path: ${p.show}, detail: ${d.show})${printThrowable(t)}"
 
       case ResourceError.AccessDenied(p, d, t) =>
-        Cord(s"AccessDenied(path: ${p.show}, detail: ${d.show})${printThrowable(t)}")
+        s"AccessDenied(path: ${p.show}, detail: ${d.show})${printThrowable(t)}"
     }
 }
