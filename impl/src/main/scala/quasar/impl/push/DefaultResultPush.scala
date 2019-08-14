@@ -28,7 +28,7 @@ import quasar.api.table.TableRef
 
 import java.time.Instant
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Timer}
@@ -66,10 +66,12 @@ class DefaultResultPush[
         lookupTable(tableId),
         ResultPushError.TableNotFound(tableId))
 
-      sink: ResultSink.Aux[F, ResultType.Csv[F]] <-
-        liftOptionF[F, ResultPushError[T, D], ResultSink.Aux[F, ResultType.Csv[F]]](
-          findCsvSink(dest.sinks).point[F],
-          ResultPushError.FormatNotSupported(destinationId, ResultFormat.fromResultType(format)))
+      sink <- format match {
+        case ResultType.Csv() =>
+          liftOptionF[F, ResultPushError[T, D], ResultSink.Aux[F, ResultType.Csv[F]]](
+            findCsvSink(dest.sinks).point[F],
+            ResultPushError.FormatNotSupported(destinationId, ResultFormat.fromResultType(format)))
+      }
 
       query = tableRef.query
       columns = tableRef.columns
@@ -79,7 +81,9 @@ class DefaultResultPush[
       evaluated <- EitherT.rightT(evaluator.evaluate(query).map(convertToCsv))
       sinked = Stream.eval(sink(path, (columns, evaluated))).map(Right(_))
 
+      now <- EitherT.rightT(instantNow)
       _ <- EitherT.rightT(jobManager.submit(Job(tableId, sinked)))
+      _ <- EitherT.rightT(pushStatus.update(_ + (tableId -> Status.running(now))))
 
     } yield ()
 
@@ -88,26 +92,27 @@ class DefaultResultPush[
 
   def cancel(tableId: T): F[Condition[ExistentialError[T, D]]] =
     (for {
-      _ <- ensureTableExists(tableId)
-      _ <- EitherT.rightT(pushStatus.update(_ + (tableId -> Status.canceled)))
+      _ <- ensureTableExists[ExistentialError[T, D]](tableId)
       result <- EitherT.rightT(jobManager.cancel(tableId))
+      now <- EitherT.rightT(instantNow)
+      _ <- EitherT.rightT(pushStatus.update(_ + (tableId -> Status.canceled(now))))
     } yield result).run.map(Condition.disjunctionIso.reverseGet(_))
 
   def status(tableId: T): F[ResultPushError[T, D] \/ Status] =
-    (ensureTableExists(tableId) *> EitherT.rightT(jobManager.status(tableId)))
-      .foldM((e: ResultPushError[T, D]) => e.left[Status].point[F], {
-        case Some(JobStatus.Running | JobStatus.Pending) =>
-          Status.running.right.point[F]
-        case Some(JobStatus.Canceled) =>
-          Status.canceled.right.point[F]
-        case None =>
-          OptionT(pushStatus.get.map(_.get(tableId))).toRight[ResultPushError[T, D]](
-            ResultPushError.StatusUnknown(tableId)).run
-      })
+    ((ensureTableExists[ResultPushError[T, D]](tableId) *> EitherT.rightT(pushStatus.get.map(_.get(tableId)))) flatMap {
+      case Some(status) =>
+        EitherT.either(status.right[ResultPushError[T, D]])
+      case None =>
+        EitherT.either(ResultPushError.StatusUnknown(tableId).left[Status])
+    }).run
 
   def cancelAll: F[Unit] =
     jobManager.jobIds
       .flatMap(Traverse[List].traverse(_)(jobManager.cancel(_))).void
+
+  private def instantNow: F[Instant] =
+    Timer[F].clock.realTime(MILLISECONDS)
+      .map(Instant.ofEpochMilli(_))
 
   private def findCsvSink(sinks: NonEmptyList[ResultSink[F]]): Option[ResultSink.Aux[F, ResultType.Csv[F]]] =
     sinks.findMapM[Id.Id, ResultSink.Aux[F, ResultType.Csv[F]]] {
@@ -115,9 +120,10 @@ class DefaultResultPush[
       case _ => none
     }
 
-  private def ensureTableExists(tableId: T): EitherT[F, ExistentialError[T, D], Unit] =
+  private def ensureTableExists[E >: ExistentialError[T, D] <: ResultPushError[T, D]](tableId: T)
+      : EitherT[F, E, Unit] =
     OptionT(lookupTable(tableId))
-      .toRight[ExistentialError[T, D]](ResultPushError.TableNotFound(tableId))
+      .toRight[E](ResultPushError.TableNotFound(tableId))
       .void
 
   private def liftOptionF[F[_]: Functor, E, A](oa: F[Option[A]], err: E): EitherT[F, E, A] =
@@ -142,6 +148,8 @@ object DefaultResultPush {
   ): F[DefaultResultPush[F, T, D, Q, R]] = {
     for {
       pushStatus <- Ref.of[F, Map[T, Status]](Map.empty[T, Status])
+      // we can't keep track of Completed and Failed jobs in this impl, so we consume them from JobManager
+      // and update internal state accordingly
       _ <- Concurrent[F].start((jobManager.events.evalMap {
         case JobEvent.Completed(ti, start, duration) =>
           pushStatus.update(_ + (ti -> Status.finished(epochToInstant(start.epoch), epochToInstant(start.epoch + duration))))
