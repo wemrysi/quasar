@@ -20,7 +20,7 @@ import slamdata.Predef.{Byte, List}
 
 import quasar.api.table.TableColumn
 
-import scalaz.Equal
+import scalaz.{Equal, Show}
 import fs2.Stream
 
 sealed trait ResultType[F[_]] {
@@ -36,6 +36,11 @@ object ResultType {
     type T = (List[TableColumn], Stream[F, Byte])
   }
 
-  implicit def resultTypeEqual[F[_]]: Equal[ResultType[F]] =
+  implicit def equal[F[_]]: Equal[ResultType[F]] =
     Equal.equalA[ResultType[F]]
+
+  implicit def show[F[_]]: Show[ResultType[F]] =
+    Show.shows[ResultType[F]] {
+      case ResultType.Csv() => "csv"
+    }
 }

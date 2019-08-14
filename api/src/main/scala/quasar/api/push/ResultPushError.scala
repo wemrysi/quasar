@@ -18,8 +18,6 @@ package quasar.api.push
 
 import slamdata.Predef._
 
-import quasar.api.destination.ResultFormat
-
 sealed trait ResultPushError[+T, +D] extends Product with Serializable
 
 object ResultPushError {
@@ -28,7 +26,7 @@ object ResultPushError {
   final case class DestinationNotFound[D](destinationId: D) extends ExistentialError[Nothing, D]
   final case class TableNotFound[T](tableId: T) extends ExistentialError[T, Nothing]
 
-  final case class FormatNotSupported[D](destinationId: D, format: ResultFormat) extends ResultPushError[Nothing, D]
+  final case class FormatNotSupported[D](destinationId: D, format: String) extends ResultPushError[Nothing, D]
 
   final case class StatusUnknown[T](tableId: T) extends ResultPushError[T, Nothing]
   final case class PushAlreadyRunning[T](tableId: T) extends ResultPushError[T, Nothing]

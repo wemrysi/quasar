@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.connector.{Destination, ResultSink}
 import quasar.api.QueryEvaluator
-import quasar.api.destination.{ResultFormat, ResultType}
+import quasar.api.destination.ResultType
 import quasar.api.push.{ResultPush, ResultPushError, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
@@ -34,11 +34,12 @@ import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Timer}
 import fs2.Stream
 import fs2.job.{JobManager, Job, Status => JobStatus, Event => JobEvent}
-import scalaz.std.option._
 import scalaz.std.list._
+import scalaz.std.option._
 import scalaz.syntax.either._
 import scalaz.syntax.foldable._
 import scalaz.syntax.monad._
+import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 import scalaz.{EitherT, Functor, Id, NonEmptyList, OptionT, Traverse, \/}
 import shims._
@@ -70,7 +71,7 @@ class DefaultResultPush[
         case ResultType.Csv() =>
           liftOptionF[F, ResultPushError[T, D], ResultSink.Aux[F, ResultType.Csv[F]]](
             findCsvSink(dest.sinks).point[F],
-            ResultPushError.FormatNotSupported(destinationId, ResultFormat.fromResultType(format)))
+            ResultPushError.FormatNotSupported(destinationId, format.shows))
       }
 
       query = tableRef.query
