@@ -212,43 +212,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
-    "cancel and restart a push" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
-
-      for {
-        (destination, filesystem) <- RefDestination()
-        sync <- SignallingRef[IO, String]("Not started")
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
-          Stream.eval_(sync.set("Started")) ++ awaitS ++ Stream.eval_(sync.set("Finished"))))
-
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
-        _ <- latchGet(sync, "Started")
-        statusAfterStart <- push.status(TableId)
-        _ <- push.cancel(TableId)
-        _ <- await // wait for cancel
-        statusAfterCancel <- push.status(TableId)
-
-        _ <- sync.set("Not started")
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
-        _ <- latchGet(sync, "Finished")
-        statusAfterFinish <- push.status(TableId)
-        _ <- cleanup
-      } yield {
-        statusAfterStart must beLike {
-          case \/-(Status.Running(_)) => ok
-        }
-
-        statusAfterCancel must beLike {
-          case \/-(Status.Canceled(_)) => ok
-        }
-
-        statusAfterFinish must beLike {
-          case \/-(Status.Finished(_, _)) => ok
-        }
-      }
-    }
-
     "retrieves the status of a canceled push" >>* {
       val testTable = TableRef(TableName("baz"), "query", List())
 
