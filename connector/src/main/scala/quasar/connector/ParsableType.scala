@@ -121,7 +121,7 @@ object ParsableType extends ParsableTypeInstances {
           closeQuote = closeQuote.toByte,
           escape = escape.toByte
         ))
-      case _ => DecodeResult.fail("tololo", c.history)
+      case other => DecodeResult.fail(s"Unrecognized type field in ParsableType decoding", c.history)
     }))
   }
 
