@@ -58,7 +58,6 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
         root,
         lc.readChunkSizeBytes,
         lc.format,
-        lc.compressionScheme,
         blockingPool)
     }
 

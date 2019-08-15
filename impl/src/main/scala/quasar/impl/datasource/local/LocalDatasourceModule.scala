@@ -58,7 +58,6 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
         root,
         lc.readChunkSizeBytes,
         lc.format,
-        lc.compressionScheme,
         blockingPool)
     }
 

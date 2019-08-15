@@ -25,7 +25,7 @@ import quasar.impl.parsing.ResultParser
 import java.nio.file.{Path => JPath}
 
 import cats.effect.{ContextShift, Effect, Timer}
-import fs2.{gzip, io}
+import fs2.io
 import qdata.{QDataDecode, QDataEncode}
 import scalaz.syntax.tag._
 
@@ -38,24 +38,14 @@ object LocalParsedDatasource {
   def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer, A: QDataDecode: QDataEncode](
       root: JPath,
       readChunkSizeBytes: Int,
-      format: ParsableType,
-      compressionScheme: Option[CompressionScheme],
+      format: DataFormat,
       blockingPool: BlockingContext)
       : DS[F] = {
 
     EvaluableLocalDatasource[F](LocalParsedType, root) { iRead =>
       val rawBytes =
         io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes)
-
-      val decompressedBytes = compressionScheme match {
-        case Some(CompressionScheme.Gzip) =>
-          rawBytes.through(gzip.decompress[F](DecompressionBufferSize))
-
-        case None =>
-          rawBytes
-      }
-
-      val parsedValues = decompressedBytes.through(ResultParser.parsableTypePipe(format))
+      val parsedValues = rawBytes.through(ResultParser.parsableTypePipe(format))
 
       QueryResult.parsed[F, A](QDataDecode[A], parsedValues, iRead.stages)
     }

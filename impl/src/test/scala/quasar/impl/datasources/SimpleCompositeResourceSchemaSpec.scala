@@ -21,8 +21,7 @@ import slamdata.Predef._
 import quasar.{IdStatus, ScalarStages}
 import quasar.api.resource.{ResourceName, ResourcePath}
 import quasar.common.data.RValue
-import quasar.connector.{CompressionScheme, ParsableType, QueryResult, ResourceError}
-import quasar.connector.ParsableType.JsonVariant
+import quasar.connector.{DataFormat, QueryResult, ResourceError}
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka.envT
 import quasar.contrib.scalaz.MonadError_
@@ -88,9 +87,9 @@ object SimpleCompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
       Stream.emits(BoolsData.map(RValue.rBoolean(_))),
       ScalarStages.Id)
 
-  val unparsedResult: QueryResult.Unparsed[IO] =
-    QueryResult.typed(
-      ParsableType.Json(JsonVariant.LineDelimited, false),
+  val unparsedResult: QueryResult.Typed[IO] =
+    QueryResult.Typed(
+      DataFormat.ldjson,
       Stream.emits(BoolsData.mkString("\n").getBytes(Charset.forName("UTF-8"))),
       ScalarStages.Id)
 
@@ -111,9 +110,10 @@ object SimpleCompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
 
   "computes an SST of gzipped data" >>* {
     val gzippedResult =
-      QueryResult.compressed(
-        CompressionScheme.Gzip,
-        unparsedResult.modifyBytes(_ through gzip.compress(50)))
+      QueryResult.Typed[IO](
+        DataFormat.compressed(DataFormat.ldjson),
+        unparsedResult.data.through(gzip.compress[IO](50)),
+        ScalarStages.Id)
 
     resourceSchema(defaultCfg, (path, Left(gzippedResult)), 1.hour) map { qsst =>
       qsst must_= Some(schema)
@@ -144,7 +144,7 @@ object SimpleCompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
   "emits parser errors as ResourceError" >>* {
     val badResult =
       QueryResult.typed[IO](
-        ParsableType.Json(JsonVariant.LineDelimited, false),
+        DataFormat.ldjson,
         Stream.emits("""{ "foo": sdlfkj""".getBytes(Charset.forName("UTF-8"))),
         ScalarStages.Id)
 

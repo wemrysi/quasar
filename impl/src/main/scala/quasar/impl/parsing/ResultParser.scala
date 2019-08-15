@@ -19,8 +19,7 @@ package quasar.impl.parsing
 import slamdata.Predef._
 
 import quasar.ScalarStages
-import quasar.connector.{CompressionScheme, ParsableType, QueryResult}
-import quasar.connector.ParsableType.JsonVariant
+import quasar.connector.{CompressionScheme, QueryResult, DataFormat}, DataFormat.JsonVariant
 
 import java.lang.IllegalArgumentException
 
@@ -47,29 +46,27 @@ object ResultParser {
     bufs.foldLeft(new ArrayBuffer[A](totalSize))(_ ++= _)
   }
 
-  def parsableTypePipe[F[_]: Sync, A: QDataEncode](pt: ParsableType): Pipe[F, Byte, A] = {
-    val parser = pt match {
-      case ParsableType.Json(vnt, isPrecise) =>
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def parsableTypePipe[F[_]: Sync, A: QDataEncode](format: DataFormat): Pipe[F, Byte, A] = {
+    format match {
+      case DataFormat.Json(vnt, isPrecise) =>
         val mode: TParser.Mode = vnt match {
           case JsonVariant.ArrayWrapped => TParser.UnwrapArray
           case JsonVariant.LineDelimited => TParser.ValueStream
         }
-        TParser(QDataPlate[F, A, ArrayBuffer[A]](isPrecise), mode)
-      case ParsableType.SeparatedValues(cfg) =>
-        SVParser(QDataPlate[F, A, ArrayBuffer[A]](false), cfg)
+        StreamParser(TParser(QDataPlate[F, A, ArrayBuffer[A]](isPrecise), mode))(Chunk.buffer, bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+      case DataFormat.SeparatedValues(cfg) =>
+        StreamParser(SVParser(QDataPlate[F, A, ArrayBuffer[A]](false), cfg))(Chunk.buffer, bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+      case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
+        gzip.decompress[F](DefaultDecompressionBufferSize) andThen parsableTypePipe[F, A](pt)
     }
-    StreamParser(parser)(Chunk.buffer, bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
   }
 
   def apply[F[_]: Sync, A: QDataEncode](queryResult: QueryResult[F]): Stream[F, A] = {
-    @tailrec
     def parsedStream(qr: QueryResult[F]): Stream[F, A] =
       qr match {
         case QueryResult.Parsed(qdd, data, _) =>
           data.map(QData.convert(_)(qdd, QDataEncode[A]))
-
-        case QueryResult.Compressed(CompressionScheme.Gzip, content) =>
-          parsedStream(content.modifyBytes(gzip.decompress[F](DefaultDecompressionBufferSize)))
 
         case QueryResult.Typed(pt, data, _) =>
           data.through(parsableTypePipe[F, A](pt))
