@@ -78,13 +78,16 @@ class DefaultResultPush[
       query = tableRef.query
       columns = tableRef.columns
 
-      _ <- verifyNotRunning(tableId)
-
       evaluated <- EitherT.rightT(evaluator.evaluate(query).map(convertToCsv))
       sinked = Stream.eval(sink(path, (columns, evaluated))).map(Right(_))
 
       now <- EitherT.rightT(instantNow)
-      _ <- EitherT.rightT(jobManager.submit(Job(tableId, sinked)))
+      submitted <- EitherT.rightT(jobManager.submit(Job(tableId, sinked)))
+      _ <- EitherT.either[F, ResultPushError[T, D], Unit](
+        if (submitted)
+          ().right
+        else
+          ResultPushError.PushAlreadyRunning(tableId).left)
       _ <- EitherT.rightT(Concurrent[F].delay(pushStatus.put(tableId, Status.running(now))))
 
     } yield ()
@@ -126,14 +129,6 @@ class DefaultResultPush[
 
   private def liftOptionF[F[_]: Functor, E, A](oa: F[Option[A]], err: E): EitherT[F, E, A] =
     OptionT(oa).toRight[E](err)
-
-  private def verifyNotRunning(i: T): EitherT[F, ResultPushError[T, D], Unit] =
-    EitherT(jobManager.status(i).map {
-      case Some(JobStatus.Running | JobStatus.Pending) =>
-        ResultPushError.PushAlreadyRunning(i).left
-      case _ =>
-        ().right
-    })
 }
 
 object DefaultResultPush {
