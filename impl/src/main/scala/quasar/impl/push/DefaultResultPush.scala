@@ -34,7 +34,7 @@ import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
 import cats.effect.{Concurrent, Timer}
 import fs2.Stream
-import fs2.job.{JobManager, Job, Status => JobStatus, Event => JobEvent}
+import fs2.job.{JobManager, Job, Event => JobEvent}
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.syntax.either._
