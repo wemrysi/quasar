@@ -38,7 +38,7 @@ trait ResultPush[F[_], TableId, DestinationId] {
       : F[Condition[ExistentialError[TableId, DestinationId]]]
 
   def status(tableId: TableId)
-      : F[ResultPushError[TableId, DestinationId] \/ Status]
+      : F[TableNotFound[TableId] \/ Option[Status]]
 
   def cancelAll: F[Unit]
 }

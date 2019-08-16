@@ -41,7 +41,7 @@ import org.specs2.matcher.MatchResult
 import scalaz.std.set._
 import scalaz.std.string._
 import scalaz.syntax.bind._
-import scalaz.{\/-, Equal, NonEmptyList}
+import scalaz.{Equal, NonEmptyList, \/-}
 import shims._
 
 object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
@@ -148,6 +148,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, evaluator)
         startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv[IO](), None)
         _ <- latchGet(ref, "Finished")
+        _ <- await
         filesystemAfterPush <- filesystem.get
         _ <- cleanup
       } yield {
@@ -178,6 +179,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv[IO](), None)
         _ <- latchGet(ref, "Started")
         cancelRes <- push.cancel(TableId)
+        _ <- await
         filesystemAfterPush <- filesystem.get
         // fail the test if push evaluation was not cancelled
         evaluationFinished <- verifyTimeout(latchGet(ref, "Finished"), "Push not cancelled")
@@ -207,7 +209,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- cleanup
       } yield {
         pushStatus must beLike {
-          case \/-(Status.Running(_)) => ok
+          case \/-(Some(Status.Running(_))) => ok
         }
       }
     }
@@ -229,7 +231,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- cleanup
       } yield {
         pushStatus must beLike {
-          case \/-(Status.Canceled(_)) => ok
+          case \/-(Some(Status.Canceled(_))) => ok
         }
       }
     }
@@ -250,7 +252,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- cleanup
       } yield {
         pushStatus must beLike {
-          case \/-(Status.Finished(_, _)) => ok
+          case \/-(Some(Status.Finished(_, _))) => ok
         }
       }
     }
@@ -261,7 +263,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
       for {
         (destination, filesystem) <- RefDestination()
-        sync <- SignallingRef[IO, String]("Not started")
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           Stream.raiseError[IO](ex)))
@@ -270,10 +271,33 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         pushStatus <- push.status(TableId)
         _ <- cleanup
       } yield {
-
         pushStatus must beLike {
-          case \/-(Status.Failed(ex, _, _)) => ex.getMessage must equal("boom")
+          case \/-(Some(Status.Failed(ex, _, _))) => ex.getMessage must equal("boom")
         }
+      }
+    }
+
+    "returns ResultPushError.TableNotFound for unknown tables" >>* {
+      for {
+        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        push <- mkResultPush(Map(), Map(), jm, mkEvaluator(_ => Stream.empty))
+        pushStatus <- push.status(99)
+        _ <- cleanup
+      } yield {
+        pushStatus must be_-\/(ResultPushError.TableNotFound(99))
+      }
+    }
+
+    "returns None for a table that has not been pushed" >>* {
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      for {
+        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        push <- mkResultPush(Map(TableId -> testTable), Map(), jm, mkEvaluator(_ => Stream.empty))
+        pushStatus <- push.status(TableId)
+        _ <- cleanup
+      } yield {
+        pushStatus must be_\/-(None)
       }
     }
 

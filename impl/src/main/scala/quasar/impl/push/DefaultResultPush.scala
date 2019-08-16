@@ -16,7 +16,7 @@
 
 package quasar.impl.push
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => _, _}
 
 import quasar.Condition
 import quasar.connector.{Destination, ResultSink}
@@ -27,10 +27,11 @@ import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
 
 import java.time.Instant
+import java.util.Map
+import java.util.concurrent.ConcurrentHashMap
 
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
-import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Timer}
 import fs2.Stream
 import fs2.job.{JobManager, Job, Status => JobStatus, Event => JobEvent}
@@ -51,7 +52,7 @@ class DefaultResultPush[
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, T, Nothing],
     convertToCsv: R => Stream[F, Byte],
-    pushStatus: Ref[F, Map[T, Status]])
+    pushStatus: Map[T, Status])
     extends ResultPush[F, T, D] {
   import ResultPushError._
 
@@ -84,7 +85,7 @@ class DefaultResultPush[
 
       now <- EitherT.rightT(instantNow)
       _ <- EitherT.rightT(jobManager.submit(Job(tableId, sinked)))
-      _ <- EitherT.rightT(pushStatus.update(_ + (tableId -> Status.running(now))))
+      _ <- EitherT.rightT(Concurrent[F].delay(pushStatus.put(tableId, Status.running(now))))
 
     } yield ()
 
@@ -96,16 +97,12 @@ class DefaultResultPush[
       _ <- ensureTableExists[ExistentialError[T, D]](tableId)
       result <- EitherT.rightT(jobManager.cancel(tableId))
       now <- EitherT.rightT(instantNow)
-      _ <- EitherT.rightT(pushStatus.update(_ + (tableId -> Status.canceled(now))))
+      _ <- EitherT.rightT(Concurrent[F].delay(pushStatus.put(tableId, Status.canceled(now))))
     } yield result).run.map(Condition.disjunctionIso.reverseGet(_))
 
-  def status(tableId: T): F[ResultPushError[T, D] \/ Status] =
-    ((ensureTableExists[ResultPushError[T, D]](tableId) *> EitherT.rightT(pushStatus.get.map(_.get(tableId)))) flatMap {
-      case Some(status) =>
-        EitherT.either(status.right[ResultPushError[T, D]])
-      case None =>
-        EitherT.either(ResultPushError.StatusUnknown(tableId).left[Status])
-    }).run
+  def status(tableId: T): F[TableNotFound[T] \/ Option[Status]] =
+    (ensureTableExists[TableNotFound[T]](tableId) *>
+      EitherT.rightT(Concurrent[F].delay(Option(pushStatus.get(tableId))))).run
 
   def cancelAll: F[Unit] =
     jobManager.jobIds
@@ -121,7 +118,7 @@ class DefaultResultPush[
       case _ => none
     }
 
-  private def ensureTableExists[E >: ExistentialError[T, D] <: ResultPushError[T, D]](tableId: T)
+  private def ensureTableExists[E >: TableNotFound[T] <: ResultPushError[T, D]](tableId: T)
       : EitherT[F, E, Unit] =
     OptionT(lookupTable(tableId))
       .toRight[E](ResultPushError.TableNotFound(tableId))
@@ -148,14 +145,22 @@ object DefaultResultPush {
     convertToCsv: R => Stream[F, Byte]
   ): F[DefaultResultPush[F, T, D, Q, R]] = {
     for {
-      pushStatus <- Ref.of[F, Map[T, Status]](Map.empty[T, Status])
+      pushStatus <- Concurrent[F].delay(new ConcurrentHashMap[T, Status]())
       // we can't keep track of Completed and Failed jobs in this impl, so we consume them from JobManager
       // and update internal state accordingly
       _ <- Concurrent[F].start((jobManager.events.evalMap {
         case JobEvent.Completed(ti, start, duration) =>
-          pushStatus.update(_ + (ti -> Status.finished(epochToInstant(start.epoch), epochToInstant(start.epoch + duration))))
+          Concurrent[F].delay(
+            pushStatus.put(ti, Status.finished(
+              epochToInstant(start.epoch),
+              epochToInstant(start.epoch + duration))))
+
         case JobEvent.Failed(ti, start, duration, ex) =>
-          pushStatus.update(_ + (ti -> Status.failed(ex, epochToInstant(start.epoch), epochToInstant(start.epoch + duration))))
+          Concurrent[F].delay(
+            pushStatus.put(ti, Status.failed(
+              ex,
+              epochToInstant(start.epoch),
+              epochToInstant(start.epoch + duration))))
       }).compile.drain)
     } yield new DefaultResultPush(lookupTable, evaluator, lookupDestination, jobManager, convertToCsv, pushStatus)
   }
