@@ -32,7 +32,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 import cats.effect.IO
-import cats.effect.concurrent.Ref
 import eu.timepit.refined.auto._
 import fs2.concurrent.SignallingRef
 import fs2.job.JobManager
@@ -58,7 +57,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   type Filesystem = Map[ResourcePath, String]
 
   // a sink that writes to a Ref
-  final class RefCsvSink(ref: Ref[IO, Filesystem]) extends ResultSink[IO] {
+  final class RefCsvSink(ref: SignallingRef[IO, Filesystem]) extends ResultSink[IO] {
     type RT = ResultType.Csv[IO]
 
     val resultType = ResultType.Csv()
@@ -73,15 +72,15 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
   }
 
-  final class RefDestination(ref: Ref[IO, Filesystem]) extends Destination[IO] {
+  final class RefDestination(ref: SignallingRef[IO, Filesystem]) extends Destination[IO] {
     def destinationType: DestinationType = RefDestinationType
     def sinks = NonEmptyList(new RefCsvSink(ref))
   }
 
   object RefDestination {
-    def apply(): IO[(Destination[IO], Ref[IO, Filesystem])] =
+    def apply(): IO[(Destination[IO], SignallingRef[IO, Filesystem])] =
       for {
-        fs <- Ref.of[IO, Filesystem](Map.empty)
+        fs <- SignallingRef[IO, Filesystem](Map.empty)
         destination = new RefDestination(fs)
       } yield (destination, fs)
   }
@@ -119,14 +118,17 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   def mockEvaluate(q: String): String =
     s"evaluated($q)"
 
-  def latchGet(s: SignallingRef[IO, String], expected: String): IO[Unit] =
-    s.discrete.filter(Equal[String].equal(_, expected)).take(1).compile.drain
-
-  val WorkTime = Duration(300, MILLISECONDS)
+  val WorkTime = Duration(200, MILLISECONDS)
   val Timeout = 5 * WorkTime
 
   val await = IO.sleep(WorkTime)
   val awaitS = Stream.sleep_(WorkTime)
+
+  def latchGet(s: SignallingRef[IO, String], expected: String): IO[Unit] =
+    s.discrete.filter(Equal[String].equal(_, expected)).take(1).compile.drain.timeout(Timeout)
+
+  def waitForUpdate[K, V](s: SignallingRef[IO, Map[K, V]]): IO[Unit] =
+    s.discrete.filter(_.nonEmpty).take(1).compile.drain.timeout(Timeout)
 
   /* Runs `io` with a timeout, producing a failing expectation if `io`
      completes before the timeout. errMsg is included with the failing expectation. */
@@ -148,8 +150,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, evaluator)
         startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv[IO](), None)
         _ <- latchGet(ref, "Finished")
-        _ <- await
-        filesystemAfterPush <- filesystem.get
+        filesystemAfterPush <- waitForUpdate(filesystem) >> filesystem.get
         _ <- cleanup
       } yield {
         filesystemAfterPush.keySet must equal(Set(pushPath))
@@ -179,8 +180,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv[IO](), None)
         _ <- latchGet(ref, "Started")
         cancelRes <- push.cancel(TableId)
-        _ <- await
-        filesystemAfterPush <- filesystem.get
+
+        filesystemAfterPush <- waitForUpdate(filesystem) >> filesystem.get
         // fail the test if push evaluation was not cancelled
         evaluationFinished <- verifyTimeout(latchGet(ref, "Finished"), "Push not cancelled")
         _ <- cleanup
@@ -226,7 +227,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
         _ <- latchGet(sync, "Started")
         _ <- push.cancel(TableId)
-        _ <- await // wait for cancel
+        _ <- await
         pushStatus <- push.status(TableId)
         _ <- cleanup
       } yield {
@@ -277,7 +278,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
-    "returns ResultPushError.TableNotFound for unknown tables" >>* {
+    "fails with ResultPushError.TableNotFound for unknown tables" >>* {
       for {
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(), Map(), jm, mkEvaluator(_ => Stream.empty))
