@@ -118,7 +118,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   def mockEvaluate(q: String): String =
     s"evaluated($q)"
 
-  val WorkTime = Duration(200, MILLISECONDS)
+  val WorkTime = Duration(400, MILLISECONDS)
   val Timeout = 5 * WorkTime
 
   val await = IO.sleep(WorkTime)
