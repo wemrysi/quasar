@@ -24,7 +24,7 @@ import quasar.api.destination.ResultType
 import quasar.api.push.{ResultPush, ResultPushError, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
-import quasar.api.table.{TableColumn, TableName, TableRef}
+import quasar.api.table.{TableName, TableRef}
 import quasar.connector.{Destination, ResultSink}
 import quasar.{ConditionMatchers, EffectfulQSpec}
 
@@ -56,25 +56,16 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
   type Filesystem = Map[ResourcePath, String]
 
-  // a sink that writes to a Ref
-  final class RefCsvSink(ref: SignallingRef[IO, Filesystem]) extends ResultSink[IO] {
-    type RT = ResultType.Csv[IO]
-
-    val resultType = ResultType.Csv()
-
-    def apply(dst: ResourcePath, result: (List[TableColumn], Stream[IO, Byte])): IO[Unit] = {
-      val (columns, data) = result
-
-      // write stream one word at a time to ref
-      bytesToString(data).evalMap(str =>
-        ref.update(currentFs =>
-          currentFs + (dst -> currentFs.get(dst).fold(str)(_ ++ str)))).compile.drain
-    }
-  }
-
   final class RefDestination(ref: SignallingRef[IO, Filesystem]) extends Destination[IO] {
     def destinationType: DestinationType = RefDestinationType
-    def sinks = NonEmptyList(new RefCsvSink(ref))
+    def sinks = NonEmptyList(csvSink)
+
+    val csvSink: ResultSink[IO] = ResultSink.Csv[IO] {
+      case (dst, columns, bytes) =>
+        bytesToString(bytes).evalMap(str =>
+          ref.update(currentFs =>
+            currentFs + (dst -> currentFs.get(dst).fold(str)(_ ++ str)))).compile.drain
+    }
   }
 
   object RefDestination {
@@ -148,7 +139,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         evaluator = mkEvaluator(q => Stream.emit(mockEvaluate(q)) ++ Stream.eval_(ref.set("Finished")))
 
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, evaluator)
-        startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv[IO](), None)
+        startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv, None)
         _ <- latchGet(ref, "Finished")
         filesystemAfterPush <- waitForUpdate(filesystem) >> filesystem.get
         _ <- cleanup
@@ -177,7 +168,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (destination, filesystem) <- RefDestination()
         ref <- SignallingRef[IO, String]("Not started")
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ => testStream(ref)))
-        startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv[IO](), None)
+        startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv, None)
         _ <- latchGet(ref, "Started")
         cancelRes <- push.cancel(TableId)
 
@@ -204,7 +195,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2")))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
+        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- latchGet(sync, "Started")
         pushStatus <- push.status(TableId)
         _ <- cleanup
@@ -224,7 +215,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2")))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
+        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- latchGet(sync, "Started")
         _ <- push.cancel(TableId)
         _ <- await
@@ -246,7 +237,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           Stream.eval_(sync.set("Started")) ++ awaitS ++ Stream.eval_(sync.set("Finished"))))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
+        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- latchGet(sync, "Finished")
         _ <- await // wait for concurrent update of push status
         pushStatus <- push.status(TableId)
@@ -267,7 +258,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           Stream.raiseError[IO](ex)))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO], None)
+        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- await // wait for error handling
         pushStatus <- push.status(TableId)
         _ <- cleanup
@@ -315,8 +306,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           Map(DestinationId -> destination),
           jm,
           mkEvaluator(_ => Stream.eval(sync.set("Started")).as("1") ++ awaitS.as("2") ++ Stream.eval(sync.set("Finished")).as("3")))
-        firstStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv[IO], None)
-        secondStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv[IO], None)
+        firstStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
+        secondStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
         _ <- cleanup
       } yield {
         firstStartStatus must beNormal
@@ -342,8 +333,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           case "queryBar" =>
             Stream.eval_(refBar.set("Started")) ++ awaitS ++ Stream.eval_(refBar.set("Finished"))
         })
-        _ <- push.start(1, DestinationId, path1, ResultType.Csv[IO](), None)
-        _ <- push.start(2, DestinationId, path2, ResultType.Csv[IO](), None)
+        _ <- push.start(1, DestinationId, path1, ResultType.Csv, None)
+        _ <- push.start(2, DestinationId, path2, ResultType.Csv, None)
         _ <- latchGet(refFoo, "Started") >> latchGet(refBar, "Started")
         _ <- push.cancelAll
         fooCanceled <- verifyTimeout(latchGet(refFoo, "Finished"), "queryFoo not cancelled")
@@ -360,7 +351,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (destination, filesystem) <- RefDestination()
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(TableId -> testTable), Map(), jm, mkEvaluator(_ => Stream.empty))
-        pushRes <- push.start(TableId, UnknownDestinationId, ResourcePath.root(), ResultType.Csv[IO](), None)
+        pushRes <- push.start(TableId, UnknownDestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- cleanup
       } yield {
         pushRes must beAbnormal(ResultPushError.DestinationNotFound(UnknownDestinationId))
@@ -375,7 +366,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (destination, filesystem) <- RefDestination()
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(), Map(DestinationId -> destination), jm, mkEvaluator(_ => Stream.empty))
-        pushRes <- push.start(UnknownTableId, DestinationId, ResourcePath.root(), ResultType.Csv[IO](), None)
+        pushRes <- push.start(UnknownTableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- cleanup
       } yield {
         pushRes must beAbnormal(ResultPushError.TableNotFound(UnknownTableId))

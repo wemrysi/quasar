@@ -18,14 +18,11 @@ package quasar.impl.datasource.local
 
 import slamdata.Predef.{Stream => _, _}
 
-import quasar.api.destination.ResultType
-import quasar.api.resource.ResourcePath
-import quasar.api.table.TableColumn
 import quasar.concurrent.BlockingContext
 import quasar.connector.{Destination, MonadResourceErr, ResourceError, ResultSink}
 
 import cats.effect.{ContextShift, Effect}
-import fs2.{io, Stream}
+import fs2.io
 import scalaz.NonEmptyList
 import scalaz.syntax.monad._
 import scalaz.syntax.tag._
@@ -40,7 +37,21 @@ final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] priva
   val destinationType = LocalDestinationType
 
   def sinks: NonEmptyList[ResultSink[F]] =
-    NonEmptyList(LocalCsvSink[F](root, blockingContext))
+    NonEmptyList(csvSink(root, blockingContext))
+
+  private def csvSink(root: JPath, blockingContext: BlockingContext): ResultSink[F] =
+    ResultSink.Csv[F] {
+      case (dst, columns, bytes) =>
+        resolvedResourcePath[F](root, dst) >>= {
+          case Some(writePath) =>
+            val fileSink = io.file.writeAll[F](writePath, blockingContext.unwrap)
+
+            bytes.through(fileSink).compile.drain
+
+          case None =>
+            MonadResourceErr[F].raiseError(ResourceError.notAResource(dst))
+        }
+    }
 }
 
 object LocalDestination {
@@ -49,32 +60,4 @@ object LocalDestination {
       blockingContext: BlockingContext)
       : LocalDestination[F] =
     new LocalDestination[F](root, blockingContext)
-}
-
-final class LocalCsvSink[F[_]: Effect: ContextShift: MonadResourceErr] private (
-    root: JPath,
-    blockingContext: BlockingContext) extends ResultSink[F] {
-
-  type RT = ResultType.Csv[F]
-  val resultType = ResultType.Csv[F]()
-
-  def apply(dst: ResourcePath, result: (List[TableColumn], Stream[F, Byte])): F[Unit] =
-    resolvedResourcePath[F](root, dst) >>= {
-      case Some(writePath) =>
-        val (_, bytes) = result
-        val fileSink = io.file.writeAll[F](writePath, blockingContext.unwrap)
-
-        bytes.through(fileSink).compile.drain
-
-      case None =>
-        MonadResourceErr[F].raiseError(ResourceError.notAResource(dst))
-    }
-}
-
-object LocalCsvSink {
-  def apply[F[_]: Effect: ContextShift: MonadResourceErr](
-      root: JPath,
-      blockingContext: BlockingContext)
-      : LocalCsvSink[F] =
-    new LocalCsvSink(root, blockingContext)
 }

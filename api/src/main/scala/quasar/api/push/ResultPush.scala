@@ -31,7 +31,7 @@ import scalaz.\/
 trait ResultPush[F[_], TableId, DestinationId] {
   import ResultPushError._
 
-  def start(tableId: TableId, destinationId: DestinationId, path: ResourcePath, format: ResultType[F], limit: Option[Long])
+  def start(tableId: TableId, destinationId: DestinationId, path: ResourcePath, format: ResultType, limit: Option[Long])
       : F[Condition[ResultPushError[TableId, DestinationId]]]
 
   def cancel(tableId: TableId)

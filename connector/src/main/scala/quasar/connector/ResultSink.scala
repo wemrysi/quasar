@@ -16,31 +16,16 @@
 
 package quasar.connector
 
-import slamdata.Predef._
+import slamdata.Predef.{Stream => _, _}
 
 import quasar.api.destination.ResultType
 import quasar.api.resource.ResourcePath
+import quasar.api.table.TableColumn
 
-trait ResultSink[F[_]] {
-  type RT <: ResultType[F]
-  val resultType: RT
+import fs2.Stream
 
-  def apply(dst: ResourcePath, result: resultType.T): F[Unit]
-}
+sealed trait ResultSink[F[_]]
 
 object ResultSink {
-  type Aux[F[_], RT0 <: ResultType[F]] = ResultSink[F] {
-    type RT = RT0
-  }
-
-  object Csv {
-    // TODO: make @unchecked unnecessary
-    def unapply[F[_]](sink: ResultSink[F]): Option[ResultSink.Aux[F, ResultType.Csv[F]]] =
-      (sink, sink.resultType) match {
-        case (rs: ResultSink.Aux[F, ResultType.Csv[F]] @unchecked, ResultType.Csv()) =>
-          Some(rs)
-        case _ =>
-          None
-      }
-  }
+  final case class Csv[F[_]](run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => F[Unit]) extends ResultSink[F]
 }

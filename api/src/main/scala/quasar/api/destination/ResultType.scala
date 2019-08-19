@@ -16,31 +16,23 @@
 
 package quasar.api.destination
 
-import slamdata.Predef.{Byte, List}
+import slamdata.Predef._
 
 import quasar.api.table.TableColumn
 
 import scalaz.{Equal, Show}
 import fs2.Stream
 
-sealed trait ResultType[F[_]] {
-  type T
-}
+sealed trait ResultType extends Product with Serializable
 
 object ResultType {
-  type Aux[F[_], T0] = ResultType[F] {
-    type T = T0
-  }
+  case object Csv extends ResultType
 
-  final case class Csv[F[_]]() extends ResultType[F] {
-    type T = (List[TableColumn], Stream[F, Byte])
-  }
+  implicit def equal: Equal[ResultType] =
+    Equal.equalA[ResultType]
 
-  implicit def equal[F[_]]: Equal[ResultType[F]] =
-    Equal.equalA[ResultType[F]]
-
-  implicit def show[F[_]]: Show[ResultType[F]] =
-    Show.shows[ResultType[F]] {
-      case ResultType.Csv() => "csv"
+  implicit def show: Show[ResultType] =
+    Show.shows[ResultType] {
+      case ResultType.Csv => "csv"
     }
 }

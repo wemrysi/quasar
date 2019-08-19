@@ -56,7 +56,7 @@ class DefaultResultPush[
     extends ResultPush[F, T, D] {
   import ResultPushError._
 
-  def start(tableId: T, destinationId: D, path: ResourcePath, format: ResultType[F], limit: Option[Long])
+  def start(tableId: T, destinationId: D, path: ResourcePath, format: ResultType, limit: Option[Long])
       : F[Condition[ResultPushError[T, D]]] = {
 
     val writing = for {
@@ -69,8 +69,8 @@ class DefaultResultPush[
         ResultPushError.TableNotFound(tableId))
 
       sink <- format match {
-        case ResultType.Csv() =>
-          liftOptionF[F, ResultPushError[T, D], ResultSink.Aux[F, ResultType.Csv[F]]](
+        case ResultType.Csv =>
+          liftOptionF[F, ResultPushError[T, D], ResultSink.Csv[F]](
             findCsvSink(dest.sinks).point[F],
             ResultPushError.FormatNotSupported(destinationId, format.shows))
       }
@@ -79,7 +79,7 @@ class DefaultResultPush[
       columns = tableRef.columns
 
       evaluated <- EitherT.rightT(evaluator.evaluate(query).map(convertToCsv))
-      sinked = Stream.eval(sink(path, (columns, evaluated))).map(Right(_))
+      sinked = Stream.eval(sink.run(path, columns, evaluated)).map(Right(_))
 
       now <- EitherT.rightT(instantNow)
       submitted <- EitherT.rightT(jobManager.submit(Job(tableId, sinked)))
@@ -115,9 +115,9 @@ class DefaultResultPush[
     Timer[F].clock.realTime(MILLISECONDS)
       .map(Instant.ofEpochMilli(_))
 
-  private def findCsvSink(sinks: NonEmptyList[ResultSink[F]]): Option[ResultSink.Aux[F, ResultType.Csv[F]]] =
-    sinks.findMapM[Id.Id, ResultSink.Aux[F, ResultType.Csv[F]]] {
-      case ResultSink.Csv(sink) => sink.some
+  private def findCsvSink(sinks: NonEmptyList[ResultSink[F]]): Option[ResultSink.Csv[F]] =
+    sinks.findMapM[Id.Id, ResultSink.Csv[F]] {
+      case csvSink @ ResultSink.Csv(_) => csvSink.some
       case _ => none
     }
 
