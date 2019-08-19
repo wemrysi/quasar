@@ -18,10 +18,7 @@ package quasar.api.destination
 
 import slamdata.Predef._
 
-import quasar.api.table.TableColumn
-
 import scalaz.{Equal, Show}
-import fs2.Stream
 
 sealed trait ResultType extends Product with Serializable
 
