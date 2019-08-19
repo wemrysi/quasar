@@ -36,7 +36,7 @@ object TectonicResourceError {
   val typeSummary: DataFormat => String = {
     case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
       "gzipped " + typeSummary(pt: DataFormat)
-    case DataFormat.SeparatedValues(cfg) =>
+    case v: DataFormat.SeparatedValues =>
       "separated values"
     case DataFormat.Json(vnt, isPrecise) =>
       variantString(vnt) + (if (isPrecise) " (precise)" else "")

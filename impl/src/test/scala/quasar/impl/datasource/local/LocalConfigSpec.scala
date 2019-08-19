@@ -26,8 +26,6 @@ import cats.instances.either._
 import cats.instances.string._
 import cats.syntax.either._
 
-import tectonic.csv.Parser.Config
-
 import shims._
 
 object LocalConfigSpec extends quasar.Qspec {
@@ -134,7 +132,7 @@ object LocalConfigSpec extends quasar.Qspec {
         LocalConfig(
           "/data",
           LocalConfig.DefaultReadChunkSizeBytes,
-          DataFormat.SeparatedValues(Config()))
+          DataFormat.SeparatedValues.Default)
 
       Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
     }

@@ -30,7 +30,6 @@ import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.κ
 import quasar.qscript.InterpretedRead
-import tectonic.csv.Parser.Config
 
 import shims._
 
@@ -131,7 +130,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
     val ds = LocalParsedDatasource[IO, RValue](
       Paths.get("./impl/src/test/resources"),
       1024,
-      DataFormat.SeparatedValues(Config()),
+      DataFormat.SeparatedValues.Default,
       blockingPool)
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.csv"), ScalarStages.Id)

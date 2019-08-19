@@ -23,19 +23,36 @@ import quasar.{NonTerminal, RenderTree}, RenderTree.ops._
 import cats.{Show, Eq}
 import cats.syntax.eq._
 import cats.syntax.show._
-import cats.kernel.instances.byte._
+import cats.kernel.instances.char._
 
-import argonaut.{HCursor, DecodeResult, DecodeJson, CodecJson, Argonaut, Json => AJson}, Argonaut._
-
-import tectonic.csv.Parser.Config
+import argonaut.{HCursor, DecodeResult, CodecJson, Argonaut, Json => AJson}, Argonaut._
 
 sealed trait DataFormat extends Product with Serializable
 sealed trait ParsingFormat extends DataFormat
 
 object DataFormat {
   final case class Json(variant: JsonVariant, isPrecise: Boolean) extends ParsingFormat
-  final case class SeparatedValues(config: Config) extends ParsingFormat
+  final case class SeparatedValues(
+      header: Boolean,
+      row1: Char,
+      row2: Char,
+      record: Char,
+      openQuote: Char,
+      closeQuote: Char,
+      escape: Char)
+      extends ParsingFormat
   final case class Compressed(scheme: CompressionScheme, parsing: ParsingFormat) extends DataFormat
+
+  object SeparatedValues {
+    val Default: DataFormat = SeparatedValues(
+      header = true,
+      row1 = '\r',
+      row2 = '\n',
+      record = ',',
+      openQuote = '"',
+      closeQuote = '"',
+      escape = '"')
+  }
 
   sealed trait JsonVariant extends Product with Serializable
   object JsonVariant {
@@ -57,24 +74,16 @@ object DataFormat {
 
   import JsonVariant._
 
-  val legacyDecodeParsingFormat: DecodeJson[ParsingFormat] = DecodeJson { c => c.as[String].flatMap {
-    case "ldjson" => DecodeResult.ok(Json(LineDelimited, false))
-    case "json" => DecodeResult.ok(Json(ArrayWrapped, false))
-    case "array" => DecodeResult.ok(Json(ArrayWrapped, false))
-    case "lineDelimited" => DecodeResult.ok(Json(LineDelimited, false))
-    case other => DecodeResult.fail(s"Unrecognized parsing format: $other", c.history)
-  }}
-
   implicit val codecParsingFormat: CodecJson[ParsingFormat] = CodecJson({
     case Json(v, precise) => AJson(
       "type" := "json",
       "variant" := v,
       "precise" := precise)
-    case SeparatedValues(config) => AJson(
+    case config: SeparatedValues => AJson(
       "type" := "separated-values",
       "header" := config.header,
       "row1" := config.row1.toChar,
-      "row2" := (if (config.row2 === 0.toByte) "" else config.row2.toChar.toString),
+      "row2" := (if (config.row2 === 0.toByte.toChar) "" else config.row2.toChar.toString),
       "record" := config.record.toChar,
       "openQuote" := config.openQuote.toChar,
       "closeQuote" := config.closeQuote.toChar,
@@ -94,28 +103,24 @@ object DataFormat {
         openQuote <- (c --\ "openQuote").as[Char]
         closeQuote <- (c --\ "closeQuote").as[Char]
         escape <- (c --\ "escape").as[Char]
-      } yield SeparatedValues(Config(
+      } yield SeparatedValues(
         header = header,
-        row1 = row1.toByte,
+        row1 = row1,
         row2 = row2.headOption match {
-          case None => 0.toByte
-          case Some(h) => h.toByte
+          case None => 0.toByte.toChar
+          case Some(h) => h
         },
-        record = record.toByte,
-        openQuote = openQuote.toByte,
-        closeQuote = closeQuote.toByte,
-        escape = escape.toByte
-      ))
+        record = record,
+        openQuote = openQuote,
+        closeQuote = closeQuote,
+        escape = escape
+      )
     case other => DecodeResult.fail(s"Unrecognized type field in ParsingType: $other", c.history)
   }))
 
   implicit val codecDataFormat: CodecJson[DataFormat] = {
     def decode(c: HCursor): DecodeResult[DataFormat] = for {
-      parsing <- {
-        (c --\ "jsonParsing").as(legacyDecodeParsingFormat) |||
-        (c --\ "resourceType").as(legacyDecodeParsingFormat) |||
-        (c --\ "format").as[ParsingFormat]
-      }
+      parsing <- (c --\ "format").as[ParsingFormat]
       compression <- (c --\ "compressionScheme").as[Option[CompressionScheme]]
     } yield {
       compression match {
@@ -138,7 +143,14 @@ object DataFormat {
 
   implicit val renderTreeParsingFormat: RenderTree[ParsingFormat] = RenderTree.make {
     case Json(v, precise) => NonTerminal(List("Json"), None, List(v.show.render, precise.render))
-    case SeparatedValues(c) => NonTerminal(List("SeparatedValues"), None, List())
+    case SeparatedValues(header, row1, row2, record, openQuote, closeQuote, escape) => NonTerminal(List("SeparatedValues"), None, List(
+      header.toString.render,
+      row1.toString.render,
+      row2.toString.render,
+      record.toString.render,
+      openQuote.toString.render,
+      closeQuote.toString.render,
+      escape.toString.render))
   }
 
   implicit val renderTreeDataFormat: RenderTree[DataFormat] = RenderTree.make {
@@ -146,11 +158,8 @@ object DataFormat {
     case Compressed(scheme, pt) => NonTerminal(List("Compressed"), None, List(pt.render))
   }
 
-
-  implicit val eqConfig: Eq[Config] = Eq.fromUniversalEquals
   implicit val eqParsingFormat: Eq[ParsingFormat] = Eq.fromUniversalEquals
   implicit val eqDataFormat: Eq[DataFormat] = Eq.fromUniversalEquals
-
 
   def json: DataFormat = Json(ArrayWrapped, false)
   def ldjson: DataFormat = Json(LineDelimited, false)

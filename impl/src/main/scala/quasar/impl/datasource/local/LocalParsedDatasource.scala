@@ -45,7 +45,7 @@ object LocalParsedDatasource {
     EvaluableLocalDatasource[F](LocalParsedType, root) { iRead =>
       val rawBytes =
         io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes)
-      val parsedValues = rawBytes.through(ResultParser.parsableTypePipe(format))
+      val parsedValues = rawBytes.through(ResultParser.typed(format))
 
       QueryResult.parsed[F, A](QDataDecode[A], parsedValues, iRead.stages)
     }

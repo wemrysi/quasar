@@ -35,8 +35,7 @@ import qdata.tectonic.QDataPlate
 import scalaz.syntax.equal._
 
 import tectonic.fs2.StreamParser
-import tectonic.json.{Parser => TParser}
-import tectonic.csv.{Parser => SVParser}
+import tectonic.{json, csv}
 
 object ResultParser {
   val DefaultDecompressionBufferSize: Int = 32768
@@ -47,18 +46,31 @@ object ResultParser {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def parsableTypePipe[F[_]: Sync, A: QDataEncode](format: DataFormat): Pipe[F, Byte, A] = {
+  def typed[F[_]: Sync, A: QDataEncode](format: DataFormat): Pipe[F, Byte, A] = {
     format match {
       case DataFormat.Json(vnt, isPrecise) =>
-        val mode: TParser.Mode = vnt match {
-          case JsonVariant.ArrayWrapped => TParser.UnwrapArray
-          case JsonVariant.LineDelimited => TParser.ValueStream
+        val mode: json.Parser.Mode = vnt match {
+          case JsonVariant.ArrayWrapped => json.Parser.UnwrapArray
+          case JsonVariant.LineDelimited => json.Parser.ValueStream
         }
-        StreamParser(TParser(QDataPlate[F, A, ArrayBuffer[A]](isPrecise), mode))(Chunk.buffer, bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
-      case DataFormat.SeparatedValues(cfg) =>
-        StreamParser(SVParser(QDataPlate[F, A, ArrayBuffer[A]](false), cfg))(Chunk.buffer, bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+        StreamParser(json.Parser(QDataPlate[F, A, ArrayBuffer[A]](isPrecise), mode))(
+          Chunk.buffer,
+          bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+      case sv: DataFormat.SeparatedValues =>
+        val config = csv.Parser.Config(
+          header = sv.header,
+          row1 = sv.row1.toByte,
+          row2 = sv.row2.toByte,
+          record = sv.record.toByte,
+          openQuote = sv.openQuote.toByte,
+          closeQuote = sv.closeQuote.toByte,
+          escape = sv.escape.toByte
+        )
+        StreamParser(csv.Parser(QDataPlate[F, A, ArrayBuffer[A]](false), config))(
+          Chunk.buffer,
+          bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
       case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
-        gzip.decompress[F](DefaultDecompressionBufferSize) andThen parsableTypePipe[F, A](pt)
+        gzip.decompress[F](DefaultDecompressionBufferSize) andThen typed[F, A](pt)
     }
   }
 
@@ -69,7 +81,7 @@ object ResultParser {
           data.map(QData.convert(_)(qdd, QDataEncode[A]))
 
         case QueryResult.Typed(pt, data, _) =>
-          data.through(parsableTypePipe[F, A](pt))
+          data.through(typed[F, A](pt))
 
       }
     if (queryResult.stages === ScalarStages.Id)
