@@ -18,7 +18,6 @@ package quasar.connector
 
 import slamdata.Predef.{Stream => _, _}
 
-import quasar.api.destination.ResultType
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableColumn
 
