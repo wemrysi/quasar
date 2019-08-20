@@ -116,7 +116,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   val awaitS = Stream.sleep_(WorkTime)
 
   def latchGet(s: SignallingRef[IO, String], expected: String): IO[Unit] =
-    s.discrete.filter(Equal[String].equal(_, expected)).take(1).compile.drain.timeout(Timeout)
+    s.discrete.filter(Equal[String].equal(_, expected)).take(1).compile.drain.timeout(Timeout * 2)
 
   def waitForUpdate[K, V](s: SignallingRef[IO, Map[K, V]]): IO[Unit] =
     s.discrete.filter(_.nonEmpty).take(1).compile.drain.timeout(Timeout)
