@@ -76,7 +76,7 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, Strin
     allocatedManager._1
 
   val tables: Tables[IO, UUID, String, String, String] =
-    DefaultTables[IO, UUID, String, String, String](freshId, tableStore, evaluator, manager, lookup, lookupSchema)
+    DefaultTables[IO, UUID, String, String, String](freshId, tableStore, manager, lookup, lookupSchema)
 
   val columns1: List[TableColumn] =
     List(TableColumn("foo1", ColumnType.Number),

@@ -14,17 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.api.push
 
-import slamdata.Predef.{Stream => _, _}
+import slamdata.Predef._
 
-import quasar.api.resource.ResourcePath
-import quasar.api.table.TableColumn
+sealed trait ResultPushError[+T, +D] extends Product with Serializable
 
-import fs2.Stream
+object ResultPushError {
+  sealed trait ExistentialError[+T, +D] extends ResultPushError[T, D]
 
-sealed trait ResultSink[F[_]]
+  final case class DestinationNotFound[D](destinationId: D) extends ExistentialError[Nothing, D]
+  final case class TableNotFound[T](tableId: T) extends ExistentialError[T, Nothing]
 
-object ResultSink {
-  final case class Csv[F[_]](run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => F[Unit]) extends ResultSink[F]
+  final case class FormatNotSupported[D](destinationId: D, format: String) extends ResultPushError[Nothing, D]
+
+  final case class PushAlreadyRunning[T](tableId: T) extends ResultPushError[T, Nothing]
 }

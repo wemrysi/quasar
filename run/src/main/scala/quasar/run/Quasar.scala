@@ -124,7 +124,7 @@ object Quasar extends Logging {
       prepManager <- preparationsManager(sqlEvaluator)
 
       tables =
-        DefaultTables(freshUUID, tableRefs, sqlEvaluator, prepManager, lookupTableData, lookupTableSchema)
+        DefaultTables(freshUUID, tableRefs, prepManager, lookupTableData, lookupTableSchema)
 
     } yield new Quasar(datasources, destinations, tables, sqlEvaluator)
   }

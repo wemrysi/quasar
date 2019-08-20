@@ -15,6 +15,9 @@ def readVersion(path: File): String =
 lazy val fs2GzipVersion = Def.setting[String](
   readVersion(baseDirectory.value / ".." / "fs2-gzip-version"))
 
+lazy val fs2JobVersion = Def.setting[String](
+  readVersion(baseDirectory.value / ".." / "fs2-job-version"))
+
 lazy val qdataVersion = Def.setting[String](
   readVersion(baseDirectory.value / ".." / "qdata-version"))
 
@@ -291,6 +294,7 @@ lazy val impl = project
 
     libraryDependencies ++= Seq(
       "com.slamdata"   %% "fs2-gzip"                 % fs2GzipVersion.value,
+      "com.slamdata"   %% "fs2-job"                  % fs2JobVersion.value,
       "com.slamdata"   %% "qdata-tectonic"           % qdataVersion.value,
       "com.slamdata"   %% "tectonic-fs2"             % tectonicVersion.value,
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,

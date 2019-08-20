@@ -14,20 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.api.destination
 
-import slamdata.Predef.{Byte, List}
+import slamdata.Predef._
 
-import quasar.api.table.TableColumn
+import scalaz.{Equal, Show}
 
-import fs2.Stream
-
-sealed trait ResultType[F[_]] {
-  type T
-}
+sealed trait ResultType extends Product with Serializable
 
 object ResultType {
-  final case class Csv[F[_]]() extends ResultType[F] {
-    type T = (List[TableColumn], Stream[F, Byte])
-  }
+  case object Csv extends ResultType
+
+  implicit def equal: Equal[ResultType] =
+    Equal.equalA[ResultType]
+
+  implicit def show: Show[ResultType] =
+    Show.shows[ResultType] {
+      case ResultType.Csv => "csv"
+    }
 }

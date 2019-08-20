@@ -20,15 +20,12 @@ import slamdata.Predef._
 
 import quasar.api.destination.DestinationError.InitializationError
 import quasar.api.destination.DestinationType
-import quasar.api.resource.ResourcePath
-import quasar.api.table.TableColumn
-import quasar.connector.{Destination, DestinationModule, MonadResourceErr, ResultSink, ResultType}
+import quasar.connector.{Destination, DestinationModule, MonadResourceErr, ResultSink}
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
 import cats.syntax.either._
 import eu.timepit.refined.auto._
-import fs2.Stream
 import scalaz.syntax.applicative._
 import scalaz.{Applicative, NonEmptyList}
 import shims._
@@ -47,11 +44,9 @@ object MockDestinationModule extends DestinationModule {
 class MockDestination[F[_]: Applicative] extends Destination[F] {
   def destinationType: DestinationType =
     MockDestinationModule.destinationType
-  def sinks = NonEmptyList(new MockCsvSink[F])
-}
+  def sinks = NonEmptyList(mockCsvSink)
 
-class MockCsvSink[F[_]: Applicative] extends ResultSink[F] {
-  val resultType = ResultType.Csv()
-  def apply(dst: ResourcePath, result: (List[TableColumn], Stream[F, Byte])): F[Unit] =
-    ().point[F]
+  val mockCsvSink = ResultSink.Csv[F] {
+    case (_, _, _) => ().point[F]
+  }
 }
