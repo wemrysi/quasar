@@ -112,14 +112,16 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   val WorkTime = Duration(400, MILLISECONDS)
   val Timeout = 5 * WorkTime
 
-  val await = IO.sleep(WorkTime)
+  val await = IO.sleep(WorkTime * 2)
   val awaitS = Stream.sleep_(WorkTime)
 
   def latchGet(s: SignallingRef[IO, String], expected: String): IO[Unit] =
-    s.discrete.filter(Equal[String].equal(_, expected)).take(1).compile.drain.timeout(Timeout * 2)
+    s.discrete.filter(Equal[String].equal(_, expected)).take(1).compile.drain
+      .timeoutTo(Timeout * 2, IO.raiseError(new Exception("latchGet timed out")))
 
   def waitForUpdate[K, V](s: SignallingRef[IO, Map[K, V]]): IO[Unit] =
-    s.discrete.filter(_.nonEmpty).take(1).compile.drain.timeout(Timeout)
+    s.discrete.filter(_.nonEmpty).take(1).compile.drain
+      .timeoutTo(Timeout, IO.raiseError(new Exception("waitForUpdate timed out")))
 
   /* Runs `io` with a timeout, producing a failing expectation if `io`
      completes before the timeout. errMsg is included with the failing expectation. */
@@ -256,9 +258,11 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       for {
         (destination, filesystem) <- RefDestination()
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
+        sync <- SignallingRef[IO, String]("Not started")
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
-          Stream.raiseError[IO](ex)))
+          Stream.eval_(sync.set("Started")) ++ Stream.raiseError[IO](ex)))
         _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+        _ <- latchGet(sync, "Started")
         _ <- await // wait for error handling
         pushStatus <- push.status(TableId)
         _ <- cleanup
