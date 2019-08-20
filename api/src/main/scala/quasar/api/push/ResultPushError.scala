@@ -28,6 +28,5 @@ object ResultPushError {
 
   final case class FormatNotSupported[D](destinationId: D, format: String) extends ResultPushError[Nothing, D]
 
-  final case class StatusUnknown[T](tableId: T) extends ResultPushError[T, Nothing]
   final case class PushAlreadyRunning[T](tableId: T) extends ResultPushError[T, Nothing]
 }

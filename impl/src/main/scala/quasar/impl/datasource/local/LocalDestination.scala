@@ -40,8 +40,7 @@ final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] priva
     NonEmptyList(csvSink(root, blockingContext))
 
   private def csvSink(root: JPath, blockingContext: BlockingContext): ResultSink[F] =
-    ResultSink.Csv[F] {
-      case (dst, columns, bytes) =>
+    ResultSink.Csv[F]((dst, columns, bytes) =>
         resolvedResourcePath[F](root, dst) >>= {
           case Some(writePath) =>
             val fileSink = io.file.writeAll[F](writePath, blockingContext.unwrap)
@@ -50,8 +49,7 @@ final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] priva
 
           case None =>
             MonadResourceErr[F].raiseError(ResourceError.notAResource(dst))
-        }
-    }
+        })
 }
 
 object LocalDestination {
