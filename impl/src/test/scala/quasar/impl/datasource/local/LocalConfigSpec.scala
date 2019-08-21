@@ -45,7 +45,7 @@ object LocalConfigSpec extends quasar.Qspec {
         LocalConfig(
           "/data",
           2048,
-          DataFormat.compressed(DataFormat.json))
+          DataFormat.gzipped(DataFormat.json))
 
       Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
     }
@@ -148,13 +148,13 @@ object LocalConfigSpec extends quasar.Qspec {
         LocalConfig(
           "/data",
           LocalConfig.DefaultReadChunkSizeBytes,
-          DataFormat.compressed(DataFormat.json))
+          DataFormat.gzipped(DataFormat.json))
 
       val exp1 =
         LocalConfig(
           "/data",
           LocalConfig.DefaultReadChunkSizeBytes,
-          DataFormat.compressed(DataFormat.json))
+          DataFormat.gzipped(DataFormat.json))
 
       Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
     }

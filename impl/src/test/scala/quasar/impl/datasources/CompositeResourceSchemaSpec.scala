@@ -126,7 +126,7 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
   "computes an SST of gzipped data" >>* {
     val gzippedResult =
       QueryResult.Typed[IO](
-        DataFormat.compressed(DataFormat.ldjson),
+        DataFormat.gzipped(DataFormat.ldjson),
         unparsedResult.data.through(gzip.compress[IO](50)),
         ScalarStages.Id)
 

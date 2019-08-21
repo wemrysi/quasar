@@ -115,7 +115,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       LocalParsedDatasource[IO, RValue](
         Paths.get("./impl/src/test/resources"),
         1024,
-        DataFormat.compressed(DataFormat.precise(DataFormat.json)),
+        DataFormat.gzipped(DataFormat.precise(DataFormat.json)),
         blockingPool)
 
     val iread =
