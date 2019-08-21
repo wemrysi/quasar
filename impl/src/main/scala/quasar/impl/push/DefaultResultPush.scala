@@ -22,7 +22,7 @@ import quasar.Condition
 import quasar.connector.{Destination, ResultSink}
 import quasar.api.QueryEvaluator
 import quasar.api.destination.ResultType
-import quasar.api.push.{ResultPush, ResultPushError, Status}
+import quasar.api.push.{ResultPush, ResultPushError, ResultRender, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
 
@@ -51,7 +51,7 @@ class DefaultResultPush[
     evaluator: QueryEvaluator[F, Q, R],
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, T, Nothing],
-    convertToCsv: R => Stream[F, Byte],
+    render: ResultRender[F, R],
     pushStatus: Map[T, Status])
     extends ResultPush[F, T, D] {
   import ResultPushError._
@@ -78,7 +78,11 @@ class DefaultResultPush[
       query = tableRef.query
       columns = tableRef.columns
 
-      evaluated <- EitherT.rightT(evaluator.evaluate(query).map(convertToCsv))
+      evaluated <- EitherT.rightT(format match {
+        case ResultType.Csv =>
+          evaluator.evaluate(query).map(render.renderCsv(_, columns))
+      })
+
       sinked = Stream.eval(sink.run(path, columns, evaluated)).map(Right(_))
 
       now <- EitherT.rightT(instantNow)
@@ -137,7 +141,7 @@ object DefaultResultPush {
     evaluator: QueryEvaluator[F, Q, R],
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, T, Nothing],
-    convertToCsv: R => Stream[F, Byte]
+    render: ResultRender[F, R]
   ): F[DefaultResultPush[F, T, D, Q, R]] = {
     for {
       pushStatus <- Concurrent[F].delay(new ConcurrentHashMap[T, Status]())
@@ -157,7 +161,7 @@ object DefaultResultPush {
               epochToInstant(start.epoch),
               epochToInstant(start.epoch + duration))))
       }).compile.drain)
-    } yield new DefaultResultPush(lookupTable, evaluator, lookupDestination, jobManager, convertToCsv, pushStatus)
+    } yield new DefaultResultPush(lookupTable, evaluator, lookupDestination, jobManager, render, pushStatus)
   }
 
   private def epochToInstant(e: FiniteDuration): Instant =
