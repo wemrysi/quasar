@@ -45,11 +45,7 @@ import quasar.qsu.minimizers.Minimizer
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 
-import monocle.syntax.fields._1
-
-import scalaz.{@@, Bind, Equal, Monad, OptionT, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
-import scalaz.Tags.Disjunction
-import scalaz.syntax.tag._
+import scalaz.{Bind, Equal, Monad, OptionT, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
 
 sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends MraPhase[T] {
   import MinimizeAutoJoins._
@@ -105,20 +101,14 @@ sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: Re
       branches: List[QSUGraph],
       combiner: FreeMapA[Int]): G[Option[QSUGraph]] = {
 
-    val grpSym = IdAccess.groupKey composeLens _1
-
-    def wasGrouped(s: Symbol, p: P): Boolean = {
-      import shims._
-      qprov.foldMapVectorIds[Boolean @@ Disjunction]((i, _) =>
-        Disjunction(grpSym.exist(_ === s)(i)))(p).unwrap
-    }
-
     for {
       state <- MinStateM[T, P, G].get
 
+      grouped = state.auth.groupKeys.keySet.map(_._1)
+
       fms = branches map { g =>
         /* Halt coalescing if this graph was grouped, to ensure joining on group keys works */
-        MappableRegion[T](s => state.auth.lookupDims(s).exists(wasGrouped(s, _)), g)
+        MappableRegion[T](grouped, g)
       }
 
       sources = fms.flatMap(_.toList).zipWithIndex
