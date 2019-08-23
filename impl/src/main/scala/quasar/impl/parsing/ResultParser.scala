@@ -19,8 +19,7 @@ package quasar.impl.parsing
 import slamdata.Predef._
 
 import quasar.ScalarStages
-import quasar.connector.{CompressionScheme, ParsableType, QueryResult}
-import quasar.connector.ParsableType.JsonVariant
+import quasar.connector.{CompressionScheme, QueryResult, DataFormat}, DataFormat.JsonVariant
 
 import java.lang.IllegalArgumentException
 
@@ -28,7 +27,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import cats.effect.Sync
 
-import fs2.{gzip, Chunk, Stream}
+import fs2.{gzip, Chunk, Stream, Pipe}
 
 import qdata.{QData, QDataEncode}
 import qdata.tectonic.QDataPlate
@@ -36,41 +35,55 @@ import qdata.tectonic.QDataPlate
 import scalaz.syntax.equal._
 
 import tectonic.fs2.StreamParser
-import tectonic.json.{Parser => TParser}
+import tectonic.{json, csv}
 
 object ResultParser {
   val DefaultDecompressionBufferSize: Int = 32768
 
-  def apply[F[_]: Sync, A: QDataEncode](queryResult: QueryResult[F]): Stream[F, A] = {
-    def concatArrayBufs(bufs: List[ArrayBuffer[A]]): ArrayBuffer[A] = {
-      val totalSize = bufs.foldLeft(0)(_ + _.length)
-      bufs.foldLeft(new ArrayBuffer[A](totalSize))(_ ++= _)
-    }
+  private def concatArrayBufs[A](bufs: List[ArrayBuffer[A]]): ArrayBuffer[A] = {
+    val totalSize = bufs.foldLeft(0)(_ + _.length)
+    bufs.foldLeft(new ArrayBuffer[A](totalSize))(_ ++= _)
+  }
 
-    @tailrec
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def typed[F[_]: Sync, A: QDataEncode](format: DataFormat): Pipe[F, Byte, A] = {
+    format match {
+      case DataFormat.Json(vnt, isPrecise) =>
+        val mode: json.Parser.Mode = vnt match {
+          case JsonVariant.ArrayWrapped => json.Parser.UnwrapArray
+          case JsonVariant.LineDelimited => json.Parser.ValueStream
+        }
+        StreamParser(json.Parser(QDataPlate[F, A, ArrayBuffer[A]](isPrecise), mode))(
+          Chunk.buffer,
+          bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+      case sv: DataFormat.SeparatedValues =>
+        val config = csv.Parser.Config(
+          header = sv.header,
+          row1 = sv.row1.toByte,
+          row2 = sv.row2.toByte,
+          record = sv.record.toByte,
+          openQuote = sv.openQuote.toByte,
+          closeQuote = sv.closeQuote.toByte,
+          escape = sv.escape.toByte
+        )
+        StreamParser(csv.Parser(QDataPlate[F, A, ArrayBuffer[A]](false), config))(
+          Chunk.buffer,
+          bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+      case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
+        gzip.decompress[F](DefaultDecompressionBufferSize) andThen typed[F, A](pt)
+    }
+  }
+
+  def apply[F[_]: Sync, A: QDataEncode](queryResult: QueryResult[F]): Stream[F, A] = {
     def parsedStream(qr: QueryResult[F]): Stream[F, A] =
       qr match {
         case QueryResult.Parsed(qdd, data, _) =>
           data.map(QData.convert(_)(qdd, QDataEncode[A]))
 
-        case QueryResult.Compressed(CompressionScheme.Gzip, content) =>
-          parsedStream(content.modifyBytes(gzip.decompress[F](DefaultDecompressionBufferSize)))
+        case QueryResult.Typed(pt, data, _) =>
+          data.through(typed[F, A](pt))
 
-        case QueryResult.Typed(js @ ParsableType.Json(vnt, isPrecise), data, _) =>
-          val mode: TParser.Mode = vnt match {
-            case JsonVariant.ArrayWrapped => TParser.UnwrapArray
-            case JsonVariant.LineDelimited => TParser.ValueStream
-          }
-
-          val parser =
-            TParser(QDataPlate[F, A, ArrayBuffer[A]](isPrecise), mode)
-
-          val parserPipe =
-            StreamParser(parser)(Chunk.buffer, bufs => Chunk.buffer(concatArrayBufs(bufs)))
-
-          data.through(parserPipe)
       }
-
     if (queryResult.stages === ScalarStages.Id)
       parsedStream(queryResult)
     else

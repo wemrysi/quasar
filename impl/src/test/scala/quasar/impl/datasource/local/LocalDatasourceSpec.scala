@@ -26,7 +26,7 @@ import quasar.ScalarStages
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.common.data.RValue
 import quasar.concurrent.BlockingContext
-import quasar.connector._, ParsableType.JsonVariant
+import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.κ
 import quasar.qscript.InterpretedRead
@@ -80,8 +80,7 @@ object LocalDatasourceSpec extends LocalDatasourceSpec {
     LocalDatasource[IO](
       Paths.get("./impl/src/test/resources"),
       1024,
-      ParsableType.json(JsonVariant.LineDelimited, true),
-      None,
+      DataFormat.precise(DataFormat.ldjson),
       blockingPool)
 }
 
@@ -92,8 +91,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
     LocalParsedDatasource[IO, RValue](
       Paths.get("./impl/src/test/resources"),
       1024,
-      ParsableType.json(JsonVariant.LineDelimited, true),
-      None,
+      DataFormat.precise(DataFormat.ldjson),
       blockingPool)
 
   "parses array-wrapped JSON" >>* {
@@ -101,8 +99,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       LocalParsedDatasource[IO, RValue](
         Paths.get("./impl/src/test/resources"),
         1024,
-        ParsableType.json(JsonVariant.ArrayWrapped, true),
-        None,
+        DataFormat.precise(DataFormat.json),
         blockingPool)
 
     val iread =
@@ -118,12 +115,25 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       LocalParsedDatasource[IO, RValue](
         Paths.get("./impl/src/test/resources"),
         1024,
-        ParsableType.json(JsonVariant.ArrayWrapped, true),
-        Some(CompressionScheme.Gzip),
+        DataFormat.gzipped(DataFormat.precise(DataFormat.json)),
         blockingPool)
 
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.gz"), ScalarStages.Id)
+
+    ds.evaluate(iread)
+      .flatMap(_.data.foldMap(κ(1)).compile.lastOrError)
+      .map(_ must_=== 100)
+  }
+
+  "parses csv" >>* {
+    val ds = LocalParsedDatasource[IO, RValue](
+      Paths.get("./impl/src/test/resources"),
+      1024,
+      DataFormat.SeparatedValues.Default,
+      blockingPool)
+    val iread =
+      InterpretedRead(ResourcePath.root() / ResourceName("smallZips.csv"), ScalarStages.Id)
 
     ds.evaluate(iread)
       .flatMap(_.data.foldMap(κ(1)).compile.lastOrError)

@@ -23,7 +23,7 @@ import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.connector._
-import quasar.connector.ParsableType.JsonVariant
+import quasar.connector.DataFormat
 import quasar.contrib.fs2.stream._
 import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.implicits._
@@ -105,7 +105,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
     EmptyDatasource[F, Stream[F, ?], Q, QueryResult[F], P](
       kind,
       QueryResult.typed(
-        ParsableType.Json(JsonVariant.LineDelimited, false),
+        DataFormat.ldjson,
         Stream.empty,
         ScalarStages.Id))
 
