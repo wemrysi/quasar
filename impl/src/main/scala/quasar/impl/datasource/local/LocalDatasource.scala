@@ -34,8 +34,7 @@ object LocalDatasource {
   def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer](
       root: JPath,
       readChunkSizeBytes: Int,
-      format: ParsableType,
-      compressionScheme: Option[CompressionScheme],
+      format: DataFormat,
       blockingPool: BlockingContext)
       : DS[F] = {
 
@@ -43,10 +42,7 @@ object LocalDatasource {
       val content =
         io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes)
 
-      val typedResult =
-        QueryResult.typed(format, content, iRead.stages)
-
-      compressionScheme.fold(typedResult)(QueryResult.compressed(_, typedResult))
+      QueryResult.typed(format, content, iRead.stages)
     }
   }
 }
