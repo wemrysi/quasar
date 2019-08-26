@@ -76,14 +76,14 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       } yield (destination, fs)
   }
 
-  final class MockResultRender extends ResultRender[IO, Stream[IO, String]] {
-    def renderCsv(input: Stream[IO, String], columns: List[TableColumn]): Stream[IO, Byte] =
-      input.through(text.utf8Encode)
+  final class MockResultRender extends ResultRender[IO, String] {
+    def renderCsv(input: String, columns: List[TableColumn]): Stream[IO, Byte] =
+      Stream(input).through(text.utf8Encode)
 
-    def renderLdJson(input: Stream[IO, String]): Stream[IO, Byte] =
+    def renderLdJson(input: String): Stream[IO, Byte] =
       Stream.empty
 
-    def renderJson(input: Stream[IO, String]): Stream[IO, Byte] =
+    def renderJson(input: String): Stream[IO, Byte] =
       Stream.empty
   }
 
@@ -108,7 +108,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     val render = new MockResultRender
 
-    DefaultResultPush[IO, Int, Int, String, Stream[IO, String]](
+    DefaultResultPush[IO, Int, Int, String, String](
       lookupTable,
       evaluator,
       lookupDestination,

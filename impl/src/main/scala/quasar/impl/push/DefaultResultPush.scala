@@ -48,7 +48,7 @@ import shims._
 class DefaultResultPush[
   F[_]: Concurrent: Timer, T, D, Q, R] private (
     lookupTable: T => F[Option[TableRef[Q]]],
-    evaluator: QueryEvaluator[F, Q, R],
+    evaluator: QueryEvaluator[F, Q, Stream[F, R]],
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, T, Nothing],
     render: ResultRender[F, R],
@@ -80,7 +80,7 @@ class DefaultResultPush[
 
       evaluated <- EitherT.rightT(format match {
         case ResultType.Csv =>
-          evaluator.evaluate(query).map(render.renderCsv(_, columns))
+          evaluator.evaluate(query).map(_.flatMap(render.renderCsv(_, columns)))
       })
 
       sinked = Stream.eval(sink.run(path, columns, evaluated)).map(Right(_))
@@ -138,7 +138,7 @@ class DefaultResultPush[
 object DefaultResultPush {
   def apply[F[_]: Concurrent: Timer, T, D, Q, R](
     lookupTable: T => F[Option[TableRef[Q]]],
-    evaluator: QueryEvaluator[F, Q, R],
+    evaluator: QueryEvaluator[F, Q, Stream[F, R]],
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, T, Nothing],
     render: ResultRender[F, R]
