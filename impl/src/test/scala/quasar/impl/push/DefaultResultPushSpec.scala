@@ -80,10 +80,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     def renderCsv(input: String, columns: List[TableColumn]): Stream[IO, Byte] =
       Stream(input).through(text.utf8Encode)
 
-    def renderLdJson(input: String): Stream[IO, Byte] =
-      Stream.empty
-
-    def renderJson(input: String): Stream[IO, Byte] =
+    def renderJson(input: String, prefix: String, delimiter: String, suffix: String): Stream[IO, Byte] =
       Stream.empty
   }
 

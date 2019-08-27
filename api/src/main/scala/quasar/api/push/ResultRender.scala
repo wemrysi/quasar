@@ -16,7 +16,7 @@
 
 package quasar.api.push
 
-import slamdata.Predef.{Byte, List}
+import slamdata.Predef.{Byte, List, String}
 
 import quasar.api.table.TableColumn
 
@@ -24,6 +24,5 @@ import fs2.Stream
 
 trait ResultRender[F[_], I] {
   def renderCsv(input: I, columns: List[TableColumn]): Stream[F, Byte]
-  def renderLdJson(input: I): Stream[F, Byte]
-  def renderJson(input: I): Stream[F, Byte]
+  def renderJson(input: I, prefix: String, delimiter: String, suffix: String): Stream[F, Byte]
 }
