@@ -21,10 +21,10 @@ import slamdata.Predef._
 import quasar.api.QueryEvaluator
 import quasar.api.destination.DestinationType
 import quasar.api.destination.ResultType
-import quasar.api.push.{ResultPush, ResultPushError, Status}
+import quasar.api.push.{ResultPush, ResultPushError, ResultRender, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
-import quasar.api.table.{TableName, TableRef}
+import quasar.api.table.{TableColumn, TableName, TableRef}
 import quasar.connector.{Destination, ResultSink}
 import quasar.{ConditionMatchers, EffectfulQSpec}
 
@@ -76,8 +76,13 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       } yield (destination, fs)
   }
 
-  def convert(st: Stream[IO, String]): Stream[IO, Byte] =
-    st.through(text.utf8Encode)
+  final class MockResultRender extends ResultRender[IO, String] {
+    def renderCsv(input: String, columns: List[TableColumn]): Stream[IO, Byte] =
+      Stream(input).through(text.utf8Encode)
+
+    def renderJson(input: String, prefix: String, delimiter: String, suffix: String): Stream[IO, Byte] =
+      Stream.empty
+  }
 
   def mkEvaluator(fn: String => Stream[IO, String]): QueryEvaluator[IO, String, Stream[IO, String]] =
     new QueryEvaluator[IO, String, Stream[IO, String]] {
@@ -98,12 +103,14 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     val lookupDestination: Int => IO[Option[Destination[IO]]] =
       destinationId => IO(destinations.get(destinationId))
 
-    DefaultResultPush[IO, Int, Int, String, Stream[IO, String]](
+    val render = new MockResultRender
+
+    DefaultResultPush[IO, Int, Int, String, String](
       lookupTable,
       evaluator,
       lookupDestination,
       manager,
-      convert)
+      render)
   }
 
   def mockEvaluate(q: String): String =

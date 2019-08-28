@@ -22,7 +22,7 @@ import quasar.Condition
 import quasar.connector.{Destination, ResultSink}
 import quasar.api.QueryEvaluator
 import quasar.api.destination.ResultType
-import quasar.api.push.{ResultPush, ResultPushError, Status}
+import quasar.api.push.{ResultPush, ResultPushError, ResultRender, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
 
@@ -48,10 +48,10 @@ import shims._
 class DefaultResultPush[
   F[_]: Concurrent: Timer, T, D, Q, R] private (
     lookupTable: T => F[Option[TableRef[Q]]],
-    evaluator: QueryEvaluator[F, Q, R],
+    evaluator: QueryEvaluator[F, Q, Stream[F, R]],
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, T, Nothing],
-    convertToCsv: R => Stream[F, Byte],
+    render: ResultRender[F, R],
     pushStatus: Map[T, Status])
     extends ResultPush[F, T, D] {
   import ResultPushError._
@@ -78,7 +78,11 @@ class DefaultResultPush[
       query = tableRef.query
       columns = tableRef.columns
 
-      evaluated <- EitherT.rightT(evaluator.evaluate(query).map(convertToCsv))
+      evaluated <- EitherT.rightT(format match {
+        case ResultType.Csv =>
+          evaluator.evaluate(query).map(_.flatMap(render.renderCsv(_, columns)))
+      })
+
       sinked = Stream.eval(sink.run(path, columns, evaluated)).map(Right(_))
 
       now <- EitherT.rightT(instantNow)
@@ -134,10 +138,10 @@ class DefaultResultPush[
 object DefaultResultPush {
   def apply[F[_]: Concurrent: Timer, T, D, Q, R](
     lookupTable: T => F[Option[TableRef[Q]]],
-    evaluator: QueryEvaluator[F, Q, R],
+    evaluator: QueryEvaluator[F, Q, Stream[F, R]],
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, T, Nothing],
-    convertToCsv: R => Stream[F, Byte]
+    render: ResultRender[F, R]
   ): F[DefaultResultPush[F, T, D, Q, R]] = {
     for {
       pushStatus <- Concurrent[F].delay(new ConcurrentHashMap[T, Status]())
@@ -157,7 +161,7 @@ object DefaultResultPush {
               epochToInstant(start.epoch),
               epochToInstant(start.epoch + duration))))
       }).compile.drain)
-    } yield new DefaultResultPush(lookupTable, evaluator, lookupDestination, jobManager, convertToCsv, pushStatus)
+    } yield new DefaultResultPush(lookupTable, evaluator, lookupDestination, jobManager, render, pushStatus)
   }
 
   private def epochToInstant(e: FiniteDuration): Instant =
