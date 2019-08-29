@@ -248,22 +248,23 @@ sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: Re
 
         back <- resultM traverse {
           case (retarget, result) =>
-            updateForCoalesce[G](multiple, retarget.root) as result
+            updateForCoalesce[G](multiple, retarget) as result
         }
       } yield back
   }
 
   private def updateForCoalesce[G[_]: Bind: MinStateM[T, P, ?[_]]](
       candidates: List[QSUGraph],
-      newRoot: Symbol): G[Unit] = {
+      replacement: QSUGraph)
+      : G[Unit] = {
+
+    val reachable = replacement.foldMapDown(g => Set(g.root)) + replacement.root
+    val toRename = candidates.map(_.root).toSet.filter(!reachable(_))
 
     MinStateM[T, P, G] modify { state =>
-      val auth2 = candidates.foldLeft(state.auth) { (auth, c) =>
-        if (c.root =/= newRoot)
-          QAuth.dims[T, P].modify(_.mapValues(B.rename(c.root, newRoot, _)))(auth)
-        else
-          auth
-      }
+      val auth2 = QAuth.dims[T, P].modify(_ map {
+        case (k, p) => (k, B.modifySymbols(p)(s => if (toRename(s)) replacement.root else s))
+      })(state.auth)
 
       state.copy(auth = auth2)
     }

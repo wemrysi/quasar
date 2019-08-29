@@ -49,10 +49,11 @@ import Path.Sandboxed
 import scalaz.{\/-, EitherT, Free, Need, StateT}
 import scalaz.std.anyVal._
 import scalaz.syntax.std.boolean._
+import scalaz.syntax.equal._
 import scalaz.syntax.tag._
 //import scalaz.syntax.show._
 
-import shims.{eqToScalaz, orderToCats, orderToScalaz, showToCats, showToScalaz}
+import shims.{eqToScalaz, monoidToCats, orderToCats, orderToScalaz, showToCats, showToScalaz}
 
 object MinimizeAutoJoinsSpec
     extends Qspec
@@ -588,6 +589,38 @@ object MinimizeAutoJoinsSpec
               func.MakeMapS("1", func.RightSide)))
 
           prjPop must beTreeEqual(func.ProjectKeyS(func.Hole, "pop"))
+      }
+    }
+
+    "avoid renaming dimensions when coalesced node appears on both sides" in {
+      val ann = QScriptUniform.AnnotatedDsl[Fix, Symbol]
+
+      val read =
+        ann.read('read1, (afile, ExcludeId))
+
+      val tree =
+        ann.autojoin2(('n0, (
+          ann.map(('n1, (
+            read,
+            recFunc.ProjectKeyS(recFunc.Hole, "b")))),
+          ann.transpose(('n2, (
+            ann.map(('n3, (
+              read,
+              recFunc.ProjectKeyS(recFunc.Hole, "a")))),
+            Retain.Values,
+            Rotation.ShiftArray))),
+          _(MapFuncsCore.ConcatMaps(_, _)))))
+
+      val (rename, qgraph) =
+        QSUGraph.fromAnnotatedTree[Fix](tree.map(Some(_)))
+
+      val AuthenticatedQSU(agraph, auth) = runOn_(qgraph)
+
+      auth.dims exists {
+        case (_, p) =>
+          qprov.foldMapVectorIds {
+            case (id, _) => IdAccess.symbols.exist(_ ≟ rename('read1))(id).disjunction
+          }(p).unwrap
       }
     }
 
