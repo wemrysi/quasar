@@ -81,9 +81,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       CatchTranspose[T, qprov.P]             >==>
       debug("CatchTranspose")                >==>
       ReifyAutoJoins[T, F](qprov)            >==>
-      debug("ReifyAutoJoins")                >-
-      agraph.modify(ResolveOwnIdentities[T]) >==>
-      debug("ResolveOwnIdentities")          >==>
+      debug("ReifyAutoJoins")                >==>
       ReifyIdentities[T, F]                  >==>
       debug("ReifyIdentities")               >==>
       Graduate[T, F]

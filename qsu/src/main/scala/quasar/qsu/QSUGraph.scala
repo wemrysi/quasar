@@ -24,7 +24,7 @@ import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp._
 import quasar.fp.ski.κ
-import quasar.qscript.{FreeMapA, OnUndefined, RecFreeMap}
+import quasar.qscript.{JoinFunc, OnUndefined, RecFreeMap}
 
 import monocle.macros.Lenses
 import matryoshka._
@@ -483,7 +483,7 @@ object QSUGraph extends QSUGraphInstances {
     }
 
     object LeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], RecFreeMap[T], IdStatus, OnUndefined, FreeMapA[T, QSU.ShiftTarget], QSU.Rotation)] = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], RecFreeMap[T], IdStatus, OnUndefined, JoinFunc[T], QSU.Rotation)] = g.unfold match {
         case g: QSU.LeftShift[T, QSUGraph[T]] => QSU.LeftShift.unapply(g)
         case _ => None
       }

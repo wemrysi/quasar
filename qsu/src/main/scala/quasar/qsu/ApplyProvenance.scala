@@ -171,17 +171,11 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
             shiftedDims
           else
             applyFuncProvenanceN(repair flatMap {
-              case ShiftTarget.LeftTarget =>
+              case LeftSide =>
                 Free.pure(0)
 
-              case ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
-                Free.pure(0)
-
-              case ShiftTarget.RightTarget =>
+              case RightSide =>
                 Free.pure(1)
-
-              case _ =>
-                func.Undefined
             })(sdims, applyIdStatus(idStatus, shiftedDims))
         }
 

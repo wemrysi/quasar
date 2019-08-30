@@ -80,7 +80,7 @@ object CatchTransposeSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           Rotation.ShiftMap) =>
 
         struct must beTreeEqual(rec.Hole)
-        repair must beTreeEqual(RightTarget[Fix])
+        repair must beTreeEqual(func.RightSide)
       }
     }
 
@@ -98,7 +98,7 @@ object CatchTransposeSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           Rotation.FlattenArray) =>
 
         struct must beTreeEqual(rec.Hole)
-        repair must beTreeEqual(RightTarget[Fix])
+        repair must beTreeEqual(func.RightSide)
       }
     }
 
@@ -128,10 +128,10 @@ object CatchTransposeSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           MapFuncsCore.ConcatMaps(LeftSide, RightSide)) =>
 
         structA must beTreeEqual(rec.Hole)
-        repairA must beTreeEqual(RightTarget[Fix])
+        repairA must beTreeEqual(func.RightSide)
 
         structB must beTreeEqual(rec.Hole)
-        repairB must beTreeEqual(RightTarget[Fix])
+        repairB must beTreeEqual(func.RightSide)
       }
     }
 
@@ -159,8 +159,8 @@ object CatchTransposeSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
         repair must beTreeEqual(
           func.StaticMapS(
-            "foo" -> func.ProjectKeyS(RightTarget[Fix], "foo"),
-            "bar" -> func.ProjectKeyS(RightTarget[Fix], "bar")))
+            "foo" -> func.ProjectKeyS(func.RightSide, "foo"),
+            "bar" -> func.ProjectKeyS(func.RightSide, "bar")))
       }
     }
 
@@ -184,7 +184,7 @@ object CatchTransposeSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
         struct must beTreeEqual(rec.ProjectKeyS(rec.Hole, "foo"))
 
-        repair must beTreeEqual(RightTarget[Fix])
+        repair must beTreeEqual(func.RightSide)
       }
     }
 
@@ -214,8 +214,8 @@ object CatchTransposeSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
         repair must beTreeEqual(
           func.StaticMapS(
-            "foo" -> func.ProjectKeyS(RightTarget[Fix], "foo"),
-            "bar" -> func.ProjectKeyS(RightTarget[Fix], "bar")))
+            "foo" -> func.ProjectKeyS(func.RightSide, "foo"),
+            "bar" -> func.ProjectKeyS(func.RightSide, "bar")))
       }
     }
 
@@ -255,8 +255,8 @@ object CatchTransposeSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
         repair must beTreeEqual(
           func.StaticMapS(
-            "foo" -> func.ProjectKeyS(RightTarget[Fix], "foo"),
-            "bar" -> func.ProjectKeyS(RightTarget[Fix], "bar")))
+            "foo" -> func.ProjectKeyS(func.RightSide, "foo"),
+            "bar" -> func.ProjectKeyS(func.RightSide, "bar")))
       }
     }
   }
