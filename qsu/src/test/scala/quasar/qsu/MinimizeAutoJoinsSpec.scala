@@ -2233,7 +2233,6 @@ object MinimizeAutoJoinsSpec
   def haveShiftCount(count: Int): Matcher[QSUGraph] = { graph: QSUGraph =>
     val actual = graph.foldMapUp {
       case LeftShift(_, _, _, _, _, _) => 1
-      case MultiLeftShift(_, ss, _, _) => ss.length
       case _ => 0
     }
 
