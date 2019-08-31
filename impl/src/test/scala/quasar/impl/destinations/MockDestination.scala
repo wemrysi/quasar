@@ -19,8 +19,8 @@ package quasar.impl.destinations
 import slamdata.Predef._
 
 import quasar.api.destination.DestinationError.InitializationError
-import quasar.api.destination.DestinationType
-import quasar.connector.{Destination, DestinationModule, MonadResourceErr, ResultSink}
+import quasar.api.destination.{Destination, DestinationType, ResultSink}
+import quasar.connector.{DestinationModule, MonadResourceErr}
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}

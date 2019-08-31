@@ -14,17 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.api.destination
 
-import slamdata.Predef.{Stream => _, _}
+import scalaz.NonEmptyList
 
-import quasar.api.resource.ResourcePath
-import quasar.api.table.TableColumn
+trait Destination[F[_]] {
+  def destinationType: DestinationType
 
-import fs2.Stream
-
-sealed trait ResultSink[F[_]]
-
-object ResultSink {
-  final case class Csv[F[_]](run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => F[Unit]) extends ResultSink[F]
+  def sinks: NonEmptyList[ResultSink[F]]
 }

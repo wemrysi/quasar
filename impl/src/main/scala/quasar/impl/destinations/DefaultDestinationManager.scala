@@ -18,11 +18,9 @@ package quasar.impl.destinations
 
 import slamdata.Predef._
 
-import quasar.Condition
-import quasar.api.destination.DestinationError
 import quasar.api.destination.DestinationError.CreateError
-import quasar.api.destination.{DestinationRef, DestinationType}
-import quasar.connector.{Destination, DestinationModule, MonadResourceErr}
+import quasar.api.destination.{Destination, DestinationError, DestinationRef, DestinationType}
+import quasar.connector.{DestinationModule, MonadResourceErr}
 import quasar.impl.IncompatibleModuleException.linkDestination
 
 import argonaut.Json
@@ -33,7 +31,7 @@ import scalaz.std.option._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.either._
 import scalaz.syntax.unzip._
-import scalaz.{EitherT, IMap, ISet, OptionT, Order}
+import scalaz.{EitherT, IMap, ISet, OptionT, Order, \/}
 import shims._
 
 class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer] (
@@ -42,7 +40,7 @@ class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: 
   currentErrors: Ref[F, IMap[I, Exception]]) extends DestinationManager[I, Json, F] {
 
   def initDestination(destinationId: I, ref: DestinationRef[Json])
-      : F[Condition[CreateError[Json]]] =
+      : F[CreateError[Json] \/ Destination[F]] =
     (for {
       supported <- EitherT.rightT(supportedDestinationTypes)
 
@@ -60,7 +58,7 @@ class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: 
 
       added <- EitherT.rightT(
         running.update(r => r.insert(destinationId, (dest, disposeM))))
-    } yield added).run.map(Condition.disjunctionIso.reverseGet(_))
+    } yield dest).run
 
   def destinationOf(destinationId: I): F[Option[Destination[F]]] =
     running.get.map(_.lookup(destinationId).firsts)

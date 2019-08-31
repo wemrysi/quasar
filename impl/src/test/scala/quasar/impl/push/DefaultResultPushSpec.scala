@@ -19,13 +19,11 @@ package quasar.impl.push
 import slamdata.Predef._
 
 import quasar.api.QueryEvaluator
-import quasar.api.destination.DestinationType
-import quasar.api.destination.ResultType
+import quasar.api.destination.{Destination, DestinationType, ResultSink, ResultType}
 import quasar.api.push.{ResultPush, ResultPushError, ResultRender, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
 import quasar.api.table.{TableColumn, TableName, TableRef}
-import quasar.connector.{Destination, ResultSink}
 import quasar.{ConditionMatchers, EffectfulQSpec}
 
 import scala.concurrent.ExecutionContext.Implicits.global

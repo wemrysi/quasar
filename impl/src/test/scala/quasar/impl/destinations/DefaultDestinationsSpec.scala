@@ -19,8 +19,8 @@ package quasar.impl.destinations
 import slamdata.Predef.{Stream => _, _}
 
 import quasar.{Condition, ConditionMatchers}
-import quasar.api.destination.{DestinationError, DestinationMeta, DestinationName, DestinationRef, DestinationType, Destinations}
-import quasar.connector.{Destination, DestinationModule, ResourceError}
+import quasar.api.destination.{Destination, DestinationError, DestinationMeta, DestinationName, DestinationRef, DestinationType, Destinations}
+import quasar.connector.{DestinationModule, ResourceError}
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage.RefIndexedStore
 

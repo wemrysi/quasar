@@ -18,9 +18,8 @@ package quasar.impl.destinations
 
 import slamdata.Predef._
 
-import quasar.Condition
-import quasar.api.destination.{DestinationError, DestinationName, DestinationRef, DestinationType}
-import quasar.connector.{Destination, DestinationModule, ResourceError}
+import quasar.api.destination.{Destination, DestinationError, DestinationName, DestinationRef, DestinationType}
+import quasar.connector.{DestinationModule, ResourceError}
 import quasar.contrib.scalaz.MonadError_
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -29,7 +28,7 @@ import argonaut.Json
 import cats.effect.IO
 import cats.effect.concurrent.Ref
 import eu.timepit.refined.auto._
-import scalaz.{IMap, ISet}
+import scalaz.{-\/, IMap, ISet}
 import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
 import shims._
@@ -75,7 +74,7 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
         val ref = DestinationRef(notKnown, DestinationName("notknown"), Json.jEmptyString)
 
         emptyManager.flatMap(_.initDestination(1, ref)).unsafeRunSync must beLike {
-          case Condition.Abnormal(DestinationError.DestinationUnsupported(k, s)) =>
+          case -\/(DestinationError.DestinationUnsupported(k, s)) =>
             k must_== notKnown
             s must_== ISet.singleton(MockDestinationType)
         }

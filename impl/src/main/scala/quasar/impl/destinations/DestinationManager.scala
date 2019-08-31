@@ -18,12 +18,10 @@ package quasar.impl.destinations
 
 import slamdata.Predef.{Exception, Option, Unit}
 
-import quasar.Condition
 import quasar.api.destination.DestinationError.CreateError
-import quasar.api.destination.{DestinationRef, DestinationType}
-import quasar.connector.Destination
+import quasar.api.destination.{Destination, DestinationRef, DestinationType}
 
-import scalaz.{IMap, ISet}
+import scalaz.{IMap, ISet, \/}
 
 /** A primitive facility for managing the lifecycle of destinations. */
 trait DestinationManager[I, C, F[_]] {
@@ -31,7 +29,7 @@ trait DestinationManager[I, C, F[_]] {
     * destination exists at `destinationId`, it is shut down.
     */
   def initDestination(destinationId: I, ref: DestinationRef[C])
-      : F[Condition[CreateError[C]]]
+      : F[CreateError[C] \/ Destination[F]]
 
   /** Returns the destination having the given id or `None` if not found. */
   def destinationOf(destinationId: I): F[Option[Destination[F]]]

@@ -31,7 +31,7 @@ import fs2.Stream
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
-import scalaz.{\/, Equal, EitherT, IMap, ISet, OptionT, Order}
+import scalaz.{\/, -\/, \/-, Bifunctor, Equal, EitherT, IMap, ISet, OptionT, Order}
 import shims._
 
 class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
@@ -49,9 +49,9 @@ class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
         newId <- freshId
         destStatus <- manager.initDestination(newId, ref)
         result <- destStatus match {
-          case Condition.Normal() =>
+          case \/-(_) =>
             refs.insert(newId, ref) *> newId.right[CreateError[C]].point[F]
-          case Condition.Abnormal(e) =>
+          case -\/(e) =>
             e.left[I].point[F]
         }
       } yield result)
@@ -67,6 +67,18 @@ class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
       .map(manager.sanitizedRef(_))
       .toRight(DestinationError.destinationNotFound(destinationId))
       .run
+
+  def destinationOf(destinationId: I): F[DestinationError[I, C] \/ Destination[F]] =
+    ((manager.destinationOf(destinationId) |@| refs.lookup(destinationId)) {
+      case (Some(alreadyRunning), _) =>
+        alreadyRunning.right[DestinationError[I, C]].point[F]
+      case (None, Some(stored)) =>
+        liftE[CreateError[C], DestinationError[I, C], Destination[F]](
+          manager.initDestination(destinationId, stored))
+      case _ =>
+        DestinationError.destinationNotFound[I, DestinationError[I, C]](destinationId)
+          .left[Destination[F]].point[F]
+    }).join
 
   def destinationStatus(destinationId: I): F[ExistentialError[I] \/ Condition[Exception]] =
     (refs.lookup(destinationId) |@| manager.errorsOf(destinationId)) {
@@ -90,7 +102,7 @@ class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
         (for {
         _ <- uniqueName(destinationId, ref) >> refSupported(ref)
         _ <- liftC[ExistentialError[I], DestinationError[I, C]](removeDestination(destinationId))
-        _ <- liftC[CreateError[C], DestinationError[I, C]](manager.initDestination(destinationId, ref))
+        _ <- liftET[CreateError[C], DestinationError[I, C], Destination[F]](manager.initDestination(destinationId, ref))
         _ <- EitherT.rightT(refs.insert(destinationId, ref))
       } yield ()).run.map(Condition.disjunctionIso.reverseGet(_))
       case None =>
@@ -106,6 +118,12 @@ class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
 
   private def liftC[E, EE >: E](c: F[Condition[E]]): EitherT[F, EE, Unit] =
     EitherT(c.map(Condition.disjunctionIso.get(_)))
+
+  private def liftET[E, EE >: E, A](e: F[E \/ A]): EitherT[F, EE, A] =
+    Bifunctor[EitherT[F, ?, ?]].widen[E, A, EE, A](EitherT(e))
+
+  private def liftE[E, EE >: E, A](e: F[E \/ A]): F[EE \/ A] =
+    liftET[E, EE, A](e).run
 
   private def refSupported(ref: DestinationRef[C]): EitherT[F, DestinationError[I, C], Unit] =
     EitherT(supportedDestinationTypes.map(_.member(ref.kind)).ifM(
