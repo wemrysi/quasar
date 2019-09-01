@@ -51,7 +51,7 @@ import scalaz.std.anyVal._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.equal._
 import scalaz.syntax.tag._
-//import scalaz.syntax.show._
+import scalaz.syntax.show._
 
 import shims.{eqToScalaz, monoidToCats, orderToCats, orderToScalaz, showToCats, showToScalaz}
 
@@ -2049,6 +2049,57 @@ object MinimizeAutoJoinsSpec
 
       runOn(qgraph) must haveShiftCount(4)
     }
+  }
+
+  "all cartouche share a common prefix on shifted root" >> {
+		val shiftRoot =
+			qsu.transpose(
+				shiftedRead,
+        Retain.Values,
+        Rotation.ShiftMap)
+
+    val tree = QSUGraph.fromTree[Fix](
+      qsu._autojoin2(
+        qsu._autojoin2(
+          shiftRoot,
+          qsu.transpose(
+            qsu.map(
+              shiftRoot,
+              recFunc.ProjectKeyS(recFunc.Hole, "z")),
+            Retain.Values,
+            Rotation.ShiftArray),
+          func.StaticMapS(
+            "y" -> func.ProjectKeyS(func.LeftSide, "y"),
+            "z" -> func.RightSide)),
+        qsu.transpose(
+          qsu.transpose(
+            qsu.map(
+              shiftRoot,
+              recFunc.ProjectKeyS(recFunc.Hole, "q")),
+            Retain.Values,
+            Rotation.ShiftMap),
+          Retain.Values,
+          Rotation.ShiftArray),
+        func.ConcatMaps(
+          func.LeftSide,
+          func.MakeMapS("q", func.RightSide))))
+
+    val g = runOn(tree)
+
+    println(g.shows)
+
+    ko
+    /*
+	'rlp16 -> AutoJoin2('rlp10, 'rlp14, ConcatMaps(LeftSide, MakeMap(Constant(Str(q)), RightSide)))
+  'rlp10 -> AutoJoin2('rlp3, 'rlp8, ConcatMaps(MakeMap(Constant(Str(y)), ProjectKey(LeftSide, Constant(Str(y)))), MakeMap(Constant(Str(z)), RightSide)))
+  'rlp8 -> Transpose('rlp7, Values, ShiftArray)
+  'rlp7 -> Map('rlp3, ProjectKey(SrcHole, Constant(Str(z))))
+  'rlp14 -> Transpose('rlp13, Values, ShiftArray)
+  'rlp13 -> Transpose('rlp12, Values, ShiftMap)
+  'rlp12 -> Map('rlp3, ProjectKey(SrcHole, Constant(Str(q))))
+  'rlp3 -> Transpose('rlp0, Values, ShiftMap)
+  'rlp0 -> Read(/datasource/6c4681a9-d701-4d3e-a061-c896a8317dd5/foo, ExcludeId)
+     */
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph =

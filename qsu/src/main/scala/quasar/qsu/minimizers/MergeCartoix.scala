@@ -26,7 +26,7 @@ import matryoshka._
 import matryoshka.data.free._
 
 import quasar.{IdStatus, RenderTreeT}
-//import quasar.RenderTree.ops._
+import quasar.RenderTree.ops._
 import quasar.common.effect.NameGenerator
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.free._
@@ -137,8 +137,11 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
         CStage.Join(cs.toMap, fm.map(i => CartoucheRef.Final(Symbol(s"cart$i"))))
       }
 
+    println(s"MAYBE_JOIN\n${maybeJoin.fold("NO JOIN")((_: CStage).render.shows)}")
+
     maybeJoin
       .map(simplifyJoin(_))
+      .map { j => println(s"SIMPLIFIED\n${(j: CStage).render.shows}"); j }
       .traverse(j => reifyJoin[G](j, singleSource, StructLens.init(j.cartoix.size > 1), false))
       .map(_.map(_.squared))
   }
