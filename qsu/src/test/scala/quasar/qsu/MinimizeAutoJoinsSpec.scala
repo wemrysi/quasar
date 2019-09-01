@@ -51,7 +51,7 @@ import scalaz.std.anyVal._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.equal._
 import scalaz.syntax.tag._
-//import scalaz.syntax.show._
+import scalaz.syntax.show._
 
 import shims.{eqToScalaz, monoidToCats, orderToCats, orderToScalaz, showToCats, showToScalaz}
 
@@ -2048,6 +2048,171 @@ object MinimizeAutoJoinsSpec
             func.MakeMapS("3", func.RightSide)))))
 
       runOn(qgraph) must haveShiftCount(4)
+    }
+  }
+
+  // select *{_}.z[_], *{_}.y, *{_}.q{_}[_] from foo
+  "all cartouche share a common prefix on shifted root" >> {
+		val shiftRoot =
+			qsu.transpose(
+				shiftedRead,
+        Retain.Values,
+        Rotation.ShiftMap)
+
+    val qgraph = QSUGraph.fromTree[Fix](
+      qsu._autojoin2(
+        qsu._autojoin2(
+          shiftRoot,
+          qsu.transpose(
+            qsu.map(
+              shiftRoot,
+              recFunc.ProjectKeyS(recFunc.Hole, "z")),
+            Retain.Values,
+            Rotation.ShiftArray),
+          func.StaticMapS(
+            "y" -> func.ProjectKeyS(func.LeftSide, "y"),
+            "z" -> func.RightSide)),
+        qsu.transpose(
+          qsu.transpose(
+            qsu.map(
+              shiftRoot,
+              recFunc.ProjectKeyS(recFunc.Hole, "q")),
+            Retain.Values,
+            Rotation.ShiftMap),
+          Retain.Values,
+          Rotation.ShiftArray),
+        func.ConcatMaps(
+          func.LeftSide,
+          func.MakeMapS("q", func.RightSide))))
+
+    runOn(qgraph) must beLike {
+      case LeftShift(
+        LeftShift(
+          LeftShift(
+            LeftShift(
+              Read(_, ExcludeId),
+              rootStruct,
+              ExcludeId,
+              _,
+              rootRepair,
+              Rotation.ShiftMap),
+            zStruct,
+            ExcludeId,
+            _,
+            zRepair,
+            Rotation.ShiftArray),
+          qStruct,
+          ExcludeId,
+          _,
+          qRepair,
+          Rotation.ShiftMap),
+        qStruct2,
+        ExcludeId,
+        _,
+        joiner,
+        Rotation.ShiftArray) =>
+
+      rootStruct must beTreeEqual(recFunc.Hole)
+      rootRepair must beTreeEqual(func.StaticMapS(
+        "cart0:0" -> RightTarget[Fix],
+        "cart0" -> RightTarget[Fix]))
+
+      zStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "cart0:0"), "z"))
+      zRepair must beTreeEqual(func.ConcatMaps(AccessLeftTarget[Fix](Access.value(_)), func.MakeMapS("cart1", RightTarget[Fix])))
+
+      qStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "cart0:0"), "q"))
+      qRepair must beTreeEqual(func.ConcatMaps(AccessLeftTarget[Fix](Access.value(_)), func.MakeMapS("cart2", RightTarget[Fix])))
+
+      qStruct2 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart2"))
+
+      joiner must beTreeEqual(func.StaticMapS(
+        "y" -> func.ProjectKeyS(func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart0"), "y"),
+        "z" -> func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart1"),
+        "q" -> RightTarget[Fix]))
+    }
+  }
+
+  // select *{_}.z[_], *{_:} as y, *{_}.q{_}[_] from foo
+  "all cartouche share a common prefix on shifted root including identities" >> {
+		val shiftRoot =
+			qsu.transpose(
+				shiftedRead,
+        Retain.Values,
+        Rotation.ShiftMap)
+
+    val qgraph = QSUGraph.fromTree[Fix](
+      qsu._autojoin2(
+        qsu._autojoin2(
+          qsu.transpose(
+            shiftedRead,
+            Retain.Identities,
+            Rotation.ShiftMap),
+          qsu.transpose(
+            qsu.map(
+              shiftRoot,
+              recFunc.ProjectKeyS(recFunc.Hole, "z")),
+            Retain.Values,
+            Rotation.ShiftArray),
+          func.StaticMapS(
+            "y" -> func.ProjectKeyS(func.LeftSide, "y"),
+            "z" -> func.RightSide)),
+        qsu.transpose(
+          qsu.transpose(
+            qsu.map(
+              shiftRoot,
+              recFunc.ProjectKeyS(recFunc.Hole, "q")),
+            Retain.Values,
+            Rotation.ShiftMap),
+          Retain.Values,
+          Rotation.ShiftArray),
+        func.ConcatMaps(
+          func.LeftSide,
+          func.MakeMapS("q", func.RightSide))))
+
+    runOn(qgraph) must beLike {
+      case LeftShift(
+        LeftShift(
+          LeftShift(
+            LeftShift(
+              Read(_, ExcludeId),
+              rootStruct,
+              IncludeId,
+              _,
+              rootRepair,
+              Rotation.ShiftMap),
+            zStruct,
+            ExcludeId,
+            _,
+            zRepair,
+            Rotation.ShiftArray),
+          qStruct,
+          ExcludeId,
+          _,
+          qRepair,
+          Rotation.ShiftMap),
+        qStruct2,
+        ExcludeId,
+        _,
+        joiner,
+        Rotation.ShiftArray) =>
+
+      rootStruct must beTreeEqual(recFunc.Hole)
+      rootRepair must beTreeEqual(func.StaticMapS(
+        "cart0:0" -> func.ProjectIndexI(RightTarget[Fix], 1),
+        "cart0:0_0" -> func.ProjectIndexI(RightTarget[Fix], 0)))
+
+      zStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "cart0:0"), "z"))
+      zRepair must beTreeEqual(func.ConcatMaps(AccessLeftTarget[Fix](Access.value(_)), func.MakeMapS("cart1", RightTarget[Fix])))
+
+      qStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "cart0:0"), "q"))
+      qRepair must beTreeEqual(func.ConcatMaps(AccessLeftTarget[Fix](Access.value(_)), func.MakeMapS("cart2", RightTarget[Fix])))
+
+      qStruct2 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart2"))
+
+      joiner must beTreeEqual(func.StaticMapS(
+        "y" -> func.ProjectKeyS(func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart0:0_0"), "y"),
+        "z" -> func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart1"),
+        "q" -> RightTarget[Fix]))
     }
   }
 

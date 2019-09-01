@@ -354,6 +354,19 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
         else
           CartoucheRef.Final(to)
 
+      def isFocused(c: Cartouche): Boolean =
+        c match {
+          case Cartouche.Source() =>
+            true
+
+          case Cartouche.Stages(ss) =>
+            ss all {
+              case CStage.Join(_, _) => false
+              case CStage.Cartesian(_) => false
+              case _ => true
+            }
+        }
+
       val (simplified, remap) =
         allResolved.foldLeft((cartoix, SMap.empty[Symbol, CartoucheRef])) {
           case ((cx, remap0), (stage, syms)) =>
@@ -393,7 +406,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
             }
         }
 
-      if (simplified.size === 1)
+      if (simplified.size === 1 && isFocused(simplified.head._2))
         (Left(simplified.head._2), remap)
       else
         (Right(simplified), remap)
