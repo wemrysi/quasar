@@ -58,7 +58,6 @@ import spire.std.double._
 final class Quasar[F[_], R, S, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double], C],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
-    val destManager: DestinationManager[UUID, Json, F],
     val tables: Tables[F, UUID, SqlQuery, R, S],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, R])
 
@@ -127,7 +126,7 @@ object Quasar extends Logging {
       tables =
         DefaultTables(freshUUID, tableRefs, prepManager, lookupTableData, lookupTableSchema)
 
-    } yield new Quasar(datasources, destinations, destManager, tables, sqlEvaluator)
+    } yield new Quasar(datasources, destinations, tables, sqlEvaluator)
   }
 
   ////
