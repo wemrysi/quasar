@@ -32,7 +32,7 @@ import quasar.impl.DatasourceModule
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources._
 import quasar.impl.datasources.middleware._
-import quasar.impl.destinations.{DefaultDestinationManager, DefaultDestinations, DestinationManager}
+import quasar.impl.destinations.{DefaultDestinationManager, DefaultDestinations}
 import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.storage.IndexedStore
 import quasar.impl.table.{DefaultTables, PreparationsManager}
