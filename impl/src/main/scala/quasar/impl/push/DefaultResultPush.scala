@@ -19,7 +19,7 @@ package quasar.impl.push
 import slamdata.Predef.{Map => _, _}
 
 import quasar.Condition
-import quasar.connector.{Destination, ResultSink}
+import quasar.api.destination.{Destination, ResultSink}
 import quasar.api.QueryEvaluator
 import quasar.api.destination.ResultType
 import quasar.api.push.{ResultPush, ResultPushError, ResultRender, Status}

@@ -16,12 +16,13 @@
 
 package quasar.impl.datasource.local
 
+import quasar.api.destination.Destination
 import quasar.api.destination.DestinationError.{
   InitializationError,
   malformedConfiguration
 }
 import quasar.concurrent.BlockingContext
-import quasar.connector.{Destination, DestinationModule, MonadResourceErr}
+import quasar.connector.{DestinationModule, MonadResourceErr}
 
 import scala.util.Either
 

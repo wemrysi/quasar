@@ -18,8 +18,9 @@ package quasar.impl.datasource.local
 
 import slamdata.Predef.{Stream => _, _}
 
+import quasar.api.destination.{Destination, ResultSink}
 import quasar.concurrent.BlockingContext
-import quasar.connector.{Destination, MonadResourceErr, ResourceError, ResultSink}
+import quasar.connector.{MonadResourceErr, ResourceError}
 
 import cats.effect.{ContextShift, Effect}
 import fs2.io

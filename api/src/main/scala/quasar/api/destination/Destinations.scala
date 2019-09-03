@@ -44,6 +44,9 @@ trait Destinations[F[_], G[_], I, C] {
     */
   def destinationRef(destinationId: I): F[ExistentialError[I] \/ DestinationRef[C]]
 
+  /** Returns the specified destination. Initializes it if necessary */
+  def destinationOf(destinationId: I): F[DestinationError[I, C] \/ Destination[F]]
+
   /** Returns the status of the specified destination or an error if it doesn't
     * exist.
     */
