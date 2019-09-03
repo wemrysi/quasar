@@ -51,7 +51,6 @@ import scalaz.std.anyVal._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.equal._
 import scalaz.syntax.tag._
-import scalaz.syntax.show._
 
 import shims.{eqToScalaz, monoidToCats, orderToCats, orderToScalaz, showToCats, showToScalaz}
 
