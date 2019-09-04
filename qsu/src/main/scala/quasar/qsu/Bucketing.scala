@@ -66,17 +66,19 @@ final class Bucketing[T[_[_]]: BirecursiveT: EqualT, P] private (
   def modifyIdentities(p: P)(f: IdAccess => IdAccess): P =
     qprov.traverseVectorIds[Id.Id]((i, t) => (f(i), t))(p)
 
+  /** Returns new provenance where all symbols have been modified by `f`. */
+  def modifySymbols(p: P)(f: Symbol => Symbol): P =
+    modifyIdentities(p)(IdAccess.symbols.modify(f))
+
   /** The index of the next group key for `of`. */
   def nextGroupKeyIndex(of: Symbol, p: P): SInt =
     maxGroupKeyIndex(of, p).fold(0)(_ + 1)
 
   /** Renames `from` to `to` in the given dimensions. */
-  def rename(from: Symbol, to: Symbol, p: P): P = {
-    def rename0(sym: Symbol): Symbol =
+  def rename(from: Symbol, to: Symbol, p: P): P =
+    modifySymbols(p) { sym =>
       if (sym === from) to else sym
-
-    modifyIdentities(p)(IdAccess.symbols.modify(rename0))
-  }
+    }
 
   ////
 

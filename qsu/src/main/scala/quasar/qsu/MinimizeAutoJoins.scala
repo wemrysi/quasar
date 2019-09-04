@@ -45,11 +45,7 @@ import quasar.qsu.minimizers.Minimizer
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 
-import monocle.syntax.fields._1
-
-import scalaz.{@@, Bind, Equal, Monad, OptionT, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
-import scalaz.Tags.Disjunction
-import scalaz.syntax.tag._
+import scalaz.{Bind, Equal, Monad, OptionT, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
 
 sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends MraPhase[T] {
   import MinimizeAutoJoins._
@@ -60,7 +56,7 @@ sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: Re
   private lazy val Minimizers: List[Minimizer.Aux[T, P]] = List(
     minimizers.MergeReductions[T](qprov),
     minimizers.FilterToCond[T](qprov),
-    minimizers.CollapseShifts[T](qprov))
+    minimizers.MergeCartoix[T](qprov))
 
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
@@ -105,20 +101,14 @@ sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: Re
       branches: List[QSUGraph],
       combiner: FreeMapA[Int]): G[Option[QSUGraph]] = {
 
-    val grpSym = IdAccess.groupKey composeLens _1
-
-    def wasGrouped(s: Symbol, p: P): Boolean = {
-      import shims._
-      qprov.foldMapVectorIds[Boolean @@ Disjunction]((i, _) =>
-        Disjunction(grpSym.exist(_ === s)(i)))(p).unwrap
-    }
-
     for {
       state <- MinStateM[T, P, G].get
 
+      grouped = state.auth.groupKeys.keySet.map(_._1)
+
       fms = branches map { g =>
         /* Halt coalescing if this graph was grouped, to ensure joining on group keys works */
-        MappableRegion[T](s => state.auth.lookupDims(s).exists(wasGrouped(s, _)), g)
+        MappableRegion[T](grouped, g)
       }
 
       sources = fms.flatMap(_.toList).zipWithIndex
@@ -143,7 +133,7 @@ sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: Re
   private def coalesceRoots[
       G[_]: Monad: NameGenerator: RevIdxM: MinStateM[T, P, ?[_]]: MonadPlannerErr](
       qgraph: QSUGraph,
-      fm: => FreeMapA[Int],
+      fm: FreeMapA[Int],
       candidates: List[QSUGraph]): G[Option[QSUGraph]] = candidates match {
 
     case Nil =>
@@ -258,22 +248,23 @@ sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: Re
 
         back <- resultM traverse {
           case (retarget, result) =>
-            updateForCoalesce[G](multiple, retarget.root) as result
+            updateForCoalesce[G](multiple, retarget) as result
         }
       } yield back
   }
 
   private def updateForCoalesce[G[_]: Bind: MinStateM[T, P, ?[_]]](
       candidates: List[QSUGraph],
-      newRoot: Symbol): G[Unit] = {
+      replacement: QSUGraph)
+      : G[Unit] = {
+
+    val reachable = replacement.foldMapDown(g => Set(g.root)) + replacement.root
+    val toRename = candidates.map(_.root).toSet.filter(!reachable(_))
 
     MinStateM[T, P, G] modify { state =>
-      val auth2 = candidates.foldLeft(state.auth) { (auth, c) =>
-        if (c.root =/= newRoot)
-          QAuth.dims[T, P].modify(_.mapValues(B.rename(c.root, newRoot, _)))(auth)
-        else
-          auth
-      }
+      val auth2 = QAuth.dims[T, P].modify(_ map {
+        case (k, p) => (k, B.modifySymbols(p)(s => if (toRename(s)) replacement.root else s))
+      })(state.auth)
 
       state.copy(auth = auth2)
     }

@@ -77,11 +77,11 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       ReifyBuckets[T, F](qprov)              >==>
       debug("ReifyBuckets")                  >==>
       MinimizeAutoJoins[T, F](qprov)         >==>
-      debug("MinimizeAutoJoins")             >==>
+      debug("MinimizeAutoJoins")             >-
+      CatchTranspose[T, qprov.P]             >==>
+      debug("CatchTranspose")                >==>
       ReifyAutoJoins[T, F](qprov)            >==>
-      debug("ReifyAutoJoins")                >==>
-      ExpandShifts[T, F](qprov)              >==>
-      debug("ExpandShifts")                  >-
+      debug("ReifyAutoJoins")                >-
       agraph.modify(ResolveOwnIdentities[T]) >==>
       debug("ResolveOwnIdentities")          >==>
       ReifyIdentities[T, F]                  >==>

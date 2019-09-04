@@ -101,8 +101,13 @@ object MappableRegion {
   object MaximalUnary {
     import QSUGraph.Extractors._
 
-    def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T])] = {
-      val fm = maximal[T](g)
+    def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T])] =
+      extractUnary(g)(κ(false))
+
+    def extractUnary[T[_[_]]](g: QSUGraph[T])(halt: Symbol => Boolean)
+        : Option[(QSUGraph[T], FreeMap[T])] = {
+
+      val fm = apply[T](halt, g)
 
       val roots = Foldable[FreeMapA[T, ?]].foldMap(fm) {
         case Unreferenced() => Set.empty[Symbol]
