@@ -19,7 +19,7 @@ package quasar.qsu
 import slamdata.Predef.{Option, Set, Symbol}
 
 import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly}
-import quasar.qscript.{HoleR, OnUndefined, RecFreeS}
+import quasar.qscript.{HoleR, OnUndefined, RecFreeS, RightSideF}
 import quasar.qsu.{QScriptUniform => QSU}
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
 
@@ -51,7 +51,7 @@ final class CatchTranspose[T[_[_]], P] private () extends QSUTTypes[T] {
           struct.asRec,
           retain.fold(IdOnly, ExcludeId),
           OnUndefined.Emit,
-          repair >> RightTarget[T],
+          repair >> RightSideF[T],
           rotation))
 
       case g @ Ungrouped(Transpose(src, retain, rotation), repair) =>
@@ -60,7 +60,7 @@ final class CatchTranspose[T[_[_]], P] private () extends QSUTTypes[T] {
           HoleR[T],
           retain.fold(IdOnly, ExcludeId),
           OnUndefined.Emit,
-          repair >> RightTarget[T],
+          repair >> RightSideF[T],
           rotation))
 
       case g @ Transpose(Ungrouped(src, struct), retain, rotation) =>
@@ -69,7 +69,7 @@ final class CatchTranspose[T[_[_]], P] private () extends QSUTTypes[T] {
           struct.asRec,
           retain.fold(IdOnly, ExcludeId),
           OnUndefined.Emit,
-          RightTarget[T],
+          RightSideF[T],
           rotation))
 
       case g @ Transpose(src, retain, rotation) =>
@@ -78,7 +78,7 @@ final class CatchTranspose[T[_[_]], P] private () extends QSUTTypes[T] {
           HoleR[T],
           retain.fold(IdOnly, ExcludeId),
           OnUndefined.Emit,
-          RightTarget[T],
+          RightSideF[T],
           rotation))
     }
 

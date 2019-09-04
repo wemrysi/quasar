@@ -119,18 +119,13 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
       "convert LeftShift" in {
         val struct: RecFreeMap = recFunc.Add(recFunc.Hole, recFunc.Constant(Fixed[Fix[EJson]].int(17)))
 
-        val arepair: FreeMapA[QScriptUniform.ShiftTarget] = func.ConcatArrays(
-          func.MakeArray(AccessLeftTarget[Fix](Access.value(_))),
-          func.ConcatArrays(
-            LeftTarget[Fix],
-            func.MakeArray(RightTarget[Fix])))
         val repair: JoinFunc = func.ConcatArrays(
           func.MakeArray(func.LeftSide),
           func.ConcatArrays(
             func.LeftSide,
             func.MakeArray(func.RightSide)))
 
-        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile, ExcludeId), struct, IncludeId, OnUndefined.Omit, arepair, Rotation.ShiftArray)
+        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile, ExcludeId), struct, IncludeId, OnUndefined.Omit, repair, Rotation.ShiftArray)
         val qscript: Fix[QSE] = qse.LeftShift(qse.Read[ResourcePath](path, ExcludeId), struct, IncludeId, ShiftType.Array, OnUndefined.Omit, repair)
 
         qgraph must graduateAs(qscript)
@@ -177,10 +172,6 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
     }
 
     "graduate naive `select * from zips`" in {
-      val aconcatArr =
-        func.ConcatArrays(
-          func.MakeArray(AccessLeftTarget[Fix](Access.value(_))),
-          func.MakeArray(RightTarget[Fix]))
       val concatArr =
         func.ConcatArrays(
           func.MakeArray(func.LeftSide),
@@ -196,7 +187,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
               recFunc.Hole,
               IncludeId,
               OnUndefined.Omit,
-              aconcatArr,
+              concatArr,
               Rotation.FlattenArray),
             qsu.cint(1),
             func.Constant[JoinSide](Fixed[Fix[EJson]].bool(true)),

@@ -32,8 +32,8 @@ import quasar.contrib.iota._
 import quasar.contrib.scalaz.free._
 import quasar.fp._
 import quasar.fp.ski.κ2
-import quasar.qscript.{construction, Hole, MapFuncCore, MonadPlannerErr, OnUndefined, RecFreeS}
-import quasar.qsu.{QScriptUniform => QSU}, QSU.{Rotation, ShiftTarget}
+import quasar.qscript.{construction, Hole, JoinSide, MapFuncCore, MonadPlannerErr, OnUndefined, RecFreeS}
+import quasar.qsu.{QScriptUniform => QSU}, QSU.Rotation
 
 import scalaz.{~>, Equal, Foldable, Forall, Monad, NonEmptyList, Scalaz}, Scalaz._
 
@@ -529,7 +529,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
               struct,
               idStatus,
               onUndef,
-              lens.inject[ShiftTarget](
+              lens.inject[JoinSide](
                 id,
                 MapFuncCore.normalized(f(repair)),
                 repair,
@@ -578,15 +578,15 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
             (struct >> lens.project).asRec,
             idStatus,
             if (lens.outer) OnUndefined.Emit else OnUndefined.Omit,
-            lens.inject[ShiftTarget](
+            lens.inject[JoinSide](
               id,
               idStatus match {
-                case IncludeId => func.ProjectIndexI(RightTarget[T], 1)
-                case _ => RightTarget[T]
+                case IncludeId => func.ProjectIndexI(func.RightSide, 1)
+                case _ => func.RightSide
               },
-              AccessLeftTarget[T](Access.value(_)),
+              func.LeftSide,
               idStatus match {
-                case IncludeId => Some(func.ProjectIndexI(RightTarget[T], 0))
+                case IncludeId => Some(func.ProjectIndexI(func.RightSide, 0))
                 case _ => None
               }),
             rot))

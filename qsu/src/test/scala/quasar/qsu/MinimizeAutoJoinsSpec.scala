@@ -315,7 +315,7 @@ object MinimizeAutoJoinsSpec
         recFunc.Hole,
         ExcludeId,
         OnUndefined.Omit,
-        RightTarget[Fix],
+        func.RightSide,
         Rotation.ShiftArray)
 
       val qgraph = QSUGraph.fromTree[Fix](
@@ -647,8 +647,8 @@ object MinimizeAutoJoinsSpec
 
           repair must beTreeEqual(
             func.Add(
-              RightTarget[Fix],
-              AccessLeftTarget[Fix](Access.value(_))))
+              func.RightSide,
+              func.LeftSide))
       }
     }
 
@@ -676,8 +676,8 @@ object MinimizeAutoJoinsSpec
 
           repair must beTreeEqual(
             func.Add(
-              AccessLeftTarget[Fix](Access.value(_)),
-              RightTarget[Fix]))
+              func.LeftSide,
+              func.RightSide))
       }
     }
 
@@ -719,8 +719,8 @@ object MinimizeAutoJoinsSpec
 
         repairInner must beTreeEqual(
           func.StaticMapS(
-            "0" -> RightTarget[Fix],
-            "1" -> AccessLeftTarget[Fix](Access.value(_))))
+            "0" -> func.RightSide,
+            "1" -> func.LeftSide))
 
         h1 must beTreeEqual(func.ProjectKeyS(func.Hole, "0"))
         h2 must beTreeEqual(func.ProjectKeyS(func.Hole, "1"))
@@ -830,16 +830,16 @@ object MinimizeAutoJoinsSpec
 
           repairInner must beTreeEqual(
             func.StaticMapS(
-              "source" -> AccessLeftTarget[Fix](Access.value(_)),
-              "cart0" -> RightTarget[Fix]))
+              "source" -> func.LeftSide,
+              "cart0" -> func.RightSide))
 
           structOuter must beTreeEqual(
             recFunc.ProjectKeyS(recFunc.Hole, "cart0"))
 
           repairOuter must beTreeEqual(
             func.Add(
-              RightTarget[Fix],
-              func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "source")))
+              func.RightSide,
+              func.ProjectKeyS(func.LeftSide, "source")))
       }
     }
 
@@ -886,23 +886,23 @@ object MinimizeAutoJoinsSpec
 
           repairInnerInner must beTreeEqual(
             func.StaticMapS(
-              "source" -> AccessLeftTarget[Fix](Access.value(_)),
-              "cart0" -> RightTarget[Fix]))
+              "source" -> func.LeftSide,
+              "cart0" -> func.RightSide))
 
           structInner must beTreeEqual(
             recFunc.ProjectKeyS(recFunc.Hole, "cart0"))
 
           repairInner must beTreeEqual(
             func.ConcatMaps(
-              AccessLeftTarget[Fix](Access.value(_)),
-              func.MakeMapS("cart0", RightTarget[Fix])))
+              func.LeftSide,
+              func.MakeMapS("cart0", func.RightSide)))
 
           structOuter must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart0"))
 
           repairOuter must beTreeEqual(
             func.Add(
-              RightTarget[Fix],
-              func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "source")))
+              func.RightSide,
+              func.ProjectKeyS(func.LeftSide, "source")))
       }
     }
 
@@ -957,18 +957,18 @@ object MinimizeAutoJoinsSpec
 
           cRepair must beTreeEqual(
             func.StaticMapS(
-              "source" -> AccessLeftTarget[Fix](Access.value(_)),
-              "cart0" -> RightTarget[Fix]))
+              "source" -> func.LeftSide,
+              "cart0" -> func.RightSide))
 
           dRepair must beTreeEqual(
             func.ConcatMaps(
-              AccessLeftTarget[Fix](Access.value(_)),
-              func.MakeMapS("cart1", RightTarget[Fix])))
+              func.LeftSide,
+              func.MakeMapS("cart1", func.RightSide)))
 
           ddRepair must beTreeEqual(
             func.Divide(
-              func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart0"),
-              RightTarget[Fix]))
+              func.ProjectKeyS(func.LeftSide, "cart0"),
+              func.RightSide))
       }
     }
 
@@ -1064,37 +1064,37 @@ object MinimizeAutoJoinsSpec
 
         arepair0 must beTreeEqual(
           func.StaticMapS(
-            "source" -> AccessLeftTarget[Fix](Access.value(_)),
-            "cart0" -> RightTarget[Fix]))
+            "source" -> func.LeftSide,
+            "cart0" -> func.RightSide))
 
         arepair1 must beTreeEqual(
           func.ConcatMaps(
-            AccessLeftTarget[Fix](Access.value(_)),
-            func.MakeMapS("cart0", RightTarget[Fix])))
+            func.LeftSide,
+            func.MakeMapS("cart0", func.RightSide)))
 
         arepair2 must beTreeEqual(
           func.ConcatMaps(
-            AccessLeftTarget[Fix](Access.value(_)),
-            func.MakeMapS("cart0", RightTarget[Fix])))
+            func.LeftSide,
+            func.MakeMapS("cart0", func.RightSide)))
 
         crepair0 must beTreeEqual(
           func.ConcatMaps(
-            AccessLeftTarget[Fix](Access.value(_)),
-            func.MakeMapS("cart2", RightTarget[Fix])))
+            func.LeftSide,
+            func.MakeMapS("cart2", func.RightSide)))
 
         drepair0 must beTreeEqual(
           func.ConcatMaps(
-            AccessLeftTarget[Fix](Access.value(_)),
-            func.MakeMapS("cart3", RightTarget[Fix])))
+            func.LeftSide,
+            func.MakeMapS("cart3", func.RightSide)))
 
         drepair1 must beTreeEqual(
           func.Subtract(
             func.Add(
-              func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart0"),
-              func.ProjectKeyS(func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "source"), "b")),
+              func.ProjectKeyS(func.LeftSide, "cart0"),
+              func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "source"), "b")),
             func.Divide(
-              func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart2"),
-              RightTarget[Fix])))
+              func.ProjectKeyS(func.LeftSide, "cart2"),
+              func.RightSide)))
       }
     }
 
@@ -1153,8 +1153,8 @@ object MinimizeAutoJoinsSpec
 
           innerRepair must beTreeEqual(
             func.StaticMapS(
-              "source" -> AccessLeftTarget[Fix](Access.value(_)),
-              "cart1" -> RightTarget[Fix]))
+              "source" -> func.LeftSide,
+              "cart1" -> func.RightSide))
 
           outerStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart1"))
 
@@ -1162,13 +1162,13 @@ object MinimizeAutoJoinsSpec
             func.ConcatArrays(
               func.MakeArray(
                 func.Guard(
-                  func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "source"),
+                  func.ProjectKeyS(func.LeftSide, "source"),
                   Type.AnyObject,
                   func.ProjectKeyS(
-                    func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "source"),
+                    func.ProjectKeyS(func.LeftSide, "source"),
                     "a"),
                   func.Undefined)),
-              func.MakeArray(RightTarget[Fix])))
+              func.MakeArray(func.RightSide)))
       }
     }
 
@@ -1277,8 +1277,8 @@ object MinimizeAutoJoinsSpec
 
           innerRepair must beTreeEqual(
             func.StaticMapS(
-              "source" -> AccessLeftTarget[Fix](Access.value(_)),
-              "cart1" -> RightTarget[Fix]))
+              "source" -> func.LeftSide,
+              "cart1" -> func.RightSide))
 
           outerStruct must beTreeEqual(
             recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "cart1"), "c"))
@@ -1286,9 +1286,9 @@ object MinimizeAutoJoinsSpec
           outerRepair must beTreeEqual(
             func.Add(
               func.ProjectKeyS(
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "source"),
+                func.ProjectKeyS(func.LeftSide, "source"),
                 "a"),
-              RightTarget[Fix]))
+              func.RightSide))
       }
     }
 
@@ -1340,18 +1340,18 @@ object MinimizeAutoJoinsSpec
 
           aRepair must beTreeEqual(
             func.StaticMapS(
-              "source" -> AccessLeftTarget[Fix](Access.value(_)),
-              "cart0" -> RightTarget[Fix]))
+              "source" -> func.LeftSide,
+              "cart0" -> func.RightSide))
 
           bRepair must beTreeEqual(
             func.ConcatMaps(
-              AccessLeftTarget[Fix](Access.value(_)),
-              func.MakeMapS("cart1", RightTarget[Fix])))
+              func.LeftSide,
+              func.MakeMapS("cart1", func.RightSide)))
 
           cRepair must beTreeEqual(
             func.Add(
-              func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart0"),
-              RightTarget[Fix]))
+              func.ProjectKeyS(func.LeftSide, "cart0"),
+              func.RightSide))
       }
     }
 
@@ -1482,8 +1482,8 @@ object MinimizeAutoJoinsSpec
 
           repair must beTreeEqual(
             func.StaticMapS(
-              "0" -> func.ProjectIndexI(RightTarget[Fix], 0),
-              "1" -> func.ProjectIndexI(RightTarget[Fix], 1)))
+              "0" -> func.ProjectIndexI(func.RightSide, 0),
+              "1" -> func.ProjectIndexI(func.RightSide, 1)))
       }
     }
 
@@ -1534,14 +1534,14 @@ object MinimizeAutoJoinsSpec
 
           repairB must beTreeEqual(
             func.StaticMapS(
-              "source" -> AccessLeftTarget[Fix](Access.value(_)),
-              "cart1" -> RightTarget[Fix]))
+              "source" -> func.LeftSide,
+              "cart1" -> func.RightSide))
 
           repairA must beTreeEqual(
             func.StaticMapS(
-              "0" -> func.ProjectIndexI(RightTarget[Fix], 0),
-              "1" -> func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart1"),
-              "2" -> func.ProjectIndexI(RightTarget[Fix], 1)))
+              "0" -> func.ProjectIndexI(func.RightSide, 0),
+              "1" -> func.ProjectKeyS(func.LeftSide, "cart1"),
+              "2" -> func.ProjectIndexI(func.RightSide, 1)))
       }
     }
 
@@ -1577,8 +1577,8 @@ object MinimizeAutoJoinsSpec
 
           repair must beTreeEqual(
             func.StaticMapS(
-              "0" -> func.ProjectKeyS(RightTarget[Fix], "city"),
-              "1" -> func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "last_visit")))
+              "0" -> func.ProjectKeyS(func.RightSide, "city"),
+              "1" -> func.ProjectKeyS(func.LeftSide, "last_visit")))
 
           outerMap must beTreeEqual(
             recFunc.StaticMapS(
@@ -1713,15 +1713,15 @@ object MinimizeAutoJoinsSpec
 
         repairInner must beTreeEqual(
           func.StaticMapS(
-            "cart0" -> func.ProjectIndexI(RightTarget[Fix], 1),
-            "cart0_0" -> func.ProjectIndexI(RightTarget[Fix], 0)))
+            "cart0" -> func.ProjectIndexI(func.RightSide, 1),
+            "cart0_0" -> func.ProjectIndexI(func.RightSide, 0)))
 
         repair must beTreeEqual(
           func.ConcatMaps(
             func.ConcatMaps(
-              func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart0_0"),
-              func.ProjectIndexI(RightTarget[Fix], 0)),
-            func.ProjectIndexI(RightTarget[Fix], 1)))
+              func.ProjectKeyS(func.LeftSide, "cart0_0"),
+              func.ProjectIndexI(func.RightSide, 0)),
+            func.ProjectIndexI(func.RightSide, 1)))
       }
     }
 
@@ -2113,21 +2113,21 @@ object MinimizeAutoJoinsSpec
 
       rootStruct must beTreeEqual(recFunc.Hole)
       rootRepair must beTreeEqual(func.StaticMapS(
-        "cart0:0" -> RightTarget[Fix],
-        "cart0" -> RightTarget[Fix]))
+        "cart0:0" -> func.RightSide,
+        "cart0" -> func.RightSide))
 
       zStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "cart0:0"), "z"))
-      zRepair must beTreeEqual(func.ConcatMaps(AccessLeftTarget[Fix](Access.value(_)), func.MakeMapS("cart1", RightTarget[Fix])))
+      zRepair must beTreeEqual(func.ConcatMaps(func.LeftSide, func.MakeMapS("cart1", func.RightSide)))
 
       qStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "cart0:0"), "q"))
-      qRepair must beTreeEqual(func.ConcatMaps(AccessLeftTarget[Fix](Access.value(_)), func.MakeMapS("cart2", RightTarget[Fix])))
+      qRepair must beTreeEqual(func.ConcatMaps(func.LeftSide, func.MakeMapS("cart2", func.RightSide)))
 
       qStruct2 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart2"))
 
       joiner must beTreeEqual(func.StaticMapS(
-        "y" -> func.ProjectKeyS(func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart0"), "y"),
-        "z" -> func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart1"),
-        "q" -> RightTarget[Fix]))
+        "y" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "cart0"), "y"),
+        "z" -> func.ProjectKeyS(func.LeftSide, "cart1"),
+        "q" -> func.RightSide))
     }
   }
 
@@ -2197,21 +2197,21 @@ object MinimizeAutoJoinsSpec
 
       rootStruct must beTreeEqual(recFunc.Hole)
       rootRepair must beTreeEqual(func.StaticMapS(
-        "cart0:0" -> func.ProjectIndexI(RightTarget[Fix], 1),
-        "cart0:0_0" -> func.ProjectIndexI(RightTarget[Fix], 0)))
+        "cart0:0" -> func.ProjectIndexI(func.RightSide, 1),
+        "cart0:0_0" -> func.ProjectIndexI(func.RightSide, 0)))
 
       zStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "cart0:0"), "z"))
-      zRepair must beTreeEqual(func.ConcatMaps(AccessLeftTarget[Fix](Access.value(_)), func.MakeMapS("cart1", RightTarget[Fix])))
+      zRepair must beTreeEqual(func.ConcatMaps(func.LeftSide, func.MakeMapS("cart1", func.RightSide)))
 
       qStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "cart0:0"), "q"))
-      qRepair must beTreeEqual(func.ConcatMaps(AccessLeftTarget[Fix](Access.value(_)), func.MakeMapS("cart2", RightTarget[Fix])))
+      qRepair must beTreeEqual(func.ConcatMaps(func.LeftSide, func.MakeMapS("cart2", func.RightSide)))
 
       qStruct2 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart2"))
 
       joiner must beTreeEqual(func.StaticMapS(
-        "y" -> func.ProjectKeyS(func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart0:0_0"), "y"),
-        "z" -> func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "cart1"),
-        "q" -> RightTarget[Fix]))
+        "y" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "cart0:0_0"), "y"),
+        "z" -> func.ProjectKeyS(func.LeftSide, "cart1"),
+        "q" -> func.RightSide))
     }
   }
 
@@ -2233,7 +2233,6 @@ object MinimizeAutoJoinsSpec
   def haveShiftCount(count: Int): Matcher[QSUGraph] = { graph: QSUGraph =>
     val actual = graph.foldMapUp {
       case LeftShift(_, _, _, _, _, _) => 1
-      case MultiLeftShift(_, ss, _, _) => ss.length
       case _ => 0
     }
 
