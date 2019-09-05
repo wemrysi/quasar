@@ -137,10 +137,11 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
         CStage.Join(cs.toMap, fm.map(i => CartoucheRef.Final(Symbol(s"cart$i"))))
       }
 
-    maybeJoin
-      .map(simplifyJoin(_))
-      .traverse(j => reifyJoin[G](j, singleSource, StructLens.init(j.cartoix.size > 1), false))
-      .map(_.map(_.squared))
+    maybeJoin traverse { j =>
+      simplifyJoin[G](j)
+        .flatMap(j => reifyJoin[G](j, singleSource, StructLens.init(j.cartoix.size > 1), false))
+        .map(_.squared)
+    }
   }
 
   private final class FuncOf(src: Symbol) {
@@ -249,93 +250,16 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   @SuppressWarnings(Array(
     "org.wartremover.warts.Recursion",
     "org.wartremover.warts.TraversableOps"))
-  private def simplifyJoin(join: CStage.Join[T]): CStage.Join[T] = {
-    def step(cartoix: SMap[Symbol, Cartouche], depth: Int)
-        : (Either[Cartouche, SMap[Symbol, Cartouche]], SMap[Symbol, CartoucheRef]) = {
+  private def simplifyJoin[F[_]: Monad: NameGenerator](join: CStage.Join[T]): F[CStage.Join[T]] = {
+    val simplName = freshSymbol[F]("simpl")
 
+    def step(cartoix: SMap[Symbol, Cartouche]): F[(SMap[Symbol, Cartouche], SMap[Symbol, CartoucheRef])] = {
       import CStage._
-
-      val buckets = {
-        val bs = Buckets.fromCartoix(cartoix)
-        bs.copy(joins = bs.joins.map { case (s, j) => (s, simplifyJoin(j)) })
-      }
-
-      // within subgroups, compare all possible pairs and build final subsubgroups
-      // this process is O(n^3) in the size of each bucket, since computing the set
-      // of disjoint reflexive transitive closures is O(n) with memoization
-      val joinRelation =
-        Relation.allPairs(buckets.joins.toList)(_._1) {
-          case ((_, l), (_, r)) =>
-            // can't merge joins at all, so they have to be fully equal
-            (l: CStage) === r
-        }
-
-      val shiftRelations =
-        buckets.shifts mapValues { syms =>
-          Relation.allPairs(syms.toList)(_._1) {
-            case ((_, l), (_, r)) => l.struct === r.struct
-          }
-        }
-
-      val projectRelations = buckets.projects mapValues { syms =>
-        Relation.allPairs(syms)(s => s)(κ2(true))
-      }
-
-      val exprRelation =
-        Relation.allPairs(buckets.exprs.toList)(_._1) {
-          case ((_, l), (_, r)) => l.f === r.f
-        }
 
       /** The tuple represents the resolution of a closure: an optional
         * collapsee and the set of cartouche identifiers that collapsed.
         */
       type Resolved = List[(CStage, Set[Symbol])]
-
-      val resolvedJoins: Resolved =
-        joinRelation.closures.toList map { cl =>
-          // just arbitrarily pick a join; we know by construction they're all equal
-          (buckets.joins(cl.head), cl)
-        }
-
-      val resolvedShifts: Resolved = shiftRelations.toList flatMap {
-        case (rot, rel) =>
-          rel.closures.toList map { cl =>
-            val shifts = cl.map(ref => ref -> buckets.shifts(rot)(ref)).toMap
-
-            val (ido, eid, iid) = shifts.foldLeft((Set[Symbol](), Set[Symbol](), Set[Symbol]())) {
-              case ((ido, eid, iid), (ref, Shift(_, ids, _))) =>
-                ids match {
-                  case IdStatus.IdOnly => (ido + ref, eid, iid)
-                  case IdStatus.IncludeId => (ido, eid, iid + ref)
-                  case IdStatus.ExcludeId => (ido, eid + ref, iid)
-                }
-            }
-
-            val idStatus = if (!iid.isEmpty)
-              IdStatus.IncludeId
-            else if (ido.isEmpty)
-              IdStatus.ExcludeId
-            else if (eid.isEmpty)
-              IdStatus.IdOnly
-            else    // this is the case where we have both ido and eid
-              IdStatus.IncludeId
-
-            (Shift(shifts.values.head.struct, idStatus, rot), cl)
-          }
-      }
-
-      val resolvedProjects: Resolved =
-        projectRelations.toList flatMap {
-          case (idx, rel) => rel.closures.toList.map((Project[T](idx), _))
-        }
-
-      val resolvedExprs: Resolved =
-        exprRelation.closures.toList map { cl =>
-          (buckets.exprs(cl.head), cl)
-        }
-
-      val allResolved =
-        resolvedJoins ::: resolvedShifts ::: resolvedProjects ::: resolvedExprs
 
       // Returns whether the original cartouche that was collapsed into `stage`
       // referenced identities.
@@ -350,37 +274,102 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
 
       def remapResolved(stage: CStage, from: Symbol, to: Symbol): CartoucheRef =
         if (referencesId(stage, from))
-          CartoucheRef.Offset(to, depth)
+          CartoucheRef.Offset(to, 0)
         else
           CartoucheRef.Final(to)
 
-      def isFocused(c: Cartouche): Boolean =
-        c match {
-          case Cartouche.Source() =>
-            true
+      val buckets = Buckets.fromCartoix(cartoix)
 
-          case Cartouche.Stages(ss) =>
-            ss all {
-              case CStage.Join(_, _) => false
-              case CStage.Cartesian(_) => false
-              case _ => true
+      for {
+        simplifiedJoins <- buckets.joins.traverse(simplifyJoin[F](_))
+
+        simplifiedBuckets = buckets.copy(joins = simplifiedJoins)
+
+        // within subgroups, compare all possible pairs and build final subsubgroups
+        // this process is O(n^3) in the size of each bucket, since computing the set
+        // of disjoint reflexive transitive closures is O(n) with memoization
+        joinRelation =
+          Relation.allPairs(simplifiedBuckets.joins.toList)(_._1) {
+            case ((_, l), (_, r)) =>
+              // can't merge joins at all, so they have to be fully equal
+              (l: CStage) === r
+          }
+
+        shiftRelations =
+          simplifiedBuckets.shifts mapValues { syms =>
+            Relation.allPairs(syms.toList)(_._1) {
+              case ((_, l), (_, r)) => l.struct === r.struct
+            }
+          }
+
+        projectRelations =
+          simplifiedBuckets.projects mapValues { syms =>
+            Relation.allPairs(syms)(s => s)(κ2(true))
+          }
+
+        exprRelation =
+          Relation.allPairs(simplifiedBuckets.exprs.toList)(_._1) {
+            case ((_, l), (_, r)) => l.f === r.f
+          }
+
+        resolvedJoins =
+          joinRelation.closures.toList map { cl =>
+            // just arbitrarily pick a join; we know by construction they're all equal
+            (simplifiedBuckets.joins(cl.head), cl)
+          }
+
+        resolvedShifts = shiftRelations.toList flatMap {
+          case (rot, rel) =>
+            rel.closures.toList map { cl =>
+              val shifts = cl.map(ref => ref -> simplifiedBuckets.shifts(rot)(ref)).toMap
+
+              val (ido, eid, iid) = shifts.foldLeft((Set[Symbol](), Set[Symbol](), Set[Symbol]())) {
+                case ((ido, eid, iid), (ref, Shift(_, ids, _))) =>
+                  ids match {
+                    case IdStatus.IdOnly => (ido + ref, eid, iid)
+                    case IdStatus.IncludeId => (ido, eid, iid + ref)
+                    case IdStatus.ExcludeId => (ido, eid + ref, iid)
+                  }
+              }
+
+              val idStatus = if (!iid.isEmpty)
+                IdStatus.IncludeId
+              else if (ido.isEmpty)
+                IdStatus.ExcludeId
+              else if (eid.isEmpty)
+                IdStatus.IdOnly
+              else    // this is the case where we have both ido and eid
+                IdStatus.IncludeId
+
+              (Shift(shifts.values.head.struct, idStatus, rot), cl)
             }
         }
 
-      val (simplified, remap) =
-        allResolved.foldLeft((cartoix, SMap.empty[Symbol, CartoucheRef])) {
-          case ((cx, remap0), (stage, syms)) =>
-            val h = syms.head
+        resolvedProjects =
+          projectRelations.toList flatMap {
+            case (idx, rel) => rel.closures.toList.map((Project[T](idx), _))
+          }
 
+        resolvedExprs =
+          exprRelation.closures.toList map { cl =>
+            (simplifiedBuckets.exprs(cl.head), cl)
+          }
+
+        allResolved = resolvedJoins ::: resolvedShifts ::: resolvedProjects ::: resolvedExprs
+
+        back <- allResolved.foldLeftM((cartoix, SMap.empty[Symbol, CartoucheRef])) {
+          case ((cx, remap0), (stage, syms)) =>
             val nestedCartoix =
               cx.filterKeys(syms) map {
                 case (s, cart) => (s, cart.dropHead)
               }
 
             if (nestedCartoix forall { case (_, c) => c.isEmpty }) {
+              // Pick a name to use for the cartouche
+              val h = syms.head
               // Everything merged, so remap all references
               val rm1 = syms.map(fm => (fm, remapResolved(stage, fm, h))).toMap
-              ((cx -- syms).updated(h, Cartouche.stages(NonEmptyList(stage))), remap0 ++ rm1)
+              ((cx -- syms).updated(h, Cartouche.stages(NonEmptyList(stage))), remap0 ++ rm1).point[F]
             } else {
               // Extract any source references of identities, removing their cartouche
               val (cx1, ids) = nestedCartoix.toList.foldLeft((SMap[Symbol, Cartouche](), Set[Symbol]())) {
@@ -390,36 +379,46 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
                 case ((c, r), kv) => (c + kv, r)
               }
 
-              val (res, rmTail) = step(cx1, depth + 1)
+              for {
+                (lower, lowerRemap) <- step(cx1)
 
-              res match {
-                case Right(cts) =>
-                  val id = Symbol(s"${h.name}:$depth")
-                  val rmIds = ids.map((_, CartoucheRef.Offset(id, depth))).toMap
-                  val tail = Cartouche.stages(NonEmptyList[CStage](CStage.Cartesian(cts)))
-                  ((cx -- syms).updated(id, stage :: tail), remap0 ++ rmIds ++ rmTail)
+                back <-
+                  // lower coalesced into a single cartouche, increment id references and prepend to it
+                  if (lower.size === 1) {
+                    val (lowerName, lowerCart) = lower.head
 
-                case Left(ct) =>
-                  val rmIds = ids.map((_, CartoucheRef.Offset(h, depth))).toMap
-                  ((cx -- syms).updated(h, stage :: ct), remap0 ++ rmIds ++ rmTail)
-              }
+                    val lowerRemap1 = lowerRemap map {
+                      case (k, CartoucheRef.Offset(r, i)) if r === lowerName =>
+                        (k, CartoucheRef.Offset(r, i + 1))
+
+                      case other => other
+                    }
+
+                    val currentRemap = ids.map((_, CartoucheRef.Offset(lowerName, 0))).toMap
+
+                    ((cx -- syms).updated(lowerName, stage :: lowerCart), remap0 ++ lowerRemap1 ++ currentRemap).point[F]
+                  } else {
+                    // lower has multiple cartoix, turn it into a cartesian and make it the tail of a new cartouche
+                    simplName map { newName =>
+                      val currentRemap = ids.map((_, CartoucheRef.Offset(newName, 0))).toMap
+                      val currentCart = Cartouche.stages(NonEmptyList[CStage](stage, CStage.Cartesian(lower)))
+
+                      ((cx -- syms).updated(newName, currentCart), remap0 ++ lowerRemap ++ currentRemap)
+                    }
+                  }
+
+              } yield back
             }
         }
 
-      if (simplified.size === 1 && isFocused(simplified.head._2))
-        (Left(simplified.head._2), remap)
-      else
-        (Right(simplified), remap)
+      } yield back
     }
 
-    step(join.cartoix, 0) match {
-      case (Left(cartouche), remap) =>
+    step(join.cartoix) map {
+      case (simplified, remap) =>
         CStage.Join(
-          SMap('cart0 -> cartouche),
-          join.joiner.map(cr => remap.getOrElse(cr.ref, cr).setRef('cart0)))
-
-      case (Right(cartoix), remap) =>
-        CStage.Join(cartoix, join.joiner.map(cr => remap.getOrElse(cr.ref, cr)))
+          simplified,
+          join.joiner.map(cr => remap.getOrElse(cr.ref, cr)))
     }
   }
 
@@ -474,9 +473,15 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
       : G[QSUGraph] =
     cartoix match {
       case (s, NonEmptyList(hd, tail)) :: rest =>
-        def inj(offset: Int) =
-          new ∀[λ[α => (Symbol, FreeMapA[α], FreeMapA[α], Option[FreeMapA[α]]) => FreeMapA[α]]] {
-            def apply[α] = { (id, results, above, maybeIds) =>
+        val prj =
+          if (isNested)
+            lens0.project
+          else
+            func.ProjectKeyS(func.Hole, SourceKey)
+
+        val inj =
+          new ∀[λ[α => (Symbol, Int, FreeMapA[α], FreeMapA[α], Option[FreeMapA[α]]) => FreeMapA[α]]] {
+            def apply[α] = { (id, offset, results, above, maybeIds) =>
               val core = func.ConcatMaps(
                 above,
                 func.MakeMapS(id.name, results))
@@ -489,22 +494,16 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
             }
           }
 
-        val prj =
-          if (isNested)
-            lens0.project
-          else
-            func.ProjectKeyS(func.Hole, SourceKey)
-
-        val resultsM = reifyStage[G](s, hd, parent, lens0, true) flatMap { parent =>
+        val resultsM = reifyStage[G](s, 0, hd, parent, lens0, true) flatMap { parent =>
           val projectPrev = func.ProjectKeyS(func.Hole, s.name)
 
           tail.zipWithIndex.foldLeftM(parent) {
             case (parent, (stage, i)) =>
-              reifyStage[G](s, stage, parent, StructLens(projectPrev, inj(i + 1), true), true)
+              reifyStage[G](s, i + 1, stage, parent, StructLens(projectPrev, inj, true), true)
           }
         }
 
-        resultsM.flatMap(reifyCartoix[G](_, rest, StructLens(prj, inj(0), true), isNested))
+        resultsM.flatMap(reifyCartoix[G](_, rest, StructLens(prj, inj, true), isNested))
 
       case Nil =>
         parent.point[G]
@@ -514,6 +513,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   private def reifyStage[
       G[_]: Monad: MonadPlannerErr: NameGenerator: RevIdxM: MinStateM[T, P, ?[_]]](
       id: Symbol,
+      offset: Int,
       stage: CStage,
       parent: QSUGraph,
       lens: StructLens,
@@ -531,6 +531,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
               onUndef,
               lens.inject[JoinSide](
                 id,
+                offset,
                 MapFuncCore.normalized(f(repair)),
                 repair,
                 None),
@@ -542,6 +543,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
               _,
               lens.inject[Hole](
                 id,
+                offset,
                 MapFuncCore.normalized(f(rfm.linearize)),
                 func.Hole,
                 None).asRec))
@@ -552,6 +554,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
               _,
               lens.inject[Hole](
                 id,
+                offset,
                 MapFuncCore.normalized(f(func.Hole)),
                 func.Hole,
                 None).asRec))
@@ -580,6 +583,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
             if (lens.outer) OnUndefined.Emit else OnUndefined.Omit,
             lens.inject[JoinSide](
               id,
+              offset,
               idStatus match {
                 case IncludeId => func.ProjectIndexI(func.RightSide, 1)
                 case _ => func.RightSide
@@ -635,15 +639,15 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
 
   private case class StructLens(
       project: FreeMap,
-      // (cartouche id, result access, incoming value, identity access)
-      inject: ∀[λ[α => (Symbol, FreeMapA[α], FreeMapA[α], Option[FreeMapA[α]]) => FreeMapA[α]]],
+      // (cartouche id, offset, result access, incoming value, identity access)
+      inject: ∀[λ[α => (Symbol, Int, FreeMapA[α], FreeMapA[α], Option[FreeMapA[α]]) => FreeMapA[α]]],
       outer: Boolean)
 
   private object StructLens {
     def init(includeSource: Boolean): StructLens = {
       val inj =
-        new ∀[λ[α => (Symbol, FreeMapA[α], FreeMapA[α], Option[FreeMapA[α]]) => FreeMapA[α]]] {
-          def apply[α] = { (id, results, above, maybeIds) =>
+        new ∀[λ[α => (Symbol, Int, FreeMapA[α], FreeMapA[α], Option[FreeMapA[α]]) => FreeMapA[α]]] {
+          def apply[α] = { (id, offset, results, above, maybeIds) =>
             val core =
               if (includeSource)
                 func.StaticMapS(
@@ -655,7 +659,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
             maybeIds.fold(core) { ids =>
               func.ConcatMaps(
                 core,
-                func.MakeMapS(idsKey(id, 0), ids))
+                func.MakeMapS(idsKey(id, offset), ids))
             }
           }
         }
