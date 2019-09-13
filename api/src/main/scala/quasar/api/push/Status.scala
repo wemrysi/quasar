@@ -27,7 +27,7 @@ sealed trait Status extends Product with Serializable
 object Status {
   final case class Finished(startedAt: Instant, finishedAt: Instant) extends Status
   final case class Running(startedAt: Instant) extends Status
-  final case class Canceled(canceledAt: Instant) extends Status
+  final case class Canceled(startedAt: Instant, canceledAt: Instant) extends Status
   final case class Failed(th: Throwable, startedAt: Instant, failedAt: Instant) extends Status
 
   implicit val equal: Equal[Status] =
@@ -38,8 +38,8 @@ object Status {
       s"Finished($startedAt, $finishedAt)"
     case Running(startedAt) =>
       s"Running($startedAt)"
-    case Canceled(canceledAt) =>
-      s"Canceled($canceledAt)"
+    case Canceled(startedAt, canceledAt) =>
+      s"Canceled($startedAt, $canceledAt)"
     case Failed(ex, startedAt, finishedAt) =>
       s"Failed(${ex.getMessage}, $startedAt, $finishedAt)" + "\n\n" + s"$ex"
   }
@@ -50,8 +50,8 @@ object Status {
   def running(startedAt: Instant): Status =
     Running(startedAt)
 
-  def canceled(canceledAt: Instant): Status =
-    Canceled(canceledAt)
+  def canceled(startedAt: Instant, canceledAt: Instant): Status =
+    Canceled(startedAt, canceledAt)
 
   def failed(ex: Throwable, startedAt: Instant, failedAt: Instant): Status =
     Failed(ex, startedAt, failedAt)
