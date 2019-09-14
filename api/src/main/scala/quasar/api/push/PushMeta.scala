@@ -23,7 +23,7 @@ import quasar.api.resource.ResourcePath
 
 final case class PushMeta[D](
   destinationId: D,
-  destination: ResourcePath,
+  path: ResourcePath,
   resultType: ResultType,
   status: Status,
   limit: Option[Long])
