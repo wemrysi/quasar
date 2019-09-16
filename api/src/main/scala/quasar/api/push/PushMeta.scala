@@ -16,29 +16,14 @@
 
 package quasar.api.push
 
-import slamdata.Predef.{Option, Long, Unit}
+import slamdata.Predef._
 
-import quasar.Condition
 import quasar.api.destination.ResultType
 import quasar.api.resource.ResourcePath
 
-import scalaz.\/
-
-/** @tparam F effects
-  * @tparam T Table Id
-  * @tparam D Destination Id
-  */
-trait ResultPush[F[_], TableId, DestinationId] {
-  import ResultPushError._
-
-  def start(tableId: TableId, destinationId: DestinationId, path: ResourcePath, format: ResultType, limit: Option[Long])
-      : F[Condition[ResultPushError[TableId, DestinationId]]]
-
-  def cancel(tableId: TableId)
-      : F[Condition[ExistentialError[TableId, DestinationId]]]
-
-  def status(tableId: TableId)
-      : F[TableNotFound[TableId] \/ Option[PushMeta[DestinationId]]]
-
-  def cancelAll: F[Unit]
-}
+final case class PushMeta[D](
+  destinationId: D,
+  path: ResourcePath,
+  resultType: ResultType,
+  status: Status,
+  limit: Option[Long])

@@ -22,7 +22,7 @@ import quasar.Condition
 import quasar.api.destination.{Destination, ResultSink}
 import quasar.api.QueryEvaluator
 import quasar.api.destination.ResultType
-import quasar.api.push.{ResultPush, ResultPushError, ResultRender, Status}
+import quasar.api.push.{PushMeta, ResultPush, ResultPushError, ResultRender, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
 
@@ -52,7 +52,7 @@ class DefaultResultPush[
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, T, Nothing],
     render: ResultRender[F, R],
-    pushStatus: Map[T, Status])
+    pushStatus: Map[T, PushMeta[D]])
     extends ResultPush[F, T, D] {
   import ResultPushError._
 
@@ -92,7 +92,9 @@ class DefaultResultPush[
           ().right
         else
           ResultPushError.PushAlreadyRunning(tableId).left)
-      _ <- EitherT.rightT(Concurrent[F].delay(pushStatus.put(tableId, Status.running(now))))
+
+      pushMeta = PushMeta(destinationId, path, format, Status.running(now), limit)
+      _ <- EitherT.rightT(Concurrent[F].delay(pushStatus.put(tableId, pushMeta)))
 
     } yield ()
 
@@ -104,10 +106,16 @@ class DefaultResultPush[
       _ <- ensureTableExists[ExistentialError[T, D]](tableId)
       result <- EitherT.rightT(jobManager.cancel(tableId))
       now <- EitherT.rightT(instantNow)
-      _ <- EitherT.rightT(Concurrent[F].delay(pushStatus.put(tableId, Status.canceled(now))))
+      statusUpdate = Concurrent[F].delay(pushStatus.computeIfPresent(tableId, {
+        case (_, pm @ PushMeta(_, _, _, Status.Running(startedAt), _)) =>
+          pm.copy(status = Status.canceled(startedAt, now))
+        case (_, pm) =>
+          pm
+      }))
+      _ <- EitherT.rightT(statusUpdate)
     } yield result).run.map(Condition.disjunctionIso.reverseGet(_))
 
-  def status(tableId: T): F[TableNotFound[T] \/ Option[Status]] =
+  def status(tableId: T): F[TableNotFound[T] \/ Option[PushMeta[D]]] =
     (ensureTableExists[TableNotFound[T]](tableId) *>
       EitherT.rightT(Concurrent[F].delay(Option(pushStatus.get(tableId))))).run
 
@@ -144,22 +152,29 @@ object DefaultResultPush {
     render: ResultRender[F, R]
   ): F[DefaultResultPush[F, T, D, Q, R]] = {
     for {
-      pushStatus <- Concurrent[F].delay(new ConcurrentHashMap[T, Status]())
+      pushStatus <- Concurrent[F].delay(new ConcurrentHashMap[T, PushMeta[D]]())
       // we can't keep track of Completed and Failed jobs in this impl, so we consume them from JobManager
       // and update internal state accordingly
       _ <- Concurrent[F].start((jobManager.events.evalMap {
-        case JobEvent.Completed(ti, start, duration) =>
+        case JobEvent.Completed(ti, start, duration) => {
           Concurrent[F].delay(
-            pushStatus.put(ti, Status.finished(
-              epochToInstant(start.epoch),
-              epochToInstant(start.epoch + duration))))
+            pushStatus.computeIfPresent(ti, {
+              case (_, pm) =>
+                pm.copy(status = Status.finished(
+                  epochToInstant(start.epoch),
+                  epochToInstant(start.epoch + duration)))
+            }))
+        }
 
         case JobEvent.Failed(ti, start, duration, ex) =>
           Concurrent[F].delay(
-            pushStatus.put(ti, Status.failed(
-              ex,
-              epochToInstant(start.epoch),
-              epochToInstant(start.epoch + duration))))
+            pushStatus.computeIfPresent(ti, {
+              case (_, pm) =>
+                pm.copy(status = Status.failed(
+                  ex,
+                  epochToInstant(start.epoch),
+                  epochToInstant(start.epoch + duration)))
+            }))
       }).compile.drain)
     } yield new DefaultResultPush(lookupTable, evaluator, lookupDestination, jobManager, render, pushStatus)
   }

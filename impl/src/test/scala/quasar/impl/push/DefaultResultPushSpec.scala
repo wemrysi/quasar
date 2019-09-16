@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.api.QueryEvaluator
 import quasar.api.destination.{Destination, DestinationType, ResultSink, ResultType}
-import quasar.api.push.{ResultPush, ResultPushError, ResultRender, Status}
+import quasar.api.push.{PushMeta, ResultPush, ResultPushError, ResultRender, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
 import quasar.api.table.{TableColumn, TableName, TableRef}
@@ -208,7 +208,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- cleanup
       } yield {
         pushStatus must beLike {
-          case \/-(Some(Status.Running(_))) => ok
+          case \/-(Some(PushMeta(DestinationId, _, ResultType.Csv, Status.Running(_), None))) => ok
         }
       }
     }
@@ -230,7 +230,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- cleanup
       } yield {
         pushStatus must beLike {
-          case \/-(Some(Status.Canceled(_))) => ok
+          case \/-(Some(PushMeta(DestinationId, _, ResultType.Csv, Status.Canceled(_, _), None))) => ok
         }
       }
     }
@@ -251,7 +251,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- cleanup
       } yield {
         pushStatus must beLike {
-          case \/-(Some(Status.Finished(_, _))) => ok
+          case \/-(Some(PushMeta(DestinationId, _, ResultType.Csv, Status.Finished(_, _), None))) => ok
         }
       }
     }
@@ -273,7 +273,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         _ <- cleanup
       } yield {
         pushStatus must beLike {
-          case \/-(Some(Status.Failed(ex, _, _))) => ex.getMessage must equal("boom")
+          case \/-(Some(PushMeta(DestinationId, _, ResultType.Csv, Status.Failed(ex, _, _), None))) =>
+            ex.getMessage must equal("boom")
         }
       }
     }
