@@ -75,7 +75,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   }
 
   final class MockResultRender extends ResultRender[IO, String] {
-    def renderCsv(input: String, columns: List[TableColumn]): Stream[IO, Byte] =
+    def renderCsv(input: String, columns: List[TableColumn], limit: Option[Long]): Stream[IO, Byte] =
       Stream(input).through(text.utf8Encode)
 
     def renderJson(input: String, prefix: String, delimiter: String, suffix: String): Stream[IO, Byte] =

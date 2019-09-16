@@ -80,7 +80,7 @@ class DefaultResultPush[
 
       evaluated <- EitherT.rightT(format match {
         case ResultType.Csv =>
-          evaluator.evaluate(query).map(_.flatMap(render.renderCsv(_, columns)))
+          evaluator.evaluate(query).map(_.flatMap(render.renderCsv(_, columns, limit)))
       })
 
       sinked = Stream.eval(sink.run(path, columns, evaluated)).map(Right(_))
