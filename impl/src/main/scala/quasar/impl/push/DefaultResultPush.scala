@@ -80,7 +80,7 @@ class DefaultResultPush[
 
       evaluated <- EitherT.rightT(format match {
         case ResultType.Csv =>
-          evaluator.evaluate(query).map(_.flatMap(render.renderCsv(_, columns, limit)))
+          evaluator.evaluate(query).map(_.flatMap(render.renderCsv(_, columns, sink.includeHeader, limit)))
       })
 
       sinked = Stream.eval(sink.run(path, columns, evaluated)).map(Right(_))
@@ -129,7 +129,7 @@ class DefaultResultPush[
 
   private def findCsvSink(sinks: NonEmptyList[ResultSink[F]]): Option[ResultSink.Csv[F]] =
     sinks.findMapM[Id.Id, ResultSink.Csv[F]] {
-      case csvSink @ ResultSink.Csv(_) => csvSink.some
+      case csvSink @ ResultSink.Csv(_, _) => csvSink.some
       case _ => none
     }
 
