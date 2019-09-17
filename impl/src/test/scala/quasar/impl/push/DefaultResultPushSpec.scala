@@ -58,7 +58,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     def destinationType: DestinationType = RefDestinationType
     def sinks = NonEmptyList(csvSink)
 
-    val csvSink: ResultSink[IO] = ResultSink.Csv[IO] {
+    val csvSink: ResultSink[IO] = ResultSink.csv[IO](true) {
       case (dst, columns, bytes) =>
         bytesToString(bytes).evalMap(str =>
           ref.update(currentFs =>
@@ -75,7 +75,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   }
 
   final class MockResultRender extends ResultRender[IO, String] {
-    def renderCsv(input: String, columns: List[TableColumn], limit: Option[Long]): Stream[IO, Byte] =
+    def renderCsv(input: String, columns: List[TableColumn], includeHeader: Boolean, limit: Option[Long])
+        : Stream[IO, Byte] =
       Stream(input).through(text.utf8Encode)
 
     def renderJson(input: String, prefix: String, delimiter: String, suffix: String): Stream[IO, Byte] =

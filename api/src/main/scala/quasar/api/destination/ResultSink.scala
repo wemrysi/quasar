@@ -26,5 +26,9 @@ import fs2.Stream
 sealed trait ResultSink[F[_]]
 
 object ResultSink {
-  final case class Csv[F[_]](run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => F[Unit]) extends ResultSink[F]
+  final case class Csv[F[_]](includeHeader: Boolean, run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => F[Unit]) extends ResultSink[F]
+
+  def csv[F[_]](includeHeader: Boolean)(run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => F[Unit])
+      : ResultSink[F] =
+    Csv[F](includeHeader, run)
 }

@@ -46,7 +46,7 @@ class MockDestination[F[_]: Applicative] extends Destination[F] {
     MockDestinationModule.destinationType
   def sinks = NonEmptyList(mockCsvSink)
 
-  val mockCsvSink = ResultSink.Csv[F] {
+  val mockCsvSink = ResultSink.csv[F](true) {
     case (_, _, _) => ().point[F]
   }
 }
