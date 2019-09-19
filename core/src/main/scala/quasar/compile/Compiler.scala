@@ -234,6 +234,7 @@ final class Compiler[M[_], T: Equal]
       CIName("time_of_day")               -> date.TimeOfDay,
       CIName("to_timestamp")              -> date.ToTimestamp,
       CIName("to_local")                  -> date.ToLocal,
+      CIName("to_offset")                 -> date.ToOffset,
       CIName("squash")                    -> identity.Squash,
       CIName("type_of")                   -> identity.TypeOf,
       CIName("abs")                       -> math.Abs,

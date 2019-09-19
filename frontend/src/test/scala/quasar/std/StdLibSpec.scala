@@ -1607,25 +1607,78 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ToLocal" >> {
-        "OffsetDateTime" >> {
-          unary(
-            ToLocal(_).embed,
-            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T23:31:30.011+12:15:18")),
-            Data.LocalDateTime(JLocalDateTime.parse("2009-02-13T23:31:30.011")))
+        "OffsetDateTime earlier offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T21:31:30.011+10:00")),
+            Data.Str("+01:00"),
+            Data.LocalDateTime(JLocalDateTime.parse("2009-02-13T12:31:30.011")))
         }
 
-        "OffsetDate" >> {
-          unary(
-            ToLocal(_).embed,
-            Data.OffsetDate(QOffsetDate.parse("2009-02-13+12:15:18")),
+        "OffsetDateTime later offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T21:31:30.011-10:00")),
+            Data.Str("+01:00"),
+            Data.LocalDateTime(JLocalDateTime.parse("2009-02-14T08:31:30.011")))
+        }
+
+        "OffsetDate earlier offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDate(QOffsetDate.parse("2009-02-13+10:00")),
+            Data.Str("+01:00"),
             Data.LocalDate(JLocalDate.parse("2009-02-13")))
         }
 
-        "OffsetTime" >> {
-          unary(
-            ToLocal(_).embed,
-            Data.OffsetTime(JOffsetTime.parse("23:31:30.011+12:15:18")),
-            Data.LocalTime(JLocalTime.parse("23:31:30.011")))
+        "OffsetDate later offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDate(QOffsetDate.parse("2009-02-13-10:00")),
+            Data.Str("+01:00"),
+            Data.LocalDate(JLocalDate.parse("2009-02-13")))
+        }
+
+        "OffsetTime earlier offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetTime(JOffsetTime.parse("21:31:30.011+10:00")),
+            Data.Str("+01:00"),
+            Data.LocalTime(JLocalTime.parse("12:31:30.011")))
+        }
+
+        "OffsetTime later offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetTime(JOffsetTime.parse("21:31:30.011-10:00")),
+            Data.Str("+01:00"),
+            Data.LocalTime(JLocalTime.parse("08:31:30.011")))
+        }
+      }
+
+      "ToOffset" >> {
+        "LocalDateTime" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalDateTime(JLocalDateTime.parse("2009-02-13T12:31:30.011")),
+            Data.Str("+01:00"),
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T12:31:30.011+01:00")))
+        }
+
+        "LocalDate" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalDate(JLocalDate.parse("2009-02-13")),
+            Data.Str("+01:00"),
+            Data.OffsetDate(QOffsetDate.parse("2009-02-13+01:00")))
+        }
+
+        "LocalTime" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalTime(JLocalTime.parse("08:31:30.011")),
+            Data.Str("+01:00"),
+            Data.OffsetTime(JOffsetTime.parse("08:31:30.011+01:00")))
         }
       }
 
