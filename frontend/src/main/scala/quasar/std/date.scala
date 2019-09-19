@@ -239,12 +239,12 @@ trait DateLib extends Library with Serializable {
 
   val ToLocal = BinaryFunc(
     Mapping,
-    "Converts an offset date, time, or datetime and timezone string to a local date, time, or datetime.",
+    "Converts an offset date, time, or datetime and offset string to a local date, time, or datetime.",
     noSimplification)
 
   val ToOffset = BinaryFunc(
     Mapping,
-    "Converts a local date, time, or datetime and timezone string to an offset date, time, or datetime.",
+    "Converts a local date, time, or datetime and offset string to an offset date, time, or datetime.",
     noSimplification)
 }
 
