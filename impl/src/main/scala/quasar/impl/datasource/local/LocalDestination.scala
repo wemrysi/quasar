@@ -18,15 +18,19 @@ package quasar.impl.datasource.local
 
 import slamdata.Predef.{Stream => _, _}
 
+import cats.effect.{ContextShift, Effect}
+
+import fs2.io
+
 import quasar.api.destination.{Destination, ResultSink}
+import quasar.api.push.RenderConfig
 import quasar.concurrent.BlockingContext
 import quasar.connector.{MonadResourceErr, ResourceError}
 
-import cats.effect.{ContextShift, Effect}
-import fs2.io
 import scalaz.NonEmptyList
 import scalaz.syntax.monad._
 import scalaz.syntax.tag._
+
 import shims._
 
 import java.nio.file.{Path => JPath}
@@ -41,7 +45,7 @@ final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] priva
     NonEmptyList(csvSink(root, blockingContext))
 
   private def csvSink(root: JPath, blockingContext: BlockingContext): ResultSink[F] =
-    ResultSink.csv(true)((dst, columns, bytes) =>
+    ResultSink.csv(RenderConfig.Csv())((dst, columns, bytes) =>
         resolvedResourcePath[F](root, dst) >>= {
           case Some(writePath) =>
             val fileSink = io.file.writeAll[F](writePath, blockingContext.unwrap)

@@ -18,28 +18,33 @@ package quasar.impl.push
 
 import slamdata.Predef._
 
+import cats.effect.IO
+
+import eu.timepit.refined.auto._
+
+import fs2.concurrent.SignallingRef
+import fs2.job.JobManager
+import fs2.{Stream, text}
+
+import org.specs2.matcher.MatchResult
+
 import quasar.api.QueryEvaluator
 import quasar.api.destination.{Destination, DestinationType, ResultSink, ResultType}
-import quasar.api.push.{PushMeta, ResultPush, ResultPushError, ResultRender, Status}
+import quasar.api.push.{PushMeta, RenderConfig, ResultPush, ResultPushError, ResultRender, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
 import quasar.api.table.{TableColumn, TableName, TableRef}
 import quasar.{ConditionMatchers, EffectfulQSpec}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-
-import cats.effect.IO
-import eu.timepit.refined.auto._
-import fs2.concurrent.SignallingRef
-import fs2.job.JobManager
-import fs2.{Stream, text}
-import org.specs2.matcher.MatchResult
 import scalaz.std.set._
 import scalaz.std.string._
 import scalaz.syntax.bind._
 import scalaz.{Equal, NonEmptyList, \/-}
+
 import shims._
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   implicit val tmr = IO.timer(global)
@@ -58,7 +63,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     def destinationType: DestinationType = RefDestinationType
     def sinks = NonEmptyList(csvSink)
 
-    val csvSink: ResultSink[IO] = ResultSink.csv[IO](true) {
+    val csvSink: ResultSink[IO] = ResultSink.csv[IO](RenderConfig.Csv()) {
       case (dst, columns, bytes) =>
         bytesToString(bytes).evalMap(str =>
           ref.update(currentFs =>
@@ -75,11 +80,20 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   }
 
   final class MockResultRender extends ResultRender[IO, String] {
-    def renderCsv(input: String, columns: List[TableColumn], includeHeader: Boolean, limit: Option[Long])
+    def renderCsv(
+        input: String,
+        columns: List[TableColumn],
+        config: RenderConfig.Csv,
+        limit: Option[Long])
         : Stream[IO, Byte] =
       Stream(input).through(text.utf8Encode)
 
-    def renderJson(input: String, prefix: String, delimiter: String, suffix: String): Stream[IO, Byte] =
+    def renderJson(
+        input: String,
+        prefix: String,
+        delimiter: String,
+        suffix: String)
+        : Stream[IO, Byte] =
       Stream.empty
   }
 
