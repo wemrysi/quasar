@@ -14,22 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.api.destination
+package quasar.api.push
 
-import slamdata.Predef.{Stream => _, _}
+import scala.Boolean
 
-import quasar.api.push.RenderConfig
-import quasar.api.resource.ResourcePath
-import quasar.api.table.TableColumn
+import java.time.format.DateTimeFormatter
 
-import fs2.Stream
+object RenderConfig {
+  import DateTimeFormatter._
 
-sealed trait ResultSink[F[_]]
-
-object ResultSink {
-  final case class Csv[F[_]](config: RenderConfig.Csv, run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => F[Unit]) extends ResultSink[F]
-
-  def csv[F[_]](config: RenderConfig.Csv)(run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => F[Unit])
-      : ResultSink[F] =
-    Csv[F](config, run)
+  final case class Csv(
+      includeHeader: Boolean = true,
+      offsetDateTimeFormat: DateTimeFormatter = ISO_DATE_TIME,
+      offsetDateFormat: DateTimeFormatter = ISO_OFFSET_DATE,
+      offsetTimeFormat: DateTimeFormatter = ISO_OFFSET_TIME,
+      localDateTimeFormat: DateTimeFormatter = ISO_LOCAL_DATE_TIME,
+      localDateFormat: DateTimeFormatter = ISO_LOCAL_DATE,
+      localTimeFormat: DateTimeFormatter = ISO_LOCAL_TIME)
 }
