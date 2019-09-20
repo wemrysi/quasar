@@ -16,8 +16,9 @@
 
 package quasar.api.push
 
-import scala.Boolean
+import scala.{Boolean, Option, None}
 
+import java.lang.String
 import java.time.format.DateTimeFormatter
 
 object RenderConfig {
@@ -25,6 +26,7 @@ object RenderConfig {
 
   final case class Csv(
       includeHeader: Boolean = true,
+      nullSentinel: Option[String] = None,
       offsetDateTimeFormat: DateTimeFormatter = ISO_OFFSET_DATE_TIME,
       offsetDateFormat: DateTimeFormatter = ISO_OFFSET_DATE,
       offsetTimeFormat: DateTimeFormatter = ISO_OFFSET_TIME,
