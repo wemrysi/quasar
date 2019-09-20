@@ -1607,6 +1607,22 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ToLocal" >> {
+        "OffsetDateTime invalid offset: ZoneRulesException" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T21:31:30.011+10:00")),
+            Data.Str("foo"),
+            Data.NA)
+        }
+
+        "OffsetDateTime invalid offset: DateTimeException" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T21:31:30.011+10:00")),
+            Data.Str("+"),
+            Data.NA)
+        }
+
         "OffsetDateTime earlier offset" >> {
           binary(
             ToLocal(_, _).embed,
@@ -1623,6 +1639,14 @@ abstract class StdLibSpec extends Qspec {
             Data.LocalDateTime(JLocalDateTime.parse("2009-02-14T08:31:30.011")))
         }
 
+        "OffsetDate invalid offset: DateTimeException" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDate(QOffsetDate.parse("2009-02-13+10:00")),
+            Data.Str("foo"),
+            Data.NA)
+        }
+
         "OffsetDate earlier offset" >> {
           binary(
             ToLocal(_, _).embed,
@@ -1637,6 +1661,14 @@ abstract class StdLibSpec extends Qspec {
             Data.OffsetDate(QOffsetDate.parse("2009-02-13-10:00")),
             Data.Str("+01:00"),
             Data.LocalDate(JLocalDate.parse("2009-02-13")))
+        }
+
+        "OffsetTime invalid offset: DateTimeException" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetTime(JOffsetTime.parse("21:31:30.011+10:00")),
+            Data.Str("foo"),
+            Data.NA)
         }
 
         "OffsetTime earlier offset" >> {
@@ -1665,6 +1697,22 @@ abstract class StdLibSpec extends Qspec {
             Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T12:31:30.011+01:00")))
         }
 
+        "LocalDateTime invalid offset: ZoneRuleException" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalDateTime(JLocalDateTime.parse("2009-02-13T12:31:30.011")),
+            Data.Str("foo"),
+            Data.NA)
+        }
+
+        "LocalDateTime invalid offset: DateTimeException" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalDateTime(JLocalDateTime.parse("2009-02-13T12:31:30.011")),
+            Data.Str("+"),
+            Data.NA)
+        }
+
         "LocalDate" >> {
           binary(
             ToOffset(_, _).embed,
@@ -1673,12 +1721,28 @@ abstract class StdLibSpec extends Qspec {
             Data.OffsetDate(QOffsetDate.parse("2009-02-13+01:00")))
         }
 
+        "LocalDate invalid offset" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalDate(JLocalDate.parse("2009-02-13")),
+            Data.Str("foo"),
+            Data.NA)
+        }
+
         "LocalTime" >> {
           binary(
             ToOffset(_, _).embed,
             Data.LocalTime(JLocalTime.parse("08:31:30.011")),
             Data.Str("+01:00"),
             Data.OffsetTime(JOffsetTime.parse("08:31:30.011+01:00")))
+        }
+
+        "LocalTime invalid offset: DateTimeException" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalTime(JLocalTime.parse("08:31:30.011")),
+            Data.Str("foo"),
+            Data.NA)
         }
       }
 
