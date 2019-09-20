@@ -21,7 +21,7 @@ import quasar.fp.ski._
 
 import java.net.{URLDecoder, URLEncoder}
 
-import argonaut._
+import _root_.argonaut._
 import monocle.Prism
 import _root_.pathy.Path, Path._
 import _root_.pathy.argonaut._
