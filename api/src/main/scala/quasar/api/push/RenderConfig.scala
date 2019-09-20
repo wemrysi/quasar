@@ -24,7 +24,7 @@ object RenderConfig {
   import DateTimeFormatter._
 
   // please note that binary compatibility is *only* guaranteed on this if you
-  // construct instances named arguments
+  // construct instances based on named arguments
   final case class Csv(
       includeHeader: Boolean = true,
       includeBom: Boolean = true,
