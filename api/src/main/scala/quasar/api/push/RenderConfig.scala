@@ -16,8 +16,9 @@
 
 package quasar.api.push
 
-import scala.Boolean
+import scala.{Boolean, Option, None}
 
+import java.lang.String
 import java.time.format.DateTimeFormatter
 
 object RenderConfig {
