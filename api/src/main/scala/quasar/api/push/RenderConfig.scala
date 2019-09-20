@@ -25,7 +25,7 @@ object RenderConfig {
 
   final case class Csv(
       includeHeader: Boolean = true,
-      offsetDateTimeFormat: DateTimeFormatter = ISO_DATE_TIME,
+      offsetDateTimeFormat: DateTimeFormatter = ISO_OFFSET_DATE_TIME,
       offsetDateFormat: DateTimeFormatter = ISO_OFFSET_DATE,
       offsetTimeFormat: DateTimeFormatter = ISO_OFFSET_TIME,
       localDateTimeFormat: DateTimeFormatter = ISO_LOCAL_DATE_TIME,
