@@ -23,8 +23,11 @@ import java.time.format.DateTimeFormatter
 object RenderConfig {
   import DateTimeFormatter._
 
+  // please note that binary compatibility is *only* guaranteed on this if you
+  // construct instances named arguments
   final case class Csv(
       includeHeader: Boolean = true,
+      includeBom: Boolean = true,
       offsetDateTimeFormat: DateTimeFormatter = ISO_DATE_TIME,
       offsetDateFormat: DateTimeFormatter = ISO_OFFSET_DATE,
       offsetTimeFormat: DateTimeFormatter = ISO_OFFSET_TIME,
