@@ -49,6 +49,13 @@ abstract class LocalDatasourceSpec
 
   def gatherMultiple[A](g: Stream[IO, A]) = g.compile.toList
 
+  def compileData(qr: QueryResult[IO]): IO[Int] =
+    qr match {
+      case QueryResult.Parsed(_, data, _) => data.foldMap(κ(1)).compile.lastOrError
+      case QueryResult.Typed(_, data, _) => data.foldMap(κ(1)).compile.lastOrError
+      case QueryResult.Stateful(_, _, _, _, _) => scala.sys.error("stateful not tested")
+    }
+
   "directory jail" >> {
     val tio = ResourcePath.root() / ResourceName("..") / ResourceName("scala")
 
@@ -68,7 +75,7 @@ abstract class LocalDatasourceSpec
   "returns data from a nonempty file" >>* {
     datasource
       .evaluate(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.ldjson"), ScalarStages.Id))
-      .flatMap(_.data.foldMap(κ(1)).compile.lastOrError)
+      .flatMap(compileData)
       .map(_ must be_>(0))
   }
 }
@@ -106,7 +113,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json"), ScalarStages.Id)
 
     ds.evaluate(iread)
-      .flatMap(_.data.foldMap(κ(1)).compile.lastOrError)
+      .flatMap(compileData)
       .map(_ must_=== 100)
   }
 
@@ -122,7 +129,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.gz"), ScalarStages.Id)
 
     ds.evaluate(iread)
-      .flatMap(_.data.foldMap(κ(1)).compile.lastOrError)
+      .flatMap(compileData)
       .map(_ must_=== 100)
   }
 
@@ -136,7 +143,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.csv"), ScalarStages.Id)
 
     ds.evaluate(iread)
-      .flatMap(_.data.foldMap(κ(1)).compile.lastOrError)
+      .flatMap(compileData)
       .map(_ must_=== 100)
   }
 }
