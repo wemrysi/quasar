@@ -255,6 +255,9 @@ lazy val connector = project
     foundation % "test->test",
     qscript)
   .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.slamdata" %% "tectonic" % tectonicVersion.value))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project

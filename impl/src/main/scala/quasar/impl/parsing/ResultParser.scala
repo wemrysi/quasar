@@ -83,6 +83,8 @@ object ResultParser {
         case QueryResult.Typed(pt, data, _) =>
           data.through(typed[F, A](pt))
 
+        case QueryResult.Stateful(_, _, _, _, _) =>
+          scala.sys.error("result parsing not implemented for QueryResult.Stateful")
       }
     if (queryResult.stages === ScalarStages.Id)
       parsedStream(queryResult)
