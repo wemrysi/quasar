@@ -21,14 +21,16 @@ import slamdata.Predef._
 import quasar.impl.cluster.Timestamped, Timestamped._
 
 import cats.FlatMap
-import cats.effect.Timer
+import cats.effect.{Timer, Sync}
+import cats.effect.concurrent.Ref
 import cats.syntax.functor._
 import cats.syntax.flatMap._
 
 import fs2.Stream
 
-final case class TimestampedStore[F[_]: FlatMap: Timer, K, V](
-    underlying: IndexedStore[F, K, Timestamped[V]])
+final class TimestampedStore[F[_]: FlatMap: Timer, K, V](
+    val underlying: IndexedStore[F, K, Timestamped[V]],
+    ref: Ref[F, Map[K, Long]])
     extends IndexedStore[F, K, V] {
 
   def entries: Stream[F, (K, V)] =
@@ -37,12 +39,29 @@ final case class TimestampedStore[F[_]: FlatMap: Timer, K, V](
   def lookup(k: K): F[Option[V]] =
     underlying.lookup(k).map(_.flatMap(raw(_)))
 
-  def insert(k: K, v: V): F[Unit] =
-    tagged[F, V](v).flatMap(underlying.insert(k, _))
+  def insert(k: K, v: V): F[Unit] = for {
+    toInsert <- tagged[F, V](v)
+    _ <- underlying.insert(k, toInsert)
+    _ <- ref.modify((mp: Map[K, Long]) => (mp.updated(k, timestamp(toInsert)), ()))
+  } yield ()
 
   def delete(k: K): F[Boolean] = for {
     was <- underlying.lookup(k)
     tmb <- tombstone[F, V]
     res <- underlying.insert(k, tmb)
+    _ <- ref.modify((mp: Map[K, Long]) => (mp.updated(k, timestamp(tmb)), ()))
   } yield was.flatMap(raw(_)).nonEmpty
+
+  def timestamps: F[Map[K, Long]] = ref.get
+}
+
+object TimestampedStore {
+  def apply[F[_]: Sync: Timer, K, V](
+      underlying: IndexedStore[F, K, Timestamped[V]])
+      : F[TimestampedStore[F, K, V]] = for {
+    entries <- underlying.entries.compile.toList.map(_.toMap)
+    r <- Ref.of[F, Map[K, Long]](entries.map {
+      case (k, v) => (k, timestamp(v))
+    })
+  } yield new TimestampedStore[F, K, V](underlying, r)
 }

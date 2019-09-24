@@ -47,7 +47,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
     Resource.liftF[IO, Persistence](IO(new ConcurrentHashMap[String, Timestamped[String]]()))
       .map(ConcurrentMapIndexedStore.unhooked[IO, String, Timestamped[String]](_, pool))
 
-  val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = underlying.map(TimestampedStore(_))
+  val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = underlying.evalMap(TimestampedStore(_))
   val valueA = "A"
   val valueB = "B"
   val freshIndex = IO(Random.nextInt().toString)
@@ -57,7 +57,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
       underlying.use { (us: UnderlyingStore) => for {
         bar <- Timestamped.tagged[IO, String]("bar")
         _ <- us.insert("foo", bar)
-        ts = TimestampedStore(us)
+        ts <- TimestampedStore(us)
         res <- ts.lookup("foo")
       } yield {
         res mustEqual Some("bar")
@@ -65,7 +65,8 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
     }
     "inserted values are timestamps" >>* {
       underlying.use { (us: UnderlyingStore) => for {
-        _ <- TimestampedStore(us).insert("foo", "bar")
+        ts <- TimestampedStore(us)
+        _ <- ts.insert("foo", "bar")
         bar <- us.lookup("foo")
       } yield {
         bar.flatMap(Timestamped.raw(_)) mustEqual Some("bar")
@@ -74,8 +75,9 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
     "deletion preserves tombstones" >>* {
       underlying.use { (us: UnderlyingStore) => for {
         start <- timer.clock.realTime(MILLISECONDS)
-        _ <- TimestampedStore(us).insert("foo", "bar")
-        _ <- TimestampedStore(us).delete("foo")
+        ts <- TimestampedStore(us)
+        _ <- ts.insert("foo", "bar")
+        _ <- ts.delete("foo")
         t <- us.lookup("foo")
         stop <- timer.clock.realTime(MILLISECONDS)
       } yield {

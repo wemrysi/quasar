@@ -25,7 +25,6 @@ import cats.~>
 import cats.effect._
 import cats.effect.concurrent.Semaphore
 import cats.instances.list._
-import cats.instances.option._
 import cats.syntax.applicative._
 import cats.syntax.apply._
 import cats.syntax.flatMap._
@@ -74,44 +73,35 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
     (Stream.eval(sendAd) *> Stream.sleep(ms(config.adTimeoutMillis))).repeat
 
   private def sendAd: F[Unit] =
-    prepareAd.flatMap(cluster.gossip(Advertisement(name), _))
-
-  private def prepareAd: F[Map[K, Long]] =
-    underlying.entries.map({ case (k, v) => (k, timestamp(v))}).compile.toList.map(_.toMap)
+    store.timestamps.flatMap(cluster.gossip(Advertisement(name), _))
 
   // RECEIVING ADS
   private def handleAdvertisement(id: cluster.Id, ad: Map[K, Long]): F[Unit] = {
     type Accum = (List[K], Map[K, Timestamped[V]])
 
-    // sender has no idea about this keys
-    val fInitMap: F[Map[K, Timestamped[V]]] =
-      underlying
-        .entries
-        .map({ case (k, v) => ad.get(k) as ((k, v)) })
-        .unNone
-        .compile
-        .toList
-        .map(_.toMap)
-
-    val fInit: F[Accum] = fInitMap.map((List(), _))
-
-    // for every key in advertisement
-    def result(init: Accum)  = ad.toList.foldM[F, Accum](init){ (acc, v) => (acc, v) match {
-      case ((requesting, returning), (k, v)) => for {
-        // we have the following value
-        mbCurrent <- underlying.lookup(k)
-        res <- if (mbCurrent.fold(0L)(timestamp(_)) < v) {
-          // and it's older than in adsender node -> update request
+    // Note, that we don't handle keys aren't presented in advertisement
+    // They are handled when this node sends its advertisement instead.
+    // for every key in advertisement having the most recent modification timestamp map
+    def result(init: Accum, timestamps: Map[K, Long])  = ad.toList.foldM[F, Accum](init){ (acc, v) => (acc, v) match {
+      case ((requesting, returning), (k, incoming)) => for {
+        // when this key was modified last time
+        current <- timestamps.get(k).getOrElse(0L).pure[F]
+        res <- if (current < incoming) {
+          // current value is older than incoming, add key to update request
           ((k :: requesting, returning)).pure[F]
-        } else {
-          // and we we have newer value -> update response
-          mbCurrent.fold(tombstone[F, V])(_.pure[F]).map((v: Timestamped[V]) => (requesting, returning.updated(k, v)))
+        } else underlying.lookup(k).map {
+          case None =>
+            acc // impossible in theory, but can't figure out how to handle this gracefully
+          case Some(having) =>
+            // Value we have is newer than incoming, create update message
+            (requesting, returning.updated(k, having))
         }
+
       } yield res
     }}
     for {
-      init <- fInit
-      (requesting, returning) <- result(init)
+      timestamps <- store.timestamps
+      (requesting, returning) <- result((List(), Map.empty), timestamps)
       _ <- cluster.unicast(RequestUpdate(name), requesting, id)
       _ <- cluster.unicast(Update(name), returning, id)
     } yield ()
