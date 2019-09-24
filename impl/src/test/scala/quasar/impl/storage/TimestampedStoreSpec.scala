@@ -21,7 +21,10 @@ import slamdata.Predef._
 import quasar.concurrent.BlockingContext
 import quasar.impl.cluster.Timestamped
 
-import cats.effect.{IO, Resource, Timer}
+import cats.effect.{IO, Resource, Timer, ContextShift, Concurrent}
+import cats.effect.concurrent.Ref
+
+import fs2.Stream
 
 import scalaz.std.string._
 
@@ -47,7 +50,11 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
     Resource.liftF[IO, Persistence](IO(new ConcurrentHashMap[String, Timestamped[String]]()))
       .map(ConcurrentMapIndexedStore.unhooked[IO, String, Timestamped[String]](_, pool))
 
-  val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = underlying.evalMap(TimestampedStore(_))
+  val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = for {
+    u <- underlying
+    res <- TimestampedStore(u, pool)
+  } yield res
+
   val valueA = "A"
   val valueB = "B"
   val freshIndex = IO(Random.nextInt().toString)
@@ -57,7 +64,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
       underlying.use { (us: UnderlyingStore) => for {
         bar <- Timestamped.tagged[IO, String]("bar")
         _ <- us.insert("foo", bar)
-        ts <- TimestampedStore(us)
+        ts <- TimestampedStore(us, pool).use(IO(_))
         res <- ts.lookup("foo")
       } yield {
         res mustEqual Some("bar")
@@ -65,7 +72,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
     }
     "inserted values are timestamps" >>* {
       underlying.use { (us: UnderlyingStore) => for {
-        ts <- TimestampedStore(us)
+        ts <- TimestampedStore(us, pool).use(IO(_))
         _ <- ts.insert("foo", "bar")
         bar <- us.lookup("foo")
       } yield {
@@ -75,7 +82,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
     "deletion preserves tombstones" >>* {
       underlying.use { (us: UnderlyingStore) => for {
         start <- timer.clock.realTime(MILLISECONDS)
-        ts <- TimestampedStore(us)
+        ts <- TimestampedStore(us, pool).use(IO(_))
         _ <- ts.insert("foo", "bar")
         _ <- ts.delete("foo")
         t <- us.lookup("foo")
@@ -88,6 +95,21 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
         }
       }}
     }
+    "timestamps works" >>* {
+      underlying.use { (us: UnderlyingStore) => for {
+        ts <- TimestampedStore(us, pool).use(IO(_))
+        _ <- ts.insert("foo", "bar")
+        _ <- ts.delete("foo")
+        _ <- ts.insert("foo", "baz")
+        _ <- ts.insert("bar", "foo")
+        foo <- us.lookup("foo")
+        bar <- us.lookup("bar")
+        timestamps <- ts.timestamps
+      } yield {
+        timestamps.size mustEqual 2
+        timestamps.get("foo") mustEqual(foo.map(Timestamped.timestamp(_)))
+        timestamps.get("bar") mustEqual(bar.map(Timestamped.timestamp(_)))
+      }}
+    }
   }
-
 }

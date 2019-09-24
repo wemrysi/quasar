@@ -54,7 +54,7 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
   } yield NodeInfo(id, "localhost", port)
 
   val pool = BlockingContext.cached("antientropy-spec-pool")
-  val sleep: IO[Unit] = timer.sleep(new FiniteDuration(2000, MILLISECONDS))
+  val sleep: IO[Unit] = timer.sleep(new FiniteDuration(4000, MILLISECONDS))
 
   type Persistence = ConcurrentHashMap[String, Timestamped[String]]
   type UnderlyingStore = IndexedStore[IO, String, Timestamped[String]]
@@ -67,7 +67,7 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
       : Resource[IO, Store] = for {
     atomix <- Atomix.resource[IO](me, seeds.map(_.address))
     storage <- Resource.liftF(IO(new ConcurrentHashMap[String, Timestamped[String]]()))
-    timestamped <- Resource.liftF(TimestampedStore[IO, String, String](underlying))
+    timestamped <- TimestampedStore[IO, String, String](underlying, pool)
     cluster = Atomix.cluster[IO](atomix, pool).contramap(printMessage(_))
     store <- AntiEntropyStore.default[IO, String, String]("default", cluster, timestamped, pool)
   } yield store

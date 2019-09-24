@@ -39,7 +39,7 @@ import scodec.Codec
 import scodec.codecs.{listOfN, int32}
 import scodec.codecs.implicits._
 
-import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
+import scala.concurrent.duration._
 
 import AntiEntropyStore._
 
@@ -155,6 +155,12 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
     cluster.subscribe[List[K]](RequestUpdate(name), config.updateRequestLimit)
       .map(_.evalMap(Function.tupled(updateRequestedHandler(_, _))(_)))
 
+  // BROADCASTING UPDATES
+  def broadcastUpdates: Stream[F, Unit] =
+    store.updates
+      .groupWithin(config.updateBroadcastBatch, config.updateBroadcastMillis.milliseconds)
+      .map(_.toList.toMap)
+      .evalMap(cluster.broadcast(Update(name), _))
 }
 
 object AntiEntropyStore {
@@ -200,6 +206,7 @@ object AntiEntropyStore {
         adReceiver,
         store.sendingAdStream,
         store.purgeTombstones,
+        store.broadcastUpdates,
         updates,
         updateRequester)).parJoinUnbounded
       val storeStream = Stream.emit[F, IndexedStore[F, K, V]](store)
