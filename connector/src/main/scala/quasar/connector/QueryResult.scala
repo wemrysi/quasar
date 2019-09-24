@@ -76,10 +76,10 @@ object QueryResult extends QueryResultInstances {
     def mapK[G[_]](f: F ~> G): QueryResult[G] =
       Stateful[G, P, S](
         format,
-	f(plateF),
-	p => f(state(p)),
-	data(_).translate[F, G](f),
-	stages)
+        f(plateF),
+        p => f(state(p)),
+        data(_).translate[F, G](f),
+        stages)
   }
 
   def parsed[F[_], A](q: QDataDecode[A], d: Stream[F, A], ss: ScalarStages)
