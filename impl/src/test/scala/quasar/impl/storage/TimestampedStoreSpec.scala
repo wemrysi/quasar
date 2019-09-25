@@ -21,10 +21,7 @@ import slamdata.Predef._
 import quasar.concurrent.BlockingContext
 import quasar.impl.cluster.Timestamped
 
-import cats.effect.{IO, Resource, Timer, ContextShift, Concurrent}
-import cats.effect.concurrent.Ref
-
-import fs2.Stream
+import cats.effect.{IO, Resource, Timer}
 
 import scalaz.std.string._
 
