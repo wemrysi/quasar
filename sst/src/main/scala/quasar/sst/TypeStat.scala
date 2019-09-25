@@ -318,16 +318,16 @@ sealed abstract class TypeStatInstances {
         MaxKey -> mx.asEJson[J])
 
     def sstats(ss: SampleStats[A]): J = {
-			val state =
-				emap(
-					SizeKey -> ss.size.asEJson[J],
-				  M1Key -> ss.m1.asEJson[J],
-				  M2Key -> ss.m2.asEJson[J],
-				  M3Key -> ss.m3.asEJson[J],
-				  M4Key -> ss.m4.asEJson[J])
+      val state =
+        emap(
+          SizeKey -> ss.size.asEJson[J],
+          M1Key -> ss.m1.asEJson[J],
+          M2Key -> ss.m2.asEJson[J],
+          M3Key -> ss.m3.asEJson[J],
+          M4Key -> ss.m4.asEJson[J])
 
       emap(
-				(StateKey, state) ::
+        (StateKey, state) ::
         (MeanKey, ss.mean.asEJson[J]) ::
         optEntry(VarianceKey,
           isPopulation.fold(ss.variance, ss.populationVariance)) :::
