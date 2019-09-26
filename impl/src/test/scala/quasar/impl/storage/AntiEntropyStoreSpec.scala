@@ -67,7 +67,7 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
       : Resource[IO, Store] = for {
     atomix <- Atomix.resource[IO](me, seeds.map(_.address))
     storage <- Resource.liftF(IO(new ConcurrentHashMap[String, Timestamped[String]]()))
-    timestamped <- TimestampedStore[IO, String, String](underlying, pool)
+    timestamped <- TimestampedStore[IO, String, String](underlying)
     cluster = Atomix.cluster[IO](atomix, pool).contramap(printMessage(_))
     store <- AntiEntropyStore.default[IO, String, String]("default", cluster, timestamped, pool)
   } yield store

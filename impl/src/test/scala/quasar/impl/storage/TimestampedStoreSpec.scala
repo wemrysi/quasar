@@ -49,7 +49,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
 
   val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = for {
     u <- underlying
-    res <- TimestampedStore(u, pool)
+    res <- TimestampedStore(u)
   } yield res
 
   val valueA = "A"
@@ -62,7 +62,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
         us <- underlying
         bar <- Resource.liftF(Timestamped.tagged[IO, String]("bar"))
         _ <- Resource.liftF(us.insert("foo", bar))
-        ts <- TimestampedStore(us, pool)
+        ts <- TimestampedStore(us)
         res <- Resource.liftF(ts.lookup("foo"))
       } yield {
         res mustEqual Some("bar")
@@ -72,7 +72,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
     "inserted values are timestamps" >>* {
       val resource = for {
         us <- underlying
-        ts <- TimestampedStore(us, pool)
+        ts <- TimestampedStore(us)
         _ <- Resource.liftF(ts.insert("foo", "bar"))
         bar <- Resource.liftF(us.lookup("foo"))
       } yield {
@@ -84,7 +84,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
       val resource = for {
         us <- underlying
         start <- Resource.liftF(timer.clock.realTime(MILLISECONDS))
-        ts <- TimestampedStore(us, pool)
+        ts <- TimestampedStore(us)
         _ <- Resource.liftF(ts.insert("foo", "bar"))
         _ <- Resource.liftF(ts.delete("foo"))
         t <- Resource.liftF(us.lookup("foo"))
@@ -101,7 +101,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
     "timestamps works" >>* {
       val resource = for {
         us <- underlying
-        ts <- TimestampedStore(us, pool)
+        ts <- TimestampedStore(us)
         _ <- Resource.liftF(for {
           _ <- ts.insert("foo", "bar")
           _ <- ts.delete("foo")
