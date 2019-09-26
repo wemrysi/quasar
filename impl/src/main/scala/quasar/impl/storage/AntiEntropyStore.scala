@@ -83,7 +83,7 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
     // They are handled when this node sends its advertisement instead.
     // for every key in advertisement having the most recent modification timestamp map
     def result(init: Accum, timestamps: Map[K, Long])  = ad.toList.foldM[F, Accum](init){
-      case (acc@(requesting, returning), (k, incoming)) => for {
+      case (acc @ (requesting, returning), (k, incoming)) => for {
         // when this key was modified last time
         current <- timestamps.get(k).getOrElse(0L).pure[F]
         res <- if (current < incoming) {
