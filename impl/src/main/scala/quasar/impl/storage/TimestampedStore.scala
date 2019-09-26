@@ -75,13 +75,11 @@ object TimestampedStore {
       r <- Ref.of[F, Map[K, Long]](entries.map {
         case (k, v) => (k, timestamp(v))
       })
-      store <- Concurrent[F].delay(new TimestampedStore(underlying, r, q))
     } yield {
+      val store = new TimestampedStore(underlying, r, q)
       val storeStream = Stream.emit[F, TimestampedStore[F, K, V]](store)
       storeStream.concurrently(store.updates).compile.resource.lastOrError
     }
-    Resource.liftF(res).flatten.mapK[F](new ~>[F, F] {
-      def apply[A](fa: F[A]): F[A] = ContextShift[F].evalOn(pool.unwrap)(fa)
-    })
+    Resource.suspend(res).mapK[F](λ[F ~> F](ContextShift[F].evalOn(pool.unwrap)(_)))
   }
 }

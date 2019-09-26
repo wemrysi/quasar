@@ -58,55 +58,65 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
 
   "timestamp store" >> {
     "lookup for timestamped" >>* {
-      underlying.use { (us: UnderlyingStore) => for {
-        bar <- Timestamped.tagged[IO, String]("bar")
-        _ <- us.insert("foo", bar)
-        ts <- TimestampedStore(us, pool).use(IO(_))
-        res <- ts.lookup("foo")
+      val resource = for {
+        us <- underlying
+        bar <- Resource.liftF(Timestamped.tagged[IO, String]("bar"))
+        _ <- Resource.liftF(us.insert("foo", bar))
+        ts <- TimestampedStore(us, pool)
+        res <- Resource.liftF(ts.lookup("foo"))
       } yield {
         res mustEqual Some("bar")
-      }}
+      }
+      resource.use(IO.pure(_))
     }
     "inserted values are timestamps" >>* {
-      underlying.use { (us: UnderlyingStore) => for {
-        ts <- TimestampedStore(us, pool).use(IO(_))
-        _ <- ts.insert("foo", "bar")
-        bar <- us.lookup("foo")
+      val resource = for {
+        us <- underlying
+        ts <- TimestampedStore(us, pool)
+        _ <- Resource.liftF(ts.insert("foo", "bar"))
+        bar <- Resource.liftF(us.lookup("foo"))
       } yield {
         bar.flatMap(Timestamped.raw(_)) mustEqual Some("bar")
-      }}
+      }
+      resource.use(IO.pure(_))
     }
     "deletion preserves tombstones" >>* {
-      underlying.use { (us: UnderlyingStore) => for {
-        start <- timer.clock.realTime(MILLISECONDS)
-        ts <- TimestampedStore(us, pool).use(IO(_))
-        _ <- ts.insert("foo", "bar")
-        _ <- ts.delete("foo")
-        t <- us.lookup("foo")
-        stop <- timer.clock.realTime(MILLISECONDS)
+      val resource = for {
+        us <- underlying
+        start <- Resource.liftF(timer.clock.realTime(MILLISECONDS))
+        ts <- TimestampedStore(us, pool)
+        _ <- Resource.liftF(ts.insert("foo", "bar"))
+        _ <- Resource.liftF(ts.delete("foo"))
+        t <- Resource.liftF(us.lookup("foo"))
+        stop <- Resource.liftF(timer.clock.realTime(MILLISECONDS))
       } yield {
         t must beLike {
           case Some(Timestamped.Tombstone(stamp)) =>
             stamp must be_>=(start)
             stamp must be_<=(stop)
         }
-      }}
+      }
+      resource.use(IO.pure(_))
     }
     "timestamps works" >>* {
-      underlying.use { (us: UnderlyingStore) => for {
-        ts <- TimestampedStore(us, pool).use(IO(_))
-        _ <- ts.insert("foo", "bar")
-        _ <- ts.delete("foo")
-        _ <- ts.insert("foo", "baz")
-        _ <- ts.insert("bar", "foo")
-        foo <- us.lookup("foo")
-        bar <- us.lookup("bar")
-        timestamps <- ts.timestamps
+      val resource = for {
+        us <- underlying
+        ts <- TimestampedStore(us, pool)
+        _ <- Resource.liftF(for {
+          _ <- ts.insert("foo", "bar")
+          _ <- ts.delete("foo")
+          _ <- ts.insert("foo", "baz")
+          _ <- ts.insert("bar", "foo")
+        } yield ())
+        foo <- Resource.liftF(us.lookup("foo"))
+        bar <- Resource.liftF(us.lookup("bar"))
+        timestamps <- Resource.liftF(ts.timestamps)
       } yield {
         timestamps.size mustEqual 2
         timestamps.get("foo") mustEqual(foo.map(Timestamped.timestamp(_)))
         timestamps.get("bar") mustEqual(bar.map(Timestamped.timestamp(_)))
-      }}
+      }
+      resource.use(IO.pure(_))
     }
   }
 }

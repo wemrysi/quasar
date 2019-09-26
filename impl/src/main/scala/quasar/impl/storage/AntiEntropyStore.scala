@@ -82,8 +82,8 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
     // Note, that we don't handle keys aren't presented in advertisement
     // They are handled when this node sends its advertisement instead.
     // for every key in advertisement having the most recent modification timestamp map
-    def result(init: Accum, timestamps: Map[K, Long])  = ad.toList.foldM[F, Accum](init){ (acc, v) => (acc, v) match {
-      case ((requesting, returning), (k, incoming)) => for {
+    def result(init: Accum, timestamps: Map[K, Long])  = ad.toList.foldM[F, Accum](init){
+      case (acc@(requesting, returning), (k, incoming)) => for {
         // when this key was modified last time
         current <- timestamps.get(k).getOrElse(0L).pure[F]
         res <- if (current < incoming) {
@@ -98,7 +98,7 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
         }
 
       } yield res
-    }}
+    }
     for {
       timestamps <- store.timestamps
       (requesting, returning) <- result((List(), Map.empty), timestamps)
@@ -212,10 +212,7 @@ object AntiEntropyStore {
       val storeStream = Stream.emit[F, IndexedStore[F, K, V]](store)
       storeStream.concurrently(merged).compile.resource.lastOrError
     }
-
-    Resource.liftF(res).flatten.mapK[F](new ~>[F, F] {
-      def apply[A](fa: F[A]): F[A] = ContextShift[F].evalOn(pool.unwrap)(fa)
-    })
+    Resource.suspend(res).mapK[F](λ[F ~> F](ContextShift[F].evalOn(pool.unwrap)(_)))
   }
   def default[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
       name: String,
