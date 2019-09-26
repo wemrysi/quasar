@@ -27,40 +27,44 @@ import cats.effect.concurrent.Ref
 import cats.syntax.functor._
 import cats.syntax.flatMap._
 
-import fs2.Stream
-import fs2.concurrent.Queue
+import fs2.{Stream, Pipe}
+import fs2.concurrent.{Queue, NoneTerminatedQueue}
 
 import scalaz.syntax.tag._
 
-final class TimestampedStore[F[_]: Sync: Timer, K, V](
+final class TimestampedStore[F[_]: Sync: ContextShift: Timer, K, V](
     val underlying: IndexedStore[F, K, Timestamped[V]],
     ref: Ref[F, Map[K, Long]],
-    queue: Queue[F, (K, Timestamped[V])])
+    private val queue: NoneTerminatedQueue[F, (K, Timestamped[V])],
+    pool: BlockingContext)
     extends IndexedStore[F, K, V] {
 
+  private def evalOn[A](fa: F[A]): F[A] = ContextShift[F].evalOn(pool.unwrap)(fa)
+  private def evalOnStream[A]: Pipe[F, A, A] = _.translate(λ[F ~> F](evalOn(_)))
+
   def entries: Stream[F, (K, V)] =
-    underlying.entries.map({ case (k, v) => raw(v).map((k, _))}).unNone
+    underlying.entries.map({ case (k, v) => raw(v).map((k, _))}).unNone.through(evalOnStream)
 
   def lookup(k: K): F[Option[V]] =
-    underlying.lookup(k).map(_.flatMap(raw(_)))
+    evalOn(underlying.lookup(k).map(_.flatMap(raw(_))))
 
-  def insert(k: K, v: V): F[Unit] = for {
+  def insert(k: K, v: V): F[Unit] = evalOn(for {
     toInsert <- tagged[F, V](v)
     _ <- underlying.insert(k, toInsert)
     _ <- ref.modify((mp: Map[K, Long]) => (mp.updated(k, timestamp(toInsert)), ()))
-    _ <- queue.enqueue1((k, toInsert))
-  } yield ()
+    _ <- queue.enqueue1(Some((k, toInsert)))
+  } yield ())
 
-  def delete(k: K): F[Boolean] = for {
+  def delete(k: K): F[Boolean] = evalOn(for {
     was <- underlying.lookup(k)
     tmb <- tombstone[F, V]
     res <- underlying.insert(k, tmb)
     _ <- ref.modify((mp: Map[K, Long]) => (mp.updated(k, timestamp(tmb)), ()))
-    _ <- queue.enqueue1((k, tmb))
-  } yield was.flatMap(raw(_)).nonEmpty
+    _ <- queue.enqueue1(Some((k, tmb)))
+  } yield was.flatMap(raw(_)).nonEmpty)
 
-  def timestamps: F[Map[K, Long]] = ref.get
-  def updates: Stream[F, (K, Timestamped[V])] = queue.dequeue
+  def timestamps: F[Map[K, Long]] = evalOn(ref.get)
+  def updates: Stream[F, (K, Timestamped[V])] = queue.dequeue.through(evalOnStream)
 }
 
 object TimestampedStore {
@@ -69,17 +73,16 @@ object TimestampedStore {
       underlying: IndexedStore[F, K, Timestamped[V]],
       pool: BlockingContext)
       : Resource[F, TimestampedStore[F, K, V]] = {
-    val res: F[Resource[F, TimestampedStore[F, K, V]]] = for {
+    val make: F[TimestampedStore[F, K, V]] = for {
       entries <- underlying.entries.compile.toList.map(_.toMap)
-      q <- Queue.bounded[F, (K, Timestamped[V])](QueueSize)
+      q <- Queue.boundedNoneTerminated[F, (K, Timestamped[V])](QueueSize)
       r <- Ref.of[F, Map[K, Long]](entries.map {
         case (k, v) => (k, timestamp(v))
       })
-    } yield {
-      val store = new TimestampedStore(underlying, r, q)
-      val storeStream = Stream.emit[F, TimestampedStore[F, K, V]](store)
-      storeStream.concurrently(store.updates).compile.resource.lastOrError
+    } yield new TimestampedStore(underlying, r, q, pool)
+    val release: TimestampedStore[F, K, V] => F[Unit] = { ts =>
+      ts.queue.enqueue1(None)
     }
-    Resource.suspend(res).mapK[F](λ[F ~> F](ContextShift[F].evalOn(pool.unwrap)(_)))
+    Resource.make(make)(release)
   }
 }
