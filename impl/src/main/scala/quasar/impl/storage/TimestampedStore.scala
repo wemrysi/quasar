@@ -20,15 +20,18 @@ import slamdata.Predef._
 
 import quasar.impl.cluster.Timestamped, Timestamped._
 
-import cats.FlatMap
-import cats.effect.Timer
+import cats.effect.{Timer, Concurrent, Sync, Resource}
+import cats.effect.concurrent.Ref
 import cats.syntax.functor._
 import cats.syntax.flatMap._
 
 import fs2.Stream
+import fs2.concurrent.{Queue, NoneTerminatedQueue}
 
-final case class TimestampedStore[F[_]: FlatMap: Timer, K, V](
-    underlying: IndexedStore[F, K, Timestamped[V]])
+final class TimestampedStore[F[_]: Sync: Timer, K, V](
+    val underlying: IndexedStore[F, K, Timestamped[V]],
+    ref: Ref[F, Map[K, Long]],
+    private val queue: NoneTerminatedQueue[F, (K, Timestamped[V])])
     extends IndexedStore[F, K, V] {
 
   def entries: Stream[F, (K, V)] =
@@ -37,12 +40,40 @@ final case class TimestampedStore[F[_]: FlatMap: Timer, K, V](
   def lookup(k: K): F[Option[V]] =
     underlying.lookup(k).map(_.flatMap(raw(_)))
 
-  def insert(k: K, v: V): F[Unit] =
-    tagged[F, V](v).flatMap(underlying.insert(k, _))
+  def insert(k: K, v: V): F[Unit] = for {
+    toInsert <- tagged[F, V](v)
+    _ <- underlying.insert(k, toInsert)
+    _ <- ref.modify((mp: Map[K, Long]) => (mp.updated(k, timestamp(toInsert)), ()))
+    _ <- queue.enqueue1(Some((k, toInsert)))
+  } yield ()
 
   def delete(k: K): F[Boolean] = for {
     was <- underlying.lookup(k)
     tmb <- tombstone[F, V]
     res <- underlying.insert(k, tmb)
+    _ <- ref.modify((mp: Map[K, Long]) => (mp.updated(k, timestamp(tmb)), ()))
+    _ <- queue.enqueue1(Some((k, tmb)))
   } yield was.flatMap(raw(_)).nonEmpty
+
+  def timestamps: F[Map[K, Long]] = ref.get
+  def updates: Stream[F, (K, Timestamped[V])] = queue.dequeue
+}
+
+object TimestampedStore {
+  val QueueSize: Int = 4096
+  def apply[F[_]: Concurrent: Timer, K, V](
+      underlying: IndexedStore[F, K, Timestamped[V]])
+      : Resource[F, TimestampedStore[F, K, V]] = {
+    val make: F[TimestampedStore[F, K, V]] = for {
+      entries <- underlying.entries.compile.toList.map(_.toMap)
+      q <- Queue.boundedNoneTerminated[F, (K, Timestamped[V])](QueueSize)
+      r <- Ref.of[F, Map[K, Long]](entries.map {
+        case (k, v) => (k, timestamp(v))
+      })
+    } yield new TimestampedStore(underlying, r, q)
+    val release: TimestampedStore[F, K, V] => F[Unit] = { ts =>
+      ts.queue.enqueue1(None)
+    }
+    Resource.make(make)(release)
+  }
 }

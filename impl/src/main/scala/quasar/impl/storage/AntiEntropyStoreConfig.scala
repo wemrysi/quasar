@@ -21,6 +21,8 @@ import slamdata.Predef._
 final case class AntiEntropyStoreConfig(
   adTimeoutMillis: Long,
   purgeTimeoutMillis: Long,
+  updateBroadcastMillis: Long,
+  updateBroadcastBatch: Int,
   tombstoneLiveForMillis: Long,
   updateRequestLimit: Int,
   updateLimit: Int,
@@ -28,8 +30,10 @@ final case class AntiEntropyStoreConfig(
 
 object AntiEntropyStoreConfig {
   val default: AntiEntropyStoreConfig = AntiEntropyStoreConfig(
-    adTimeoutMillis = 30L,
+    adTimeoutMillis = 300L,
     purgeTimeoutMillis = 1000L,
+    updateBroadcastMillis = 100L,
+    updateBroadcastBatch = 100,
     tombstoneLiveForMillis = 300000L,
     updateRequestLimit = 128,
     updateLimit = 128,
