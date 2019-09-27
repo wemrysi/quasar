@@ -299,7 +299,7 @@ lazy val impl = project
       "org.mapdb"      % "mapdb"                     % mapdbVersion,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
-      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.0"))
+      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.1"))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))
