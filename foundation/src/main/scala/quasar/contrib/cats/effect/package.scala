@@ -21,7 +21,6 @@ import slamdata.Predef._
 import scala.concurrent.Future
 
 import cats.effect._
-import cats.syntax.functor._
 
 package object effect {
   implicit class toOps[F[_], A](val fa: F[A]) extends AnyVal {
