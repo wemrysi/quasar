@@ -21,7 +21,6 @@ import slamdata.Predef._
 import scala.concurrent.Future
 
 import cats.effect._
-import cats.syntax.functor._
 
 package object effect {
   implicit class toOps[F[_], A](val fa: F[A]) extends AnyVal {
@@ -35,6 +34,6 @@ package object effect {
 
   implicit class IOOps(val self: IO.type) extends AnyVal {
     def fromFutureShift[A](iofa: IO[Future[A]])(implicit cs: ContextShift[IO]): IO[A] =
-      IO.fromFuture(iofa).flatMap(a => IO.shift.as(a))
+      IO.fromFuture(iofa).guarantee(IO.shift)
    }
 }
