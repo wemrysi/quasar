@@ -27,9 +27,12 @@ import fs2.Stream
 sealed trait ResultSink[F[_]]
 
 object ResultSink {
-  final case class Csv[F[_]](config: RenderConfig.Csv, run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => F[Unit]) extends ResultSink[F]
+  final case class Csv[F[_]](
+    config: RenderConfig.Csv,
+    run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => Stream[F, Unit])
+      extends ResultSink[F]
 
-  def csv[F[_]](config: RenderConfig.Csv)(run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => F[Unit])
-      : ResultSink[F] =
+  def csv[F[_]](config: RenderConfig.Csv)(
+    run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => Stream[F, Unit]): ResultSink[F] =
     Csv[F](config, run)
 }

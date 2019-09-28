@@ -83,7 +83,7 @@ class DefaultResultPush[
           evaluator.evaluate(query).map(_.flatMap(render.renderCsv(_, columns, sink.config, limit)))
       })
 
-      sinked = Stream.eval(sink.run(path, columns, evaluated)).map(Right(_))
+      sinked = sink.run(path, columns, evaluated).map(Right(_))
 
       now <- EitherT.rightT(instantNow)
       submitted <- EitherT.rightT(jobManager.submit(Job(tableId, sinked)))

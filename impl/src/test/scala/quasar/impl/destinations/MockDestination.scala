@@ -16,7 +16,7 @@
 
 package quasar.impl.destinations
 
-import slamdata.Predef._
+import slamdata.Predef.{Stream => _, _}
 
 import argonaut.Json
 
@@ -24,6 +24,8 @@ import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
 import cats.syntax.either._
 
 import eu.timepit.refined.auto._
+
+import fs2.Stream
 
 import quasar.api.destination.DestinationError.InitializationError
 import quasar.api.destination.{Destination, DestinationType, ResultSink}
@@ -52,6 +54,6 @@ class MockDestination[F[_]: Applicative] extends Destination[F] {
   def sinks = NonEmptyList(mockCsvSink)
 
   val mockCsvSink = ResultSink.csv[F](RenderConfig.Csv()) {
-    case (_, _, _) => ().point[F]
+    case (_, _, _) => Stream(())
   }
 }
