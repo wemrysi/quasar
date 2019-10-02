@@ -49,7 +49,8 @@ object IncompatibleModuleException {
     try {
       fa
     } catch {
-      case _: java.lang.LinkageError => ApplicativeError[F, Throwable].raiseError(ex)
+      case linkError: java.lang.LinkageError =>
+        ApplicativeError[F, Throwable].raiseError(ex.initCause(linkError))
     }
 
 }
