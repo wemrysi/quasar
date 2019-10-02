@@ -26,6 +26,7 @@ import java.lang.IllegalArgumentException
 import scala.collection.mutable.ArrayBuffer
 
 import cats.effect.Sync
+import cats.implicits._
 
 import fs2.{gzip, Chunk, Stream, Pipe}
 
@@ -34,8 +35,8 @@ import qdata.tectonic.QDataPlate
 
 import scalaz.syntax.equal._
 
+import tectonic.{json, csv, MultiplexingPlate, Plate}
 import tectonic.fs2.StreamParser
-import tectonic.{json, csv}
 
 object ResultParser {
   val DefaultDecompressionBufferSize: Int = 32768
@@ -53,9 +54,11 @@ object ResultParser {
           case JsonVariant.ArrayWrapped => json.Parser.UnwrapArray
           case JsonVariant.LineDelimited => json.Parser.ValueStream
         }
+
         StreamParser(json.Parser(QDataPlate[F, A, ArrayBuffer[A]](isPrecise), mode))(
           Chunk.buffer,
           bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+
       case sv: DataFormat.SeparatedValues =>
         val config = csv.Parser.Config(
           header = sv.header,
@@ -64,11 +67,12 @@ object ResultParser {
           record = sv.record.toByte,
           openQuote = sv.openQuote.toByte,
           closeQuote = sv.closeQuote.toByte,
-          escape = sv.escape.toByte
-        )
+          escape = sv.escape.toByte)
+
         StreamParser(csv.Parser(QDataPlate[F, A, ArrayBuffer[A]](false), config))(
           Chunk.buffer,
           bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+
       case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
         gzip.decompress[F](DefaultDecompressionBufferSize) andThen typed[F, A](pt)
     }
@@ -83,13 +87,79 @@ object ResultParser {
         case QueryResult.Typed(pt, data, _) =>
           data.through(typed[F, A](pt))
 
-        case QueryResult.Stateful(_, _, _, _, _) =>
-          scala.sys.error("result parsing not implemented for QueryResult.Stateful")
+        case QueryResult.Stateful(format, plateF, state, data, stages) =>
+          val pipe = stateful(format, plateF, state, data)
+
+          data(None).through(pipe).scope ++
+            recurseStateful(plateF, state, data, pipe)
       }
+
     if (queryResult.stages === ScalarStages.Id)
       parsedStream(queryResult)
     else
       // TODO: Be nice to have a static representation of the absence of parse instructions
-      Stream.raiseError(new IllegalArgumentException("ParseInstructions not supported."))
+      Stream.raiseError[F](new IllegalArgumentException("ParseInstructions not supported."))
   }
+
+  private def recurseStateful[F[_]: Sync, P <: Plate[Unit], S, A](
+      plateF: F[P],
+      state: P => F[Option[S]],
+      data: Option[S] => Stream[F, Byte],
+      pipe: Pipe[F, Byte, A])
+      : Stream[F, A] =
+    Stream.eval(plateF.flatMap(state)) flatMap {
+      case s @ Some(_) =>
+        data(s).through(pipe).scope ++
+          recurseStateful(plateF, state, data, pipe)
+      case None =>
+        Stream.empty
+    }
+
+  private def stateful[F[_]: Sync, P <: Plate[Unit], S, A: QDataEncode](
+      format: DataFormat,
+      plateF: F[P],
+      state: P => F[Option[S]],
+      data: Option[S] => Stream[F, Byte])
+      : Pipe[F, Byte, A] =
+    format match {
+      case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
+        gzip.decompress[F](DefaultDecompressionBufferSize) andThen
+          stateful(pt, plateF, state, data)
+
+      case DataFormat.Json(vnt, isPrecise) =>
+        val mode: json.Parser.Mode = vnt match {
+          case JsonVariant.ArrayWrapped => json.Parser.UnwrapArray
+          case JsonVariant.LineDelimited => json.Parser.ValueStream
+        }
+
+        val parserPlate: F[Plate[ArrayBuffer[A]]] =
+          for {
+            statePlate <- plateF
+            schemaPlate <- QDataPlate[F, A, ArrayBuffer[A]](isPrecise)
+          } yield MultiplexingPlate(schemaPlate, statePlate)
+
+        StreamParser(json.Parser(parserPlate, mode))(
+          Chunk.buffer,
+          bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+
+      case sv: DataFormat.SeparatedValues =>
+        val cfg = csv.Parser.Config(
+          header = sv.header,
+          row1 = sv.row1.toByte,
+          row2 = sv.row2.toByte,
+          record = sv.record.toByte,
+          openQuote = sv.openQuote.toByte,
+          closeQuote = sv.closeQuote.toByte,
+          escape = sv.escape.toByte)
+
+        val parserPlate: F[Plate[ArrayBuffer[A]]] =
+          for {
+            statePlate <- plateF
+            schemaPlate <- QDataPlate[F, A, ArrayBuffer[A]](false)
+          } yield MultiplexingPlate(schemaPlate, statePlate)
+
+        StreamParser(csv.Parser(parserPlate, cfg))(
+          Chunk.buffer,
+          bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+    }
 }
