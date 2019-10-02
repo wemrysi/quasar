@@ -27,12 +27,11 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.{IO, Sync}
-import fs2.Stream
 import scalaz.{~>, IMap, Id}
 import scalaz.std.string._
 import shims._
 
-final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, String] {
+final class DefaultTablesSpec extends TablesSpec[IO, UUID, String] {
   import DefaultTablesSpec._
 
   sequential
@@ -47,36 +46,13 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, Strin
   val pTableStore: IndexedStore[IO, UUID, String] =
     PureIndexedStore[IO, UUID, String]
 
-  val runToStore: (UUID, String) => IO[Stream[IO, Unit]] =
-    pTableStore.insert(_, _).map(Stream(_))
-
-  val lookup: UUID => IO[Option[String]] =
-    pTableStore.lookup(_)
-
-  val lookupSchema: UUID => IO[Option[String]] =
-    uuid => {
-      for {
-        l <- pTableStore.lookup(uuid)
-      } yield l match {
-        case Some(s) => Some(s)
-        case _ => None
-      }
-    }
-
   val evaluator: QueryEvaluator[IO, String, String] =
     new QueryEvaluator[IO, String, String] {
       def evaluate(query: String): IO[String] = IO(query)
     }
 
-   val allocatedManager: (PreparationsManager[IO, UUID, String, String], IO[Unit]) =
-    PreparationsManager[IO, UUID, String, String](evaluator)(runToStore)
-      .allocated.unsafeRunSync()
-
-  val manager: PreparationsManager[IO, UUID, String, String] =
-    allocatedManager._1
-
-  val tables: Tables[IO, UUID, String, String, String] =
-    DefaultTables[IO, UUID, String, String, String](freshId, tableStore, manager, lookup, lookupSchema)
+  val tables: Tables[IO, UUID, String] =
+    DefaultTables[IO, UUID, String](freshId, tableStore)
 
   val columns1: List[TableColumn] =
     List(TableColumn("foo1", ColumnType.Number),
@@ -95,9 +71,6 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, Strin
   val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1", columns1)
   val table2: TableRef[String] = TableRef(TableName("table2"), "select * from table2", columns2)
 
-  val preparation1: String = table1.query
-  val preparation2: String = table2.query
-
   val uniqueId: UUID = UUID.randomUUID
 
   def run: IO ~> Id.Id = λ[IO ~> Id.Id](_.unsafeRunSync)
@@ -106,8 +79,6 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, Strin
     msmaptref.put(IMap()).unsafeRunSync()
     msmapstring.put(IMap()).unsafeRunSync()
   }
-
-  step(allocatedManager._2.unsafeRunSync())
 }
 
 object DefaultTablesSpec {

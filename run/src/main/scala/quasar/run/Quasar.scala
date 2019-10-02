@@ -35,7 +35,7 @@ import quasar.impl.datasources.middleware._
 import quasar.impl.destinations.{DefaultDestinationManager, DefaultDestinations}
 import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.storage.IndexedStore
-import quasar.impl.table.{DefaultTables, PreparationsManager}
+import quasar.impl.table.DefaultTables
 import quasar.qscript.{QScriptEducated, construction, Map => QSMap}
 import quasar.run.implicits._
 
@@ -55,10 +55,10 @@ import scalaz.syntax.show._
 import shims._
 import spire.std.double._
 
-final class Quasar[F[_], R, S, C <: SchemaConfig](
+final class Quasar[F[_], R, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double], C],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
-    val tables: Tables[F, UUID, SqlQuery, R, S],
+    val tables: Tables[F, UUID, SqlQuery],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, R])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -69,21 +69,18 @@ object Quasar extends Logging {
   type LookupRunning[F[_]] = UUID => F[Option[ManagedDatasource[Fix, F, Stream[F, ?], EvalResult[F], ResourcePathType]]]
 
   /** What it says on the tin. */
-  def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer, R, S, C <: SchemaConfig](
+  def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer, R, C <: SchemaConfig](
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
-      qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], R],
-      preparationsManager: QueryEvaluator[F, SqlQuery, R] => Resource[F, PreparationsManager[F, UUID, SqlQuery, R]],
-      lookupTableData: UUID => F[Option[R]],
-      lookupTableSchema: UUID => F[Option[S]])(
+      qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], R])(
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
       sstEvalConfig: SstEvalConfig)(
       implicit
       ec: ExecutionContext)
-      : Resource[F, Quasar[F, R, S, C]] = {
+      : Resource[F, Quasar[F, R, C]] = {
 
     for {
       configured <-
@@ -121,10 +118,7 @@ object Quasar extends Logging {
 
       sqlEvaluator = Sql2QueryEvaluator(qscriptEvaluator(lookupRunning))
 
-      prepManager <- preparationsManager(sqlEvaluator)
-
-      tables =
-        DefaultTables(freshUUID, tableRefs, prepManager, lookupTableData, lookupTableSchema)
+      tables = DefaultTables(freshUUID, tableRefs)
 
     } yield new Quasar(datasources, destinations, tables, sqlEvaluator)
   }
