@@ -108,6 +108,25 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
       Stream.emits(BoolsData.mkString("\n").getBytes(Charset.forName("UTF-8"))),
       ScalarStages.Id)
 
+  val statefulResult: QueryResult.Stateful[IO, CountBoolPlate, Unit] = {
+    val plate = new CountBoolPlate()
+
+    QueryResult.Stateful[IO, CountBoolPlate, Unit](
+      DataFormat.ldjson,
+      IO(plate),
+      (p: CountBoolPlate) => {
+        val cur = p.getState
+        if (cur > 3) IO(None) else IO(Some(()))
+      },
+      {
+        case Some(_) =>
+          Stream.emits("true".getBytes(Charset.forName("UTF-8"))).covary[IO]
+        case None =>
+          Stream.emits("false".getBytes(Charset.forName("UTF-8"))).covary[IO]
+      },
+      ScalarStages.Id)
+  }
+
   val resourceSchema: ResourceSchema[IO, SstConfig[Fix[EJson], Double], (ResourcePath, CompositeResult[IO, QueryResult[IO]])] =
     CompositeResourceSchema[IO, Fix[EJson], Double](SstEvalConfig(20L, 1L, 100L))
 
@@ -120,6 +139,18 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
   "computes an SST of unparsed data" >>* {
     resourceSchema(defaultCfg, (path, Left(unparsedResult)), 1.hour) map { qsst =>
       qsst must_= Some(schema)
+    }
+  }
+
+  "computes an SST of stateful data" >>* {
+    val sst = envT(
+      TypeStat.bool(3.0, 1.0),
+      TypeST(TypeF.simple[Fix[EJson], SST[Fix[EJson], Double]](SimpleType.Bool))).embed
+
+    val expected = SstSchema.fromSampled(100.0, sst)
+
+    resourceSchema(defaultCfg, (path, Left(statefulResult)), 1.hour) map { qsst =>
+      qsst must_= Some(expected)
     }
   }
 
