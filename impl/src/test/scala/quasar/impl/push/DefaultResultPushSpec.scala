@@ -67,7 +67,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       case (dst, columns, bytes) =>
         bytesToString(bytes).evalMap(str =>
           ref.update(currentFs =>
-            currentFs + (dst -> currentFs.get(dst).fold(str)(_ ++ str)))).compile.drain
+            currentFs + (dst -> currentFs.get(dst).fold(str)(_ ++ str))))
     }
   }
 

@@ -20,7 +20,7 @@ import slamdata.Predef.{Stream => _, _}
 
 import cats.effect.{ContextShift, Effect}
 
-import fs2.io
+import fs2.{io, Stream}
 
 import quasar.api.destination.{Destination, ResultSink}
 import quasar.api.push.RenderConfig
@@ -46,14 +46,15 @@ final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] priva
 
   private def csvSink(root: JPath, blockingContext: BlockingContext): ResultSink[F] =
     ResultSink.csv(RenderConfig.Csv())((dst, columns, bytes) =>
-        resolvedResourcePath[F](root, dst) >>= {
+        Stream.eval(resolvedResourcePath[F](root, dst)) >>= {
           case Some(writePath) =>
             val fileSink = io.file.writeAll[F](writePath, blockingContext.unwrap)
 
-            bytes.through(fileSink).compile.drain
+            bytes.through(fileSink)
 
           case None =>
-            MonadResourceErr[F].raiseError(ResourceError.notAResource(dst))
+            Stream.eval(
+              MonadResourceErr[F].raiseError(ResourceError.notAResource(dst)))
         })
 }
 
