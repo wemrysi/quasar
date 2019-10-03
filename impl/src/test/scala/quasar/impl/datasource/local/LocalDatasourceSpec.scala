@@ -20,8 +20,10 @@ import slamdata.Predef._
 
 import cats.effect.IO
 import fs2.Stream
+
 import java.nio.file.Paths
 import scala.concurrent.ExecutionContext
+
 import quasar.ScalarStages
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.common.data.RValue
@@ -32,6 +34,7 @@ import quasar.fp.ski.κ
 import quasar.qscript.InterpretedRead
 
 import shims._
+import tectonic.Plate
 
 abstract class LocalDatasourceSpec
     extends DatasourceSpec[IO, Stream[IO, ?], ResourcePathType.Physical] {
@@ -53,7 +56,21 @@ abstract class LocalDatasourceSpec
     qr match {
       case QueryResult.Parsed(_, data, _) => data.foldMap(κ(1)).compile.lastOrError
       case QueryResult.Typed(_, data, _) => data.foldMap(κ(1)).compile.lastOrError
-      case QueryResult.Stateful(_, _, _, _, _) => scala.sys.error("stateful not tested")
+      case QueryResult.Stateful(_, plate, state, data, _) =>
+        val bytes = data(None).scope ++ recurseStateful(plate, state, data)
+        bytes.foldMap(κ(1)).compile.lastOrError
+    }
+
+  private def recurseStateful[P <: Plate[Unit], S](
+      plateF: IO[P],
+      state: P => IO[Option[S]],
+      data: Option[S] => Stream[IO, Byte])
+      : Stream[IO, Byte] =
+    Stream.eval(plateF.flatMap(state)) flatMap {
+      case s @ Some(_) =>
+        data(s).scope ++ recurseStateful(plateF, state, data)
+      case None =>
+        Stream.empty
     }
 
   "directory jail" >> {
@@ -88,6 +105,18 @@ object LocalDatasourceSpec extends LocalDatasourceSpec {
       Paths.get("./impl/src/test/resources"),
       1024,
       DataFormat.precise(DataFormat.ldjson),
+      blockingPool)
+}
+
+object LocalStatefulDatasourceSpec extends LocalDatasourceSpec {
+  val blockingPool = BlockingContext.cached("local-stateful-datasource-spec")
+
+  def datasource =
+    LocalStatefulDatasource[IO](
+      Paths.get("./impl/src/test/resources"),
+      1024,
+      DataFormat.precise(DataFormat.ldjson),
+      10,
       blockingPool)
 }
 

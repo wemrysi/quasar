@@ -47,6 +47,7 @@ package object local {
   // TODO: These should actually be v2 with some indication that v1 is also supported
   val LocalType = DatasourceType("local", 1L)
   val LocalParsedType = DatasourceType("local-parsed", 1L)
+  val LocalStatefulType = DatasourceType("local-stateful", 1L)
 
   val LocalDestinationType = DestinationType("local", 1L)
 
