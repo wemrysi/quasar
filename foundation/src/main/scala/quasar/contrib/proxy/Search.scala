@@ -31,8 +31,7 @@ object Search {
       val builder = new ProxySearch
 
       if (PlatformUtil.getCurrentPlattform() == Platform.WIN) {
-        builder.addStrategy(ProxySearch.Strategy.IE)
-        builder.addStrategy(ProxySearch.Strategy.FIREFOX)
+        builder.addStrategy(ProxySearch.Strategy.BROWSER)
       } else if (PlatformUtil.getCurrentPlattform() == Platform.LINUX) {
         builder.addStrategy(ProxySearch.Strategy.GNOME)
         builder.addStrategy(ProxySearch.Strategy.KDE)
