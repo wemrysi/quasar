@@ -30,12 +30,8 @@ import matryoshka.data.free._
 
 import scala.collection.immutable.{Map => SMap}
 
-import scalaz.Equal
-import scalaz.std.anyVal._
-import scalaz.std.either._
-import scalaz.std.map._
-import scalaz.std.string._
-import scalaz.syntax.equal._
+import scalaz.{Equal, NonEmptyList}
+import scalaz.Scalaz._
 
 private[minimizers] sealed trait CStage[T[_[_]]] extends Product with Serializable
 
@@ -67,7 +63,7 @@ private[minimizers] object CStage {
       extends CStage[T]
 
   final case class Project[T[_[_]]](
-      index: Either[Int, String])
+      path: NonEmptyList[Either[Int, String]])
       extends CStage[T]
 
   final case class Expr[T[_[_]]](
@@ -88,11 +84,13 @@ private[minimizers] object CStage {
         NonTerminal(List("Shift"), Some(s"status = $status, rotation = $rot"), List(
           NonTerminal(List("Struct"), None, List(struct.render))))
 
-      case Project(Left(idx)) =>
-        Terminal(List("ProjectIndex"), Some(s"$idx"))
+      case Project(path) =>
+        val s = path foldMap {
+          case Left(i) => s"[$i]"
+          case Right(f) => s".$f"
+        }
 
-      case Project(Right(key)) =>
-        Terminal(List("ProjectKey"), Some(s"$key"))
+        Terminal(List("Project"), Some(s))
 
       case Expr(f) =>
         NonTerminal(List("Expr"), None, List(f.render))
