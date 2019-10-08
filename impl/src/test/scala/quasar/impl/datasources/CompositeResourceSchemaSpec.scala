@@ -108,15 +108,13 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
       Stream.emits(BoolsData.mkString("\n").getBytes(Charset.forName("UTF-8"))),
       ScalarStages.Id)
 
-  val statefulResult: QueryResult.Stateful[IO, CountBoolPlate, Unit] = {
-    val plate = new CountBoolPlate()
-
+  val statefulResult: QueryResult.Stateful[IO, CountBoolPlate, Unit] =
     QueryResult.Stateful[IO, CountBoolPlate, Unit](
       DataFormat.ldjson,
-      IO(plate),
-      (p: CountBoolPlate) => {
+      IO.delay(new CountBoolPlate()),
+      (p: CountBoolPlate) => IO delay {
         val cur = p.getState
-        if (cur > 3) IO(None) else IO(Some(()))
+        if (cur > 3) None else Some(())
       },
       {
         case Some(_) =>
@@ -125,7 +123,6 @@ object CompositeResourceSchemaSpec extends quasar.EffectfulQSpec[IO] {
           Stream.emits("false".getBytes(Charset.forName("UTF-8"))).covary[IO]
       },
       ScalarStages.Id)
-  }
 
   val resourceSchema: ResourceSchema[IO, SstConfig[Fix[EJson], Double], (ResourcePath, CompositeResult[IO, QueryResult[IO]])] =
     CompositeResourceSchema[IO, Fix[EJson], Double](SstEvalConfig(20L, 1L, 100L))

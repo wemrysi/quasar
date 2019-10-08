@@ -41,7 +41,7 @@ object LocalStatefulDatasource {
 
     EvaluableLocalDatasource[F](LocalType, root) { iRead =>
 
-      val plate = new LocalStatefulPlate()
+      val plate = Effect[F].delay(new LocalStatefulPlate())
 
       def data(more: Option[Long]): Stream[F, Byte] =
         more match {
@@ -66,7 +66,7 @@ object LocalStatefulDatasource {
 
       QueryResult.stateful(
         format,
-        Effect[F].pure(plate),
+        plate,
         state(_),
         data(_),
         iRead.stages)
