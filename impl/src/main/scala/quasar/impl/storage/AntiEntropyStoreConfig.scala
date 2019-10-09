@@ -30,7 +30,7 @@ final case class AntiEntropyStoreConfig(
 
 object AntiEntropyStoreConfig {
   val default: AntiEntropyStoreConfig = AntiEntropyStoreConfig(
-    adTimeoutMillis = 300L,
+    adTimeoutMillis = 1000L,
     purgeTimeoutMillis = 1000L,
     updateBroadcastMillis = 100L,
     updateBroadcastBatch = 100,

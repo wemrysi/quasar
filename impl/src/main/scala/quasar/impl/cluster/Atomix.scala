@@ -27,8 +27,10 @@ import cats.syntax.eq._
 import cats.syntax.flatMap._
 import cats.syntax.foldable._
 import cats.syntax.functor._
+import cats.syntax.traverse._
 import cats.instances.int._
 import cats.instances.list._
+import cats.instances.option._
 
 import fs2.Stream
 import fs2.concurrent.InspectableQueue
@@ -96,13 +98,23 @@ object Atomix extends Logging {
     def peers: F[Set[MemberId]] =
       F.delay(service.getMembers.asScala.to[Set].map(_.id))
 
-    def random: F[Set[MemberId]] = for {
+    def sample: F[Set[MemberId]] = for {
       ps <- peers
       size = ps.size
       ix0 <- Sync[F].delay(Random.nextInt(size))
       ix1 <- Sync[F].delay(Random.nextInt(size))
       vec = ps.toVector
     } yield Set(vec(ix0), vec(ix1))
+
+    def random: F[Option[MemberId]] = for {
+      me <- localId
+      ps <- peers.map(x => x - me)
+      res <- if (ps.isEmpty) {
+        None.pure[F]
+      } else for {
+        ix <- Sync[F].delay(Random.nextInt(ps.size))
+      } yield ps.toVector.lift(ix)
+    } yield res
 
     @SuppressWarnings(Array("org.wartremover.warts.Equals"))
     def byAddress(addr: InetAddress, port: Int): F[Option[MemberId]] = {
@@ -143,16 +155,20 @@ object Atomix extends Logging {
           log.warn(s"malformed payload sent by multicast ::: ${payload}, to ::: ${targets}")
         })
 
-    def subscribe[P: Codec](tag: String, limit: Int): F[Stream[F, (MemberId, P)]] =
-      InspectableQueue.unbounded[F, (MemberId, P)]
+    def subscribe[P: Codec](tag: String, limit: Int): F[Stream[F, (MemberId, P)]] = for {
+      localId <- membership.localId
+      _ <- Sync[F].delay(println(s"subscribing ::: me ::: $localId ::: $tag"))
+      res <- InspectableQueue.unbounded[F, (MemberId, P)]
         .map((queue: InspectableQueue[F, (MemberId, P)]) => enqueue[P](queue, tag, limit) *> queue.dequeue)
         .map(_.onFinalize(F.delay(service.unsubscribe(tag))))
+    } yield res
 
     private def enqueue[P: Codec](q: InspectableQueue[F, (MemberId, P)], eventType: String, maxItems: Int): Stream[F, Unit] = {
       def decodeBits(a: BitVector, cont: P => F[Unit]): F[Unit] = Codec[P].decode(a) match {
         case Attempt.Failure(_) =>
           F.delay(log.warn(s"malformed payload received: eventType ::: ${eventType}, bits ::: ${a.toHex}"))
         case Attempt.Successful(d) =>
+          println(s"${eventType} ::: ${d.value}")
           cont(d.value)
       }
       def getMemberId(addr: Address): F[Option[MemberId]] = for {
@@ -201,7 +217,7 @@ object Atomix extends Logging {
     val communication: Communication[F, Id, String] = Atomix.communication[F](atomix.getCommunicationService(), membership, pool)
 
     def gossip[P: Codec](msg: String, p: P): F[Unit] = for {
-      targets <- membership.random
+      targets <- membership.sample
       _ <- communication.multicast(msg, p, targets)
       _ <- ContextShift[F].shift
     } yield ()
@@ -214,6 +230,15 @@ object Atomix extends Logging {
       _ <- communication.multicast(msg, p, targets)
       _ <- ContextShift[F].shift
     } yield ()
+
+    def random[P: Codec](msg: String, p: P): F[Unit] = for {
+      mbid <- membership.random
+      _ <- Sync[F].delay(println(s"mbid ::: $mbid"))
+      _ <- mbid.traverse(communication.unicast(msg, p, _) *> ContextShift[F].shift)
+    } yield ()
+
+    def isEmpty: F[Boolean] =
+      membership.peers.map(x => x.size < 2) // localId is here too
 
     def subscribe[P: Codec](msg: String, limit: Int): F[Stream[F, (Id, P)]] =
       communication.subscribe(msg, limit)
