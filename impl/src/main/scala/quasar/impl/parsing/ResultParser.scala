@@ -88,10 +88,12 @@ object ResultParser {
           data.through(typed[F, A](pt))
 
         case QueryResult.Stateful(format, plateF, state, data, stages) =>
-          val pipe = stateful(format, plateF, state, data)
+          Stream.eval(plateF) flatMap { plate =>
+            val pipe = stateful(format, plate, state, data)
 
-          data(None).through(pipe).scope ++
-            recurseStateful(plateF, state, data, pipe)
+            data(None).through(pipe).scope ++
+              recurseStateful(state(plate), data, pipe)
+          }
       }
 
     if (queryResult.stages === ScalarStages.Id)
@@ -102,29 +104,28 @@ object ResultParser {
   }
 
   private def recurseStateful[F[_]: Sync, P <: Plate[Unit], S, A](
-      plateF: F[P],
-      state: P => F[Option[S]],
+      state: F[Option[S]],
       data: Option[S] => Stream[F, Byte],
       pipe: Pipe[F, Byte, A])
       : Stream[F, A] =
-    Stream.eval(plateF.flatMap(state)) flatMap {
+    Stream.eval(state) flatMap {
       case s @ Some(_) =>
         data(s).through(pipe).scope ++
-          recurseStateful(plateF, state, data, pipe)
+          recurseStateful(state, data, pipe)
       case None =>
         Stream.empty
     }
 
   private def stateful[F[_]: Sync, P <: Plate[Unit], S, A: QDataEncode](
       format: DataFormat,
-      plateF: F[P],
+      plate: P,
       state: P => F[Option[S]],
       data: Option[S] => Stream[F, Byte])
       : Pipe[F, Byte, A] =
     format match {
       case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
         gzip.decompress[F](DefaultDecompressionBufferSize) andThen
-          stateful(pt, plateF, state, data)
+          stateful(pt, plate, state, data)
 
       case DataFormat.Json(vnt, isPrecise) =>
         val mode: json.Parser.Mode = vnt match {
@@ -133,10 +134,8 @@ object ResultParser {
         }
 
         val parserPlate: F[Plate[ArrayBuffer[A]]] =
-          for {
-            statePlate <- plateF
-            schemaPlate <- QDataPlate[F, A, ArrayBuffer[A]](isPrecise)
-          } yield MultiplexingPlate(schemaPlate, statePlate)
+          QDataPlate[F, A, ArrayBuffer[A]](isPrecise).map(
+            MultiplexingPlate(_, plate))
 
         StreamParser(json.Parser(parserPlate, mode))(
           Chunk.buffer,
@@ -153,10 +152,8 @@ object ResultParser {
           escape = sv.escape.toByte)
 
         val parserPlate: F[Plate[ArrayBuffer[A]]] =
-          for {
-            statePlate <- plateF
-            schemaPlate <- QDataPlate[F, A, ArrayBuffer[A]](false)
-          } yield MultiplexingPlate(schemaPlate, statePlate)
+          QDataPlate[F, A, ArrayBuffer[A]](false).map(
+            MultiplexingPlate(_, plate))
 
         StreamParser(csv.Parser(parserPlate, cfg))(
           Chunk.buffer,
