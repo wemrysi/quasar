@@ -19,8 +19,8 @@ package minimizers
 
 import slamdata.Predef._
 
-import cats.MonoidK
-import cats.instances.map._
+import cats.{~>, Eq, Foldable, Monad, Monoid, MonoidK}
+import cats.implicits._
 
 import matryoshka._
 import matryoshka.data.free._
@@ -30,16 +30,19 @@ import quasar.{IdStatus, RenderTreeT}
 import quasar.common.effect.NameGenerator
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.free._
-import quasar.fp._
 import quasar.fp.ski.κ2
 import quasar.qscript.{construction, Hole, JoinSide, MapFuncCore, MonadPlannerErr, OnUndefined, RecFreeS}
 import quasar.qsu.{QScriptUniform => QSU}, QSU.Rotation
 
-import scalaz.{~>, Equal, Foldable, Forall, Monad, NonEmptyList, Scalaz}, Scalaz._
+import scalaz.{Forall, NonEmptyList}
+
+// these instances don't exist in cats (for good reason), but we depend on them here
+import scalaz.std.set.{setMonoid => _, _}
+import scalaz.std.map._
 
 import scala.collection.immutable.{Map => SMap}
 
-import shims._
+import shims.{plusEmptyToCats => _, _}
 
 sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT]
     extends Minimizer[T]
@@ -54,10 +57,12 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   type CStage = quasar.qsu.minimizers.CStage[T]
   type ∀[P[_]] = Forall[P]
 
-  implicit def PEqual: Equal[P]
+  implicit def PEqual: Eq[P]
 
   private val FM = Foldable[FreeMapA]
-  private implicit val MM = MonoidK[SMap[Symbol, ?]].algebra[Cartouche]
+
+  private implicit val MM: Monoid[SMap[Symbol, Cartouche]] =
+    MonoidK[SMap[Symbol, ?]].algebra[Cartouche]
 
   private val SourceKey = "source"
   private val func = construction.Func[T]
@@ -67,7 +72,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def extract[
-      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
+      G[_]: scalaz.Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
       candidate: QSUGraph)
       : Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = {
 
@@ -75,7 +80,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
       // handle a shift candidate
       case Transpose(parent, retain, rotations) =>
         extract[G](parent) map {
-          _ rightMap {
+          _ map {
             _ andThen {
               _ flatMap { parent2 =>
                 updateGraph[G](parent2)(QSU.Transpose(_, retain, rotations))
@@ -87,7 +92,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
       // handle a transformed shift candidate
       case MappableRegion.MaximalUnary(Transpose(parent, retain, rotations), fm) =>
         extract[G](parent) map {
-          _ rightMap {
+          _ map {
             _ andThen { p2 =>
               for {
                 parent2 <- p2
@@ -104,7 +109,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
           val f = MapFuncCore.normalized(fm >> fm2)
 
           if (f === func.Hole)
-            parent2.point[G]
+            parent2.pure[G]
           else
             updateGraph[G](parent2)(QSU.Map(_, f.asRec))
         }))
@@ -113,7 +118,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
       case qgraph =>
         Some((qgraph, (src, fm) => {
           if (fm === func.Hole)
-            src.point[G]
+            src.pure[G]
           else
             updateGraph[G](src)(QSU.Map(_, fm.asRec))
         }))
@@ -121,7 +126,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   }
 
   def apply[
-      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
+      G[_]: scalaz.Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
       original: QSUGraph,
       singleSource: QSUGraph,
       candidates: List[QSUGraph],
@@ -140,7 +145,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
     maybeJoin traverse { j =>
       simplifyJoin[G](j)
         .flatMap(j => reifyJoin[G](j, singleSource, StructLens.init(j.cartoix.size > 1), false))
-        .map(_.squared)
+        .map(x => (x, x))
     }
   }
 
@@ -162,7 +167,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
           MappableRegion[T](singleSource.root === _, src)
 
         val maybeCartoix: Option[FreeMapA[(Symbol, List[CStage])]] =
-          above.traverse(g => readCandidate(singleSource, g).strengthL(g.root))
+          above.traverse(g => readCandidate(singleSource, g).tupleLeft(g.root))
 
         maybeCartoix map {
           case FreeA((_, parent)) =>
@@ -369,7 +374,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
               val h = syms.head
               // Everything merged, so remap all references
               val rm1 = syms.map(fm => (fm, remapResolved(stage, fm, h))).toMap
-              ((cx -- syms).updated(h, Cartouche.stages(NonEmptyList(stage))), remap0 ++ rm1).point[F]
+              ((cx -- syms).updated(h, Cartouche.stages(NonEmptyList(stage))), remap0 ++ rm1).pure[F]
             } else {
               // Extract any source references of identities, removing their cartouche
               val (cx1, ids) = nestedCartoix.toList.foldLeft((SMap[Symbol, Cartouche](), Set[Symbol]())) {
@@ -396,7 +401,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
 
                     val currentRemap = ids.map((_, CartoucheRef.Offset(lowerName, 0))).toMap
 
-                    ((cx -- syms).updated(lowerName, stage :: lowerCart), remap0 ++ lowerRemap1 ++ currentRemap).point[F]
+                    ((cx -- syms).updated(lowerName, stage :: lowerCart), remap0 ++ lowerRemap1 ++ currentRemap).pure[F]
                   } else {
                     // lower has multiple cartoix, turn it into a cartesian and make it the tail of a new cartouche
                     simplName map { newName =>
@@ -506,7 +511,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
         resultsM.flatMap(reifyCartoix[G](_, rest, StructLens(prj, inj, true), isNested))
 
       case Nil =>
-        parent.point[G]
+        parent.pure[G]
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -673,7 +678,7 @@ object MergeCartoix {
 
   def apply[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT](
       qp: QProv[T])(
-      implicit eqP: Equal[qp.P])
+      implicit eqP: Eq[qp.P])
       : Minimizer.Aux[T, qp.P] =
     new MergeCartoix[T] {
       val qprov: qp.type = qp
