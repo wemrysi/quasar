@@ -78,12 +78,12 @@ class DefaultResultPush[
       query = tableRef.query
       columns = tableRef.columns
 
-      evaluated <- EitherT.rightT(format match {
+      evaluated = format match {
         case ResultType.Csv =>
           evaluator.evaluate(query).map(_.flatMap(render.renderCsv(_, columns, sink.config, limit)))
-      })
+      }
 
-      sinked = sink.run(path, columns, evaluated).map(Right(_))
+      sinked = sink.run(path, columns, Stream.force(evaluated)).map(Right(_))
 
       now <- EitherT.rightT(instantNow)
       submitted <- EitherT.rightT(jobManager.submit(Job(tableId, sinked)))
