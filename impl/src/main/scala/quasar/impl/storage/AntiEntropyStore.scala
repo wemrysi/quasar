@@ -104,9 +104,8 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
     for {
       timestamps <- store.timestamps
       (requesting, returning) <- result((List(), Map.empty), timestamps)
-      // Idk why, but `unlessA` doesn't work here
-      _ <- if (!requesting.isEmpty) cluster.unicast(RequestUpdate(name), requesting, id) else ().pure[F]
-      _ <- if (!returning.isEmpty) cluster.unicast(Update(name), returning, id) else ().pure[F]
+      _ <- cluster.unicast(RequestUpdate(name), requesting, id).unlessA(requesting.isEmpty)
+      _ <- cluster.unicast(Update(name), returning, id).unlessA(returning.isEmpty)
     } yield ()
   }
 
@@ -160,24 +159,28 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
 
   // INITIALIZATION
   def requestInitialization: F[Unit] =
-    Sync[F].delay(println("initing")) *> cluster.random(RequestInit(name), ())
+    cluster.random(RequestInit(name), ())
+
+  def initialization: Stream[F, Unit] =
+    (Stream.eval(requestInitialization) *> Stream.sleep(ms(config.adTimeoutMillis))).repeat
 
   def initRequestHandled: F[Stream[F, Unit]] =
     cluster.subscribe[Unit](RequestInit(name), config.updateRequestLimit)
-      .map(_.evalMap { case (id, _) => for {
-        _ <- Sync[F].delay(println("handling init request"))
-        _ <- initRequestHandler(id)
-      } yield ()
-      })
+      .map(_.evalMap(x => initRequestHandler(x._1)))
 
   def initRequestHandler(id: cluster.Id): F[Unit] =
     gates.strict(underlying.entries.compile.toList.flatMap { (lst: List[(K, Timestamped[V])]) =>
       cluster.unicast(Init(name), lst.toMap, id)
     })
 
-  def initHandled: F[Stream[F, Unit]] =
+  def initHandled(stopper: Deferred[F, Either[Throwable, Unit]]): F[Stream[F, Unit]] =
     cluster.subscribe[Map[K, Timestamped[V]]](Init(name), config.updateLimit)
-      .map(_.evalMap(Function.tupled(updateHandler(_, _))(_)))
+      .map(_.evalMap {
+        case (id, mp) => for {
+          _ <- updateHandler(id, mp)
+          _ <- Sync[F].suspend(stopper.complete(Right(())))
+        } yield ()
+      })
 
   // BROADCASTING UPDATES
   def broadcastUpdates: Stream[F, Unit] =
@@ -212,9 +215,7 @@ object AntiEntropyStore {
       pool: BlockingContext)(
       implicit timer: Timer[F])
       : Resource[F, IndexedStore[F, K, V]] = {
-
     val res: F[Resource[F, IndexedStore[F, K, V]]] = for {
-      currentTime <- timer.clock.realTime(MILLISECONDS)
       gates <- Gates[F]
       store <- Sync[F].delay(new AntiEntropyStore[F, K, V](
         name,
@@ -222,36 +223,32 @@ object AntiEntropyStore {
         underlying,
         gates,
         config))
+
+      stopper <- Deferred[F, Either[Throwable, Unit]]
+      empty <- cluster.isEmpty
+      _ <- stopper.complete(Right(())).whenA(empty)
+
+      initRequest <- store.initRequestHandled
+      init <- store.initHandled(stopper)
       adReceiver <- store.advertisementHandled
       updates <- store.updateHandled
       updateRequester <- store.updateRequestHandled
-
-      empty <- cluster.isEmpty
-      _ <- Sync[F].delay(println(s"empty ::: $empty"))
-      initRequest <- store.initRequestHandled
-      _ <- Sync[F].delay(println(initRequest))
-      init <- if (empty) {
-        Stream.emit(()).pure[F]
-      } else for {
-        _ <- Sync[F].delay(println("non empty"))
-        init <- store.initHandled
-        _ <- Sync[F].delay(println("non empty 2"))
-        _ <- store.requestInitialization
-        _ <- Sync[F].delay(println("non empty 3"))
-      } yield init
-//      _ <- init.head.compile.lastOrError
-      _ <- Sync[F].delay(println(s"INITIALIZED"))
     } yield {
       val merged = Stream.emits(List(
         adReceiver,
         store.sendingAdStream,
         store.purgeTombstones,
         store.broadcastUpdates,
+        initRequest,
         updates,
         updateRequester,
-        initRequest)).parJoinUnbounded
+        store.initialization.interruptWhen(stopper),
+        init.interruptWhen(stopper))).parJoinUnbounded
       val storeStream = Stream.emit[F, IndexedStore[F, K, V]](store)
-      storeStream.concurrently(merged).compile.resource.lastOrError
+      for {
+        resource <- storeStream.concurrently(merged).compile.resource.lastOrError
+        _ <- Resource.liftF(stopper.get)
+      } yield resource
     }
     Resource.suspend(res).mapK[F](λ[F ~> F](ContextShift[F].evalOn(pool.unwrap)(_)))
   }

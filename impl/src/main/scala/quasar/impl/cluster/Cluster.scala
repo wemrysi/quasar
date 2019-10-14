@@ -32,6 +32,7 @@ abstract class Cluster[F[_], T] {
   def broadcast[P: Codec](tag: T, p: P): F[Unit]
   def random[P: Codec](tag: T, p: P): F[Unit]
   def isEmpty: F[Boolean]
+  def self[P: Codec](tag: T, p: P): F[Unit]
 }
 
 object Cluster {
@@ -44,6 +45,7 @@ object Cluster {
       def broadcast[P: Codec](tag: B, p: P): F[Unit] = fa.broadcast(f(tag), p)
       def random[P: Codec](tag: B, p: P): F[Unit] = fa.random(f(tag), p)
       def isEmpty = fa.isEmpty
+      def self[P: Codec](tag: B, p: P): F[Unit] = fa.self(f(tag), p)
     }
   }
 }

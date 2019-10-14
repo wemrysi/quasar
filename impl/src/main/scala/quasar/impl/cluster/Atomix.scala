@@ -86,7 +86,8 @@ object Atomix extends Logging {
   private def cfToAsync[F[_]: Async: ContextShift, A](cf: CompletableFuture[A]): F[A] =
     if (cf.isDone) cf.get.pure[F]
     else Async[F].async { (cb: Either[Throwable, A] => Unit) =>
-      val _ = cf.whenComplete((res: A, t: Throwable) => cb(Option(t).toLeft(res)))
+      val _ = cf.whenComplete((res: A, t: Throwable) => {
+        cb(Option(t).toLeft(res))})
     } productL ContextShift[F].shift
 
 
@@ -99,12 +100,15 @@ object Atomix extends Logging {
       F.delay(service.getMembers.asScala.to[Set].map(_.id))
 
     def sample: F[Set[MemberId]] = for {
-      ps <- peers
+      me <- localId
+      ps <- peers.map(x => x - me)
       size = ps.size
-      ix0 <- Sync[F].delay(Random.nextInt(size))
-      ix1 <- Sync[F].delay(Random.nextInt(size))
-      vec = ps.toVector
-    } yield Set(vec(ix0), vec(ix1))
+      res <- if (ps.size < 1) { Set[MemberId]().pure[F] } else for {
+        ix0 <- Sync[F].delay(Random.nextInt(size))
+        ix1 <- Sync[F].delay(Random.nextInt(size))
+        vec = ps.toVector
+      } yield Set(vec(ix0), vec(ix1))
+    } yield res
 
     def random: F[Option[MemberId]] = for {
       me <- localId
@@ -133,17 +137,20 @@ object Atomix extends Logging {
       : Communication[F, MemberId, String] = new Communication[F, MemberId, String] {
     val F = ConcurrentEffect[F]
 
-    def unicast[P: Codec](tag: String, payload: P, target: MemberId): F[Unit] =
+    def unicast[P: Codec](tag: String, payload: P, target: MemberId): F[Unit] = {
       Codec[P].encode(payload).map((b: BitVector) => {
-        cfToAsync(service.unicast(
-          tag,
-          b.toByteArray,
-          target)).void
+        F.suspend(cfToAsync {
+          service.unicast(
+            tag,
+            b.toByteArray,
+            target)
+        }).void
       }).getOrElse(F.delay {
         log.warn(s"malformed payload was sent by unicast ::: ${payload}, to ::: ${target}")
       })
+    }
 
-    def multicast[P: Codec](tag: String, payload: P, targets: Set[MemberId]): F[Unit] =
+    def multicast[P: Codec](tag: String, payload: P, targets: Set[MemberId]): F[Unit] = {
       if (targets.isEmpty) F.delay(())
       else
         Codec[P].encode(payload).map((b: BitVector) => {
@@ -154,21 +161,25 @@ object Atomix extends Logging {
         }).getOrElse(F.delay {
           log.warn(s"malformed payload sent by multicast ::: ${payload}, to ::: ${targets}")
         })
+    }
 
-    def subscribe[P: Codec](tag: String, limit: Int): F[Stream[F, (MemberId, P)]] = for {
-      localId <- membership.localId
-      _ <- Sync[F].delay(println(s"subscribing ::: me ::: $localId ::: $tag"))
-      res <- InspectableQueue.unbounded[F, (MemberId, P)]
-        .map((queue: InspectableQueue[F, (MemberId, P)]) => enqueue[P](queue, tag, limit) *> queue.dequeue)
-        .map(_.onFinalize(F.delay(service.unsubscribe(tag))))
-    } yield res
+    def subscribe[P: Codec](tag: String, limit: Int): F[Stream[F, (MemberId, P)]] = {
+      val fStream = for {
+        localId <- membership.localId
+        queue <- InspectableQueue.unbounded[F, (MemberId, P)]
+        _ <- enqueue[P](queue, tag, limit)
+      } yield queue.dequeue
+      fStream.map(_.onFinalize(F.delay(service.unsubscribe(tag))))
+    }
 
-    private def enqueue[P: Codec](q: InspectableQueue[F, (MemberId, P)], eventType: String, maxItems: Int): Stream[F, Unit] = {
+    private def enqueue[P: Codec](q: InspectableQueue[F, (MemberId, P)], eventType: String, maxItems: Int): F[Unit] = {
       def decodeBits(a: BitVector, cont: P => F[Unit]): F[Unit] = Codec[P].decode(a) match {
         case Attempt.Failure(_) =>
-          F.delay(log.warn(s"malformed payload received: eventType ::: ${eventType}, bits ::: ${a.toHex}"))
+          F.delay {
+            log.warn(s"malformed payload received: eventType ::: ${eventType}, bits ::: ${a.toHex}")
+          }
+
         case Attempt.Successful(d) =>
-          println(s"${eventType} ::: ${d.value}")
           cont(d.value)
       }
       def getMemberId(addr: Address): F[Option[MemberId]] = for {
@@ -177,7 +188,7 @@ object Atomix extends Logging {
         mid <- membership.byAddress(netAddr, port)
       } yield mid
 
-      Stream.eval(handler(eventType, { (addr: Address, a: BitVector) => run {
+      handler(eventType, { (addr: Address, a: BitVector) => run {
         getMemberId(addr).flatMap {
           case None => F.delay {
             log.warn(s"(impossible) the message sent from unknown node ::: ${addr}")
@@ -190,16 +201,16 @@ object Atomix extends Logging {
               decodeBits(a, x => q.enqueue1((id, x)))
             }
           } yield ()
-        }}}))
+        }}})
     }
     private def handler(eventName: String, cb: (Address, BitVector) => Unit): F[Unit] = {
       val biconsumer: BiConsumer[Address, Array[Byte]] = (addr, bytes) => {
         cb(addr, ByteVector(bytes).bits)
       }
-      cfToAsync(service.subscribe[Array[Byte]](
+      (cfToAsync(service.subscribe[Array[Byte]](
         eventName,
         biconsumer,
-        blockingContextExecutor(pool))).void
+        blockingContextExecutor(pool)))).void
     }
 
     private def run(action: F[Unit]) =
@@ -233,7 +244,7 @@ object Atomix extends Logging {
 
     def random[P: Codec](msg: String, p: P): F[Unit] = for {
       mbid <- membership.random
-      _ <- Sync[F].delay(println(s"mbid ::: $mbid"))
+      me <- membership.localId
       _ <- mbid.traverse(communication.unicast(msg, p, _) *> ContextShift[F].shift)
     } yield ()
 
@@ -242,6 +253,12 @@ object Atomix extends Logging {
 
     def subscribe[P: Codec](msg: String, limit: Int): F[Stream[F, (Id, P)]] =
       communication.subscribe(msg, limit)
+
+    def self[P: Codec](msg: String, p: P): F[Unit] = for {
+      me <- membership.localId
+      _ <- communication.unicast(msg, p, me)
+      _ <- ContextShift[F].shift
+    } yield ()
   }
 
   private def blockingContextExecutor(pool: BlockingContext): Executor = new Executor {
