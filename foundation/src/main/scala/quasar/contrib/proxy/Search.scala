@@ -27,23 +27,5 @@ import java.net.ProxySelector
 object Search {
 
   def apply[F[_]: Sync]: F[ProxySelector] =
-    Sync[F] delay {
-      val builder = new ProxySearch
-
-      if (PlatformUtil.getCurrentPlattform() == Platform.WIN) {
-        builder.addStrategy(ProxySearch.Strategy.BROWSER)
-      } else if (PlatformUtil.getCurrentPlattform() == Platform.LINUX) {
-        builder.addStrategy(ProxySearch.Strategy.GNOME)
-        builder.addStrategy(ProxySearch.Strategy.KDE)
-        builder.addStrategy(ProxySearch.Strategy.BROWSER)
-      } else {
-        // mac and other
-        builder.addStrategy(ProxySearch.Strategy.OS_DEFAULT)    // TODO
-      }
-
-      // Cache 20 hosts for up to 10 minutes. This is the default
-      builder.setPacCacheSettings(20, 1000 * 60 * 10, CacheScope.CACHE_SCOPE_HOST)
-
-      builder.getProxySelector()
-    }
+    Sync[F].delay(ProxySearch.getDefaultProxySearch.getProxySelector)
 }
