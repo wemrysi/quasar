@@ -19,8 +19,6 @@ package quasar.contrib.proxy
 import cats.effect.Sync
 
 import com.github.markusbernhardt.proxy.ProxySearch
-import com.github.markusbernhardt.proxy.selector.misc.BufferedProxySelector.CacheScope
-import com.github.markusbernhardt.proxy.util.PlatformUtil, PlatformUtil.Platform
 
 import java.net.ProxySelector
 
