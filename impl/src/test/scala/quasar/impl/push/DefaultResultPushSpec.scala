@@ -178,9 +178,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val testTable = TableRef(TableName("foo"), query, List())
 
       def testStream(ref: SignallingRef[IO, String]): Stream[IO, String] =
-        Stream.eval_(ref.set("Started")) ++
-          Stream("foo") ++
+        Stream("foo") ++
           Stream(" ") ++ // chunk delimiter
+          Stream.eval_(ref.set("Working")) ++
           Stream.sleep_(WorkTime) ++
           Stream("bar") ++
           Stream.eval_(ref.set("Finished"))
@@ -191,7 +191,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         ref <- SignallingRef[IO, String]("Not started")
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ => testStream(ref)))
         startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv, None)
-        _ <- latchGet(ref, "Started")
+        _ <- latchGet(ref, "Working")
         cancelRes <- push.cancel(TableId)
 
         filesystemAfterPush <- waitForUpdate(filesystem) >> filesystem.get
