@@ -16,10 +16,41 @@
 
 package quasar.api.destination
 
-import scalaz.NonEmptyList
+import argonaut.CodecJson
 
+import cats.Eq
+import cats.data.NonEmptyList
+
+import quasar.api.table.ColumnType
+import quasar.fp.Dependent
+
+/**
+ * @see quasar.api.destination.UntypedDestination
+ */
 trait Destination[F[_]] {
+  type Type
+
+  implicit val labelType: Label[Type]
+  implicit val eqType: Eq[Type]
+  implicit val jsonCodecType: CodecJson[Type]
+
+  type Constructor[P] <: ConstructorLike[P]
+
+  implicit def labelConstructor[P]: Label[Constructor[P]]
+  implicit def eqConstructor[P]: Eq[Constructor[P]]
+  implicit def jsonCodecConstructor[P]: CodecJson[Constructor[P]]
+
+  implicit val dependentLabel: Dependent[Constructor, Label]
+  implicit val dependentEq: Dependent[Constructor, Eq]
+  implicit val dependentCodecJson: Dependent[Constructor, CodecJson]
+
+  def coerce(tpe: ColumnType): TypeCoercion[Constructor, Type]
+
   def destinationType: DestinationType
 
-  def sinks: NonEmptyList[ResultSink[F]]
+  def sinks: NonEmptyList[ResultSink[F, Type]]
+
+  trait ConstructorLike[P] { this: Constructor[P] =>
+    def apply(p: P): Type
+  }
 }

@@ -14,26 +14,23 @@
  * limitations under the License.
  */
 
-package quasar.api.destination
+package quasar.contrib.cats
 
-import slamdata.Predef.{Stream => _, _}
+import cats.{Foldable, Id, Monad}
+import cats.implicits._
 
-import quasar.api.push.RenderConfig
-import quasar.api.resource.ResourcePath
+import scala.{AnyVal, Option, None}
 
-import fs2.Stream
+object foldable {
+  implicit final class ContribFoldableSyntax[F[_], A](val self: F[A]) extends AnyVal {
 
-sealed trait ResultSink[F[_], T]
+    def findMap[B](f: A => Option[B])(implicit F: Foldable[F]): Option[B] =
+      findMapM[Id, B](f)
 
-object ResultSink {
-  final case class Csv[F[_], T](
-      config: RenderConfig.Csv,
-      run: (ResourcePath, List[DestinationColumn[T]], Stream[F, Byte]) => Stream[F, Unit])
-      extends ResultSink[F, T]
-
-  def csv[F[_], T](
-      config: RenderConfig.Csv)(
-      run: (ResourcePath, List[DestinationColumn[T]], Stream[F, Byte]) => Stream[F, Unit])
-      : ResultSink[F, T] =
-    Csv[F, T](config, run)
+    def findMapM[G[_]: Monad, B](f: A => G[Option[B]])(implicit F: Foldable[F]): G[Option[B]] =
+      self.foldLeftM(None: Option[B]) {
+        case (None, a) => f(a)
+        case (opt, _) => opt.pure[G]
+      }
+  }
 }

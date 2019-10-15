@@ -18,17 +18,17 @@ package quasar.impl.datasource.local
 
 import slamdata.Predef.{Stream => _, _}
 
+import cats.data.NonEmptyList
+import cats.implicits._
 import cats.effect.{ContextShift, Effect}
 
 import fs2.{io, Stream}
 
-import quasar.api.destination.{Destination, ResultSink}
+import quasar.api.destination.{ResultSink, UntypedDestination}
 import quasar.api.push.RenderConfig
 import quasar.concurrent.BlockingContext
 import quasar.connector.{MonadResourceErr, ResourceError}
 
-import scalaz.NonEmptyList
-import scalaz.syntax.monad._
 import scalaz.syntax.tag._
 
 import shims._
@@ -37,15 +37,16 @@ import java.nio.file.{Path => JPath}
 
 final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] private (
     root: JPath,
-    blockingContext: BlockingContext) extends Destination[F] {
+    blockingContext: BlockingContext)
+    extends UntypedDestination[F] {
 
   val destinationType = LocalDestinationType
 
-  def sinks: NonEmptyList[ResultSink[F]] =
-    NonEmptyList(csvSink(root, blockingContext))
+  def sinks: NonEmptyList[ResultSink[F, Unit]] =
+    NonEmptyList.one(csvSink(root, blockingContext))
 
-  private def csvSink(root: JPath, blockingContext: BlockingContext): ResultSink[F] =
-    ResultSink.csv(RenderConfig.Csv())((dst, columns, bytes) =>
+  private def csvSink(root: JPath, blockingContext: BlockingContext): ResultSink[F, Unit] =
+    ResultSink.csv(RenderConfig.Csv())((dst, _, bytes) =>
         Stream.eval(resolvedResourcePath[F](root, dst)) >>= {
           case Some(writePath) =>
             val fileSink = io.file.writeAll[F](writePath, blockingContext.unwrap)

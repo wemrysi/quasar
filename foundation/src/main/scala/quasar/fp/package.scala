@@ -137,6 +137,15 @@ package object fp
 
   import ski._
 
+  // an existential skolem
+  type τ
+
+  object τ {
+    // you can put many different materializations in here; this is just the one I needed
+    implicit def materialize[C[_], F[_], A](implicit F: C[F[τ]]): C[F[A]] =
+      F.asInstanceOf[C[F[A]]]
+  }
+
   /** An endomorphism is a mapping from a category to itself.
    *  It looks like scalaz already staked out "Endo" for the
    *  lower version.

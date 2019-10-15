@@ -16,15 +16,58 @@
 
 package quasar.api.table
 
+import argonaut._, Argonaut._
+
 import slamdata.Predef.{Int, Product, Serializable, Set}
 
-import scalaz.{Order, Show}
-import scalaz.std.anyVal._
-import scalaz.syntax.order._
+import cats.{Order, Show}
+import cats.implicits._
+
+import scala.StringContext
 
 sealed abstract class ColumnType(final val ordinal: Int) extends Product with Serializable
 
-object ColumnType {
+private[table] trait LowPriorityImplicits {
+  import ColumnType._
+
+  implicit val codecJson: CodecJson[ColumnType] =
+    CodecJson(
+      {
+        case Null => "null".asJson
+        case Boolean => "boolean".asJson
+        case LocalTime => "localtime".asJson
+        case OffsetTime => "offsettime".asJson
+        case LocalDate => "localdate".asJson
+        case OffsetDate => "offsetdate".asJson
+        case LocalDateTime => "localdatetime".asJson
+        case OffsetDateTime => "offsetdatetime".asJson
+        case Interval => "interval".asJson
+        case Number => "number".asJson
+        case String => "string".asJson
+        case Array => "array".asJson
+        case Object => "object".asJson
+      },
+      { c =>
+        c.as[java.lang.String] flatMap {
+          case "null" => DecodeResult.ok(Null)
+          case "boolean" => DecodeResult.ok(Boolean)
+          case "localtime" => DecodeResult.ok(LocalTime)
+          case "offsettime" => DecodeResult.ok(OffsetTime)
+          case "localdate" => DecodeResult.ok(LocalDate)
+          case "offsetdate" => DecodeResult.ok(OffsetDate)
+          case "localdatetime" => DecodeResult.ok(LocalDateTime)
+          case "offsetdatetime" => DecodeResult.ok(OffsetDateTime)
+          case "interval" => DecodeResult.ok(Interval)
+          case "number" => DecodeResult.ok(Number)
+          case "string" => DecodeResult.ok(String)
+          case "array" => DecodeResult.ok(Array)
+          case "object" => DecodeResult.ok(Object)
+          case s => DecodeResult.fail(s"unknown column type '$s'", c.history)
+        }
+      })
+}
+
+object ColumnType extends LowPriorityImplicits {
 
   sealed abstract class Scalar(ordinal: Int) extends ColumnType(ordinal)
 
@@ -62,8 +105,40 @@ object ColumnType {
       Object)
 
   implicit def columnTypeOrder[T <: ColumnType]: Order[T] =
-    Order.order((x, y) => x.ordinal ?|? y.ordinal)
+    Order.by(_.ordinal)
 
   implicit def columnTypeShow[T <: ColumnType]: Show[T] =
-    Show.showFromToString
+    Show.fromToString
+
+  implicit val codecJsonScalar: CodecJson[ColumnType.Scalar] =
+    CodecJson(
+      {
+        case Null => "null".asJson
+        case Boolean => "boolean".asJson
+        case LocalTime => "localtime".asJson
+        case OffsetTime => "offsettime".asJson
+        case LocalDate => "localdate".asJson
+        case OffsetDate => "offsetdate".asJson
+        case LocalDateTime => "localdatetime".asJson
+        case OffsetDateTime => "offsetdatetime".asJson
+        case Interval => "interval".asJson
+        case Number => "number".asJson
+        case String => "string".asJson
+      },
+      { c =>
+        c.as[java.lang.String] flatMap {
+          case "null" => DecodeResult.ok(Null)
+          case "boolean" => DecodeResult.ok(Boolean)
+          case "localtime" => DecodeResult.ok(LocalTime)
+          case "offsettime" => DecodeResult.ok(OffsetTime)
+          case "localdate" => DecodeResult.ok(LocalDate)
+          case "offsetdate" => DecodeResult.ok(OffsetDate)
+          case "localdatetime" => DecodeResult.ok(LocalDateTime)
+          case "offsetdatetime" => DecodeResult.ok(OffsetDateTime)
+          case "interval" => DecodeResult.ok(Interval)
+          case "number" => DecodeResult.ok(Number)
+          case "string" => DecodeResult.ok(String)
+          case s => DecodeResult.fail(s"unknown column type '$s'", c.history)
+        }
+      })
 }

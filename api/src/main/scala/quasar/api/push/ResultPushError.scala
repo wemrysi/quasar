@@ -18,6 +18,8 @@ package quasar.api.push
 
 import slamdata.Predef._
 
+import cats.data.NonEmptyList
+
 sealed trait ResultPushError[+T, +D] extends Product with Serializable
 
 object ResultPushError {
@@ -29,4 +31,9 @@ object ResultPushError {
   final case class FormatNotSupported[D](destinationId: D, format: String) extends ResultPushError[Nothing, D]
 
   final case class PushAlreadyRunning[T](tableId: T) extends ResultPushError[T, Nothing]
+
+  final case class DestinationTypesNotDecodable[D](
+      destinationId: D,
+      errors: NonEmptyList[String])
+      extends ResultPushError[Nothing, D]
 }

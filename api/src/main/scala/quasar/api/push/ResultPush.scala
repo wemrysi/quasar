@@ -16,11 +16,12 @@
 
 package quasar.api.push
 
-import slamdata.Predef.{Option, Long, Unit}
+import slamdata.Predef.{Option, List, Long, Unit}
 
 import quasar.Condition
-import quasar.api.destination.ResultType
+import quasar.api.destination.{DestinationColumn, ResultType}
 import quasar.api.resource.ResourcePath
+import quasar.api.table.ColumnType
 
 import scalaz.\/
 
@@ -28,16 +29,29 @@ import scalaz.\/
   * @tparam T Table Id
   * @tparam D Destination Id
   */
-trait ResultPush[F[_], TableId, DestinationId] {
+trait ResultPush[F[_], TableId, DestinationId, DData] {
   import ResultPushError._
 
-  def start(tableId: TableId, destinationId: DestinationId, path: ResourcePath, format: ResultType, limit: Option[Long])
+  def coerce(
+      destinationId: DestinationId,
+      tpe: ColumnType)
+      : F[DestinationNotFound[DestinationId] \/ DData]
+
+  def start(
+      tableId: TableId,
+      columns: List[DestinationColumn[DData]],
+      destinationId: DestinationId,
+      path: ResourcePath,
+      format: ResultType,
+      limit: Option[Long])
       : F[Condition[ResultPushError[TableId, DestinationId]]]
 
-  def cancel(tableId: TableId)
+  def cancel(
+      tableId: TableId)
       : F[Condition[ExistentialError[TableId, DestinationId]]]
 
-  def status(tableId: TableId)
+  def status(
+      tableId: TableId)
       : F[TableNotFound[TableId] \/ Option[PushMeta[DestinationId]]]
 
   def cancelAll: F[Unit]

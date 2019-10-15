@@ -16,24 +16,24 @@
 
 package quasar.api.destination
 
-import slamdata.Predef.{Stream => _, _}
+import scala.AnyVal
 
-import quasar.api.push.RenderConfig
-import quasar.api.resource.ResourcePath
+import java.lang.String
 
-import fs2.Stream
+trait Label[A] {
+  def label(a: A): String
+}
 
-sealed trait ResultSink[F[_], T]
+object Label {
 
-object ResultSink {
-  final case class Csv[F[_], T](
-      config: RenderConfig.Csv,
-      run: (ResourcePath, List[DestinationColumn[T]], Stream[F, Byte]) => Stream[F, Unit])
-      extends ResultSink[F, T]
+  def apply[A](implicit A: Label[A]): Label[A] = A
 
-  def csv[F[_], T](
-      config: RenderConfig.Csv)(
-      run: (ResourcePath, List[DestinationColumn[T]], Stream[F, Byte]) => Stream[F, Unit])
-      : ResultSink[F, T] =
-    Csv[F, T](config, run)
+  def label[A](f: A => String): Label[A] =
+    new Label[A] { def label(a: A) = f(a) }
+
+  object Syntax {
+    implicit final class EnrichedA[A](val self: A) extends AnyVal {
+      def label(implicit A: Label[A]): String = A.label(self)
+    }
+  }
 }

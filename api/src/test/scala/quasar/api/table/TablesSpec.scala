@@ -24,11 +24,13 @@ import cats.effect.Sync
 import org.specs2.execute.AsResult
 import org.specs2.specification.BeforeEach
 import org.specs2.specification.core.Fragment
-import scalaz.{~>, \/, \/-, -\/, Equal, Id, Monad, Show}, Id.Id
+import scalaz.{~>, \/, \/-, -\/, Equal, Id, Show}, Id.Id
 import scalaz.std.list._
 import scalaz.syntax.monad._
 
-abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show]
+import shims._
+
+abstract class TablesSpec[F[_]: Sync, I: Equal: Show, Q: Equal: Show]
     extends Qspec
     with ConditionMatchers
     with BeforeEach {

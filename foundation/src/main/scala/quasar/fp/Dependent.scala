@@ -14,21 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.fp
 
-import slamdata.Predef._
+import cats.~>
 
-import cats.{Eq, Show}
-import cats.implicits._
-
-final case class TableColumn(name: String, tpe: ColumnType.Scalar)
-
-object TableColumn {
-  implicit val equalTableColumn: Eq[TableColumn] =
-    Eq.by(c => (c.name, c.tpe))
-
-  implicit val showTableColumn: Show[TableColumn] =
-    Show show { tc =>
-      "TableColumn(" + tc.name + ", " + tc.tpe.show + ")"
-    }
+/**
+ * This a bit weird, but it's useful when you have an F which forms
+ * a GADT over some closed algebra of A, and where some class C may
+ * be materialized for every member of that set, but only if you know
+ * *which* A you have. This is distinct from `FunctionK` because it
+ * is intended to be implicit.
+ */
+trait Dependent[F[_], +C[_]] {
+  def apply[A](fa: F[A]): C[A]
+  def lift[C2[a] >: C[a]]: F ~> C2 = λ[F ~> C2](apply(_))
 }

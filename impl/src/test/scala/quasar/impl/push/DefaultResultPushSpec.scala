@@ -18,6 +18,9 @@ package quasar.impl.push
 
 import slamdata.Predef._
 
+import argonaut.Json
+
+import cats.data.NonEmptyList
 import cats.effect.IO
 
 import eu.timepit.refined.auto._
@@ -29,7 +32,7 @@ import fs2.{Stream, text}
 import org.specs2.matcher.MatchResult
 
 import quasar.api.QueryEvaluator
-import quasar.api.destination.{Destination, DestinationType, ResultSink, ResultType}
+import quasar.api.destination.{Destination, DestinationType, ResultSink, ResultType, UntypedDestination}
 import quasar.api.push.{PushMeta, RenderConfig, ResultPush, ResultPushError, ResultRender, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
@@ -39,7 +42,7 @@ import quasar.{ConditionMatchers, EffectfulQSpec}
 import scalaz.std.set._
 import scalaz.std.string._
 import scalaz.syntax.bind._
-import scalaz.{Equal, NonEmptyList, \/-}
+import scalaz.{Equal, \/-}
 
 import shims._
 
@@ -59,11 +62,11 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
   type Filesystem = Map[ResourcePath, String]
 
-  final class RefDestination(ref: SignallingRef[IO, Filesystem]) extends Destination[IO] {
+  final class RefDestination(ref: SignallingRef[IO, Filesystem]) extends UntypedDestination[IO] {
     def destinationType: DestinationType = RefDestinationType
-    def sinks = NonEmptyList(csvSink)
+    def sinks = NonEmptyList.of(csvSink)
 
-    val csvSink: ResultSink[IO] = ResultSink.csv[IO](RenderConfig.Csv()) {
+    val csvSink: ResultSink[IO, Unit] = ResultSink.csv[IO, Unit](RenderConfig.Csv()) {
       case (dst, columns, bytes) =>
         bytesToString(bytes).evalMap(str =>
           ref.update(currentFs =>
@@ -108,7 +111,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     destinations: Map[Int, Destination[IO]],
     manager: JobManager[IO, Int, Nothing],
     evaluator: QueryEvaluator[IO, String, Stream[IO, String]])
-      : IO[ResultPush[IO, Int, Int]] = {
+      : IO[ResultPush[IO, Int, Int, Json]] = {
 
     val lookupTable: Int => IO[Option[TableRef[String]]] =
       tableId => IO(tables.get(tableId))
@@ -161,7 +164,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         evaluator = mkEvaluator(q => IO(Stream.emit(mockEvaluate(q)) ++ Stream.eval_(ref.set("Finished"))))
 
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, evaluator)
-        startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv, None)
+        startRes <- push.start(TableId, Nil, DestinationId, pushPath, ResultType.Csv, None)
         _ <- latchGet(ref, "Finished")
         filesystemAfterPush <- waitForUpdate(filesystem) >> filesystem.get
         _ <- cleanup
@@ -190,7 +193,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (destination, filesystem) <- RefDestination()
         ref <- SignallingRef[IO, String]("Not started")
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ => IO(testStream(ref))))
-        startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv, None)
+        startRes <- push.start(TableId, Nil, DestinationId, pushPath, ResultType.Csv, None)
         _ <- latchGet(ref, "Working")
         cancelRes <- push.cancel(TableId)
 
@@ -217,7 +220,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           IO(Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2"))))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+        _ <- push.start(TableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- latchGet(sync, "Started")
         pushStatus <- push.status(TableId)
         _ <- cleanup
@@ -237,7 +240,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           IO(Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2"))))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+        _ <- push.start(TableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- latchGet(sync, "Started")
         _ <- push.cancel(TableId)
         _ <- await
@@ -259,7 +262,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           IO(Stream.eval_(sync.set("Started")) ++ awaitS ++ Stream.eval_(sync.set("Finished")))))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+        _ <- push.start(TableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- latchGet(sync, "Finished")
         _ <- await // wait for concurrent update of push status
         pushStatus <- push.status(TableId)
@@ -281,7 +284,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           Map(TableId -> testTable),
           Map(DestinationId -> destination), jm, mkEvaluator(_ =>
             IO.raiseError[Stream[IO, String]](new Exception("boom"))))
-        pushStatus <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+        pushStatus <- push.start(TableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- await // wait for error handling
         status <- push.status(TableId)
         _ <- cleanup
@@ -303,7 +306,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         sync <- SignallingRef[IO, String]("Not started")
         push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
           IO(Stream.eval_(sync.set("Started")) ++ Stream.raiseError[IO](ex))))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+        _ <- push.start(TableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- latchGet(sync, "Started")
         _ <- await // wait for error handling
         pushStatus <- push.status(TableId)
@@ -353,8 +356,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           Map(DestinationId -> destination),
           jm,
           mkEvaluator(_ => IO(Stream.eval(sync.set("Started")).as("1") ++ awaitS.as("2") ++ Stream.eval(sync.set("Finished")).as("3"))))
-        firstStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
-        secondStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
+        firstStartStatus <- push.start(TableId, Nil, DestinationId, path, ResultType.Csv, None)
+        secondStartStatus <- push.start(TableId, Nil, DestinationId, path, ResultType.Csv, None)
         _ <- cleanup
       } yield {
         firstStartStatus must beNormal
@@ -380,8 +383,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           case "queryBar" =>
             IO(Stream.eval_(refBar.set("Started")) ++ awaitS ++ Stream.eval_(refBar.set("Finished")))
         })
-        _ <- push.start(1, DestinationId, path1, ResultType.Csv, None)
-        _ <- push.start(2, DestinationId, path2, ResultType.Csv, None)
+        _ <- push.start(1, Nil, DestinationId, path1, ResultType.Csv, None)
+        _ <- push.start(2, Nil, DestinationId, path2, ResultType.Csv, None)
         _ <- latchGet(refFoo, "Started") >> latchGet(refBar, "Started")
         _ <- push.cancelAll
         fooCanceled <- verifyTimeout(latchGet(refFoo, "Finished"), "queryFoo not cancelled")
@@ -398,7 +401,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (destination, filesystem) <- RefDestination()
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(TableId -> testTable), Map(), jm, mkEvaluator(_ => IO(Stream.empty)))
-        pushRes <- push.start(TableId, UnknownDestinationId, ResourcePath.root(), ResultType.Csv, None)
+        pushRes <- push.start(TableId, Nil, UnknownDestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- cleanup
       } yield {
         pushRes must beAbnormal(ResultPushError.DestinationNotFound(UnknownDestinationId))
@@ -413,7 +416,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (destination, filesystem) <- RefDestination()
         (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
         push <- mkResultPush(Map(), Map(DestinationId -> destination), jm, mkEvaluator(_ => IO(Stream.empty)))
-        pushRes <- push.start(UnknownTableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+        pushRes <- push.start(UnknownTableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
         _ <- cleanup
       } yield {
         pushRes must beAbnormal(ResultPushError.TableNotFound(UnknownTableId))

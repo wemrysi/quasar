@@ -34,6 +34,8 @@ import scalaz.std.tuple._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
 
+import shims._
+
 sealed trait ScalarStage extends Product with Serializable
 
 object ScalarStage extends ScalarStageInstances {
