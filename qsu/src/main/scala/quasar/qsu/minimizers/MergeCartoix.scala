@@ -36,15 +36,15 @@ import quasar.fp.ski.κ2
 import quasar.qscript._
 import quasar.qsu.{QScriptUniform => QSU}, QSU.Rotation
 
-import scalaz.{Forall, NonEmptyList}
+import scalaz.{Forall, IList, NonEmptyList}
 // these instances don't exist in cats (for good reason), but we depend on them here
 import scalaz.std.set.{setMonoid => _, _}
 import scalaz.std.map._
 
 import scala.collection.immutable.{Map => SMap}
 
-// 3s comple with this, 60s with import shims._
-import shims.{foldableToCats, monoidToScalaz}
+// An order of magnitude faster to compile than import shims.{plusEmptyToCats => _, _}
+import shims.{plusEmptyToCats => _, equalToCats, eqToScalaz, foldableToCats, foldableToScalaz, monadToCats, monadToScalaz, showToCats, traverseToCats}
 
 sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT]
     extends Minimizer[T]
@@ -162,13 +162,13 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
           CStage.Join(cs.toMap, fm.map(i => CartoucheRef.Final(Symbol(s"cart$i"))))
         }
 
-    println(s"SINGLE_SOURCE = ${singleSource.root}, candidates = ${candidates0.map(_.root)}\nFM\n${fm0.render.shows}")
+    println(s"SINGLE_SOURCE = ${singleSource.root}, candidates = ${candidates0.map(_.root)}\nFM\n${fm0.render.show}")
 
-    maybeJoin.fold(println("NO JOIN"))(j => println(s"MAYBE_JOIN\n${(j: CStage).render.shows}"))
+    maybeJoin.fold(println("NO JOIN"))(j => println(s"MAYBE_JOIN\n${(j: CStage).render.show}"))
 
     maybeJoin traverse { j =>
       simplifyJoin[G](j)
-        .map { smpl => println(s"SIMPLIFIED_JOIN\n${(smpl: CStage).render.shows}"); smpl }
+        .map { smpl => println(s"SIMPLIFIED_JOIN\n${(smpl: CStage).render.show}"); smpl }
         .flatMap(j => reifyJoin[G](j, singleSource, StructLens.init(j.cartoix.size > 1), false))
         .map(x => (x, x))
     }
@@ -255,7 +255,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
 
     val read =
       Some(attemptProject(expr))
-        .filter(_ any { case (i, p) => indices.contains(i) && p.nonEmpty })
+        .filter(_ exists { case (i, p) => indices.contains(i) && p.nonEmpty })
         .map(_ flatMap {
           case (i, h :: t) if indices.contains(i) =>
             FreeA(Left(NonEmptyList.nels(h, t: _*)): T)
@@ -265,8 +265,8 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
         })
 
     read map { r =>
-      val reindexed = r.indexed
-      (reindexed.toList.sortBy(_._1).map(_._2), reindexed.map(_._1))
+      val reindexed = r.zipWithIndex
+      (reindexed.toList.sortBy(_._2).map(_._1), reindexed.map(_._2))
     }
   }
 
@@ -291,13 +291,19 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   // Returns an expression where all projections of `Hole` have been
   // extracted, `None` if any access of `Hole` is not a project.
   private def extractProject(fm: FreeMap): Option[FreeMapA[PrjPath]] =
-    attemptProject(fm).traverse(_._2.toNel)
+    attemptProject(fm) traverse {
+      case (_, h :: t) => Some(NonEmptyList.nels(h, t: _*))
+      case _ => None
+    }
 
-  private def commonPrjPrefix(xs: PrjPath, ys: PrjPath): Option[PrjPath] =
-    (xs zip ys).list
-      .takeWhile { case (x, y) => x === y }
-      .map(_._1)
-      .toNel
+  private def commonPrjPrefix(xs: PrjPath, ys: PrjPath): Option[PrjPath] = {
+    val prefix =
+      (xs zip ys).list
+        .takeWhile { case (x, y) => x === y }
+        .map(_._1)
+
+    prefix.headOption.map(NonEmptyList.nel(_, prefix.drop(1)))
+  }
 
   // Extracts the longest common project prefix of `Hole`, turning it into
   // a `Project` stage, followed by an `Expr` stage containing the remainder
@@ -306,9 +312,9 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
     val factored = for {
       extracted <- extractProject(fm)
 
-      prefix <- extracted.foldMapLeft1Opt(_.some)((x, y) => x.flatMap(commonPrjPrefix(_, y))).join
+      prefix <- extracted.reduceLeftToOption(_.some)((x, y) => x.flatMap(commonPrjPrefix(_, y))).flatten
 
-      len = prefix.length
+      len = prefix.size
 
       expr = extracted.flatMap(p => reifyPath(func.Hole, p.list.drop(len)))
     } yield {
@@ -476,14 +482,14 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
               val struct0 =
                 shifts.values.head.struct
 
-              projectedPaths.toNel match {
-                case Some(paths) =>
-                  maskStruct(paths, rot, struct0) match {
+              projectedPaths match {
+                case h :: t =>
+                  maskStruct(NonEmptyList.nels(h, t: _*), rot, struct0) match {
                     case Left(prj) => (Project[T](prj), cl)
                     case Right(struct1) => (Shift[T](struct1, idStatus, rot), cl)
                   }
 
-                case None =>
+                case Nil =>
                   (Shift[T](struct0, idStatus, rot), cl)
               }
             }
@@ -570,7 +576,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
         case FreeA(p) => p
       }
 
-      len = structPrj.length
+      len = structPrj.size
 
       prefixed = paths.list.filter(isPrefix(structPrj, _))
 
