@@ -30,10 +30,14 @@ import matryoshka.data.free._
 
 import scala.collection.immutable.{Map => SMap}
 
-import scalaz.{Equal, NonEmptyList}
+import scalaz.{Equal, Show}
 import scalaz.Scalaz._
 
-private[minimizers] sealed trait CStage[T[_[_]]] extends Product with Serializable
+/**
+ * @tparam P path
+ * @tparam S struct
+ */
+private[minimizers] sealed trait CStage[T[_[_]], +P, +S] extends Product with Serializable
 
 private[minimizers] object CStage {
   import QScriptUniform.Rotation
@@ -45,7 +49,7 @@ private[minimizers] object CStage {
   final case class Join[T[_[_]]](
       cartoix: SMap[Symbol, Cartouche[T]],
       joiner: FreeMapA[T, CartoucheRef])
-      extends CStage[T]
+      extends CStage[T, Nothing, Nothing]
 
   /** Represents a cartesian between the cartoix, producing a map containing
     * the result of each cartouche at the cooresponding symbol.
@@ -54,23 +58,21 @@ private[minimizers] object CStage {
     */
   final case class Cartesian[T[_[_]]](
       cartoix: SMap[Symbol, Cartouche[T]])
-      extends CStage[T]
+      extends CStage[T, Nothing, Nothing]
 
-  final case class Shift[T[_[_]]](
-      struct: FreeMap[T],
+  final case class Shift[T[_[_]], S](
+      struct: S,
       idStatus: IdStatus,
       rot: Rotation)
-      extends CStage[T]
+      extends CStage[T, Nothing, S]
 
-  final case class Project[T[_[_]]](
-      path: NonEmptyList[Either[Int, String]])
-      extends CStage[T]
+  final case class Project[T[_[_]], P](path: P)
+      extends CStage[T, P, Nothing]
 
-  final case class Expr[T[_[_]]](
-      f: FreeMap[T])
-      extends CStage[T]
+  final case class Expr[T[_[_]]](f: FreeMap[T])
+      extends CStage[T, Nothing, Nothing]
 
-  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: RenderTree[CStage[T]] =
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT, P: Show, S: RenderTree]: RenderTree[CStage[T, P, S]] =
     RenderTree make {
       case Join(cart, join) =>
         NonTerminal(List("Join"), None,
@@ -85,18 +87,13 @@ private[minimizers] object CStage {
           NonTerminal(List("Struct"), None, List(struct.render))))
 
       case Project(path) =>
-        val s = path foldMap {
-          case Left(i) => s"[$i]"
-          case Right(f) => s".$f"
-        }
-
-        Terminal(List("Project"), Some(s))
+        Terminal(List("Project"), Some(path.shows))
 
       case Expr(f) =>
         NonTerminal(List("Expr"), None, List(f.render))
     }
 
-  implicit def equal[T[_[_]]: BirecursiveT: EqualT]: Equal[CStage[T]] =
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT, P: Equal, S: Equal]: Equal[CStage[T, P, S]] =
     Equal equal {
       case (Join(c1, j1), Join(c2, j2)) => c1 === c2 && j1 === j2
       case (Cartesian(c1), Cartesian(c2)) => c1 === c2
