@@ -58,8 +58,10 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   import MapFuncsCore.{IntLit, ProjectIndex, ProjectKey, StrLit}
 
   type Cartouche = quasar.qsu.minimizers.Cartouche[T]
-  type CStage = quasar.qsu.minimizers.CStage[T]
-  type PrjPath = NonEmptyList[Either[Int, String]]
+  type PrjPath = NonEmptyList[Index]
+  // TODO: Better names
+  type CStage0 = quasar.qsu.minimizers.CStage[T, Index, Hole]
+  type CStage1 = quasar.qsu.minimizers.CStage[T, Nothing, FreeMap]
   type ∀[P[_]] = Forall[P]
 
   implicit def PEqual: Eq[P]
@@ -144,15 +146,15 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
         .flatMap(readSourceProjections(singleSource, _, fm0))
         .getOrElse((candidates0.map(Right(_)), fm0))
 
-    val exprProjections: CStage => List[CStage] = {
+    val exprProjections: CStage0 => List[CStage0] = {
       case CStage.Expr(f) => quotientProjection(f).toList
       case other => List(other)
     }
 
-    val maybeJoin: Option[CStage.Join[T]] =
+    val maybeJoin: Option[CStage.Join[T, Index, Hole]] =
       candidates
         .traverse(_.fold(
-          p => Some(List(CStage.Project[T](p))),
+          p => Some(List(CStage.Project[T, Index](p))),
           readCandidate(singleSource, _)))
         .map { cartoix =>
           val cs = cartoix.zipWithIndex map {
@@ -164,11 +166,11 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
 
     println(s"SINGLE_SOURCE = ${singleSource.root}, candidates = ${candidates0.map(_.root)}\nFM\n${fm0.render.show}")
 
-    maybeJoin.fold(println("NO JOIN"))(j => println(s"MAYBE_JOIN\n${(j: CStage).render.show}"))
+    maybeJoin.fold(println("NO JOIN"))(j => println(s"MAYBE_JOIN\n${(j: CStage0).render.show}"))
 
     maybeJoin traverse { j =>
       simplifyJoin[G](j)
-        .map { smpl => println(s"SIMPLIFIED_JOIN\n${(smpl: CStage).render.show}"); smpl }
+        .map { smpl => println(s"SIMPLIFIED_JOIN\n${(smpl: CStage0).render.show}"); smpl }
         .flatMap(j => reifyJoin[G](j, singleSource, StructLens.init(j.cartoix.size > 1), false))
         .map(x => (x, x))
     }
@@ -182,7 +184,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   // returns the list of stages in reverse order, Nil represents the source
   // ignores projection
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def readCandidate(singleSource: QSUGraph, qgraph: QSUGraph): Option[List[CStage]] = {
+  private def readCandidate(singleSource: QSUGraph, qgraph: QSUGraph): Option[List[CStage0]] = {
     val MapSrc = new FuncOf(singleSource.root)
 
     qgraph match {
@@ -191,12 +193,12 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
         val above: FreeMapA[QSUGraph] =
           MappableRegion[T](singleSource.root === _, src)
 
-        val maybeCartoix: Option[FreeMapA[(Symbol, List[CStage])]] =
+        val maybeCartoix: Option[FreeMapA[(Symbol, List[CStage0])]] =
           above.traverse(g => readCandidate(singleSource, g).tupleLeft(g.root))
 
         maybeCartoix map {
           case FreeA((_, parent)) =>
-            CStage.Shift[T](func.Hole, retain.fold(IdOnly, ExcludeId), rot) :: parent
+            CStage.Shift[T, Hole](Hole(), retain.fold(IdOnly, ExcludeId), rot) :: parent
 
           case cartoix =>
             val roots = FM.foldMap(cartoix) { case (root, _) => Set(root) }
@@ -217,10 +219,10 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
               current :: join :: Nil
             } else {
               val parent = cartoix.toList.take(1).flatMap { case (_, s) => s }
-              val struct = cartoix.as(Hole())
-              val current = CStage.Shift[T](struct, retain.fold(IdOnly, ExcludeId), rot)
+              val struct = CStage.Expr[T](cartoix.as(Hole()))
+              val current = CStage.Shift[T, Hole](Hole(), retain.fold(IdOnly, ExcludeId), rot)
 
-              current :: parent
+              struct :: current :: parent
             }
         }
 
@@ -234,10 +236,10 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
     }
   }
 
-  // TODO: This results in slightly different output, try reifying sibling stages: Cartouche -> Shift -> Project
-  //       that allows for the project/source refs to have a repair to update rather than introducing
-  //       a Map node.
-  private def readSourceProjections(singleSource: QSUGraph, candidates: List[QSUGraph], expr: FreeMapA[Int])
+  private def readSourceProjections(
+      singleSource: QSUGraph,
+      candidates: List[QSUGraph],
+      expr: FreeMapA[Int])
       : Option[(List[Either[PrjPath, QSUGraph]], FreeMapA[Int])] = {
 
     type T = Either[PrjPath, QSUGraph]
@@ -270,16 +272,16 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
     }
   }
 
-  private def attemptProject[A](fm: FreeMapA[A]): FreeMapA[(A, List[Either[Int, String]])] = {
+  private def attemptProject[A](fm: FreeMapA[A]): FreeMapA[(A, List[Index])] = {
     val fa: A => FreeMapA[(A, List[Either[Int, String]])] =
       a => FreeA((a, Nil))
 
     val ff: Algebra[MapFunc, FreeMapA[(A, List[Either[Int, String]])]] = {
       case MFC(ProjectKey(FreeA((a, p)), StrLit(key))) =>
-        FreeA((a, Right(key) :: p))
+        FreeA((a, Index.field(key) :: p))
 
       case MFC(ProjectIndex(FreeA((a, p)), IntLit(i))) if i.isValidInt =>
-        FreeA((a, Left(i.toInt) :: p))
+        FreeA((a, Index.position(i.toInt) :: p))
 
       case other =>
         FreeF(other)
