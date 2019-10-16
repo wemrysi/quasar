@@ -2434,6 +2434,141 @@ object MinimizeAutoJoinsSpec
     }
   }
 
+  "project, pivot at same locus" >> {
+    "shift map, single field project eliminates pivot" >> {
+      // select x.y.z.a + x.y{_}.b from afile
+      val qgraph =
+        QSUGraph.fromTree[Fix](
+          qsu.autojoin2((
+            qsu.map(
+              shiftedRead,
+              recFunc.ProjectKeyS(
+                recFunc.ProjectKeyS(
+                  recFunc.ProjectKeyS(
+                    recFunc.ProjectKeyS(recFunc.Hole, "x"),
+                    "y"),
+                  "z"),
+                "a")),
+            qsu.map(
+              qsu.transpose(
+                qsu.map(
+                  shiftedRead,
+                  recFunc.ProjectKeyS(
+                    recFunc.ProjectKeyS(recFunc.Hole, "x"),
+                    "y")),
+                Retain.Values,
+                Rotation.ShiftMap),
+              recFunc.ProjectKeyS(recFunc.Hole, "b")),
+            _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case Map(Read(_, ExcludeId), func) =>
+          func must beTreeEqual(
+            recFunc.StaticMapS(
+              "a" -> recFunc.ProjectKeyS(
+                recFunc.ProjectKeyS(
+                  recFunc.ProjectKeyS(
+                    recFunc.ProjectKeyS(recFunc.Hole, "x"),
+                    "y"),
+                  "z"),
+                "a"),
+
+              "b" -> recFunc.ProjectKeyS(
+                recFunc.ProjectKeyS(
+                  recFunc.ProjectKeyS(
+                    recFunc.ProjectKeyS(recFunc.Hole, "x"),
+                    "y"),
+                  "z"),
+                "b")))
+      }
+    }
+
+    "shift map, multi field project masks input to projected" >> {
+      // select x.y.z.a + x.y{_}.b + x.y.q.c from afile
+      val qgraph =
+        QSUGraph.fromTree[Fix](
+          qsu.autojoin2((
+            qsu.autojoin2((
+              qsu.map(
+                shiftedRead,
+                recFunc.ProjectKeyS(
+                  recFunc.ProjectKeyS(
+                    recFunc.ProjectKeyS(
+                      recFunc.ProjectKeyS(recFunc.Hole, "x"),
+                      "y"),
+                    "z"),
+                  "a")),
+              qsu.map(
+                qsu.transpose(
+                  qsu.map(
+                    shiftedRead,
+                    recFunc.ProjectKeyS(
+                      recFunc.ProjectKeyS(recFunc.Hole, "x"),
+                      "y")),
+                  Retain.Values,
+                  Rotation.ShiftMap),
+                recFunc.ProjectKeyS(recFunc.Hole, "b")),
+              _(MapFuncsCore.Add(_, _)))),
+            qsu.map(
+              shiftedRead,
+              recFunc.ProjectKeyS(
+                recFunc.ProjectKeyS(
+                  recFunc.ProjectKeyS(
+                    recFunc.ProjectKeyS(recFunc.Hole, "x"),
+                    "y"),
+                  "q"),
+                "c")),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case LeftShift(
+          Read(_, ExcludeId),
+          struct,
+          ExcludeId,
+          _,
+          repair,
+          Rotation.ShiftMap) =>
+
+          struct must beTreeEqual(
+            recFunc.StaticMapS(
+              "z" -> recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "x"), "y"), "z"),
+              "q" -> recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "x"), "y"), "q")))
+
+          repair must beTreeEqual(
+            func.Add(
+              func.Add(
+                func.ProjectKeyS(func.ProjectKeyS(func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "x"), "y"), "z"), "a"),
+                func.ProjectKeyS(func.RightSide, "b")),
+              func.ProjectKeyS(func.ProjectKeyS(func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "x"), "y"), "q"), "c")))
+      }
+    }
+
+    "shift map, single index project crosses" >> todo
+    "shift map, multi index project crosses" >> todo
+
+    "flatten map, single field project" >> todo
+    "flatten map, multi field project" >> todo
+    "flatten map, single index project" >> todo
+    "flatten map, multi index project" >> todo
+
+    "shift array, single index project" >> todo
+    "shift array, multi index project" >> todo
+    "shift array, single field project" >> todo
+    "shift array, multi field project" >> todo
+
+    "flatten array, single index project" >> todo
+    "flatten array, multi index project" >> todo
+    "flatten array, single field project" >> todo
+    "flatten array, multi field project" >> todo
+
+    // x.y.z, x{_:} -> x.y.z, "y" as x
+    "shift map keys, single field project" >> todo
+
+    // select x{_}{_}{_}, x{_}.y{_} from foo
+    // FIXME: The .y projection is going to end up in the struct of the project.
+    "shift map, shift map with intervening field project" >> todo
+  }
+
   def runOn(qgraph: QSUGraph): QSUGraph =
     runOn_(qgraph).graph
 
