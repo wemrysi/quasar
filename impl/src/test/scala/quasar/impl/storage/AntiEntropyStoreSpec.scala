@@ -116,8 +116,6 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
         b1 mustEqual Some("c")
       }
     }
-
-
     "persistence" >>* {
       underlyingResource.use { (underlying: UnderlyingStore) => for {
         node0 <- mkNode("0")
@@ -127,7 +125,6 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
         someB mustEqual Some("b")
       }}
     }
-
     "1234 - 12 - 34 - 1234" >>* {
       val underlying: Resource[IO, List[(UnderlyingStore, NodeInfo)]] = {
         val nodesR: Resource[IO, List[NodeInfo]] =
@@ -252,5 +249,4 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
       }}
     }
   }
-
 }

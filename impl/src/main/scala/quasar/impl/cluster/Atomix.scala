@@ -136,7 +136,7 @@ object Atomix extends Logging {
       : Communication[F, MemberId, String] = new Communication[F, MemberId, String] {
     val F = ConcurrentEffect[F]
 
-    def unicast[P: Codec](tag: String, payload: P, target: MemberId): F[Unit] = {
+    def unicast[P: Codec](tag: String, payload: P, target: MemberId): F[Unit] =
       Codec[P].encode(payload).map((b: BitVector) => {
         F.suspend(cfToAsync {
           service.unicast(
@@ -147,9 +147,8 @@ object Atomix extends Logging {
       }).getOrElse(F.delay {
         log.warn(s"malformed payload was sent by unicast ::: ${payload}, to ::: ${target}")
       })
-    }
 
-    def multicast[P: Codec](tag: String, payload: P, targets: Set[MemberId]): F[Unit] = {
+    def multicast[P: Codec](tag: String, payload: P, targets: Set[MemberId]): F[Unit] =
       if (targets.isEmpty) F.delay(())
       else
         Codec[P].encode(payload).map((b: BitVector) => {
@@ -160,7 +159,6 @@ object Atomix extends Logging {
         }).getOrElse(F.delay {
           log.warn(s"malformed payload sent by multicast ::: ${payload}, to ::: ${targets}")
         })
-    }
 
     def subscribe[P: Codec](tag: String, limit: Int): F[Stream[F, (MemberId, P)]] = {
       val fStream = for {
