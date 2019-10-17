@@ -86,8 +86,7 @@ object Atomix extends Logging {
   private def cfToAsync[F[_]: Async: ContextShift, A](cf: CompletableFuture[A]): F[A] =
     if (cf.isDone) cf.get.pure[F]
     else Async[F].async { (cb: Either[Throwable, A] => Unit) =>
-      val _ = cf.whenComplete((res: A, t: Throwable) => {
-        cb(Option(t).toLeft(res))})
+      val _ = cf.whenComplete((res: A, t: Throwable) => cb(Option(t).toLeft(res)))
     } productL ContextShift[F].shift
 
 
@@ -178,7 +177,6 @@ object Atomix extends Logging {
           F.delay {
             log.warn(s"malformed payload received: eventType ::: ${eventType}, bits ::: ${a.toHex}")
           }
-
         case Attempt.Successful(d) =>
           cont(d.value)
       }
@@ -207,10 +205,10 @@ object Atomix extends Logging {
       val biconsumer: BiConsumer[Address, Array[Byte]] = (addr, bytes) => {
         cb(addr, ByteVector(bytes).bits)
       }
-      (cfToAsync(service.subscribe[Array[Byte]](
+      cfToAsync(service.subscribe[Array[Byte]](
         eventName,
         biconsumer,
-        blockingContextExecutor(pool)))).void
+        blockingContextExecutor(pool))).void
     }
 
     private def run(action: F[Unit]) =
@@ -245,7 +243,7 @@ object Atomix extends Logging {
     def random[P: Codec](msg: String, p: P): F[Unit] = for {
       mbid <- membership.random
       me <- membership.localId
-      _ <- mbid.traverse(communication.unicast(msg, p, _) *> ContextShift[F].shift)
+      _ <- mbid.traverse(communication.unicast(msg, p, _))
     } yield ()
 
     def isEmpty: F[Boolean] =
@@ -253,12 +251,6 @@ object Atomix extends Logging {
 
     def subscribe[P: Codec](msg: String, limit: Int): F[Stream[F, (Id, P)]] =
       communication.subscribe(msg, limit)
-
-    def self[P: Codec](msg: String, p: P): F[Unit] = for {
-      me <- membership.localId
-      _ <- communication.unicast(msg, p, me)
-      _ <- ContextShift[F].shift
-    } yield ()
   }
 
   private def blockingContextExecutor(pool: BlockingContext): Executor = new Executor {

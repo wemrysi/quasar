@@ -44,7 +44,6 @@ import scala.util.Random
 import shims._
 
 final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
-  sequential
   implicit val ec: ExecutionContext = ExecutionContext.global
   implicit val strCodec: Codec[String] = utf8_32
   implicit val timer: Timer[IO] = IO.timer(ec)
@@ -56,7 +55,6 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
 
   val pool = BlockingContext.cached("antientropy-spec-pool")
   val sleep: IO[Unit] = timer.sleep(new FiniteDuration(4000, MILLISECONDS))
-  val shortSleep: IO[Unit] = timer.sleep(new FiniteDuration(100, MILLISECONDS))
 
   type Persistence = ConcurrentHashMap[String, Timestamped[String]]
   type UnderlyingStore = IndexedStore[IO, String, Timestamped[String]]
@@ -130,7 +128,7 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
       }}
     }
 
-    "1234 - 12 - 34 - 1234" >> {
+    "1234 - 12 - 34 - 1234" >>* {
       val underlying: Resource[IO, List[(UnderlyingStore, NodeInfo)]] = {
         val nodesR: Resource[IO, List[NodeInfo]] =
           Resource.liftF(List("0", "1", "2", "3").traverse(mkNode(_)))
@@ -147,7 +145,7 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
         case (s, i) => clusterify(i, nodes)(s)
       }
 
-      val io = underlying.use { (underlyings: List[(UnderlyingStore, NodeInfo)]) => for {
+      underlying.use { (underlyings: List[(UnderlyingStore, NodeInfo)]) => for {
         resourceFromPair <- IO(mkResource(underlyings.map(_._2)))
         foos0 <- parallelResource(underlyings.map(resourceFromPair)).use { stores => for {
           _ <- stores(0).insert("foo", "bar")
@@ -180,9 +178,8 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
         foos3 mustEqual List(Some("bar"), Some("bar"), Some("bar"), Some("bar"))
         bars3 mustEqual List(Some("quux"), Some("quux"), Some("quux"), Some("quux"))
       }}
-      io.unsafeRunTimed(100000.milliseconds).get
     }
-    "1234 - 12 - 34 - 1234 -- deletion" >> {
+    "1234 - 12 - 34 - 1234 -- deletion" >>* {
       val underlying: Resource[IO, List[(UnderlyingStore, NodeInfo)]] = {
         val nodesR: Resource[IO, List[NodeInfo]] =
           Resource.liftF(List("0", "1", "2", "3").traverse(mkNode(_)))
@@ -199,30 +196,23 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
         case (s, i) => clusterify(i, nodes)(s)
       }
 
-      val io = underlying.use { (underlyings: List[(UnderlyingStore, NodeInfo)]) => for {
+      underlying.use { (underlyings: List[(UnderlyingStore, NodeInfo)]) => for {
         resourceFromPair <- IO(mkResource(underlyings.map(_._2)))
-        // 1234
         foos0 <- parallelResource(underlyings.map(resourceFromPair)).use { stores => for {
           _ <- stores(0).insert("foo", "bar")
           _ <- sleep
           foos <- stores.parTraverse(_.lookup("foo"))
         } yield foos }
-        _ <- shortSleep
-        // 12
         foos1 <- parallelResource(List(underlyings(0), underlyings(1)).map(resourceFromPair)).use { stores => for {
           _ <- stores(0).insert("foo", "quux")
           _ <- sleep
           foos <- stores.parTraverse(_.lookup("foo"))
         } yield foos }
-        _ <- shortSleep
-        // 34
         foos2 <- parallelResource(List(underlyings(2), underlyings(3)).map(resourceFromPair)).use { stores => for {
           _ <- stores(0).delete("foo")
           _ <- sleep
           foos <- stores.parTraverse(_.lookup("foo"))
         } yield foos }
-        _ <- shortSleep
-        // 1234
         foos3 <- parallelResource(underlyings.map(resourceFromPair)).use { stores => for {
           _ <- sleep
           foos <- stores.parTraverse(_.lookup("foo"))
@@ -233,10 +223,9 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
         foos2 mustEqual List(None, None)
         foos3 mustEqual List(None, None, None, None)
       }}
-      io.unsafeRunTimed(100000.milliseconds).get
     }
 
-    "seed list might be incomplete" >> {
+    "seed list might be incomplete" >>* {
       val storesR: Resource[IO, List[Store]] = {
         val ioRes: IO[Resource[IO, List[Store]]] = for {
           node0 <- mkNode("0")
@@ -248,7 +237,7 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
         Resource.liftF(ioRes).flatten
       }
 
-      val io = storesR.use { (stores: List[Store]) => for {
+      storesR.use { (stores: List[Store]) => for {
         _ <- stores(0).insert("0", "0")
         _ <- stores(1).insert("1", "1")
         _ <- stores(2).insert("2", "2")
@@ -261,7 +250,6 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
         ones mustEqual List(Some("1"), Some("1"), Some("1"))
         twos mustEqual List(Some("2"), Some("2"), Some("2"))
       }}
-      io.unsafeRunTimed(100000.milliseconds).get
     }
   }
 

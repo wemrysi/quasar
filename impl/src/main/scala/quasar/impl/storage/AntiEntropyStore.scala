@@ -169,9 +169,9 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
       .map(_.evalMap(x => initRequestHandler(x._1)))
 
   def initRequestHandler(id: cluster.Id): F[Unit] =
-    gates.strict(underlying.entries.compile.toList.flatMap { (lst: List[(K, Timestamped[V])]) =>
+    underlying.entries.compile.toList.flatMap { (lst: List[(K, Timestamped[V])]) =>
       cluster.unicast(Init(name), lst.toMap, id)
-    })
+    }
 
   def initHandled(stopper: Deferred[F, Either[Throwable, Unit]]): F[Stream[F, Unit]] =
     cluster.subscribe[Map[K, Timestamped[V]]](Init(name), config.updateLimit)
@@ -223,7 +223,6 @@ object AntiEntropyStore {
         underlying,
         gates,
         config))
-
       stopper <- Deferred[F, Either[Throwable, Unit]]
       empty <- cluster.isEmpty
       _ <- stopper.complete(Right(())).whenA(empty)

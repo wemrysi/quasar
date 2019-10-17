@@ -138,7 +138,6 @@ class AtomixSpec (implicit ec: ExecutionContext) extends EffectfulQSpec[IO]{
         stream2 <- handle(2)
         _ <- Concurrent[IO].start(oneSecondStream(stream1).compile.drain)
         _ <- Concurrent[IO].start(oneSecondStream(stream2).compile.drain)
-
         _ <- clusters(0).broadcast("handshake", "")
         received <- unicasts.compile.toList
       } yield {
