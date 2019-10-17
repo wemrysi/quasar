@@ -66,6 +66,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       debug("InlineNullary")                 >-
       CoalesceUnaryMappable[T]               >==>
       debug("CoalesceUnaryMappable")         >-
+      CoalesceSquashedMappable[T]            >==>
+      debug("CoalesceSquashedMappable")      >-
       RecognizeDistinct[T]                   >==>
       debug("RecognizeDistinct")             >==>
       ExtractFreeMap[T, F]                   >==>
