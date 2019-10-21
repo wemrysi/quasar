@@ -20,6 +20,7 @@ package minimizers
 import slamdata.Predef._
 
 import cats.{~>, Eq, Foldable, Monad, Monoid, MonoidK}
+import cats.data.Ior
 import cats.implicits._
 
 import matryoshka.{Hole => _, _}
@@ -36,7 +37,7 @@ import quasar.fp.ski.κ2
 import quasar.qscript._
 import quasar.qsu.{QScriptUniform => QSU}, QSU.Rotation
 
-import scalaz.{Forall, IList, NonEmptyList}
+import scalaz.{Forall, Foldable1, IList, NonEmptyList}
 // these instances don't exist in cats (for good reason), but we depend on them here
 import scalaz.std.set.{setMonoid => _, _}
 import scalaz.std.map._
@@ -54,10 +55,10 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   import MinimizeAutoJoins.MinStateM
   import QSUGraph.Extractors._
   import RecFreeS.RecOps
-  import MapFuncCore.StaticArray
   import MapFuncsCore.{IntLit, ProjectIndex, ProjectKey, StrLit}
 
-  type Cartouche = quasar.qsu.minimizers.Cartouche[T]
+  type Cartouche0 = quasar.qsu.minimizers.Cartouche[T, Index, Hole]
+  type Cartouche1 = quasar.qsu.minimizers.Cartouche[T, Nothing, FreeMap]
   type PrjPath = NonEmptyList[Index]
   // TODO: Better names
   type CStage0 = quasar.qsu.minimizers.CStage[T, Index, Hole]
@@ -68,11 +69,13 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
 
   private val FM = Foldable[FreeMapA]
 
-  private implicit val MM: Monoid[SMap[Symbol, Cartouche]] =
-    MonoidK[SMap[Symbol, ?]].algebra[Cartouche]
+  private implicit val MM: Monoid[SMap[Symbol, Cartouche0]] =
+    MonoidK[SMap[Symbol, ?]].algebra[Cartouche0]
 
   private val SourceKey = "source"
   private val func = construction.Func[T]
+
+  private def absurd[A]: A = scala.sys.error("absurd!")
 
   def couldApplyTo(candidates: List[QSUGraph]): Boolean =
     candidates exists { case Transpose(_, _, _) => true; case _ => false }
@@ -151,7 +154,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
       case other => List(other)
     }
 
-    val maybeJoin: Option[CStage.Join[T]] =
+    val maybeJoin: Option[CStage.Join[T, Index, Hole]] =
       candidates
         .traverse(_.fold(
           p => Some(p.map(CStage.Project[T, Index](_)).toList),
@@ -171,6 +174,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
     maybeJoin traverse { j =>
       simplifyJoin[G](j)
         .map { smpl => println(s"SIMPLIFIED_JOIN\n${(smpl: CStage0).render.show}"); smpl }
+        .map(finalizeStages)
         .flatMap(j => reifyJoin[G](j, singleSource, StructLens.init(j.cartoix.size > 1), false))
         .map(x => (x, x))
     }
@@ -273,7 +277,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   }
 
   private def attemptProject[A](fm: FreeMapA[A]): FreeMapA[(A, List[Index])] = {
-    val fa: A => FreeMapA[(A, List[Either[Int, String]])] =
+    val fa: A => FreeMapA[(A, List[Index])] =
       a => FreeA((a, Nil))
 
     val ff: Algebra[MapFunc, FreeMapA[(A, List[Index])]] = {
@@ -330,9 +334,9 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   }
 
   private case class Buckets(
-      joins: SMap[Symbol, CStage.Join[T]],
+      joins: SMap[Symbol, CStage.Join[T, Index, Hole]],
       shifts: SMap[Rotation, SMap[Symbol, CStage.Shift[T, Hole]]],
-      projects: SMap[PrjPath, Set[Symbol]],
+      projects: SMap[Index, Set[Symbol]],
       exprs: SMap[Symbol, CStage.Expr[T]])
 
   private object Buckets {
@@ -343,7 +347,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
       *
       * Note that being in the same bucket doesn't guarantee compatible, just possible
       */
-    def fromCartoix(cartoix: SMap[Symbol, Cartouche]): Buckets = {
+    def fromCartoix(cartoix: SMap[Symbol, Cartouche0]): Buckets = {
       import CStage._
 
       cartoix.foldLeft(Empty) {
@@ -375,10 +379,10 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   @SuppressWarnings(Array(
     "org.wartremover.warts.Recursion",
     "org.wartremover.warts.TraversableOps"))
-  private def simplifyJoin[F[_]: Monad: NameGenerator](join: CStage.Join[T]): F[CStage.Join[T]] = {
+  private def simplifyJoin[F[_]: Monad: NameGenerator](join: CStage.Join[T, Index, Hole]): F[CStage.Join[T, Index, Hole]] = {
     val simplName = freshSymbol[F]("simpl")
 
-    def step(cartoix: SMap[Symbol, Cartouche]): F[(SMap[Symbol, Cartouche], SMap[Symbol, CartoucheRef])] = {
+    def step(cartoix: SMap[Symbol, Cartouche0]): F[(SMap[Symbol, Cartouche0], SMap[Symbol, CartoucheRef])] = {
       import CStage._
 
       /** The tuple represents the resolution of a closure: an optional
@@ -422,9 +426,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
 
         shiftRelations =
           simplifiedBuckets.shifts mapValues { syms =>
-            Relation.allPairs(syms.toList)(_._1) {
-              case ((_, l), (_, r)) => l.struct === r.struct
-            }
+            Relation.allPairs(syms.toList)(_._1)(κ2(true))
           }
 
         projectRelations =
@@ -447,12 +449,12 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
           projectRelations.toList flatMap {
             case (idx, rel) => rel.closures.toList.map((Project[T, Index](idx), _))
           }
-
+/*
         projectedPaths =
           resolvedProjects collect {
             case (Project(p), _) => p
           }
-
+*/
         resolvedExprs =
           exprRelation.closures.toList map { cl =>
             (simplifiedBuckets.exprs(cl.head), cl)
@@ -481,6 +483,8 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
               else    // this is the case where we have both ido and eid
                 IdStatus.IncludeId
 
+              (Shift[T, Hole](Hole(), idStatus, rot), cl)
+/*
               val struct0 =
                 shifts.values.head.struct
 
@@ -494,6 +498,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
                 case Nil =>
                   (Shift[T](struct0, idStatus, rot), cl)
               }
+*/
             }
         }
 
@@ -514,7 +519,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
               ((cx -- syms).updated(h, Cartouche.stages(NonEmptyList(stage))), remap0 ++ rm1).pure[F]
             } else {
               // Extract any source references of identities, removing their cartouche
-              val (cx1, ids) = nestedCartoix.toList.foldLeft((SMap[Symbol, Cartouche](), Set[Symbol]())) {
+              val (cx1, ids) = nestedCartoix.toList.foldLeft((SMap[Symbol, Cartouche0](), Set[Symbol]())) {
                 case ((c, i), (ref, Cartouche.Source())) if referencesId(stage, ref) =>
                   (c, i + ref)
 
@@ -563,7 +568,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
           join.joiner.map(cr => remap.getOrElse(cr.ref, cr)))
     }
   }
-
+/*
   private def maskStruct(paths: NonEmptyList[PrjPath], rot: Rotation, struct: FreeMap)
       : Either[PrjPath, FreeMap] = {
 
@@ -603,19 +608,81 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
 
     back getOrElse Right(struct)
   }
-
+*/
   private def idsKey(ref: Symbol, offset: Int): String =
     ref.name + "_" + offset.toString
 
+  // Eliminates Project stages, collapsing them into Shift structs or Expr nodes.
+  private def finalizeStages(init: CStage.Join[T, Index, Hole]): CStage.Join[T, Nothing, FreeMap] = {
+    def z(c0: CStage0): Either[NonEmptyList[CStage1], FreeMap] =
+      c0 match {
+        case j @ CStage.Join(_, _) => Left(NonEmptyList(finalizeStages(j): CStage1))
+        case CStage.Cartesian(cx) => Left(NonEmptyList(CStage.Cartesian(finalizeCartoix(cx))))
+        case CStage.Shift(_, idStatus, rot) => Left(NonEmptyList(CStage.Shift(func.Hole, idStatus, rot)))
+        case CStage.Project(idx) => Right(reifyIndex(func.Hole, idx))
+        case CStage.Expr(f) => Right(f)
+      }
+
+    def acc(a: NonEmptyList[CStage1] Ior FreeMap, s: CStage0): NonEmptyList[CStage1] Ior FreeMap =
+      (a, s) match {
+        case (Ior.Right(f), CStage.Project(idx)) => Ior.Right(reifyIndex(f, idx))
+        case (Ior.Left(ss), CStage.Project(idx)) => Ior.Both(ss, reifyIndex(func.Hole, idx))
+        case (Ior.Both(ss, f), CStage.Project(idx)) => Ior.Both(ss, reifyIndex(f, idx))
+
+        case (Ior.Right(f), CStage.Shift(_, i, r)) => Ior.Left(NonEmptyList(CStage.Shift(f, i, r)))
+        case (Ior.Left(ss), CStage.Shift(_, i, r)) => Ior.Left((CStage.Shift(func.Hole, i, r): CStage1) <:: ss)
+        case (Ior.Both(ss, f), CStage.Shift(_, i, r)) => Ior.Left((CStage.Shift(f, i, r): CStage1) <:: ss)
+
+        case (Ior.Right(f), CStage.Expr(g)) => Ior.Right(g >> f)
+        case (Ior.Left(ss), CStage.Expr(g)) => Ior.Both(ss, g)
+        case (Ior.Both(ss, f), CStage.Expr(g)) => Ior.Both(ss, g >> f)
+
+        case (Ior.Right(f), CStage.Cartesian(cx)) =>
+          Ior.Left(NonEmptyList(CStage.Cartesian(finalizeCartoix(cx)), CStage.Expr(f)))
+
+        case (Ior.Left(ss), CStage.Cartesian(cx)) =>
+          Ior.Left((CStage.Cartesian(finalizeCartoix(cx)): CStage1) <:: ss)
+
+        case (Ior.Both(ss, f), CStage.Cartesian(cx)) =>
+          Ior.Left((CStage.Cartesian(finalizeCartoix(cx)): CStage1) <:: (CStage.Expr(f): CStage1) <:: ss)
+
+        case (Ior.Right(f), j @ CStage.Join(_, _)) =>
+          Ior.Left(NonEmptyList(finalizeStages(j): CStage1, CStage.Expr(f)))
+
+        case (Ior.Left(ss), j @ CStage.Join(_, _)) =>
+          Ior.Left((finalizeStages(j): CStage1) <:: ss)
+
+        case (Ior.Both(ss, f), j @ CStage.Join(_, _)) =>
+          Ior.Left((finalizeStages(j): CStage1) <:: (CStage.Expr(f): CStage1) <:: ss)
+      }
+
+    def finalizeCartouche(c0: Cartouche0): Cartouche1 =
+      c0 match {
+        case Cartouche.Stages(ss0) =>
+          Foldable1[NonEmptyList].foldMapLeft1(ss0)(s => Ior.fromEither(z(s)))(acc) match {
+            case Ior.Left(ss1) => Cartouche.stages[T, Nothing, FreeMap](ss1.reverse)
+            case Ior.Right(fm) => Cartouche.stages[T, Nothing, FreeMap](NonEmptyList(CStage.Expr(fm): CStage1))
+            case Ior.Both(ss1, fm) => Cartouche.stages[T, Nothing, FreeMap]((CStage.Expr(fm) <:: ss1).reverse)
+          }
+
+        case Cartouche.Source() => Cartouche.source
+      }
+
+    def finalizeCartoix(cx: SMap[Symbol, Cartouche0]): SMap[Symbol, Cartouche1] =
+      cx map { case (k, v) => (k, finalizeCartouche(v)) }
+
+    CStage.Join(finalizeCartoix(init.cartoix), init.joiner)
+  }
+
   private def reifyJoin[
       G[_]: Monad: MonadPlannerErr: NameGenerator: RevIdxM: MinStateM[T, P, ?[_]]](
-      join: CStage.Join[T],
+      join: CStage.Join[T, Nothing, FreeMap],
       parent: QSUGraph,
       lens: StructLens,
       isNested: Boolean)
       : G[QSUGraph] = {
 
-    val (srcRefs, rest) = join.cartoix.toList.foldRight((Set[Symbol](), List[(Symbol, NonEmptyList[CStage0])]())) {
+    val (srcRefs, rest) = join.cartoix.toList.foldRight((Set[Symbol](), List[(Symbol, NonEmptyList[CStage1])]())) {
       case ((s, Cartouche.Source()), (as, r)) => (as + s, r)
       case ((s, Cartouche.Stages(ss)), (as, r)) => (as, (s, ss) :: r)
     }
@@ -649,7 +716,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   private def reifyCartoix[
       G[_]: Monad: MonadPlannerErr: NameGenerator: RevIdxM: MinStateM[T, P, ?[_]]](
       parent: QSUGraph,
-      cartoix: List[(Symbol, NonEmptyList[CStage0])],
+      cartoix: List[(Symbol, NonEmptyList[CStage1])],
       lens0: StructLens,
       isNested: Boolean)
       : G[QSUGraph] =
@@ -691,74 +758,66 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
         parent.pure[G]
     }
 
+  private def reifyIndex[A](src: FreeMapA[A], idx: Index): FreeMapA[A] =
+    idx.toEither.fold(func.ProjectIndexI(src, _), func.ProjectKeyS(src, _))
+
   private def reifyPath[A, F[_]: Foldable](z: FreeMapA[A], path: F[Index])
       : FreeMapA[A] =
-    path.foldLeft(z) { (fm, n) =>
-      n.toEither.fold(func.ProjectIndexI(fm, _), func.ProjectKeyS(fm, _))
-    }
+    path.foldLeft(z)(reifyIndex)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def reifyStage[
       G[_]: Monad: MonadPlannerErr: NameGenerator: RevIdxM: MinStateM[T, P, ?[_]]](
       id: Symbol,
       offset: Int,
-      stage: CStage0,
+      stage: CStage1,
       parent: QSUGraph,
       lens: StructLens,
       isNested: Boolean)
       : G[QSUGraph] = {
 
-    def applyToIncoming(in: QSUGraph, f: FreeMapA ~> FreeMapA): G[QSUGraph] =
-      in match {
-        case LeftShift(src, struct, idStatus, onUndef, repair, rot) =>
-          updateGraph[G](src)(
-            QSU.LeftShift(
-              _,
-              struct,
-              idStatus,
-              onUndef,
-              lens.inject[JoinSide](
-                id,
-                offset,
-                MapFuncCore.normalized(f(repair)),
-                repair,
-                None),
-              rot))
-
-        case Map(src, rfm) =>
-          updateGraph[G](src)(
-            QSU.Map(
-              _,
-              lens.inject[Hole](
-                id,
-                offset,
-                MapFuncCore.normalized(f(rfm.linearize)),
-                func.Hole,
-                None).asRec))
-
-        case src =>
-          updateGraph[G](src)(
-            QSU.Map(
-              _,
-              lens.inject[Hole](
-                id,
-                offset,
-                MapFuncCore.normalized(f(func.Hole)),
-                func.Hole,
-                None).asRec))
-      }
-
     stage match {
-      case CStage.Project(path) =>
-        val projected =
-          λ[FreeMapA ~> FreeMapA] { incoming =>
-            reifyPath(lens.project >> incoming, path)
-          }
-
-        applyToIncoming(parent, projected)
-
       case CStage.Expr(f) =>
-        applyToIncoming(parent, λ[FreeMapA ~> FreeMapA](f >> lens.project >> _))
+        val ap = λ[FreeMapA ~> FreeMapA](f >> lens.project >> _)
+
+        parent match {
+          case LeftShift(src, struct, idStatus, onUndef, repair, rot) =>
+            updateGraph[G](src)(
+              QSU.LeftShift(
+                _,
+                struct,
+                idStatus,
+                onUndef,
+                lens.inject[JoinSide](
+                  id,
+                  offset,
+                  MapFuncCore.normalized(ap(repair)),
+                  repair,
+                  None),
+                rot))
+
+          case Map(src, rfm) =>
+            updateGraph[G](src)(
+              QSU.Map(
+                _,
+                lens.inject[Hole](
+                  id,
+                  offset,
+                  MapFuncCore.normalized(ap(rfm.linearize)),
+                  func.Hole,
+                  None).asRec))
+
+          case src =>
+            updateGraph[G](src)(
+              QSU.Map(
+                _,
+                lens.inject[Hole](
+                  id,
+                  offset,
+                  MapFuncCore.normalized(ap(func.Hole)),
+                  func.Hole,
+                  None).asRec))
+        }
 
       case CStage.Shift(struct, idStatus, rot) =>
         updateGraph[G](parent)(
@@ -784,24 +843,27 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
       case CStage.Cartesian(cartoix) =>
         val cartoix2 = cartoix.toList map {
           case (k, Cartouche.Stages(ss)) => (k, ss)
-          case (k, Cartouche.Source()) => (k, NonEmptyList[CStage0](CStage.Expr(func.Hole)))
+          case (k, Cartouche.Source()) => (k, NonEmptyList[CStage1](CStage.Expr(func.Hole)))
         }
 
         reifyCartoix[G](parent, cartoix2, lens, isNested)
 
       case j @ CStage.Join(_, _) =>
         reifyJoin[G](j, parent, lens, isNested)
+
+      case CStage.Project(_) =>
+        absurd
     }
   }
 
   // Order sibling cartouches when rendering to minimize
   // structure and provide stability for tests
-  private val reifyPrecedence: CStage0 => Int = {
+  private val reifyPrecedence: CStage1 => Int = {
     case CStage.Join(_, _) => 0
     case CStage.Cartesian(_) => 1
     case CStage.Shift(_, _, _) => 2
     case CStage.Expr(_) => 3
-    case CStage.Project(_) => 4
+    case CStage.Project(_) => absurd
   }
 
   private def updateGraph[

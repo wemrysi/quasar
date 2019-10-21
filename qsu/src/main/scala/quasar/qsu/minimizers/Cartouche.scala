@@ -21,10 +21,11 @@ import slamdata.Predef._
 
 import quasar.{NonTerminal, RenderTree, RenderTreeT, Terminal}
 import quasar.RenderTree.ops._
+import quasar.contrib.scalaz.nel._
 
 import matryoshka._
 
-import scalaz.{Equal, Foldable, NonEmptyList}
+import scalaz.{Equal, Foldable, NonEmptyList, Show}
 import scalaz.std.option._
 import scalaz.syntax.foldable._
 
@@ -32,7 +33,7 @@ private[minimizers] sealed trait Cartouche[T[_[_]], +P, +S] extends Product with
   def dropHead: Cartouche[T, P, S]
   def isEmpty: Boolean
   def length: Int
-  def ::(stage: CStage[T, P, S]): Cartouche[T, P, S]
+  def ::[PP >: P, SS >: S](stage: CStage[T, PP, SS]): Cartouche[T, PP, SS]
 }
 
 private[minimizers] object Cartouche {
@@ -48,8 +49,8 @@ private[minimizers] object Cartouche {
 
     def length: Int = stages.length
 
-    def ::(stage: CStage[T, P, S]): Cartouche[T, P, S] =
-      Cartouche.stages(stage <:: stages)
+    def ::[PP >: P, SS >: S](stage: CStage[T, PP, SS]): Cartouche[T, PP, SS] =
+      Cartouche.stages(stage <:: stages.widen[CStage[T, PP, SS]])
   }
 
   private[minimizers] final case class Source[T[_[_]], P, S]()
@@ -57,7 +58,7 @@ private[minimizers] object Cartouche {
     val dropHead: Cartouche[T, P, S] = this
     val isEmpty: Boolean = true
     val length: Int = 0
-    def ::(stage: CStage[T, P, S]): Cartouche[T, P, S] =
+    def ::[PP >: P, SS >: S](stage: CStage[T, PP, SS]): Cartouche[T, PP, SS] =
       Cartouche.stages(NonEmptyList(stage))
   }
 
@@ -77,13 +78,13 @@ private[minimizers] object Cartouche {
         Terminal(List("Source"), None)
 
       case Stages(ss) =>
-        NonTerminal(List("Cartouche"), None, ss.toList.map(_.render))
+        NonTerminal(List("Cartouche"), None, ss.widen[CStage[T, P, S]].toList.map(_.render))
     }
 
   implicit def equal[T[_[_]]: BirecursiveT: EqualT, P: Equal, S: Equal]
       : Equal[Cartouche[T, P, S]] =
     Equal.equalBy[Cartouche[T, P, S], Option[NonEmptyList[CStage[T, P, S]]]] {
       case Source() => None
-      case Stages(ss) => Some(ss)
+      case Stages(ss) => Some(ss.widen[CStage[T, P, S]])
     }
 }

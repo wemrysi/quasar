@@ -46,19 +46,19 @@ private[minimizers] object CStage {
    * Represents a divergence in the graph, as if millions of rows
    * cried out in terror and were suddenly silenced.
    */
-  final case class Join[T[_[_]]](
-      cartoix: SMap[Symbol, Cartouche[T]],
+  final case class Join[T[_[_]], P, S](
+      cartoix: SMap[Symbol, Cartouche[T, P, S]],
       joiner: FreeMapA[T, CartoucheRef])
-      extends CStage[T, Nothing, Nothing]
+      extends CStage[T, P, S]
 
   /** Represents a cartesian between the cartoix, producing a map containing
     * the result of each cartouche at the cooresponding symbol.
     *
     * Used to represent intermediate results when simplifying joins.
     */
-  final case class Cartesian[T[_[_]]](
-      cartoix: SMap[Symbol, Cartouche[T]])
-      extends CStage[T, Nothing, Nothing]
+  final case class Cartesian[T[_[_]], P, S](
+      cartoix: SMap[Symbol, Cartouche[T, P, S]])
+      extends CStage[T, P, S]
 
   final case class Shift[T[_[_]], S](
       struct: S,
