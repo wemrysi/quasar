@@ -28,46 +28,50 @@ import scalaz.{Equal, Foldable, NonEmptyList}
 import scalaz.std.option._
 import scalaz.syntax.foldable._
 
-private[minimizers] sealed trait Cartouche[T[_[_]]] extends Product with Serializable {
-  def dropHead: Cartouche[T]
+private[minimizers] sealed trait Cartouche[T[_[_]], +P, +S] extends Product with Serializable {
+  def dropHead: Cartouche[T, P, S]
   def isEmpty: Boolean
   def length: Int
-  def ::(stage: CStage[T]): Cartouche[T]
+  def ::(stage: CStage[T, P, S]): Cartouche[T, P, S]
 }
 
 private[minimizers] object Cartouche {
 
-  private[minimizers] final case class Stages[T[_[_]]](
-      stages: NonEmptyList[CStage[T]]) extends Cartouche[T] {
+  private[minimizers] final case class Stages[T[_[_]], P, S](
+      stages: NonEmptyList[CStage[T, P, S]])
+      extends Cartouche[T, P, S] {
 
-    def dropHead: Cartouche[T] =
+    def dropHead: Cartouche[T, P, S] =
       Cartouche.fromFoldable(stages.tail)
 
     val isEmpty: Boolean = false
 
     def length: Int = stages.length
 
-    def ::(stage: CStage[T]): Cartouche[T] = Cartouche.stages(stage <:: stages)
+    def ::(stage: CStage[T, P, S]): Cartouche[T, P, S] =
+      Cartouche.stages(stage <:: stages)
   }
 
-  private[minimizers] final case class Source[T[_[_]]]() extends Cartouche[T] {
-    val dropHead: Cartouche[T] = this
+  private[minimizers] final case class Source[T[_[_]], P, S]()
+      extends Cartouche[T, P, S] {
+    val dropHead: Cartouche[T, P, S] = this
     val isEmpty: Boolean = true
     val length: Int = 0
-    def ::(stage: CStage[T]): Cartouche[T] = Cartouche.stages(NonEmptyList(stage))
+    def ::(stage: CStage[T, P, S]): Cartouche[T, P, S] =
+      Cartouche.stages(NonEmptyList(stage))
   }
 
-  def source[T[_[_]]]: Cartouche[T] =
-    Source[T]()
+  def source[T[_[_]], P, S]: Cartouche[T, P, S] =
+    Source[T, P, S]()
 
-  def stages[T[_[_]]](ss: NonEmptyList[CStage[T]]): Cartouche[T] =
+  def stages[T[_[_]], P, S](ss: NonEmptyList[CStage[T, P, S]]): Cartouche[T, P, S] =
     Stages(ss)
 
-  def fromFoldable[F[_]: Foldable, T[_[_]]](fa: F[CStage[T]]): Cartouche[T] =
+  def fromFoldable[F[_]: Foldable, T[_[_]], P, S](fa: F[CStage[T, P, S]]): Cartouche[T, P, S] =
     fa.foldMapRight1Opt(NonEmptyList(_))((s, ss) => s <:: ss)
-      .fold(source[T])(stages(_))
+      .fold(source[T, P, S])(stages(_))
 
-  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: RenderTree[Cartouche[T]] =
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT, P: Show, S: RenderTree]: RenderTree[Cartouche[T, P, S]] =
     RenderTree make {
       case Source() =>
         Terminal(List("Source"), None)
@@ -76,8 +80,9 @@ private[minimizers] object Cartouche {
         NonTerminal(List("Cartouche"), None, ss.toList.map(_.render))
     }
 
-  implicit def equal[T[_[_]]: BirecursiveT: EqualT]: Equal[Cartouche[T]] =
-    Equal.equalBy[Cartouche[T], Option[NonEmptyList[CStage[T]]]] {
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT, P: Equal, S: Equal]
+      : Equal[Cartouche[T, P, S]] =
+    Equal.equalBy[Cartouche[T, P, S], Option[NonEmptyList[CStage[T, P, S]]]] {
       case Source() => None
       case Stages(ss) => Some(ss)
     }
