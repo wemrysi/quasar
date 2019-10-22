@@ -2432,6 +2432,8 @@ object MinimizeAutoJoinsSpec
         "q" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "simpl26"), "q"),
         "w" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "cart4"), "w")))
     }
+
+    "ids and values of the same locus with additional operations on ids" >> ko
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph =
