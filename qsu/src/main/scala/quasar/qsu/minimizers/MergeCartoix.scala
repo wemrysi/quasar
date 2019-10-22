@@ -381,15 +381,39 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   private def simplifyJoin[F[_]: Monad: NameGenerator](join: CStage.Join[T, Index, Hole, Retain])
       : F[CStage.Join[T, Index, Hole, Output]] = {
 
+    type Remap = SMap[Symbol, Symbol]
+    type OutStage = CStage[T, Index, Hole, Output]
+    type OutCart = Cartouche[T, Index, Hole, Output]
+
     val simplName = freshSymbol[F]("simpl")
 
-    def step(cartoix: SMap[Symbol, Cartouche0]): F[(SMap[Symbol, Cartouche0], SMap[Symbol, Symbol])] = {
+    def convertUnchanged(s: CStage0): OutStage =
+      s match {
+        case CStage.Join(cx, jn) => CStage.Join(convertCartoix(cx), jn)
+
+        case CStage.Cartesian(cx) => CStage.Cartesian(convertCartoix(cx))
+
+        case CStage.Shift(s, Retain.Identities, rot) => CStage.Shift(s, Output.id, rot)
+        case CStage.Shift(s, Retain.Values, rot) => CStage.Shift(s, Output.value, rot)
+
+        case CStage.Project(p) => CStage.Project(p)
+
+        case CStage.Expr(f) => CStage.Expr(f)
+      }
+
+    def convertCartoix(cx: SMap[Symbol, Cartouche0]): SMap[Symbol, OutCart] =
+      cx map {
+        case (s, Cartouche.Source()) => (s, Cartouche.Source(): OutCart)
+        case (s, Cartouche.Stages(ss)) => (s, Cartouche.Stages(ss.map(convertUnchanged)))
+      }
+
+    def step(cartoix: SMap[Symbol, Cartouche0]): F[(SMap[Symbol, OutCart], Remap)] = {
       import CStage._
 
       /** The tuple represents the resolution of a closure: an optional
         * collapsee and the set of cartouche identifiers that collapsed.
         */
-      type Resolved = List[(CStage[T, Index, Hole, Output], Set[Symbol])]
+      type Resolved = List[(OutStage, Set[Symbol])]
 
       val buckets = Buckets.fromCartoix(cartoix)
 
@@ -405,7 +429,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
           Relation.allPairs(simplifiedBuckets.joins.toList)(_._1) {
             case ((_, l), (_, r)) =>
               // can't merge joins at all, so they have to be fully equal
-              (l: CStage[T, Index, Hole, Output]) === r
+              (l: OutStage) === r
           }
 
         shiftRelations =
@@ -448,7 +472,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
           case (rot, rel) => rel.closures.toList.tupleLeft(rot)
         }
 
-        (resolvedShifts, idsRemap) <- shiftClosures.foldLeftM((Nil: Resolved, SMap[Symbol, Symbol]())) {
+        (resolvedShifts, idsRemap) <- shiftClosures.foldLeftM((Nil: Resolved, SMap(): Remap)) {
           case ((res, rm), (rot, cl)) =>
             val shifts = cl.map(ref => ref -> simplifiedBuckets.shifts(rot)(ref)).toMap
 
@@ -488,10 +512,12 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
 
         allResolved = resolvedJoins ::: resolvedShifts ::: resolvedProjects ::: resolvedExprs
 
-        back <- allResolved.foldLeftM((cartoix, SMap.empty[Symbol, Symbol])) {
+        unchanged = convertCartoix(cartoix -- (allResolved.foldMap(_._2) ++ idsRemap.keySet))
+
+        back <- allResolved.foldLeftM((unchanged, SMap(): Remap)) {
           case ((cx, remap0), (stage, syms)) =>
             val nestedCartoix =
-              cx.filterKeys(syms) map {
+              cartoix.filterKeys(syms) map {
                 case (s, cart) => (s, cart.dropHead)
               }
 
@@ -500,7 +526,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
               val h = syms.head
               // Everything merged, so remap all references
               val rm1 = syms.map(fm => (fm, idsRemap.getOrElse(fm, h)))
-              ((cx -- syms).updated(h, Cartouche.stages(NonEmptyList(stage))), remap0 ++ rm1).pure[F]
+              (cx.updated(h, Cartouche.stages(NonEmptyList(stage))), remap0 ++ rm1).pure[F]
             } else {
               // Extract any source references of identities, removing their cartouche
               val (cx1, ids) = nestedCartoix.toList.foldLeft((SMap[Symbol, Cartouche0](), Set[Symbol]())) {
@@ -526,13 +552,13 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
                   if (lower.size === 1) {
                     val (lowerName, lowerCart) = lower.head
 
-                    ((cx -- syms).updated(lowerName, stage :: lowerCart), finalRemap).pure[F]
+                    (cx.updated(lowerName, stage :: lowerCart), finalRemap).pure[F]
                   } else {
                     // lower has multiple cartoix, turn it into a cartesian and make it the tail of a new cartouche
                     simplName map { newName =>
                       val currentCart = Cartouche.stages(NonEmptyList(stage, CStage.Cartesian(lower)))
 
-                      ((cx -- syms).updated(newName, currentCart), finalRemap)
+                      (cx.updated(newName, currentCart), finalRemap)
                     }
                   }
 

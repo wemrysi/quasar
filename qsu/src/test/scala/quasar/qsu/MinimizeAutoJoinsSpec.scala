@@ -1714,12 +1714,12 @@ object MinimizeAutoJoinsSpec
       repairInner must beTreeEqual(
         func.StaticMapS(
           "cart1" -> func.ProjectIndexI(func.RightSide, 1),
-          "cart1_0" -> func.ProjectIndexI(func.RightSide, 0)))
+          "simpl9" -> func.ProjectIndexI(func.RightSide, 0)))
 
       repair must beTreeEqual(
         func.ConcatMaps(
           func.ConcatMaps(
-            func.ProjectKeyS(func.LeftSide, "cart1_0"),
+            func.ProjectKeyS(func.LeftSide, "simpl9"),
             func.ProjectIndexI(func.RightSide, 0)),
           func.ProjectIndexI(func.RightSide, 1)))
     }
@@ -2194,19 +2194,19 @@ object MinimizeAutoJoinsSpec
 
       rootStruct must beTreeEqual(recFunc.Hole)
       rootRepair must beTreeEqual(func.StaticMapS(
-        "simpl6" -> func.ProjectIndexI(func.RightSide, 1),
-        "simpl6_0" -> func.ProjectIndexI(func.RightSide, 0)))
+        "simpl7" -> func.ProjectIndexI(func.RightSide, 1),
+        "simpl6" -> func.ProjectIndexI(func.RightSide, 0)))
 
-      zStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl6"), "z"))
+      zStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl7"), "z"))
       zRepair must beTreeEqual(func.ConcatMaps(func.LeftSide, func.MakeMapS("cart1", func.RightSide)))
 
-      qStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl6"), "q"))
+      qStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl7"), "q"))
       qRepair must beTreeEqual(func.ConcatMaps(func.LeftSide, func.MakeMapS("cart2", func.RightSide)))
 
       qStruct2 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart2"))
 
       joiner must beTreeEqual(func.StaticMapS(
-        "y" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "simpl6_0"), "y"),
+        "y" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "simpl6"), "y"),
         "z" -> func.ProjectKeyS(func.LeftSide, "cart1"),
         "q" -> func.RightSide))
     }
@@ -2287,22 +2287,22 @@ object MinimizeAutoJoinsSpec
         Rotation.ShiftArray) =>
 
       xstruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "x"))
-      xrepair must beTreeEqual(func.MakeMapS("simpl18", func.RightSide))
+      xrepair must beTreeEqual(func.MakeMapS("simpl19", func.RightSide))
 
-      ystruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl18"), "y"))
+      ystruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl19"), "y"))
       yrepair must beTreeEqual(
         func.ConcatMaps(
           func.ConcatMaps(
             func.LeftSide,
-            func.MakeMapS("simpl17", func.ProjectIndexI(func.RightSide, 1))),
-          func.MakeMapS("simpl17_0", func.ProjectIndexI(func.RightSide, 0))))
+            func.MakeMapS("simpl18", func.ProjectIndexI(func.RightSide, 1))),
+          func.MakeMapS("simpl17", func.ProjectIndexI(func.RightSide, 0))))
 
-      vstruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl17"), "v"))
+      vstruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl18"), "v"))
 
       joiner must beTreeEqual(func.StaticMapS(
-        "z" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "simpl17"), "z"),
-        "y" -> func.ProjectKeyS(func.LeftSide, "simpl17_0"),
-        "q" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "simpl18"), "q"),
+        "z" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "simpl18"), "z"),
+        "y" -> func.ProjectKeyS(func.LeftSide, "simpl17"),
+        "q" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "simpl19"), "q"),
         "w" -> func.ProjectKeyS(func.RightSide, "w")))
     }
   }
@@ -2410,31 +2410,31 @@ object MinimizeAutoJoinsSpec
         Rotation.ShiftMap) =>
 
       xstruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "x"))
-      xrepair must beTreeEqual(func.MakeMapS("simpl26", func.RightSide))
+      xrepair must beTreeEqual(func.MakeMapS("simpl28", func.RightSide))
 
-      ystruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl26"), "y"))
+      ystruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl28"), "y"))
       yrepair must beTreeEqual(
         func.ConcatMaps(
           func.ConcatMaps(
             func.LeftSide,
-            func.MakeMapS("simpl25", func.ProjectIndexI(func.RightSide, 1))),
-          func.MakeMapS("simpl25_0", func.ProjectIndexI(func.RightSide, 0))))
+            func.MakeMapS("simpl27", func.ProjectIndexI(func.RightSide, 1))),
+          func.MakeMapS("simpl25", func.ProjectIndexI(func.RightSide, 0))))
 
-      vstruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl25"), "v"))
+      vstruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl27"), "v"))
       vrepair must beTreeEqual(func.ConcatMaps(func.LeftSide, func.MakeMapS("cart4", func.RightSide)))
 
-      zstruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl25"), "z"))
+      zstruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "simpl27"), "z"))
 
       joiner must beTreeEqual(func.StaticMapS(
         "zk" -> func.ProjectIndexI(func.RightSide, 0),
-        "y" -> func.ProjectKeyS(func.LeftSide, "simpl25_0"),
+        "y" -> func.ProjectKeyS(func.LeftSide, "simpl25"),
         "z" -> func.ProjectIndexI(func.RightSide, 1),
-        "q" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "simpl26"), "q"),
+        "q" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "simpl28"), "q"),
         "w" -> func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "cart4"), "w")))
     }
-
-    "ids and values of the same locus with additional operations on ids" >> ko
   }
+
+  "ids and values of the same locus with additional operations on ids" >> ko
 
   def runOn(qgraph: QSUGraph): QSUGraph =
     runOn_(qgraph).graph
