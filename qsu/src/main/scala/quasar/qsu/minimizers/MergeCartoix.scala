@@ -33,6 +33,7 @@ import quasar.RenderTreeT
 import quasar.common.effect.NameGenerator
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.free._
+import quasar.contrib.std.errorImpossible
 import quasar.fp.ski.κ2
 import quasar.qscript._
 import quasar.qsu.{QScriptUniform => QSU}, QSU.{Retain, Rotation}
@@ -72,8 +73,6 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
 
   private val SourceKey = "source"
   private val func = construction.Func[T]
-
-  private def absurd[A]: A = scala.sys.error("absurd!")
 
   def couldApplyTo(candidates: List[QSUGraph]): Boolean =
     candidates exists { case Transpose(_, _, _) => true; case _ => false }
@@ -798,7 +797,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
         reifyJoin[G](j, parent, lens, isNested)
 
       case CStage.Project(_) =>
-        absurd
+        errorImpossible
     }
   }
 
@@ -809,7 +808,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
     case CStage.Cartesian(_) => 1
     case CStage.Shift(_, _, _) => 2
     case CStage.Expr(_) => 3
-    case CStage.Project(_) => absurd
+    case CStage.Project(_) => errorImpossible
   }
 
   private def updateGraph[
