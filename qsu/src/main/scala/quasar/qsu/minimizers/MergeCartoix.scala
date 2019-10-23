@@ -670,7 +670,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
       lens0: StructLens,
       isNested: Boolean)
       : G[QSUGraph] =
-    cartoix.sortBy(kv => (reifyPrecedence(kv._2.head), -kv._2.size)) match {
+    cartoix.sortBy(kv => (reifyPrecedence(kv._2.head), kv._2.size)) match {
       case (s, NonEmptyList(hd, tail)) :: rest =>
         val prj =
           if (isNested)

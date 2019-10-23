@@ -1024,63 +1024,48 @@ object MinimizeAutoJoinsSpec
                 LeftShift(
                   LeftShift(
                     Read(`afile`, ExcludeId),
-                    astruct0,
+                      cstruct0,
+                      ExcludeId,
+                      OnUndefined.Emit,
+                      crepair0,
+                      Rotation.ShiftArray),
+                    dstruct0,
                     ExcludeId,
                     OnUndefined.Emit,
-                    arepair0,
+                    drepair0,
                     Rotation.ShiftArray),
-                  astruct1,
+                  dstruct1,
                   ExcludeId,
                   OnUndefined.Emit,
-                  arepair1,
+                  drepair1,
                   Rotation.ShiftArray),
-                astruct2,
+                astruct0,
                 ExcludeId,
                 OnUndefined.Emit,
-                arepair2,
+                arepair0,
                 Rotation.ShiftArray),
-              cstruct0,
+              astruct1,
               ExcludeId,
               OnUndefined.Emit,
-              crepair0,
+              arepair1,
               Rotation.ShiftArray),
-            dstruct0,
+            astruct2,
             ExcludeId,
             OnUndefined.Emit,
-            drepair0,
-            Rotation.ShiftArray),
-          dstruct1,
-          ExcludeId,
-          OnUndefined.Emit,
-          drepair1,
-          Rotation.ShiftArray) =>
+            arepair2,
+            Rotation.ShiftArray) =>
 
-      astruct0 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "a"))
-      astruct1 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart0"))
-      astruct2 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart0"))
-      cstruct0 must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "source"), "c"))
+      cstruct0 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "c"))
       dstruct0 must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "source"), "d"))
       dstruct1 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart3"))
-
-      arepair0 must beTreeEqual(
-        func.StaticMapS(
-          "source" -> func.LeftSide,
-          "cart0" -> func.RightSide))
-
-      arepair1 must beTreeEqual(
-        func.ConcatMaps(
-          func.LeftSide,
-          func.MakeMapS("cart0", func.RightSide)))
-
-      arepair2 must beTreeEqual(
-        func.ConcatMaps(
-          func.LeftSide,
-          func.MakeMapS("cart0", func.RightSide)))
+      astruct0 must beTreeEqual(recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "source"), "a"))
+      astruct1 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart0"))
+      astruct2 must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "cart0"))
 
       crepair0 must beTreeEqual(
-        func.ConcatMaps(
-          func.LeftSide,
-          func.MakeMapS("cart2", func.RightSide)))
+        func.StaticMapS(
+          "source" -> func.LeftSide,
+          "cart2" -> func.RightSide))
 
       drepair0 must beTreeEqual(
         func.ConcatMaps(
@@ -1088,13 +1073,28 @@ object MinimizeAutoJoinsSpec
           func.MakeMapS("cart3", func.RightSide)))
 
       drepair1 must beTreeEqual(
+        func.ConcatMaps(
+          func.LeftSide,
+          func.MakeMapS("cart3", func.RightSide)))
+
+      arepair0 must beTreeEqual(
+        func.ConcatMaps(
+          func.LeftSide,
+          func.MakeMapS("cart0", func.RightSide)))
+
+      arepair1 must beTreeEqual(
+        func.ConcatMaps(
+          func.LeftSide,
+          func.MakeMapS("cart0", func.RightSide)))
+
+      arepair2 must beTreeEqual(
         func.Subtract(
           func.Add(
-            func.ProjectKeyS(func.LeftSide, "cart0"),
+            func.RightSide,
             func.ProjectKeyS(func.ProjectKeyS(func.LeftSide, "source"), "b")),
           func.Divide(
             func.ProjectKeyS(func.LeftSide, "cart2"),
-            func.RightSide)))
+            func.ProjectKeyS(func.LeftSide, "cart3"))))
     }
   }
 
