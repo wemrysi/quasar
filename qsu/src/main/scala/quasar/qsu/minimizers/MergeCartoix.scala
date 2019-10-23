@@ -29,7 +29,7 @@ import matryoshka.implicits._
 import matryoshka.patterns.interpret
 
 import quasar.RenderTreeT
-import quasar.RenderTree.ops._
+//import quasar.RenderTree.ops._
 import quasar.common.effect.NameGenerator
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.free._
@@ -165,15 +165,13 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
           CStage.Join(cs.toMap, fm.map(i => Symbol(s"cart$i")))
         }
 
-    println(s"SINGLE_SOURCE = ${singleSource.root}, candidates = ${candidates0.map(_.root)}\nFM\n${fm0.render.show}")
-
-    maybeJoin.fold(println("NO JOIN"))(j => println(s"MAYBE_JOIN\n${(j: CStage0).render.show}"))
+//  maybeJoin.fold(println("NO JOIN"))(j => println(s"MAYBE_JOIN\n${(j: CStage0).render.show}"))
 
     maybeJoin traverse { j =>
       simplifyJoin[G](j)
-        .map { smpl => println(s"SIMPLIFIED_JOIN\n${(smpl: CStage[T, Index, Hole, Output]).render.show}"); smpl }
+//      .map { smpl => println(s"SIMPLIFIED_JOIN\n${(smpl: CStage[T, Index, Hole, Output]).render.show}"); smpl }
         .map(finalizeStages(_))
-        .map { fnl => println(s"FINALIZED_JOIN\n${fnl.asInstanceOf[CStage[T, Unit, FreeMap, Output]].render.show}"); fnl }
+//      .map { fnl => println(s"FINALIZED_JOIN\n${fnl.asInstanceOf[CStage[T, Unit, FreeMap, Output]].render.show}"); fnl }
         .flatMap(j => reifyJoin[G](j, singleSource, StructLens.init(j.cartoix.size > 1), false))
         .map(x => (x, x))
     }
@@ -239,6 +237,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
     }
   }
 
+  // Extracts projections of `singleSource` from `expr`, returning the remainder.
   private def readSourceProjections(
       singleSource: QSUGraph,
       candidates: List[QSUGraph],
@@ -472,6 +471,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
           case (rot, rel) => rel.closures.toList.tupleLeft(rot)
         }
 
+        // resolve shifts, generating fresh names for identity references
         (resolvedShifts, idsRemap) <- shiftClosures.foldLeftM((Nil: Resolved, SMap(): Remap)) {
           case ((res, rm), (rot, cl)) =>
             val shifts = cl.map(ref => ref -> simplifiedBuckets.shifts(rot)(ref)).toMap
@@ -524,8 +524,10 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
             if (nestedCartoix forall { case (_, c) => c.isEmpty }) {
               // Pick a name to use for the cartouche
               val h = syms.head
+
               // Everything merged, so remap all references
               val rm1 = syms.map(fm => (fm, idsRemap.getOrElse(fm, h)))
+
               (cx.updated(h, Cartouche.stages(NonEmptyList(stage))), remap0 ++ rm1).pure[F]
             } else {
               // Extract any source references of identities, removing their cartouche
@@ -534,11 +536,14 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
                 case ((c, i), (ref, Cartouche.Source())) if idsRemap.contains(ref) =>
                   (c, i + ref)
 
-                // Cartouche references shift ids, but hasn't terminated, add a stage to project out the identity
-                case ((c, i), (ref, stages)) if idsRemap.contains(ref) =>
-                  (c.updated(ref, CStage.Expr(func.ProjectKeyS(func.Hole, idsRemap(ref).name)) :: stages), i)
-
-                // Cartouche doesn't reference shift ids, retain
+                // Cartouche doesn't terminate here, retain
+                //
+                // TODO: This isn't quite correct, see
+                //       https://app.clubhouse.io/data/story/9672/compatible-operations-to-id-and-value-components-of-a-shift-are-incorrectly-coalesced
+                //
+                //       Ideally when the cartouche did reference ids and didn't terminate,
+                //       we'd indicate that it should project the upstream id, not the value,
+                //       but we don't have a way to express this currently.
                 case ((c, i), kv) => (c + kv, i)
               }
 
@@ -548,7 +553,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
                 finalRemap = remap0 ++ lowerRemap ++ idsRemap.filterKeys(ids)
 
                 back <-
-                  // lower coalesced into a single cartouche, include any id remaps and prepend stage
+                  // lower coalesced into a single cartouche, prepend stage
                   if (lower.size === 1) {
                     val (lowerName, lowerCart) = lower.head
 

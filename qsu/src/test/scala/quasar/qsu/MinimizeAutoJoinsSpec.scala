@@ -2434,8 +2434,6 @@ object MinimizeAutoJoinsSpec
     }
   }
 
-  "ids and values of the same locus with additional operations on ids" >> ko
-
   def runOn(qgraph: QSUGraph): QSUGraph =
     runOn_(qgraph).graph
 
