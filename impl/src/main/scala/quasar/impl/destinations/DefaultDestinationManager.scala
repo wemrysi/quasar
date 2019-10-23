@@ -32,7 +32,8 @@ import scalaz.syntax.monad._
 import scalaz.syntax.std.either._
 import scalaz.syntax.unzip._
 import scalaz.{EitherT, IMap, ISet, OptionT, Order, \/}
-import shims._
+
+import shims.monadToScalaz
 
 class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer] (
   modules: IMap[DestinationType, DestinationModule],

@@ -35,7 +35,7 @@ import scalaz.std.option._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 
-import shims._
+import shims.{applicativeToCats, equalToCats, monoidToCats}
 
 final class Bucketing[T[_[_]]: BirecursiveT: EqualT, P] private (
     qprov: QProvAux[T, P])

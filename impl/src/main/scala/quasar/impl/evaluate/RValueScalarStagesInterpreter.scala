@@ -35,7 +35,7 @@ import fs2.{Chunk, Pipe, Stream}
 
 import scalaz.{NonEmptyList, Scalaz}, Scalaz._
 
-import shims._
+import shims.monadToScalaz
 
 object RValueScalarStagesInterpreter {
 

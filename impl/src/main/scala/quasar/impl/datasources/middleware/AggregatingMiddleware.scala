@@ -29,7 +29,7 @@ import cats.Monad
 import cats.effect.Sync
 import cats.syntax.functor._
 import fs2.Stream
-import shims._
+import shims.{functorToCats, functorToScalaz}
 
 object AggregatingMiddleware {
   def apply[T[_[_]], F[_]: MonadResourceErr: MonadCreateErr: Sync, I, R](

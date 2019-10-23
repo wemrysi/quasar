@@ -44,7 +44,7 @@ import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import scalaz.{EitherT, IMap, ISet, OptionT, Order, Scalaz}
 import Scalaz._
-import shims._
+import shims.monadToScalaz
 
 final class DefaultDatasourceManager[
     I: Order,

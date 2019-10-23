@@ -34,7 +34,8 @@ import java.nio.file.attribute.BasicFileAttributes
 import cats.effect.{ContextShift, Effect, Timer}
 import fs2.Stream
 import scalaz.{OptionT, Scalaz}, Scalaz._
-import shims._
+
+import shims.monadToScalaz
 
 /** A Datasource backed by the underlying filesystem local to Quasar.
   *

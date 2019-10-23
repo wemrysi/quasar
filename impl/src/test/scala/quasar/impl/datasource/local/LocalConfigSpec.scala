@@ -26,7 +26,7 @@ import cats.instances.either._
 import cats.instances.string._
 import cats.syntax.either._
 
-import shims._
+import shims.{eqToScalaz, showToScalaz}
 
 object LocalConfigSpec extends quasar.Qspec {
   "json decoding" >> {

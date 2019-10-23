@@ -29,7 +29,7 @@ import org.specs2.matcher.MatchResult
 
 import scalaz.Scalaz._
 
-import shims._
+import shims.monadToScalaz
 
 abstract class DatasourceSpec[F[_]: Effect, G[_], P <: ResourcePathType]
     extends EffectfulQSpec[F] {

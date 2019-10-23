@@ -27,7 +27,7 @@ import quasar.tpe._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._
-import shims._
+import shims.orderToScalaz
 import spire.math.Real
 
 object SstSchemaSpec extends quasar.Qspec {

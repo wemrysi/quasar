@@ -41,8 +41,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
 
-import shims._
-
 final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
   implicit val ec: ExecutionContext = ExecutionContext.global
   implicit val strCodec: Codec[String] = utf8_32

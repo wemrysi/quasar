@@ -38,7 +38,8 @@ import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 import scalaz.syntax.unzip._
 import scalaz.{IMap, ISet}
-import shims._
+
+import shims.monadToScalaz
 
 object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
   implicit val cs = IO.contextShift(global)

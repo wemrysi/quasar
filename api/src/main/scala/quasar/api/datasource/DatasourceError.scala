@@ -31,7 +31,7 @@ import quasar.api.resource.ResourcePath
 
 import scalaz.{ISet, NonEmptyList}
 
-import shims._
+import shims.{eqToScalaz, equalToCats, showToCats, showToScalaz}
 
 sealed trait DatasourceError[+I, +C] extends Product with Serializable
 

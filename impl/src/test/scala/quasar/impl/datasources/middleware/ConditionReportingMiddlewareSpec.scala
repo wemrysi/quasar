@@ -34,7 +34,7 @@ import cats.effect.concurrent.Ref
 
 import eu.timepit.refined.auto._
 
-import shims._
+import shims.monadToScalaz
 
 object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with ConditionMatchers {
 

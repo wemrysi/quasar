@@ -32,7 +32,7 @@ import qdata.QDataDecode
 import scalaz.Show
 import scalaz.syntax.show._
 
-import shims._
+import shims.showToScalaz
 
 import tectonic.Plate
 

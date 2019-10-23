@@ -32,7 +32,7 @@ import scalaz.ISet
 import scalaz.std.anyVal._
 import scalaz.std.list._
 import scalaz.std.string._
-import shims._
+import shims.{monadToScalaz, monoidToCats}
 import MockDatasourcesSpec._
 
 final class MockDatasourcesSpec
