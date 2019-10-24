@@ -31,7 +31,7 @@ import scalaz.NonEmptyList
 import scalaz.syntax.monad._
 import scalaz.syntax.tag._
 
-import shims._
+import shims.monadToScalaz
 
 import java.nio.file.{Path => JPath}
 

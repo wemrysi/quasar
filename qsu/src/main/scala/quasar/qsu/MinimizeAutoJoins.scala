@@ -47,7 +47,7 @@ import matryoshka.{BirecursiveT, EqualT, ShowT}
 
 import scalaz.{Bind, Equal, Monad, OptionT, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
 
-import shims._
+import shims.equalToCats
 
 sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends MraPhase[T] {
   import MinimizeAutoJoins._

@@ -28,8 +28,6 @@ import cats.instances.string._
 import cats.instances.tuple._
 import cats.syntax.show._
 
-import shims._
-
 final case class LocalConfig(
     rootDir: String,
     readChunkSizeBytes: Int,

@@ -27,7 +27,9 @@ import cats.data.StateT
 import cats.effect.{Sync, IO, Resource}
 import scalaz.std.anyVal._
 import scalaz.std.string._
-import shims._
+
+import shims.monoidToCats
+
 import java.util.concurrent.ConcurrentHashMap
 
 final class ConcurrentMapIndexedStoreSpec extends

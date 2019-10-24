@@ -37,7 +37,7 @@ import scalaz.syntax.equal._
 import scalaz.syntax.foldable._
 import scalaz.std.list._
 
-import shims._
+import shims.{eqToScalaz, equalToCats, showToCats, showToScalaz}
 
 abstract class DatasourcesSpec[
     F[_], G[_], I: Order: Show, C: Equal: Show, OldS <: SchemaConfig, S <: SchemaConfig](

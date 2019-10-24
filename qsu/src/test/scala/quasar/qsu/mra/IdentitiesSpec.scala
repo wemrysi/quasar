@@ -36,8 +36,6 @@ import org.specs2.scalacheck.Parameters
 
 import org.typelevel.discipline.specs2.mutable.Discipline
 
-import shims._
-
 object IdentitiesSpec extends Qspec
     with SpecificationLike
     with IdentitiesGenerator

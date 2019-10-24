@@ -35,7 +35,7 @@ import quasar.connector.{DestinationModule, MonadResourceErr}
 import scalaz.syntax.applicative._
 import scalaz.{Applicative, NonEmptyList}
 
-import shims._
+import shims.monadToScalaz
 
 object MockDestinationModule extends DestinationModule {
   def destinationType = DestinationType("mock", 1L)

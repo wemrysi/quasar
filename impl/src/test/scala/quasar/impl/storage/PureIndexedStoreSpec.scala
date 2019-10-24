@@ -29,7 +29,8 @@ import cats.syntax.applicative._
 import scalaz.IMap
 import scalaz.std.anyVal._
 import scalaz.std.string._
-import shims._
+
+import shims.{monadToScalaz, monoidToCats}
 
 final class PureIndexedStoreSpec extends
     IndexedStoreSpec[StateT[IO, IMap[Int, String], ?], Int, String] {

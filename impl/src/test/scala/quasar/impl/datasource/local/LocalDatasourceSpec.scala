@@ -33,7 +33,8 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.κ
 import quasar.qscript.InterpretedRead
 
-import shims._
+import shims.{monadToScalaz, monoidToCats}
+
 import tectonic.Plate
 
 abstract class LocalDatasourceSpec

@@ -31,7 +31,8 @@ import eu.timepit.refined.auto._
 import scalaz.{-\/, IMap, ISet}
 import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
-import shims._
+
+import shims.monadToScalaz
 
 object DefaultDestinationManagerSpec extends quasar.Qspec {
   implicit val cs = IO.contextShift(global)

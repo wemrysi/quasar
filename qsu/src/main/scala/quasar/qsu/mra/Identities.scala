@@ -459,7 +459,7 @@ object Identities extends IdentitiesInstances {
   /** NB: Linear in the size of the fully expanded representation. */
   def values[A, B: Order]: PTraversal[Identities[A], Identities[B], A, B] =
     new PTraversal[Identities[A], Identities[B], A, B] {
-      import shims._
+      import shims.applicativeToCats
 
       val T = Traverse[NonEmptyList].compose[NonEmptyList].compose[NonEmptyList]
 

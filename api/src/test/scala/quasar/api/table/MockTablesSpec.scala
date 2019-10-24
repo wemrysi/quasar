@@ -26,7 +26,7 @@ import cats.data.StateT
 import cats.effect.IO
 import scalaz.{~>, Id, IMap}, Id.Id
 import scalaz.std.string._
-import shims._
+import shims.monadToScalaz
 import MockTablesSpec.MockM
 
 final class MockTablesSpec extends TablesSpec[MockM, UUID, String] {

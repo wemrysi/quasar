@@ -30,7 +30,7 @@ import scalaz.syntax.tag._
 import java.util.concurrent.ConcurrentMap
 import scala.collection.JavaConverters._
 
-import shims._
+import shims.monadToScalaz
 
 final class ConcurrentMapIndexedStore[F[_]: Sync: ContextShift, K, V](
     mp: ConcurrentMap[K, V], blockingPool: BlockingContext)

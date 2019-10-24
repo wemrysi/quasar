@@ -42,7 +42,7 @@ import scalaz.syntax.monad._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.std.option._
 
-import shims._
+import shims.monadToScalaz
 
 final class DefaultDatasources[
     F[_]: Sync, I: Equal, C: Equal, OldS <: SchemaConfig, S <: SchemaConfig,

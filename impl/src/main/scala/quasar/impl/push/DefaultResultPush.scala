@@ -43,7 +43,8 @@ import scalaz.syntax.monad._
 import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 import scalaz.{EitherT, Functor, Id, NonEmptyList, OptionT, Traverse, \/}
-import shims._
+
+import shims.monadToScalaz
 
 class DefaultResultPush[
   F[_]: Concurrent: Timer, T, D, Q, R] private (

@@ -41,7 +41,7 @@ import scalaz.std.string._
 import scalaz.syntax.bind._
 import scalaz.{Equal, NonEmptyList, \/-}
 
-import shims._
+import shims.monadToScalaz
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._

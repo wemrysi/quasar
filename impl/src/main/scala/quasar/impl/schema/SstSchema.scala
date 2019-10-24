@@ -30,7 +30,6 @@ import scalaz.syntax.show._
 import scalaz.syntax.tag._
 import spire.algebra.{AdditiveSemigroup, Field, NRoot}
 import spire.syntax.field._
-import shims._
 
 sealed trait SstSchema[J, A] extends Product with Serializable {
   import SstSchema._

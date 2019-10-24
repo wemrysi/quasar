@@ -52,7 +52,7 @@ import matryoshka.data.Fix
 import org.slf4s.Logging
 import scalaz.{IMap, Show, ~>}
 import scalaz.syntax.show._
-import shims._
+import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz}
 import spire.std.double._
 
 final class Quasar[F[_], R, C <: SchemaConfig](

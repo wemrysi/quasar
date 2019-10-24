@@ -33,7 +33,7 @@ package object mra {
     Equal.equal((x, y) => Tag.unwrap(x).equalsAsSets(Tag.unwrap(y)))
 
   implicit def asSetEq[F[_]: CFoldable, A: Eq]: Eq[F[A] @@ AsSet] = {
-    import shims._
+    import shims.{eqToScalaz, foldableToScalaz}
     Eq.instance((x, y) => Tag.unwrap(x).equalsAsSets(Tag.unwrap(y)))
   }
 }

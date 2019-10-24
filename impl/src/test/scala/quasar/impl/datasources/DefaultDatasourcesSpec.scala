@@ -49,7 +49,8 @@ import scalaz.{-\/, IMap, ISet, Monoid, \/-}
 import scalaz.std.anyVal._
 import scalaz.std.string._
 import scalaz.syntax.std.option._
-import shims._
+
+import shims.{eqToScalaz, equalToCats, monoidToCats, monoidToScalaz, monadToScalaz, showToCats, showToScalaz}
 
 final class DefaultDatasourcesSpec
     extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type, MockSchemaConfig.type] {

@@ -37,7 +37,7 @@ import fs2.{Pull, Stream}
 
 import monocle.Lens
 
-import shims._
+import shims.{equalToCats, monadToScalaz}
 
 /** A datasource transformer that augments underlying datasources by adding an aggregate resource
   * `p / **` for every prefix `p`. An aggregate resource `p / **` will aggregate

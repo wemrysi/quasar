@@ -28,7 +28,8 @@ import cats.effect.IO
 import org.specs2.matcher.{Expectable, MatchResult, Matcher}
 import matryoshka.data._
 import pathy.Path
-import shims._
+
+import shims.monadToScalaz
 
 abstract class CountingRegressionSpec extends Qspec {
 

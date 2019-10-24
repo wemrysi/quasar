@@ -28,7 +28,8 @@ import cats.effect.IO
 import eu.timepit.refined.auto._
 import scalaz.IMap
 import scalaz.std.list._
-import shims._
+
+import shims.monadToScalaz
 
 object MapBasedDatasourceSpec extends DatasourceSpec[IO, List, ResourcePathType.Physical] {
 
