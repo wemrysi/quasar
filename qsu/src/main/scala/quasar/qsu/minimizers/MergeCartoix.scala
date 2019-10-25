@@ -372,6 +372,71 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
     }
   }
 
+  // if a single project and shift align, replace the shift with the project in the cartouche, add the ref to the set of coalesced things
+  //
+  // if multple projects and a shift align, retain the shift and add a masking Expr node ahead of it to mask out the values
+  //
+  // y{_}, x{_}.b, x{_}.c, x{_}{_}
+  //
+  // { y: {u: 1, v: 2}, x: { q: {a: true, b: false, c: 45}, r: {a: false}, s: {c: 21, b: true} } }
+  //
+  // y{_}: [
+  // <r, prj(y), inf(u)>: 1
+  // <r, prj(y), inf(v)>: 2
+  // ]
+  //
+  // x{_}.b: [
+  // <r, prj(x), inf(q), prj(b)>: false
+  // <r, prj(x), inf(r), prj(b)>: undefined
+  // <r, prj(x), inf(s), prj(b)>: true
+  // ]
+  //
+  // x{_}.c: [
+  // <r, prj(x), inf(q), prj(c)>: 45
+  // <r, prj(x), inf(r), prj(c)>: undefined
+  // <r, prj(x), inf(s), prj(c)>: 21
+  // ]
+  //
+  // x{_}{_}: [
+  // <r, prj(x), inf(q), inf(a)>: true
+  // <r, prj(x), inf(q), inf(b)>: false
+  // <r, prj(x), inf(q), inf(c)>: 45
+  // <r, prj(x), inf(r), inf(a)>: false
+  // <r, prj(x), inf(s), inf(c)>: 21
+  // <r, prj(x), inf(s), inf(b)>: true
+  // ]
+  //
+  // ---
+  //
+  // y{_}, x{_}.b: [
+  // {<r, prj(y), inf(u)>, <r, prj(x), inf(q), prj(b)>}: 1, false
+  // {<r, prj(y), inf(u)>, <r, prj(x), inf(r), prj(b)>}: 1, undefined
+  // {<r, prj(y), inf(u)>, <r, prj(x), inf(s), prj(b)>}: 1, true
+  // {<r, prj(y), inf(v)>, <r, prj(x), inf(q), prj(b)>}: 2, false
+  // {<r, prj(y), inf(v)>, <r, prj(x), inf(r), prj(b)>}: 2, undefined
+  // {<r, prj(y), inf(v)>, <r, prj(x), inf(s), prj(b)>}: 2, true
+  // ]
+  //
+  // longest prefix = 1
+  //
+  //
+  // (y{_}, x{_}.b), x{_}.c: [
+  // {<r, prj(y), inf(u)>, <r, prj(x), inf(q), prj(b)>, <r, prj(x), inf(q), prj(c)>}: 1, false, 45
+  // {<r, prj(y), inf(u)>, <r, prj(x), inf(r), prj(b)>, <r, prj(x), inf(r), prj(c)>}: 1, undefined, undefined
+  // {<r, prj(y), inf(u)>, <r, prj(x), inf(s), prj(b)>, <r, prj(x), inf(s), prj(c)>}: 1, true, 21
+  // {<r, prj(y), inf(v)>, <r, prj(x), inf(q), prj(b)>, <r, prj(x), inf(q), prj(c)>}: 2, false, 45
+  // {<r, prj(y), inf(v)>, <r, prj(x), inf(r), prj(b)>, <r, prj(x), inf(r), prj(c)>}: 2, undefined, undefined
+  // {<r, prj(y), inf(v)>, <r, prj(x), inf(s), prj(b)>, <r, prj(x), inf(s), prj(c)>}: 2, true, 21
+  // ]
+  //
+  // longest prefix = 3
+  //
+  //
+  // ((y{_}, x{_}.b), x{_}.c), x{_}{_}: []
+  //
+  // longest prefix = 4
+  //
+
   /** Attempts to simplify a CStage.Join by coalescing compatible stages. */
   @SuppressWarnings(Array(
     "org.wartremover.warts.Recursion",
@@ -559,6 +624,38 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
           simplified,
           join.joiner.map(s => remap.getOrElse(s, s)))
     }
+  }
+
+  private def maskStruct(paths: NonEmptyList[PrjPath], rot: Rotation, struct: FreeMap)
+      : Either[PrjPath, FreeMap] = {
+    val pivotArr = Set(Rotation.FlattenArray, Rotation.ShiftArray)
+    val pivotMap = Set(Rotation.FlattenMap, Rotation.ShiftMap)
+    def isPrefix(l: PrjPath, r: PrjPath): Boolean =
+      commonPrjPrefix(l, r).exists(_ === l)
+    val back = for {
+      structPrj <- extractProject(struct) collect {
+        case FreeA(p) => p
+      }
+      len = structPrj.size
+      prefixed = paths.list.filter(isPrefix(structPrj, _))
+      mask0 = prefixed.map(_.toList.drop(len)) collect {
+        case (l @ Left(_)) :: _ if pivotArr(rot) => l
+        case (r @ Right(_)) :: _ if pivotMap(rot) => r
+      }
+      mask <- mask0.toNel
+    } yield {
+      if (mask.tail.isEmpty)
+        Left(structPrj :::> IList(mask.head))
+      else if (mask.head.isLeft)
+        Right(StaticArray(mask.toList collect {
+          case idx @ Left(_) => reifyPath(func.Hole, structPrj :::> IList(idx))
+        }))
+      else
+        Right(func.StaticMapS(mask.toList collect {
+          case fld @ Right(n) => (n, reifyPath(func.Hole, structPrj :::> IList(fld)))
+        }: _*))
+    }
+    back getOrElse Right(struct)
   }
 
   // Eliminates Project stages, collapsing them into Shift structs or Expr nodes.
