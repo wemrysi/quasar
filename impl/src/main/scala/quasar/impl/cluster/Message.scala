@@ -24,10 +24,14 @@ object Message {
   final case class RequestUpdate(name: String) extends Message
   final case class Update(name: String) extends Message
   final case class Advertisement(name: String) extends Message
+  final case class RequestInit(name: String) extends Message
+  final case class Init(name: String) extends Message
 
   def printMessage(m: Message): String = m match {
     case RequestUpdate(n) => s"aestore::requestUpdate::${n}"
     case Update(n) => s"aestore::update::${n}"
     case Advertisement(n) => s"aestore::advertisement::${n}"
+    case RequestInit(n) => s"aestore::requestInit::${n}"
+    case Init(n) => s"aestore::init::${n}"
   }
 }

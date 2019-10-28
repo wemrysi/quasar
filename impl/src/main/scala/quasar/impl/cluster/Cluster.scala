@@ -30,6 +30,8 @@ abstract class Cluster[F[_], T] {
   def subscribe[P: Codec](tag: T, limit: Int): F[Stream[F, (Id, P)]]
   def unicast[P: Codec](tag: T, p: P, id: Id): F[Unit]
   def broadcast[P: Codec](tag: T, p: P): F[Unit]
+  def random[P: Codec](tag: T, p: P): F[Unit]
+  def isEmpty: F[Boolean]
 }
 
 object Cluster {
@@ -40,6 +42,8 @@ object Cluster {
       def subscribe[P: Codec](tag: B, limit: Int): F[Stream[F, (Id, P)]] = fa.subscribe(f(tag), limit)
       def unicast[P: Codec](tag: B, p: P, id: Id): F[Unit] = fa.unicast(f(tag), p, id)
       def broadcast[P: Codec](tag: B, p: P): F[Unit] = fa.broadcast(f(tag), p)
+      def random[P: Codec](tag: B, p: P): F[Unit] = fa.random(f(tag), p)
+      def isEmpty = fa.isEmpty
     }
   }
 }
