@@ -163,15 +163,11 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
       .map(ps => Disjunction.subst(ps).combineAll.unwrap)
   }
 
-  def traverseScalarIds[F[_]: Applicative](f: (S, T) => F[(S, T)])(p: P): F[P] = {
-    import shims.applicativeToScalaz
+  def traverseScalarIds[F[_]: Applicative](f: (S, T) => F[(S, T)])(p: P): F[P] =
     scalarIds.modifyF[F](f.tupled)(p)
-  }
 
-  def traverseVectorIds[F[_]: Applicative](f: (V, T) => F[(V, T)])(p: P): F[P] = {
-    import shims.applicativeToScalaz
+  def traverseVectorIds[F[_]: Applicative](f: (V, T) => F[(V, T)])(p: P): F[P] =
     vectorIds.modifyF[F](f.tupled)(p)
-  }
 
   ////
 
@@ -180,8 +176,7 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
   // Not totally lawful, so private
   private lazy val UopT =
     new Traversal[P, J] {
-      import shims.applicativeToCats
-      def modifyF[F[_]: scalaz.Applicative](f: J => F[J])(p: P): F[P] =
+      def modifyF[F[_]: Applicative](f: J => F[J])(p: P): F[P] =
         p.toList.traverse(f).map(Uop.fromFoldable(_))
     }
 

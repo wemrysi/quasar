@@ -26,7 +26,7 @@ import scala.math.max
 
 import monocle.{Lens, Optional, Prism, PTraversal}
 
-import cats.{Eq, Eval, Foldable, Monoid, Order, Reducible, Show, Traverse}
+import cats.{Applicative, Eq, Eval, Foldable, Monoid, Order, Reducible, Show, Traverse}
 import cats.data.NonEmptyList
 import cats.instances.int._
 import cats.instances.list._
@@ -41,8 +41,6 @@ import cats.syntax.order._
 import cats.syntax.reducible._
 import cats.syntax.semigroup._
 import cats.syntax.show._
-
-import scalaz.Applicative
 
 /** A set of vectors where new items may be added to, or conjoined with, the end
   * of all vectors.
@@ -459,8 +457,6 @@ object Identities extends IdentitiesInstances {
   /** NB: Linear in the size of the fully expanded representation. */
   def values[A, B: Order]: PTraversal[Identities[A], Identities[B], A, B] =
     new PTraversal[Identities[A], Identities[B], A, B] {
-      import shims.applicativeToCats
-
       val T = Traverse[NonEmptyList].compose[NonEmptyList].compose[NonEmptyList]
 
       def modifyF[F[_]: Applicative](f: A => F[B])(ids: Identities[A]) =

@@ -24,7 +24,6 @@ import quasar.common.CIName
 import matryoshka._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
-import scalaz.Liskov._
 
 sealed abstract class Sql[A]
 object Sql {

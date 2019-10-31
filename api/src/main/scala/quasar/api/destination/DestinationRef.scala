@@ -22,6 +22,8 @@ import scalaz.std.tuple._
 import scalaz.syntax.show._
 import scalaz.{Apply, Equal, Order, Show, Traverse1}
 
+import shims.functorToCats
+
 @Lenses
 final case class DestinationRef[C](kind: DestinationType, name: DestinationName, config: C)
 

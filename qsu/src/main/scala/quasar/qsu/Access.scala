@@ -25,6 +25,8 @@ import scalaz.syntax.show._
 import scalaz.std.option._
 import scalaz.std.tuple._
 
+import shims.functorToCats
+
 sealed abstract class Access[A] {
   def symbolic(value: A => Symbol): Access[Symbol] =
     this match {

@@ -25,6 +25,8 @@ import monocle.{Iso, PPrism, Prism}
 
 import scalaz._, Scalaz._
 
+import shims.{applicativeToCats, monoidToCats}
+
 sealed trait Condition[+E] extends Product with Serializable {
   def flatMap[EE](f: E => Condition[EE]): Condition[EE] =
     this match {
@@ -48,8 +50,8 @@ object Condition extends ConditionInstances {
 
   def pAbnormal[E1, E2]: PPrism[Condition[E1], Condition[E2], E1, E2] =
     PPrism[Condition[E1], Condition[E2], E1, E2] {
-      case Abnormal(a) => a.right
-      case Normal()    => (Normal[E2](): Condition[E2]).left
+      case Abnormal(a) => Right(a)
+      case Normal()    => Left(Normal[E2]())
     } (Abnormal(_))
 
   def abnormal[E]: Prism[Condition[E], E] =

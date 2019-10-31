@@ -18,14 +18,10 @@ package quasar.qsu.mra
 
 import slamdata.Predef.{Product, Serializable, StringContext}
 
-import cats.{Eq, Order, Show}
-import cats.instances.option._
-import cats.instances.tuple._
-import cats.syntax.show._
+import cats.{Applicative, Eq, Order, Show}
+import cats.implicits._
 
 import monocle.{Prism, Traversal}
-
-import scalaz.Applicative
 
 sealed trait JoinKey[S, V] extends Product with Serializable {
   def flip: JoinKey[S, V] =
@@ -58,10 +54,9 @@ object JoinKey extends JoinKeyInstances {
 
   def vectorIds[S, V]: Traversal[JoinKey[S, V], V] =
     new Traversal[JoinKey[S, V], V] {
-      import scalaz.syntax.applicative._
       def modifyF[F[_]: Applicative](f: V => F[V])(jk: JoinKey[S, V]) =
         jk match {
-          case Dynamic(l, r) => (f(l) |@| f(r))(JoinKey.dynamic(_, _))
+          case Dynamic(l, r) => (f(l), f(r)).mapN(JoinKey.dynamic(_, _))
           case StaticL(s, v) => f(v).map(JoinKey.staticL(s, _))
           case StaticR(v, s) => f(v).map(JoinKey.staticR(_, s))
         }

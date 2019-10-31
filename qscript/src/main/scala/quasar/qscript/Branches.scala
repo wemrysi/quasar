@@ -16,14 +16,23 @@
 
 package quasar.qscript
 
+import slamdata.Predef._
+
+import quasar.contrib.iota.mkInject
+
+import cats.Applicative
+import cats.implicits._
+
+import iotaz.TListK.:::
+import iotaz.{CopK, TListK, TNilK}
+
 import matryoshka.patterns._
 
 import monocle._
-import scalaz._, Scalaz._
-import slamdata.Predef._
-import iotaz.TListK.:::
-import quasar.contrib.iota.mkInject
-import iotaz.{CopK, TListK, TNilK}
+
+import scalaz.Const
+
+import shims.applicativeToScalaz
 
 trait Branches[T[_[_]], IN[_]] {
   def branches[A]: Traversal[IN[A], FreeQS[T]]
@@ -36,7 +45,7 @@ object Branches {
       def branches[A]: Traversal[Const[C, A], FreeQS[T]] =
         new Traversal[Const[C, A], FreeQS[T]] {
           def modifyF[F[_]: Applicative](f: FreeQS[T] => F[FreeQS[T]])(s: Const[C, A]): F[Const[C, A]] =
-            Applicative[F].pure(s)
+            s.pure[F]
         }
     }
 
@@ -99,10 +108,10 @@ object Branches {
           def modifyF[F[_]: Applicative](f: FreeQS[T] => F[FreeQS[T]])(s: QScriptCore[T, A]): F[QScriptCore[T, A]] =
             s match {
               case Union(src, left, right) =>
-                (f(left) |@| f(right))(Union(src, _, _))
+                (f(left), f(right)).mapN(Union(src, _, _))
               case Subset(src, from, op, count) =>
-                (f(from) |@| f(count))(Subset(src, _, op, _))
-              case qs => Applicative[F].pure(qs)
+                (f(from), f(count)).mapN(Subset(src, _, op, _))
+              case qs => qs.pure[F]
             }
         }
     }
@@ -114,7 +123,7 @@ object Branches {
           def modifyF[F[_]: Applicative](f: FreeQS[T] => F[FreeQS[T]])(s: ThetaJoin[T, A]): F[ThetaJoin[T, A]] =
             s match {
               case ThetaJoin(src, left, right, key, func, combine) =>
-                (f(left) |@| f(right))(ThetaJoin(src, _, _, key, func, combine))
+                (f(left), f(right)).mapN(ThetaJoin(src, _, _, key, func, combine))
             }
         }
     }
@@ -126,7 +135,7 @@ object Branches {
           def modifyF[F[_]: Applicative](f: FreeQS[T] => F[FreeQS[T]])(s: EquiJoin[T, A]): F[EquiJoin[T, A]] = {
             s match {
               case EquiJoin(src, left, right, key, func, combine) =>
-                (f(left) |@| f(right))(EquiJoin(src, _, _, key, func, combine))
+                (f(left), f(right)).mapN(EquiJoin(src, _, _, key, func, combine))
             }
           }
         }

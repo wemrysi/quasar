@@ -26,6 +26,8 @@ import matryoshka.data._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 
+import shims.applicativeToCats
+
 trait Trans[F[_], M[_]] {
   def trans[T, G[_]: Functor]
       (GtoF: PrismNT[G, F])

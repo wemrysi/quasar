@@ -42,7 +42,7 @@ import scalaz.std.list._
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 
-import shims.{showToCats, showToScalaz}
+import shims.{showToCats, showToScalaz, traverseToCats}
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 

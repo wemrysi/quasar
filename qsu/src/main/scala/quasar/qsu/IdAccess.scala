@@ -20,12 +20,15 @@ import slamdata.Predef._
 import quasar.RenderTree
 import quasar.fp.symbolOrder
 
+import cats.Applicative
+import cats.syntax.functor._
+
 import monocle.{Prism, Traversal}
-import scalaz.{Applicative, Equal, Order, Show}
+
+import scalaz.{Equal, Order, Show}
 import scalaz.std.anyVal._
 import scalaz.std.option._
 import scalaz.std.tuple._
-import scalaz.syntax.applicative._
 
 /** Describes access to the various forms of ids. */
 sealed abstract class IdAccess

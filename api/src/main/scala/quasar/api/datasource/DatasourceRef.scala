@@ -22,6 +22,8 @@ import scalaz.{Apply, Equal, Order, Show, Traverse1}
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 
+import shims.functorToCats
+
 @Lenses
 final case class DatasourceRef[C](kind: DatasourceType, name: DatasourceName, config: C)
 

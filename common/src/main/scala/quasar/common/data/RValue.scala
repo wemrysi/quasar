@@ -102,8 +102,18 @@ object RValue extends RValueInstances {
   def rField1(field: String): Optional[RValue, RValue] =
     rField(field) composePrism monocle.std.option.some
 
-  val rFields: Traversal[RValue, RValue] =
-    rObject composeTraversal Each.each
+  val rFields: Traversal[RValue, RValue] = {
+    val fieldsTraversal: Traversal[Map[String, RValue], RValue] =
+      new Traversal[Map[String, RValue], RValue] {
+        def modifyF[F[_]](f: RValue => F[RValue])(s: Map[String, RValue])(implicit F: cats.Applicative[F])
+            : F[Map[String, RValue]] =
+          s.foldLeft(F.pure(Map[String, RValue]())) {
+            case (t, (k, rv)) => F.map2(t, f(rv))((x, y) => x.updated(k, y))
+          }
+      }
+
+    rObject composeTraversal fieldsTraversal
+  }
 
   val rArray: Prism[RValue, List[RValue]] =
     Prism.partial[RValue, List[RValue]] {

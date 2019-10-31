@@ -19,14 +19,10 @@ package quasar.qsu.mra
 import slamdata.Predef._
 import quasar.fp.ski.κ
 
-import cats.{Eq, Order, Show}
-import cats.instances.int._
-import cats.syntax.order._
-import cats.syntax.show._
+import cats.{Applicative, Eq, Order, Show}
+import cats.implicits._
 
 import monocle.{Prism, Traversal}
-
-import scalaz.Applicative
 
 /** A single dimension of an identity vector.
   *
@@ -71,8 +67,6 @@ object Dim extends DimInstances {
 
     val scalar: Traversal[Dim[S, V, T], (S, T)] =
       new Traversal[Dim[S, V, T], (S, T)] {
-        import scalaz.syntax.applicative._
-
         val I = inject
         val P = project
 
@@ -80,7 +74,7 @@ object Dim extends DimInstances {
           d match {
             case I(s, t) => f((s, t)).map(I(_))
             case P(s, t) => f((s, t)).map(P(_))
-            case other => other.point[F]
+            case other => other.pure[F]
           }
       }
   }
