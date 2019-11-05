@@ -16,6 +16,8 @@
 
 package quasar.impl.datasource.local
 
+import scala.Unit
+
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
   InitializationError,
@@ -41,7 +43,8 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
   def sanitizeConfig(config: Json): Json = config
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-      config: Json)(
+      config: Json,
+      saveConfig: Json => F[Unit])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], DS[F]]] = {
     val ds = for {

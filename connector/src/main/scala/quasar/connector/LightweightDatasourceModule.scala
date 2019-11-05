@@ -16,6 +16,8 @@
 
 package quasar.connector
 
+import scala.Unit
+
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource.{ResourcePath, ResourcePathType}
@@ -34,7 +36,8 @@ trait LightweightDatasourceModule {
   def sanitizeConfig(config: Json): Json
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-      config: Json)(
+      config: Json,
+      saveConfig: Json => F[Unit])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]]
 }

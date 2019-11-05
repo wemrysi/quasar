@@ -63,6 +63,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
 
   type Mgr = DatasourceManager[Int, Json, Fix, IO, Stream[IO, ?], QueryResult[IO], ResourcePathType.Physical]
   type Disposes = Ref[IO, List[DatasourceType]]
+  type Saves = Ref[IO, Int]
 
   type R[F[_], A] = Either[InitializationError[Json], Datasource[F, Stream[F, ?], A, QueryResult[F], ResourcePathType.Physical]]
 
@@ -118,12 +119,13 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
     def sanitizeConfig(config: Json): Json = jString("sanitized")
 
     def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-        config: Json)(
+        config: Json,
+        saveConfig: Json => F[Unit])(
         implicit ec: ExecutionContext)
         : Resource[F, R[F, InterpretedRead[ResourcePath]]] =
-      Resource((
+      Resource(saveConfig(config).as((
         Right(mkDatasource[F, InterpretedRead[ResourcePath], ResourcePathType.Physical](kind)) : R[F, InterpretedRead[ResourcePath]],
-        ConcurrentEffect[F].liftIO(disposes.update(kind :: _))).pure[F])
+        ConcurrentEffect[F].liftIO(disposes.update(kind :: _)))))
   }
 
   def heavyMod(disposes: Disposes) = new HeavyweightDatasourceModule {
@@ -134,12 +136,13 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
     def heavyweightDatasource[
         T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
         F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
-        config: Json)(
+        config: Json,
+        saveConfig: Json => F[Unit])(
         implicit ec: ExecutionContext)
         : Resource[F, R[F, T[QScriptEducated[T, ?]]]] =
-      Resource((
+      Resource(saveConfig(config).as((
         Right(mkDatasource[F, T[QScriptEducated[T, ?]], ResourcePathType.Physical](kind)) : R[F, T[QScriptEducated[T, ?]]],
-        ConcurrentEffect[F].liftIO(disposes.update(kind :: _))).pure[F])
+        ConcurrentEffect[F].liftIO(disposes.update(kind :: _)))))
   }
 
   def modules(disposes: Disposes): DefaultDatasourceManager.Modules = {
@@ -151,13 +154,23 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       hm.kind -> DatasourceModule.Heavyweight(hm))
   }
 
-  def withInitialMgr[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgr, Disposes) => IO[A]): A =
-    Ref[IO].of(List.empty[DatasourceType])
-      .flatMap(disps =>
+  def withInitialAndSaveMgr[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgr, Disposes, Saves) => IO[A]): A = {
+    val used = for {
+      disposes <- Ref[IO].of(List.empty[DatasourceType])
+
+      saves <- Ref[IO].of(0)
+
+      a <-
         DefaultDatasourceManager.Builder[Int, Fix, IO]
-          .build(modules(disps), configured)
-          .use(f(_, disps)))
-      .unsafeRunSync()
+          .build(modules(disposes), configured, _ => _ => saves.update(_ + 1))
+          .use(f(_, disposes, saves))
+    } yield a
+
+    used.unsafeRunSync()
+  }
+
+  def withInitialMgr[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgr, Disposes) => IO[A]): A =
+    withInitialAndSaveMgr(configured)((m, ds, _) => f(m, ds))
 
   def withMgr[A](f: (Mgr, Disposes) => IO[A]): A =
     withInitialMgr(IMap.empty)(f)
@@ -297,6 +310,18 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
         u <- mgr.sanitizedRef(DatasourceRef(unkT, DatasourceName("b"), jString("config"))).pure[IO]
       } yield {
         u.config must_= jEmptyObject
+      }
+    }
+  }
+
+  "config saving" >> {
+    "configures config saving when datasources instantiated" >> withInitialAndSaveMgr(IMap.empty) { (mgr, _, saves) =>
+      for {
+        l <- mgr.initDatasource(1, DatasourceRef(LightT, DatasourceName("a"), Json.jNull))
+        h <- mgr.initDatasource(2, DatasourceRef(HeavyT, DatasourceName("b"), Json.jNull))
+        ss <- saves.get
+      } yield {
+        ss must_=== 2
       }
     }
   }

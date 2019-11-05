@@ -46,6 +46,9 @@ import argonaut.Json
 import argonaut.JsonScalaz._
 import cats.Functor
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
+import cats.instances.option._
+import cats.syntax.flatMap._
+import cats.syntax.foldable._
 import cats.syntax.functor._
 import fs2.Stream
 import matryoshka.data.Fix
@@ -82,6 +85,15 @@ object Quasar extends Logging {
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
 
+    val saveConfig: UUID => Json => F[Unit] =
+      uuid => cfg => for {
+        ref0 <- datasourceRefs.lookup(uuid)
+
+        ref1 = ref0.map(DatasourceRef.config.set(cfg))
+
+        _ <- ref1.traverse_(datasourceRefs.insert(uuid, _))
+      } yield ()
+
     for {
       configured <-
         Resource.liftF(
@@ -99,7 +111,7 @@ object Quasar extends Logging {
         DefaultDatasourceManager.Builder[UUID, Fix, F]
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
-          .build(moduleMap, configured)
+          .build(moduleMap, configured, saveConfig)
 
       destModules = IMap.fromList(destinationModules.map(dest => dest.destinationType -> dest))
 

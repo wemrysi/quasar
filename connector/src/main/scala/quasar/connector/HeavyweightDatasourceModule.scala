@@ -16,6 +16,8 @@
 
 package quasar.connector
 
+import scala.Unit
+
 import quasar.RenderTreeT
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
@@ -38,7 +40,8 @@ trait HeavyweightDatasourceModule {
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
-      config: Json)(
+      config: Json,
+      saveConfig: Json => F[Unit])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]]
 }
