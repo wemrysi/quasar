@@ -36,8 +36,6 @@ import org.slf4s.Logging
 import scalaz.{Monad, StateT}
 import scalaz.syntax.bind._
 
-import shims._
-
 object Sql2QueryEvaluator extends Logging {
   def apply[
     T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,

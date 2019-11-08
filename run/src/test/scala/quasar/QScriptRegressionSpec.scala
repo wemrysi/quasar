@@ -22,7 +22,7 @@ import cats.effect.IO
 
 import matryoshka.data.Fix
 
-import shims._
+import shims.monadToScalaz
 
 object QScriptRegressionSpec extends CountingRegressionSpec {
 

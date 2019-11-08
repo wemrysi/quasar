@@ -23,7 +23,8 @@ import java.nio.file.{Files, Path}
 import cats.effect.Sync
 import scalaz.std.list._
 import scalaz.syntax.traverse._
-import shims._
+
+import shims.applicativeToScalaz
 
 sealed trait ExternalConfig extends Product with Serializable
 

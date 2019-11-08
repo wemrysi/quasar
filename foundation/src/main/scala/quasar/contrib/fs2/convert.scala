@@ -27,7 +27,8 @@ import cats.syntax.monadError._
 import fs2.concurrent.{NoneTerminatedQueue, Queue, SignallingRef}
 import fs2.{Chunk, Stream}
 import scalaz.{Functor, StreamT, Scalaz}, Scalaz._
-import shims._
+
+import shims.monadToScalaz
 
 object convert {
 

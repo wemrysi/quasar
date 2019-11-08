@@ -26,7 +26,7 @@ import cats.syntax.show._
 
 import monocle.macros.Lenses
 
-import shims._
+import shims.{equalToCats, showToCats}
 
 /** Description of an MRA autojoin.
   *

@@ -31,8 +31,6 @@ import quasar.connector.{MonadResourceErr, ResourceError}
 
 import scalaz.syntax.tag._
 
-import shims._
-
 import java.nio.file.{Path => JPath}
 
 final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] private (

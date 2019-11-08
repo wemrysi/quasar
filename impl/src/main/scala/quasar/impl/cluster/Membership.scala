@@ -22,6 +22,7 @@ import java.net.InetAddress
 abstract class Membership[F[_], Id] {
   def localId: F[Id]
   def peers: F[Set[Id]]
-  def random: F[Set[Id]]
+  def sample: F[Set[Id]]
+  def random: F[Option[Id]]
   def byAddress(addr: InetAddress, port: Int): F[Option[Id]]
 }

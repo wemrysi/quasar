@@ -32,7 +32,8 @@ import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.{\/, -\/, \/-, Bifunctor, Equal, EitherT, IMap, ISet, OptionT, Order}
-import shims._
+
+import shims.monadToScalaz
 
 class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
     freshId: F[I],

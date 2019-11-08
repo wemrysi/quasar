@@ -28,6 +28,7 @@ import scalaz.{~>, \/, \/-, -\/, Equal, Id, Show}, Id.Id
 import scalaz.std.list._
 import scalaz.syntax.monad._
 
+// NB: this one proved sufficiently annoying to make specific that I left it alone
 import shims._
 
 abstract class TablesSpec[F[_]: Sync, I: Equal: Show, Q: Equal: Show]

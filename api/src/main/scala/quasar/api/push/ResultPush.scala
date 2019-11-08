@@ -16,14 +16,18 @@
 
 package quasar.api.push
 
-import slamdata.Predef.{Option, List, Long, Unit}
+import slamdata.Predef._
 
 import quasar.Condition
 import quasar.api.destination.{DestinationColumn, ResultType}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.ColumnType
 
-import scalaz.\/
+import scala.collection.immutable.SortedMap
+
+import cats.Applicative
+import cats.data.NonEmptyMap
+import cats.implicits._
 
 /** @tparam F effects
   * @tparam T Table Id
@@ -35,7 +39,17 @@ trait ResultPush[F[_], TableId, DestinationId, DData] {
   def coerce(
       destinationId: DestinationId,
       tpe: ColumnType)
-      : F[DestinationNotFound[DestinationId] \/ DData]
+      : F[Either[DestinationNotFound[DestinationId], DData]]
+
+  def cancel(
+      tableId: TableId,
+      destinationId: DestinationId)
+      : F[Condition[ExistentialError[TableId, DestinationId]]]
+
+  def cancelAll: F[Unit]
+
+  def destinationStatus(destinationId: DestinationId)
+      : F[Either[DestinationNotFound[DestinationId], Map[TableId, PushMeta]]]
 
   def start(
       tableId: TableId,
@@ -46,13 +60,28 @@ trait ResultPush[F[_], TableId, DestinationId, DData] {
       limit: Option[Long])
       : F[Condition[ResultPushError[TableId, DestinationId]]]
 
-  def cancel(
-      tableId: TableId)
-      : F[Condition[ExistentialError[TableId, DestinationId]]]
+  /** Attempts to start a push for each entry `tables`.
+    *
+    * The resulting `Map` will contain an entry for any push that failed to
+    * start. An empty `Map` indicates all pushes were started successfully.
+    */
+  def startAll(
+      destinationId: DestinationId,
+      tables: NonEmptyMap[TableId, (List[DestinationColumn[DData]], ResourcePath, ResultType, Option[Long])])(
+      implicit F: Applicative[F])
+      : F[Map[TableId, ResultPushError[TableId, DestinationId]]] = {
 
-  def status(
-      tableId: TableId)
-      : F[TableNotFound[TableId] \/ Option[PushMeta[DestinationId]]]
+    val tablesM = tables.toSortedMap
 
-  def cancelAll: F[Unit]
+    val failed: Map[TableId, ResultPushError[TableId, DestinationId]] =
+      SortedMap.empty(tablesM.ordering)
+
+    tablesM.foldLeft(failed.pure[F]) {
+      case (f, (tid, (cols, path, tpe, limit))) =>
+        (f, start(tid, cols, destinationId, path, tpe, limit)) mapN {
+          case (m, Condition.Abnormal(err)) => m.updated(tid, err)
+          case (m, Condition.Normal()) => m
+        }
+    }
+  }
 }

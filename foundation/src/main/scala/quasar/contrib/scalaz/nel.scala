@@ -14,23 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.sst
+package quasar.contrib.scalaz
 
-import quasar.ejson.{EJsonArbitrary, TypeTag}
-import quasar.pkg.tests._
+import scala.annotation.unchecked.uncheckedVariance
 
-import matryoshka.Delay
-import scalaz._, Scalaz._
-import scalaz.scalacheck.ScalaCheckBinding._
+import scalaz.NonEmptyList
+import scalaz.Liskov.{<~<, refl}
 
-trait TaggedArbitrary {
-  import EJsonArbitrary._
-
-  implicit val arbitraryTagged: Delay[Arbitrary, Tagged] =
-    new Delay[Arbitrary, Tagged] {
-      def apply[A](arb: Arbitrary[A]) =
-        Arbitrary((arbitrary[TypeTag] ⊛ arb.gen)(Tagged(_, _)))
-    }
+object nel {
+  implicit final class NonEmptyListOps[A](xs: NonEmptyList[A]) {
+    def widen[B](implicit ev: A <~< B): NonEmptyList[B] =
+      ev.subst[λ[`-α` => NonEmptyList[α @uncheckedVariance] <~< NonEmptyList[B]]](refl)(xs)
+  }
 }
-
-object TaggedArbitrary extends TaggedArbitrary

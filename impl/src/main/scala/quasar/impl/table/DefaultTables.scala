@@ -32,7 +32,7 @@ import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 
-import shims._
+import shims.{eqToScalaz, monadToScalaz}
 
 final class DefaultTables[F[_]: Effect, I: Equal, Q](
     freshId: F[I],

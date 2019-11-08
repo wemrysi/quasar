@@ -82,13 +82,12 @@ lazy val root = project.in(file("."))
   .aggregate(
     api,
     common, connector, core,
-    datagen,
     ejson,
     foundation, frontend,
     impl,
     qscript, qsu,
     runp,
-    sql, sst,
+    sql
   ).enablePlugins(AutomateHeaderPlugin)
 
 /** Very general utilities, ostensibly not Quasar-specific, but they just aren’t
@@ -194,24 +193,6 @@ lazy val frontend = project
       "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test))
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val sst = project
-  .settings(name := "quasar-sst")
-  .dependsOn(frontend % BothScopes)
-  .settings(commonSettings)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val datagen = project
-  .settings(name := "quasar-datagen")
-  .dependsOn(sst % BothScopes)
-  .settings(commonSettings)
-  .settings(
-    mainClass in Compile := Some("quasar.datagen.Main"),
-
-    libraryDependencies ++= Seq(
-      "com.github.scopt" %% "scopt"          % scoptVersion,
-      "eu.timepit"       %% "refined-scalaz" % refinedVersion))
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Implementation of the SQL² query language.
   */
 lazy val sql = project
@@ -280,8 +261,7 @@ lazy val impl = project
     api % BothScopes,
     common % "test->test",
     connector % BothScopes,
-    frontend % "test->test",
-    sst)
+    frontend % "test->test")
   .settings(commonSettings)
   .settings(
 

@@ -34,8 +34,6 @@ import quasar.api.destination.{Destination, UntypedDestination, DestinationType,
 import quasar.api.push.RenderConfig
 import quasar.connector.{DestinationModule, MonadResourceErr}
 
-import shims._
-
 object MockDestinationModule extends DestinationModule {
   def destinationType = DestinationType("mock", 1L)
   def sanitizeDestinationConfig(config: Json) =

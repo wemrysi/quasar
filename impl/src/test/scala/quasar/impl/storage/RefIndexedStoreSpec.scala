@@ -25,7 +25,6 @@ import cats.effect.concurrent.Ref
 import scalaz.IMap
 import scalaz.std.anyVal._
 import scalaz.std.string._
-import shims._
 
 object RefIndexedStoreSpec extends RefSpec(Ref.unsafe[IO, Int](0))
 

@@ -38,7 +38,7 @@ import scalaz.{Const, Functor, Monad}
 import scalaz.syntax.applicative._
 import scalaz.syntax.monoid._
 
-import shims._
+import shims.monadToScalaz
 
 abstract class CountingQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,

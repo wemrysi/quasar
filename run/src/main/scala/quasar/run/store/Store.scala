@@ -33,7 +33,8 @@ import org.mapdb._
 
 import argonaut.{CodecJson, Parse}
 import monocle.Prism
-import shims._
+
+import shims.monadToScalaz
 
 object Store {
   val MapDBTableName = "default"

@@ -42,7 +42,7 @@ import scalaz.syntax.equal._
 import scalaz.syntax.traverse._
 import scalaz.syntax.std.option._
 
-import shims._
+import shims.monadToScalaz
 
 object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], ResourcePathType] {
 

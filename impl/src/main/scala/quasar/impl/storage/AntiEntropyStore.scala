@@ -23,7 +23,7 @@ import quasar.impl.cluster.{Timestamped, Cluster, Message}, Timestamped._, Messa
 
 import cats.~>
 import cats.effect._
-import cats.effect.concurrent.Semaphore
+import cats.effect.concurrent.{Deferred, Semaphore}
 import cats.instances.list._
 import cats.syntax.applicative._
 import cats.syntax.apply._
@@ -73,7 +73,9 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
     (Stream.eval(sendAd) *> Stream.sleep(ms(config.adTimeoutMillis))).repeat
 
   private def sendAd: F[Unit] =
-    store.timestamps.flatMap(cluster.gossip(Advertisement(name), _))
+    store.timestamps.flatMap { (ts: Map[K, Long]) =>
+      cluster.gossip(Advertisement(name), ts).unlessA(ts.isEmpty)
+    }
 
   // RECEIVING ADS
   private def handleAdvertisement(id: cluster.Id, ad: Map[K, Long]): F[Unit] = {
@@ -102,8 +104,8 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
     for {
       timestamps <- store.timestamps
       (requesting, returning) <- result((List(), Map.empty), timestamps)
-      _ <- cluster.unicast(RequestUpdate(name), requesting, id)
-      _ <- cluster.unicast(Update(name), returning, id)
+      _ <- cluster.unicast(RequestUpdate(name), requesting, id).unlessA(requesting.isEmpty)
+      _ <- cluster.unicast(Update(name), returning, id).unlessA(returning.isEmpty)
     } yield ()
   }
 
@@ -141,7 +143,7 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
 
   private def updateRequestedHandler(id: cluster.Id, req: List[K]): F[Unit] = for {
     payload <- subMap(req)
-    _ <- cluster.unicast(Update(name), payload, id)
+    _ <- cluster.unicast(Update(name), payload, id).unlessA(payload.isEmpty)
   } yield (())
 
   private def subMap(req: List[K]): F[Map[K, Timestamped[V]]] =
@@ -154,6 +156,31 @@ final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Cod
   def updateRequestHandled: F[Stream[F, Unit]] =
     cluster.subscribe[List[K]](RequestUpdate(name), config.updateRequestLimit)
       .map(_.evalMap(Function.tupled(updateRequestedHandler(_, _))(_)))
+
+  // INITIALIZATION
+  def requestInitialization: F[Unit] =
+    cluster.random(RequestInit(name), ())
+
+  def initialization: Stream[F, Unit] =
+    (Stream.eval(requestInitialization) *> Stream.sleep(ms(config.adTimeoutMillis))).repeat
+
+  def initRequestHandled: F[Stream[F, Unit]] =
+    cluster.subscribe[Unit](RequestInit(name), config.updateRequestLimit)
+      .map(_.evalMap(x => initRequestHandler(x._1)))
+
+  def initRequestHandler(id: cluster.Id): F[Unit] =
+    underlying.entries.compile.toList.flatMap { (lst: List[(K, Timestamped[V])]) =>
+      cluster.unicast(Init(name), lst.toMap, id)
+    }
+
+  def initHandled(stopper: Deferred[F, Either[Throwable, Unit]]): F[Stream[F, Unit]] =
+    cluster.subscribe[Map[K, Timestamped[V]]](Init(name), config.updateLimit)
+      .map(_.evalMap {
+        case (id, mp) => for {
+          _ <- updateHandler(id, mp)
+          _ <- Sync[F].suspend(stopper.complete(Right(())))
+        } yield ()
+      })
 
   // BROADCASTING UPDATES
   def broadcastUpdates: Stream[F, Unit] =
@@ -188,9 +215,7 @@ object AntiEntropyStore {
       pool: BlockingContext)(
       implicit timer: Timer[F])
       : Resource[F, IndexedStore[F, K, V]] = {
-
     val res: F[Resource[F, IndexedStore[F, K, V]]] = for {
-      currentTime <- timer.clock.realTime(MILLISECONDS)
       gates <- Gates[F]
       store <- Sync[F].delay(new AntiEntropyStore[F, K, V](
         name,
@@ -198,6 +223,12 @@ object AntiEntropyStore {
         underlying,
         gates,
         config))
+      stopper <- Deferred[F, Either[Throwable, Unit]]
+      empty <- cluster.isEmpty
+      _ <- stopper.complete(Right(())).whenA(empty)
+
+      initRequest <- store.initRequestHandled
+      init <- store.initHandled(stopper)
       adReceiver <- store.advertisementHandled
       updates <- store.updateHandled
       updateRequester <- store.updateRequestHandled
@@ -207,10 +238,16 @@ object AntiEntropyStore {
         store.sendingAdStream,
         store.purgeTombstones,
         store.broadcastUpdates,
+        initRequest,
         updates,
-        updateRequester)).parJoinUnbounded
+        updateRequester,
+        store.initialization.interruptWhen(stopper),
+        init.interruptWhen(stopper))).parJoinUnbounded
       val storeStream = Stream.emit[F, IndexedStore[F, K, V]](store)
-      storeStream.concurrently(merged).compile.resource.lastOrError
+      for {
+        resource <- storeStream.concurrently(merged).compile.resource.lastOrError
+        _ <- Resource.liftF(stopper.get)
+      } yield resource
     }
     Resource.suspend(res).mapK[F](λ[F ~> F](ContextShift[F].evalOn(pool.unwrap)(_)))
   }

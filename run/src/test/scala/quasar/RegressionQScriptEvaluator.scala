@@ -27,8 +27,6 @@ import matryoshka.implicits._
 import scalaz.Monad
 import scalaz.syntax.applicative._
 
-import shims._
-
 final class RegressionQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: Monad: MonadPlannerErr: PhaseResultTell]

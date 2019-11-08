@@ -29,7 +29,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import cats.effect.{IO, Sync}
 import scalaz.{~>, IMap, Id}
 import scalaz.std.string._
-import shims._
+
+import shims.monadToScalaz
 
 final class DefaultTablesSpec extends TablesSpec[IO, UUID, String] {
   import DefaultTablesSpec._
