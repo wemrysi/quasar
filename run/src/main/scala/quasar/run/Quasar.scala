@@ -75,9 +75,9 @@ object Quasar extends Logging {
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
-      qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], Stream[F, R]])(
+      qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], Stream[F, R]],
       resultRender: ResultRender[F, R],
-      resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
+      resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])])(
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule])(
       implicit
