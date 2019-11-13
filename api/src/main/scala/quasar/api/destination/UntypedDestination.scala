@@ -26,7 +26,7 @@ import quasar.api.table.ColumnType
 import quasar.contrib.std.errorImpossible
 import quasar.fp.Dependent
 
-import scala.{sys, Nothing, Unit}
+import scala.{Nothing, Unit}
 import scala.util.Right
 
 trait UntypedDestination[F[_]] extends Destination[F] {
