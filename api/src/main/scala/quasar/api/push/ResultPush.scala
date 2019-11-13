@@ -26,7 +26,7 @@ import quasar.api.table.ColumnType
 import scala.collection.immutable.SortedMap
 
 import cats.Applicative
-import cats.data.NonEmptyMap
+import cats.data.{NonEmptyMap, NonEmptySet}
 import cats.implicits._
 
 /** @tparam F effects
@@ -60,12 +60,35 @@ trait ResultPush[F[_], TableId, DestinationId, DData] {
       limit: Option[Long])
       : F[Condition[ResultPushError[TableId, DestinationId]]]
 
-  /** Attempts to start a push for each entry `tables`.
+  /** Attempts to cancel the push to `destinationId` for each entry `tables`.
+    *
+    * The resulting `Map` will contain an entry for any push that failed to
+    * cancel. An empty `Map` indicates no errors were encountered.
+    */
+  def cancelThese(
+      destinationId: DestinationId,
+      tables: NonEmptySet[TableId])(
+      implicit F: Applicative[F])
+      : F[Map[TableId, ExistentialError[TableId, DestinationId]]] = {
+
+    val failed: Map[TableId, ExistentialError[TableId, DestinationId]] =
+      SortedMap.empty(tables.toSortedSet.ordering)
+
+    tables.foldLeft(failed.pure[F]) {
+      case (f, tid) =>
+        (f, cancel(tid, destinationId)) mapN {
+          case (m, Condition.Abnormal(err)) => m.updated(tid, err)
+          case (m, Condition.Normal()) => m
+        }
+    }
+  }
+
+  /** Attempts to start a push to `destinationId` for each entry `tables`.
     *
     * The resulting `Map` will contain an entry for any push that failed to
     * start. An empty `Map` indicates all pushes were started successfully.
     */
-  def startAll(
+  def startThese(
       destinationId: DestinationId,
       tables: NonEmptyMap[TableId, (List[DestinationColumn[DData]], ResourcePath, ResultType, Option[Long])])(
       implicit F: Applicative[F])

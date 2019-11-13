@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import argonaut.Json
 
-import cats.data.{NonEmptyList, NonEmptyMap}
+import cats.data.{NonEmptyList, NonEmptyMap, NonEmptySet}
 import cats.effect.IO
 
 import eu.timepit.refined.auto._
@@ -268,7 +268,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     "fails when destination doesn't support requested format" >> todo
   }
 
-  "start all" >> {
+  "start these" >> {
     val path1 = ResourcePath.root() / ResourceName("foo")
     val testTable1 = TableRef(TableName("foo"), "queryFoo", List())
 
@@ -292,7 +292,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
                 IO(Stream.eval_(ref2.set("Started")) ++ awaitS ++ Stream.eval_(ref2.set("Finished")))
             })
 
-          errors <- push.startAll(DestinationId, NonEmptyMap.of(
+          errors <- push.startThese(DestinationId, NonEmptyMap.of(
             1 -> ((Nil, path1, ResultType.Csv, None)),
             2 -> ((Nil, path2, ResultType.Csv, None))))
 
@@ -317,7 +317,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
                 IO(Stream.eval_(ref2.set("Started")) ++ awaitS ++ Stream.eval_(ref2.set("Finished")))
             })
 
-          errors <- push.startAll(DestinationId, NonEmptyMap.of(
+          errors <- push.startThese(DestinationId, NonEmptyMap.of(
             1 -> ((Nil, path1, ResultType.Csv, None)),
             2 -> ((Nil, path2, ResultType.Csv, None))))
 
@@ -449,6 +449,140 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           cancelRes <- push.cancel(TableId, DestinationId)
         } yield {
           cancelRes must beAbnormal(ResultPushError.TableNotFound(TableId))
+        }
+      }
+    }
+  }
+
+  "cancel these" >> {
+    "cancels running pushes" >>* {
+      val queryA = "queryA"
+      val queryB = "queryB"
+      val queryC = "queryC"
+
+      val testTableA = TableRef(TableName("A"), queryA, List())
+      val testTableB = TableRef(TableName("B"), queryB, List())
+      val testTableC = TableRef(TableName("C"), queryC, List())
+
+      val pushPathA = ResourcePath.root() / ResourceName("foo") / ResourceName("A")
+      val pushPathB = ResourcePath.root() / ResourceName("foo") / ResourceName("B")
+
+      val idA = TableId
+      val idB = idA + 1
+      val idC = idB + 1
+
+      def testStream(ref: SignallingRef[IO, String]): Stream[IO, String] =
+        Stream("foo") ++
+          Stream(" ") ++ // chunk delimiter
+          Stream.eval_(ref.set("Working")) ++
+          Stream.sleep_(WorkTime) ++
+          Stream("bar") ++
+          Stream.eval_(ref.set("Finished"))
+
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- RefDestination()
+
+          refA <- SignallingRef[IO, String]("Not started")
+          refB <- SignallingRef[IO, String]("Not started")
+
+          push <- mkResultPush(
+            Map(
+              idA -> testTableA,
+              idB -> testTableB,
+              idC -> testTableC),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator {
+              case `queryA` => IO(testStream(refA))
+              case `queryB` => IO(testStream(refB))
+            })
+
+          startRes <- push.startThese(
+            DestinationId,
+            NonEmptyMap.of(
+              idA -> ((Nil, pushPathA, ResultType.Csv, None)),
+              idB -> ((Nil, pushPathB, ResultType.Csv, None))))
+
+          _ <- latchGet(refA, "Working")
+          _ <- latchGet(refB, "Working")
+
+          cancelRes <- push.cancelThese(
+            DestinationId,
+            NonEmptySet.of(idA, idB, idC))
+
+          filesystemAfterPush <- waitForUpdate(filesystem) >> filesystem.get
+          // fail the test if push evaluation was not cancelled
+          evaluationAFinished <- verifyTimeout(latchGet(refA, "Finished"), "Push A not cancelled")
+          evaluationBFinished <- verifyTimeout(latchGet(refB, "Finished"), "Push B not cancelled")
+        } yield {
+          filesystemAfterPush.keySet must equal(Set(pushPathA, pushPathB))
+          // check if a *partial* result was pushed
+          filesystemAfterPush(pushPathA) must equal("foo")
+          filesystemAfterPush(pushPathB) must equal("foo")
+          startRes.isEmpty must beTrue
+          cancelRes.isEmpty must beTrue
+          evaluationAFinished and evaluationBFinished
+        }
+      }
+    }
+
+    "returns the cause of any push that failed to cancel" >>* {
+      val queryA = "queryA"
+      val queryB = "queryB"
+
+      val testTableA = TableRef(TableName("A"), queryA, List())
+      val testTableB = TableRef(TableName("B"), queryB, List())
+
+      val pushPathA = ResourcePath.root() / ResourceName("foo") / ResourceName("A")
+
+      val idA = TableId
+      val idB = idA + 1
+
+      def testStream(ref: SignallingRef[IO, String]): Stream[IO, String] =
+        Stream("foo") ++
+          Stream(" ") ++ // chunk delimiter
+          Stream.eval_(ref.set("Working")) ++
+          Stream.sleep_(WorkTime) ++
+          Stream("bar") ++
+          Stream.eval_(ref.set("Finished"))
+
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- RefDestination()
+
+          refA <- SignallingRef[IO, String]("Not started")
+
+          push <- mkResultPush(
+            Map(idA -> testTableA),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator {
+              case `queryA` => IO(testStream(refA))
+            })
+
+          startRes <- push.start(
+            idA,
+            Nil,
+            DestinationId,
+            pushPathA,
+            ResultType.Csv,
+            None)
+
+          _ <- latchGet(refA, "Working")
+
+          cancelRes <- push.cancelThese(DestinationId, NonEmptySet.of(idA, idB))
+
+          filesystemAfterPush <- waitForUpdate(filesystem) >> filesystem.get
+          // fail the test if push evaluation was not cancelled
+          evaluationAFinished <- verifyTimeout(latchGet(refA, "Finished"), "Push A not cancelled")
+        } yield {
+          filesystemAfterPush.keySet must equal(Set(pushPathA))
+          // check if a *partial* result was pushed
+          filesystemAfterPush(pushPathA) must equal("foo")
+          startRes must beNormal
+          cancelRes must_=== Map(idB -> ResultPushError.TableNotFound(idB))
+          evaluationAFinished
         }
       }
     }
