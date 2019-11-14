@@ -29,16 +29,17 @@ import scala.Nothing
 import scala.util.Right
 
 trait LegacyDestination[F[_]] extends Destination[F] {
-  type Type = ColumnType
+  type Type = ColumnType.Scalar
   type Constructor[A] = Nothing
 
-  implicit val labelType: Label[ColumnType] =
-    Label.label[ColumnType](_.toString)
+  implicit val labelType: Label[ColumnType.Scalar] =
+    Label.label[ColumnType.Scalar](_.toString)
 
-  implicit val eqType: Eq[ColumnType] = Eq[ColumnType]
+  implicit val eqType: Eq[ColumnType.Scalar] =
+    Eq[ColumnType.Scalar]
 
-  implicit val jsonCodecType: CodecJson[ColumnType] =
-    CodecJson.derived[ColumnType]
+  implicit val jsonCodecType: CodecJson[ColumnType.Scalar] =
+    CodecJson.derived[ColumnType.Scalar]
 
   implicit def labelConstructor[P]: Label[Nothing] =
     Label.label[Nothing](_ => errorImpossible)
@@ -58,6 +59,6 @@ trait LegacyDestination[F[_]] extends Destination[F] {
   implicit val dependentCodecJson: Dependent[Constructor, CodecJson] =
     λ[Dependent[Constructor, CodecJson]](_ => errorImpossible)
 
-  final def coerce(tpe: ColumnType): TypeCoercion[Constructor, Type] =
+  final def coerce(tpe: ColumnType.Scalar): TypeCoercion[Constructor, Type] =
     TypeCoercion.Satisfied(NonEmptyList.one(Right(tpe)))
 }

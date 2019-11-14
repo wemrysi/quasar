@@ -38,7 +38,7 @@ trait ResultPush[F[_], TableId, DestinationId, DData] {
 
   def coerce(
       destinationId: DestinationId,
-      tpe: ColumnType)
+      tpe: ColumnType.Scalar)
       : F[Either[DestinationNotFound[DestinationId], DData]]
 
   def cancel(

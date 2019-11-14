@@ -58,7 +58,7 @@ final class DefaultResultPush[
 
   def coerce(
       destinationId: D,
-      tpe: ColumnType)
+      tpe: ColumnType.Scalar)
       : F[Either[ResultPushError.DestinationNotFound[D], Json]] = {
 
     val destF = EitherT.fromOptionF[F, ResultPushError.DestinationNotFound[D], Destination[F]](

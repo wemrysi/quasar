@@ -58,6 +58,6 @@ trait UntypedDestination[F[_]] extends Destination[F] {
   implicit val dependentCodecJson: Dependent[Constructor, CodecJson] =
     λ[Dependent[Constructor, CodecJson]](_ => errorImpossible)
 
-  final def coerce(tpe: ColumnType): TypeCoercion[Constructor, Type] =
+  final def coerce(tpe: ColumnType.Scalar): TypeCoercion[Constructor, Type] =
     TypeCoercion.Satisfied(NonEmptyList.one(Right(())))
 }

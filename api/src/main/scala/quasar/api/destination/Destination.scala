@@ -44,7 +44,7 @@ trait Destination[F[_]] {
   implicit val dependentEq: Dependent[Constructor, Eq]
   implicit val dependentCodecJson: Dependent[Constructor, CodecJson]
 
-  def coerce(tpe: ColumnType): TypeCoercion[Constructor, Type]
+  def coerce(tpe: ColumnType.Scalar): TypeCoercion[Constructor, Type]
 
   def destinationType: DestinationType
 
