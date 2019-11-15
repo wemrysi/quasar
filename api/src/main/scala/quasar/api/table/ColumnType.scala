@@ -23,7 +23,10 @@ import slamdata.Predef.{Int, Product, Serializable, Set}
 import cats.{Order, Show}
 import cats.implicits._
 
-import scala.StringContext
+import monocle.Prism
+
+import java.lang.{String => JString}
+import scala.{None, Some, StringContext}
 
 sealed abstract class ColumnType(final val ordinal: Int) extends Product with Serializable
 
@@ -32,39 +35,11 @@ private[table] trait LowPriorityImplicits {
 
   implicit val codecJson: CodecJson[ColumnType] =
     CodecJson(
-      {
-        case Null => "null".asJson
-        case Boolean => "boolean".asJson
-        case LocalTime => "localtime".asJson
-        case OffsetTime => "offsettime".asJson
-        case LocalDate => "localdate".asJson
-        case OffsetDate => "offsetdate".asJson
-        case LocalDateTime => "localdatetime".asJson
-        case OffsetDateTime => "offsetdatetime".asJson
-        case Interval => "interval".asJson
-        case Number => "number".asJson
-        case String => "string".asJson
-        case Array => "array".asJson
-        case Object => "object".asJson
-      },
-      { c =>
-        c.as[java.lang.String] flatMap {
-          case "null" => DecodeResult.ok(Null)
-          case "boolean" => DecodeResult.ok(Boolean)
-          case "localtime" => DecodeResult.ok(LocalTime)
-          case "offsettime" => DecodeResult.ok(OffsetTime)
-          case "localdate" => DecodeResult.ok(LocalDate)
-          case "offsetdate" => DecodeResult.ok(OffsetDate)
-          case "localdatetime" => DecodeResult.ok(LocalDateTime)
-          case "offsetdatetime" => DecodeResult.ok(OffsetDateTime)
-          case "interval" => DecodeResult.ok(Interval)
-          case "number" => DecodeResult.ok(Number)
-          case "string" => DecodeResult.ok(String)
-          case "array" => DecodeResult.ok(Array)
-          case "object" => DecodeResult.ok(Object)
-          case s => DecodeResult.fail(s"unknown column type '$s'", c.history)
-        }
-      })
+      stringP(_).asJson,
+      c => c.as[JString].flatMap(s => stringP.getOption(s) match {
+        case Some(t) => DecodeResult.ok(t)
+        case None => DecodeResult.fail(s"unknown column type '$s'", c.history)
+      }))
 }
 
 object ColumnType extends LowPriorityImplicits {
@@ -104,6 +79,42 @@ object ColumnType extends LowPriorityImplicits {
       Array,
       Object)
 
+  val stringP: Prism[JString, ColumnType] =
+    Prism((s: JString) => Some(s) collect {
+      case "null" => Null
+      case "boolean" => Boolean
+      case "localtime" => LocalTime
+      case "offsettime" => OffsetTime
+      case "localdate" => LocalDate
+      case "offsetdate" => OffsetDate
+      case "localdatetime" => LocalDateTime
+      case "offsetdatetime" => OffsetDateTime
+      case "interval" => Interval
+      case "number" => Number
+      case "string" => String
+      case "array" => Array
+      case "object" => Object
+    }) {
+      case Null => "null"
+      case Boolean => "boolean"
+      case LocalTime => "localtime"
+      case OffsetTime => "offsettime"
+      case LocalDate => "localdate"
+      case OffsetDate => "offsetdate"
+      case LocalDateTime => "localdatetime"
+      case OffsetDateTime => "offsetdatetime"
+      case Interval => "interval"
+      case Number => "number"
+      case String => "string"
+      case Array => "array"
+      case Object => "object"
+    }
+
+  val scalarP: Prism[JString, ColumnType.Scalar] =
+    Prism((s: JString) => stringP.getOption(s) collect {
+      case s: ColumnType.Scalar => s
+    })(stringP(_))
+
   implicit def columnTypeOrder[T <: ColumnType]: Order[T] =
     Order.by(_.ordinal)
 
@@ -112,33 +123,12 @@ object ColumnType extends LowPriorityImplicits {
 
   implicit val codecJsonScalar: CodecJson[ColumnType.Scalar] =
     CodecJson(
-      {
-        case Null => "null".asJson
-        case Boolean => "boolean".asJson
-        case LocalTime => "localtime".asJson
-        case OffsetTime => "offsettime".asJson
-        case LocalDate => "localdate".asJson
-        case OffsetDate => "offsetdate".asJson
-        case LocalDateTime => "localdatetime".asJson
-        case OffsetDateTime => "offsetdatetime".asJson
-        case Interval => "interval".asJson
-        case Number => "number".asJson
-        case String => "string".asJson
-      },
-      { c =>
-        c.as[java.lang.String] flatMap {
-          case "null" => DecodeResult.ok(Null)
-          case "boolean" => DecodeResult.ok(Boolean)
-          case "localtime" => DecodeResult.ok(LocalTime)
-          case "offsettime" => DecodeResult.ok(OffsetTime)
-          case "localdate" => DecodeResult.ok(LocalDate)
-          case "offsetdate" => DecodeResult.ok(OffsetDate)
-          case "localdatetime" => DecodeResult.ok(LocalDateTime)
-          case "offsetdatetime" => DecodeResult.ok(OffsetDateTime)
-          case "interval" => DecodeResult.ok(Interval)
-          case "number" => DecodeResult.ok(Number)
-          case "string" => DecodeResult.ok(String)
-          case s => DecodeResult.fail(s"unknown column type '$s'", c.history)
-        }
-      })
+      scalarP(_).asJson,
+      c => c.as[JString].flatMap(s => scalarP.getOption(s) match {
+        case Some(t) => DecodeResult.ok(t)
+        case None => DecodeResult.fail(s"unknown column type '$s'", c.history)
+      }))
+
+  implicit val encodeJsonKeyScalar: EncodeJsonKey[ColumnType.Scalar] =
+    EncodeJsonKey.from(scalarP(_))
 }
