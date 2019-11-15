@@ -18,16 +18,18 @@ package quasar.api.push
 
 import slamdata.Predef._
 
-import quasar.Condition
+import quasar.{Condition, Exhaustive}
 import quasar.api.destination.{DestinationColumn, ResultType}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.ColumnType
 
 import scala.collection.immutable.SortedMap
 
-import cats.Applicative
-import cats.data.{NonEmptyMap, NonEmptySet}
+import cats.{Applicative, Monad}
+import cats.data.{EitherT, NonEmptyMap, NonEmptySet}
 import cats.implicits._
+
+import shapeless._
 
 /** @tparam F effects
   * @tparam T Table Id
@@ -106,5 +108,32 @@ trait ResultPush[F[_], TableId, DestinationId, DData] {
           case (m, Condition.Normal()) => m
         }
     }
+  }
+
+  def coercions(destinationId: DestinationId)
+      (implicit F: Monad[F])
+      : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, DData]]] = {
+
+    // Ensures the map contains an entry for every ColumType.Scalar
+    def coercions0[H <: HList](l: H)(implicit E: Exhaustive[ColumnType.Scalar, H])
+        : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, DData]]] =
+      E.toNel(l)
+        .traverse(t => EitherT(coerce(destinationId, t)).tupleLeft(t))
+        .map(n => NonEmptyMap.of(n.head, n.tail: _*))
+        .value
+
+    coercions0(
+      ColumnType.Null ::
+      ColumnType.Boolean ::
+      ColumnType.LocalTime ::
+      ColumnType.OffsetTime ::
+      ColumnType.LocalDate ::
+      ColumnType.OffsetDate ::
+      ColumnType.LocalDateTime ::
+      ColumnType.OffsetDateTime ::
+      ColumnType.Interval ::
+      ColumnType.Number ::
+      ColumnType.String ::
+      HNil)
   }
 }
