@@ -55,8 +55,8 @@ trait ResultPush[F[_], TableId, DestinationId, DData] {
 
   def start(
       tableId: TableId,
-      columns: List[DestinationColumn[DData]],
       destinationId: DestinationId,
+      columns: List[DestinationColumn[DData]],
       path: ResourcePath,
       format: ResultType,
       limit: Option[Long])
@@ -103,15 +103,15 @@ trait ResultPush[F[_], TableId, DestinationId, DData] {
 
     tablesM.foldLeft(failed.pure[F]) {
       case (f, (tid, (cols, path, tpe, limit))) =>
-        (f, start(tid, cols, destinationId, path, tpe, limit)) mapN {
+        (f, start(tid, destinationId, cols, path, tpe, limit)) mapN {
           case (m, Condition.Abnormal(err)) => m.updated(tid, err)
           case (m, Condition.Normal()) => m
         }
     }
   }
 
-  def coercions(destinationId: DestinationId)
-      (implicit F: Monad[F])
+  def coercions(destinationId: DestinationId)(
+      implicit F: Monad[F])
       : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, DData]]] = {
 
     // Ensures the map contains an entry for every ColumType.Scalar

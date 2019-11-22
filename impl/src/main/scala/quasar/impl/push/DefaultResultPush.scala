@@ -75,8 +75,8 @@ final class DefaultResultPush[
 
   def start(
       tableId: T,
-      columns: List[DestinationColumn[Json]], // I hate seeing Json here, but... the Destination itself drives the decoding
       destinationId: D,
+      columns: List[DestinationColumn[Json]],
       path: ResourcePath,
       format: ResultType,
       limit: Option[Long])
@@ -116,7 +116,10 @@ final class DefaultResultPush[
             // see? isn't this elegant?
             val applied = cs map { dc =>
               dc map {
-                case Left((c, p)) => c(p)
+                case Left(e) =>
+                  val (c, p) = e.value
+                  c(p)
+
                 case Right(t) => t
               }
             }

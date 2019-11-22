@@ -34,7 +34,7 @@ trait UntypedDestination[F[_]] extends UnparameterizedDestination[F] {
 
   implicit val eqType: Eq[Unit] = Eq[Unit]
 
-  implicit val jsonCodecType: CodecJson[Unit] =
+  implicit val codecJsonType: CodecJson[Unit] =
     CodecJson.derived[Unit]
 
   final def coerce(tpe: ColumnType.Scalar): TypeCoercion[Constructor, Type] =

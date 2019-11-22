@@ -66,10 +66,9 @@ object TypeCoercion {
         tpeOrC <- (c --\ "type").as[Either[∃[C], T]]
 
         back <- tpeOrC match {
-          case Left(const0) =>
-            val const = const0()
-            (c --\ "params" =\ 0).as(P(const)) map { p =>
-              Left(∃[λ[α => (C[α], α)]]((const, p)))
+          case Left(const) =>
+            (c --\ "params" =\ 0).as(P(const.value)) map { p =>
+              Left(∃[λ[α => (C[α], α)]]((const.value, p)))
             }
 
           case Right(t) =>

@@ -20,7 +20,6 @@ import argonaut.CodecJson
 
 import cats.Eq
 
-import quasar.api.table.ColumnType
 import quasar.contrib.std.errorImpossible
 import quasar.fp.Dependent
 
