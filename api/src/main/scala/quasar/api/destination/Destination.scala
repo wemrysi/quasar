@@ -24,6 +24,8 @@ import cats.data.NonEmptyList
 import quasar.api.table.ColumnType
 import quasar.fp.Dependent
 
+import skolems.∃
+
 /**
  * @see quasar.api.destination.UntypedDestination
  */
@@ -36,11 +38,10 @@ trait Destination[F[_]] {
 
   type Constructor[P] <: ConstructorLike[P]
 
-  implicit def labelConstructor[P]: Label[Constructor[P]]
-  implicit def eqConstructor[P]: Eq[Constructor[P]]
-  implicit def jsonCodecConstructor[P]: CodecJson[Constructor[P]]
+  implicit val labelConstructor: Label[∃[Constructor]]
+  implicit val eqConstructor: Eq[∃[Constructor]]
+  implicit val codecJsonConstructor: CodecJson[∃[Constructor]]
 
-  implicit val dependentLabel: Dependent[Constructor, Label]
   implicit val dependentEq: Dependent[Constructor, Eq]
   implicit val dependentCodecJson: Dependent[Constructor, CodecJson]
 
