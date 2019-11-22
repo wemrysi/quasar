@@ -17,46 +17,25 @@
 package quasar.api.destination
 
 import argonaut.CodecJson
-import argonaut.Argonaut.{UnitDecodeJson, UnitEncodeJson}
 
 import cats.Eq
 import cats.data.NonEmptyList
 
 import quasar.api.table.ColumnType
-import quasar.contrib.std.errorImpossible
-import quasar.fp.Dependent
 
-import scala.{Nothing, Unit}
+import scala.Unit
 import scala.util.Right
 
-trait UntypedDestination[F[_]] extends Destination[F] {
+trait UntypedDestination[F[_]] extends UnparameterizedDestination[F] {
   type Type = Unit
-  type Constructor[A] = Nothing
 
-  implicit val labelType: Label[Unit] = Label.label[Unit](_ => "()")
+  implicit val labelType: Label[Unit] =
+    Label.label[Unit](_ => "()")
 
   implicit val eqType: Eq[Unit] = Eq[Unit]
 
   implicit val jsonCodecType: CodecJson[Unit] =
-    CodecJson[Unit](UnitEncodeJson.encode, UnitDecodeJson.decode)
-
-  implicit def labelConstructor[P]: Label[Nothing] =
-    Label.label[Nothing](_ => errorImpossible)
-
-  implicit def eqConstructor[P]: Eq[Nothing] =
-    Eq.by[Nothing, Nothing](_ => errorImpossible)
-
-  implicit def jsonCodecConstructor[P]: CodecJson[Nothing] =
-    CodecJson[Nothing](_ => errorImpossible, _ => errorImpossible)
-
-  implicit val dependentLabel: Dependent[Constructor, Label] =
-    λ[Dependent[Constructor, Label]](_ => errorImpossible)
-
-  implicit val dependentEq: Dependent[Constructor, Eq] =
-    λ[Dependent[Constructor, Eq]](_ => errorImpossible)
-
-  implicit val dependentCodecJson: Dependent[Constructor, CodecJson] =
-    λ[Dependent[Constructor, CodecJson]](_ => errorImpossible)
+    CodecJson.derived[Unit]
 
   final def coerce(tpe: ColumnType.Scalar): TypeCoercion[Constructor, Type] =
     TypeCoercion.Satisfied(NonEmptyList.one(Right(())))

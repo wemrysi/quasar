@@ -34,7 +34,7 @@ trait Destination[F[_]] {
 
   implicit val labelType: Label[Type]
   implicit val eqType: Eq[Type]
-  implicit val jsonCodecType: CodecJson[Type]
+  implicit val codecJsonType: CodecJson[Type]
 
   type Constructor[P] <: ConstructorLike[P]
 
