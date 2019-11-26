@@ -32,17 +32,17 @@ trait LegacyDestination[F[_]] extends UnparameterizedDestination[F] {
     import ColumnType._
 
     Prism.partial[Int, ColumnType.Scalar] {
-      case i if i == Null.ordinal => Null
-      case i if i == Boolean.ordinal => Boolean
-      case i if i == LocalTime.ordinal => LocalTime
-      case i if i == OffsetTime.ordinal => OffsetTime
-      case i if i == LocalDate.ordinal => LocalDate
-      case i if i == OffsetDate.ordinal => OffsetDate
-      case i if i == LocalDateTime.ordinal => LocalDateTime
-      case i if i == OffsetDateTime.ordinal => OffsetDateTime
-      case i if i == Interval.ordinal => Interval
-      case i if i == Number.ordinal => Number
-      case i if i == String.ordinal => String
+      case Null.ordinal => Null
+      case Boolean.ordinal => Boolean
+      case LocalTime.ordinal => LocalTime
+      case OffsetTime.ordinal => OffsetTime
+      case LocalDate.ordinal => LocalDate
+      case OffsetDate.ordinal => OffsetDate
+      case LocalDateTime.ordinal => LocalDateTime
+      case OffsetDateTime.ordinal => OffsetDateTime
+      case Interval.ordinal => Interval
+      case Number.ordinal => Number
+      case String.ordinal => String
     } (_.ordinal)
   }
 

@@ -16,34 +16,18 @@
 
 package quasar.api.destination
 
-import cats.data.NonEmptyList
-
-import monocle.Prism
-
 import quasar.api.destination.param._
-import quasar.api.table.ColumnType
 
 import java.lang.String
-import scala.{Int, List, Nil}
+import scala.{List, Nil}
 import scala.util.{Either, Right}
 
 import skolems.∃
 
-trait UnparameterizedDestination[F[_]] {
-  type TypeId
+trait UnparameterizedDestination[F[_]] extends Destination[F] {
   type Type = TypeId
-
-  val typeIdOrdinal: Prism[Int, TypeId]
-
-  implicit val typeIdLabel: Label[TypeId]
-
-  def coerce(tpe: ColumnType.Scalar): TypeCoercion[TypeId]
 
   def params(id: TypeId): List[Labeled[∃[TParam]]] = Nil
 
   def construct(id: TypeId, params: List[∃[TArg]]): Either[String, Type] = Right(id)
-
-  def destinationType: DestinationType
-
-  def sinks: NonEmptyList[ResultSink[F, Type]]
 }

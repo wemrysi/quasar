@@ -92,7 +92,7 @@ trait ResultPush[F[_], TableId, DestinationId] {
     */
   def startThese(
       destinationId: DestinationId,
-      tables: NonEmptyMap[TableId, (List[DestinationColumn[DData]], ResourcePath, ResultType, Option[Long])])(
+      tables: NonEmptyMap[TableId, (List[DestinationColumn[PreappliedType[Int]]], ResourcePath, ResultType, Option[Long])])(
       implicit F: Applicative[F])
       : F[Map[TableId, ResultPushError[TableId, DestinationId]]] = {
 
@@ -112,11 +112,11 @@ trait ResultPush[F[_], TableId, DestinationId] {
 
   def coercions(destinationId: DestinationId)
       (implicit F: Monad[F])
-      : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, DData]]] = {
+      : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, CoercedType[Int]]]] = {
 
     // Ensures the map contains an entry for every ColumType.Scalar
     def coercions0[H <: HList](l: H)(implicit E: Exhaustive[ColumnType.Scalar, H])
-        : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, DData]]] =
+        : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, CoercedType[Int]]]] =
       E.toNel(l)
         .traverse(t => EitherT(coerce(destinationId, t)).tupleLeft(t))
         .map(n => NonEmptyMap.of(n.head, n.tail: _*))
