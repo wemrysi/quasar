@@ -16,8 +16,6 @@
 
 package quasar.api.table
 
-import argonaut._, Argonaut._
-
 import slamdata.Predef.{Int, Product, Serializable, Set}
 
 import cats.{Order, Show}
@@ -26,23 +24,11 @@ import cats.implicits._
 import monocle.Prism
 
 import java.lang.{String => JString}
-import scala.{None, Some, StringContext}
+import scala.Some
 
 sealed abstract class ColumnType(final val ordinal: Int) extends Product with Serializable
 
-private[table] trait LowPriorityImplicits {
-  import ColumnType._
-
-  implicit val codecJson: CodecJson[ColumnType] =
-    CodecJson(
-      stringP(_).asJson,
-      c => c.as[JString].flatMap(s => stringP.getOption(s) match {
-        case Some(t) => DecodeResult.ok(t)
-        case None => DecodeResult.fail(s"unknown column type '$s'", c.history)
-      }))
-}
-
-object ColumnType extends LowPriorityImplicits {
+object ColumnType {
 
   sealed abstract class Scalar(ordinal: Int) extends ColumnType(ordinal)
 
@@ -120,15 +106,4 @@ object ColumnType extends LowPriorityImplicits {
 
   implicit def columnTypeShow[T <: ColumnType]: Show[T] =
     Show.fromToString
-
-  implicit val codecJsonScalar: CodecJson[ColumnType.Scalar] =
-    CodecJson(
-      scalarP(_).asJson,
-      c => c.as[JString].flatMap(s => scalarP.getOption(s) match {
-        case Some(t) => DecodeResult.ok(t)
-        case None => DecodeResult.fail(s"unknown column type '$s'", c.history)
-      }))
-
-  implicit val encodeJsonKeyScalar: EncodeJsonKey[ColumnType.Scalar] =
-    EncodeJsonKey.from(scalarP(_))
 }

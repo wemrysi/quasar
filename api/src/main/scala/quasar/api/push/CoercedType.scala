@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.fp
+package quasar.api.push
 
-import cats.~>
+import quasar.api.destination.Labeled
+import quasar.api.destination.param.Formal
 
-/**
- * This a bit weird, but it's useful when you have an F which forms
- * a GADT over some closed algebra of A, and where some class C may
- * be materialized for every member of that set, but only if you know
- * *which* A you have. This is distinct from `FunctionK` because it
- * is intended to be implicit.
- */
-trait Dependent[F[_], +C[_]] {
-  def apply[A](fa: F[A]): C[A]
-  def lift[C2[a] >: C[a]]: F ~> C2 = λ[F ~> C2](apply(_))
-}
+import scala.Option
+
+import skolems.∃
+
+final case class CoercedType(index: Labeled[TypeIndex], arg: Option[Labeled[∃[Formal]]])

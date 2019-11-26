@@ -14,25 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.api.destination
+package quasar.api.push
 
-import cats.data.NonEmptyList
+import quasar.api.destination.param.Actual
 
-import monocle.Prism
+import scala.Option
 
-import quasar.api.table.ColumnType
+import skolems.∃
 
-import scala.{Int, Unit}
-
-trait UntypedDestination[F[_]] extends UnparameterizedDestination[F] {
-  type TypeId = Unit
-
-  val typeIdOrdinal: Prism[Int, Unit] =
-    Prism.partial[Int, Unit] { case 0 => () } (_ => 0)
-
-  implicit val typeIdLabel: Label[Unit] =
-    Label.label[Unit](_ => "()")
-
-  final def coerce(tpe: ColumnType.Scalar): TypeCoercion[Type] =
-    TypeCoercion.Satisfied(NonEmptyList.one(()))
-}
+final case class SelectedType(index: TypeIndex, arg: Option[∃[Actual]])

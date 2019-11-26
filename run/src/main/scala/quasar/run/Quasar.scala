@@ -60,7 +60,7 @@ final class Quasar[F[_], R, C <: SchemaConfig](
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
     val tables: Tables[F, UUID, SqlQuery],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, R]],
-    val resultPush: ResultPush[F, UUID, UUID, Json],
+    val resultPush: ResultPush[F, UUID, UUID],
     val resultRender: ResultRender[F, R])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

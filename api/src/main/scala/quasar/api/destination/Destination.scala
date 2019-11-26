@@ -16,13 +16,18 @@
 
 package quasar.api.destination
 
-import argonaut.CodecJson
-
-import cats.Eq
 import cats.data.NonEmptyList
 
+import monocle.Prism
+
+import quasar.api.destination.param._
 import quasar.api.table.ColumnType
-import quasar.fp.Dependent
+
+import java.lang.String
+import scala.Int
+import scala.util.Either
+
+import skolems.∃
 
 /**
  * @see quasar.api.destination.UntypedDestination
@@ -30,27 +35,28 @@ import quasar.fp.Dependent
 trait Destination[F[_]] {
   type Type
 
-  implicit val labelType: Label[Type]
-  implicit val eqType: Eq[Type]
-  implicit val jsonCodecType: CodecJson[Type]
-
   type Constructor[P] <: ConstructorLike[P]
 
-  implicit def labelConstructor[P]: Label[Constructor[P]]
-  implicit def eqConstructor[P]: Eq[Constructor[P]]
-  implicit def jsonCodecConstructor[P]: CodecJson[Constructor[P]]
+  trait ConstructorLike[P] { self: Constructor[P] =>
+    def apply(actual: P): Type
+  }
 
-  implicit val dependentLabel: Dependent[Constructor, Label]
-  implicit val dependentEq: Dependent[Constructor, Eq]
-  implicit val dependentCodecJson: Dependent[Constructor, CodecJson]
+  type TypeId
 
-  def coerce(tpe: ColumnType.Scalar): TypeCoercion[Constructor, Type]
+  val typeIdOrdinal: Prism[Int, TypeId]
+
+  implicit val typeIdLabel: Label[TypeId]
+
+  def coerce(tpe: ColumnType.Scalar): TypeCoercion[TypeId]
+
+  def construct(id: TypeId): Either[Type, ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]]
 
   def destinationType: DestinationType
 
   def sinks: NonEmptyList[ResultSink[F, Type]]
 
-  trait ConstructorLike[P] { this: Constructor[P] =>
-    def apply(p: P): Type
-  }
+  // Convenience function to consolidate all the type ascriptions
+  protected def formalConstructor[A](ctor: Constructor[A], paramLabel: String, param: Formal[A])
+      : ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]] =
+    ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]((ctor, Labeled(paramLabel, param)))
 }
