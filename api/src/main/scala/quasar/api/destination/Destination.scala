@@ -16,41 +16,39 @@
 
 package quasar.api.destination
 
-import argonaut.CodecJson
-
-import cats.Eq
 import cats.data.NonEmptyList
 
+import monocle.Prism
+
+import quasar.api.destination.param._
 import quasar.api.table.ColumnType
-import quasar.fp.Dependent
+
+import java.lang.String
+import scala.{Int, List}
+import scala.util.Either
+
+import skolems.∃
 
 /**
  * @see quasar.api.destination.UntypedDestination
  */
 trait Destination[F[_]] {
   type Type
+  type TypeId
 
-  implicit val labelType: Label[Type]
-  implicit val eqType: Eq[Type]
-  implicit val jsonCodecType: CodecJson[Type]
+  val typeIdOrdinal: Prism[Int, TypeId]
 
-  type Constructor[P] <: ConstructorLike[P]
+  implicit val typeIdLabel: Label[TypeId]
 
-  implicit def labelConstructor[P]: Label[Constructor[P]]
-  implicit def eqConstructor[P]: Eq[Constructor[P]]
-  implicit def jsonCodecConstructor[P]: CodecJson[Constructor[P]]
+  def coerce(tpe: ColumnType.Scalar): TypeCoercion[TypeId]
 
-  implicit val dependentLabel: Dependent[Constructor, Label]
-  implicit val dependentEq: Dependent[Constructor, Eq]
-  implicit val dependentCodecJson: Dependent[Constructor, CodecJson]
+  // Allows for both reporting available coercions and generalized validation
+  def params(id: TypeId): List[Labeled[∃[TParam]]]
 
-  def coerce(tpe: ColumnType.Scalar): TypeCoercion[Constructor, Type]
+  // Will only be called with validated params, still some partiality though
+  def construct(id: TypeId, params: List[∃[TArg]]): Either[String, Type]
 
   def destinationType: DestinationType
 
   def sinks: NonEmptyList[ResultSink[F, Type]]
-
-  trait ConstructorLike[P] { this: Constructor[P] =>
-    def apply(p: P): Type
-  }
 }

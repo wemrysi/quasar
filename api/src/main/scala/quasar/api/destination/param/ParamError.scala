@@ -16,17 +16,20 @@
 
 package quasar.api.destination.param
 
-import argonaut.Json
+import cats.data.{Ior, NonEmptyList}
 
-import scala.{Int, List, Option, Product, Serializable}
+import java.lang.String
+import scala.{Boolean, Int, Product, Serializable}
 
 sealed trait ParamError extends Product with Serializable
 
 object ParamError {
-  final case class InvalidBoolean(json: Json) extends ParamError
-  final case class InvalidInt(json: Json) extends ParamError
-  final case class InvalidEnum(json: Json) extends ParamError
-  final case class IntOutOfRange(i: Int, min: Option[Int], max: Option[Int]) extends ParamError
+  import ParamType.Enum
+
+  final case class InvalidBoolean(value: Boolean, detail: String) extends ParamError
+  final case class InvalidInt(value: Int, detail: String) extends ParamError
+  final case class InvalidEnum(value: Enum.Alt, detail: String) extends ParamError
+  final case class IntOutOfBounds(i: Int, bounds: Ior[Int, Int]) extends ParamError
   final case class IntOutOfStep(i: Int, step: IntegerStep) extends ParamError
-  final case class ValueNotInEnum[A](a: A, possibilities: List[A]) extends ParamError
+  final case class ValueNotInEnum(a: Enum.Alt, possibilities: NonEmptyList[Enum.Alt]) extends ParamError
 }

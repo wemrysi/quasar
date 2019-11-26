@@ -28,7 +28,7 @@ import java.lang.String
 /**
  * Otherwise known as "the Free Label".
  */
-final case class Labeled[A](label: String, value: A)
+final case class Labeled[+A](label: String, value: A)
 
 private[destination] trait LowPriorityImplicits {
 

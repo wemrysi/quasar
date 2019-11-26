@@ -35,13 +35,13 @@ import shapeless._
   * @tparam T Table Id
   * @tparam D Destination Id
   */
-trait ResultPush[F[_], TableId, DestinationId, DData] {
+trait ResultPush[F[_], TableId, DestinationId] {
   import ResultPushError._
 
   def coerce(
       destinationId: DestinationId,
       tpe: ColumnType.Scalar)
-      : F[Either[DestinationNotFound[DestinationId], DData]]
+      : F[Either[DestinationNotFound[DestinationId], CoercedType[Int]]]
 
   def cancel(
       tableId: TableId,
@@ -55,7 +55,7 @@ trait ResultPush[F[_], TableId, DestinationId, DData] {
 
   def start(
       tableId: TableId,
-      columns: List[DestinationColumn[DData]],
+      columns: List[DestinationColumn[PreappliedType[Int]]],
       destinationId: DestinationId,
       path: ResourcePath,
       format: ResultType,

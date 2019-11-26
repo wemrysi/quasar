@@ -16,49 +16,39 @@
 
 package quasar.api.destination
 
-import argonaut.CodecJson
-
-import cats.Eq
 import cats.data.NonEmptyList
 
+import monocle.Prism
+
 import quasar.api.table.ColumnType
-import quasar.contrib.std.errorImpossible
-import quasar.fp.Dependent
 
-import scala.Nothing
-import scala.util.Right
+import scala.Int
 
-trait LegacyDestination[F[_]] extends Destination[F] {
-  type Type = ColumnType.Scalar
-  type Constructor[A] = Nothing
+trait LegacyDestination[F[_]] extends UnparameterizedDestination[F] {
 
-  implicit val labelType: Label[ColumnType.Scalar] =
+  type TypeId = ColumnType.Scalar
+
+  val typeIdOrdinal: Prism[Int, ColumnType.Scalar] = {
+    import ColumnType._
+
+    Prism.partial[Int, ColumnType.Scalar] {
+      case i if i == Null.ordinal => Null
+      case i if i == Boolean.ordinal => Boolean
+      case i if i == LocalTime.ordinal => LocalTime
+      case i if i == OffsetTime.ordinal => OffsetTime
+      case i if i == LocalDate.ordinal => LocalDate
+      case i if i == OffsetDate.ordinal => OffsetDate
+      case i if i == LocalDateTime.ordinal => LocalDateTime
+      case i if i == OffsetDateTime.ordinal => OffsetDateTime
+      case i if i == Interval.ordinal => Interval
+      case i if i == Number.ordinal => Number
+      case i if i == String.ordinal => String
+    } (_.ordinal)
+  }
+
+  implicit val typeIdLabel: Label[ColumnType.Scalar] =
     Label.label[ColumnType.Scalar](_.toString)
 
-  implicit val eqType: Eq[ColumnType.Scalar] =
-    Eq[ColumnType.Scalar]
-
-  implicit val jsonCodecType: CodecJson[ColumnType.Scalar] =
-    CodecJson.derived[ColumnType.Scalar]
-
-  implicit def labelConstructor[P]: Label[Nothing] =
-    Label.label[Nothing](_ => errorImpossible)
-
-  implicit def eqConstructor[P]: Eq[Nothing] =
-    Eq.by[Nothing, Nothing](_ => errorImpossible)
-
-  implicit def jsonCodecConstructor[P]: CodecJson[Nothing] =
-    CodecJson[Nothing](_ => errorImpossible, _ => errorImpossible)
-
-  implicit val dependentLabel: Dependent[Constructor, Label] =
-    λ[Dependent[Constructor, Label]](_ => errorImpossible)
-
-  implicit val dependentEq: Dependent[Constructor, Eq] =
-    λ[Dependent[Constructor, Eq]](_ => errorImpossible)
-
-  implicit val dependentCodecJson: Dependent[Constructor, CodecJson] =
-    λ[Dependent[Constructor, CodecJson]](_ => errorImpossible)
-
-  final def coerce(tpe: ColumnType.Scalar): TypeCoercion[Constructor, Type] =
-    TypeCoercion.Satisfied(NonEmptyList.one(Right(tpe)))
+  final def coerce(tpe: ColumnType.Scalar): TypeCoercion[Type] =
+    TypeCoercion.Satisfied(NonEmptyList.one(tpe))
 }

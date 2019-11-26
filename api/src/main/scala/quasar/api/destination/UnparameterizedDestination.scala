@@ -20,19 +20,30 @@ import cats.data.NonEmptyList
 
 import monocle.Prism
 
+import quasar.api.destination.param._
 import quasar.api.table.ColumnType
 
-import scala.{Int, Unit}
+import java.lang.String
+import scala.{Int, List, Nil}
+import scala.util.{Either, Right}
 
-trait UntypedDestination[F[_]] extends UnparameterizedDestination[F] {
-  type TypeId = Unit
+import skolems.∃
 
-  val typeIdOrdinal: Prism[Int, Unit] =
-    Prism.partial[Int, Unit] { case 0 => () } (_ => 0)
+trait UnparameterizedDestination[F[_]] {
+  type TypeId
+  type Type = TypeId
 
-  implicit val typeIdLabel: Label[Unit] =
-    Label.label[Unit](_ => "()")
+  val typeIdOrdinal: Prism[Int, TypeId]
 
-  final def coerce(tpe: ColumnType.Scalar): TypeCoercion[Type] =
-    TypeCoercion.Satisfied(NonEmptyList.one(()))
+  implicit val typeIdLabel: Label[TypeId]
+
+  def coerce(tpe: ColumnType.Scalar): TypeCoercion[TypeId]
+
+  def params(id: TypeId): List[Labeled[∃[TParam]]] = Nil
+
+  def construct(id: TypeId, params: List[∃[TArg]]): Either[String, Type] = Right(id)
+
+  def destinationType: DestinationType
+
+  def sinks: NonEmptyList[ResultSink[F, Type]]
 }
