@@ -23,4 +23,4 @@ import scala.List
 
 import skolems.∃
 
-final case class CoercedType[+A](id: Labeled[A], params: List[Labeled[∃[TParam]]])
+final case class CoercedType(index: Labeled[TypeIndex], params: List[Labeled[∃[TParam]]])

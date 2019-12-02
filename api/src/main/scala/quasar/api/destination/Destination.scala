@@ -23,7 +23,6 @@ import monocle.Prism
 import quasar.api.destination.param._
 import quasar.api.table.ColumnType
 
-import java.lang.String
 import scala.{Int, List}
 import scala.util.Either
 
@@ -46,7 +45,7 @@ trait Destination[F[_]] {
   def params(id: TypeId): List[Labeled[∃[TParam]]]
 
   // Will only be called with validated params, still some partiality though
-  def construct(id: TypeId, params: List[∃[TArg]]): Either[String, Type]
+  def construct(id: TypeId, params: List[∃[TArg]]): Either[ConstructionFailed, Type]
 
   def destinationType: DestinationType
 

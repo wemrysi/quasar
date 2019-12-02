@@ -14,19 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.api.destination
+package quasar.api.push
 
-import quasar.api.destination.param._
+import scala.Int
 
-import scala.{List, Nil}
-import scala.util.{Either, Right}
-
-import skolems.∃
-
-trait UnparameterizedDestination[F[_]] extends Destination[F] {
-  type Type = TypeId
-
-  def params(id: TypeId): List[Labeled[∃[TParam]]] = Nil
-
-  def construct(id: TypeId, params: List[∃[TArg]]): Either[ConstructionFailed, Type] = Right(id)
-}
+final case class TypeIndex(ordinal: Int) extends scala.AnyVal

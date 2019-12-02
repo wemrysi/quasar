@@ -22,4 +22,4 @@ import scala.List
 
 import skolems.∃
 
-final case class PreappliedType[+A](id: A, args: List[∃[TArg]])
+final case class PreappliedType(index: TypeIndex, args: List[∃[TArg]])
