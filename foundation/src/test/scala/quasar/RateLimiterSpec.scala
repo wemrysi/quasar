@@ -115,7 +115,7 @@ object RateLimiterSpec extends Specification {
             effect >> IO.delay(a += 1) >>
             effect >> IO.delay(a += 1)
 
-        run.unsafeToFuture()
+        run.unsafeRunAsyncAndForget()
 
         a mustEqual(1)
 
@@ -143,7 +143,7 @@ object RateLimiterSpec extends Specification {
             effect >> IO.delay(a += 1) >>
             effect >> IO.delay(a += 1)
 
-        run.unsafeToFuture()
+        run.unsafeRunAsyncAndForget()
 
         a mustEqual(1)
 
@@ -185,7 +185,7 @@ object RateLimiterSpec extends Specification {
             effect >> IO.delay(a += 1) >>
             effect >> IO.delay(a += 1)
 
-        run.unsafeToFuture()
+        run.unsafeRunAsyncAndForget()
 
         a mustEqual(2)
 
@@ -214,7 +214,7 @@ object RateLimiterSpec extends Specification {
             effect >> IO.delay(a += 1) >>
             effect >> IO.delay(a += 1)
 
-        run.unsafeToFuture()
+        run.unsafeRunAsyncAndForget()
 
         a mustEqual(3)
 
@@ -243,7 +243,7 @@ object RateLimiterSpec extends Specification {
             effect >> IO.delay(a += 1) >>
             effect >> IO.delay(a += 1)
 
-        run.unsafeToFuture()
+        run.unsafeRunAsyncAndForget()
 
         a mustEqual(3)
 
@@ -271,7 +271,7 @@ object RateLimiterSpec extends Specification {
             effect2 >> IO.delay(a += 1) >>
             effect2 >> IO.delay(a += 1)
 
-        run.unsafeToFuture()
+        run.unsafeRunAsyncAndForget()
 
         a mustEqual(2)
 
@@ -310,8 +310,8 @@ object RateLimiterSpec extends Specification {
             effect2 >> IO.delay(a2 += 1) >>
             effect2 >> IO.delay(a2 += 1)
 
-        run1.unsafeToFuture()
-        run2.unsafeToFuture()
+        run1.unsafeRunAsyncAndForget()
+        run2.unsafeRunAsyncAndForget()
 
         a1 mustEqual(2)
         a2 mustEqual(3)
@@ -351,8 +351,8 @@ object RateLimiterSpec extends Specification {
             effect2 >> IO.delay(a2 += 1) >>
             effect2 >> IO.delay(a2 += 1)
 
-        run1.unsafeToFuture()
-        run2.unsafeToFuture()
+        run1.unsafeRunAsyncAndForget()
+        run2.unsafeRunAsyncAndForget()
 
         a1 mustEqual(2)
         a2 mustEqual(2)
