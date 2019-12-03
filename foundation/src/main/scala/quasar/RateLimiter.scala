@@ -99,13 +99,13 @@ final class RateLimiter[F[_]: Sync: Timer] private () {
       new Hash[Exists[Key]] {
 
         def hash(k: Exists[Key]) =
-          k.apply().hash.hash(k.apply().value)
+          k().hash.hash(k().value)
 
         def eqv(left: Exists[Key], right: Exists[Key]) = {
-          (left.apply().tag == right.apply().tag) &&
-            left.apply().hash.eqv(
-              left.apply().value,
-              right.apply().value.asInstanceOf[left.A])
+          (left().tag == right().tag) &&
+            left().hash.eqv(
+              left().value,
+              right().value.asInstanceOf[left.A])
         }
       }
   }
