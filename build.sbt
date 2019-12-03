@@ -107,7 +107,7 @@ lazy val foundation = project
       "com.codecommit"             %% "shims"                     % "2.1.0",
       "com.codecommit"             %% "skolems"                   % "0.1.2",
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
-      "org.typelevel"              %% "cats-effect-laws"          % catsEffectVersion,
+      "org.typelevel"              %% "cats-effect-laws"          % catsEffectVersion % Test,
       "co.fs2"                     %% "fs2-core"                  % fs2Version,
       "co.fs2"                     %% "fs2-io"                    % fs2Version,
       "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
