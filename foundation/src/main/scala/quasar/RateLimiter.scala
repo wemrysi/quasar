@@ -19,17 +19,17 @@ package quasar
 import slamdata.Predef._
 
 import quasar.contrib.cats.hash.toHashing
+import quasar.contrib.cats.eqv.toEquiv
 
 import java.util.concurrent.TimeUnit
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
-import scala.math.Equiv
 import scala.reflect.{ClassTag, classTag}
 
 import cats.effect.{Sync, Timer}
 import cats.effect.concurrent.Ref
-import cats.kernel.{Eq, Hash}
+import cats.kernel.Hash
 import cats.implicits._
 
 import skolems._
@@ -39,12 +39,12 @@ final class RateLimiter[F[_]: Sync: Timer] private () {
   private val configs: TrieMap[Exists[Key], Config] =
     new TrieMap[Exists[Key], Config](
       toHashing[Exists[Key]],
-      RateLimiter.toEquiv[Exists[Key]])
+      toEquiv[Exists[Key]])
 
   private val states: TrieMap[Exists[Key], Ref[F, State]] =
     new TrieMap[Exists[Key], Ref[F, State]](
       toHashing[Exists[Key]],
-      RateLimiter.toEquiv[Exists[Key]])
+      toEquiv[Exists[Key]])
 
   def apply[A: Hash: ClassTag](key: A, max: Int, caution: Double, window: FiniteDuration)
       : F[F[Unit]] =
@@ -114,7 +114,4 @@ final class RateLimiter[F[_]: Sync: Timer] private () {
 object RateLimiter {
   def apply[F[_]: Sync: Timer]: RateLimiter[F] =
     new RateLimiter[F]
-
-  def toEquiv[A: Eq]: Equiv[A] =
-    Equiv.fromFunction(Eq[A].eqv(_, _))
 }
