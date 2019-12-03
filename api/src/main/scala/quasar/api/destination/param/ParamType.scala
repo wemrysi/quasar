@@ -17,12 +17,12 @@
 package quasar.api.destination.param
 
 import cats._
-import cats.data.{Ior, NonEmptyList}
+import cats.data.{Ior, NonEmptyMap}
 import cats.implicits._
 
 import java.lang.String
 
-import scala.{AnyVal, Boolean => SBoolean, Int, Option, Product, Serializable, Unit}
+import scala.{Boolean => SBoolean, Int, Nothing, Option, Product, Serializable, Unit}
 
 sealed trait ParamType[F[_], A] extends Product with Serializable
 
@@ -48,15 +48,9 @@ object ParamType {
     }
   }
 
-  final case class Enum[F[_]](value: F[NonEmptyList[Enum.Alt]])
-      extends ParamType[F, Enum.Alt]
+  final case class Enum[F[_], A](value: F[NonEmptyMap[String, A]])
+      extends ParamType[F, A]
 
-  object Enum {
-    final case class Alt(name: String) extends AnyVal
-
-    object Alt {
-      implicit val altOrder: Order[Alt] = Order.by(_.name)
-      implicit val altShow: Show[Alt] = Show.fromToString
-    }
-  }
+  final case class EnumSelect[F[_]](value: F[Nothing])
+      extends ParamType[F, String]
 }

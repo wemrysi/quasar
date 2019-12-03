@@ -23,7 +23,7 @@ import monocle.Prism
 import quasar.api.destination.param._
 import quasar.api.table.ColumnType
 
-import scala.{Int, List}
+import scala.Int
 import scala.util.Either
 
 import skolems.∃
@@ -33,6 +33,13 @@ import skolems.∃
  */
 trait Destination[F[_]] {
   type Type
+
+  type Constructor[P] <: ConstructorLike[P]
+
+  trait ConstructorLike[P] { self: Constructor[P] =>
+    def apply(actual: P): Type
+  }
+
   type TypeId
 
   val typeIdOrdinal: Prism[Int, TypeId]
@@ -41,9 +48,7 @@ trait Destination[F[_]] {
 
   def coerce(tpe: ColumnType.Scalar): TypeCoercion[TypeId]
 
-  def params(id: TypeId): List[Labeled[∃[Formal]]]
-
-  def construct(id: TypeId, params: List[∃[Actual]]): Either[ConstructionFailed, Type]
+  def construct(id: TypeId): Either[Type, ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]]
 
   def destinationType: DestinationType
 

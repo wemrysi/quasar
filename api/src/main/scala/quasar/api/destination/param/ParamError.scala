@@ -24,12 +24,9 @@ import scala.{Boolean, Int, Product, Serializable}
 sealed trait ParamError extends Product with Serializable
 
 object ParamError {
-  import ParamType.Enum
-
   final case class InvalidBoolean(value: Boolean, detail: String) extends ParamError
   final case class InvalidInt(value: Int, detail: String) extends ParamError
-  final case class InvalidEnum(value: Enum.Alt, detail: String) extends ParamError
   final case class IntOutOfBounds(i: Int, bounds: Ior[Int, Int]) extends ParamError
   final case class IntOutOfStep(i: Int, step: IntegerStep) extends ParamError
-  final case class ValueNotInEnum(a: Enum.Alt, possibilities: NonEmptyList[Enum.Alt]) extends ParamError
+  final case class ValueNotInEnum(selector: String, possibilities: NonEmptyList[String]) extends ParamError
 }

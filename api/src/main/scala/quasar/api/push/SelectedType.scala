@@ -18,8 +18,8 @@ package quasar.api.push
 
 import quasar.api.destination.param.Actual
 
-import scala.List
+import scala.Option
 
 import skolems.∃
 
-final case class PreappliedType(index: TypeIndex, args: List[∃[Actual]])
+final case class SelectedType(index: TypeIndex, arg: Option[∃[Actual]])

@@ -18,15 +18,15 @@ package quasar.api.destination
 
 import quasar.api.destination.param._
 
-import scala.{List, Nil}
-import scala.util.{Either, Right}
+import scala.Nothing
+import scala.util.{Either, Left}
 
 import skolems.∃
 
 trait UnparameterizedDestination[F[_]] extends Destination[F] {
   type Type = TypeId
+  type Constructor[P] = Nothing
 
-  def params(id: TypeId): List[Labeled[∃[Formal]]] = Nil
-
-  def construct(id: TypeId, params: List[∃[Actual]]): Either[ConstructionFailed, Type] = Right(id)
+  def construct(id: TypeId): Either[Type, ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]] =
+    Left(id)
 }
