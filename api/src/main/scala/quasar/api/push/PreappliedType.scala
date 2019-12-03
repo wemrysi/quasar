@@ -16,10 +16,10 @@
 
 package quasar.api.push
 
-import quasar.api.destination.param._
+import quasar.api.destination.param.Actual
 
 import scala.List
 
 import skolems.∃
 
-final case class PreappliedType(index: TypeIndex, args: List[∃[TArg]])
+final case class PreappliedType(index: TypeIndex, args: List[∃[Actual]])

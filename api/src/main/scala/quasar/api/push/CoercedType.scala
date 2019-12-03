@@ -17,10 +17,10 @@
 package quasar.api.push
 
 import quasar.api.destination.Labeled
-import quasar.api.destination.param._
+import quasar.api.destination.param.Formal
 
 import scala.List
 
 import skolems.∃
 
-final case class CoercedType(index: Labeled[TypeIndex], params: List[Labeled[∃[TParam]]])
+final case class CoercedType(index: Labeled[TypeIndex], params: List[Labeled[∃[Formal]]])

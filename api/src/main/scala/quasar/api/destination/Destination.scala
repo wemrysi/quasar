@@ -41,11 +41,9 @@ trait Destination[F[_]] {
 
   def coerce(tpe: ColumnType.Scalar): TypeCoercion[TypeId]
 
-  // Allows for both reporting available coercions and generalized validation
-  def params(id: TypeId): List[Labeled[∃[TParam]]]
+  def params(id: TypeId): List[Labeled[∃[Formal]]]
 
-  // Will only be called with validated params, still some partiality though
-  def construct(id: TypeId, params: List[∃[TArg]]): Either[ConstructionFailed, Type]
+  def construct(id: TypeId, params: List[∃[Actual]]): Either[ConstructionFailed, Type]
 
   def destinationType: DestinationType
 

@@ -26,7 +26,7 @@ import skolems.∃
 trait UnparameterizedDestination[F[_]] extends Destination[F] {
   type Type = TypeId
 
-  def params(id: TypeId): List[Labeled[∃[TParam]]] = Nil
+  def params(id: TypeId): List[Labeled[∃[Formal]]] = Nil
 
-  def construct(id: TypeId, params: List[∃[TArg]]): Either[ConstructionFailed, Type] = Right(id)
+  def construct(id: TypeId, params: List[∃[Actual]]): Either[ConstructionFailed, Type] = Right(id)
 }

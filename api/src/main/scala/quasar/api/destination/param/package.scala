@@ -20,6 +20,6 @@ import cats.Id
 import cats.data.Const
 
 package object param {
-  type TParam[A] = ParamType[Id, A]
-  type TArg[A] = ParamType[Const[A, ?], A]
+  type Formal[A] = ParamType[Id, A]
+  type Actual[A] = ParamType[Const[A, ?], A]
 }
