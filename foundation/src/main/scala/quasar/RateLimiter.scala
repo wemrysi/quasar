@@ -89,10 +89,10 @@ final class RateLimiter[F[_]: Sync: Timer] private () {
   private val nowF: F[FiniteDuration] =
     Timer[F].clock.realTime(TimeUnit.MILLISECONDS).map(_.millis)
 
-  private final case class Config(max: Int, caution: Double, window: FiniteDuration)
-  private final case class State(count: Int, start: FiniteDuration)
+  private case class Config(max: Int, caution: Double, window: FiniteDuration)
+  private case class State(count: Int, start: FiniteDuration)
 
-  private final case class Key[A](value: A, hash: Hash[A], tag: ClassTag[A])
+  private case class Key[A](value: A, hash: Hash[A], tag: ClassTag[A])
 
   private object Key {
     implicit def hash: Hash[Exists[Key]] =
