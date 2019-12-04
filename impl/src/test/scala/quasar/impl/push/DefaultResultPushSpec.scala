@@ -390,6 +390,16 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
 
     "fails when destination doesn't support requested format" >> todo
+
+    "fails when selected type isn't found" >> todo
+
+    "fails when a required type argument is missing" >> todo
+
+    "fails when wrong kind of type argument given" >> todo
+
+    "fails when integer type argument is out of bounds" >> todo
+
+    "fails when enum type argument selection is not found" >> todo
   }
 
   "start these" >> {
