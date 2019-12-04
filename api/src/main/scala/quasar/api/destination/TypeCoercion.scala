@@ -16,7 +16,7 @@
 
 package quasar.api.destination
 
-import cats.{Eq, Show}
+import cats.{Applicative, Eq, Eval, Show, Traverse}
 import cats.data.NonEmptyList
 import cats.implicits._
 
@@ -39,8 +39,7 @@ object TypeCoercion {
     Eq instance {
       case (Unsatisfied(a1, t1), Unsatisfied(a2, t2)) =>
         a1 === a2 && t1 === t2
-
-      case (Satisfied(s1), Satisfied(s2)) =>
+case (Satisfied(s1), Satisfied(s2)) =>
         s1 === s2
 
       case _ =>
@@ -54,5 +53,29 @@ object TypeCoercion {
 
       case Satisfied(priority) =>
         s"Satisfied(${priority.show})"
+    }
+
+  implicit val traverse: Traverse[TypeCoercion] =
+    new Traverse[TypeCoercion] {
+      def traverse[G[_]: Applicative, A, B](fa: TypeCoercion[A])(f: A => G[B]): G[TypeCoercion[B]] =
+        fa match {
+          case Unsatisfied(alts, top) =>
+            top.traverse(f).map(Unsatisfied(alts, _))
+
+          case Satisfied(prio) =>
+            prio.traverse(f).map(Satisfied(_))
+        }
+
+      def foldLeft[A, B](fa: TypeCoercion[A], b: B)(f: (B, A) => B): B =
+        fa match {
+          case Unsatisfied(_, top) => top.foldLeft(b)(f)
+          case Satisfied(prio) => prio.foldLeft(b)(f)
+        }
+
+      def foldRight[A, B](fa: TypeCoercion[A], b: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
+        fa match {
+          case Unsatisfied(_, top) => top.foldr(b)(f)
+          case Satisfied(prio) => prio.foldr(b)(f)
+        }
     }
 }

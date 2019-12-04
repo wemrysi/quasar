@@ -16,12 +16,10 @@
 
 package quasar.api.destination
 
-import argonaut._, Argonaut._
-
 import cats.{Applicative, Eq, Eval, Order, Show, Traverse}
 import cats.implicits._
 
-import scala.{::, Nil, Predef, StringContext}, Predef._
+import scala.{Predef, StringContext}, Predef._
 
 import java.lang.String
 
@@ -31,24 +29,8 @@ import java.lang.String
 final case class Labeled[+A](label: String, value: A)
 
 private[destination] trait LowPriorityImplicits {
-
   implicit def eq[A: Eq]: Eq[Labeled[A]] =
     Eq.by(l => (l.label, l.value))
-
-  implicit def encodeJson[A: EncodeJson]: EncodeJson[Labeled[A]] =
-    EncodeJson(l => Json(l.label -> l.value.asJson))
-
-  implicit def decodeJson[A: DecodeJson]: DecodeJson[Labeled[A]] =
-    DecodeJson { c =>
-      val maybeLabel = c.fields collect {
-        case label :: Nil => label
-      }
-
-      for {
-        label <- maybeLabel.map(DecodeResult.ok(_)).getOrElse(DecodeResult.fail("expected a map with exactly one field", c.history))
-        value <- (c --\ label).as[A]
-      } yield Labeled(label, value)
-    }
 }
 
 object Labeled extends LowPriorityImplicits {
@@ -61,9 +43,6 @@ object Labeled extends LowPriorityImplicits {
 
   implicit def order[A: Order]: Order[Labeled[A]] =
     Order.by(l => (l.label, l.value))
-
-  implicit def codecJson[A: CodecJson]: CodecJson[Labeled[A]] =
-    CodecJson.derived[Labeled[A]]
 
   implicit val traverse: Traverse[Labeled] = new Traverse[Labeled] {
 

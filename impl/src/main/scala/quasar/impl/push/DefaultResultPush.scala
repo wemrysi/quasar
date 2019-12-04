@@ -16,15 +16,15 @@
 
 package quasar.impl.push
 
-import slamdata.Predef._
-
-import argonaut.{Argonaut, Json}, Argonaut._
+import slamdata.Predef.{Boolean => SBoolean, _}
 
 import quasar.Condition
 import quasar.api.destination.{Destination, DestinationColumn, ResultSink, TypeCoercion}
 import quasar.api.QueryEvaluator
-import quasar.api.destination.ResultType
-import quasar.api.push.{PushMeta, ResultPush, ResultPushError, ResultRender, Status}
+import quasar.api.destination.{Labeled, ResultType}
+import quasar.api.destination.Label.Syntax._
+import quasar.api.destination.param._
+import quasar.api.push._
 import quasar.api.resource.ResourcePath
 import quasar.api.table.{ColumnType, TableRef}
 
@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
-import cats.data.{EitherT, OptionT, NonEmptyList}
+import cats.data.{Const, EitherT, Ior, OptionT, NonEmptyList}
 import cats.effect.{Concurrent, Timer}
 import cats.implicits._
 
@@ -43,6 +43,8 @@ import fs2.Stream
 import fs2.job.{JobManager, Job, Event => JobEvent}
 
 import shims.showToCats
+
+import skolems.∃
 
 final class DefaultResultPush[
     F[_]: Concurrent: Timer, T, D, Q, R] private (
@@ -52,78 +54,134 @@ final class DefaultResultPush[
     jobManager: JobManager[F, (D, T), Nothing],
     render: ResultRender[F, R],
     pushStatus: JMap[D, JMap[T, PushMeta]])
-    extends ResultPush[F, T, D, Json] {
+    extends ResultPush[F, T, D] {
 
   import ResultPushError._
 
   def coerce(
       destinationId: D,
       tpe: ColumnType.Scalar)
-      : F[Either[ResultPushError.DestinationNotFound[D], Json]] = {
+      : F[Either[ResultPushError.DestinationNotFound[D], TypeCoercion[CoercedType]]] = {
 
     val destF = EitherT.fromOptionF[F, ResultPushError.DestinationNotFound[D], Destination[F]](
       lookupDestination(destinationId),
       ResultPushError.DestinationNotFound(destinationId))
 
-    val jsonF = destF map { dest =>
+    val coerceF = destF map { dest =>
       import dest._
-      dest.coerce(tpe).asJson
+
+      dest.coerce(tpe) map { id =>
+        val param = construct(id) match {
+          case Right(e) =>
+            val (_, p) = e.value
+            Some(p.map(∃(_)))
+
+          case Left(_) => None
+        }
+
+        CoercedType(Labeled(id.label, TypeIndex(typeIdOrdinal(id))), param)
+      }
     }
 
-    jsonF.value
+    coerceF.value
   }
 
   def start(
       tableId: T,
-      columns: List[DestinationColumn[Json]], // I hate seeing Json here, but... the Destination itself drives the decoding
+      columns: List[DestinationColumn[SelectedType]],
       destinationId: D,
       path: ResourcePath,
       format: ResultType,
       limit: Option[Long])
-      : F[Condition[ResultPushError[T, D]]] = {
+      : F[Condition[NonEmptyList[ResultPushError[T, D]]]] = {
 
-    type RPE = ResultPushError[T, D]
+    type Errs = NonEmptyList[ResultPushError[T, D]]
+
+    def err(rpe: ResultPushError[T, D]): Errs = NonEmptyList.one(rpe)
+
+    def constructType(dest: Destination[F], name: String, selected: SelectedType)
+        : Either[ResultPushError[T, D], dest.Type] = {
+
+      import dest._
+      import ParamType._
+
+      def checkBounds(b: Int Ior Int, i: Int): SBoolean =
+        b.fold(_ <= i, _ >= i, (min, max) => min <= i && i <= max)
+
+      typeIdOrdinal.getOption(selected.index.ordinal) match {
+        case Some(id) => construct(id) match {
+          case Left(t) => Right(t)
+
+          case Right(e) =>
+            val (c, Labeled(label, formal)) = e.value
+
+            val back = for {
+              actual <- selected.arg.toRight(ParamError.ParamMissing(label, formal))
+
+              t <- (formal: Formal[A] forSome { type A }, actual) match {
+                case (Boolean(_), ∃(Boolean(Const(b)))) =>
+                  Right(c(b.asInstanceOf[e.A]))
+
+                case (Integer(Integer.Args(None, None)), ∃(Integer(Const(i)))) =>
+                  Right(c(i.asInstanceOf[e.A]))
+
+                case (Integer(Integer.Args(Some(bounds), None)), ∃(Integer(Const(i)))) =>
+                  if (checkBounds(bounds, i))
+                    Right(c(i.asInstanceOf[e.A]))
+                  else
+                    Left(ParamError.IntOutOfBounds(label, i, bounds))
+
+                case (Integer(Integer.Args(None, Some(step))), ∃(Integer(Const(i)))) =>
+                  if (step(i))
+                    Right(c(i.asInstanceOf[e.A]))
+                  else
+                    Left(ParamError.IntOutOfStep(label, i, step))
+
+                case (Integer(Integer.Args(Some(bounds), Some(step))), ∃(Integer(Const(i)))) =>
+                  if (!checkBounds(bounds, i))
+                    Left(ParamError.IntOutOfBounds(label, i, bounds))
+                  else if (!step(i))
+                    Left(ParamError.IntOutOfStep(label, i, step))
+                  else
+                    Right(c(i.asInstanceOf[e.A]))
+
+                case (Enum(possiblities), ∃(EnumSelect(Const(key)))) =>
+                  possiblities.lookup(key)
+                    .map(a => c(a.asInstanceOf[e.A]))
+                    .toRight(ParamError.ValueNotInEnum(label, key, possiblities.keys))
+
+                case _ => Left(ParamError.ParamMismatch(label, formal, actual))
+              }
+            } yield t
+
+            back.leftMap(err =>
+              ResultPushError.TypeConstructionFailed(destinationId, name, selected.index, NonEmptyList.one(err)))
+        }
+
+        case None =>
+          Left(ResultPushError.TypeNotFound(destinationId, name, selected.index))
+      }
+    }
 
     val writing = for {
-      dest <- EitherT.fromOptionF[F, RPE, Destination[F]](
+      dest <- EitherT.fromOptionF[F, Errs, Destination[F]](
         lookupDestination(destinationId),
-        ResultPushError.DestinationNotFound(destinationId))
+        err(ResultPushError.DestinationNotFound(destinationId)))
 
-      tableRef <- EitherT.fromOptionF[F, RPE, TableRef[Q]](
+      tableRef <- EitherT.fromOptionF[F, Errs, TableRef[Q]](
         lookupTable(tableId),
-        ResultPushError.TableNotFound(tableId))
+        err(ResultPushError.TableNotFound(tableId)))
 
       sink <- format match {
         case ResultType.Csv =>
-          EitherT.fromOptionF[F, RPE, ResultSink.Csv[F, dest.Type]](
+          EitherT.fromOptionF[F, Errs, ResultSink.Csv[F, dest.Type]](
             findCsvSink(dest.sinks).pure[F],
-            ResultPushError.FormatNotSupported(destinationId, format.show))
+            err(ResultPushError.FormatNotSupported(destinationId, format.show)))
       }
 
-      columns <- {
-        import dest._
-
-        val validatedColumns = columns.traverse(
-          _.traverse(
-            _.as(
-              TypeCoercion.appliedDecodeJson[Constructor, Type]).toEither).toValidatedNel)
-
-        validatedColumns.fold(
-          es =>
-            EitherT.leftT[F, List[DestinationColumn[Type]]](
-              ResultPushError.DestinationTypesNotDecodable(destinationId, es.map(_._1)): ResultPushError[T, D]),
-          { cs =>
-            // see? isn't this elegant?
-            val applied = cs map { dc =>
-              dc map {
-                case Left((c, p)) => c(p)
-                case Right(t) => t
-              }
-            }
-
-            EitherT.rightT[F, ResultPushError[T, D]](applied)
-          })
-      }
+      typedColumns <-
+        EitherT.fromEither[F](
+          columns.traverse(c => c.traverse(constructType(dest, c.name, _)).toValidatedNel).toEither)
 
       evaluated = format match {
         case ResultType.Csv =>
@@ -131,19 +189,19 @@ final class DefaultResultPush[
             .map(_.flatMap(render.renderCsv(_, tableRef.columns, sink.config, limit)))
       }
 
-      sinked = sink.run(path, columns, Stream.force(evaluated)).map(Right(_))
+      sinked = sink.run(path, typedColumns, Stream.force(evaluated)).map(Right(_))
 
-      now <- EitherT.right[RPE](instantNow)
-      submitted <- EitherT.right[RPE](jobManager.submit(Job((destinationId, tableId), sinked)))
+      now <- EitherT.right[Errs](instantNow)
+      submitted <- EitherT.right[Errs](jobManager.submit(Job((destinationId, tableId), sinked)))
 
       _ <- EitherT.cond[F](
         submitted,
         (),
-        ResultPushError.PushAlreadyRunning(tableId, destinationId))
+        err(ResultPushError.PushAlreadyRunning(tableId, destinationId)))
 
       pushMeta = PushMeta(path, format, limit, Status.running(now))
 
-      _ <- EitherT.right[RPE](Concurrent[F] delay {
+      _ <- EitherT.right[Errs](Concurrent[F] delay {
         pushStatus
           .computeIfAbsent(destinationId, _ => new ConcurrentHashMap[T, PushMeta]())
           .put(tableId, pushMeta)
