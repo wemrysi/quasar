@@ -39,7 +39,8 @@ object TypeCoercion {
     Eq instance {
       case (Unsatisfied(a1, t1), Unsatisfied(a2, t2)) =>
         a1 === a2 && t1 === t2
-case (Satisfied(s1), Satisfied(s2)) =>
+
+      case (Satisfied(s1), Satisfied(s2)) =>
         s1 === s2
 
       case _ =>
