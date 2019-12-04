@@ -18,7 +18,6 @@ package quasar.impl.push
 
 import slamdata.Predef._
 
-import cats.Id
 import cats.data.{Ior, NonEmptyList, NonEmptyMap, NonEmptySet}
 import cats.effect.IO
 import cats.effect.concurrent.Deferred
@@ -32,6 +31,7 @@ import fs2.job.JobManager
 
 import monocle.Prism
 
+import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
 import quasar.api.QueryEvaluator
 import quasar.api.destination._
 import quasar.api.destination.param._
@@ -39,7 +39,6 @@ import quasar.api.push._
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
 import quasar.api.table.{ColumnType, TableColumn, TableName, TableRef}
-import quasar.{ConditionMatchers, EffectfulQSpec}
 
 import shims.{eqToScalaz, orderToCats, showToCats, showToScalaz}
 
@@ -118,17 +117,19 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           Left(Bool)
 
         case VarcharId =>
-          val args = ParamType.Integer.Args(Some(Ior.both(1, 256)), None)
-          Right(formalConstructor(Varchar, "Length", ParamType.Integer[Id](args)))
+          Right(formalConstructor(
+            Varchar,
+            "Length",
+            Formal.integer(Some(Ior.both(1, 256)), None)))
 
         case NumId =>
           Right(formalConstructor(
             Num,
             "Width",
-            ParamType.Enum[Id, Int](NonEmptyMap.of(
+            Formal.enum[Int](
               "4-bits" -> 4,
               "8-bits" -> 8,
-              "16-bits" -> 16))))
+              "16-bits" -> 16)))
       }
 
     def destinationType: DestinationType = QDestinationType
@@ -391,15 +392,161 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "fails when destination doesn't support requested format" >> todo
 
-    "fails when selected type isn't found" >> todo
+    "fails when selected type isn't found" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
 
-    "fails when a required type argument is missing" >> todo
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
 
-    "fails when wrong kind of type argument given" >> todo
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
 
-    "fails when integer type argument is out of bounds" >> todo
+          idx = TypeIndex(-1)
+          cols = List(DestinationColumn("A", SelectedType(idx, None)))
 
-    "fails when enum type argument selection is not found" >> todo
+          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startStatus must beAbnormal(NonEmptyList.one(ResultPushError.TypeNotFound(DestinationId, "A", idx)))
+        }
+      }
+    }
+
+    "fails when a required type argument is missing" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          idx = TypeIndex(1)
+          cols = List(DestinationColumn("A", SelectedType(idx, None)))
+
+          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startStatus must beLike {
+            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
+              DestinationId,
+              "A",
+              "VARCHAR",
+              NonEmptyList(ParamError.ParamMissing("Length", _), Nil)), Nil)) => ok
+          }
+        }
+      }
+    }
+
+    "fails when wrong kind of type argument given" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          idx = TypeIndex(1)
+          cols = List(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.boolean(false))))))
+
+          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startStatus must beLike {
+            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
+              DestinationId,
+              "A",
+              "VARCHAR",
+              NonEmptyList(ParamError.ParamMismatch("Length", _, _), Nil)), Nil)) => ok
+          }
+        }
+      }
+    }
+
+    "fails when integer type argument is out of bounds" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          idx = TypeIndex(1)
+
+          colsLow = List(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.integer(0))))))
+          startLow <- push.start(TableId, colsLow, DestinationId, path, ResultType.Csv, None)
+
+          colsHigh = List(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.integer(300))))))
+          startHigh <- push.start(TableId, colsHigh, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startLow must beLike {
+            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
+              DestinationId,
+              "A",
+              "VARCHAR",
+              NonEmptyList(ParamError.IntOutOfBounds("Length", 0, Ior.Both(1, 256)), Nil)), Nil)) => ok
+          }
+
+          startHigh must beLike {
+            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
+              DestinationId,
+              "A",
+              "VARCHAR",
+              NonEmptyList(ParamError.IntOutOfBounds("Length", 300, Ior.Both(1, 256)), Nil)), Nil)) => ok
+          }
+        }
+      }
+    }
+
+    "fails when enum type argument selection is not found" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          idx = TypeIndex(2)
+          cols = List(DestinationColumn("B", SelectedType(idx, Some(∃(Actual.enumSelect("32-bits"))))))
+
+          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startStatus must beLike {
+            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
+              DestinationId,
+              "B",
+              "NUMBER",
+              NonEmptyList(ParamError.ValueNotInEnum("Width", "32-bits", xs), Nil)), Nil)) =>
+                xs must_=== NonEmptySet.of("4-bits", "8-bits", "16-bits")
+          }
+        }
+      }
+    }
   }
 
   "start these" >> {

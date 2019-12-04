@@ -41,7 +41,7 @@ object ResultPushError {
   final case class TypeConstructionFailed[D](
       destinationId: D,
       column: String,
-      index: TypeIndex,
+      typeLabel: String,
       errors: NonEmptyList[ParamError])
       extends ResultPushError[Nothing, D]
 }

@@ -155,7 +155,7 @@ final class DefaultResultPush[
             } yield t
 
             back.leftMap(err =>
-              ResultPushError.TypeConstructionFailed(destinationId, name, selected.index, NonEmptyList.one(err)))
+              ResultPushError.TypeConstructionFailed(destinationId, name, id.label, NonEmptyList.one(err)))
         }
 
         case None =>

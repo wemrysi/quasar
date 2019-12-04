@@ -55,7 +55,7 @@ trait Destination[F[_]] {
 
   def sinks: NonEmptyList[ResultSink[F, Type]]
 
-  // Convience function to consolidate all the type ascriptions
+  // Convenience function to consolidate all the type ascriptions
   protected def formalConstructor[A](ctor: Constructor[A], paramLabel: String, param: Formal[A])
       : ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]] =
     ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]((ctor, Labeled(paramLabel, param)))
