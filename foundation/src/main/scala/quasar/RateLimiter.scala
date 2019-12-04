@@ -112,6 +112,6 @@ final class RateLimiter[F[_]: Sync: Timer] private () {
 }
 
 object RateLimiter {
-  def apply[F[_]: Sync: Timer]: RateLimiter[F] =
-    new RateLimiter[F]
+  def apply[F[_]: Sync: Timer]: F[RateLimiter[F]] =
+    Sync[F].delay(new RateLimiter[F])
 }

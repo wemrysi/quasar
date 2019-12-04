@@ -48,7 +48,7 @@ object RateLimiterSpec extends Specification {
   "rate limiter" should {
     "output events with real time" >> {
       "one event in one window" in {
-        val rl = RateLimiter[IO]
+        val rl = RateLimiter[IO].unsafeRunSync()
 
         val effect: IO[Unit] = rl(Token1, 1, 1.0, 1.seconds).unsafeRunSync()
 
@@ -58,7 +58,7 @@ object RateLimiterSpec extends Specification {
       }
 
       "two events in one window" in {
-        val rl = RateLimiter[IO]
+        val rl = RateLimiter[IO].unsafeRunSync()
 
         val effect: IO[Unit] = rl(Token1, 2, 1.0, 1.seconds).unsafeRunSync()
 
@@ -70,7 +70,7 @@ object RateLimiterSpec extends Specification {
       }
 
       "two events in two windows" in {
-        val rl = RateLimiter[IO]
+        val rl = RateLimiter[IO].unsafeRunSync()
 
         val effect: IO[Unit] = rl(Token1, 1, 1.0, 1.seconds).unsafeRunSync()
 
@@ -82,7 +82,7 @@ object RateLimiterSpec extends Specification {
       }
 
       "events from two tokens" in {
-        val rl = RateLimiter[IO]
+        val rl = RateLimiter[IO].unsafeRunSync()
 
         val effect1: IO[Unit] = rl(Token1, 1, 1.0, 1.seconds).unsafeRunSync()
         val effect2: IO[Unit] = rl(Token2, 1, 1.0, 1.seconds).unsafeRunSync()
@@ -103,7 +103,7 @@ object RateLimiterSpec extends Specification {
     "output events with simulated time" >> {
       "one event per second" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO])
+        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO]).unsafeRunSync()
 
         val effect: IO[Unit] = rl(Token1, 1, 1.0, 1.seconds).unsafeRunSync()
 
@@ -131,7 +131,7 @@ object RateLimiterSpec extends Specification {
 
       "one event per two seconds" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO])
+        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO]).unsafeRunSync()
 
         val effect: IO[Unit] = rl(Token1, 1, 1.0, 2.seconds).unsafeRunSync()
 
@@ -171,7 +171,7 @@ object RateLimiterSpec extends Specification {
 
       "two events per second" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO])
+        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO]).unsafeRunSync()
 
         val effect: IO[Unit] = rl(Token1, 2, 1.0, 1.seconds).unsafeRunSync()
 
@@ -198,7 +198,7 @@ object RateLimiterSpec extends Specification {
 
       "three events per second" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO])
+        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO]).unsafeRunSync()
 
         val effect: IO[Unit] = rl(Token1, 3, 1.0, 1.seconds).unsafeRunSync()
 
@@ -227,7 +227,7 @@ object RateLimiterSpec extends Specification {
 
       "with a caution of 0.75" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO])
+        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO]).unsafeRunSync()
 
         val effect: IO[Unit] = rl(Token1, 4, 0.75, 1.seconds).unsafeRunSync()
 
@@ -256,7 +256,7 @@ object RateLimiterSpec extends Specification {
 
       "do not overwrite configs (use existing config)" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO])
+        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO]).unsafeRunSync()
 
         val effect1: IO[Unit] = rl(Token1, 2, 1.0, 1.seconds).unsafeRunSync()
         val effect2: IO[Unit] = rl(Token1, 3, 1.0, 1.seconds).unsafeRunSync()
@@ -284,7 +284,7 @@ object RateLimiterSpec extends Specification {
 
       "support two tokens on the same schedule" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO])
+        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO]).unsafeRunSync()
 
         val effect1: IO[Unit] = rl(Token1, 2, 1.0, 1.seconds).unsafeRunSync()
         val effect2: IO[Unit] = rl(Token2, 3, 1.0, 1.seconds).unsafeRunSync()
@@ -327,7 +327,7 @@ object RateLimiterSpec extends Specification {
 
       "support two tokens on different schedules" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO])
+        val rl = RateLimiter[IO](Sync[IO], ctx.timer[IO]).unsafeRunSync()
 
         val effect1: IO[Unit] = rl(Token1, 2, 1.0, 1.seconds).unsafeRunSync()
         val effect2: IO[Unit] = rl(Token2, 2, 1.0, 2.seconds).unsafeRunSync()
