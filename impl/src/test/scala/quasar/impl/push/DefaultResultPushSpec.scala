@@ -18,8 +18,6 @@ package quasar.impl.push
 
 import slamdata.Predef._
 
-import argonaut.Json
-
 import cats.data.{NonEmptyList, NonEmptyMap, NonEmptySet}
 import cats.effect.IO
 import cats.effect.concurrent.Deferred
@@ -150,7 +148,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       destinations: Map[Int, Destination[IO]],
       manager: JobManager[IO, (Int, Int), Nothing],
       evaluator: QueryEvaluator[IO, String, Stream[IO, String]])
-      : IO[ResultPush[IO, Int, Int, Json]] = {
+      : IO[ResultPush[IO, Int, Int]] = {
 
     val lookupTable: Int => IO[Option[TableRef[String]]] =
       tableId => IO(tables.get(tableId))
@@ -190,7 +188,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     io.timeoutTo(Timeout, IO.raiseError(new RuntimeException(s"Expected completion within ${Timeout}."))).void
 
   def awaitStatusLike(
-      p: ResultPush[IO, Int, Int, Json],
+      p: ResultPush[IO, Int, Int],
       tableId: Int,
       destinationId: Int)(
       f: PartialFunction[PushMeta, Boolean])
@@ -257,7 +255,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           secondStartStatus <- push.start(TableId, Nil, DestinationId, path, ResultType.Csv, None)
         } yield {
           firstStartStatus must beNormal
-          secondStartStatus must beAbnormal(ResultPushError.PushAlreadyRunning(TableId, DestinationId))
+          secondStartStatus must beAbnormal(NonEmptyList.one(ResultPushError.PushAlreadyRunning(TableId, DestinationId)))
         }
       }
     }
@@ -299,7 +297,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             mkEvaluator(_ => IO(Stream())))
           startStatus <- push.start(TableId, Nil, DestinationId, path, ResultType.Csv, None)
         } yield {
-          startStatus must beAbnormal(ResultPushError.DestinationNotFound(DestinationId))
+          startStatus must beAbnormal(NonEmptyList.one(ResultPushError.DestinationNotFound(DestinationId)))
         }
       }
     }
@@ -318,7 +316,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             mkEvaluator(_ => IO(Stream())))
           startStatus <- push.start(TableId, Nil, DestinationId, path, ResultType.Csv, None)
         } yield {
-          startStatus must beAbnormal(ResultPushError.TableNotFound(TableId))
+          startStatus must beAbnormal(NonEmptyList.one(ResultPushError.TableNotFound(TableId)))
         }
       }
     }
@@ -384,7 +382,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
           _ <- await(barHalted)
         } yield {
-          errors must_=== Map(1 -> ResultPushError.TableNotFound(1))
+          errors must_=== Map(1 -> NonEmptyList.one(ResultPushError.TableNotFound(1)))
         }
       }
     }
