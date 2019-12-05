@@ -276,6 +276,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       .timeoutTo(Timeout, IO.raiseError(new RuntimeException(s"Expected a matching `PushMeta` $Timeout.")))
   }
 
+  val colX = NonEmptyList.one(DestinationColumn("X", SelectedType(TypeIndex(0), None)))
+
   "start" >> {
     "asynchronously pushes a table to a destination" >>* {
       val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
@@ -292,7 +294,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
           push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, evaluator)
 
-          startRes <- push.start(TableId, Nil, DestinationId, pushPath, ResultType.Csv, None)
+          startRes <- push.start(TableId, colX, DestinationId, pushPath, ResultType.Csv, None)
 
           _ <- await(halted)
 
@@ -320,8 +322,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          firstStartStatus <- push.start(TableId, Nil, DestinationId, path, ResultType.Csv, None)
-          secondStartStatus <- push.start(TableId, Nil, DestinationId, path, ResultType.Csv, None)
+          firstStartStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
+          secondStartStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
         } yield {
           firstStartStatus must beNormal
           secondStartStatus must beAbnormal(NonEmptyList.one(ResultPushError.PushAlreadyRunning(TableId, DestinationId)))
@@ -344,8 +346,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => controlledStream.map(_._2)))
 
-          firstStartStatus <- push.start(TableId, Nil, DestinationId, path, ResultType.Csv, None)
-          secondStartStatus <- push.start(TableId, Nil, dest2, path, ResultType.Csv, None)
+          firstStartStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
+          secondStartStatus <- push.start(TableId, colX, dest2, path, ResultType.Csv, None)
         } yield {
           firstStartStatus must beNormal
           secondStartStatus must beNormal
@@ -364,7 +366,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             Map(),
             jm,
             mkEvaluator(_ => IO(Stream())))
-          startStatus <- push.start(TableId, Nil, DestinationId, path, ResultType.Csv, None)
+          startStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
         } yield {
           startStatus must beAbnormal(NonEmptyList.one(ResultPushError.DestinationNotFound(DestinationId)))
         }
@@ -383,7 +385,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             Map(DestinationId -> dest),
             jm,
             mkEvaluator(_ => IO(Stream())))
-          startStatus <- push.start(TableId, Nil, DestinationId, path, ResultType.Csv, None)
+          startStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
         } yield {
           startStatus must beAbnormal(NonEmptyList.one(ResultPushError.TableNotFound(TableId)))
         }
@@ -407,7 +409,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             mkEvaluator(_ => IO(Stream())))
 
           idx = TypeIndex(-1)
-          cols = List(DestinationColumn("A", SelectedType(idx, None)))
+          cols = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, None)))
 
           startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
         } yield {
@@ -431,7 +433,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             mkEvaluator(_ => IO(Stream())))
 
           idx = TypeIndex(1)
-          cols = List(DestinationColumn("A", SelectedType(idx, None)))
+          cols = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, None)))
 
           startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
         } yield {
@@ -461,7 +463,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             mkEvaluator(_ => IO(Stream())))
 
           idx = TypeIndex(1)
-          cols = List(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.boolean(false))))))
+          cols = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.boolean(false))))))
 
           startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
         } yield {
@@ -492,10 +494,10 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
           idx = TypeIndex(1)
 
-          colsLow = List(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.integer(0))))))
+          colsLow = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.integer(0))))))
           startLow <- push.start(TableId, colsLow, DestinationId, path, ResultType.Csv, None)
 
-          colsHigh = List(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.integer(300))))))
+          colsHigh = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.integer(300))))))
           startHigh <- push.start(TableId, colsHigh, DestinationId, path, ResultType.Csv, None)
         } yield {
           startLow must beLike {
@@ -532,7 +534,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             mkEvaluator(_ => IO(Stream())))
 
           idx = TypeIndex(2)
-          cols = List(DestinationColumn("B", SelectedType(idx, Some(∃(Actual.enumSelect("32-bits"))))))
+          cols = NonEmptyList.one(DestinationColumn("B", SelectedType(idx, Some(∃(Actual.enumSelect("32-bits"))))))
 
           startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
         } yield {
@@ -574,8 +576,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             })
 
           errors <- push.startThese(DestinationId, NonEmptyMap.of(
-            1 -> ((Nil, path1, ResultType.Csv, None)),
-            2 -> ((Nil, path2, ResultType.Csv, None))))
+            1 -> ((colX, path1, ResultType.Csv, None)),
+            2 -> ((colX, path2, ResultType.Csv, None))))
 
           _ <- await(fooHalted)
           _ <- await(barHalted)
@@ -602,8 +604,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             })
 
           errors <- push.startThese(DestinationId, NonEmptyMap.of(
-            1 -> ((Nil, path1, ResultType.Csv, None)),
-            2 -> ((Nil, path2, ResultType.Csv, None))))
+            1 -> ((colX, path1, ResultType.Csv, None)),
+            2 -> ((colX, path2, ResultType.Csv, None))))
 
           _ <- await(barHalted)
         } yield {
@@ -631,7 +633,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          startRes <- push.start(TableId, Nil, DestinationId, pushPath, ResultType.Csv, None)
+          startRes <- push.start(TableId, colX, DestinationId, pushPath, ResultType.Csv, None)
 
           _ <- ctl.emit(W1)
 
@@ -665,7 +667,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          startRes <- push.start(TableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          startRes <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
 
           _ <- awaitFs(filesystem)
           _ <- await(halted)
@@ -774,8 +776,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           startRes <- push.startThese(
             DestinationId,
             NonEmptyMap.of(
-              idA -> ((Nil, pushPathA, ResultType.Csv, None)),
-              idB -> ((Nil, pushPathB, ResultType.Csv, None))))
+              idA -> ((colX, pushPathA, ResultType.Csv, None)),
+              idB -> ((colX, pushPathB, ResultType.Csv, None))))
 
           _ <- ctlA.emit(W1)
           _ <- ctlB.emit(W2)
@@ -824,7 +826,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
           startRes <- push.start(
             idA,
-            Nil,
+            colX,
             DestinationId,
             pushPathA,
             ResultType.Csv,
@@ -886,7 +888,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          _ <- push.start(TableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
 
           _ <- ctl.emit(W1)
           _ <- awaitFs(filesystem, 1)
@@ -913,7 +915,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          _ <- push.start(TableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
 
           _ <- ctl.emit(W1)
           _ <- awaitFs(filesystem, 1)
@@ -944,7 +946,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          _ <- push.start(TableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
           _ <- await(halted)
 
           _ <- awaitStatusLike(push, TableId, DestinationId) {
@@ -967,7 +969,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO.raiseError[Stream[IO, String]](new Exception("boom"))))
 
-          pushStatus <- push.start(TableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          pushStatus <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
 
           status <- awaitStatusLike(push, TableId, DestinationId) {
             case PushMeta(_, _, _, Status.Failed(_, _, _)) => true
@@ -997,7 +999,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data ++ Stream.raiseError[IO](ex))))
 
-          _ <- push.start(TableId, Nil, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
           _ <- await(halted)
 
           status <- awaitStatusLike(push, TableId, DestinationId) {
@@ -1054,8 +1056,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
               case "queryBar" => IO(dataB)
             })
 
-          _ <- push.start(1, Nil, DestinationId, path1, ResultType.Csv, None)
-          _ <- push.start(2, Nil, DestinationId, path2, ResultType.Csv, None)
+          _ <- push.start(1, colX, DestinationId, path1, ResultType.Csv, None)
+          _ <- push.start(2, colX, DestinationId, path2, ResultType.Csv, None)
 
           _ <- ctlA.emit(W1)
           _ <- ctlB.emit(W2)

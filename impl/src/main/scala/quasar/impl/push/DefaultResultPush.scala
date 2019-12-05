@@ -88,7 +88,7 @@ final class DefaultResultPush[
 
   def start(
       tableId: T,
-      columns: List[DestinationColumn[SelectedType]],
+      columns: NonEmptyList[DestinationColumn[SelectedType]],
       destinationId: D,
       path: ResourcePath,
       format: ResultType,

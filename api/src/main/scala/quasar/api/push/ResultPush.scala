@@ -55,7 +55,7 @@ trait ResultPush[F[_], TableId, DestinationId] {
 
   def start(
       tableId: TableId,
-      columns: List[DestinationColumn[SelectedType]],
+      columns: NonEmptyList[DestinationColumn[SelectedType]],
       destinationId: DestinationId,
       path: ResourcePath,
       format: ResultType,
@@ -92,7 +92,7 @@ trait ResultPush[F[_], TableId, DestinationId] {
     */
   def startThese(
       destinationId: DestinationId,
-      tables: NonEmptyMap[TableId, (List[DestinationColumn[SelectedType]], ResourcePath, ResultType, Option[Long])])(
+      tables: NonEmptyMap[TableId, (NonEmptyList[DestinationColumn[SelectedType]], ResourcePath, ResultType, Option[Long])])(
       implicit F: Applicative[F])
       : F[Map[TableId, NonEmptyList[ResultPushError[TableId, DestinationId]]]] = {
 
