@@ -20,6 +20,12 @@ import scala.AnyVal
 
 import java.lang.String
 
+/** A semantic, human consumable description.
+  *
+  * In contrast to `Show`, which is more representation focused, `Label`
+  * focuses on semantics and aims to be suitable for display to an end-user
+  * of the system.
+  */
 trait Label[A] {
   def label(a: A): String
 }
