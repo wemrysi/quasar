@@ -153,7 +153,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
   }
 
   def withInitialMgr[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgr, Disposes) => IO[A]): A =
-    RateLimiter[IO].flatMap(limiter =>
+    RateLimiter[IO](1.0).flatMap(limiter =>
       Ref[IO].of(List.empty[DatasourceType])
         .flatMap(disps =>
           DefaultDatasourceManager.Builder[Int, Fix, IO]
