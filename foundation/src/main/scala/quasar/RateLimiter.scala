@@ -34,7 +34,7 @@ import cats.implicits._
 
 import skolems._
 
-final class RateLimiter[F[_]: Sync: Timer] private () {
+final class RateLimiter[F[_]: Sync: Timer] private (caution: Double) {
   // TODO make these things clustering-aware
   private val configs: TrieMap[Exists[Key], Config] =
     new TrieMap[Exists[Key], Config](
@@ -46,11 +46,11 @@ final class RateLimiter[F[_]: Sync: Timer] private () {
       toHashing[Exists[Key]],
       toEquiv[Exists[Key]])
 
-  def apply[A: Hash: ClassTag](key: A, max: Int, caution: Double, window: FiniteDuration)
+  def apply[A: Hash: ClassTag](key: A, max: Int, window: FiniteDuration)
       : F[F[Unit]] =
     for {
       config <- Sync[F] delay {
-        val c = Config(max, caution, window)
+        val c = Config(max, window)
         configs.putIfAbsent(Key(key, Hash[A], classTag[A]), c).getOrElse(c)
       }
 
@@ -89,7 +89,7 @@ final class RateLimiter[F[_]: Sync: Timer] private () {
   private val nowF: F[FiniteDuration] =
     Timer[F].clock.realTime(TimeUnit.MILLISECONDS).map(_.millis)
 
-  private case class Config(max: Int, caution: Double, window: FiniteDuration)
+  private case class Config(max: Int, window: FiniteDuration)
   private case class State(count: Int, start: FiniteDuration)
 
   private case class Key[A](value: A, hash: Hash[A], tag: ClassTag[A])
@@ -112,6 +112,6 @@ final class RateLimiter[F[_]: Sync: Timer] private () {
 }
 
 object RateLimiter {
-  def apply[F[_]: Sync: Timer]: F[RateLimiter[F]] =
-    Sync[F].delay(new RateLimiter[F])
+  def apply[F[_]: Sync: Timer](caution: Double): F[RateLimiter[F]] =
+    Sync[F].delay(new RateLimiter[F](caution))
 }
