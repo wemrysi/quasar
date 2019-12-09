@@ -24,11 +24,13 @@ import quasar.api.table.ColumnType
 
 import scala.{Int, Unit}
 
+import scalaz.std.anyVal._
+
 trait UntypedDestination[F[_]] extends UnparameterizedDestination[F] {
   type TypeId = Unit
 
   val typeIdOrdinal: Prism[Int, Unit] =
-    Prism.partial[Int, Unit] { case 0 => () } (_ => 0)
+    Prism.only[Int](0)
 
   implicit val typeIdLabel: Label[Unit] =
     Label.label[Unit](_ => "()")
