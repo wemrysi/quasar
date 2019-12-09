@@ -103,7 +103,7 @@ object Quasar extends Logging {
         DefaultDatasourceManager.Builder[UUID, Fix, F]
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
-          .build(moduleMap, configured, rateLimiter)
+          .build(moduleMap, configured, datasourceRefs.lookup(_), rateLimiter)
 
       destModules = IMap.fromList(destinationModules.map(dest => dest.destinationType -> dest))
 

@@ -22,6 +22,7 @@ import quasar.{ConditionMatchers, RateLimiter, RenderTreeT, ScalarStages}
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
+import quasar.concurrent.BlockingContext
 import quasar.connector._
 import quasar.connector.DataFormat
 import quasar.contrib.fs2.stream._
@@ -29,6 +30,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.implicits._
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.EmptyDatasource
+import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
 import quasar.qscript.{MonadPlannerErr, PlannerError, InterpretedRead, QScriptEducated}
 
 import scala.concurrent.ExecutionContext
@@ -57,12 +59,15 @@ import scalaz.std.anyVal._
 import scalaz.std.list._
 import scalaz.std.option._
 
+import java.util.concurrent.ConcurrentHashMap
+
 import shims.{eqToScalaz => _, orderToScalaz => _, _}
 
 object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers {
 
   type Mgr = DatasourceManager[Int, Json, Fix, IO, Stream[IO, ?], QueryResult[IO], ResourcePathType.Physical]
   type Disposes = Ref[IO, List[DatasourceType]]
+  type OuterStore = IndexedStore[IO, Int, DatasourceRef[Json]]
 
   type R[F[_], A] = Either[InitializationError[Json], Datasource[F, Stream[F, ?], A, QueryResult[F], ResourcePathType.Physical]]
 
@@ -71,6 +76,8 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
 
   final case class CreateErrorException(ce: CreateError[Json])
       extends Exception(Show[DatasourceError[Int, Json]].shows(ce))
+
+  val blockingPool: BlockingContext = BlockingContext.cached("default-ds-manager")
 
   implicit val ioPlannerErrorME: MonadError_[IO, PlannerError] =
     new MonadError_[IO, PlannerError] {
@@ -152,20 +159,27 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       hm.kind -> DatasourceModule.Heavyweight(hm))
   }
 
-  def withInitialMgr[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgr, Disposes) => IO[A]): A =
-    RateLimiter[IO](1.0).flatMap(limiter =>
-      Ref[IO].of(List.empty[DatasourceType])
-        .flatMap(disps =>
-          DefaultDatasourceManager.Builder[Int, Fix, IO]
-            .build(modules(disps), configured, limiter)
-            .use(f(_, disps))))
-      .unsafeRunSync()
+  def withInitialMgr[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgr, Disposes, OuterStore) => IO[A]): A = {
+    val ioa = for {
+      limiter <- RateLimiter[IO](1.0)
+      disps <- Ref[IO].of(List.empty[DatasourceType])
+      hashMap <- IO(new ConcurrentHashMap[Int, DatasourceRef[Json]]())
+      store =  ConcurrentMapIndexedStore.unhooked[IO, Int, DatasourceRef[Json]](hashMap, blockingPool)
+      _ <- configured.toList traverse_ { case (k, ref) =>
+        store.insert(k, ref)
+      }
+      res <- DefaultDatasourceManager.Builder[Int, Fix, IO]
+        .build(modules(disps), configured, store.lookup(_), limiter)
+        .use(f(_, disps, store))
+    } yield res
+    ioa.unsafeRunSync
+  }
 
-  def withMgr[A](f: (Mgr, Disposes) => IO[A]): A =
+  def withMgr[A](f: (Mgr, Disposes, OuterStore) => IO[A]): A =
     withInitialMgr(IMap.empty)(f)
 
   "configured datasources" >> {
-    "implicitly available" >> withInitialMgr(IMap(7 -> DatasourceRef(HeavyT, DatasourceName("bar"), Json.jNull))) { (mgr, _) =>
+    "implicitly available" >> withInitialMgr(IMap(7 -> DatasourceRef(HeavyT, DatasourceName("bar"), Json.jNull))) { (mgr, _, _) =>
       for {
         ds <- mgr.managedDatasource(7)
         isR <- ds.traverse(_.pathIsResource(ResourcePath.root()))
@@ -175,7 +189,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       }
     }
 
-    "dispose properly" >> withInitialMgr(IMap(8 -> DatasourceRef(LightT, DatasourceName("foo"), Json.jNull))) { (mgr, disps) =>
+    "dispose properly" >> withInitialMgr(IMap(8 -> DatasourceRef(LightT, DatasourceName("foo"), Json.jNull))) { (mgr, disps, _) =>
       for {
         ds <- mgr.managedDatasource(8)
         // Have to access it as initialization is lazy
@@ -190,19 +204,20 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
   }
 
   "init datasource" >> {
-    "creates a datasource successfully" >> withMgr { (mgr, _) =>
+    "creates a datasource successfully" >> withMgr { (mgr, _, store) =>
       for {
         r0 <- mgr.managedDatasource(1)
-        c <- mgr.initDatasource(1, DatasourceRef(LightT, DatasourceName("foo"), Json.jNull))
+        _ <- store.insert(1, DatasourceRef(LightT, DatasourceName("foo"), Json.jNull))
         r1 <- mgr.managedDatasource(1)
+        r2 <- mgr.managedDatasource(1)
       } yield {
         r0 must beNone
-        c must beNormal
         r1 must beSome
+        r2 must beSome
       }
     }
 
-    "error when kind is unsupported" >> withMgr { (mgr, disps) =>
+    "error when kind is unsupported" >> withMgr { (mgr, disps, _) =>
       val unkT = DatasourceType("unknown", 1L)
 
       mgr.initDatasource(1, DatasourceRef(unkT, DatasourceName("nope"), Json.jNull)) map { c =>
@@ -210,19 +225,32 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       }
     }
 
-    "finalizes an existing datasource when replaced" >> withMgr { (mgr, disps) =>
+    "error when kind is unsupported and datasource isn't inited" >> withMgr { (mgr, disps, store) =>
+      val unkT = DatasourceType("unknown", 1L)
+      for {
+        _ <- store.insert(1, DatasourceRef(unkT, DatasourceName("nope"), Json.jNull))
+        ds <- mgr.managedDatasource(1)
+        res <- ds.traverse(_.pathIsResource(ResourcePath.root()).attempt)
+      } yield {
+        ds must beSome
+        res must beLike {
+          case Some(Left(CreateErrorException(e))) => e === DatasourceUnsupported(unkT, modules(disps).keySet)
+        }
+      }
+    }
+
+    "finalizes an existing datasource when replaced" >> withMgr { (mgr, disps, store) =>
       val a = DatasourceName("a")
 
       for {
-        c1 <- mgr.initDatasource(1, DatasourceRef(LightT, a, Json.jNull))
+        _ <- store.insert(1, DatasourceRef(LightT, a, Json.jNull))
         ds1 <- mgr.managedDatasource(1)
+        _ <- ds1.traverse(_.pathIsResource(ResourcePath.root()))
         disposed0 <- disps.get
-        c2 <- mgr.initDatasource(1, DatasourceRef(HeavyT, a, Json.jNull))
-        disposed1 <- disps.get
+        _ <- store.insert(1, DatasourceRef(HeavyT, a, Json.jNull))
         ds2 <- mgr.managedDatasource(1)
+        disposed1 <- disps.get
       } yield {
-        c1 must beNormal
-        c2 must beNormal
         Applicative[Option].map2(ds1, ds2)(_ eq _) must beSome(false)
         disposed0 must_= Nil
         disposed1 must_= List(LightT)
@@ -231,14 +259,15 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
   }
 
   "shutdown" >> {
-    "finalizes the datasource" >> withMgr { (mgr, disps) =>
+    "finalizes the datasource" >> withMgr { (mgr, disps, store) =>
       for {
-        c1 <- mgr.initDatasource(3, DatasourceRef(LightT, DatasourceName("f"), Json.jNull))
+        _ <- store.insert(3, DatasourceRef(LightT, DatasourceName("f"), Json.jNull))
         ds1 <- mgr.managedDatasource(3)
+        _ <- ds1.traverse(_.pathIsResource(ResourcePath.root()))
         disposed0 <- disps.get
-        _ <- mgr.shutdownDatasource(3)
-        disposed1 <- disps.get
+        _ <- store.delete(3)
         ds2 <- mgr.managedDatasource(3)
+        disposed1 <- disps.get
       } yield {
         ds1 must beSome
         ds2 must beNone
@@ -247,9 +276,9 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       }
     }
 
-    "no-op for a datasource that doesn't exist" >> withMgr { (mgr, disps) =>
+    "no-op for a datasource that doesn't exist" >> withMgr { (mgr, disps, store) =>
       for {
-        c1 <- mgr.initDatasource(4, DatasourceRef(LightT, DatasourceName("a"), Json.jNull))
+        _ <- store.insert(4, DatasourceRef(LightT, DatasourceName("a"), Json.jNull))
         r1 <- mgr.managedDatasource(4)
         disposed0 <- disps.get
         _ <- mgr.shutdownDatasource(-1)
@@ -265,17 +294,16 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
   }
 
   "managed datasource" >> {
-    "returns an existing datasource" >> withMgr { (mgr, _) =>
+    "returns an existing datasource" >> withMgr { (mgr, _, store) =>
       for {
-        c <- mgr.initDatasource(1, DatasourceRef(LightT, DatasourceName("b"), Json.jNull))
+        _ <- store.insert(1, DatasourceRef(LightT, DatasourceName("b"), Json.jNull))
         d <- mgr.managedDatasource(1)
       } yield {
-        c must beNormal
         d must beSome
       }
     }
 
-    "returns none when no datasource having id" >> withMgr { (mgr, _) =>
+    "returns none when no datasource having id" >> withMgr { (mgr, _, _) =>
       mgr.managedDatasource(42) map (_ must beNone)
     }
   }
@@ -283,7 +311,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
   "config sanitization" >> {
     val cleansed = jString("sanitized")
 
-    "module-specific sanitization when known" >> withMgr { (mgr, _) =>
+    "module-specific sanitization when known" >> withMgr { (mgr, _, _) =>
       for {
         l <- mgr.sanitizedRef(DatasourceRef(LightT, DatasourceName("b"), jString("config"))).pure[IO]
         h <- mgr.sanitizedRef(DatasourceRef(HeavyT, DatasourceName("b"), jString("config"))).pure[IO]
@@ -293,7 +321,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       }
     }
 
-    "empty object when unknown" >> withMgr { (mgr, _) =>
+    "empty object when unknown" >> withMgr { (mgr, _, _) =>
       val unkT = DatasourceType("unknown", 1L)
       for {
         u <- mgr.sanitizedRef(DatasourceRef(unkT, DatasourceName("b"), jString("config"))).pure[IO]

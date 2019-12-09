@@ -20,11 +20,11 @@ import slamdata.Predef._
 
 import quasar.{Condition, RateLimiter, RenderTreeT}
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
-import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported, InitializationError}
+import quasar.api.datasource.DatasourceError, DatasourceError._
 import quasar.api.resource.{ResourcePath, ResourcePathType}
-import quasar.connector.{MonadResourceErr, QueryResult}
+import quasar.connector.{MonadResourceErr, QueryResult, Datasource}
 import quasar.contrib.scalaz._
-import quasar.fp.ski.κ2
+import quasar.fp.ski.{κ, κ2}
 import quasar.impl.DatasourceModule
 import quasar.impl.IncompatibleModuleException.linkDatasource
 import quasar.impl.datasource.{ByNeedDatasource, FailedDatasource, MonadCreateErr}
@@ -32,7 +32,7 @@ import quasar.qscript.{InterpretedRead, MonadPlannerErr}
 
 import scala.concurrent.ExecutionContext
 
-import argonaut.Json
+import argonaut.{Json, JsonScalaz}, JsonScalaz._
 import argonaut.Argonaut.jEmptyObject
 
 import cats.{ApplicativeError, MonadError}
@@ -42,7 +42,7 @@ import cats.effect.syntax.bracket._
 import cats.syntax.applicativeError._
 import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.{EitherT, IMap, ISet, OptionT, Order, Scalaz}
+import scalaz.{EitherT, IMap, ISet, OptionT, Order, Scalaz, ~>}
 import Scalaz._
 import shims.monadToScalaz
 
@@ -55,6 +55,7 @@ final class DefaultDatasourceManager[
     P <: ResourcePathType] private (
     modules: DefaultDatasourceManager.Modules,
     running: Ref[F, DefaultDatasourceManager.Running[I, T, F, G, R, P]],
+    getRef: I => F[Option[DatasourceRef[Json]]],
     rateLimiter: RateLimiter[F],
     onCreate: (I, DefaultDatasourceManager.MDS[T, F, ResourcePathType.Physical]) => F[ManagedDatasource[T, F, G, R, P]])(
     implicit
@@ -65,45 +66,30 @@ final class DefaultDatasourceManager[
 
   type MDS = DefaultDatasourceManager.MDS[T, F, ResourcePathType.Physical]
   type Running = DefaultDatasourceManager.Running[I, T, F, G, R, P]
+  type Allocated = DefaultDatasourceManager.Allocated[T, F, G, R, P]
 
   def initDatasource(datasourceId: I, ref: DatasourceRef[Json])
-      : F[Condition[CreateError[Json]]] = {
+      : F[Condition[CreateError[Json]]] =
+    mkDatasource(datasourceId, ref, identityK)
+      .flatMap(a => EitherT.rightT(updateAllocated(datasourceId, a)))
+      .run
+      .map(Condition.disjunctionIso.reverseGet(_))
 
-    def createDatasource(module: DatasourceModule): Resource[F, MDS] =
-      module match {
-        case DatasourceModule.Lightweight(lw) =>
-          handleInitErrors(module.kind, lw.lightweightDatasource[F](ref.config, rateLimiter))
-            .map(ManagedDatasource.lightweight[T](_))
-
-        case DatasourceModule.Heavyweight(hw) =>
-          handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config))
-            .map(ManagedDatasource.heavyweight(_))
-      }
-
-    val inited = for {
-      sup <- EitherT.rightU[CreateError[Json]](supportedDatasourceTypes)
-
-      mod <-
-        OptionT(modules.lookup(ref.kind).point[F])
-          .toRight[CreateError[Json]](DatasourceUnsupported(ref.kind, sup))
-
-      (mds, dispose) <-
-        EitherT(MonadError_[F, CreateError[Json]].attempt(createDatasource(mod).allocated))
-
-      ds <- EitherT.rightT(onCreate(datasourceId, mds) onError {
-        case _ => dispose
-      })
-
-      _ <- EitherT.rightT(modifyAndShutdown { r =>
-        (r.insert(datasourceId, (ds, dispose)), r.lookup(datasourceId))
-      })
-    } yield ()
-
-    inited.run.map(Condition.disjunctionIso.reverseGet(_))
-  }
-
-  def managedDatasource(datasourceId: I): F[Option[ManagedDatasource[T, F, G, R, P]]] =
-    running.get.map(_.lookup(datasourceId).map(_._1))
+  def managedDatasource(datasourceId: I): F[Option[ManagedDatasource[T, F, G, R, P]]] = for {
+    mbCurrentRef <- getRef(datasourceId)
+    oldDs <- running.get.map(_.lookup(datasourceId))
+    res <- (mbCurrentRef, oldDs) match {
+      case (None, _) =>
+        oldDs.traverse(x => shutdownDatasource(datasourceId)).map(κ(none))
+      case (Some(ref), Some(allocated)) if ref === allocated.ref =>
+        allocated.datasource.some.point[F]
+      case (Some(ref), _) => for {
+        eiAllocated <- mkDatasource(datasourceId, ref, lazyK(ref.kind)).run
+        allocated = eiAllocated.fold(x => Allocated(ref, failedDatasource(ref, x), (()).point[F]), x => x)
+        _ <- updateAllocated(datasourceId, allocated)
+      } yield allocated.datasource.some
+    }
+  } yield res
 
   def sanitizedRef(ref: DatasourceRef[Json]): DatasourceRef[Json] =
     modules.lookup(ref.kind)
@@ -121,16 +107,78 @@ final class DefaultDatasourceManager[
   private val configL = DatasourceRef.config[Json]
 
   private def modifyAndShutdown(
-      f: Running => (Running, Option[(ManagedDatasource[T, F, G, R, P], F[Unit])]))
+      f: Running => (Running, Option[Allocated]))
       : F[Unit] =
-    running.modify(f).flatMap(_.traverse_(_._2))
+    running.modify(f).flatMap(_.traverse_(_.finalizer))
+
+  private def updateAllocated(datasourceId: I, allocated: Allocated): F[Unit] =
+    modifyAndShutdown { r =>
+      (r.insert(datasourceId, allocated), r.lookup(datasourceId))
+    }
+
+  private def mkDatasource(
+      datasourceId: I,
+      ref: DatasourceRef[Json],
+      transform: RDS ~> RDS)
+      : EitherT[F, CreateError[Json], Allocated] = for {
+    sup <-
+      EitherT.rightU[CreateError[Json]](supportedDatasourceTypes)
+    mod <-
+      OptionT(modules.lookup(ref.kind).point[F])
+        .toRight[CreateError[Json]](DatasourceUnsupported(ref.kind, sup))
+    (mds, dispose) <-
+      EitherT(MonadError_[F, CreateError[Json]].attempt(createDatasource(mod, ref, transform).allocated))
+    ds <-
+      EitherT.rightT(onCreate(datasourceId, mds) onError { case _ => dispose })
+  } yield Allocated(ref, ds, dispose)
+
+  private def failedDatasource(ref: DatasourceRef[Json], e: CreateError[Json]): ManagedDatasource[T, F, G, R, P] =
+    ManagedDatasource.lightweight[T](FailedDatasource[
+      CreateError[Json],
+      F, G,
+      InterpretedRead[ResourcePath],
+      R, P](ref.kind, e))
+
+  type RDS[A] = Resource[F, Datasource[F, Stream[F, ?], A, QueryResult[F], ResourcePathType.Physical]]
+
+  private def identityK: RDS ~> RDS = new ~>[RDS, RDS] {
+    def apply[A](fa: RDS[A]) = fa
+  }
+  private def lazyK(kind: DatasourceType): RDS ~> RDS = new ~>[RDS, RDS] {
+    def apply[A](fa: RDS[A]) = ByNeedDatasource(kind, fa)
+  }
+
+  private def createDatasource(
+      module: DatasourceModule,
+      ref: DatasourceRef[Json],
+      transform: RDS ~> RDS)
+      : Resource[F, MDS] = module match {
+    case DatasourceModule.Lightweight(lw) =>
+      val mklw = handleInitErrors(module.kind, lw.lightweightDatasource[F](ref.config, rateLimiter))
+      transform(mklw).map(ManagedDatasource.lightweight[T](_))
+
+    case DatasourceModule.Heavyweight(hw) =>
+      val mkhw = handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config))
+      transform(mkhw).map(ManagedDatasource.heavyweight(_))
+  }
 }
 
 object DefaultDatasourceManager {
-  type Modules = IMap[DatasourceType, DatasourceModule]
-  type MDS[T[_[_]], F[_], P <: ResourcePathType] = ManagedDatasource[T, F, Stream[F, ?], QueryResult[F], P]
+
+  type Modules =
+    IMap[DatasourceType, DatasourceModule]
+
+  type MDS[T[_[_]], F[_], P <: ResourcePathType] =
+    ManagedDatasource[T, F, Stream[F, ?], QueryResult[F], P]
+
+  final case class Allocated[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
+      ref: DatasourceRef[Json],
+      datasource: ManagedDatasource[T, F, G, R, P],
+      finalizer:  F[Unit])
+      extends Product with Serializable
+
   type Running[I, T[_[_]], F[_], G[_], R, P <: ResourcePathType] =
-    IMap[I, (ManagedDatasource[T, F, G, R, P], F[Unit])]
+    IMap[I, Allocated[T, F, G, R, P]]
 
   final class Builder[
       I: Order,
@@ -141,50 +189,30 @@ object DefaultDatasourceManager {
       P <: ResourcePathType] private (
       onCreate: (I, MDS[T, F, ResourcePathType.Physical]) => F[ManagedDatasource[T, F, G, R, P]]) {
 
-    def build(modules: Modules, configured: IMap[I, DatasourceRef[Json]], rateLimiter: RateLimiter[F])(
+    def build(
+        modules: Modules,
+        configured: IMap[I, DatasourceRef[Json]],
+        getRef: I => F[Option[DatasourceRef[Json]]],
+        rateLimiter: RateLimiter[F])(
         implicit
         ec: ExecutionContext)
         : Resource[F, DatasourceManager[I, Json, T, F, G, R, P]] = {
 
-      val bases =
-        configured map { ref =>
-          modules.lookup(ref.kind) match {
-            case Some(mod) =>
-              lazyDatasource[T, F](mod, ref, rateLimiter)
-
-            case None =>
-              val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], ResourcePathType.Physical](
-                ref.kind,
-                DatasourceUnsupported(ref.kind, modules.keySet))
-
-              ManagedDatasource.lightweight[T](ds).point[Resource[F, ?]]
-          }
-        }
-
       val init = for {
-        mapped <- bases.toList traverse {
-          case (id, res) =>
-            res.allocated flatMap {
-              case (mds, dispose) =>
-                onCreate(id, mds)
-                  .map(ds => (id, (ds, dispose)))
-                  .onError { case _ => dispose }
-            }
+        running <- Ref[F].of(IMap[I, Allocated[T, F, G, R, P]]())
+        mgr = new DefaultDatasourceManager(modules, running, getRef, rateLimiter, onCreate)
+        _ <- configured.toList.traverse { case (i, ref) =>
+          mgr.managedDatasource(i)
         }
+      } yield (mgr, running)
 
-        running <- Ref[F].of(IMap.fromList(mapped))
-
-        runningKeys = running.get.map(_.keySet)
-
-      } yield (new DefaultDatasourceManager(modules, running, rateLimiter, onCreate), runningKeys)
-
-      val resource = Resource.make(init) {
-        case (mgr, keys) => keys flatMap { ks =>
-          ks.foldMapLeft1Opt(mgr.shutdownDatasource)((u, k) => u.guarantee(mgr.shutdownDatasource(k)))
+      val resource = Resource.make(init) { case (mgr, running) =>
+        running.get.flatMap { (mp: IMap[I, Allocated[T, F, G, R, P]]) =>
+          mp.keySet
+            .foldMapLeft1Opt(mgr.shutdownDatasource)((u, k) => u.guarantee(mgr.shutdownDatasource(k)))
             .sequence_
         }
       }
-
       resource.map(_._1)
     }
 
@@ -205,28 +233,6 @@ object DefaultDatasourceManager {
   }
 
   ////
-
-  private def lazyDatasource[
-      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: MonadCreateErr: Timer](
-      module: DatasourceModule,
-      ref: DatasourceRef[Json],
-      rateLimiter: RateLimiter[F])(
-      implicit ec: ExecutionContext)
-      : Resource[F, MDS[T, F, ResourcePathType.Physical]] =
-    module match {
-      case DatasourceModule.Lightweight(lw) =>
-        val mklw =
-          handleInitErrors(ref.kind, lw.lightweightDatasource[F](ref.config, rateLimiter))
-
-        ByNeedDatasource(ref.kind, mklw).map(ManagedDatasource.lightweight[T](_))
-
-      case DatasourceModule.Heavyweight(hw) =>
-        val mkhw =
-          handleInitErrors(ref.kind, hw.heavyweightDatasource[T, F](ref.config))
-
-        ByNeedDatasource(ref.kind, mkhw).map(ManagedDatasource.heavyweight(_))
-    }
 
   private def handleLinkageError[F[_]: ApplicativeError[?[_], Throwable], A](kind: DatasourceType, fa: => F[A]): F[A] =
     linkDatasource(kind, fa)
