@@ -80,7 +80,8 @@ object Quasar extends Logging {
       qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], Stream[F, R]],
       resultRender: ResultRender[F, R],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
-      rateLimiting: RateLimiting[F, A])(
+      rateLimiting: RateLimiting[F, A],
+      byteStores: ByteStores[F, UUID])(
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule])(
       implicit
@@ -99,12 +100,12 @@ object Quasar extends Logging {
       (dsErrors, onCondition) <- Resource.liftF(DefaultDatasourceErrors[F, UUID])
 
       dsModules =
-        DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiting)
+        DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiting, byteStores)
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
 
       dsCache <- ResourceManager[F, UUID, ManagedDatasource[Fix, F, Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
-      datasources <- Resource.liftF(DefaultDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, resourceSchema))
+      datasources <- Resource.liftF(DefaultDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, resourceSchema, byteStores))
 
       destCache <- ResourceManager[F, UUID, Destination[F]]
       destinations <- Resource.liftF(DefaultDestinations(freshUUID, destinationRefs, destCache, destModules))

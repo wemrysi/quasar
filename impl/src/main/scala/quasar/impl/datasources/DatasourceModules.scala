@@ -97,34 +97,41 @@ object DatasourceModules {
       F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr: MonadPlannerErr,
       I, A: Hash](
       modules: List[DatasourceModule],
-      rateLimiting: RateLimiting[F, A])(
+      rateLimiting: RateLimiting[F, A],
+      byteStores: ByteStores[F, I])(
       implicit
       ec: ExecutionContext)
       : Modules[T, F, I] = {
+
     lazy val moduleSet: ISet[DatasourceType] = ISet.fromList(modules.map(_.kind))
-    lazy val moduleMap: Map[DatasourceType, DatasourceModule] = Map(modules.map(ds => (ds.kind, ds)):_*)
+    lazy val moduleMap: Map[DatasourceType, DatasourceModule] = Map(modules.map(ds => (ds.kind, ds)): _*)
 
     new DatasourceModules[T, F, Stream[F, ?], I, Json, QueryResult[F], ResourcePathType.Physical] {
       def create(i: I, ref: DatasourceRef[Json]): EitherT[Resource[F, ?], CreateError[Json], MDS[T, F]] = moduleMap.get(ref.kind) match {
         case None =>
           EitherT.pureLeft(DatasourceUnsupported(ref.kind, moduleSet))
-        case Some(module) => module match {
-          case DatasourceModule.Lightweight(lw) =>
-            handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting))
-              .map(ManagedDatasource.lightweight[T](_))
-          case DatasourceModule.Heavyweight(hw) =>
-            handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config))
-              .map(ManagedDatasource.heavyweight(_))
-        }
+
+        case Some(module) =>
+          EitherT.rightU[CreateError[Json]](Resource.liftF(byteStores.get(i))) flatMap { store =>
+            module match {
+              case DatasourceModule.Lightweight(lw) =>
+                handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting, store))
+                  .map(ManagedDatasource.lightweight[T](_))
+
+              case DatasourceModule.Heavyweight(hw) =>
+                handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config, store))
+                  .map(ManagedDatasource.heavyweight(_))
+            }
+          }
       }
+
       def sanitizeRef(inp: DatasourceRef[Json]): DatasourceRef[Json] = moduleMap.get(inp.kind) match {
         case None => inp.copy(config = jEmptyObject)
         case Some(x) => inp.copy(config = x.sanitizeConfig(inp.config))
       }
 
-      def supportedTypes: F[ISet[DatasourceType]] = {
+      def supportedTypes: F[ISet[DatasourceType]] =
         moduleSet.pure[F]
-      }
     }
   }
 
