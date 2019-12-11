@@ -22,7 +22,7 @@ import quasar.{Condition, RateLimiter, RenderTreeT}
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported, InitializationError}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
-import quasar.connector.{MonadResourceErr, QueryResult}
+import quasar.connector.{ByteStore, MonadResourceErr, QueryResult}
 import quasar.contrib.scalaz._
 import quasar.fp.ski.κ2
 import quasar.impl.DatasourceModule
@@ -56,6 +56,7 @@ final class DefaultDatasourceManager[
     modules: DefaultDatasourceManager.Modules,
     running: Ref[F, DefaultDatasourceManager.Running[I, T, F, G, R, P]],
     rateLimiter: RateLimiter[F],
+    byteStores: ByteStores[F, I],
     onCreate: (I, DefaultDatasourceManager.MDS[T, F, ResourcePathType.Physical]) => F[ManagedDatasource[T, F, G, R, P]])(
     implicit
     ec: ExecutionContext)
@@ -70,14 +71,16 @@ final class DefaultDatasourceManager[
       : F[Condition[CreateError[Json]]] = {
 
     def createDatasource(module: DatasourceModule): Resource[F, MDS] =
-      module match {
-        case DatasourceModule.Lightweight(lw) =>
-          handleInitErrors(module.kind, lw.lightweightDatasource[F](ref.config, rateLimiter))
-            .map(ManagedDatasource.lightweight[T](_))
+      Resource.liftF(byteStores.get(datasourceId)) flatMap { bs =>
+        module match {
+          case DatasourceModule.Lightweight(lw) =>
+            handleInitErrors(module.kind, lw.lightweightDatasource[F](ref.config, rateLimiter, bs))
+              .map(ManagedDatasource.lightweight[T](_))
 
-        case DatasourceModule.Heavyweight(hw) =>
-          handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config))
-            .map(ManagedDatasource.heavyweight(_))
+          case DatasourceModule.Heavyweight(hw) =>
+            handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config, bs))
+              .map(ManagedDatasource.heavyweight(_))
+        }
       }
 
     val inited = for {
@@ -141,16 +144,21 @@ object DefaultDatasourceManager {
       P <: ResourcePathType] private (
       onCreate: (I, MDS[T, F, ResourcePathType.Physical]) => F[ManagedDatasource[T, F, G, R, P]]) {
 
-    def build(modules: Modules, configured: IMap[I, DatasourceRef[Json]], rateLimiter: RateLimiter[F])(
+    def build(
+        modules: Modules,
+        configured: IMap[I, DatasourceRef[Json]],
+        rateLimiter: RateLimiter[F],
+        byteStores: ByteStores[F, I])(
         implicit
         ec: ExecutionContext)
         : Resource[F, DatasourceManager[I, Json, T, F, G, R, P]] = {
 
       val bases =
-        configured map { ref =>
+        configured mapWithKey { (id, ref) =>
           modules.lookup(ref.kind) match {
             case Some(mod) =>
-              lazyDatasource[T, F](mod, ref, rateLimiter)
+              Resource.liftF(byteStores.get(id))
+                .flatMap(lazyDatasource[T, F](mod, ref, rateLimiter, _))
 
             case None =>
               val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], ResourcePathType.Physical](
@@ -176,7 +184,7 @@ object DefaultDatasourceManager {
 
         runningKeys = running.get.map(_.keySet)
 
-      } yield (new DefaultDatasourceManager(modules, running, rateLimiter, onCreate), runningKeys)
+      } yield (new DefaultDatasourceManager(modules, running, rateLimiter, byteStores, onCreate), runningKeys)
 
       val resource = Resource.make(init) {
         case (mgr, keys) => keys flatMap { ks =>
@@ -211,19 +219,20 @@ object DefaultDatasourceManager {
       F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: MonadCreateErr: Timer](
       module: DatasourceModule,
       ref: DatasourceRef[Json],
-      rateLimiter: RateLimiter[F])(
+      rateLimiter: RateLimiter[F],
+      byteStore: ByteStore[F])(
       implicit ec: ExecutionContext)
       : Resource[F, MDS[T, F, ResourcePathType.Physical]] =
     module match {
       case DatasourceModule.Lightweight(lw) =>
         val mklw =
-          handleInitErrors(ref.kind, lw.lightweightDatasource[F](ref.config, rateLimiter))
+          handleInitErrors(ref.kind, lw.lightweightDatasource[F](ref.config, rateLimiter, byteStore))
 
         ByNeedDatasource(ref.kind, mklw).map(ManagedDatasource.lightweight[T](_))
 
       case DatasourceModule.Heavyweight(hw) =>
         val mkhw =
-          handleInitErrors(ref.kind, hw.heavyweightDatasource[T, F](ref.config))
+          handleInitErrors(ref.kind, hw.heavyweightDatasource[T, F](ref.config, byteStore))
 
         ByNeedDatasource(ref.kind, mkhw).map(ManagedDatasource.heavyweight(_))
     }

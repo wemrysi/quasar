@@ -43,7 +43,8 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json,
-      rateLimiter: RateLimiter[F])(
+      rateLimiter: RateLimiter[F],
+      stateStore: ByteStore[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], DS[F]]] = {
     val ds = for {

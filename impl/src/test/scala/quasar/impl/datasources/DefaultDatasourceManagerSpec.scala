@@ -119,7 +119,8 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
 
     def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
         config: Json,
-        rateLimiter: RateLimiter[F])(
+        rateLimiter: RateLimiter[F],
+        stateStore: ByteStore[F])(
         implicit ec: ExecutionContext)
         : Resource[F, R[F, InterpretedRead[ResourcePath]]] =
       Resource((
@@ -135,7 +136,8 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
     def heavyweightDatasource[
         T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
         F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
-        config: Json)(
+        config: Json,
+        stateStore: ByteStore[F])(
         implicit ec: ExecutionContext)
         : Resource[F, R[F, T[QScriptEducated[T, ?]]]] =
       Resource((
@@ -157,7 +159,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       Ref[IO].of(List.empty[DatasourceType])
         .flatMap(disps =>
           DefaultDatasourceManager.Builder[Int, Fix, IO]
-            .build(modules(disps), configured, limiter)
+            .build(modules(disps), configured, limiter, ByteStores.void[IO, Int])
             .use(f(_, disps))))
       .unsafeRunSync()
 

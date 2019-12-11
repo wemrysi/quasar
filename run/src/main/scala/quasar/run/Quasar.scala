@@ -79,7 +79,8 @@ object Quasar extends Logging {
       qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], Stream[F, R]],
       resultRender: ResultRender[F, R],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
-      rateLimiter: RateLimiter[F])(
+      rateLimiter: RateLimiter[F],
+      byteStores: ByteStores[F, UUID])(
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule])(
       implicit
@@ -103,7 +104,7 @@ object Quasar extends Logging {
         DefaultDatasourceManager.Builder[UUID, Fix, F]
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
-          .build(moduleMap, configured, rateLimiter)
+          .build(moduleMap, configured, rateLimiter, byteStores)
 
       destModules = IMap.fromList(destinationModules.map(dest => dest.destinationType -> dest))
 
