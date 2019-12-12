@@ -31,6 +31,7 @@ import scala.util.Either
 
 import argonaut.Json
 import cats.effect._
+import cats.kernel.Hash
 
 object LocalDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
@@ -41,9 +42,9 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
 
   def sanitizeConfig(config: Json): Json = config
 
-  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
+  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,
-      rateLimiter: RateLimiter[F])(
+      rateLimiter: RateLimiter[F, A])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], DS[F]]] = {
     val ds = for {

@@ -47,6 +47,7 @@ import argonaut.Json
 import argonaut.JsonScalaz._
 import cats.Functor
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
+import cats.kernel.Hash
 import cats.syntax.functor._
 import fs2.Stream
 import fs2.job.JobManager
@@ -72,14 +73,14 @@ object Quasar extends Logging {
   type LookupRunning[F[_]] = UUID => F[Option[ManagedDatasource[Fix, F, Stream[F, ?], EvalResult[F], ResourcePathType]]]
 
   /** What it says on the tin. */
-  def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer, R, C <: SchemaConfig](
+  def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer, R, C <: SchemaConfig, A: Hash](
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
       qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], Stream[F, R]],
       resultRender: ResultRender[F, R],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
-      rateLimiter: RateLimiter[F])(
+      rateLimiter: RateLimiter[F, A])(
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule])(
       implicit
@@ -100,7 +101,7 @@ object Quasar extends Logging {
       moduleMap = IMap.fromList(datasourceModules.map(ds => ds.kind -> ds))
 
       dsManager <-
-        DefaultDatasourceManager.Builder[UUID, Fix, F]
+        DefaultDatasourceManager.Builder[UUID, Fix, F, A]
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
           .build(moduleMap, configured, rateLimiter)

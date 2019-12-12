@@ -39,6 +39,7 @@ import cats.{ApplicativeError, MonadError}
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
 import cats.effect.concurrent.Ref
 import cats.effect.syntax.bracket._
+import cats.kernel.Hash
 import cats.syntax.applicativeError._
 import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
@@ -52,10 +53,11 @@ final class DefaultDatasourceManager[
     F[_]: ConcurrentEffect: ContextShift: MonadCreateErr: MonadPlannerErr: MonadResourceErr: Timer,
     G[_],
     R,
-    P <: ResourcePathType] private (
+    P <: ResourcePathType,
+    A: Hash] private (
     modules: DefaultDatasourceManager.Modules,
     running: Ref[F, DefaultDatasourceManager.Running[I, T, F, G, R, P]],
-    rateLimiter: RateLimiter[F],
+    rateLimiter: RateLimiter[F, A],
     onCreate: (I, DefaultDatasourceManager.MDS[T, F, ResourcePathType.Physical]) => F[ManagedDatasource[T, F, G, R, P]])(
     implicit
     ec: ExecutionContext)
@@ -72,7 +74,7 @@ final class DefaultDatasourceManager[
     def createDatasource(module: DatasourceModule): Resource[F, MDS] =
       module match {
         case DatasourceModule.Lightweight(lw) =>
-          handleInitErrors(module.kind, lw.lightweightDatasource[F](ref.config, rateLimiter))
+          handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiter))
             .map(ManagedDatasource.lightweight[T](_))
 
         case DatasourceModule.Heavyweight(hw) =>
@@ -138,10 +140,11 @@ object DefaultDatasourceManager {
       F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: MonadCreateErr: Timer,
       G[_],
       R,
-      P <: ResourcePathType] private (
+      P <: ResourcePathType,
+      A: Hash] private (
       onCreate: (I, MDS[T, F, ResourcePathType.Physical]) => F[ManagedDatasource[T, F, G, R, P]]) {
 
-    def build(modules: Modules, configured: IMap[I, DatasourceRef[Json]], rateLimiter: RateLimiter[F])(
+    def build(modules: Modules, configured: IMap[I, DatasourceRef[Json]], rateLimiter: RateLimiter[F, A])(
         implicit
         ec: ExecutionContext)
         : Resource[F, DatasourceManager[I, Json, T, F, G, R, P]] = {
@@ -150,7 +153,7 @@ object DefaultDatasourceManager {
         configured map { ref =>
           modules.lookup(ref.kind) match {
             case Some(mod) =>
-              lazyDatasource[T, F](mod, ref, rateLimiter)
+              lazyDatasource[T, F, A](mod, ref, rateLimiter)
 
             case None =>
               val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], ResourcePathType.Physical](
@@ -190,17 +193,18 @@ object DefaultDatasourceManager {
 
     def withMiddleware[H[_], S, Q <: ResourcePathType](
         f: (I, ManagedDatasource[T, F, G, R, P]) => F[ManagedDatasource[T, F, H, S, Q]])
-        : Builder[I, T, F, H, S, Q] =
-      new Builder[I, T, F, H, S, Q]((i, mds) => onCreate(i, mds).flatMap(f(i, _)))
+        : Builder[I, T, F, H, S, Q, A] =
+      new Builder[I, T, F, H, S, Q, A]((i, mds) => onCreate(i, mds).flatMap(f(i, _)))
   }
 
   object Builder {
     def apply[
         I: Order,
         T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-        F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: MonadCreateErr: Timer]
-        : Builder[I, T, F, Stream[F, ?], QueryResult[F], ResourcePathType.Physical] =
-      new Builder[I, T, F, Stream[F, ?], QueryResult[F], ResourcePathType.Physical](
+        F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: MonadCreateErr: Timer,
+        A: Hash]
+        : Builder[I, T, F, Stream[F, ?], QueryResult[F], ResourcePathType.Physical, A] =
+      new Builder[I, T, F, Stream[F, ?], QueryResult[F], ResourcePathType.Physical, A](
         (_, mds) => mds.point[F])
   }
 
@@ -208,16 +212,17 @@ object DefaultDatasourceManager {
 
   private def lazyDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: MonadCreateErr: Timer](
+      F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: MonadCreateErr: Timer,
+      A: Hash](
       module: DatasourceModule,
       ref: DatasourceRef[Json],
-      rateLimiter: RateLimiter[F])(
+      rateLimiter: RateLimiter[F, A])(
       implicit ec: ExecutionContext)
       : Resource[F, MDS[T, F, ResourcePathType.Physical]] =
     module match {
       case DatasourceModule.Lightweight(lw) =>
         val mklw =
-          handleInitErrors(ref.kind, lw.lightweightDatasource[F](ref.config, rateLimiter))
+          handleInitErrors(ref.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiter))
 
         ByNeedDatasource(ref.kind, mklw).map(ManagedDatasource.lightweight[T](_))
 

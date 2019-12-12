@@ -35,22 +35,12 @@ object RateLimiterSpec extends Specification {
   implicit def executionContext: ExecutionContext = ExecutionContext.Implicits.global
   implicit val timer: Timer[IO] = IO.timer(executionContext)
 
-  private case object Token1 {
-    implicit val eq: Hash[Token1.type] =
-      Hash.fromUniversalHashCode[Token1.type]
-  }
-
-  private case object Token2 {
-    implicit val eq: Hash[Token2.type] =
-      Hash.fromUniversalHashCode[Token2.type]
-  }
-
   "rate limiter" should {
     "output events with real time" >> {
       "one event in one window" in {
-        val rl = RateLimiter[IO](1.0).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater).unsafeRunSync()
 
-        val effect: IO[Unit] = rl(Token1, 1, 1.seconds).unsafeRunSync()
+        val effect: IO[Unit] = rl(1, 1, 1.seconds).unsafeRunSync()
 
         val back = Stream.eval_(effect) ++ Stream.emit(1)
 
@@ -58,9 +48,9 @@ object RateLimiterSpec extends Specification {
       }
 
       "two events in one window" in {
-        val rl = RateLimiter[IO](1.0).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater).unsafeRunSync()
 
-        val effect: IO[Unit] = rl(Token1, 2, 1.seconds).unsafeRunSync()
+        val effect: IO[Unit] = rl(1, 2, 1.seconds).unsafeRunSync()
 
         val back =
           Stream.eval_(effect) ++ Stream.emit(1) ++
@@ -70,9 +60,9 @@ object RateLimiterSpec extends Specification {
       }
 
       "two events in two windows" in {
-        val rl = RateLimiter[IO](1.0).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater).unsafeRunSync()
 
-        val effect: IO[Unit] = rl(Token1, 1, 1.seconds).unsafeRunSync()
+        val effect: IO[Unit] = rl(1, 1, 1.seconds).unsafeRunSync()
 
         val back =
           Stream.eval_(effect) ++ Stream.emit(1) ++
@@ -82,10 +72,10 @@ object RateLimiterSpec extends Specification {
       }
 
       "events from two tokens" in {
-        val rl = RateLimiter[IO](1.0).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater).unsafeRunSync()
 
-        val effect1: IO[Unit] = rl(Token1, 1, 1.seconds).unsafeRunSync()
-        val effect2: IO[Unit] = rl(Token2, 1, 1.seconds).unsafeRunSync()
+        val effect1: IO[Unit] = rl(1, 1, 1.seconds).unsafeRunSync()
+        val effect2: IO[Unit] = rl(2, 1, 1.seconds).unsafeRunSync()
 
         val back1 =
           Stream.eval_(effect1) ++ Stream.emit(1) ++
@@ -103,9 +93,9 @@ object RateLimiterSpec extends Specification {
     "output events with simulated time" >> {
       "one event per second" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](1.0)(Sync[IO], ctx.timer[IO]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
-        val effect: IO[Unit] = rl(Token1, 1, 1.seconds).unsafeRunSync()
+        val effect: IO[Unit] = rl(1, 1, 1.seconds).unsafeRunSync()
 
         var a: Int = 0
 
@@ -131,9 +121,9 @@ object RateLimiterSpec extends Specification {
 
       "one event per two seconds" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](1.0)(Sync[IO], ctx.timer[IO]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
-        val effect: IO[Unit] = rl(Token1, 1, 2.seconds).unsafeRunSync()
+        val effect: IO[Unit] = rl(1, 1, 2.seconds).unsafeRunSync()
 
         var a: Int = 0
 
@@ -171,9 +161,9 @@ object RateLimiterSpec extends Specification {
 
       "two events per second" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](1.0)(Sync[IO], ctx.timer[IO]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
-        val effect: IO[Unit] = rl(Token1, 2, 1.seconds).unsafeRunSync()
+        val effect: IO[Unit] = rl(1, 2, 1.seconds).unsafeRunSync()
 
         var a: Int = 0
 
@@ -198,9 +188,9 @@ object RateLimiterSpec extends Specification {
 
       "three events per second" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](1.0)(Sync[IO], ctx.timer[IO]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
-        val effect: IO[Unit] = rl(Token1, 3, 1.seconds).unsafeRunSync()
+        val effect: IO[Unit] = rl(1, 3, 1.seconds).unsafeRunSync()
 
         var a: Int = 0
 
@@ -227,9 +217,9 @@ object RateLimiterSpec extends Specification {
 
       "with a caution of 0.75" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](0.75)(Sync[IO], ctx.timer[IO]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](0.75, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
-        val effect: IO[Unit] = rl(Token1, 4, 1.seconds).unsafeRunSync()
+        val effect: IO[Unit] = rl(1, 4, 1.seconds).unsafeRunSync()
 
         var a: Int = 0
 
@@ -256,10 +246,10 @@ object RateLimiterSpec extends Specification {
 
       "do not overwrite configs (use existing config)" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](1.0)(Sync[IO], ctx.timer[IO]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
-        val effect1: IO[Unit] = rl(Token1, 2, 1.seconds).unsafeRunSync()
-        val effect2: IO[Unit] = rl(Token1, 3, 1.seconds).unsafeRunSync()
+        val effect1: IO[Unit] = rl(1, 2, 1.seconds).unsafeRunSync()
+        val effect2: IO[Unit] = rl(1, 3, 1.seconds).unsafeRunSync()
 
         var a: Int = 0
 
@@ -284,10 +274,10 @@ object RateLimiterSpec extends Specification {
 
       "support two tokens on the same schedule" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](1.0)(Sync[IO], ctx.timer[IO]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
-        val effect1: IO[Unit] = rl(Token1, 2, 1.seconds).unsafeRunSync()
-        val effect2: IO[Unit] = rl(Token2, 3, 1.seconds).unsafeRunSync()
+        val effect1: IO[Unit] = rl(1, 2, 1.seconds).unsafeRunSync()
+        val effect2: IO[Unit] = rl(2, 3, 1.seconds).unsafeRunSync()
 
         var a1: Int = 0
         var a2: Int = 0
@@ -327,10 +317,10 @@ object RateLimiterSpec extends Specification {
 
       "support two tokens on different schedules" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO](1.0)(Sync[IO], ctx.timer[IO]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
-        val effect1: IO[Unit] = rl(Token1, 2, 1.seconds).unsafeRunSync()
-        val effect2: IO[Unit] = rl(Token2, 2, 2.seconds).unsafeRunSync()
+        val effect1: IO[Unit] = rl(1, 2, 1.seconds).unsafeRunSync()
+        val effect2: IO[Unit] = rl(2, 2, 2.seconds).unsafeRunSync()
 
         var a1: Int = 0
         var a2: Int = 0
@@ -372,6 +362,275 @@ object RateLimiterSpec extends Specification {
         ctx.tick(1.seconds)
         a1 mustEqual(6)
         a2 mustEqual(6)
+      }
+    }
+
+    "handle reset request" >> {
+      "reset for unknown key has no effect" in {
+        val ctx = TestContext()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key: Int = 17
+
+        val reset = rl.reset(key)
+        val effectF = rl(key, 1, 1.seconds)
+
+        var a: Int = 0
+
+        val run =
+          (reset >> effectF).flatMap(effect =>
+            IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1))
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(2)
+
+        ctx.tick(1.seconds)
+        a mustEqual(3)
+      }
+
+      "reset for known but unused key" in {
+        val ctx = TestContext()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key: Int = 17
+
+        val reset = rl.reset(key)
+        val effectF = rl(key, 1, 1.seconds)
+
+        var a: Int = 0
+
+        val run =
+          effectF.flatMap(effect =>
+            reset >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1))
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(2)
+
+        ctx.tick(1.seconds)
+        a mustEqual(3)
+      }
+
+      "reset state for known key" in {
+        val ctx = TestContext()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key: Int = 17
+
+        val reset = rl.reset(key)
+        val effectF = rl(key, 1, 1.seconds)
+
+        var a: Int = 0
+
+        val run =
+          effectF.flatMap(effect =>
+            effect >> IO.delay(a += 1) >>
+            reset >>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1))
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(2)
+
+        ctx.tick(1.seconds)
+        a mustEqual(3)
+      }
+    }
+
+    "handle plus one request" >> {
+      "modify state for unknown key" in {
+        val ctx = TestContext()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key: Int = 17
+
+        val plusOne = rl.plusOne(key)
+        val effectF = rl(key, 1, 1.seconds)
+
+        var a: Int = 0
+
+        val run =
+          (plusOne >> effectF).flatMap(effect =>
+            IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1))
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(1)
+
+        ctx.tick(1.seconds)
+        a mustEqual(2)
+      }
+
+      "modify state for known key" in {
+        val ctx = TestContext()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key: Int = 17
+
+        val plusOne = rl.plusOne(key)
+        val effectF = rl(key, 1, 1.seconds)
+
+        var a: Int = 0
+
+        val run =
+          effectF.flatMap(effect =>
+            plusOne >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1))
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(1)
+
+        ctx.tick(1.seconds)
+        a mustEqual(2)
+      }
+    }
+
+    "handle configure request" >> {
+      "add config for unknown key" in {
+        val ctx = TestContext()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key: Int = 17
+
+        val configure = rl.configure(key, RateLimiterConfig(2, 1.seconds))
+        val effectF = rl(key, 1, 1.seconds)
+
+        var a: Int = 0
+
+        val run =
+          (configure >> effectF).flatMap(effect =>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1))
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(2)
+
+        ctx.tick(1.seconds)
+        a mustEqual(4)
+      }
+
+      "ignore config added for known key" in {
+        val ctx = TestContext()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key: Int = 17
+
+        val configure = rl.configure(key, RateLimiterConfig(2, 1.seconds))
+        val effectF = rl(key, 1, 1.seconds)
+
+        var a: Int = 0
+
+        val run =
+          effectF.flatMap(effect =>
+            configure >>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1))
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(1)
+
+        ctx.tick(1.seconds)
+        a mustEqual(2)
+
+        ctx.tick(1.seconds)
+        a mustEqual(3)
+
+        ctx.tick(1.seconds)
+        a mustEqual(4)
+      }
+    }
+
+    "send updates through the updater" >> {
+      "one event per second" in {
+        val ctx = TestContext()
+        val updater = new TestRateLimitUpdater
+        val rl = RateLimiter[IO, Int](1.0, updater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key = 17
+
+        val effect: IO[Unit] = rl(key, 1, 1.seconds).unsafeRunSync()
+
+        updater.configs must containTheSameElementsAs(List(17))
+
+        (effect >> effect >> effect).unsafeRunAsyncAndForget()
+
+        updater.plusOnes must containTheSameElementsAs(List(17))
+        updater.resets must containTheSameElementsAs(List())
+
+        ctx.tick(1.seconds)
+        updater.plusOnes must containTheSameElementsAs(List(17, 17))
+        updater.resets must containTheSameElementsAs(List(17))
+
+        ctx.tick(1.seconds)
+        updater.plusOnes must containTheSameElementsAs(List(17, 17, 17))
+        updater.resets must containTheSameElementsAs(List(17, 17))
+      }
+
+      "two events per second" in {
+        val ctx = TestContext()
+        val updater = new TestRateLimitUpdater
+        val rl = RateLimiter[IO, Int](1.0, updater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key = 17
+
+        val effect: IO[Unit] = rl(key, 2, 1.seconds).unsafeRunSync()
+
+        updater.configs must containTheSameElementsAs(List(17))
+
+        (effect >> effect >> effect >> effect).unsafeRunAsyncAndForget()
+
+        updater.plusOnes must containTheSameElementsAs(List(17, 17))
+        updater.resets must containTheSameElementsAs(List())
+
+        ctx.tick(1.seconds)
+        updater.plusOnes must containTheSameElementsAs(List(17, 17, 17, 17))
+        updater.resets must containTheSameElementsAs(List(17))
+      }
+
+      "two keys" in {
+        val ctx = TestContext()
+        val updater = new TestRateLimitUpdater
+        val rl = RateLimiter[IO, Int](1.0, updater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key1 = 17
+        val key2 = 18
+
+        val effect1: IO[Unit] = rl(key1, 1, 1.seconds).unsafeRunSync()
+        val effect2: IO[Unit] = rl(key2, 2, 1.seconds).unsafeRunSync()
+
+        updater.configs must containTheSameElementsAs(List(17, 18))
+
+        (effect1 >> effect1 >> effect1 >> effect1).unsafeRunAsyncAndForget()
+        (effect2 >> effect2 >> effect2 >> effect2).unsafeRunAsyncAndForget()
+
+        updater.plusOnes must containTheSameElementsAs(List(17, 18, 18))
+        updater.resets must containTheSameElementsAs(List())
+
+        ctx.tick(1.seconds)
+        updater.plusOnes must containTheSameElementsAs(List(17, 18, 18, 17, 18, 18))
+        updater.resets must containTheSameElementsAs(List(17, 18))
+
+        ctx.tick(1.seconds)
+        updater.plusOnes must containTheSameElementsAs(List(17, 18, 18, 17, 18, 18, 17))
+        updater.resets must containTheSameElementsAs(List(17, 18, 17))
+
+        ctx.tick(1.seconds)
+        updater.plusOnes must containTheSameElementsAs(List(17, 18, 18, 17, 18, 18, 17, 17))
+        updater.resets must containTheSameElementsAs(List(17, 18, 17, 17))
       }
     }
   }
