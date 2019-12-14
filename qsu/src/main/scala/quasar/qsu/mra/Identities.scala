@@ -21,17 +21,17 @@ import slamdata.Predef._
 import quasar.{NonTerminal, RenderTree, RenderedTree, Terminal}
 import quasar.RenderTree.ops._
 
-import scala.collection.immutable.{SortedMap, SortedSet}
+import scala.collection.immutable.{BitSet, SortedMap, SortedSet}
 import scala.math.max
 
 import monocle.{Lens, Optional, Prism, PTraversal}
 
 import cats.{Eq, Eval, Foldable, Monoid, Order, Reducible, Show, Traverse}
 import cats.data.NonEmptyList
+import cats.instances.bitSet._
 import cats.instances.int._
 import cats.instances.list._
 import cats.instances.long._
-import cats.instances.set._
 import cats.instances.sortedSet._
 import cats.instances.tuple._
 import cats.kernel.Semilattice
@@ -49,8 +49,8 @@ import scalaz.Applicative
   */
 final class Identities[A] private (
     protected val nextV: Int,
-    protected val roots: Set[Int],
-    protected val ends: Set[Int],
+    protected val roots: BitSet,
+    protected val ends: BitSet,
     protected val g: Identities.G[A]) {
 
     import Identities.{G => IG, MergeState, Node, Vert => IVert}
@@ -58,7 +58,7 @@ final class Identities[A] private (
   /** The number of vectors in the set. */
   def breadth: Int = {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def go(lvl: Set[Int]): Eval[Int] =
+    def go(lvl: BitSet): Eval[Int] =
       Eval.always(lvl.toList) flatMap { vs =>
         vs foldMapM { v =>
           val ins = vin(v).get(g)
@@ -84,7 +84,7 @@ final class Identities[A] private (
   /** The length of the longest vector in the set. */
   def depth: Int = {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def go(lvl: Set[Int], d: Int): Eval[Int] =
+    def go(lvl: BitSet, d: Int): Eval[Int] =
       Eval.always(lvl.toList) flatMap { vs =>
         vs.foldLeftM(d) { (acc, v) =>
           val vt = g(v)
@@ -115,7 +115,7 @@ final class Identities[A] private (
         xs.map(NonEmptyList.one(a) :: _)
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def expand(vs: Set[Int], conj: Boolean, xs: List[Dimensions[Region[A]]])
+    def expand(vs: BitSet, conj: Boolean, xs: List[Dimensions[Region[A]]])
         : Eval[List[Dimensions[Region[A]]]] =
       Eval.always(NonEmptyList.fromList(vs.toList)) flatMap {
         case Some(nel) =>
@@ -133,7 +133,7 @@ final class Identities[A] private (
 
   /** Returns all but the last value of each vector. */
   def initValues: Option[Identities[A]] = {
-    val (g1, ends1) = ends.foldLeft((g, Set[Int]())) {
+    val (g1, ends1) = ends.foldLeft((g, BitSet())) {
       case ((accg, acce), e) =>
         val ins = vin(e).get(g)
         (ins.foldLeft(accg)((ag, i) => vout(i).modify(_ - e)(ag)), acce ++ ins)
@@ -159,9 +159,9 @@ final class Identities[A] private (
       vout(v).get(g).forall(i => vconj(i).nonEmpty(g))
 
     @tailrec
-    def go(toDrop: Set[Int], acce: Set[Int], accr: Set[Int], accg: G): (Set[Int], Set[Int], G) = {
+    def go(toDrop: BitSet, acce: BitSet, accr: BitSet, accg: G): (BitSet, BitSet, G) = {
       val (toDrop1, acce1, accr1, accg1) =
-        toDrop.foldLeft((Set[Int](), acce, accr, accg)) {
+        toDrop.foldLeft((BitSet(), acce, accr, accg)) {
           case ((td, ae, ar, ag), v) =>
             val IVert(n, o, i) = ag(v)
 
@@ -187,7 +187,7 @@ final class Identities[A] private (
         go(toDrop1, acce1, accr1, accg1)
     }
 
-    val (ends1, roots1, g1) = go(ends, Set(), roots, g)
+    val (ends1, roots1, g1) = go(ends, BitSet(), roots, g)
 
     if (roots1.isEmpty)
       None
@@ -210,7 +210,7 @@ final class Identities[A] private (
   def merge(that: Identities[A])(implicit A: Order[A]): Identities[A] = {
     val zmap = SortedMap.empty[Node[A], NonEmptyList[Int]](Order[Node[A]].toOrdering)
 
-    def nodeMap(vs: Set[Int], m: G): SortedMap[Node[A], NonEmptyList[Int]] =
+    def nodeMap(vs: BitSet, m: G): SortedMap[Node[A], NonEmptyList[Int]] =
       vs.foldLeft(zmap) { (ns, v) =>
         val n = vnode(v).get(m)
         ns.updated(n, ns.get(n).fold(NonEmptyList.one(v))(v :: _))
@@ -218,7 +218,7 @@ final class Identities[A] private (
 
     @tailrec
     @SuppressWarnings(Array("org.wartremover.warts.Option2Iterable"))
-    def mergeLvl(thisLvl: Set[Int], thatLvl: Set[Int], s: MergeState, rg: G): (MergeState, G) =
+    def mergeLvl(thisLvl: BitSet, thatLvl: BitSet, s: MergeState, rg: G): (MergeState, G) =
       if (thatLvl.isEmpty) {
         (s, rg)
       } else {
@@ -227,7 +227,7 @@ final class Identities[A] private (
         val (ns, ng) = thatLvl.foldLeft((s, rg)) {
           case ((accs, accg), thatV) =>
             val IVert(n, o, i) = that.g(thatV)
-            val remappedIn = i.flatMap(v => accs.remap.get(v).toSet)
+            val remappedIn = i.flatMap(v => accs.remap.get(v))
 
             val candidate = thisNodes.get(n) flatMap { candidates =>
               candidates.find(c => vin(c).get(g) === remappedIn)
@@ -238,7 +238,7 @@ final class Identities[A] private (
                 (MergeState.remap.modify(_.updated(thatV, thisV))(accs), accg)
 
               case None =>
-                val nextg = remappedIn.foldLeft(accg.updated(accs.nextV, IVert(n, Set[Int](), remappedIn))) {
+                val nextg = remappedIn.foldLeft(accg.updated(accs.nextV, IVert(n, BitSet(), remappedIn))) {
                   case (ng, v) => vout(v).modify(_ + accs.nextV)(ng)
                 }
 
@@ -248,8 +248,8 @@ final class Identities[A] private (
             }
         }
 
-        val nextThis = thisLvl.unorderedFoldMap(vout(_).get(g))
-        val nextThat = thatLvl.unorderedFoldMap(vout(_).get(that.g))
+        val nextThis = collapseBitSets(thisLvl)(vout(_).get(g))
+        val nextThat = collapseBitSets(thatLvl)(vout(_).get(that.g))
 
         mergeLvl(nextThis, nextThat, ns, ng)
       }
@@ -289,11 +289,11 @@ final class Identities[A] private (
   /** The internal size of the representation. */
   def storageSize: Int = {
     @tailrec
-    def go(lvl: Set[Int], ct: Int): Int =
+    def go(lvl: BitSet, ct: Int): Int =
       if (lvl.isEmpty)
         ct
       else
-        go(lvl.unorderedFoldMap(vout(_).get(g)), lvl.size + ct)
+        go(collapseBitSets(lvl)(vout(_).get(g)), lvl.size + ct)
 
     go(roots, 0)
   }
@@ -316,12 +316,12 @@ final class Identities[A] private (
     */
   def zipWithDefined[B, C: Monoid](that: Identities[B])(f: (A, B) => Option[C]): C = {
     @tailrec
-    def zip0(thislvl: Set[Int], thatlvl: Set[Int], out: C): C =
+    def zip0(thislvl: BitSet, thatlvl: BitSet, out: C): C =
       if (thislvl.isEmpty || thatlvl.isEmpty) {
         out
       } else {
         val (nthis, nthat, nout) =
-          thislvl.foldLeft((Set[Int](), Set[Int](), out)) { (t0, thisV) =>
+          thislvl.foldLeft((BitSet(), BitSet(), out)) { (t0, thisV) =>
             thatlvl.foldLeft(t0) {
               case ((thisn, thatn, cacc), thatV) =>
                 val thisVert = g(thisV)
@@ -348,8 +348,8 @@ final class Identities[A] private (
 
     val zset = SortedSet.empty[E](Order[E].toOrdering)
 
-    def edgesAndNext(lvl: Set[Int], gg: G): (SortedSet[(Node[A], Node[A])], Set[Int]) =
-      lvl.foldLeft((zset, Set[Int]())) {
+    def edgesAndNext(lvl: BitSet, gg: G): (SortedSet[(Node[A], Node[A])], BitSet) =
+      lvl.foldLeft((zset, BitSet())) {
         case ((edges, nxt), v) =>
           val vt = gg(v)
 
@@ -361,7 +361,7 @@ final class Identities[A] private (
       }
 
     @tailrec
-    def levelsCompare(thislvl: Set[Int], thatlvl: Set[Int]): Int =
+    def levelsCompare(thislvl: BitSet, thatlvl: BitSet): Int =
       if (thislvl.isEmpty && thatlvl.isEmpty) {
         0
       } else if (thislvl.isEmpty) {
@@ -378,7 +378,7 @@ final class Identities[A] private (
         }
       }
 
-    def nodes(lvl: Set[Int], gg: G): SortedSet[Node[A]] =
+    def nodes(lvl: BitSet, gg: G): SortedSet[Node[A]] =
       lvl.foldLeft(SortedSet.empty[Node[A]](Order[Node[A]].toOrdering)) { (ns, v) =>
         ns + vnode(v).get(gg)
       }
@@ -411,10 +411,10 @@ final class Identities[A] private (
   private def vnode[X](i: Int): Lens[IG[X], Node[X]] =
     vert(i) composeLens IVert.node
 
-  private def vout[X](i: Int): Lens[IG[X], Set[Int]] =
+  private def vout[X](i: Int): Lens[IG[X], BitSet] =
     vert(i) composeLens IVert.out
 
-  private def vin[X](i: Int): Lens[IG[X], Set[Int]] =
+  private def vin[X](i: Int): Lens[IG[X], BitSet] =
     vert(i) composeLens IVert.in[X]
 
   private def add(node: Node[A]): Identities[A] = {
@@ -426,9 +426,12 @@ final class Identities[A] private (
     new Identities(
       nextV + 1,
       roots,
-      Set(nextV),
-      nextG.updated(nextV, IVert(node, Set(), ends)))
+      BitSet(nextV),
+      nextG.updated(nextV, IVert(node, BitSet(), ends)))
   }
+
+  private def collapseBitSets(s: BitSet)(f: Int => BitSet): BitSet =
+    s.foldLeft(BitSet())((a, i) => a | f(i))
 }
 
 object Identities extends IdentitiesInstances {
@@ -454,7 +457,7 @@ object Identities extends IdentitiesInstances {
     fa.reduceLeftTo(one(_))(_ :+ _)
 
   def one[A](a: A): Identities[A] =
-    new Identities(1, Set(0), Set(0), Map(0 -> Vert(Node.snoc(a), Set(), Set())))
+    new Identities(1, BitSet(0), BitSet(0), Map(0 -> Vert(Node.snoc(a), BitSet(), BitSet())))
 
   /** NB: Linear in the size of the fully expanded representation. */
   def values[A, B: Order]: PTraversal[Identities[A], Identities[B], A, B] =
@@ -535,16 +538,16 @@ object Identities extends IdentitiesInstances {
       }
   }
 
-  protected final case class Vert[A](node: Node[A], out: Set[Int], in: Set[Int])
+  protected final case class Vert[A](node: Node[A], out: BitSet, in: BitSet)
 
   protected object Vert {
     def node[A]: Lens[Vert[A], Node[A]] =
       Lens((_: Vert[A]).node)(n => _.copy(node = n))
 
-    def out[A]: Lens[Vert[A], Set[Int]] =
+    def out[A]: Lens[Vert[A], BitSet] =
       Lens((_: Vert[A]).out)(o => _.copy(out = o))
 
-    def in[A]: Lens[Vert[A], Set[Int]] =
+    def in[A]: Lens[Vert[A], BitSet] =
       Lens((_: Vert[A]).in)(i => _.copy(in = i))
   }
 }
