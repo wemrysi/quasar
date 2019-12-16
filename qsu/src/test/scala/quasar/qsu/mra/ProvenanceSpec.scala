@@ -301,20 +301,20 @@ abstract class ProvenanceSpec[
       (p ∨ q).projectStatic(s, t) eqv (p.projectStatic(s, t) ∨ q.projectStatic(s, t))
     }}
 
-    "eliminates matching inject and all other contiguous injects" >> prop { (v: V, t: T, x: S, y: S, z: S) =>
+    "selects matching inject, pruning non-matching vectors" >> prop { (v: V, t: T, x: S, y: S, z: S) =>
         (x =!= y && x =!= z && y =!= z) ==> {
       val p = empty.inflateExtend(v, t)
       val a = p.injectStatic(x, t).injectStatic(y, t)
       val b = p.injectStatic(x, t).injectStatic(z, t)
       val c = p.injectStatic(y, t).injectStatic(x, t)
+      val d = p.projectStatic(y, t)
 
-      val q = a ∧ b ∧ c
-      val r = p ∧ p.injectStatic(y, t)
+      val q = a ∧ b ∧ c ∧ d
 
-      q.projectStatic(x, t) eqv r
+      q.projectStatic(x, t) eqv p.injectStatic(y, t)
     }}
 
-    "eliminates all contiguous injects when none match" >> prop { (v: V, t: T, x: S, y: S, z: S) =>
+    "eliminates all inject-terminating vectors when none match" >> prop { (v: V, t: T, x: S, y: S, z: S) =>
         (x =!= y && x =!= z && y =!= z) ==> {
       val p = empty.inflateExtend(v, t)
       val a = p.injectStatic(x, t).injectStatic(y, t)
@@ -323,20 +323,21 @@ abstract class ProvenanceSpec[
 
       val q = a ∧ b ∧ c
 
-      q.projectStatic(x, t) eqv p
+      q.projectStatic(x, t) eqv empty
     }}
 
     "eliminates inject of same id and type" >> prop { (p: P, s: S) =>
       p.injectStatic(s, t1).projectStatic(s, t1) eqv p
     }
 
-    "does not extend when any injects exist" >> prop { (p: P, s: S, v: V, t: T) =>
+    "does not extend when any injects exist" >> prop { (p: P, x: S, y: S, v: V, t: T) =>
+        (x =!= y) ==> {
       val q = empty.projectStatic(s1, t)
-      val x = p.inflateExtend(v, t)
-      val y = q.injectStatic(s, t)
+      val a = p.inflateExtend(v, t)
+      val b = q.injectStatic(y, t)
 
-      (x ∧ y).projectStatic(s, t) eqv (x ∧ q)
-    }
+      (a ∧ b).projectStatic(x, t) eqv a
+    }}
 
     "affects unions independently" >> prop { (v: V, x: S, y: S, t: T) =>
       val p = empty.inflateExtend(v, t)

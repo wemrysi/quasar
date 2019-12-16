@@ -16,7 +16,7 @@
 
 package quasar.qsu.mra
 
-import slamdata.Predef.{None, Option, Some}
+import slamdata.Predef.{List, None, Option, Some}
 
 import quasar.contrib.cats.boolean._
 import quasar.qscript.OnUndefined
@@ -119,30 +119,48 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
     createOrConj(D.fresh(), p)
 
   def projectStatic(scalarId: S, sort: T, p: P): P = {
-    def applyVec(v: NonEmptyList[NonEmptyList[Dim[S, V, T]]]): Option[NonEmptyList[NonEmptyList[Dim[S, V, T]]]] = {
-      val r = v.reverse
-      val rh = r.head.reverse
+    val matchingInj = D.inject(scalarId, sort)
 
-      val newh =
-        if (rh.head === D.inject(scalarId, sort))
-          rh.tail
-        else
-          rh.toList.dropWhile(D.inject.nonEmpty)
+    def applyVec(
+        ids: Identities[Dim[S, V, T]])(
+        f: NonEmptyList[Dim[S, V, T]] => Option[List[Dim[S, V, T]]])
+        : Option[Identities[Dim[S, V, T]]] = {
 
-      newh.reverse.toNel match {
-        case Some(h) => Some(NonEmptyList(h, r.tail).reverse)
-        case None => r.tail.reverse.toNel
+      val applied = ids.expanded.toList flatMap { v =>
+        val r = v.reverse
+        val rh = r.head.reverse
+
+        f(rh).flatMap(_.reverse.toNel match {
+          case Some(h) => Some(NonEmptyList(h, r.tail).reverse)
+          case None => r.tail.reverse.toNel
+        })
       }
+
+      applied.toNel.map(Identities.collapsed(_))
     }
 
-    def applyIds(ids: Identities[Dim[S, V, T]]): Option[Identities[Dim[S, V, T]]] =
-      if (ids.lastValues.forall(D.inject.isEmpty))
+    def applyIds(ids: Identities[Dim[S, V, T]]): Option[Identities[Dim[S, V, T]]] = {
+      val lvs = ids.lastValues
+
+      if (lvs.forall(D.inject.isEmpty))
         Some(ids :≻ D.project(scalarId, sort))
+      else if (lvs.forall(_ === matchingInj))
+        ids.initValues
+      else if (lvs.exists(_ === matchingInj))
+        applyVec(ids) { hregion =>
+          if (hregion.head === matchingInj)
+            Some(hregion.tail)
+          else
+            None
+        }
       else
-        ids.expanded.toList
-          .flatMap(applyVec(_).toList)
-          .toNel
-          .map(Identities.collapsed(_))
+        applyVec(ids) { hregion =>
+          if (D.inject.isEmpty(hregion.head))
+            Some(hregion.toList)
+          else
+            None
+        }
+    }
 
     if (p.isEmpty)
       Uop.one(Identities(D.project(scalarId, sort)))

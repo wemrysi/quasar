@@ -163,8 +163,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           (FooBar.infRow('name0).prjMap("X").injMap("A") ∧
             FooBar.infRow('name0).prjMap("Y").injMap("B")),
         'name2 ->
-          (FooBar.infRow('name0).prjMap("X") ∧
-            FooBar.infRow('name0).prjMap("Y")))
+          FooBar.infRow('name0).prjMap("Y"))
 
       tree must haveDimensions(dims)
     }
