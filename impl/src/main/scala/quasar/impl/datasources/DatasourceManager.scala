@@ -16,24 +16,18 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{Option, Unit}
-import quasar.Condition
+import slamdata.Predef.{Option, Unit, None}
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
-import quasar.api.datasource.DatasourceError.CreateError
 import quasar.api.resource.ResourcePathType
 
 import scalaz.ISet
 
 /** A primitive facility for managing the lifecycle of datasources. */
-trait DatasourceManager[I, C, T[_[_]], F[_], G[_], R, P <: ResourcePathType] {
-  /** Initialize a datasource as `datasourceId` using the provided `ref`. If a
-    * datasource exists at `datasourceId`, it is shut down.
+private[quasar] trait DatasourceManager[I, C, T[_[_]], F[_], G[_], R, P <: ResourcePathType] {
+  /** Initialize the datasource if it hasn't been already, returns the managed datasource
+      having the given id or `None` if not found
     */
-  def initDatasource(datasourceId: I, ref: DatasourceRef[C])
-      : F[Condition[CreateError[C]]]
-
-  /** Returns the managed datasource having the given id or `None` if not found. */
-  def managedDatasource(datasourceId: I): F[Option[ManagedDatasource[T, F, G, R, P]]]
+  def managedDatasource(datasourceId: I, or: Option[DatasourceRef[C]] = None): F[Option[ManagedDatasource[T, F, G, R, P]]]
 
   /** Returns `ref` devoid of any sensitive information (credentials and the like). */
   def sanitizedRef(ref: DatasourceRef[C]): DatasourceRef[C]

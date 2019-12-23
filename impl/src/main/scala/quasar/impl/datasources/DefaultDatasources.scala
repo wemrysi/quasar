@@ -24,6 +24,7 @@ import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.contrib.iota._
+import quasar.contrib.scalaz._
 import quasar.impl.storage.IndexedStore
 import quasar.qscript.{construction, educatedToTotal, InterpretedRead, QScriptEducated}
 
@@ -43,7 +44,8 @@ import scalaz.syntax.std.option._
 import shims.monadToScalaz
 
 final class DefaultDatasources[
-    F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig,
+    F[_]: Sync: MonadError_[?[_], CreateError[C]],
+    I: Equal, C: Equal, S <: SchemaConfig,
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     R] private (
     freshId: F[I],
@@ -139,12 +141,8 @@ final class DefaultDatasources[
 
     val added = for {
       _ <- EitherT(verifyNameUnique[E](ref.name, i))
-
-      _ <- EitherT(manager.initDatasource(i, ref) map {
-        case Condition.Normal() => ().right
-        case Condition.Abnormal(e) => (e: E).left
-      })
-
+      eiRes <- EitherT(MonadError_[F, CreateError[C]].attempt(manager.managedDatasource(i, Some(ref))))
+        .leftMap((x: CreateError[C]) => (x: E))
       _ <- refs.insert(i, ref).liftM[L]
     } yield ()
 
@@ -206,7 +204,8 @@ final class DefaultDatasources[
 
 object DefaultDatasources {
   def apply[
-      F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig,
+      F[_]: Sync: MonadError_[?[_], CreateError[C]],
+      I: Equal, C: Equal, S <: SchemaConfig,
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       R](
       freshId: F[I],

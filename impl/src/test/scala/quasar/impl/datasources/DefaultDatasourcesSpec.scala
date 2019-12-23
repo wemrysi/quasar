@@ -27,7 +27,7 @@ import quasar.contrib.cats.stateT._
 import quasar.contrib.cats.writerT._
 import quasar.contrib.cats.effect.stateT.catsStateTEffect
 import quasar.contrib.fs2.stream._
-import quasar.contrib.scalaz.MonadState_
+import quasar.contrib.scalaz.{MonadState_, MonadError_}
 import quasar.impl.storage.PureIndexedStore
 
 import DefaultDatasourcesSpec._
@@ -44,24 +44,32 @@ import eu.timepit.refined.auto._
 import fs2.Stream
 import matryoshka.data.Fix
 import monocle.macros.Lenses
+import monocle.{Prism, Lens}
 import scalaz.{-\/, IMap, ISet, Monoid, \/-}
 import scalaz.std.anyVal._
 import scalaz.std.string._
+import scalaz.syntax.show._
 
 import shims.{eqToScalaz, equalToCats, monoidToCats, monoidToScalaz, monadToScalaz, showToCats, showToScalaz}
 
 final class DefaultDatasourcesSpec
     extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] {
 
+  import DefaultDatasourcesSpec._
+  import MockDatasourceManager._
+
   type PathType = ResourcePathType
 
   val monadIdx: MonadState_[DefaultM, Int] =
     MonadState_.zoom[DefaultM](DefaultState.idx)
 
-  implicit val monadInitd: MonadState_[DefaultM, ISet[Int]] =
-    MonadState_.zoom[DefaultM](DefaultState.initd)
+  implicit val monadDSM: MonadState_[DefaultM, MockDSMState[Int, String]] =
+    MonadState_.zoom[DefaultM](dsmLens)
 
-  implicit val monadRefs: MonadState_[DefaultM, Refs] =
+  implicit val monadError: MonadError_[DefaultM, CreateError[String]] =
+    MonadError_.facet[DefaultM](createErrorThrowableP)
+
+  implicit val monadRef: MonadState_[DefaultM, Refs] =
     MonadState_.zoom[DefaultM](DefaultState.refs)
 
   def datasources = mkDatasources(IMap.empty, c => c)(_ => None)
@@ -112,7 +120,7 @@ final class DefaultDatasourcesSpec
           refB >>= datasources.addDatasource
 
         addB.runEmpty.value.map(_ must beLike {
-          case (s, \/-(i)) => s.initd.member(i) must beTrue
+          case (s, \/-(i)) => s.cache.member(i) must beTrue
         }).unsafeRunSync()
       }
 
@@ -133,7 +141,7 @@ final class DefaultDatasourcesSpec
         add.runEmpty.value.map(_ must beLike {
           case (s, -\/(e)) =>
             s.refs.isEmpty must beTrue
-            s.initd.isEmpty must beTrue
+            s.cache.isEmpty must beTrue
             (e: DatasourceError[Int, String]) must_= err3
         }).unsafeRunSync()
       }
@@ -198,7 +206,7 @@ final class DefaultDatasourcesSpec
 
         sdown.runEmpty.run.map(_ must beLike {
           case (sdowns, (s, Condition.Normal())) =>
-            s.initd must_= ISet.empty
+            s.cache must_= IMap.empty
             sdowns must_= List(0)
         }).unsafeRunSync()
       }
@@ -214,11 +222,12 @@ final class DefaultDatasourcesSpec
           i = r.toOption.get
 
           c <- datasources.replaceDatasource(i, b)
-        } yield c
+          res <- datasources.pathIsResource(i, ResourcePath.root())
+        } yield (b, c)
 
         replaced.runEmpty.run.map(_ must beLike {
-          case (sdowns, (s, Condition.Normal())) =>
-            s.initd must_= ISet.singleton(0)
+          case (sdowns, (s, (ref, Condition.Normal()))) =>
+            s.cache must_= IMap.singleton(0, ref)
             sdowns must_= List(0)
         }).unsafeRunSync()
       }
@@ -229,16 +238,17 @@ final class DefaultDatasourcesSpec
           n <- randomName
 
           b = DatasourceRef.name.set(n)(a)
-
           r <- datasources.addDatasource(a)
           i = r.toOption.get
 
           c <- datasources.replaceDatasource(i, b)
-        } yield c
+
+          res <- datasources.pathIsResource(i, ResourcePath.root())
+        } yield (a, c)
 
         renamed.runEmpty.run.map(_ must beLike {
-          case (sdowns, (s, Condition.Normal())) =>
-            s.initd must_= ISet.singleton(0)
+          case (sdowns, (s, (ref, Condition.Normal()))) =>
+            s.cache must_= IMap.singleton(0, ref)
             sdowns must_= Nil
         }).unsafeRunSync()
       }
@@ -263,23 +273,36 @@ final class DefaultDatasourcesSpec
 }
 
 object DefaultDatasourcesSpec {
-  import MockDatasourceManager.{Initialized, Shutdowns}
+  import MockDatasourceManager._
 
   type Refs = IMap[Int, DatasourceRef[String]]
   type DefaultM[A] = StateT[WriterT[IO, Shutdowns[Int], ?], DefaultState, A]
 
+  private final case class CreateException(err: CreateError[String]) extends Exception(err.shows)
+
+  val createErrorThrowableP: Prism[Throwable, CreateError[String]] =
+    Prism.partial[Throwable, CreateError[String]] {
+      case CreateException(err) => err
+    } (CreateException(_))
+
+  val dsmLens: Lens[DefaultState, MockDSMState[Int, String]] =
+    Lens[DefaultState, MockDSMState[Int, String]](
+      (x: DefaultState) => MockDSMState(x.cache, x.refs))( mdst => st =>
+        st.copy(cache = mdst.cache, refs = mdst.refs))
+
+
   @Lenses
-  final case class DefaultState(idx: Int, initd: Initialized[Int], refs: Refs)
+  final case class DefaultState(idx: Int, cache: Refs, refs: Refs)
 
   object DefaultState {
     implicit val monoid: Monoid[DefaultState] =
       new Monoid[DefaultState] {
-        val zero = DefaultState(0, ISet.empty, IMap.empty)
+        val zero = DefaultState(0, IMap.empty, IMap.empty)
 
         def append(x: DefaultState, y: => DefaultState) =
           DefaultState(
             x.idx + y.idx,
-            x.initd union y.initd,
+            x.cache union y.cache,
             x.refs union y.refs)
       }
   }

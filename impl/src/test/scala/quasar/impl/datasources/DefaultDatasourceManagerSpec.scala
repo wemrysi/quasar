@@ -169,7 +169,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
         store.insert(k, ref)
       }
       res <- DefaultDatasourceManager.Builder[Int, Fix, IO]
-        .build(modules(disps), configured, store.lookup(_), limiter)
+        .build(modules(disps), store.lookup(_), limiter)
         .use(f(_, disps, store))
     } yield res
     ioa.unsafeRunSync
@@ -182,10 +182,8 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
     "implicitly available" >> withInitialMgr(IMap(7 -> DatasourceRef(HeavyT, DatasourceName("bar"), Json.jNull))) { (mgr, _, _) =>
       for {
         ds <- mgr.managedDatasource(7)
-        isR <- ds.traverse(_.pathIsResource(ResourcePath.root()))
       } yield {
         ds.map(_.kind) must_= Some(HeavyT)
-        isR must beSome(false)
       }
     }
 
@@ -193,7 +191,6 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       for {
         ds <- mgr.managedDatasource(8)
         // Have to access it as initialization is lazy
-        _ <- ds.traverse(_.pathIsResource(ResourcePath.root()))
         _ <- mgr.shutdownDatasource(8)
         disposed <- disps.get
       } yield {
@@ -217,24 +214,16 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       }
     }
 
-    "error when kind is unsupported" >> withMgr { (mgr, disps, _) =>
-      val unkT = DatasourceType("unknown", 1L)
-
-      mgr.initDatasource(1, DatasourceRef(unkT, DatasourceName("nope"), Json.jNull)) map { c =>
-        c must beAbnormal(DatasourceUnsupported(unkT, modules(disps).keySet))
-      }
-    }
-
-    "error when kind is unsupported and datasource isn't inited" >> withMgr { (mgr, disps, store) =>
+    "error when kind is unsupported" >> withMgr { (mgr, disps, store) =>
       val unkT = DatasourceType("unknown", 1L)
       for {
         _ <- store.insert(1, DatasourceRef(unkT, DatasourceName("nope"), Json.jNull))
-        ds <- mgr.managedDatasource(1)
-        res <- ds.traverse(_.pathIsResource(ResourcePath.root()).attempt)
+        res <- mgr.managedDatasource(1).attempt
       } yield {
-        ds must beSome
         res must beLike {
-          case Some(Left(CreateErrorException(e))) => e === DatasourceUnsupported(unkT, modules(disps).keySet)
+          case Left(CreateErrorException(DatasourceUnsupported(k, ms))) =>
+            k must_= unkT
+            ms must_= modules(disps).keySet
         }
       }
     }
@@ -245,7 +234,6 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       for {
         _ <- store.insert(1, DatasourceRef(LightT, a, Json.jNull))
         ds1 <- mgr.managedDatasource(1)
-        _ <- ds1.traverse(_.pathIsResource(ResourcePath.root()))
         disposed0 <- disps.get
         _ <- store.insert(1, DatasourceRef(HeavyT, a, Json.jNull))
         ds2 <- mgr.managedDatasource(1)
@@ -263,7 +251,6 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
       for {
         _ <- store.insert(3, DatasourceRef(LightT, DatasourceName("f"), Json.jNull))
         ds1 <- mgr.managedDatasource(3)
-        _ <- ds1.traverse(_.pathIsResource(ResourcePath.root()))
         disposed0 <- disps.get
         _ <- store.delete(3)
         ds2 <- mgr.managedDatasource(3)

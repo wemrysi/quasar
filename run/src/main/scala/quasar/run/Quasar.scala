@@ -87,11 +87,6 @@ object Quasar extends Logging {
       : Resource[F, Quasar[F, R, C]] = {
 
     for {
-      configured <-
-        Resource.liftF(
-          datasourceRefs.entries
-            .compile.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _))
-
       _ <- Resource.liftF(warnDuplicates[F, DatasourceModule, DatasourceType](datasourceModules)(_.kind))
       _ <- Resource.liftF(warnDuplicates[F, DestinationModule, DestinationType](destinationModules)(_.destinationType))
 
@@ -103,7 +98,7 @@ object Quasar extends Logging {
         DefaultDatasourceManager.Builder[UUID, Fix, F]
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
-          .build(moduleMap, configured, datasourceRefs.lookup(_), rateLimiter)
+          .build(moduleMap, datasourceRefs.lookup(_), rateLimiter)
 
       destModules = IMap.fromList(destinationModules.map(dest => dest.destinationType -> dest))
 
