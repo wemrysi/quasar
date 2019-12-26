@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.RateLimiter
 import quasar.api.{QueryEvaluator, SchemaConfig}
 import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
-import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
+import quasar.api.destination.{Destination, DestinationRef, DestinationType, Destinations}
 import quasar.api.push.{ResultPush, ResultRender}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.table.{TableRef, Tables}
@@ -29,11 +29,11 @@ import quasar.common.PhaseResultTell
 import quasar.connector.{Datasource, DestinationModule, QueryResult}
 import quasar.contrib.std.uuid._
 import quasar.ejson.implicits._
-import quasar.impl.DatasourceModule
+import quasar.impl.{DatasourceModule, ResourceManager}
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources._
 import quasar.impl.datasources.middleware._
-import quasar.impl.destinations.{DefaultDestinationManager, DefaultDestinations}
+import quasar.impl.destinations._
 import quasar.impl.push.DefaultResultPush
 import quasar.impl.storage.IndexedStore
 import quasar.impl.table.DefaultTables
@@ -90,28 +90,22 @@ object Quasar extends Logging {
       _ <- Resource.liftF(warnDuplicates[F, DatasourceModule, DatasourceType](datasourceModules)(_.kind))
       _ <- Resource.liftF(warnDuplicates[F, DestinationModule, DestinationType](destinationModules)(_.destinationType))
 
-      (dsErrors, onCondition) <- Resource.liftF(DefaultDatasourceErrors[F, UUID])
-
-      moduleMap = IMap.fromList(datasourceModules.map(ds => ds.kind -> ds))
-
-      dsManager <-
-        DefaultDatasourceManager.Builder[UUID, Fix, F]
-          .withMiddleware(AggregatingMiddleware(_, _))
-          .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
-          .build(moduleMap, datasourceRefs.lookup(_), rateLimiter)
-
-      destModules = IMap.fromList(destinationModules.map(dest => dest.destinationType -> dest))
-
       freshUUID = Sync[F].delay(UUID.randomUUID)
 
-      destManager <- Resource.liftF(DefaultDestinationManager.empty[UUID, F](destModules))
-      destinations = DefaultDestinations[UUID, Json, F](freshUUID, destinationRefs, destManager)
+      (dsErrors, onCondition) <- Resource.liftF(DefaultDatasourceErrors[F, UUID])
+      dsModules =
+        DatasourceModules[Fix, F, UUID](datasourceModules, rateLimiter)
+          .withMiddleware(AggregatingMiddleware(_, _))
+          .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
+      dsCache <- ResourceManager[F, UUID, ManagedDatasource[Fix, F, Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
+      datasources <- Resource.liftF(RDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, resourceSchema))
 
-      datasources =
-        DefaultDatasources(freshUUID, datasourceRefs, dsErrors, dsManager, resourceSchema)
+      destModules = DestinationModules[F, UUID](destinationModules)
+      destCache <- ResourceManager[F, UUID, Destination[F]]
+      destinations <- Resource.liftF(RDestinations(freshUUID, destinationRefs, destCache, destModules))
 
       lookupRunning =
-        (id: UUID) => dsManager.managedDatasource(id).map(_.map(_.modify(reifiedAggregateDs)))
+        (id: UUID) => dsCache.get(id).map(_.map(_.modify(reifiedAggregateDs)))
 
       sqlEvaluator = Sql2QueryEvaluator(qscriptEvaluator(lookupRunning))
 
