@@ -86,6 +86,14 @@ object Quasar extends Logging {
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
 
+    val dsModules =
+      DatasourceModules[Fix, F, UUID](datasourceModules, rateLimiter)
+        .withMiddleware(AggregatingMiddleware(_, _))
+        .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
+
+    val destModules =
+      DestinationModules[F, UUID](destinationModules)
+
     for {
       _ <- Resource.liftF(warnDuplicates[F, DatasourceModule, DatasourceType](datasourceModules)(_.kind))
       _ <- Resource.liftF(warnDuplicates[F, DestinationModule, DestinationType](destinationModules)(_.destinationType))
@@ -93,14 +101,10 @@ object Quasar extends Logging {
       freshUUID = Sync[F].delay(UUID.randomUUID)
 
       (dsErrors, onCondition) <- Resource.liftF(DefaultDatasourceErrors[F, UUID])
-      dsModules =
-        DatasourceModules[Fix, F, UUID](datasourceModules, rateLimiter)
-          .withMiddleware(AggregatingMiddleware(_, _))
-          .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
+
       dsCache <- ResourceManager[F, UUID, ManagedDatasource[Fix, F, Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
       datasources <- Resource.liftF(RDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, resourceSchema))
 
-      destModules = DestinationModules[F, UUID](destinationModules)
       destCache <- ResourceManager[F, UUID, Destination[F]]
       destinations <- Resource.liftF(RDestinations(freshUUID, destinationRefs, destCache, destModules))
 

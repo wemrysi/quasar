@@ -38,7 +38,7 @@ object ResourceManager {
     val fPair = Ref.of[F, Map[I, (A, F[Unit])]](Map.empty) map { ref =>
       val mgr = new ResourceManager[F, I, A] {
         def manage(i: I, allocated: (A, F[Unit])): F[Unit] =
-          ref.update(_.updated(i, allocated))
+          shutdown(i) >> ref.update(_.updated(i, allocated))
         def shutdown(i: I): F[Unit] = for {
           current <- ref.get
           _ <- current.get(i).traverse_(_._2)

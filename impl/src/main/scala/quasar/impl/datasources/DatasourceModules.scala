@@ -25,7 +25,7 @@ import quasar.api.resource._
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.MonadCreateErr
 import quasar.impl.IncompatibleModuleException.linkDatasource
-import quasar.connector.{MonadResourceErr, QueryResult}
+import quasar.connector.{Datasource, MonadResourceErr, QueryResult}
 import quasar.contrib.scalaz._
 import quasar.qscript.{InterpretedRead, QScriptEducated, MonadPlannerErr}
 
@@ -35,12 +35,13 @@ import argonaut.Argonaut.jEmptyObject
 import fs2.Stream
 
 import cats.{Applicative, ApplicativeError, MonadError}
-import cats.effect.{Resource, ConcurrentEffect, ContextShift, Timer}
+import cats.effect.{Resource, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.syntax.applicative._
 import cats.syntax.bifunctor._
 import cats.instances.either._
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.ISet
+import scalaz.{ISet, ~>}
+
 
 import scala.concurrent.ExecutionContext
 
@@ -57,6 +58,29 @@ trait DatasourceModules[T[_[_]], F[_], G[_], I, C, R, P <: ResourcePathType] { s
     new DatasourceModules[T, F, H, I, C, S, Q] {
       def create(i: I, ref: DatasourceRef[C]): Resource[F, ManagedDatasource[T, F, H, S, Q]] =
         self.create(i, ref).evalMap { (mds: ManagedDatasource[T, F, G, R, P]) => f(i, mds) }
+      def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
+        self.sanitizeRef(inp)
+      def supportedTypes: F[ISet[DatasourceType]] =
+        self.supportedTypes
+    }
+
+  def withFinalizer(f: (I, ManagedDatasource[T, F, G, R, P]) => F[Unit])(implicit F: Sync[F]): DatasourceModules[T, F, G, I, C, R, P] =
+    new DatasourceModules[T, F, G, I, C, R, P] {
+      def create(i: I, ref: DatasourceRef[C]): Resource[F, ManagedDatasource[T, F, G, R, P]] =
+        self.create(i, ref)
+      /*flatMap { (mds: ManagedDatasource[T, F, G, R, P]) =>
+          Resource.make(mds)(x => f(i, x))
+        }*/
+      def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
+        self.sanitizeRef(inp)
+      def supportedTypes: F[ISet[DatasourceType]] =
+        self.supportedTypes
+    }
+
+  def widenPathType[PP >: P <: ResourcePathType](implicit AF: Applicative[F]): DatasourceModules[T, F, G, I, C, R, PP] =
+    new DatasourceModules[T, F, G, I, C, R, PP] {
+      def create(i: I, ref: DatasourceRef[C]): Resource[F, ManagedDatasource[T, F, G, R, PP]] =
+        self.create(i, ref) map { ManagedDatasource.widenPathType[T, F, G, R, P, PP](_) }
       def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
         self.sanitizeRef(inp)
       def supportedTypes: F[ISet[DatasourceType]] =

@@ -36,7 +36,7 @@ import java.io.IOException
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.data.{StateT, WriterT}
-import cats.effect.IO
+import cats.effect.{Resource, IO}
 import cats.instances.list._
 import cats.syntax.applicative._
 import cats.syntax.flatMap._
@@ -72,7 +72,11 @@ final class DefaultDatasourcesSpec
   implicit val monadRef: MonadState_[DefaultM, Refs] =
     MonadState_.zoom[DefaultM](DefaultState.refs)
 
-  def datasources = mkDatasources(IMap.empty, c => c)(_ => None)
+  def datasources =
+    Resource.pure[DefaultM, Datasources[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type]] {
+      mkDatasources(IMap.empty, c => c)(_ => None)
+    }
+  def dses = mkDatasources(IMap.empty, c => c)(_ => None)
   def sanitizedDatasources = mkDatasources(IMap.empty, _ => "sanitized")(_ => None)
 
   def supportedType = DatasourceType("test-type", 3L)
@@ -109,7 +113,6 @@ final class DefaultDatasourcesSpec
         def apply(c: MockSchemaConfig.type, r: (ResourcePath, Unit)) =
           MockSchemaConfig.MockSchema.pure[DefaultM]
       }
-
     DefaultDatasources(freshId, refs, errors, manager, schema)
   }
 
@@ -117,7 +120,7 @@ final class DefaultDatasourcesSpec
     "add datasource" >> {
       "initializes datasource" >> {
         val addB =
-          refB >>= datasources.addDatasource
+          refB >>= dses.addDatasource
 
         addB.runEmpty.value.map(_ must beLike {
           case (s, \/-(i)) => s.cache.member(i) must beTrue
@@ -200,8 +203,8 @@ final class DefaultDatasourcesSpec
       "shutdown existing" >> {
         val sdown = for {
           a <- refA
-          _ <- datasources.addDatasource(a)
-          cond <- datasources.removeDatasource(0)
+          _ <- dses.addDatasource(a)
+          cond <- dses.removeDatasource(0)
         } yield cond
 
         sdown.runEmpty.run.map(_ must beLike {
@@ -218,11 +221,11 @@ final class DefaultDatasourcesSpec
           a <- refA
           b <- refB
 
-          r <- datasources.addDatasource(a)
+          r <- dses.addDatasource(a)
           i = r.toOption.get
 
-          c <- datasources.replaceDatasource(i, b)
-          res <- datasources.pathIsResource(i, ResourcePath.root())
+          c <- dses.replaceDatasource(i, b)
+          res <- dses.pathIsResource(i, ResourcePath.root())
         } yield (b, c)
 
         replaced.runEmpty.run.map(_ must beLike {
@@ -238,12 +241,12 @@ final class DefaultDatasourcesSpec
           n <- randomName
 
           b = DatasourceRef.name.set(n)(a)
-          r <- datasources.addDatasource(a)
+          r <- dses.addDatasource(a)
           i = r.toOption.get
 
-          c <- datasources.replaceDatasource(i, b)
+          c <- dses.replaceDatasource(i, b)
 
-          res <- datasources.pathIsResource(i, ResourcePath.root())
+          res <- dses.pathIsResource(i, ResourcePath.root())
         } yield (a, c)
 
         renamed.runEmpty.run.map(_ must beLike {
