@@ -43,7 +43,7 @@ import scalaz.syntax.std.boolean._
 
 import shims.{monadToScalaz, equalToCats}
 
-private[quasar] final class RDatasources[
+private[quasar] final class DefaultDatasources[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: Sync: MonadError_[?[_], CreateError[C]],
     I: Equal, C: Equal, S <: SchemaConfig,
@@ -227,7 +227,7 @@ private[quasar] final class RDatasources[
   }
 }
 
-object RDatasources {
+object DefaultDatasources {
   def apply[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: Sync: MonadError_[?[_], CreateError[C]],
@@ -239,9 +239,9 @@ object RDatasources {
     cache: ResourceManager[F, I, ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
     errors: DatasourceErrors[F, I],
     schema: ResourceSchema[F, S, (ResourcePath, R)])
-    : F[RDatasources[T, F, I, C, S, R]] = {
+    : F[DefaultDatasources[T, F, I, C, S, R]] = {
     CachedGetter(refs.lookup(_)).map { getter =>
-      new RDatasources(freshId, refs, modules, getter, cache, errors, schema)
+      new DefaultDatasources(freshId, refs, modules, getter, cache, errors, schema)
     }
   }
 }

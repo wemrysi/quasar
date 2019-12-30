@@ -60,7 +60,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import shims.{orderToScalaz, showToScalaz, applicativeToScalaz, monoidKToScalaz, showToCats, monadToScalaz}
 
-object RDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type] with ConditionMatchers {
+object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type] with ConditionMatchers {
   sequential
   implicit val tmr = IO.timer(global)
   type PathType = ResourcePathType
@@ -172,7 +172,7 @@ object RDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json,
       refs <- Resource.liftF(fRefs)
       cache <- rCache
       result <- Resource.liftF {
-        RDatasources[Fix, IO, String, Json, MockSchemaConfig.type, QueryResult[IO]](freshId, refs, modules, cache, errors, schema)
+        DefaultDatasources[Fix, IO, String, Json, MockSchemaConfig.type, QueryResult[IO]](freshId, refs, modules, cache, errors, schema)
       }
     } yield (result, refs, starts, shuts)
   }

@@ -103,10 +103,10 @@ object Quasar extends Logging {
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
 
       dsCache <- ResourceManager[F, UUID, ManagedDatasource[Fix, F, Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
-      datasources <- Resource.liftF(RDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, resourceSchema))
+      datasources <- Resource.liftF(DefaultDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, resourceSchema))
 
       destCache <- ResourceManager[F, UUID, Destination[F]]
-      destinations <- Resource.liftF(RDestinations(freshUUID, destinationRefs, destCache, destModules))
+      destinations <- Resource.liftF(DefaultDestinations(freshUUID, destinationRefs, destCache, destModules))
 
       lookupRunning =
         (id: UUID) => dsCache.get(id).map(_.map(_.modify(reifiedAggregateDs)))

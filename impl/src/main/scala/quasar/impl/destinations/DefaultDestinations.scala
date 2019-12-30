@@ -38,7 +38,7 @@ import scalaz.syntax.std.boolean._
 
 import shims.{monadToScalaz, equalToCats}
 
-private[quasar] final class RDestinations[
+private[quasar] final class DefaultDestinations[
     F[_]: Sync: MonadError_[?[_], CreateError[C]],
     I: Order, C: Equal](
     freshId: F[I],
@@ -181,14 +181,14 @@ private[quasar] final class RDestinations[
     }
 }
 
-object RDestinations {
+object DefaultDestinations {
   def apply[F[_]: Sync: MonadError_[?[_], CreateError[C]], I: Order, C: Equal](
       freshId: F[I],
       refs: IndexedStore[F, I, DestinationRef[C]],
       cache: ResourceManager[F, I, Destination[F]],
       modules: DestinationModules[F, I, C])
-      : F[RDestinations[F, I, C]] = for {
+      : F[DefaultDestinations[F, I, C]] = for {
     errs <- Ref.of[F, IMap[I, Exception]](IMap.empty)
     getter <- CachedGetter(refs.lookup(_))
-  } yield new RDestinations(freshId, refs, cache, getter, modules, errs)
+  } yield new DefaultDestinations(freshId, refs, cache, getter, modules, errs)
 }

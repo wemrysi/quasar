@@ -48,7 +48,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import shims.{showToCats, showToScalaz, orderToScalaz, applicativeToScalaz}
 
-object RDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionMatchers {
+object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionMatchers {
   sequential
   implicit val tm = IO.timer(global)
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
@@ -81,7 +81,7 @@ object RDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionMatcher
     for {
       refs <- Resource.liftF(fRefs)
       cache <- rCache
-      result <- Resource.liftF(RDestinations(freshId, refs, cache, modules))
+      result <- Resource.liftF(DefaultDestinations(freshId, refs, cache, modules))
     } yield (refs, result, cache)
   }
 
