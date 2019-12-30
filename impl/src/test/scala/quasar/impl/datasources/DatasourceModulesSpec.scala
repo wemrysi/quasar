@@ -53,7 +53,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import shims.{applicativeToScalaz, monoidKToScalaz, showToCats, showToScalaz}
 
-object DatasourceModulesSpecextends extends EffectfulQSpec[IO] {
+object DatasourceModulesSpec extends EffectfulQSpec[IO] {
   implicit val tmr = IO.timer(global)
 
   final case class PlannerErrorException(pe: PlannerError)

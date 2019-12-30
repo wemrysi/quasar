@@ -49,7 +49,7 @@ import scalaz.syntax.std.boolean._
 
 import shims.{functorToCats, monadToScalaz, equalToCats}
 
-final class RDatasources[
+private[quasar] final class RDatasources[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: Sync: MonadError_[?[_], CreateError[C]],
     I: Equal, C: Equal, S <: SchemaConfig,
@@ -212,9 +212,10 @@ final class RDatasources[
     type Res[A] = EitherT[F, E, A]
     type L[M[_], A] = EitherT[M, E, A]
     lazy val error: Res[MDS] = EitherT.pureLeft(datasourceNotFound[I, E](i))
-    getter(i).liftM[L].flatMap {
+    getter(i).liftM[L] flatMap {
       case Empty => error
-      case Removed(_) => cache.shutdown(i).liftM[L] >> error
+      case Removed(_) =>
+        cache.shutdown(i).liftM[L] >> error
       case Inserted(ref) => for {
         allocated <- modules.create(i, ref).allocated.liftM[L]
         _ <- cache.manage(i, allocated).liftM[L]

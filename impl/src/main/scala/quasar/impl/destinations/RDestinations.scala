@@ -41,7 +41,7 @@ import scalaz.syntax.std.boolean._
 
 import shims.{monadToScalaz, equalToCats}
 
-final class RDestinations[
+private[quasar] final class RDestinations[
     F[_]: Sync: MonadError_[?[_], CreateError[C]],
     I: Order, C: Equal](
     freshId: F[I],

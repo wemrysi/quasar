@@ -67,10 +67,9 @@ trait DatasourceModules[T[_[_]], F[_], G[_], I, C, R, P <: ResourcePathType] { s
   def withFinalizer(f: (I, ManagedDatasource[T, F, G, R, P]) => F[Unit])(implicit F: Sync[F]): DatasourceModules[T, F, G, I, C, R, P] =
     new DatasourceModules[T, F, G, I, C, R, P] {
       def create(i: I, ref: DatasourceRef[C]): Resource[F, ManagedDatasource[T, F, G, R, P]] =
-        self.create(i, ref)
-      /*flatMap { (mds: ManagedDatasource[T, F, G, R, P]) =>
-          Resource.make(mds)(x => f(i, x))
-        }*/
+        self.create(i, ref) flatMap { (mds: ManagedDatasource[T, F, G, R, P]) =>
+          Resource.make(mds.pure[F])(x => f(i, x))
+        }
       def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
         self.sanitizeRef(inp)
       def supportedTypes: F[ISet[DatasourceType]] =

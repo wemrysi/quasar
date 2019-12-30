@@ -18,7 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.{RateLimiter, ScalarStages}
+import quasar.{RateLimiter, ScalarStages, ConditionMatchers, Condition}
 import quasar.api.MockSchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
@@ -42,7 +42,9 @@ import cats.effect.concurrent.Ref
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 import cats.syntax.functor._
+import cats.syntax.traverse._
 import cats.instances.string._
+import cats.instances.option._
 
 import eu.timepit.refined.auto._
 
@@ -50,16 +52,16 @@ import fs2.Stream
 
 import matryoshka.data.Fix
 
-import scalaz.IMap
+import scalaz.{IMap, \/, \/-, -\/}
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import skolems._
 import shims.{orderToScalaz, showToScalaz, applicativeToScalaz, monoidKToScalaz, showToCats, monadToScalaz}
 
-object RDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type] {
+object RDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type] with ConditionMatchers {
+  sequential
   implicit val tmr = IO.timer(global)
   type PathType = ResourcePathType
 
@@ -98,17 +100,24 @@ object RDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json,
         }
     }
 
-  def lightMod: DatasourceModule = DatasourceModule.Lightweight {
+  def lightMod(
+      mp: Map[Json, InitializationError[Json]],
+      sanitize: Option[Json => Json] = None)
+      : DatasourceModule = DatasourceModule.Lightweight {
     new LightweightDatasourceModule {
       val kind = supportedType
-      def sanitizeConfig(config: Json): Json = config
+
+      def sanitizeConfig(config: Json): Json = sanitize match {
+        case None => config
+        case Some(f) => f(config)
+      }
 
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
           config: Json,
           rateLimiter: RateLimiter[F])(
           implicit ec: ExecutionContext)
           : Resource[F, R[F, InterpretedRead[ResourcePath]]] = {
-        val ds: R[F, InterpretedRead[ResourcePath]] =
+        lazy val ds: R[F, InterpretedRead[ResourcePath]] =
           Right {
             EmptyDatasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], ResourcePathType.Physical](
               supportedType,
@@ -117,16 +126,23 @@ object RDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json,
                 Stream.empty,
                 ScalarStages.Id))
           }
-        Resource.make(ds.pure[F])(x => ().pure[F])
+        val result = mp.get(config) match {
+          case None => ds
+          case Some(e) => Left(e): R[F, InterpretedRead[ResourcePath]]
+        }
+        Resource.make(result.pure[F])(x => ().pure[F])
       }
     }
   }
 
   val pool: BlockingContext = BlockingContext.cached("rdatasources-spec")
 
-  def datasources: Resource[IO, Self] = prepare.map(_._1)
+  def datasources: Resource[IO, Self] = prepare(Map()).map(_._1)
 
-  def prepare: Resource[IO, (Self, IndexedStore[IO, String, DatasourceRef[Json]], Ref[IO, List[String]], Ref[IO, List[String]])] = {
+  def prepare(
+      mp: Map[Json, InitializationError[Json]],
+      errorMap: Option[Ref[IO, IMap[String, Exception]]] = None,
+      sanitize: Option[Json => Json] = None) = {
     val freshId = IO(java.util.UUID.randomUUID.toString())
     val fRefs: IO[IndexedStore[IO, String, DatasourceRef[Json]]] =
       IO(new ConcurrentHashMap[String, DatasourceRef[Json]]()).map { (mp: ConcurrentHashMap[String, DatasourceRef[Json]]) =>
@@ -138,14 +154,17 @@ object RDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json,
         def apply(c: MockSchemaConfig.type, r: (ResourcePath, QueryResult[IO])) =
           MockSchemaConfig.MockSchema.pure[IO]
       }
-    val errors = DatasourceErrors.fromMap((IMap(): IMap[String, Exception]).pure[IO])
+    val errors = DatasourceErrors.fromMap { errorMap match {
+      case None => IMap.empty[String, Exception].pure[IO]
+      case Some(e) => e.get
+    } }
     for {
       rateLimiter <- Resource.liftF(RateLimiter[IO](1.0))
       starts <- Resource.liftF(Ref.of[IO, List[String]](List()))
       shuts <- Resource.liftF(Ref.of[IO, List[String]](List()))
 
       modules = {
-        DatasourceModules[Fix, IO, String](List(lightMod), rateLimiter)
+        DatasourceModules[Fix, IO, String](List(lightMod(mp, sanitize)), rateLimiter)
           .widenPathType[PathType]
           .withMiddleware((i: String, mds: MDS) => starts.update(i :: _) as mds)
           .withFinalizer((i: String, mds: MDS) => shuts.update(i :: _))
@@ -163,4 +182,187 @@ object RDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json,
   def validConfigs = (jString("one"), jString("two"))
   val schemaConfig = MockSchemaConfig
   def gatherMultiple[A](as: Stream[IO, A]) = as.compile.toList
+
+  "implementation specific" >> {
+    "add datasource" >> {
+      "initializes datasource" >>* {
+        for {
+          ((dses, _, starts, _), finalize) <- prepare(Map()).allocated
+          b <- refB
+          i0 <- dses.addDatasource(b)
+          _ <- finalize
+          started <- starts.get
+          _ <- finalize
+        } yield {
+          i0 must beLike {
+            case \/-(i) => List(i) === started
+          }
+        }
+      }
+      "doesn't store config when initialization fails" >>* {
+        val err3: InitializationError[Json] =
+          MalformedConfiguration(supportedType, jString("three"), "3 isn't a config!")
+        for {
+          ((dses, refs, _, _), finalize) <- prepare(Map(jString("three") -> err3)).allocated
+          a <- refA
+          _ <- dses.addDatasource(DatasourceRef.config.set(jString("three"))(a)).attempt
+          _ <- finalize
+          entries <- refs.entries.compile.toList
+        } yield {
+          entries === List()
+        }
+      }
+    }
+    "remove datasource" >> {
+      "shutdown existing" >>* {
+        for {
+          ((dses, _, starts, shuts), finalize) <- prepare(Map()).allocated
+          a <- refA
+          added <- dses.addDatasource(a)
+          mbi = added.toOption
+          cond <- mbi.traverse(dses.removeDatasource(_))
+          started <- starts.get
+          ended <- shuts.get
+          _ <- finalize
+        } yield {
+          cond must beLike {
+            case Some(c) =>
+              c must beNormal
+          }
+          mbi must beLike {
+            case Some(x) =>
+              started === List(x)
+              ended === List(x)
+          }
+        }
+      }
+    }
+    "replace datasource" >> {
+      "updates manager" >>* {
+        for {
+          a <- refA
+          b <- refB
+          ((dses, _, starts, shuts), finalize) <- prepare(Map()).allocated
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          c <- dses.replaceDatasource(i, b)
+          started <- starts.get
+          ended <- shuts.get
+          _ <- finalize
+        } yield {
+          started === List(i, i)
+          ended === List(i)
+          c must beNormal
+        }
+      }
+      "doesn't update manager when only name changed" >>* {
+        for {
+          a <- refA
+          n <- randomName
+          b = DatasourceRef.name.set(n)(a)
+          ((dses, refs, starts, shuts), finalize) <- prepare(Map()).allocated
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          c <- dses.replaceDatasource(i, b)
+          started <- starts.get
+          ended <- shuts.get
+          mbB <- refs.lookup(i)
+          _ <- finalize
+        } yield {
+          started === List(i)
+          ended === List()
+          c must beNormal
+          mbB must beSome(b)
+        }
+      }
+    }
+    "sanitize config" >> {
+      "ref is sanitized" >>* {
+        val sanitize: Json => Json = x => jString("sanitized")
+        for {
+          a <- refA
+          ((dses, _, _, _), finalize) <- prepare(Map(), None, Some(sanitize)).allocated
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          l <- dses.datasourceRef(i)
+          _ <- finalize
+        } yield {
+          l must be_\/-(a.copy(config = sanitize(a.config)))
+        }
+      }
+    }
+    "lookup status" >> {
+      "include errors" >>* {
+        for {
+          ref <- Ref.of[IO, IMap[String, Exception]](IMap.empty)
+          ((dses, _, _, _), finalize) <- prepare(Map(), Some(ref), None).allocated
+          a <- refA
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          _ <- ref.update(_.insert(i, new IOException()))
+          r <- dses.datasourceStatus(i)
+          _ <- finalize
+        } yield {
+          r must beLike {
+            case \/-(Condition.Abnormal(ex)) => ex must beAnInstanceOf[IOException]
+          }
+        }
+
+      }
+    }
+    "clustering" >> {
+      "new ref appeared" >>* {
+        for {
+          ((dses, refs, starts, _), finalize) <- prepare(Map()).allocated
+          a <- refA
+          _ <- refs.insert("foo", a)
+          res <- dses.pathIsResource("foo", ResourcePath.root())
+          started <- starts.get
+          _ <- finalize
+        } yield {
+          res.toOption must beSome(false)
+          started === List("foo")
+        }
+      }
+      "ref disappered" >>* {
+        for {
+          ((dses, refs, starts, shuts), finalize) <- prepare(Map()).allocated
+          a <- refA
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          res0 <- dses.pathIsResource(i, ResourcePath.root())
+          _ <- refs.delete(i)
+          res1 <- dses.pathIsResource(i, ResourcePath.root())
+          ended <- shuts.get
+          started <- starts.get
+          _ <- finalize
+        } yield {
+          // Note, that we count resource init and finalize by datasource modules, I couldn't come up
+          // with any way of unifying inner `F[_]` in lightweightdatasource :(
+          res1 must be_-\/
+          started === List(i, i)
+          ended === List(i, i)
+        }
+      }
+      "ref updated" >>* {
+        for {
+          ((dses, refs, starts, shuts), finalize) <- prepare(Map()).allocated
+          a <- refA
+          _ <- refs.insert("foo", a)
+          res0 <- dses.pathIsResource("foo", ResourcePath.root())
+          b <- refB
+          _ <- refs.insert("foo", b)
+          res1 <- dses.pathIsResource("foo", ResourcePath.root())
+          ended <- shuts.get
+          started <- starts.get
+          _ <- finalize
+        } yield {
+          res0.toOption must beSome(false)
+          res1.toOption must beSome(false)
+          started === List("foo", "foo")
+          ended === List("foo")
+        }
+      }
+    }
+  }
 }

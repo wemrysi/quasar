@@ -86,11 +86,6 @@ object Quasar extends Logging {
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
 
-    val dsModules =
-      DatasourceModules[Fix, F, UUID](datasourceModules, rateLimiter)
-        .withMiddleware(AggregatingMiddleware(_, _))
-        .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
-
     val destModules =
       DestinationModules[F, UUID](destinationModules)
 
@@ -101,6 +96,11 @@ object Quasar extends Logging {
       freshUUID = Sync[F].delay(UUID.randomUUID)
 
       (dsErrors, onCondition) <- Resource.liftF(DefaultDatasourceErrors[F, UUID])
+
+      dsModules =
+        DatasourceModules[Fix, F, UUID](datasourceModules, rateLimiter)
+          .withMiddleware(AggregatingMiddleware(_, _))
+          .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
 
       dsCache <- ResourceManager[F, UUID, ManagedDatasource[Fix, F, Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
       datasources <- Resource.liftF(RDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, resourceSchema))
