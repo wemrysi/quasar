@@ -25,29 +25,23 @@ import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
-import quasar.impl.{CachedGetter, DatasourceModule, ResourceManager}, CachedGetter.Signal._
+import quasar.impl.{CachedGetter, ResourceManager}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 import quasar.qscript.{construction, educatedToTotal, InterpretedRead, QScriptEducated}
 
-import cats.Eq
 import cats.effect.Sync
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 
 import fs2.Stream
 
-import argonaut.Argonaut.jEmptyObject
-import argonaut.{Json, JsonScalaz}, JsonScalaz._
-
-import scalaz.{\/, ISet, \/-, -\/, EitherT, Equal}
-import scalaz.std.option._
+import scalaz.{\/, ISet, EitherT, Equal}
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
-import scalaz.syntax.monadTrans._
 import scalaz.syntax.std.boolean._
 
-import shims.{functorToCats, monadToScalaz, equalToCats}
+import shims.{monadToScalaz, equalToCats}
 
 private[quasar] final class RDatasources[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,

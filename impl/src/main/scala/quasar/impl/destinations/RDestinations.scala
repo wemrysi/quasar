@@ -21,20 +21,17 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
-import quasar.connector.{DestinationModule, MonadResourceErr}
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.{CachedGetter, ResourceManager}, CachedGetter.Signal._
-import quasar.impl.IncompatibleModuleException.linkDestination
 import quasar.impl.storage.IndexedStore
 
-import cats.effect.{Sync, ContextShift, Timer, Resource}
+import cats.effect.Sync
 import cats.effect.concurrent.Ref
 
 import fs2.Stream
 
-import scalaz.{\/, -\/, \/-, Bifunctor, Equal, EitherT, IMap, ISet, OptionT, Order}
+import scalaz.{\/, Equal, EitherT, IMap, ISet, OptionT, Order}
 import scalaz.syntax.monad._
-import scalaz.syntax.monadTrans._
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.std.boolean._

@@ -22,7 +22,7 @@ import quasar.ConditionMatchers
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.concurrent.BlockingContext
-import quasar.connector.{DestinationModule, ResourceError}
+import quasar.connector.ResourceError
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.ResourceManager
 import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
@@ -40,8 +40,6 @@ import cats.syntax.applicativeError._
 import cats.syntax.traverse._
 
 import eu.timepit.refined.auto._
-
-import fs2.Stream
 
 import scalaz.ISet
 

@@ -25,9 +25,9 @@ import quasar.api.resource._
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.MonadCreateErr
 import quasar.impl.IncompatibleModuleException.linkDatasource
-import quasar.connector.{Datasource, MonadResourceErr, QueryResult}
+import quasar.connector.{MonadResourceErr, QueryResult}
 import quasar.contrib.scalaz._
-import quasar.qscript.{InterpretedRead, QScriptEducated, MonadPlannerErr}
+import quasar.qscript.MonadPlannerErr
 
 import argonaut.Json
 import argonaut.Argonaut.jEmptyObject
@@ -40,8 +40,7 @@ import cats.syntax.applicative._
 import cats.syntax.bifunctor._
 import cats.instances.either._
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.{ISet, ~>}
-
+import scalaz.ISet
 
 import scala.concurrent.ExecutionContext
 

@@ -25,8 +25,6 @@ import cats.syntax.eq._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 
-import quasar.contrib.scalaz._
-
 import CachedGetter._
 
 trait CachedGetter[F[_], I, A] extends (I => F[Signal[A]]) {

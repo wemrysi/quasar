@@ -52,7 +52,7 @@ import fs2.Stream
 
 import matryoshka.data.Fix
 
-import scalaz.{IMap, \/, \/-, -\/}
+import scalaz.{IMap, \/-}
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext

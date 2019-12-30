@@ -23,7 +23,6 @@ import quasar.EffectfulQSpec
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.api.push.RenderConfig
-import quasar.api.resource._
 import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
 
@@ -32,7 +31,6 @@ import cats.instances.int._
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 import cats.syntax.either._
-import cats.syntax.functor._
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Resource, Timer}
 
 import argonaut.Json
@@ -42,7 +40,6 @@ import eu.timepit.refined.auto._
 
 import fs2.Stream
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import scalaz.{NonEmptyList, ISet}
