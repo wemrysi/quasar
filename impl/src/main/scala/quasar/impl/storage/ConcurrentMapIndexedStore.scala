@@ -49,7 +49,7 @@ final class ConcurrentMapIndexedStore[F[_]: Sync: ContextShift, K, V](
   def entries: Stream[F, (K, V)] = for {
     iterator <- Stream.eval(evalOnPool(F.delay(mp.entrySet.iterator.asScala)))
     entry <- evalStreamOnPool(
-      Stream.fromIterator[F, java.util.Map.Entry[K, V]](iterator))
+      Stream.fromIterator[F](iterator))
   } yield (entry.getKey, entry.getValue)
 
   def lookup(k: K): F[Option[V]] =

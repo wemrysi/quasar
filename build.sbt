@@ -271,7 +271,7 @@ lazy val impl = project
       "com.slamdata"   %% "tectonic-fs2"             % tectonicVersion.value,
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
       "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
-      "org.typelevel"  %% "jawn-argonaut"            % jawnVersion,
+      "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
       "org.typelevel"  %% "jawn-util"                % jawnVersion,
       "io.atomix"      % "atomix"                    % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
       "org.scodec"     %% "scodec-bits"              % scodecBitsVersion,
