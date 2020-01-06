@@ -12,9 +12,6 @@ import Versions._
 def readVersion(path: File): String =
   IO.read(path).trim
 
-lazy val fs2GzipVersion = Def.setting[String](
-  readVersion(baseDirectory.value / ".." / "fs2-gzip-version"))
-
 lazy val qdataVersion = Def.setting[String](
   readVersion(baseDirectory.value / ".." / "qdata-version"))
 
@@ -265,7 +262,6 @@ lazy val impl = project
   .settings(
 
     libraryDependencies ++= Seq(
-      "com.slamdata"   %% "fs2-gzip"                 % fs2GzipVersion.value,
       "com.slamdata"   %% "fs2-job"                  % fs2JobVersion,
       "com.slamdata"   %% "qdata-tectonic"           % qdataVersion.value,
       "com.slamdata"   %% "tectonic-fs2"             % tectonicVersion.value,
