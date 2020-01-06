@@ -22,7 +22,7 @@ import quasar.api.datasource.DatasourceError.{
   InitializationError,
   malformedConfiguration
 }
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 import quasar.connector._, LightweightDatasourceModule.DS
 
 import scala.concurrent.ExecutionContext
@@ -34,8 +34,8 @@ import cats.effect._
 
 object LocalDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
-  override lazy val blockingPool: BlockingContext =
-    BlockingContext.cached("local-datasource")
+  override lazy val blocker: Blocker =
+    qc.Blocker.cached("local-datasource")
 
   val kind: DatasourceType = LocalType
 
@@ -60,7 +60,7 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
         root,
         lc.readChunkSizeBytes,
         lc.format,
-        blockingPool)
+        blocker)
     }
 
     Resource.liftF(ds.value)

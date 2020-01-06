@@ -27,7 +27,7 @@ import scala.concurrent.ExecutionContext
 import quasar.ScalarStages
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.common.data.RValue
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.κ
@@ -99,18 +99,18 @@ abstract class LocalDatasourceSpec
 }
 
 object LocalDatasourceSpec extends LocalDatasourceSpec {
-  val blockingPool = BlockingContext.cached("local-datasource-spec")
+  val blocker = qc.Blocker.cached("local-datasource-spec")
 
   def datasource =
     LocalDatasource[IO](
       Paths.get("./impl/src/test/resources"),
       1024,
       DataFormat.precise(DataFormat.ldjson),
-      blockingPool)
+      blocker)
 }
 
 object LocalStatefulDatasourceSpec extends LocalDatasourceSpec {
-  val blockingPool = BlockingContext.cached("local-stateful-datasource-spec")
+  val blocker = qc.Blocker.cached("local-stateful-datasource-spec")
 
   def datasource =
     LocalStatefulDatasource[IO](
@@ -118,18 +118,18 @@ object LocalStatefulDatasourceSpec extends LocalDatasourceSpec {
       1024,
       DataFormat.precise(DataFormat.ldjson),
       10,
-      blockingPool)
+      blocker)
 }
 
 object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
-  val blockingPool = BlockingContext.cached("local-parsed-datasource-spec")
+  val blocker = qc.Blocker.cached("local-parsed-datasource-spec")
 
   def datasource =
     LocalParsedDatasource[IO, RValue](
       Paths.get("./impl/src/test/resources"),
       1024,
       DataFormat.precise(DataFormat.ldjson),
-      blockingPool)
+      blocker)
 
   "parses array-wrapped JSON" >>* {
     val ds =
@@ -137,7 +137,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
         Paths.get("./impl/src/test/resources"),
         1024,
         DataFormat.precise(DataFormat.json),
-        blockingPool)
+        blocker)
 
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json"), ScalarStages.Id)
@@ -153,7 +153,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
         Paths.get("./impl/src/test/resources"),
         1024,
         DataFormat.gzipped(DataFormat.precise(DataFormat.json)),
-        blockingPool)
+        blocker)
 
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.gz"), ScalarStages.Id)
@@ -168,7 +168,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       Paths.get("./impl/src/test/resources"),
       1024,
       DataFormat.SeparatedValues.Default,
-      blockingPool)
+      blocker)
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.csv"), ScalarStages.Id)
 
