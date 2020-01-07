@@ -58,7 +58,7 @@ abstract class LocalDatasourceSpec
       case QueryResult.Parsed(_, data, _) => data.foldMap(κ(1)).compile.lastOrError
       case QueryResult.Typed(_, data, _) => data.foldMap(κ(1)).compile.lastOrError
       case QueryResult.Stateful(_, plate, state, data, _) =>
-        val bytes = data(None).scope ++ recurseStateful(plate, state, data)
+        val bytes = data(None) ++ recurseStateful(plate, state, data)
         bytes.foldMap(κ(1)).compile.lastOrError
     }
 
@@ -69,7 +69,7 @@ abstract class LocalDatasourceSpec
       : Stream[IO, Byte] =
     Stream.eval(plateF.flatMap(state)) flatMap {
       case s @ Some(_) =>
-        data(s).scope ++ recurseStateful(plateF, state, data)
+        data(s) ++ recurseStateful(plateF, state, data)
       case None =>
         Stream.empty
     }

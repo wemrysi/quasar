@@ -26,7 +26,7 @@ package object concurrent {
 
   object Blocker {
     def apply(ec: ExecutionContext): ce.Blocker =
-    ce.Blocker.liftExecutionContext(ec)
+      ce.Blocker.liftExecutionContext(ec)
 
     def cached(name: String): ce.Blocker =
       apply(ExecutionContext.fromExecutor(Executors.newCachedThreadPool(NamedDaemonThreadFactory(name))))

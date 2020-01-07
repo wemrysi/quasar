@@ -91,7 +91,7 @@ object ResultParser {
           Stream.eval(plateF) flatMap { plate =>
             val pipe = stateful(format, plate, state, data)
 
-            data(None).through(pipe).scope ++
+            data(None).through(pipe) ++
               recurseStateful(state(plate), data, pipe)
           }
       }
@@ -110,7 +110,7 @@ object ResultParser {
       : Stream[F, A] =
     Stream.eval(state) flatMap {
       case s @ Some(_) =>
-        data(s).through(pipe).scope ++
+        data(s).through(pipe) ++
           recurseStateful(state, data, pipe)
       case None =>
         Stream.empty
