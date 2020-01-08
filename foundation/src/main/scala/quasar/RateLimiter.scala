@@ -35,37 +35,23 @@ final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
     caution: Double,
     updater: RateLimitUpdater[F, A]) {
 
-  // TODO make these things clustering-aware
+  // TODO make this clustering-aware
   private val configs: TrieMap[A, RateLimiterConfig] =
     new TrieMap[A, RateLimiterConfig](toHashing[A], toEquiv[A])
 
+  // TODO make this clustering-aware
   private val states: TrieMap[A, Ref[F, State]] =
     new TrieMap[A, Ref[F, State]](toHashing[A], toEquiv[A])
 
-  // TODO implement with TrieMap#updateWith when we're on Scala 2.13
-  def reset(key: A): F[Unit] =
-    for {
-      ref <- Sync[F].delay(states.get(key))
-      now <- nowF
-      _ <- ref match {
-        case Some(r) =>
-          r.update(_ => State(0, now))
-        case None =>
-          for {
-            ref <- Ref.of[F, State](State(0, now))
-            put <- Sync[F].delay(states.putIfAbsent(key, ref))
-              _ <- put match {
-                case Some(old) => reset(key)
-                case None => ().pure[F]
-              }
-          } yield ()
-      }
-    } yield ()
+  def configure(key: A, config: RateLimiterConfig)
+      : F[Option[RateLimiterConfig]] =
+    Sync[F].delay(configs.putIfAbsent(key, config))
 
   // TODO implement with TrieMap#updateWith when we're on Scala 2.13
   def plusOne(key: A): F[Unit] =
     for {
       ref <- Sync[F].delay(states.get(key))
+      now <- nowF
       _ <- ref match {
         case Some(r) =>
           r.modify(s => (s.copy(count = s.count + 1), ()))
@@ -75,16 +61,32 @@ final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
             ref <- Ref.of[F, State](State(1, now))
             put <- Sync[F].delay(states.putIfAbsent(key, ref))
             _ <- put match {
-              case Some(old) => plusOne(key)
+              case Some(_) => plusOne(key)
               case None => ().pure[F]
             }
           } yield ()
       }
     } yield ()
 
-  def configure(key: A, config: RateLimiterConfig)
-      : F[Option[RateLimiterConfig]] =
-    Sync[F].delay(configs.putIfAbsent(key, config))
+  // TODO implement with TrieMap#updateWith when we're on Scala 2.13
+  def wait(key: A, duration: FiniteDuration): F[Unit] =
+    for {
+      ref <- Sync[F].delay(states.get(key))
+      now <- nowF
+      _ <- ref match {
+        case Some(r) =>
+          r.update(_ => State(0, now + duration))
+        case None =>
+          for {
+            ref <- Ref.of[F, State](State(0, now + duration))
+            put <- Sync[F].delay(states.putIfAbsent(key, ref))
+              _ <- put match {
+                case Some(_) => wait(key, duration)
+                case None => ().pure[F]
+              }
+          } yield ()
+      }
+    } yield ()
 
   def apply(key: A, max: Int, window: FiniteDuration)
       : F[F[Unit]] =
@@ -106,24 +108,27 @@ final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
   private def limit(key: A, config: RateLimiterConfig, stateRef: Ref[F, State]): F[Unit] = {
     import config._
 
-    val resetStateF: F[Unit] =
-      updater.reset(key) >>
-        nowF.flatMap(now => stateRef.update(_ => State(0, now)))
-
     for {
       now <- nowF
       state <- stateRef.get
       back <-
-        if (state.start + window < now) {
-          resetStateF >> limit(key, config, stateRef)
-        } else {
+        if (state.start > now) { // waiting
+          Timer[F].sleep(state.start - now) >>
+            limit(key, config, stateRef)
+        } else if (state.start + window < now) { // in the next window
+          stateRef.update(_ => State(0, state.start + window)) >>
+            limit(key, config, stateRef)
+        } else { // in the current window
           stateRef.modify(s => (s.copy(count = s.count + 1), s.count)) flatMap { count =>
-            if (count >= max * caution) {
-              Timer[F].sleep((state.start + window) - now) >>
-                resetStateF >>
+            if (count >= max * caution) { // max exceeded
+              val duration = (state.start + window) - now
+              updater.wait(key, duration) >>
+                Timer[F].sleep(duration) >>
+                stateRef.update(_ => State(0, state.start + window)) >>
                 limit(key, config, stateRef)
-            } else
+            } else { // continue
               updater.plusOne(key)
+            }
           }
         }
     } yield back

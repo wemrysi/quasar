@@ -18,8 +18,10 @@ package quasar
 
 import slamdata.Predef.Unit
 
+import scala.concurrent.duration.FiniteDuration
+
 trait RateLimitUpdater[F[_], A] {
   def plusOne(key: A): F[Unit]
-  def reset(key: A): F[Unit]
+  def wait(key: A, duration: FiniteDuration): F[Unit]
   def config(key: A, config: RateLimiterConfig): F[Unit]
 }

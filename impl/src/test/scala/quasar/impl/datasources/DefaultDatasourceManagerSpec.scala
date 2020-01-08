@@ -19,11 +19,11 @@ package quasar.impl.datasources
 import slamdata.Predef._
 
 import quasar.{
-    ConditionMatchers,
-    NoopRateLimitUpdater,
-    RateLimiter,
-    RenderTreeT,
-    ScalarStages
+  ConditionMatchers,
+  NoopRateLimitUpdater,
+  RateLimiter,
+  RenderTreeT,
+  ScalarStages
 }
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._

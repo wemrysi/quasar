@@ -18,11 +18,13 @@ package quasar
 
 import slamdata.Predef._
 
+import scala.concurrent.duration.FiniteDuration
+
 import cats.effect.IO
 import cats.implicits._
 
 object NoopRateLimitUpdater extends RateLimitUpdater[IO, Int] {
   def plusOne(key: Int): IO[Unit] = ().pure[IO]
-  def reset(key: Int): IO[Unit] = ().pure[IO]
+  def wait(key: Int, duration: FiniteDuration): IO[Unit] = ().pure[IO]
   def config(key: Int, config: RateLimiterConfig): IO[Unit] = ().pure[IO]
 }
