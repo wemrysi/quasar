@@ -87,7 +87,8 @@ final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
       now <- nowF
       _ <- ref match {
         case Some(r) =>
-          r.update(_ => State(0, now + duration))
+          r.update(_ => State(0, now + duration)) >>
+            updater.wait(key, duration)
         case None =>
           for {
             ref <- Ref.of[F, State](State(0, now + duration))

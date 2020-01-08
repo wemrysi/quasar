@@ -368,7 +368,8 @@ object RateLimiterSpec extends Specification {
     "handle waitFor request" >> {
       "wait for unknown key has no effect" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val updater = new TestRateLimitUpdater
+        val rl = RateLimiter[IO, Int](1.0, updater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
@@ -392,11 +393,14 @@ object RateLimiterSpec extends Specification {
 
         ctx.tick(1.seconds)
         a mustEqual(3)
+
+        updater.waits must containTheSameElementsAs(List(17, 17))
       }
 
       "wait for known but unused key" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val updater = new TestRateLimitUpdater
+        val rl = RateLimiter[IO, Int](1.0, updater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
@@ -415,26 +419,33 @@ object RateLimiterSpec extends Specification {
         run.unsafeRunAsyncAndForget()
 
         a mustEqual(0)
+        updater.waits must containTheSameElementsAs(List(17))
 
         ctx.tick(1.seconds)
         a mustEqual(0)
+        updater.waits must containTheSameElementsAs(List(17))
 
         ctx.tick(1.seconds)
         a mustEqual(0)
+        updater.waits must containTheSameElementsAs(List(17))
 
         ctx.tick(1.seconds)
         a mustEqual(1)
+        updater.waits must containTheSameElementsAs(List(17, 17))
 
         ctx.tick(1.seconds)
         a mustEqual(2)
+        updater.waits must containTheSameElementsAs(List(17, 17, 17))
 
         ctx.tick(1.seconds)
         a mustEqual(3)
+        updater.waits must containTheSameElementsAs(List(17, 17, 17))
       }
 
       "wait state for known key" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val updater = new TestRateLimitUpdater
+        val rl = RateLimiter[IO, Int](1.0, updater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
@@ -453,15 +464,19 @@ object RateLimiterSpec extends Specification {
         run.unsafeRunAsyncAndForget()
 
         a mustEqual(1)
+        updater.waits must containTheSameElementsAs(List(17))
 
         ctx.tick(1.seconds)
         a mustEqual(1)
+        updater.waits must containTheSameElementsAs(List(17))
 
         ctx.tick(1.seconds)
         a mustEqual(2)
+        updater.waits must containTheSameElementsAs(List(17, 17))
 
         ctx.tick(1.seconds)
         a mustEqual(3)
+        updater.waits must containTheSameElementsAs(List(17, 17))
       }
     }
 
