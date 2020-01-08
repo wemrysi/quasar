@@ -365,14 +365,14 @@ object RateLimiterSpec extends Specification {
       }
     }
 
-    "handle wait request" >> {
+    "handle waitFor request" >> {
       "wait for unknown key has no effect" in {
         val ctx = TestContext()
         val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
-        val wait = rl.wait(18, 5.seconds)
+        val wait = rl.waitFor(18, 5.seconds)
         val effectF = rl(key, 1, 1.seconds)
 
         var a: Int = 0
@@ -400,7 +400,7 @@ object RateLimiterSpec extends Specification {
 
         val key: Int = 17
 
-        val wait = rl.wait(key, 3.seconds)
+        val wait = rl.waitFor(key, 3.seconds)
         val effectF = rl(key, 1, 1.seconds)
 
         var a: Int = 0
@@ -438,7 +438,7 @@ object RateLimiterSpec extends Specification {
 
         val key: Int = 17
 
-        val wait = rl.wait(key, 2.seconds)
+        val wait = rl.waitFor(key, 2.seconds)
         val effectF = rl(key, 1, 1.seconds)
 
         var a: Int = 0

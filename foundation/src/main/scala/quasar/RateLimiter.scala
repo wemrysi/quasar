@@ -68,8 +68,20 @@ final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
       }
     } yield ()
 
+  // TODO wait smarter (i.e. not for an entire window)
+  // the server's window falls in our previous window between
+  // max and max+1 requests prior to the server-throttled request
+  def wait(key: A): F[Unit] = {
+    val window = Sync[F].delay(configs.get(key).map(_.window))
+
+    window flatMap {
+      case Some(d) => waitFor(key, d)
+      case None => ().pure[F]
+    }
+  }
+
   // TODO implement with TrieMap#updateWith when we're on Scala 2.13
-  def wait(key: A, duration: FiniteDuration): F[Unit] =
+  def waitFor(key: A, duration: FiniteDuration): F[Unit] =
     for {
       ref <- Sync[F].delay(states.get(key))
       now <- nowF
@@ -81,7 +93,7 @@ final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
             ref <- Ref.of[F, State](State(0, now + duration))
             put <- Sync[F].delay(states.putIfAbsent(key, ref))
               _ <- put match {
-                case Some(_) => wait(key, duration)
+                case Some(_) => waitFor(key, duration)
                 case None => ().pure[F]
               }
           } yield ()
