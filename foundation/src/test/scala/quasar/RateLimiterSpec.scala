@@ -365,15 +365,117 @@ object RateLimiterSpec extends Specification {
       }
     }
 
-    "handle waitFor request" >> {
-      "wait for unknown key has no effect" in {
+    "handle backoff request" >> {
+      "backoff for unknown key has no effect" in {
         val ctx = TestContext()
         val updater = new TestRateLimitUpdater
         val rl = RateLimiter[IO, Int](1.0, updater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
-        val wait = rl.waitFor(18, 5.seconds)
+        val backoff = rl.backoff(18)
+        val effectF = rl(key, 1, 1.seconds)
+
+        var a: Int = 0
+
+        val run =
+          (backoff >> effectF).flatMap(effect =>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1))
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(1)
+
+        ctx.tick(1.seconds)
+        a mustEqual(2)
+
+        ctx.tick(1.seconds)
+        a mustEqual(3)
+
+        updater.waits must containTheSameElementsAs(List(17, 17))
+      }
+
+      "backoff for known but unused key" in {
+        val ctx = TestContext()
+        val updater = new TestRateLimitUpdater
+        val rl = RateLimiter[IO, Int](1.0, updater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key: Int = 17
+
+        val backoff = rl.backoff(key)
+        val effectF = rl(key, 1, 1.seconds)
+
+        var a: Int = 0
+
+        val run =
+          effectF.flatMap(effect =>
+            backoff >>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1))
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(0)
+        updater.waits must containTheSameElementsAs(List(17))
+
+        ctx.tick(1.seconds)
+        a mustEqual(1)
+        updater.waits must containTheSameElementsAs(List(17, 17))
+
+        ctx.tick(1.seconds)
+        a mustEqual(2)
+        updater.waits must containTheSameElementsAs(List(17, 17, 17))
+
+        ctx.tick(1.seconds)
+        a mustEqual(3)
+        updater.waits must containTheSameElementsAs(List(17, 17, 17))
+      }
+
+      "backoff state for known key" in {
+        val ctx = TestContext()
+        val updater = new TestRateLimitUpdater
+        val rl = RateLimiter[IO, Int](1.0, updater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key: Int = 17
+
+        val backoff = rl.backoff(key)
+        val effectF = rl(key, 1, 1.seconds)
+
+        var a: Int = 0
+
+        val run =
+          effectF.flatMap(effect =>
+            effect >> IO.delay(a += 1) >>
+            effect >> IO.delay(a += 1) >>
+            backoff >>
+            effect >> IO.delay(a += 1))
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(1)
+        updater.waits must containTheSameElementsAs(List(17))
+
+        ctx.tick(1.seconds)
+        a mustEqual(2)
+        updater.waits must containTheSameElementsAs(List(17, 17))
+
+        ctx.tick(1.seconds)
+        a mustEqual(3)
+        updater.waits must containTheSameElementsAs(List(17, 17))
+      }
+    }
+
+    "handle wait request" >> {
+      "wait for unknown key has no effect" in {
+        val ctx = TestContext()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+
+        val key: Int = 17
+
+        val wait = rl.wait(18, 2.seconds)
         val effectF = rl(key, 1, 1.seconds)
 
         var a: Int = 0
@@ -393,18 +495,15 @@ object RateLimiterSpec extends Specification {
 
         ctx.tick(1.seconds)
         a mustEqual(3)
-
-        updater.waits must containTheSameElementsAs(List(17, 17))
       }
 
       "wait for known but unused key" in {
         val ctx = TestContext()
-        val updater = new TestRateLimitUpdater
-        val rl = RateLimiter[IO, Int](1.0, updater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
-        val wait = rl.waitFor(key, 3.seconds)
+        val wait = rl.wait(key, 2.seconds)
         val effectF = rl(key, 1, 1.seconds)
 
         var a: Int = 0
@@ -419,37 +518,27 @@ object RateLimiterSpec extends Specification {
         run.unsafeRunAsyncAndForget()
 
         a mustEqual(0)
-        updater.waits must containTheSameElementsAs(List(17))
 
         ctx.tick(1.seconds)
         a mustEqual(0)
-        updater.waits must containTheSameElementsAs(List(17))
-
-        ctx.tick(1.seconds)
-        a mustEqual(0)
-        updater.waits must containTheSameElementsAs(List(17))
 
         ctx.tick(1.seconds)
         a mustEqual(1)
-        updater.waits must containTheSameElementsAs(List(17, 17))
 
         ctx.tick(1.seconds)
         a mustEqual(2)
-        updater.waits must containTheSameElementsAs(List(17, 17, 17))
 
         ctx.tick(1.seconds)
         a mustEqual(3)
-        updater.waits must containTheSameElementsAs(List(17, 17, 17))
       }
 
       "wait state for known key" in {
         val ctx = TestContext()
-        val updater = new TestRateLimitUpdater
-        val rl = RateLimiter[IO, Int](1.0, updater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
-        val wait = rl.waitFor(key, 2.seconds)
+        val wait = rl.wait(key, 2.seconds)
         val effectF = rl(key, 1, 1.seconds)
 
         var a: Int = 0
@@ -457,26 +546,22 @@ object RateLimiterSpec extends Specification {
         val run =
           effectF.flatMap(effect =>
             effect >> IO.delay(a += 1) >>
-            wait >>
             effect >> IO.delay(a += 1) >>
+            wait >>
             effect >> IO.delay(a += 1))
 
         run.unsafeRunAsyncAndForget()
 
         a mustEqual(1)
-        updater.waits must containTheSameElementsAs(List(17))
-
-        ctx.tick(1.seconds)
-        a mustEqual(1)
-        updater.waits must containTheSameElementsAs(List(17))
 
         ctx.tick(1.seconds)
         a mustEqual(2)
-        updater.waits must containTheSameElementsAs(List(17, 17))
+
+        ctx.tick(1.seconds)
+        a mustEqual(2)
 
         ctx.tick(1.seconds)
         a mustEqual(3)
-        updater.waits must containTheSameElementsAs(List(17, 17))
       }
     }
 
