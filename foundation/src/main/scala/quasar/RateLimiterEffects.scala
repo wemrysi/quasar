@@ -16,19 +16,6 @@
 
 package quasar
 
-import slamdata.Predef._
+import slamdata.Predef.Unit
 
-import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.duration.FiniteDuration
-
-import cats.effect.IO
-
-class TestRateLimitUpdater extends RateLimitUpdater[IO, Int] {
-  val plusOnes: ArrayBuffer[Int] = ArrayBuffer()
-  val waits: ArrayBuffer[Int] = ArrayBuffer()
-  val configs: ArrayBuffer[Int] = ArrayBuffer()
-
-  def plusOne(key: Int): IO[Unit] = IO.delay(plusOnes += key)
-  def wait(key: Int, duration: FiniteDuration): IO[Unit] = IO.delay(waits += key)
-  def config(key: Int, config: RateLimiterConfig): IO[Unit] = IO.delay(configs += key)
-}
+final case class RateLimiterEffects[F[_]](limit: F[Unit], backoff: F[Unit])

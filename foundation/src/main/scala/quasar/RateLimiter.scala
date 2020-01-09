@@ -61,26 +61,10 @@ final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
             ref <- Ref.of[F, State](State(1, now))
             put <- Sync[F].delay(states.putIfAbsent(key, ref))
             _ <- put match {
-              case Some(_) => plusOne(key)
+              case Some(_) => plusOne(key) // retry
               case None => ().pure[F]
             }
           } yield ()
-      }
-    } yield ()
-
-  // TODO wait smarter (i.e. not for an entire window)
-  // the server's window falls in our previous window between
-  // max and max+1 requests prior to the server-throttled request
-  def backoff(key: A): F[Unit] =
-    for {
-      duration <- Sync[F].delay(configs.get(key).map(_.window))
-      ref <- Sync[F].delay(states.get(key))
-      now <- nowF
-      _ <- (ref, duration) match {
-        case (Some(r), Some(d)) =>
-          r.update(_ => State(0, now + d)) >> updater.wait(key, d)
-        case (_, _) =>
-          ().pure[F]
       }
     } yield ()
 
@@ -105,7 +89,7 @@ final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
     } yield ()
 
   def apply(key: A, max: Int, window: FiniteDuration)
-      : F[F[Unit]] =
+      : F[RateLimiterEffects[F]] =
     for {
       config <- Sync[F] delay {
         val c = RateLimiterConfig(max, window)
@@ -119,9 +103,23 @@ final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
       stateRef <- Sync[F] delay {
         states.putIfAbsent(key, maybeR).getOrElse(maybeR)
       }
-    } yield limit(key, config, stateRef)
+    } yield {
+      RateLimiterEffects[F](
+        limit(key, config, stateRef),
+        backoff(key, config, stateRef))
+    }
 
-  private def limit(key: A, config: RateLimiterConfig, stateRef: Ref[F, State]): F[Unit] = {
+  // TODO wait smarter (i.e. not for an entire window)
+  // the server's window falls in our previous window between
+  // max and max+1 requests prior to the server-throttled request
+  private def backoff(key: A, config: RateLimiterConfig, stateRef: Ref[F, State])
+      : F[Unit] =
+    nowF.flatMap(now =>
+      stateRef.update(_ => State(0, now + config.window)) >>
+        updater.wait(key, config.window))
+
+  private def limit(key: A, config: RateLimiterConfig, stateRef: Ref[F, State])
+      : F[Unit] = {
     import config._
 
     for {
