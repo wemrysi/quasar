@@ -20,11 +20,15 @@ import slamdata.Predef._
 
 import scala.concurrent.duration.FiniteDuration
 
-import cats.effect.IO
+import cats.Applicative
 import cats.implicits._
 
-object NoopRateLimitUpdater extends RateLimitUpdater[IO, Int] {
-  def plusOne(key: Int): IO[Unit] = ().pure[IO]
-  def wait(key: Int, duration: FiniteDuration): IO[Unit] = ().pure[IO]
-  def config(key: Int, config: RateLimiterConfig): IO[Unit] = ().pure[IO]
+class NoopRateLimitUpdater[F[_]: Applicative, A] private () extends RateLimitUpdater[F, A] {
+  def plusOne(key: A): F[Unit] = ().pure[F]
+  def wait(key: A, duration: FiniteDuration): F[Unit] = ().pure[F]
+  def config(key: A, config: RateLimiterConfig): F[Unit] = ().pure[F]
+}
+
+object NoopRateLimitUpdater {
+  def apply[F[_]: Applicative, A]() = new NoopRateLimitUpdater[F, A]
 }
