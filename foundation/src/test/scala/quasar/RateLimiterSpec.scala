@@ -38,7 +38,7 @@ object RateLimiterSpec extends Specification {
   "rate limiter" should {
     "output events with real time" >> {
       "one event in one window" in {
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) = rl(1, 1, 1.seconds).unsafeRunSync()
 
@@ -48,7 +48,7 @@ object RateLimiterSpec extends Specification {
       }
 
       "two events in one window" in {
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) = rl(1, 2, 1.seconds).unsafeRunSync()
 
@@ -60,7 +60,7 @@ object RateLimiterSpec extends Specification {
       }
 
       "two events in two windows" in {
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) = rl(1, 1, 1.seconds).unsafeRunSync()
 
@@ -72,7 +72,7 @@ object RateLimiterSpec extends Specification {
       }
 
       "events from two tokens" in {
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit1, _) = rl(1, 1, 1.seconds).unsafeRunSync()
         val RateLimiterEffects(limit2, _) = rl(2, 1, 1.seconds).unsafeRunSync()
@@ -93,7 +93,7 @@ object RateLimiterSpec extends Specification {
     "output events with simulated time" >> {
       "one event per second" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) = rl(1, 1, 1.seconds).unsafeRunSync()
 
@@ -121,7 +121,7 @@ object RateLimiterSpec extends Specification {
 
       "one event per two seconds" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) = rl(1, 1, 2.seconds).unsafeRunSync()
 
@@ -161,7 +161,7 @@ object RateLimiterSpec extends Specification {
 
       "two events per second" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) = rl(1, 2, 1.seconds).unsafeRunSync()
 
@@ -188,7 +188,7 @@ object RateLimiterSpec extends Specification {
 
       "three events per second" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) = rl(1, 3, 1.seconds).unsafeRunSync()
 
@@ -217,7 +217,7 @@ object RateLimiterSpec extends Specification {
 
       "with a caution of 0.75" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](0.75, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](0.75, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) = rl(1, 4, 1.seconds).unsafeRunSync()
 
@@ -246,7 +246,7 @@ object RateLimiterSpec extends Specification {
 
       "do not overwrite configs (use existing config)" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit1, _) = rl(1, 2, 1.seconds).unsafeRunSync()
         val RateLimiterEffects(limit2, _) = rl(1, 3, 1.seconds).unsafeRunSync()
@@ -274,7 +274,7 @@ object RateLimiterSpec extends Specification {
 
       "support two tokens on the same schedule" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit1, _) = rl(1, 2, 1.seconds).unsafeRunSync()
         val RateLimiterEffects(limit2, _) = rl(2, 3, 1.seconds).unsafeRunSync()
@@ -317,7 +317,7 @@ object RateLimiterSpec extends Specification {
 
       "support two tokens on different schedules" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val RateLimiterEffects(limit1, _) = rl(1, 2, 1.seconds).unsafeRunSync()
         val RateLimiterEffects(limit2, _) = rl(2, 2, 2.seconds).unsafeRunSync()
@@ -432,7 +432,7 @@ object RateLimiterSpec extends Specification {
     "handle wait request" >> {
       "wait for unknown key has no effect" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
@@ -462,7 +462,7 @@ object RateLimiterSpec extends Specification {
 
       "wait for known but unused key" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
@@ -499,7 +499,7 @@ object RateLimiterSpec extends Specification {
 
       "wait state for known key" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
@@ -535,7 +535,7 @@ object RateLimiterSpec extends Specification {
     "handle plus one request" >> {
       "modify state for unknown key" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val plusOne = rl.plusOne(18)
         val effectsF = rl(17, 1, 1.seconds)
@@ -560,7 +560,7 @@ object RateLimiterSpec extends Specification {
 
       "modify state for known key" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
@@ -592,7 +592,7 @@ object RateLimiterSpec extends Specification {
     "handle configure request" >> {
       "add config for unknown key" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
@@ -620,7 +620,7 @@ object RateLimiterSpec extends Specification {
 
       "ignore config added for known key" in {
         val ctx = TestContext()
-        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater)(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
+        val rl = RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int])(Sync[IO], ctx.timer[IO], Hash[Int]).unsafeRunSync()
 
         val key: Int = 17
 
