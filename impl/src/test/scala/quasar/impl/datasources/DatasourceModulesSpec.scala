@@ -46,12 +46,13 @@ import eu.timepit.refined.auto._
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
 
-import scalaz.{ISet, NonEmptyList}
+import scalaz.{ISet, NonEmptyList, \/-, -\/}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import shims.{applicativeToScalaz, monoidKToScalaz, showToCats, showToScalaz}
+import shims.{monadToScalaz, monoidKToScalaz, showToCats, showToScalaz, applicativeToScalaz}
+import shims.effect.scalazEitherTSync
 
 object DatasourceModulesSpec extends EffectfulQSpec[IO] {
   implicit val tmr = IO.timer(global)
@@ -195,24 +196,21 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       for {
         rl <- RateLimiter[IO](1.0)
         modules = DatasourceModules[Fix, IO, Int](List(lightMod(lightType), heavyMod(heavyType)), rl)
-        (light, finishL) <- modules.create(0, lightRef).allocated
-        (heavy, finishH) <- modules.create(1, heavyRef).allocated
-        _ <- finishL
-        _ <- finishH
+        eLight <- modules.create(0, lightRef).allocated.run
+        eHeavy <- modules.create(1, heavyRef).allocated.run
+        _ <- eLight.traverse(x => x._2.run)
+        _ <- eHeavy.traverse(x => x._2.run)
       } yield {
-        light must beLike { case ManagedDatasource.ManagedLightweight(lw) => lw.kind === lightType }
-        heavy must beLike { case ManagedDatasource.ManagedHeavyweight(hw) => hw.kind === heavyType }
+        eLight must beLike { case \/-((ManagedDatasource.ManagedLightweight(lw), _)) => lw.kind === lightType }
+        eHeavy must beLike { case \/-((ManagedDatasource.ManagedHeavyweight(hw), _)) => hw.kind === heavyType }
       }
     }
     "errors with incompatible refs" >>* {
       for {
         rl <- RateLimiter[IO](1.0)
         modules = DatasourceModules[Fix, IO, Int](List(lightMod(lightType), heavyMod(heavyType)), rl)
-        res <- modules.create(0, incompatRef).allocated.attempt
-      } yield res must beLike {
-        case Left(CreateErrorException(ce)) =>
-          ce === DatasourceUnsupported(incompatType, ISet.empty.insert(lightType).insert(heavyType))
-      }
+        res <- modules.create(0, incompatRef).allocated.run
+      } yield res must be_-\/(DatasourceUnsupported(incompatType, ISet.singleton(lightType).insert(heavyType)))
     }
     "errors with initialization error" >>* {
       val malformed =
@@ -241,28 +239,19 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
           heavyMod(accessDenied, Some(AccessDenied(accessDenied, jString("d"), "access denied")))),
           rl)
 
-        malformedDs <- modules.create(0, malformedRef).allocated.attempt
-        invalidDs <- modules.create(1, invalidRef).allocated.attempt
-        connFailedDs <- modules.create(2, connFailedRef).allocated.attempt
-        accessDeniedDs <- modules.create(3, accessDeniedRef).allocated.attempt
+        malformedDs <- modules.create(0, malformedRef).allocated.run
+        invalidDs <- modules.create(1, invalidRef).allocated.run
+        connFailedDs <- modules.create(2, connFailedRef).allocated.run
+        accessDeniedDs <- modules.create(3, accessDeniedRef).allocated.run
       } yield {
-        malformedDs must beLike {
-          case Left(CreateErrorException(ce)) =>
-            ce === MalformedConfiguration(malformed, jString("a"), "malformed configuration")
-        }
-        invalidDs must beLike {
-          case Left(CreateErrorException(ce)) =>
-            ce === InvalidConfiguration(invalid, jString("b"), NonEmptyList("invalid configuration"))
-        }
+        malformedDs must be_-\/(MalformedConfiguration(malformed, jString("a"), "malformed configuration"))
+        invalidDs must be_-\/(InvalidConfiguration(invalid, jString("b"), NonEmptyList("invalid configuration")))
+        accessDeniedDs must be_-\/(AccessDenied(accessDenied, jString("d"), "access denied"))
         connFailedDs must beLike {
-          case Left(CreateErrorException(ConnectionFailed(kind, config, cause))) =>
+          case -\/(ConnectionFailed(kind, config, cause)) =>
             kind === connFailed
             config === jString("c")
             cause.getMessage === "conn failed"
-        }
-        accessDeniedDs must beLike {
-          case Left(CreateErrorException(ce)) =>
-            ce === AccessDenied(accessDenied, jString("d"), "access denied")
         }
       }
     }

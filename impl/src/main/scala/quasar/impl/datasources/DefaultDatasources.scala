@@ -30,6 +30,7 @@ import quasar.impl.storage.IndexedStore
 import quasar.qscript.{construction, educatedToTotal, InterpretedRead, QScriptEducated}
 
 import cats.effect.Sync
+import cats.~>
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 
@@ -40,8 +41,10 @@ import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.boolean._
+import scalaz.std.tuple._
 
 import shims.{monadToScalaz, equalToCats}
+import shims.effect.scalazEitherTSync
 
 private[quasar] final class DefaultDatasources[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
@@ -171,10 +174,13 @@ private[quasar] final class DefaultDatasources[
       // Grab managed ds and if it's presented shut it down
       mbCurrent <- EitherT.rightT(cache.get(i))
       _ <- EitherT.rightT(mbCurrent.fold(().point[F])(x => cache.shutdown(i)))
-      allocated <- EitherT(MonadError_[F, CreateError[C]].attempt(modules.create(i, ref).allocated))
-        .leftMap((x: CreateError[C]) => (x: E))
+      allocated <- {
+        modules.create(i, ref)
+          .allocated
+          .leftMap(x => x: E)
+      }
       _ <- EitherT.rightT(refs.insert(i, ref))
-      _ <- EitherT.rightT(cache.manage(i, allocated))
+      _ <- EitherT.rightT(cache.manage(i, allocated.map(createErrorHandling(_))))
     } yield ()
     action.run.map(Condition.disjunctionIso.reverseGet(_))
   }
@@ -206,17 +212,18 @@ private[quasar] final class DefaultDatasources[
     type Res[A] = EitherT[F, E, A]
     type L[M[_], A] = EitherT[M, E, A]
     lazy val error: Res[MDS] = EitherT.pureLeft(datasourceNotFound[I, E](i))
+
     getter(i).liftM[L] flatMap {
       case Empty => error
       case Removed(_) =>
         cache.shutdown(i).liftM[L] >> error
       case Inserted(ref) => for {
-        allocated <- modules.create(i, ref).allocated.liftM[L]
+        allocated <- modules.create(i, ref).mapK(createErrorHandling).allocated.liftM[L]
         _ <- cache.manage(i, allocated).liftM[L]
       } yield allocated._1
       case Updated(ref, _) => for {
         _ <- cache.shutdown(i).liftM[L]
-        allocated <- modules.create(i, ref).allocated.liftM[L]
+        allocated <- modules.create(i, ref).mapK(createErrorHandling).allocated.liftM[L]
         _ <- cache.manage(i, allocated).liftM[L]
       } yield allocated._1
       case Preserved(_) => cache.get(i).liftM[L] flatMap {
@@ -225,6 +232,12 @@ private[quasar] final class DefaultDatasources[
       }
     }
   }
+
+  private val createErrorHandling: EitherT[F, CreateError[C], ?] ~> F =
+    λ[EitherT[F, CreateError[C], ?] ~> F]( inp =>
+      inp.run.flatMap(_.fold(
+        (x: CreateError[C]) => MonadError_[F, CreateError[C]].raiseError(x),
+        _.point[F])))
 }
 
 object DefaultDatasources {
