@@ -18,7 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.{RateLimiter, ScalarStages, ConditionMatchers, Condition}
+import quasar.{RateLimiter, ScalarStages, ConditionMatchers, Condition, NoopRateLimitUpdater}
 import quasar.api.MockSchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
@@ -39,10 +39,12 @@ import argonaut.Argonaut.jString
 import cats.Show
 import cats.effect.{IO, ConcurrentEffect, Resource, ContextShift, Timer}
 import cats.effect.concurrent.Ref
+import cats.kernel.Hash
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 import cats.syntax.functor._
 import cats.syntax.traverse._
+import cats.instances.int._
 import cats.instances.string._
 import cats.instances.option._
 
@@ -112,9 +114,9 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
         case Some(f) => f(config)
       }
 
-      def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
+      def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
           config: Json,
-          rateLimiter: RateLimiter[F])(
+          rateLimiter: RateLimiter[F, A])(
           implicit ec: ExecutionContext)
           : Resource[F, R[F, InterpretedRead[ResourcePath]]] = {
         lazy val ds: R[F, InterpretedRead[ResourcePath]] =
@@ -159,12 +161,12 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       case Some(e) => e.get
     } }
     for {
-      rateLimiter <- Resource.liftF(RateLimiter[IO](1.0))
+      rateLimiter <- Resource.liftF(RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]))
       starts <- Resource.liftF(Ref.of[IO, List[String]](List()))
       shuts <- Resource.liftF(Ref.of[IO, List[String]](List()))
 
       modules = {
-        DatasourceModules[Fix, IO, String](List(lightMod(mp, sanitize)), rateLimiter)
+        DatasourceModules[Fix, IO, String, Int](List(lightMod(mp, sanitize)), rateLimiter)
           .widenPathType[PathType]
           .withMiddleware((i: String, mds: MDS) => starts.update(i :: _) as mds)
           .withFinalizer((i: String, mds: MDS) => shuts.update(i :: _))

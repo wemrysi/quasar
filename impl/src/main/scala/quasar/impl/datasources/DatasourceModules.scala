@@ -34,6 +34,7 @@ import fs2.Stream
 
 import cats.{Monad, MonadError}
 import cats.effect.{Resource, ConcurrentEffect, ContextShift, Timer, Bracket}
+import cats.kernel.Hash
 import cats.syntax.applicative._
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import scalaz.{ISet, EitherT, -\/, \/-}
@@ -94,9 +95,9 @@ object DatasourceModules {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr: MonadPlannerErr,
-      I](
+      I, A: Hash](
       modules: List[DatasourceModule],
-      rateLimiter: RateLimiter[F])(
+      rateLimiter: RateLimiter[F, A])(
       implicit
       ec: ExecutionContext)
       : Modules[T, F, I] = {
@@ -109,7 +110,7 @@ object DatasourceModules {
           EitherT.pureLeft(DatasourceUnsupported(ref.kind, moduleSet))
         case Some(module) => module match {
           case DatasourceModule.Lightweight(lw) =>
-            handleInitErrors(module.kind, lw.lightweightDatasource[F](ref.config, rateLimiter))
+            handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiter))
               .map(ManagedDatasource.lightweight[T](_))
           case DatasourceModule.Heavyweight(hw) =>
             handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config))
