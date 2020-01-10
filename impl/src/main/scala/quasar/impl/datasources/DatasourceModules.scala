@@ -35,18 +35,15 @@ import fs2.Stream
 import cats.{Monad, MonadError}
 import cats.effect.{Resource, ConcurrentEffect, ContextShift, Timer, Bracket}
 import cats.syntax.applicative._
-import cats.syntax.bifunctor._
-import cats.instances.either._
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.{ISet, EitherT, \/}
+import scalaz.{ISet, EitherT, -\/, \/-}
 
 import shims.{monadToScalaz, monadToCats}
 
 import scala.concurrent.ExecutionContext
 
 trait DatasourceModules[T[_[_]], F[_], G[_], I, C, R, P <: ResourcePathType] { self =>
-  type CEResource[A] = Resource[EitherT[F, CreateError[C], ?], A]
-  def create(i: I, ref: DatasourceRef[C]): CEResource[ManagedDatasource[T, F, G, R, P]]
+  def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], ManagedDatasource[T, F, G, R, P]]
   def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C]
   def supportedTypes: F[ISet[DatasourceType]]
 
@@ -56,8 +53,10 @@ trait DatasourceModules[T[_[_]], F[_], G[_], I, C, R, P <: ResourcePathType] { s
     AF: Monad[F])
     : DatasourceModules[T, F, H, I, C, S, Q] =
     new DatasourceModules[T, F, H, I, C, S, Q] {
-      def create(i: I, ref: DatasourceRef[C]): CEResource[ManagedDatasource[T, F, H, S, Q]] =
-        self.create(i, ref).evalMap { (mds: ManagedDatasource[T, F, G, R, P]) => EitherT.rightT(f(i, mds)) }
+      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], ManagedDatasource[T, F, H, S, Q]] =
+        self.create(i, ref) flatMap { (mds: ManagedDatasource[T, F, G, R, P]) =>
+          EitherT.rightT(Resource.liftF(f(i, mds)))
+        }
       def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
         self.sanitizeRef(inp)
       def supportedTypes: F[ISet[DatasourceType]] =
@@ -66,9 +65,9 @@ trait DatasourceModules[T[_[_]], F[_], G[_], I, C, R, P <: ResourcePathType] { s
 
   def withFinalizer(f: (I, ManagedDatasource[T, F, G, R, P]) => F[Unit])(implicit F: Monad[F]): DatasourceModules[T, F, G, I, C, R, P] =
     new DatasourceModules[T, F, G, I, C, R, P] {
-      def create(i: I, ref: DatasourceRef[C]): CEResource[ManagedDatasource[T, F, G, R, P]] =
+      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], ManagedDatasource[T, F, G, R, P]] =
         self.create(i, ref) flatMap { (mds: ManagedDatasource[T, F, G, R, P]) =>
-          Resource.make(EitherT.pure[F, CreateError[C], ManagedDatasource[T, F, G, R, P]](mds))(x => EitherT.rightT(f(i, x)))
+          EitherT.rightT(Resource.make(mds.pure[F])(x => f(i, x)))
         }
       def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
         self.sanitizeRef(inp)
@@ -78,7 +77,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], I, C, R, P <: ResourcePathType] { s
 
   def widenPathType[PP >: P <: ResourcePathType](implicit AF: Monad[F]): DatasourceModules[T, F, G, I, C, R, PP] =
     new DatasourceModules[T, F, G, I, C, R, PP] {
-      def create(i: I, ref: DatasourceRef[C]): CEResource[ManagedDatasource[T, F, G, R, PP]] =
+      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], ManagedDatasource[T, F, G, R, PP]] =
         self.create(i, ref) map { ManagedDatasource.widenPathType[T, F, G, R, P, PP](_) }
       def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
         self.sanitizeRef(inp)
@@ -105,11 +104,9 @@ object DatasourceModules {
     lazy val moduleMap: Map[DatasourceType, DatasourceModule] = Map(modules.map(ds => (ds.kind, ds)):_*)
 
     new DatasourceModules[T, F, Stream[F, ?], I, Json, QueryResult[F], ResourcePathType.Physical] {
-      def create(i: I, ref: DatasourceRef[Json]): CEResource[MDS[T, F]] = moduleMap.get(ref.kind) match {
+      def create(i: I, ref: DatasourceRef[Json]): EitherT[Resource[F, ?], CreateError[Json], MDS[T, F]] = moduleMap.get(ref.kind) match {
         case None =>
-          Resource.liftF[EitherT[F, CreateError[Json], ?], MDS[T, F]] {
-            EitherT.pureLeft[F, CreateError[Json], MDS[T, F]](datasourceUnsupported[CreateError[Json]](ref.kind, moduleSet))
-          }
+          EitherT.pureLeft(DatasourceUnsupported(ref.kind, moduleSet))
         case Some(module) => module match {
           case DatasourceModule.Lightweight(lw) =>
             handleInitErrors(module.kind, lw.lightweightDatasource[F](ref.config, rateLimiter))
@@ -133,10 +130,10 @@ object DatasourceModules {
   private def handleInitErrors[F[_]: Bracket[?[_], Throwable]: MonadError[?[_], Throwable], A](
       kind: DatasourceType,
       res: Resource[F, Either[InitializationError[Json], A]])
-      : Resource[EitherT[F, CreateError[Json], ?], A] = Resource {
-    for {
-      (ea, funit) <- EitherT.rightT(linkDatasource(kind, res).map(_.leftMap(ie => ie: CreateError[Json])).allocated)
-      a <- EitherT.either[F, CreateError[Json], A](\/.fromEither(ea))
-    } yield (a, EitherT.rightT(funit))
+      : EitherT[Resource[F, ?], CreateError[Json], A] = EitherT {
+    linkDatasource(kind, res) map {
+      case Right(a) => \/-(a)
+      case Left(x) => -\/(x)
+    }
   }
 }

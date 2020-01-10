@@ -61,57 +61,45 @@ abstract class DatasourcesSpec[
   assert(validConfigs._1 =/= validConfigs._2, "validConfigs must be distinct!")
 
   def mutationExamples(f: (Datasources[F, G, I, C, S], DatasourceRef[C]) => F[Err \/ I]) = {
-    "lookup on success" >>* {
-      for {
-        (dses, finalize) <- datasources.allocated
-        a <- refA
+    "lookup on success" >>* datasources.use { dses => for {
+      a <- refA
 
-        fr <- f(dses, a)
+      fr <- f(dses, a)
 
-        i <- expectSuccess(fr)
+      i <- expectSuccess(fr)
 
-        r <- dses.datasourceRef(i)
-        _ <- finalize
-      } yield {
-        r must beRef(a)
-      }
-    }
+      r <- dses.datasourceRef(i)
+    } yield {
+      r must beRef(a)
+    }}
 
-    "normal status on success" >>* {
-      for {
-        (dses, finalize) <- datasources.allocated
-        a <- refA
+    "normal status on success" >>* datasources.use { dses => for {
+      a <- refA
 
-        fr <- f(dses, a)
+      fr <- f(dses, a)
 
-        i <- expectSuccess(fr)
+      i <- expectSuccess(fr)
 
-        r <- dses.datasourceStatus(i)
-        _ <- finalize
-      } yield {
-        r must be_\/-(beNormal[Exception])
-      }
-    }
+      r <- dses.datasourceStatus(i)
+    } yield {
+      r must be_\/-(beNormal[Exception])
+    }}
 
-    "error when name exists" >>* {
-      for {
-        (dses, finalize) <- datasources.allocated
-        n <- randomName
+    "error when name exists" >>* datasources.use { dses => for {
+      n <- randomName
 
-        x = DatasourceRef(supportedType, n, validConfigs._1)
-        y = DatasourceRef(supportedType, n, validConfigs._2)
+      x = DatasourceRef(supportedType, n, validConfigs._1)
+      y = DatasourceRef(supportedType, n, validConfigs._2)
 
-        r <- f(dses, x) *> f(dses, y)
-      } yield {
-        r must be_-\/(equal[Err](DatasourceNameExists(n)))
-      }
-    }
+      r <- f(dses, x) *> f(dses, y)
+    } yield {
+      r must be_-\/(equal[Err](DatasourceNameExists(n)))
+    }}
 
     "error when type not supported" >>* {
       val unsup = DatasourceType("--unsupported--", 17L)
 
-      for {
-        (dses, finalize) <- datasources.allocated
+      datasources.use { dses => for {
         n <- randomName
 
         uref = DatasourceRef(unsup, n, validConfigs._1)
@@ -119,44 +107,36 @@ abstract class DatasourcesSpec[
         u <- dses.addDatasource(uref)
 
         types <- dses.supportedDatasourceTypes
-        _ <- finalize
       } yield {
         u must be_-\/(equal[Err](DatasourceUnsupported(unsup, types)))
-      }
+      }}
     }
   }
 
   def resultsInNotFound[E >: ExistentialError[I] <: Err, A](f: (Datasources[F, G, I, C, S], I) => F[E \/ A]) =
-    for {
-      (dses, finalize) <- datasources.allocated
+    datasources.use { dses => for {
       i <- refA >>= createRef(dses)
 
       c <- dses.removeDatasource(i)
 
       fr <- f(dses, i)
-      _ <- finalize
     } yield {
       c must beNormal
       fr must beNotFound[E](i)
-    }
+    }}
 
   def discoveryExamples[E >: ExistentialError[I] <: Err, A](f: (Datasources[F, G, I, C, S], I, ResourcePath) => F[E \/ A]) = {
-
     "error when datasource not found" >>* {
       resultsInNotFound((dses, i) => f(dses, i, ResourcePath.root()))
     }
 
-    "respond when datasource exists" >>* {
-      for {
-        (dses, finalize) <- datasources.allocated
-        i <- refA >>= createRef(dses)
+    "respond when datasource exists" >>* datasources.use { dses => for {
+      i <- refA >>= createRef(dses)
 
-        fr <- f(dses, i, ResourcePath.root())
-        _ <- finalize
-      } yield {
-        fr must not(beNotFound[E](i))
-      }
-    }
+      fr <- f(dses, i, ResourcePath.root())
+    } yield {
+      fr must not(beNotFound[E](i))
+    }}
   }
 
   "add datasource" >> mutationExamples { (dses, ref) =>
@@ -189,26 +169,22 @@ abstract class DatasourcesSpec[
   }
 
   "all metadata" >> {
-    "returns metadata for all datasources" >>* {
-      for {
-        (dses, finalize) <- datasources.allocated
-        a <- refA
-        ia <- createRef(dses)(a)
+    "returns metadata for all datasources" >>* datasources.use { dses => for {
+      a <- refA
+      ia <- createRef(dses)(a)
 
-        b <- refB
-        ib <- createRef(dses)(b)
+      b <- refB
+      ib <- createRef(dses)(b)
 
-        g <- dses.allDatasourceMetadata
+      g <- dses.allDatasourceMetadata
 
-        ts <- gatherMultiple(g)
+      ts <- gatherMultiple(g)
 
-        m = IMap.fromFoldable(ts)
-        _ <- finalize
-      } yield {
-        m.lookup(ia).exists(v => v.kind ≟ a.kind && v.name ≟ a.name) must beTrue
-        m.lookup(ib).exists(v => v.kind ≟ b.kind && v.name ≟ b.name) must beTrue
-      }
-    }
+      m = IMap.fromFoldable(ts)
+    } yield {
+      m.lookup(ia).exists(v => v.kind ≟ a.kind && v.name ≟ a.name) must beTrue
+      m.lookup(ib).exists(v => v.kind ≟ b.kind && v.name ≟ b.name) must beTrue
+    }}
   }
 
   "lookup ref" >> {
@@ -249,25 +225,21 @@ abstract class DatasourcesSpec[
       }
     }
 
-    "not in metadata on success" >>* {
-      for {
-        a <- refA
-        (dses, finalize) <- datasources.allocated
-        i <- createRef(dses)(a)
+    "not in metadata on success" >>* datasources.use { dses => for {
+      a <- refA
+      i <- createRef(dses)(a)
 
-        gBefore <- dses.allDatasourceMetadata
-        metaBefore <- gatherMultiple(gBefore)
+      gBefore <- dses.allDatasourceMetadata
+      metaBefore <- gatherMultiple(gBefore)
 
-        _ <- dses.removeDatasource(i)
+      _ <- dses.removeDatasource(i)
 
-        gAfter <- dses.allDatasourceMetadata
-        metaAfter <- gatherMultiple(gAfter)
-        _ <- finalize
-      } yield {
-        metaBefore.any(_._1 ≟ i) must beTrue
-        metaAfter.any(_._1 ≟ i) must beFalse
-      }
-    }
+      gAfter <- dses.allDatasourceMetadata
+      metaAfter <- gatherMultiple(gAfter)
+    } yield {
+      metaBefore.any(_._1 ≟ i) must beTrue
+      metaAfter.any(_._1 ≟ i) must beFalse
+    }}
   }
 
   "resource schema" >> {

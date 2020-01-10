@@ -52,7 +52,6 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import shims.{monadToScalaz, monoidKToScalaz, showToCats, showToScalaz, applicativeToScalaz}
-import shims.effect.scalazEitherTSync
 
 object DatasourceModulesSpec extends EffectfulQSpec[IO] {
   implicit val tmr = IO.timer(global)
@@ -196,20 +195,21 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       for {
         rl <- RateLimiter[IO](1.0)
         modules = DatasourceModules[Fix, IO, Int](List(lightMod(lightType), heavyMod(heavyType)), rl)
-        eLight <- modules.create(0, lightRef).allocated.run
-        eHeavy <- modules.create(1, heavyRef).allocated.run
-        _ <- eLight.traverse(x => x._2.run)
-        _ <- eHeavy.traverse(x => x._2.run)
+        (lightRes, finalizer1) <- modules.create(0, lightRef).run.allocated
+        (heavyRes, finalizer2) <- modules.create(1, heavyRef).run.allocated
+        _ <- finalizer1
+        _ <- finalizer2
       } yield {
-        eLight must beLike { case \/-((ManagedDatasource.ManagedLightweight(lw), _)) => lw.kind === lightType }
-        eHeavy must beLike { case \/-((ManagedDatasource.ManagedHeavyweight(hw), _)) => hw.kind === heavyType }
+        lightRes must beLike { case \/-(ManagedDatasource.ManagedLightweight(lw)) => lw.kind === lightType }
+        heavyRes must beLike { case \/-(ManagedDatasource.ManagedHeavyweight(hw)) => hw.kind === heavyType }
       }
     }
     "errors with incompatible refs" >>* {
       for {
         rl <- RateLimiter[IO](1.0)
         modules = DatasourceModules[Fix, IO, Int](List(lightMod(lightType), heavyMod(heavyType)), rl)
-        res <- modules.create(0, incompatRef).allocated.run
+        (res, fin) <- modules.create(0, incompatRef).run.allocated
+        _ <- fin
       } yield res must be_-\/(DatasourceUnsupported(incompatType, ISet.singleton(lightType).insert(heavyType)))
     }
     "errors with initialization error" >>* {
@@ -239,10 +239,14 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
           heavyMod(accessDenied, Some(AccessDenied(accessDenied, jString("d"), "access denied")))),
           rl)
 
-        malformedDs <- modules.create(0, malformedRef).allocated.run
-        invalidDs <- modules.create(1, invalidRef).allocated.run
-        connFailedDs <- modules.create(2, connFailedRef).allocated.run
-        accessDeniedDs <- modules.create(3, accessDeniedRef).allocated.run
+        (malformedDs, finM) <- modules.create(0, malformedRef).run.allocated
+        (invalidDs, finI) <- modules.create(1, invalidRef).run.allocated
+        (connFailedDs, finC) <- modules.create(2, connFailedRef).run.allocated
+        (accessDeniedDs, finA) <- modules.create(3, accessDeniedRef).run.allocated
+        _ <- finM
+        _ <- finI
+        _ <- finC
+        _ <- finA
       } yield {
         malformedDs must be_-\/(MalformedConfiguration(malformed, jString("a"), "malformed configuration"))
         invalidDs must be_-\/(InvalidConfiguration(invalid, jString("b"), NonEmptyList("invalid configuration")))

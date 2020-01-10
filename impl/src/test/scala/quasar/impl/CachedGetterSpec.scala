@@ -28,7 +28,7 @@ import scala.concurrent.ExecutionContext
 
 class CachedGetterSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[IO] {
   import CachedGetter.Signal._
-  "CachedGetter works" >>* {
+  "CachedGetter calculates current value based on two previous Options" >>* {
     for {
       ref <- Ref.of[IO, Option[Int]](None)
       func = (i: Unit) => ref.get

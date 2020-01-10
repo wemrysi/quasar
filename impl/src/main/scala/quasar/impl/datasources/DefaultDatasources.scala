@@ -29,22 +29,20 @@ import quasar.impl.{CachedGetter, ResourceManager}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 import quasar.qscript.{construction, educatedToTotal, InterpretedRead, QScriptEducated}
 
-import cats.effect.Sync
+import cats.effect.{Sync, Resource}
 import cats.~>
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 
 import fs2.Stream
 
-import scalaz.{\/, ISet, EitherT, Equal}
+import scalaz.{\/, -\/, \/-, ISet, EitherT, Equal}
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.boolean._
-import scalaz.std.tuple._
 
 import shims.{monadToScalaz, equalToCats}
-import shims.effect.scalazEitherTSync
 
 private[quasar] final class DefaultDatasources[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
@@ -61,8 +59,6 @@ private[quasar] final class DefaultDatasources[
     extends Datasources[F, Stream[F, ?], I, C, S] {
 
   type PathType = ResourcePathType
-
-  type MDS = ManagedDatasource[T, F, Stream[F, ?], R, PathType]
 
   def addDatasource(ref: DatasourceRef[C]): F[CreateError[C] \/ I] = for {
     i <- freshId
@@ -174,13 +170,12 @@ private[quasar] final class DefaultDatasources[
       // Grab managed ds and if it's presented shut it down
       mbCurrent <- EitherT.rightT(cache.get(i))
       _ <- EitherT.rightT(mbCurrent.fold(().point[F])(x => cache.shutdown(i)))
-      allocated <- {
-        modules.create(i, ref)
-          .allocated
-          .leftMap(x => x: E)
-      }
+      allocated <- EitherT(modules.create(i, ref).leftMap(x => x: E).run.allocated.map { (x: (E \/ MDS, F[Unit])) => x match {
+        case (-\/(e), _) => -\/(e)
+        case (\/-(a), finalize) => \/-((a, finalize))
+      }})
       _ <- EitherT.rightT(refs.insert(i, ref))
-      _ <- EitherT.rightT(cache.manage(i, allocated.map(createErrorHandling(_))))
+      _ <- EitherT.rightT(cache.manage(i, allocated))
     } yield ()
     action.run.map(Condition.disjunctionIso.reverseGet(_))
   }
@@ -208,6 +203,8 @@ private[quasar] final class DefaultDatasources[
         .map(_ ? datasourceNameExists[E](name).left[Unit] | ().right)
     }
 
+  type MDS = ManagedDatasource[T, F, Stream[F, ?], R, PathType]
+
   private def getMDS[E >: ExistentialError[I] <: DatasourceError[I, C]](i: I): EitherT[F, E, MDS] = {
     type Res[A] = EitherT[F, E, A]
     type L[M[_], A] = EitherT[M, E, A]
@@ -218,12 +215,12 @@ private[quasar] final class DefaultDatasources[
       case Removed(_) =>
         cache.shutdown(i).liftM[L] >> error
       case Inserted(ref) => for {
-        allocated <- modules.create(i, ref).mapK(createErrorHandling).allocated.liftM[L]
+        allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
         _ <- cache.manage(i, allocated).liftM[L]
       } yield allocated._1
       case Updated(ref, _) => for {
         _ <- cache.shutdown(i).liftM[L]
-        allocated <- modules.create(i, ref).mapK(createErrorHandling).allocated.liftM[L]
+        allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
         _ <- cache.manage(i, allocated).liftM[L]
       } yield allocated._1
       case Preserved(_) => cache.get(i).liftM[L] flatMap {
@@ -233,11 +230,11 @@ private[quasar] final class DefaultDatasources[
     }
   }
 
-  private val createErrorHandling: EitherT[F, CreateError[C], ?] ~> F =
-    λ[EitherT[F, CreateError[C], ?] ~> F]( inp =>
+  private val createErrorHandling: EitherT[Resource[F, ?], CreateError[C], ?] ~> Resource[F, ?] =
+    λ[EitherT[Resource[F, ?], CreateError[C], ?] ~> Resource[F, ?]]( inp =>
       inp.run.flatMap(_.fold(
-        (x: CreateError[C]) => MonadError_[F, CreateError[C]].raiseError(x),
-        _.point[F])))
+        (x: CreateError[C]) => Resource.liftF(MonadError_[F, CreateError[C]].raiseError(x)),
+        _.point[Resource[F, ?]])))
 }
 
 object DefaultDatasources {

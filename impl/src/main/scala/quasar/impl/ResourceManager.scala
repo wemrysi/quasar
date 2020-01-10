@@ -28,22 +28,30 @@ import cats.syntax.functor._
 import cats.instances.option._
 
 trait ResourceManager[F[_], I, A] {
+  // Having a pair of A and its finalizer F[Unit] cache it at the `I` index.
+  // This uses pair instead of `Resource` to omit `Bracket` constraint (might be useful for mocking)
   def manage(i: I, allocated: (A, F[Unit])): F[Unit]
+  // Remove cached value from `I` and call the finalizer
   def shutdown(i: I): F[Unit]
+  // Get the value by index
   def get(i: I): F[Option[A]]
 }
 
 object ResourceManager {
+  // Creates a resource which finalizer is actually calls all finalizers of managed pairs
   def apply[F[_]: Sync, I, A]: Resource[F, ResourceManager[F, I, A]] = {
     val fPair = Ref.of[F, Map[I, (A, F[Unit])]](Map.empty) map { ref =>
       val mgr = new ResourceManager[F, I, A] {
+        // Replaces allocated resource at index. To do this we have to shutdown previously allocated resource
         def manage(i: I, allocated: (A, F[Unit])): F[Unit] =
           shutdown(i) >> ref.update(_.updated(i, allocated))
+
         def shutdown(i: I): F[Unit] = for {
           current <- ref.get
           _ <- current.get(i).traverse_(_._2)
           _ <- ref.update(_ - i)
         } yield ()
+
         def get(i: I): F[Option[A]] =
           ref.get map { x => x.get(i).map(_._1) }
       }
