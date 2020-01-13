@@ -18,7 +18,7 @@ package quasar.run
 
 import slamdata.Predef._
 
-import quasar.RateLimiter
+import quasar.RateLimiting
 import quasar.api.{QueryEvaluator, SchemaConfig}
 import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
 import quasar.api.destination.{Destination, DestinationRef, DestinationType, Destinations}
@@ -80,7 +80,7 @@ object Quasar extends Logging {
       qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], Stream[F, R]],
       resultRender: ResultRender[F, R],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
-      rateLimiter: RateLimiter[F, A])(
+      rateLimiting: RateLimiting[F, A])(
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule])(
       implicit
@@ -99,7 +99,7 @@ object Quasar extends Logging {
       (dsErrors, onCondition) <- Resource.liftF(DefaultDatasourceErrors[F, UUID])
 
       dsModules =
-        DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiter)
+        DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiting)
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
 

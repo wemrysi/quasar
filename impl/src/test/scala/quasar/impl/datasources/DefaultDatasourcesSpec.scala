@@ -18,7 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.{RateLimiter, ScalarStages, ConditionMatchers, Condition, NoopRateLimitUpdater}
+import quasar.{RateLimiter, RateLimiting, ScalarStages, ConditionMatchers, Condition, NoopRateLimitUpdater}
 import quasar.api.MockSchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
@@ -39,14 +39,14 @@ import argonaut.Argonaut.jString
 import cats.Show
 import cats.effect.{IO, ConcurrentEffect, Resource, ContextShift, Timer}
 import cats.effect.concurrent.Ref
+import cats.instances.string._
+import cats.instances.option._
 import cats.kernel.Hash
+import cats.kernel.instances.uuid._
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 import cats.syntax.functor._
 import cats.syntax.traverse._
-import cats.instances.int._
-import cats.instances.string._
-import cats.instances.option._
 
 import eu.timepit.refined.auto._
 
@@ -56,6 +56,7 @@ import matryoshka.data.Fix
 
 import scalaz.{IMap, \/-}
 
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -63,10 +64,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import shims.{orderToScalaz, showToScalaz, applicativeToScalaz, monoidKToScalaz, showToCats, monadToScalaz}
 
 object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type] with ConditionMatchers {
-  sequential
-  implicit val tmr = IO.timer(global)
-  type PathType = ResourcePathType
 
+  sequential
+
+  implicit val tmr = IO.timer(global)
+
+  type PathType = ResourcePathType
   type Self = Datasources[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type]
   type R[F[_], A] = Either[InitializationError[Json], Datasource[F, Stream[F, ?], A, QueryResult[F], ResourcePathType.Physical]]
   type MDS = ManagedDatasource[Fix, IO, Stream[IO, ?], QueryResult[IO], PathType]
@@ -116,7 +119,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
 
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
           config: Json,
-          rateLimiter: RateLimiter[F, A])(
+          rateLimiting: RateLimiting[F, A])(
           implicit ec: ExecutionContext)
           : Resource[F, R[F, InterpretedRead[ResourcePath]]] = {
         lazy val ds: R[F, InterpretedRead[ResourcePath]] =
@@ -145,28 +148,36 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       mp: Map[Json, InitializationError[Json]],
       errorMap: Option[Ref[IO, IMap[String, Exception]]] = None,
       sanitize: Option[Json => Json] = None) = {
+
     val freshId = IO(java.util.UUID.randomUUID.toString())
+
     val fRefs: IO[IndexedStore[IO, String, DatasourceRef[Json]]] =
       IO(new ConcurrentHashMap[String, DatasourceRef[Json]]()).map { (mp: ConcurrentHashMap[String, DatasourceRef[Json]]) =>
         ConcurrentMapIndexedStore.unhooked[IO, String, DatasourceRef[Json]](mp, pool)
       }
+
     val rCache = ResourceManager[IO, String, ManagedDatasource[Fix, IO, Stream[IO, ?], QueryResult[IO], PathType]]
+
     val schema =
       new ResourceSchema[IO, MockSchemaConfig.type, (ResourcePath, QueryResult[IO])] {
         def apply(c: MockSchemaConfig.type, r: (ResourcePath, QueryResult[IO])) =
           MockSchemaConfig.MockSchema.pure[IO]
       }
-    val errors = DatasourceErrors.fromMap { errorMap match {
-      case None => IMap.empty[String, Exception].pure[IO]
-      case Some(e) => e.get
-    } }
+
+    val errors = DatasourceErrors fromMap {
+      errorMap match {
+        case None => IMap.empty[String, Exception].pure[IO]
+        case Some(e) => e.get
+      }
+    }
+
     for {
-      rateLimiter <- Resource.liftF(RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]))
+      rateLimiting <- Resource.liftF(RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]))
       starts <- Resource.liftF(Ref.of[IO, List[String]](List()))
       shuts <- Resource.liftF(Ref.of[IO, List[String]](List()))
 
       modules = {
-        DatasourceModules[Fix, IO, String, Int](List(lightMod(mp, sanitize)), rateLimiter)
+        DatasourceModules[Fix, IO, String, UUID](List(lightMod(mp, sanitize)), rateLimiting)
           .widenPathType[PathType]
           .withMiddleware((i: String, mds: MDS) => starts.update(i :: _) as mds)
           .withFinalizer((i: String, mds: MDS) => shuts.update(i :: _))
@@ -178,7 +189,6 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       }
     } yield (result, refs, starts, shuts)
   }
-
 
   def supportedType = DatasourceType("test-type", 3L)
   def validConfigs = (jString("one"), jString("two"))

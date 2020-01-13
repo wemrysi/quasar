@@ -18,7 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.{EffectfulQSpec, RateLimiter, RenderTreeT, ScalarStages, NoopRateLimitUpdater, RateLimitUpdater}
+import quasar.{EffectfulQSpec, RateLimiter, RateLimiting, RenderTreeT, ScalarStages, NoopRateLimitUpdater, RateLimitUpdater}
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
@@ -39,6 +39,7 @@ import cats.{Applicative, Show}
 import cats.effect.{IO, ContextShift, ConcurrentEffect, Timer, Resource}
 import cats.instances.int._
 import cats.kernel.Hash
+import cats.kernel.instances.uuid._
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 
@@ -49,6 +50,7 @@ import matryoshka.data.Fix
 
 import scalaz.{ISet, NonEmptyList, \/-, -\/}
 
+import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -106,7 +108,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       def sanitizeConfig(config: Json): Json = jString("sanitized")
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
           config: Json,
-          rateLimiter: RateLimiter[F, A])(
+          rateLimiting: RateLimiting[F, A])(
           implicit ec: ExecutionContext)
           : Resource[F, R[F, InterpretedRead[ResourcePath]]] = {
         val ds: R[F, InterpretedRead[ResourcePath]] = err match {
@@ -140,8 +142,8 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
   "supported types" >> {
     "empty" >>* {
       for {
-        rl <- RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]: RateLimitUpdater[IO, Int])
-        modules = DatasourceModules[Fix, IO, Int, Int](List(), rl)
+        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        modules = DatasourceModules[Fix, IO, Int, UUID](List(), rl)
         tys <- modules.supportedTypes
       } yield {
         tys === ISet.empty
@@ -149,8 +151,8 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     }
     "non-empty" >>* {
       for {
-        rl <- RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]: RateLimitUpdater[IO, Int])
-        modules = DatasourceModules[Fix, IO, Int, Int](List(
+        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        modules = DatasourceModules[Fix, IO, Int, UUID](List(
           lightMod(DatasourceType("a", 1L)),
           lightMod(DatasourceType("b", 2L)),
           heavyMod(DatasourceType("c", 3L))),
@@ -174,8 +176,8 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     val bExpected = bRef.copy(config = jString("sanitized"))
     val cExpected = cRef.copy(config = jEmptyObject)
 
-    RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]) map { (rl: RateLimiter[IO, Int]) =>
-      val modules = DatasourceModules[Fix, IO, Int, Int](List(lightMod(aType), heavyMod(bType)), rl)
+    RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]) map { (rl: RateLimiting[IO, UUID]) =>
+      val modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(aType), heavyMod(bType)), rl)
       modules.sanitizeRef(aRef) === aExpected
       modules.sanitizeRef(bRef) === bExpected
       modules.sanitizeRef(cRef) === cExpected
@@ -194,8 +196,8 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
     "works with provided modules" >>* {
       for {
-        rl <- RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]: RateLimitUpdater[IO, Int])
-        modules = DatasourceModules[Fix, IO, Int, Int](List(lightMod(lightType), heavyMod(heavyType)), rl)
+        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(lightType), heavyMod(heavyType)), rl)
         (lightRes, finalizer1) <- modules.create(0, lightRef).run.allocated
         (heavyRes, finalizer2) <- modules.create(1, heavyRef).run.allocated
         _ <- finalizer1
@@ -207,8 +209,8 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     }
     "errors with incompatible refs" >>* {
       for {
-        rl <- RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]: RateLimitUpdater[IO, Int])
-        modules = DatasourceModules[Fix, IO, Int, Int](List(lightMod(lightType), heavyMod(heavyType)), rl)
+        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(lightType), heavyMod(heavyType)), rl)
         (res, fin) <- modules.create(0, incompatRef).run.allocated
         _ <- fin
       } yield res must be_-\/(DatasourceUnsupported(incompatType, ISet.singleton(lightType).insert(heavyType)))
@@ -232,8 +234,8 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
         DatasourceRef(accessDenied, DatasourceName("doesn't matter"), jString("access-denied-config"))
 
       for {
-        rl <- RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]: RateLimitUpdater[IO, Int])
-        modules = DatasourceModules[Fix, IO, Int, Int](List(
+        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        modules = DatasourceModules[Fix, IO, Int, UUID](List(
           lightMod(malformed, Some(MalformedConfiguration(malformed, jString("a"), "malformed configuration"))),
           heavyMod(invalid, Some(InvalidConfiguration(invalid, jString("b"), NonEmptyList("invalid configuration")))),
           lightMod(connFailed, Some(ConnectionFailed(connFailed, jString("c"), new Exception("conn failed")))),
