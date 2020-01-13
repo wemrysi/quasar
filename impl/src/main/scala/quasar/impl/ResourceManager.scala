@@ -18,8 +18,8 @@ package quasar.impl
 
 import slamdata.Predef._
 
-import cats.effect.{Resource, Sync}
-import cats.effect.concurrent.Ref
+import cats.effect.{Concurrent, Resource}
+import cats.effect.concurrent.{Ref, Semaphore}
 import cats.effect.syntax.bracket._
 import cats.syntax.applicative._
 import cats.syntax.flatMap._
@@ -39,24 +39,36 @@ trait ResourceManager[F[_], I, A] {
 
 object ResourceManager {
   // Creates a resource which finalizer is actually calls all finalizers of managed pairs
-  def apply[F[_]: Sync, I, A]: Resource[F, ResourceManager[F, I, A]] = {
-    val fPair = Ref.of[F, Map[I, (A, F[Unit])]](Map.empty) map { ref =>
-      val mgr = new ResourceManager[F, I, A] {
-        // Replaces allocated resource at index. To do this we have to shutdown previously allocated resource
-        def manage(i: I, allocated: (A, F[Unit])): F[Unit] =
-          shutdown(i) >> ref.update(_.updated(i, allocated))
+  def apply[F[_]: Concurrent, I, A]: Resource[F, ResourceManager[F, I, A]] = {
+    val fPair = for {
+      ref <- Ref.of[F, Map[I, (A, F[Unit])]](Map.empty)
+      semaphore <- Semaphore[F](1)
+    } yield {
+      def in[B](fa: F[B]): F[B] =
+        (semaphore.acquire >> fa).guarantee(semaphore.release)
 
-        def shutdown(i: I): F[Unit] = for {
-          current <- ref.get
-          _ <- current.get(i).traverse_(_._2)
-          _ <- ref.update(_ - i)
-        } yield ()
+      def shutdownImpl(i: I): F[Unit] = for {
+        current <- ref.get
+        _ <- current.get(i).traverse_(_._2)
+        _ <- ref.update(_ - i)
+      } yield ()
+      // Replace allocated resource at index. To do this we have to shutdown previous resource
+      def manageImpl(i: I, allocated: (A, F[Unit])): F[Unit] =
+        shutdownImpl(i) >> ref.update(_.updated(i, allocated))
+
+      val mgr = new ResourceManager[F, I, A] {
+        def manage(i: I, allocated: (A, F[Unit])): F[Unit] =
+          in(manageImpl(i, allocated))
+
+        def shutdown(i: I): F[Unit] =
+          in(shutdownImpl(i))
 
         def get(i: I): F[Option[A]] =
           ref.get map { x => x.get(i).map(_._1) }
       }
       (ref, mgr)
     }
+
     val rPair = Resource.make(fPair) { case (ref, _) => ref.get flatMap { (mp: Map[I, (A, F[Unit])]) =>
       val finalizers = mp.toList.map(x => x._2._2)
       finalizers.foldLeft(().pure[F]){ (ef: F[Unit], inc: F[Unit]) =>
