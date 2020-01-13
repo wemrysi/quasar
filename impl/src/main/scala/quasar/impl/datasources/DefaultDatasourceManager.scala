@@ -18,7 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.{Condition, RateLimiter, RenderTreeT}
+import quasar.{Condition, RateLimiting, RenderTreeT}
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported, InitializationError}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
@@ -57,7 +57,7 @@ final class DefaultDatasourceManager[
     A: Hash] private (
     modules: DefaultDatasourceManager.Modules,
     running: Ref[F, DefaultDatasourceManager.Running[I, T, F, G, R, P]],
-    rateLimiter: RateLimiter[F, A],
+    rateLimiting: RateLimiting[F, A],
     onCreate: (I, DefaultDatasourceManager.MDS[T, F, ResourcePathType.Physical]) => F[ManagedDatasource[T, F, G, R, P]])(
     implicit
     ec: ExecutionContext)
@@ -74,7 +74,7 @@ final class DefaultDatasourceManager[
     def createDatasource(module: DatasourceModule): Resource[F, MDS] =
       module match {
         case DatasourceModule.Lightweight(lw) =>
-          handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiter))
+          handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting))
             .map(ManagedDatasource.lightweight[T](_))
 
         case DatasourceModule.Heavyweight(hw) =>
@@ -144,7 +144,7 @@ object DefaultDatasourceManager {
       A: Hash] private (
       onCreate: (I, MDS[T, F, ResourcePathType.Physical]) => F[ManagedDatasource[T, F, G, R, P]]) {
 
-    def build(modules: Modules, configured: IMap[I, DatasourceRef[Json]], rateLimiter: RateLimiter[F, A])(
+    def build(modules: Modules, configured: IMap[I, DatasourceRef[Json]], rateLimiting: RateLimiting[F, A])(
         implicit
         ec: ExecutionContext)
         : Resource[F, DatasourceManager[I, Json, T, F, G, R, P]] = {
@@ -153,7 +153,7 @@ object DefaultDatasourceManager {
         configured map { ref =>
           modules.lookup(ref.kind) match {
             case Some(mod) =>
-              lazyDatasource[T, F, A](mod, ref, rateLimiter)
+              lazyDatasource[T, F, A](mod, ref, rateLimiting)
 
             case None =>
               val ds = FailedDatasource[CreateError[Json], F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], ResourcePathType.Physical](
@@ -179,7 +179,7 @@ object DefaultDatasourceManager {
 
         runningKeys = running.get.map(_.keySet)
 
-      } yield (new DefaultDatasourceManager(modules, running, rateLimiter, onCreate), runningKeys)
+      } yield (new DefaultDatasourceManager(modules, running, rateLimiting, onCreate), runningKeys)
 
       val resource = Resource.make(init) {
         case (mgr, keys) => keys flatMap { ks =>
@@ -216,13 +216,13 @@ object DefaultDatasourceManager {
       A: Hash](
       module: DatasourceModule,
       ref: DatasourceRef[Json],
-      rateLimiter: RateLimiter[F, A])(
+      rateLimiting: RateLimiting[F, A])(
       implicit ec: ExecutionContext)
       : Resource[F, MDS[T, F, ResourcePathType.Physical]] =
     module match {
       case DatasourceModule.Lightweight(lw) =>
         val mklw =
-          handleInitErrors(ref.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiter))
+          handleInitErrors(ref.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting))
 
         ByNeedDatasource(ref.kind, mklw).map(ManagedDatasource.lightweight[T](_))
 

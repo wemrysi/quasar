@@ -22,6 +22,7 @@ import quasar.{
   ConditionMatchers,
   NoopRateLimitUpdater,
   RateLimiter,
+  RateLimiting,
   RenderTreeT,
   ScalarStages
 }
@@ -39,6 +40,7 @@ import quasar.qscript.{MonadPlannerErr, PlannerError, InterpretedRead, QScriptEd
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
+import java.util.UUID
 
 import argonaut.Json
 import argonaut.JsonScalaz._
@@ -47,7 +49,7 @@ import argonaut.Argonaut.{jEmptyObject, jString}
 import cats.Applicative
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Resource, Timer}
 import cats.effect.concurrent.Ref
-import cats.kernel.instances.int._
+import cats.kernel.instances.uuid._
 import cats.kernel.Hash
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
@@ -127,7 +129,7 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
 
     def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
         config: Json,
-        rateLimiter: RateLimiter[F, A])(
+        rateLimiting: RateLimiting[F, A])(
         implicit ec: ExecutionContext)
         : Resource[F, R[F, InterpretedRead[ResourcePath]]] =
       Resource((
@@ -161,11 +163,11 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
   }
 
   def withInitialMgr[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgr, Disposes) => IO[A]): A =
-    RateLimiter[IO, Int](1.0, NoopRateLimitUpdater[IO, Int]).flatMap(limiter =>
+    RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]).flatMap(limiting =>
       Ref[IO].of(List.empty[DatasourceType])
         .flatMap(disps =>
-          DefaultDatasourceManager.Builder[Int, Fix, IO, Int]
-            .build(modules(disps), configured, limiter)
+          DefaultDatasourceManager.Builder[Int, Fix, IO, UUID]
+            .build(modules(disps), configured, limiting)
             .use(f(_, disps))))
       .unsafeRunSync()
 

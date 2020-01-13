@@ -16,7 +16,7 @@
 
 package quasar.connector
 
-import quasar.RateLimiter
+import quasar.RateLimiting
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource.{ResourcePath, ResourcePathType}
@@ -37,7 +37,7 @@ trait LightweightDatasourceModule {
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,
-      rateLimiter: RateLimiter[F, A])(
+      rateLimiting: RateLimiting[F, A])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]]
 }
