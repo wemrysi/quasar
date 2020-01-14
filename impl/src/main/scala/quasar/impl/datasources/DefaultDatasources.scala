@@ -209,24 +209,29 @@ private[quasar] final class DefaultDatasources[
     type Res[A] = EitherT[F, E, A]
     type L[M[_], A] = EitherT[M, E, A]
     lazy val error: Res[MDS] = EitherT.pureLeft(datasourceNotFound[I, E](i))
+    lazy val fromCache: Res[MDS] = cache.get(i).liftM[L] flatMap {
+      case None => error
+      case Some(a) => EitherT.pure(a)
+    }
 
     getter(i).liftM[L] flatMap {
-      case Empty => error
+      case Empty =>
+        error
       case Removed(_) =>
         cache.shutdown(i).liftM[L] >> error
       case Inserted(ref) => for {
         allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
         _ <- cache.manage(i, allocated).liftM[L]
       } yield allocated._1
+      case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
+        fromCache
+      case Preserved(_) =>
+        fromCache
       case Updated(ref, _) => for {
         _ <- cache.shutdown(i).liftM[L]
         allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
         _ <- cache.manage(i, allocated).liftM[L]
       } yield allocated._1
-      case Preserved(_) => cache.get(i).liftM[L] flatMap {
-        case None => error
-        case Some(ds) => ds.point[Res]
-      }
     }
   }
 
