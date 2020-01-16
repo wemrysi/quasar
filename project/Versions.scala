@@ -18,7 +18,7 @@ object Versions {
   val scoptVersion        = "3.7.1"
   val shapelessVersion    = "2.3.3"
   val simulacrumVersion   = "0.19.0"
-  val specsVersion        = "4.8.1"
+  val specsVersion        = "4.8.2"
   val spireVersion        = "0.16.2"
   val akkaVersion         = "2.5.1"
   val fs2Version          = "2.1.0"
@@ -26,5 +26,5 @@ object Versions {
   val slf4sVersion        = "1.7.25"
   val atomixVersion       = "3.0.11" // This is freezed, because atomix changed discovery service somehow
   val mapdbVersion        = "3.0.7"
-  val nettyVersion        = "4.1.42.Final"
+  val nettyVersion        = "4.1.44.Final"
 }
