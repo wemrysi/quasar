@@ -276,6 +276,7 @@ lazy val impl = project
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
       "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2"))
+  .evictToLocal("FS2_JOB_PATH", "core") 
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))

@@ -122,7 +122,7 @@ object Quasar extends Logging {
 
       tables = DefaultTables(freshUUID, tableRefs)
 
-      jobManager <- JobManager[F, (UUID, UUID), Nothing]().compile.resource.lastOrError
+      jobManager <- JobManager[F, (UUID, UUID), Nothing]()
 
       push <- Resource.liftF(DefaultResultPush[F, UUID, UUID, SqlQuery, R](
         tableRefs.lookup,
