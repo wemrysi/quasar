@@ -111,7 +111,7 @@ object Quasar extends Logging {
       destinations <- Resource.liftF(DefaultDestinations(freshUUID, destinationRefs, destCache, destModules))
 
       lookupRunning =
-        (id: UUID) => dsCache.get(id).map(_.map(_.modify(reifiedAggregateDs)))
+        (id: UUID) => datasources.managedDatasourceOf(id).map(_.map(_.modify(reifiedAggregateDs)))
 
       sqlEvaluator = Sql2QueryEvaluator(qscriptEvaluator(lookupRunning))
 

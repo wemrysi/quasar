@@ -163,6 +163,41 @@ private[quasar] final class DefaultDatasources[
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     modules.supportedTypes
 
+  type MDS = ManagedDatasource[T, F, Stream[F, ?], R, PathType]
+
+  def managedDatasourceOf(i: I): F[Option[MDS]] =
+    getMDS[ExistentialError[I]](i).toOption.run
+
+  private def getMDS[E >: ExistentialError[I] <: DatasourceError[I, C]](i: I): EitherT[F, E, MDS] = {
+    type Res[A] = EitherT[F, E, A]
+    type L[M[_], A] = EitherT[M, E, A]
+    lazy val error: Res[MDS] = EitherT.pureLeft(datasourceNotFound[I, E](i))
+    lazy val fromCache: Res[MDS] = cache.get(i).liftM[L] flatMap {
+      case None => error
+      case Some(a) => EitherT.pure(a)
+    }
+
+    getter(i).liftM[L] flatMap {
+      case Empty =>
+        error
+      case Removed(_) =>
+        dispose(i).liftM[L] >> error
+      case Inserted(ref) => for {
+        allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
+        _ <- cache.manage(i, allocated).liftM[L]
+      } yield allocated._1
+      case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
+        fromCache
+      case Preserved(_) =>
+        fromCache
+      case Updated(ref, _) => for {
+        _ <- dispose(i).liftM[L]
+        allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
+        _ <- cache.manage(i, allocated).liftM[L]
+      } yield allocated._1
+    }
+  }
+
   private val dsl = construction.mkGeneric[T, QScriptEducated[T, ?]]
 
   private def addRef[E >: CreateError[C] <: DatasourceError[I, C]](i: I, ref: DatasourceRef[C]): F[Condition[E]] = {
@@ -203,38 +238,6 @@ private[quasar] final class DefaultDatasources[
         .fold(false)(_ || _)
         .map(_ ? datasourceNameExists[E](name).left[Unit] | ().right)
     }
-
-  type MDS = ManagedDatasource[T, F, Stream[F, ?], R, PathType]
-
-  private def getMDS[E >: ExistentialError[I] <: DatasourceError[I, C]](i: I): EitherT[F, E, MDS] = {
-    type Res[A] = EitherT[F, E, A]
-    type L[M[_], A] = EitherT[M, E, A]
-    lazy val error: Res[MDS] = EitherT.pureLeft(datasourceNotFound[I, E](i))
-    lazy val fromCache: Res[MDS] = cache.get(i).liftM[L] flatMap {
-      case None => error
-      case Some(a) => EitherT.pure(a)
-    }
-
-    getter(i).liftM[L] flatMap {
-      case Empty =>
-        error
-      case Removed(_) =>
-        dispose(i).liftM[L] >> error
-      case Inserted(ref) => for {
-        allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
-        _ <- cache.manage(i, allocated).liftM[L]
-      } yield allocated._1
-      case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
-        fromCache
-      case Preserved(_) =>
-        fromCache
-      case Updated(ref, _) => for {
-        _ <- dispose(i).liftM[L]
-        allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
-        _ <- cache.manage(i, allocated).liftM[L]
-      } yield allocated._1
-    }
-  }
 
   private def dispose(i: I): F[Unit] =
     cache.shutdown(i) >> byteStores.clear(i)
