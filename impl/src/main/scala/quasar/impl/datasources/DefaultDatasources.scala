@@ -55,7 +55,8 @@ private[quasar] final class DefaultDatasources[
     getter: CachedGetter[F, I, DatasourceRef[C]],
     cache: ResourceManager[F, I, ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
     errors: DatasourceErrors[F, I],
-    schema: ResourceSchema[F, S, (ResourcePath, R)])
+    schema: ResourceSchema[F, S, (ResourcePath, R)],
+    byteStores: ByteStores[F, I])
     extends Datasources[F, Stream[F, ?], I, C, S] {
 
   type PathType = ResourcePathType
@@ -108,7 +109,7 @@ private[quasar] final class DefaultDatasources[
 
   def removeDatasource(i: I): F[Condition[ExistentialError[I]]] =
     refs.delete(i).ifM(
-      cache.shutdown(i).as(Condition.normal[ExistentialError[I]]()),
+      dispose(i).as(Condition.normal[ExistentialError[I]]()),
       Condition.abnormal(datasourceNotFound[I, ExistentialError[I]](i)).point[F])
 
   def replaceDatasource(i: I, ref: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] = {
@@ -120,7 +121,7 @@ private[quasar] final class DefaultDatasources[
         notFound.point[F]
       case Removed(_) =>
         // it's removed, but resource hasn't been finalized
-        cache.shutdown(i) as notFound
+        dispose(i).as(notFound)
       case existed => for {
         // We have a ref, start replacement
         _ <- refs.insert(i, ref)
@@ -133,12 +134,12 @@ private[quasar] final class DefaultDatasources[
           case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
             setRef(i, incoming)
           case Updated(_, _) =>
-            cache.shutdown(i) >> addRef[DatasourceError[I, C]](i, ref)
+            dispose(i) >> addRef[DatasourceError[I, C]](i, ref)
           // These two cases can't happen.
           case Empty =>
             notFound.point[F]
           case Removed(_) =>
-            cache.shutdown(i) as notFound
+            dispose(i).as(notFound)
         }
       } yield res
     }
@@ -180,7 +181,7 @@ private[quasar] final class DefaultDatasources[
       case Empty =>
         error
       case Removed(_) =>
-        cache.shutdown(i).liftM[L] >> error
+        dispose(i).liftM[L] >> error
       case Inserted(ref) => for {
         allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
         _ <- cache.manage(i, allocated).liftM[L]
@@ -190,7 +191,7 @@ private[quasar] final class DefaultDatasources[
       case Preserved(_) =>
         fromCache
       case Updated(ref, _) => for {
-        _ <- cache.shutdown(i).liftM[L]
+        _ <- dispose(i).liftM[L]
         allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
         _ <- cache.manage(i, allocated).liftM[L]
       } yield allocated._1
@@ -204,7 +205,7 @@ private[quasar] final class DefaultDatasources[
       _ <- verifyNameUnique[E](ref.name, i)
       // Grab managed ds and if it's presented shut it down
       mbCurrent <- EitherT.rightT(cache.get(i))
-      _ <- EitherT.rightT(mbCurrent.fold(().point[F])(x => cache.shutdown(i)))
+      _ <- EitherT.rightT(mbCurrent.fold(().point[F])(_ => dispose(i)))
       allocated <- EitherT(modules.create(i, ref).leftMap(x => x: E).run.allocated.map { (x: (E \/ MDS, F[Unit])) => x match {
         case (-\/(e), _) => -\/(e)
         case (\/-(a), finalize) => \/-((a, finalize))
@@ -238,6 +239,9 @@ private[quasar] final class DefaultDatasources[
         .map(_ ? datasourceNameExists[E](name).left[Unit] | ().right)
     }
 
+  private def dispose(i: I): F[Unit] =
+    cache.shutdown(i) >> byteStores.clear(i)
+
   private val createErrorHandling: EitherT[Resource[F, ?], CreateError[C], ?] ~> Resource[F, ?] =
     λ[EitherT[Resource[F, ?], CreateError[C], ?] ~> Resource[F, ?]]( inp =>
       inp.run.flatMap(_.fold(
@@ -247,19 +251,19 @@ private[quasar] final class DefaultDatasources[
 
 object DefaultDatasources {
   def apply[
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Sync: MonadError_[?[_], CreateError[C]],
-    I: Equal, C: Equal, S <: SchemaConfig,
-    R](
-    freshId: F[I],
-    refs: IndexedStore[F, I, DatasourceRef[C]],
-    modules: DatasourceModules[T, F, Stream[F, ?], I, C, R, ResourcePathType],
-    cache: ResourceManager[F, I, ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
-    errors: DatasourceErrors[F, I],
-    schema: ResourceSchema[F, S, (ResourcePath, R)])
-    : F[DefaultDatasources[T, F, I, C, S, R]] = {
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+      F[_]: Sync: MonadError_[?[_], CreateError[C]],
+      I: Equal, C: Equal, S <: SchemaConfig,
+      R](
+      freshId: F[I],
+      refs: IndexedStore[F, I, DatasourceRef[C]],
+      modules: DatasourceModules[T, F, Stream[F, ?], I, C, R, ResourcePathType],
+      cache: ResourceManager[F, I, ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
+      errors: DatasourceErrors[F, I],
+      schema: ResourceSchema[F, S, (ResourcePath, R)],
+      byteStores: ByteStores[F, I])
+      : F[DefaultDatasources[T, F, I, C, S, R]] =
     CachedGetter(refs.lookup(_)).map { getter =>
-      new DefaultDatasources(freshId, refs, modules, getter, cache, errors, schema)
+      new DefaultDatasources(freshId, refs, modules, getter, cache, errors, schema, byteStores)
     }
-  }
 }

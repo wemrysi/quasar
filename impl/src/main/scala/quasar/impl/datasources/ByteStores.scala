@@ -14,19 +14,27 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.impl.datasources
 
-import scala.{Array, Byte}
+import quasar.connector.ByteStore
 
-import quasar.contrib.scalaz.MonadError_
+import cats.Applicative
+import cats.implicits._
 
-import java.lang.String
+import scala.Unit
 
-package object connector {
-  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
+trait ByteStores[F[_], K] {
+  /** Returns the `ByteStore` for the specified key. */
+  def get(key: K): F[ByteStore[F]]
 
-  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
+  /** Removes all associations from the `ByteStore` for the specified key. */
+  def clear(key: K): F[Unit]
+}
 
-  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
-      : MonadResourceErr[F] = ev
+object ByteStores {
+  def void[F[_]: Applicative, I]: ByteStores[F, I] =
+    new ByteStores[F, I] {
+      def get(key: I) = ByteStore.void[F].pure[F]
+      def clear(key: I) = ().pure[F]
+    }
 }

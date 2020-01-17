@@ -119,7 +119,8 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
 
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
           config: Json,
-          rateLimiting: RateLimiting[F, A])(
+          rateLimiting: RateLimiting[F, A],
+          byteStore: ByteStore[F])(
           implicit ec: ExecutionContext)
           : Resource[F, R[F, InterpretedRead[ResourcePath]]] = {
         lazy val ds: R[F, InterpretedRead[ResourcePath]] =
@@ -176,8 +177,10 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       starts <- Resource.liftF(Ref.of[IO, List[String]](List()))
       shuts <- Resource.liftF(Ref.of[IO, List[String]](List()))
 
+      byteStores = ByteStores.void[IO, String]
+
       modules = {
-        DatasourceModules[Fix, IO, String, UUID](List(lightMod(mp, sanitize)), rateLimiting)
+        DatasourceModules[Fix, IO, String, UUID](List(lightMod(mp, sanitize)), rateLimiting, byteStores)
           .widenPathType[PathType]
           .withMiddleware((i: String, mds: MDS) => starts.update(i :: _) as mds)
           .withFinalizer((i: String, mds: MDS) => shuts.update(i :: _))
@@ -185,7 +188,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       refs <- Resource.liftF(fRefs)
       cache <- rCache
       result <- Resource.liftF {
-        DefaultDatasources[Fix, IO, String, Json, MockSchemaConfig.type, QueryResult[IO]](freshId, refs, modules, cache, errors, schema)
+        DefaultDatasources[Fix, IO, String, Json, MockSchemaConfig.type, QueryResult[IO]](freshId, refs, modules, cache, errors, schema, byteStores)
       }
     } yield (result, refs, starts, shuts)
   }
