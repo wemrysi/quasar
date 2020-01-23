@@ -16,93 +16,81 @@
 
 package quasar.connector
 
-// CDC Query
-// (InterpretedRead[Path], Offset) => CDCResult
+import slamdata.Predef._
 
-// Changes
-//
-// How to communicate/negotiate which changes are supported by datasource + destinations
+import quasar.ScalarStages
+import quasar.api.datasource.DatasourceType
+import quasar.api.destination._
+import quasar.api.push.RenderConfig
+import quasar.api.resource._
+import quasar.api.table._
 
+import cats.data.NonEmptyList
 
-// Types, existentials or not?
-//
-sealed trait Change[+F[_], +O, +A] extends Product with Serializable {
+import qdata.QDataDecode
+
+import fs2.Stream
+
+sealed trait Change[F[_], +O, +A] extends Product with Serializable {
+  /** The offset representing the end of the event payload. */
   def endOffset: O
 }
-
-final case class Delete(correlationIds: List[???], endOffset: O) extends Change[Nothing, O, Nothing]
-// or maybe
-final case class Delete2(correlationIds: Stream[F, Array[Byte]], endOffset: O) extends Change[F, Nothing]
-
-// AdditiveChange[F, A] ???
-sealed trait NonReductiveChange[+F[_], +O, +A] extends Change[F, O, A]
 
 final case class Create[F[_], O, A](
     stages: ScalarStages,
     data: Stream[F, A],
     endOffset: O)
-    extends NonReductiveChange[F, O, A]
+    extends Change[F, O, A]
 
 final case class Replace[F[_], O, A](
     stages: ScalarStages,
     correlationId: Array[Byte],
     endOffset: O,
     data: Stream[F, A])
-    extends NonReductiveChange[F, O, A]
+    extends Change[F, O, A]
 
-// Result
-sealed trait CDCResult[F[_], C <: Change] extends Product with Serializable
+final case class Delete[F[_], O](
+    correlationIds: Stream[F, Array[Byte]],
+    endOffset: O)
+    extends Change[F, O, Nothing]
 
-final case class Parsed[F[_], A, C <: Change[F, A]](
+
+sealed trait DeltaResult[F[_], +O] extends Product with Serializable
+
+final case class Parsed[F[_], O, A](
 		decode: QDataDecode[A],
-		changes: Stream[F, C])
-		extends CDCResult[F]
+		changes: Stream[F, Change[F, O, A]])
+		extends DeltaResult[F, O]
 
-class TableColumns(correlationId: TableColumn, columns: List[TableColumn])
 
-/*
- * Datasource needs to provide the offset somehow
- *
- * Keep in mind at least once delivery of events.
- */
+class TableColumns(correlationId: Option[TableColumn], columns: List[TableColumn])
 
-// TODO: name
 
-trait Loader[F[_], -O, -A] extends Product with Serializable
+// TODO: better name?
+trait Loader[F[_], O, -A] extends Product with Serializable
 final case class Full[F[_], A](f: A => Stream[F, QueryResult[F]])
-final case class Delta[F[_], O, A](f: (A, Option[O]) => Stream[F, CDCResult[F]])
+final case class Delta[F[_], O, A](f: (A, Option[O]) => Stream[F, DeltaResult[F, O]])
 
-trait SomethingDatasource[F[_]] extends Datasource[F, A] {
+trait Datasource[F[_], G[_], Q, P <: ResourcePathType] {
 
   type Offset
 
-  def offsetCodec: Codec[Offset]
+  def kind: DatasourceType
 
-  def loaders: NonEmptyList[Loader[Offset, A]]
+  def offsetCodec: scodec.Codec[Offset]
 
-  def prefixedChildPaths(path: ResourcePath)
+  def loaders: NonEmptyList[Loader[F, Offset, Q]]
 
-  def isResource(path: ResourcePath)
+  def pathIsResource(path: ResourcePath): F[Boolean]
 
-/*
-  def evaluate(read: IR): Option[Stream[F, QueryResult[F]]]
-
-  def delta(read: IR, offset: Option[Offset]): Option[Stream[F, CDCResult[F]]]
-
-  // What if the the initial backfill doesn't complete?
-  def backfill(read: IR, offset: Option[Offset]): Option[Stream[F, CDCResult[F]]]
-*/
+  def prefixedChildPaths(prefixPath: ResourcePath)
+      : F[Option[G[(ResourceName, P)]]]
 }
 
-// For when a destination cannot support a column as a correlation id
-final case class UnsupportedCorrelationColumn(col: TableColumn) extends PushError
+/** Indicates a destination cannot support a column as a correlation id. */
+final case class UnsupportedCorrelationColumn(col: TableColumn)// extends ResultPushError
 
-// Given an id that can be used to restart, reference, remove, etc this push definition
-//
-// Full Push
-// Delta Push
-// Backfill (Full + Delta without losing events)
-//
+/** First class push representation, enables resuming delta pushes and redoing full pushes. */
 final case class Push[T, D](
     tableId: T,
     destinationId: D,
@@ -110,76 +98,28 @@ final case class Push[T, D](
     path: ResourcePath,
     format: ResultType)
 
-// push changes: ??? Resumption Push, Delta Push
-// push everything: ???, Full Push, Fresh Push, Total Push, Complete Push
-//
-// Do we need to be able to "reset" a delta push to start from the beginning?
-//  * May not be useful, or be able to actually reset very far into the past
-//  * If needed, then want to expose some sort of capability reporting from destination
-//
-// Backfill?
-//  * Is starting from whatever the current delta stream can provide good enough?
-//  * Do we need to incorporate historical records and then delta load from some point in time?
-//  * Want to allow for any help the backend can provide in enabling backfill
 
-val evaluator = ???
+/** Allows for Destinations to handle what they are able. */
+sealed trait ResultSink[F[_]] extends Product with Serializable
 
-Stream[F, Change[A]] => Stream[F, Unit]
+final case class CreateSink[F[_]](
+    format: RenderConfig,
+    ingest: (ResourcePath, TableColumns, Stream[F, Byte]) => Stream[F, Unit])
+    extends ResultSink[F]
 
-flatMap { change =>
-  case Create(stages, data, offset) =>
-    evaluate(stages, data)
-      .flatMap(_.renderCsv(createSink.format))
-      .flatMap(createSink.f(path, columsn, _)) ++
-      Stream.eval_(commitOffset)
+final case class ReplaceSink[F[_]](
+    format: RenderConfig,
+    ingest: (ResourcePath, TableColumns, Array[Byte], Stream[F, Byte]) => Stream[F, Unit])
+    extends ResultSink[F]
 
-  case Delete(ids, offset) =>
-    deleteSink.f(path, columns, ids) ++ Stream.eval_(commitOffset)
-}
+final case class DeleteSink[F[_]](
+    format: RenderConfig,
+    ingest: (ResourcePath, TableColumns, Stream[F, Array[Byte]]) => Stream[F, Unit])
+    extends ResultSink[F]
 
-object ResultSink {
-  // Many rows
-  final case class CreateSink(
-    format: RenderFormat,
-    f: (ResourcePath, TableColumns, Stream[F, Byte]) => Stream[F, Unit])
 
-  // One row
-  final case class ReplaceSink(
-    format: RenderFormat,
-    f: (ResourcePath, TableColumns, Array[Byte], Stream[F, Byte]) => Stream[F, Unit])
-
-  // Many rows
-  final case class DeleteSink(
-    format: RenderFormat,
-    f: (ResourcePath, TableColumns, Stream[F, Array[Byte]]) => Stream[F, Unit])
-}
-
-// Errors/push behavior when capabilities differ between sourc/dest?
-
-// How do we handle the REFORM table definition changing after having been pushed with CDC?
-//  * Check for compatibility with existing?
-//  * If incompatible, refuse and require they make a new push
-//
-// One of these per-consumption capability? Just start with all Changes
-trait SomethingElseDestination[F[_]] extends Destination[F[_]] {
-  // new column information representing correlation id/primary key
-  // a way to consume a change stream
+trait Destination[F[_]] {
+  def kind: DestinationType
 
   def sinks: NonEmptyList[ResultSink[F]]
 }
-
-// something like this?
-def evaluate[C <: Change[F, A]](changes: Stream[F, C]): Stream[F, Change[MimirRepr]] =
-	changes evalMap {
-		case Create(stages, data) =>
-			underlying
-				.evaluate(stages, data)
-				.map(Create(ScalarStages.Id, _))
-
-		case Update(stages, id, data) =>
-			underlying
-				.evaluate(stages, data)
-        .map(Update(ScalarStages.Id, id, _))
-
-		case d @ Delete(_) => d.pure[F]
-	}
