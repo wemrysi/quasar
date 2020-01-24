@@ -16,17 +16,12 @@
 
 package quasar
 
-import scala.{Array, Byte}
+import slamdata.Predef.Unit
 
-import quasar.contrib.scalaz.MonadError_
+import scala.concurrent.duration.FiniteDuration
 
-import java.lang.String
-
-package object connector {
-  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
-
-  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
-
-  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
-      : MonadResourceErr[F] = ev
+trait RateLimitUpdater[F[_], A] {
+  def plusOne(key: A): F[Unit]
+  def wait(key: A, duration: FiniteDuration): F[Unit]
+  def config(key: A, config: RateLimiterConfig): F[Unit]
 }

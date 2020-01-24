@@ -14,19 +14,24 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.qsu.mra
 
-import scala.{Array, Byte}
+import quasar.pkg.tests._
 
-import quasar.contrib.scalaz.MonadError_
+import cats.Order
 
-import java.lang.String
+import org.scalacheck.Cogen
 
-package object connector {
-  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
+import ProvImpl.Vecs
 
-  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
+trait VecsGenerator {
+  import IdentitiesGenerator._
 
-  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
-      : MonadResourceErr[F] = ev
+  implicit def arbitraryVecs[A: Arbitrary: Order]: Arbitrary[Vecs[A]] =
+    Arbitrary(arbitrary[Identities[A]].map(Vecs.active(_)))
+
+  implicit def cogenVecs[A: Order: Cogen]: Cogen[Vecs[A]] =
+    Cogen[Identities[A]].contramap(_.united)
 }
+
+object VecsGenerator extends VecsGenerator

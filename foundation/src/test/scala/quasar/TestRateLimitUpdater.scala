@@ -16,17 +16,19 @@
 
 package quasar
 
-import scala.{Array, Byte}
+import slamdata.Predef._
 
-import quasar.contrib.scalaz.MonadError_
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.duration.FiniteDuration
 
-import java.lang.String
+import cats.effect.IO
 
-package object connector {
-  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
+class TestRateLimitUpdater[A] extends RateLimitUpdater[IO, A] {
+  val plusOnes: ArrayBuffer[A] = ArrayBuffer()
+  val waits: ArrayBuffer[A] = ArrayBuffer()
+  val configs: ArrayBuffer[A] = ArrayBuffer()
 
-  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
-
-  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
-      : MonadResourceErr[F] = ev
+  def plusOne(key: A): IO[Unit] = IO.delay(plusOnes += key)
+  def wait(key: A, duration: FiniteDuration): IO[Unit] = IO.delay(waits += key)
+  def config(key: A, config: RateLimiterConfig): IO[Unit] = IO.delay(configs += key)
 }

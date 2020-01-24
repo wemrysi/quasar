@@ -16,17 +16,19 @@
 
 package quasar
 
-import scala.{Array, Byte}
+import slamdata.Predef._
 
-import quasar.contrib.scalaz.MonadError_
+import scala.concurrent.duration.FiniteDuration
 
-import java.lang.String
+import cats.Applicative
+import cats.implicits._
 
-package object connector {
-  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
+class NoopRateLimitUpdater[F[_]: Applicative, A] private () extends RateLimitUpdater[F, A] {
+  def plusOne(key: A): F[Unit] = ().pure[F]
+  def wait(key: A, duration: FiniteDuration): F[Unit] = ().pure[F]
+  def config(key: A, config: RateLimiterConfig): F[Unit] = ().pure[F]
+}
 
-  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
-
-  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
-      : MonadResourceErr[F] = ev
+object NoopRateLimitUpdater {
+  def apply[F[_]: Applicative, A]() = new NoopRateLimitUpdater[F, A]
 }

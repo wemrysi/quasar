@@ -239,9 +239,9 @@ final class DefaultResultPush[
 
   def destinationStatus(destinationId: D): F[Either[DestinationNotFound[D], Map[T, PushMeta]]] =
     ensureDestinationExists[DestinationNotFound[D]](destinationId)
-      .semiflatMap(_ => Concurrent[F] delay {
-        Option(pushStatus.get(destinationId))
-          .fold(Map[T, PushMeta]())(_.asScala.toMap)
+      .semiflatMap(x => Concurrent[F] delay {
+        val back = Option(pushStatus.get(destinationId))
+        back.fold(Map[T, PushMeta]())(_.asScala.toMap)
       })
       .value
 

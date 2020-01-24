@@ -16,17 +16,8 @@
 
 package quasar
 
-import scala.{Array, Byte}
+import slamdata.Predef.Int
 
-import quasar.contrib.scalaz.MonadError_
+import scala.concurrent.duration.FiniteDuration
 
-import java.lang.String
-
-package object connector {
-  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
-
-  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
-
-  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
-      : MonadResourceErr[F] = ev
-}
+final case class RateLimiterConfig(max: Int, window: FiniteDuration)
