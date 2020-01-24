@@ -46,7 +46,7 @@ import scalaz.ISet
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import shims.{showToCats, showToScalaz, orderToScalaz, applicativeToScalaz}
+import shims.{showToCats, showToScalaz, orderToScalaz}
 
 object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionMatchers {
   sequential
