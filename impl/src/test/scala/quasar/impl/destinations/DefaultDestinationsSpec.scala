@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.ConditionMatchers
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 import quasar.connector.ResourceError
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.ResourceManager
@@ -34,7 +34,7 @@ import cats.Show
 import cats.instances.int._
 import cats.instances.string._
 import cats.instances.option._
-import cats.effect.{IO, Resource}
+import cats.effect.{Blocker, IO, Resource}
 import cats.effect.concurrent.Ref
 import cats.syntax.applicativeError._
 import cats.syntax.traverse._
@@ -68,13 +68,13 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         }
     }
 
-  val pool: BlockingContext = BlockingContext.cached("rdestinations-spec")
+  val blocker: Blocker = qc.Blocker.cached("rdestinations-spec")
 
   def mkDestinations = {
     val freshId = IO(java.util.UUID.randomUUID().toString())
     val fRefs: IO[IndexedStore[IO, String, DestinationRef[Json]]] =
       IO(new ConcurrentHashMap[String, DestinationRef[Json]]()).map { (mp: ConcurrentHashMap[String, DestinationRef[Json]]) =>
-        ConcurrentMapIndexedStore.unhooked[IO, String, DestinationRef[Json]](mp, pool)
+        ConcurrentMapIndexedStore.unhooked[IO, String, DestinationRef[Json]](mp, blocker)
       }
     val rCache = ResourceManager[IO, String, Destination[IO]]
     val modules = DestinationModules[IO, String](List(MockDestinationModule))
