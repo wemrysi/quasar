@@ -237,9 +237,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
   val jobManager =
     JobManager[IO, (Int, Int), Nothing]()
-      .compile
-      .resource
-      .lastOrError
 
   def awaitFs(fss: Stream[IO, Filesystem], count: Long = -1): IO[Filesystem] = {
     val (s, msg) =
