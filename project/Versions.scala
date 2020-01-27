@@ -22,7 +22,7 @@ object Versions {
   val spireVersion        = "0.16.2"
   val akkaVersion         = "2.5.1"
   val fs2Version          = "2.2.1"
-  val fs2JobVersion       = "1.0.0"
+  val fs2JobVersion       = "1.0.1"
   val slf4sVersion        = "1.7.25"
   val atomixVersion       = "3.0.11" // This is freezed, because atomix changed discovery service somehow
   val mapdbVersion        = "3.0.7"
