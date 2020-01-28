@@ -18,7 +18,7 @@ package quasar.impl
 
 import slamdata.Predef._
 
-import cats.effect.{Concurrent, ContextShift, Sync}
+import cats.effect.{Concurrent, ContextShift, Sync, Resource}
 import cats.effect.concurrent.{Ref, Semaphore}
 import cats.effect.syntax.bracket._
 import cats.syntax.applicative._
@@ -28,7 +28,7 @@ import cats.syntax.functor._
 import cats.~>
 
 abstract class IndexedSemaphore[F[_]: Sync, I] {
-  def get(i: I): F[Semaphore[F]]
+  def get(i: I): Resource[F, Unit]
 }
 
 object IndexedSemaphore {
@@ -41,7 +41,8 @@ object IndexedSemaphore {
         (mainSemaphore.acquire *> fa).guarantee(mainSemaphore.release)
       }
       new IndexedSemaphore[F, I] {
-        def get(i: I): F[Semaphore[F]] =
+        def get(i: I): Resource[F, Unit] = {
+          val fSemaphore: F[Semaphore[F]] =
           inMain { semaphores.get flatMap { ss =>
             ss.get(i) match {
               case None => for {
@@ -50,6 +51,11 @@ object IndexedSemaphore {
               } yield s
               case Some(s) => s.pure[F]
             }}}
+          val fResource: F[Resource[F, Unit]] = fSemaphore map { (semaphore: Semaphore[F]) =>
+            Resource.make(semaphore.acquire)(_ => semaphore.release)
+          }
+          Resource.suspend(fResource)
+        }
       }
     }
   }

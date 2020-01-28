@@ -27,7 +27,6 @@ import quasar.impl.storage.IndexedStore
 
 import cats.effect.{Concurrent, ContextShift, Sync}
 import cats.effect.concurrent.Ref
-import cats.effect.syntax.bracket._
 import cats.~>
 
 import fs2.Stream
@@ -186,7 +185,7 @@ private[quasar] final class DefaultDestinations[
     }
 
   private def throughSemaphore(i: I): F ~> F = λ[F ~> F]{ fa =>
-    semaphore.get(i).flatMap(s => (s.acquire *> fa).guarantee(s.release))
+    semaphore.get(i).use(_ => fa)
   }
 }
 

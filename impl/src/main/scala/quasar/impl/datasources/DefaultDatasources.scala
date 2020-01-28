@@ -30,7 +30,6 @@ import quasar.impl.storage.IndexedStore
 import quasar.qscript.{construction, educatedToTotal, InterpretedRead, QScriptEducated}
 
 import cats.effect.{Concurrent, ContextShift, Sync, Resource}
-import cats.effect.syntax.bracket._
 import cats.~>
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
@@ -255,7 +254,7 @@ private[quasar] final class DefaultDatasources[
         _.point[Resource[F, ?]])))
 
   private def throughSemaphore[G[_]: Sync](i: I, fg: F ~> G): G ~> G = λ[G ~> G]{ ga =>
-    fg(semaphore.get(i)).flatMap(s => (fg(s.acquire) *> ga).guarantee(fg(s.release)))
+    semaphore.get(i).mapK(fg).use(_ => ga)
   }
 }
 
