@@ -42,7 +42,7 @@ import fs2.Stream
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import scalaz.{NonEmptyList, ISet}
+import scalaz.{\/, -\/, NonEmptyList, ISet}
 
 import shims.{showToCats, showToScalaz}
 
@@ -86,7 +86,6 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
 
   def mkModules(lst: List[DestinationModule]) = DestinationModules[IO, String](lst)
 
-
   "supported types" >> {
     "empty" >>* {
       for {
@@ -95,6 +94,7 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
         actual === ISet.empty
       }
     }
+
     "non-empty" >>* {
       val expected = ISet.fromList(List(DestinationType("foo", 1L), DestinationType("bar", 2L)))
       for {
@@ -119,25 +119,24 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
     "work for supported" >>* {
       val kind = DestinationType("foo", 1L)
       val ref = DestinationRef(kind, DestinationName("supported"), Json.jString(""))
-      for {
-        (mod, finish) <- mkModules(List(module(kind))).create(ref).allocated
-        _ <- finish
-      } yield {
-        mod.destinationType === kind
+
+      mkModules(List(module(kind))).create(ref).run use { res =>
+        IO.pure(res.map(_.destinationType) must_=== \/.right(kind))
       }
     }
+
     "doesn't work for unsupported" >>* {
       val kind = DestinationType("foo", 1L)
       val ref = DestinationRef(DestinationType("bar", 2L), DestinationName("unsupported"), Json.jString(""))
-      for {
-        res <- mkModules(List(module(kind))).create(ref).allocated.attempt
-      } yield {
-        res must beLike {
-          case Left(CreateErrorException(ce)) =>
+
+      mkModules(List(module(kind))).create(ref).run use { res =>
+        IO.pure(res must beLike {
+          case -\/(ce) =>
             ce === DestinationUnsupported(DestinationType("bar", 2L), ISet.singleton(DestinationType("foo", 1L)))
-        }
+        })
       }
     }
+
     "errors with initialization error" >>* {
       val malformed =
         DestinationType("malformed", 1L)
@@ -162,27 +161,30 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
           module(accessDenied, Some(AccessDenied(accessDenied, Json.jString("d"), "access denied")))))
 
       for {
-        malformedDs <- modules.create(malformedRef).allocated.attempt
-        invalidDs <- modules.create(invalidRef).allocated.attempt
-        connFailedDs <- modules.create(connFailedRef).allocated.attempt
-        accessDeniedDs <- modules.create(accessDeniedRef).allocated.attempt
+        malformedDs <- modules.create(malformedRef).run.allocated
+        invalidDs <- modules.create(invalidRef).run.allocated
+        connFailedDs <- modules.create(connFailedRef).run.allocated
+        accessDeniedDs <- modules.create(accessDeniedRef).run.allocated
       } yield {
         malformedDs must beLike {
-          case Left(CreateErrorException(ce)) =>
+          case (-\/(ce), _) =>
             ce === MalformedConfiguration(malformed, Json.jString("a"), "malformed configuration")
         }
+
         invalidDs must beLike {
-          case Left(CreateErrorException(ce)) =>
+          case (-\/(ce), _) =>
             ce === InvalidConfiguration(invalid, Json.jString("b"), NonEmptyList("invalid configuration"))
         }
+
         connFailedDs must beLike {
-          case Left(CreateErrorException(ConnectionFailed(kind, config, cause))) =>
+          case (-\/(ConnectionFailed(kind, config, cause)), _) =>
             kind === connFailed
             config === Json.jString("c")
             cause.getMessage === "conn failed"
         }
+
         accessDeniedDs must beLike {
-          case Left(CreateErrorException(ce)) =>
+          case (-\/(ce), _) =>
             ce === AccessDenied(accessDenied, Json.jString("d"), "access denied")
         }
       }
