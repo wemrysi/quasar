@@ -42,7 +42,7 @@ lazy val buildSettings = Seq(
    * an optimization.
    */
   addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full))
+  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full))
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
