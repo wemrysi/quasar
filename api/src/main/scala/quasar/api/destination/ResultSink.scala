@@ -16,7 +16,7 @@
 
 package quasar.api.destination
 
-import slamdata.Predef.{Stream => _, _}
+import slamdata.Predef._
 
 import quasar.api.push.RenderConfig
 import quasar.api.resource.ResourcePath

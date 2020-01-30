@@ -18,7 +18,7 @@ package quasar.pkg
 
 import slamdata.Predef._
 
-import scala.{Byte, Char}
+import scala.{Byte, Char, Stream}
 import scala.Predef.$conforms
 import scala.collection.mutable.Builder
 import scala.collection.Traversable

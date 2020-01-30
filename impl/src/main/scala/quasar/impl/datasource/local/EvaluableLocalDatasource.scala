@@ -16,7 +16,7 @@
 
 package quasar.impl.datasource.local
 
-import slamdata.Predef.{Seq => _, Stream => _, _}
+import slamdata.Predef.{Seq => _, _}
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._

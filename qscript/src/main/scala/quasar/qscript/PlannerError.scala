@@ -43,7 +43,7 @@ object PlannerError {
     def message = dirs match {
       case Nil => "No paths provided to read from."
       case ds  =>
-        "None of these directories contain any files to read from: " ++
+        "None of these directories contain any files to read from: " +
           ds.map(posixCodec.printPath).mkString(", ")
       }
   }

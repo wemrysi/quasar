@@ -16,7 +16,7 @@
 
 package quasar.impl.datasource.local
 
-import slamdata.Predef.{Stream => _, _}
+import slamdata.Predef._
 
 import cats.effect.{Blocker, ContextShift, Effect}
 

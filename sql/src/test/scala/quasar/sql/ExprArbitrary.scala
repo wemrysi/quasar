@@ -31,6 +31,8 @@ import java.time.{Duration, Instant}
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 
+import scala.Stream
+
 trait ExprArbitrary {
   implicit val exprArbitrary: Arbitrary[Fix[Sql]] = Arbitrary(selectGen(4))
 

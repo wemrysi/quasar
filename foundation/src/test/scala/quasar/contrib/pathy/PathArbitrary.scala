@@ -22,6 +22,8 @@ import org.scalacheck.{Arbitrary, Gen, Shrink}
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 
+import scala.Stream
+
 trait PathArbitrary {
 
   implicit val arbitraryAPath: Arbitrary[APath] =

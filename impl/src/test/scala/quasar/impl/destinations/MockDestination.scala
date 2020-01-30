@@ -16,7 +16,7 @@
 
 package quasar.impl.destinations
 
-import slamdata.Predef.{Stream => _, _}
+import slamdata.Predef._
 
 import argonaut.Json
 

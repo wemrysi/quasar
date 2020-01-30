@@ -29,6 +29,8 @@ import java.time.{
   ZoneOffset
 }
 
+import scala.Stream
+
 trait DataGenerators {
   import DataGenerators._
 

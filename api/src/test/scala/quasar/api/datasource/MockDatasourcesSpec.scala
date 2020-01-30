@@ -16,7 +16,7 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{Int, List, String, Stream => SStream}
+import slamdata.Predef.{Int, List, String}
 import quasar.Condition
 import quasar.api.MockSchemaConfig
 import quasar.contrib.cats.stateT._
@@ -34,6 +34,8 @@ import scalaz.std.list._
 import scalaz.std.string._
 import shims.{monadToScalaz, monoidToCats}
 import MockDatasourcesSpec._
+
+import scala.{Stream => SStream}
 
 final class MockDatasourcesSpec
   extends DatasourcesSpec[MockM, List, Int, String, MockSchemaConfig.type] {

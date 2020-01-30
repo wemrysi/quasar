@@ -16,7 +16,7 @@
 
 package quasar.impl.evaluate
 
-import slamdata.Predef.{Stream => _, _}
+import slamdata.Predef._
 
 import quasar.{IdStatus, ScalarStage, ScalarStages}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}

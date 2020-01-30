@@ -34,6 +34,8 @@ import matryoshka.implicits._
 import pathy.Path.posixCodec
 import scalaz.{Failure => _, Select => _, _}, Scalaz._
 
+import scala.Stream
+
 package object compile {
   type SemanticErrors = NonEmptyList[SemanticError]
 

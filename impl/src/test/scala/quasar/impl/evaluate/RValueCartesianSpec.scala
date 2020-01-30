@@ -16,7 +16,7 @@
 
 package quasar.impl.evaluate
 
-import slamdata.Predef.{Stream => _, _}
+import slamdata.Predef._
 
 import quasar._
 import quasar.ScalarStage.{Cartesian, Pivot}

@@ -16,7 +16,7 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{Stream => SStream, _}
+import slamdata.Predef._
 import quasar.Condition
 import quasar.api.MockSchemaConfig
 import quasar.api.datasource.DatasourceError.InitializationError
@@ -36,6 +36,8 @@ import scalaz.syntax.std.boolean._
 import scalaz.syntax.std.option._
 
 import MockDatasources.MockState
+
+import scala.{Stream => SStream}
 
 final class MockDatasources[
     C,
