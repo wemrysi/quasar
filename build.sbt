@@ -41,7 +41,8 @@ lazy val buildSettings = Seq(
    * Slice#allFromRValues to not free memory, so it's not just a convenience or
    * an optimization.
    */
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"))
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full))
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
@@ -122,7 +123,7 @@ lazy val foundation = project
       "com.propensive"             %% "contextual"                % "1.2.1",
       "io.frees"                   %% "iotaz-core"                % "0.3.10",
       "com.github.markusbernhardt"  % "proxy-vole"                % "1.0.5",
-      "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
+      "org.typelevel"              %% "simulacrum"                % "1.0.0",
       "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
       "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
       "org.typelevel"              %% "spire-laws"                % spireVersion                         % Test,
@@ -199,6 +200,7 @@ lazy val sql = project
   .dependsOn(common % BothScopes)
   .settings(commonSettings)
   .settings(
+
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
       "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.1.2"))
