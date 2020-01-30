@@ -18,7 +18,7 @@ package quasar.impl
 
 import slamdata.Predef._
 
-import cats.effect.{Concurrent, ContextShift, Sync, Resource}
+import cats.effect.{Concurrent, Resource}
 import cats.effect.concurrent.{Ref, Semaphore}
 import cats.effect.syntax.bracket._
 import cats.syntax.applicative._
@@ -27,12 +27,12 @@ import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.~>
 
-abstract class IndexedSemaphore[F[_]: Sync, I] {
+abstract class IndexedSemaphore[F[_], I] {
   def get(i: I): Resource[F, Unit]
 }
 
 object IndexedSemaphore {
-  def apply[F[_]: Concurrent: ContextShift, I]: F[IndexedSemaphore[F, I]] = {
+  def apply[F[_]: Concurrent, I]: F[IndexedSemaphore[F, I]] = {
     for {
       semaphores <- Ref.of[F, Map[I, Semaphore[F]]](Map.empty)
       mainSemaphore <- Semaphore[F](1)
