@@ -12,9 +12,6 @@ import Versions._
 def readVersion(path: File): String =
   IO.read(path).trim
 
-lazy val fs2GzipVersion = Def.setting[String](
-  readVersion(baseDirectory.value / ".." / "fs2-gzip-version"))
-
 lazy val qdataVersion = Def.setting[String](
   readVersion(baseDirectory.value / ".." / "qdata-version"))
 
@@ -44,7 +41,8 @@ lazy val buildSettings = Seq(
    * Slice#allFromRValues to not free memory, so it's not just a convenience or
    * an optimization.
    */
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"))
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full))
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
@@ -102,6 +100,7 @@ lazy val foundation = project
       "com.slamdata"               %% "slamdata-predef"           % "0.0.7",
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
       "com.codecommit"             %% "shims"                     % "2.1.0",
+      "com.codecommit"             %% "shims-effect"              % "2.1.0",
       "com.codecommit"             %% "skolems"                   % "0.1.2",
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
       "org.typelevel"              %% "cats-effect-laws"          % catsEffectVersion % Test,
@@ -118,11 +117,13 @@ lazy val foundation = project
       "com.slamdata"               %% "qdata-time"                % qdataVersion.value,
       "eu.timepit"                 %% "refined"                   % refinedVersion,
       "com.chuusai"                %% "shapeless"                 % shapelessVersion,
+      // jawn-parser can be removed again once argonaut supports jawn 1.0.0
+      "org.typelevel"              %% "jawn-parser"               % jawnVersion,
       "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
       "com.propensive"             %% "contextual"                % "1.2.1",
       "io.frees"                   %% "iotaz-core"                % "0.3.10",
       "com.github.markusbernhardt"  % "proxy-vole"                % "1.0.5",
-      "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
+      "org.typelevel"              %% "simulacrum"                % "1.0.0",
       "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
       "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
       "org.typelevel"              %% "spire-laws"                % spireVersion                         % Test,
@@ -199,6 +200,7 @@ lazy val sql = project
   .dependsOn(common % BothScopes)
   .settings(commonSettings)
   .settings(
+
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
       "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.1.2"))
@@ -265,13 +267,14 @@ lazy val impl = project
   .settings(
 
     libraryDependencies ++= Seq(
-      "com.slamdata"   %% "fs2-gzip"                 % fs2GzipVersion.value,
       "com.slamdata"   %% "fs2-job"                  % fs2JobVersion,
       "com.slamdata"   %% "qdata-tectonic"           % qdataVersion.value,
       "com.slamdata"   %% "tectonic-fs2"             % tectonicVersion.value,
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
       "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
-      "org.typelevel"  %% "jawn-argonaut"            % jawnVersion,
+      // Temporarily excluded because argonaut does not support jawn 1.0.0 yet.
+      // Code is added in quasar.contrib.argonaut.JawnParser for now.
+      // "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
       "org.typelevel"  %% "jawn-util"                % jawnVersion,
       "io.atomix"      % "atomix"                    % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
       "org.scodec"     %% "scodec-bits"              % scodecBitsVersion,
@@ -280,6 +283,7 @@ lazy val impl = project
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
       "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2"))
+  .evictToLocal("FS2_JOB_PATH", "core")
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))
