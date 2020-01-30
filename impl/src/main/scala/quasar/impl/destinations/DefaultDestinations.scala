@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
-import quasar.contrib.scalaz.MonadError_
 import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 
@@ -31,7 +30,7 @@ import cats.~>
 
 import fs2.Stream
 
-import scalaz.{\/, Equal, EitherT, IMap, ISet, OptionT, Order}
+import scalaz.{\/, -\/, \/-, Equal, EitherT, IMap, ISet, OptionT, Order}
 import scalaz.syntax.monad._
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
@@ -39,9 +38,7 @@ import scalaz.syntax.std.boolean._
 
 import shims.{monadToScalaz, equalToCats}
 
-private[quasar] final class DefaultDestinations[
-    F[_]: Sync: MonadError_[?[_], CreateError[C]],
-    I: Order, C: Equal](
+private[quasar] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
     semaphore: IndexedSemaphore[F, I],
     freshId: F[I],
     refs: IndexedStore[F, I, DestinationRef[C]],
@@ -51,7 +48,7 @@ private[quasar] final class DefaultDestinations[
     currentErrors: Ref[F, IMap[I, Exception]])
     extends Destinations[F, Stream[F, ?], I, C] {
 
-  def addDestination(ref: DestinationRef[C]): F[CreateError[C] \/ I ] = for {
+  def addDestination(ref: DestinationRef[C]): F[CreateError[C] \/ I] = for {
     i <- freshId
     c <- addRef[CreateError[C]](i, ref)
   } yield Condition.disjunctionIso.get(c).as(i)
@@ -70,12 +67,18 @@ private[quasar] final class DefaultDestinations[
       .run
 
   def destinationOf(i: I): F[DestinationError[I, C] \/ Destination[F]] = {
-    type L[M[_], A] = EitherT[M, DestinationError[I, C], A]
-    lazy val error: EitherT[F, DestinationError[I, C], Destination[F]] = EitherT.pureLeft(destinationNotFound[I, DestinationError[I, C]](i))
-    lazy val fromCache: EitherT[F, DestinationError[I, C], Destination[F]] = cache.get(i).liftM[L] flatMap {
-      case None => error
-      case Some(a) => EitherT.pure(a)
-    }
+    type DE = DestinationError[I, C]
+    type L[M[_], A] = EitherT[M, DE, A]
+
+    lazy val error: EitherT[F, DestinationError[I, C], Destination[F]] =
+      EitherT.pureLeft(destinationNotFound[I, DE](i))
+
+    lazy val fromCache: EitherT[F, DE, Destination[F]] =
+      cache.get(i).liftM[L] flatMap {
+        case None => error
+        case Some(a) => EitherT.pure(a)
+      }
+
     throughSemaphore(i) {
       val action = for {
         signal <- EitherT.rightT(getter(i))
@@ -85,7 +88,7 @@ private[quasar] final class DefaultDestinations[
           case Removed(_) =>
             cache.shutdown(i).liftM[L] >> error
           case Inserted(ref) => for {
-            allocated <- modules.create(ref).allocated.liftM[L]
+            allocated <- allocateDestination[DE](ref)
             _ <- cache.manage(i, allocated).liftM[L]
           } yield allocated._1
           case Updated(incoming, old) if DestinationRef.atMostRenamed(incoming, old) =>
@@ -94,11 +97,12 @@ private[quasar] final class DefaultDestinations[
             fromCache
           case Updated(incoming, _) => for {
             _ <- EitherT.rightT(cache.shutdown(i))
-            allocated <- modules.create(incoming).allocated.liftM[L]
+            allocated <- allocateDestination[DE](incoming)
             _ <- cache.manage(i, allocated).liftM[L]
           } yield allocated._1
         }
       } yield res
+
       action.run
     }
   }
@@ -116,7 +120,9 @@ private[quasar] final class DefaultDestinations[
       Condition.abnormal(destinationNotFound[I, ExistentialError[I]](i)).point[F])
 
   def replaceDestination(i: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] = {
-    lazy val notFound = Condition.abnormal(destinationNotFound[I, DestinationError[I, C]](i))
+    lazy val notFound =
+      Condition.abnormal(destinationNotFound[I, DestinationError[I, C]](i))
+
     throughSemaphore(i) {
       getter(i) flatMap {
         case Empty =>
@@ -157,13 +163,16 @@ private[quasar] final class DefaultDestinations[
   private def addRef[E >: CreateError[C] <: DestinationError[I, C]](i: I, ref: DestinationRef[C]): F[Condition[E]] = {
     val action = for {
       _ <- verifyNameUnique[E](ref.name, i)
+
       mbCurrent <- EitherT.rightT(cache.get(i))
       _ <- EitherT.rightT(mbCurrent.fold(().point[F])(x => cache.shutdown(i)))
-      allocated <- EitherT(MonadError_[F, CreateError[C]].attempt(modules.create(ref).allocated))
-        .leftMap((x: CreateError[C]) => (x: E))
+
+      allocated <- allocateDestination[E](ref)
+
       _ <- EitherT.rightT(refs.insert(i, ref))
       _ <- EitherT.rightT(cache.manage(i, allocated))
     } yield ()
+
     action.run.map(Condition.disjunctionIso.reverseGet(_))
   }
 
@@ -184,15 +193,21 @@ private[quasar] final class DefaultDestinations[
         .map(_ ? destinationNameExists[E](name).left[Unit] | ().right)
     }
 
+  private def allocateDestination[E >: CreateError[C] <: DestinationError[I, C]](
+      ref: DestinationRef[C])
+      : EitherT[F, E, (Destination[F], F[Unit])] =
+    EitherT(modules.create(ref).run.allocated map {
+      case (-\/(e), _) => -\/(e: E)
+      case (\/-(a), finalize) => \/-((a, finalize))
+    })
+
   private def throughSemaphore(i: I): F ~> F = λ[F ~> F]{ fa =>
     semaphore.get(i).use(_ => fa)
   }
 }
 
 object DefaultDestinations {
-  def apply[
-      F[_]: Concurrent: ContextShift: MonadError_[?[_], CreateError[C]],
-      I: Order, C: Equal](
+  def apply[F[_]: Concurrent: ContextShift, I: Order, C: Equal](
       freshId: F[I],
       refs: IndexedStore[F, I, DestinationRef[C]],
       cache: ResourceManager[F, I, Destination[F]],

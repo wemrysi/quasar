@@ -41,7 +41,8 @@ lazy val buildSettings = Seq(
    * Slice#allFromRValues to not free memory, so it's not just a convenience or
    * an optimization.
    */
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"))
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full))
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
@@ -68,7 +69,10 @@ lazy val publishSettings = Seq(
 )
 
 // Build and publish a project, excluding its tests.
-lazy val commonSettings = buildSettings ++ publishSettings
+lazy val commonSettings =
+  buildSettings ++ publishSettings ++ Seq(
+    // TODO: Should be able to remove once using modern versions of pathy/matryoshka
+    excludeDependencies += ExclusionRule("org.typelevel", "scala-library"))
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
@@ -96,7 +100,7 @@ lazy val foundation = project
     buildInfoPackage := "quasar.build",
 
     libraryDependencies ++= Seq(
-      "com.slamdata"               %% "slamdata-predef"           % "0.0.7",
+      "com.slamdata"               %% "slamdata-predef"           % "0.1.1",
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
       "com.codecommit"             %% "shims"                     % "2.1.0",
       "com.codecommit"             %% "shims-effect"              % "2.1.0",
@@ -122,7 +126,7 @@ lazy val foundation = project
       "com.propensive"             %% "contextual"                % "1.2.1",
       "io.frees"                   %% "iotaz-core"                % "0.3.10",
       "com.github.markusbernhardt"  % "proxy-vole"                % "1.0.5",
-      "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
+      "org.typelevel"              %% "simulacrum"                % "1.0.0",
       "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
       "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
       "org.typelevel"              %% "spire-laws"                % spireVersion                         % Test,
@@ -138,8 +142,12 @@ lazy val api = project
   .settings(name := "quasar-api")
   .dependsOn(foundation % BothScopes)
   .settings(
+    // this does strange things with UntypedDestination.scala
+    scalacOptions -= "-Ywarn-dead-code",
+
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro"      % monocleVersion,
+      "com.codecommit"             %% "skolems"            % "0.2.0",
       "eu.timepit"                 %% "refined-scalaz"     % refinedVersion,
       "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test))
   .settings(commonSettings)
@@ -199,6 +207,7 @@ lazy val sql = project
   .dependsOn(common % BothScopes)
   .settings(commonSettings)
   .settings(
+
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
       "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.1.2"))
