@@ -23,10 +23,12 @@ import quasar.EffectfulQSpec
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.api.push.RenderConfig
+import quasar.api.table.ColumnType
 import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
 
 import cats.Show
+import cats.data.NonEmptyList
 import cats.instances.int._
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
@@ -42,7 +44,7 @@ import fs2.Stream
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import scalaz.{\/, -\/, NonEmptyList, ISet}
+import scalaz.{\/, -\/, NonEmptyList => ZNel, ISet}
 
 import shims.{showToCats, showToScalaz}
 
@@ -70,10 +72,10 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
     def destinationType = kind
     def sanitizeDestinationConfig(inp: Json) = Json.jString("sanitized")
     def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](config: Json) = {
-      val dest: Destination[F] = new Destination[F] {
+      val dest: Destination[F] = new LegacyDestination[F] {
         def destinationType = kind
-        def sinks = NonEmptyList(mock)
-        val mock = ResultSink.csv[F](RenderConfig.Csv()) {
+        def sinks = NonEmptyList.of(mock)
+        val mock = ResultSink.csv[F, ColumnType.Scalar](RenderConfig.Csv()) {
           case _ => Stream(())
         }
       }
@@ -156,7 +158,7 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
         DestinationRef(accessDenied, DestinationName("doesn't matter"), Json.jString("access-denied-config"))
       val modules = mkModules(List(
           module(malformed, Some(MalformedConfiguration(malformed, Json.jString("a"), "malformed configuration"))),
-          module(invalid, Some(InvalidConfiguration(invalid, Json.jString("b"), NonEmptyList("invalid configuration")))),
+          module(invalid, Some(InvalidConfiguration(invalid, Json.jString("b"), ZNel("invalid configuration")))),
           module(connFailed, Some(ConnectionFailed(connFailed, Json.jString("c"), new Exception("conn failed")))),
           module(accessDenied, Some(AccessDenied(accessDenied, Json.jString("d"), "access denied")))))
 
@@ -173,7 +175,7 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
 
         invalidDs must beLike {
           case (-\/(ce), _) =>
-            ce === InvalidConfiguration(invalid, Json.jString("b"), NonEmptyList("invalid configuration"))
+            ce === InvalidConfiguration(invalid, Json.jString("b"), ZNel("invalid configuration"))
         }
 
         connFailedDs must beLike {

@@ -16,26 +16,30 @@
 
 package quasar.api.destination
 
-import slamdata.Predef._
+import scala.AnyVal
 
-import quasar.api.push.RenderConfig
-import quasar.api.resource.ResourcePath
+import java.lang.String
 
-import cats.data.NonEmptyList
+/** A semantic, human consumable description.
+  *
+  * In contrast to `Show`, which is more representation focused, `Label`
+  * focuses on semantics and aims to be suitable for display to an end-user
+  * of the system.
+  */
+trait Label[A] {
+  def label(a: A): String
+}
 
-import fs2.Stream
+object Label {
 
-sealed trait ResultSink[F[_], T]
+  def apply[A](implicit A: Label[A]): Label[A] = A
 
-object ResultSink {
-  final case class Csv[F[_], T](
-      config: RenderConfig.Csv,
-      run: (ResourcePath, NonEmptyList[DestinationColumn[T]], Stream[F, Byte]) => Stream[F, Unit])
-      extends ResultSink[F, T]
+  def label[A](f: A => String): Label[A] =
+    new Label[A] { def label(a: A) = f(a) }
 
-  def csv[F[_], T](
-      config: RenderConfig.Csv)(
-      run: (ResourcePath, NonEmptyList[DestinationColumn[T]], Stream[F, Byte]) => Stream[F, Unit])
-      : ResultSink[F, T] =
-    Csv[F, T](config, run)
+  object Syntax {
+    implicit final class EnrichedA[A](val self: A) extends AnyVal {
+      def label(implicit A: Label[A]): String = A.label(self)
+    }
+  }
 }

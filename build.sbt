@@ -142,8 +142,12 @@ lazy val api = project
   .settings(name := "quasar-api")
   .dependsOn(foundation % BothScopes)
   .settings(
+    // this does strange things with UntypedDestination.scala
+    scalacOptions -= "-Ywarn-dead-code",
+
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro"      % monocleVersion,
+      "com.codecommit"             %% "skolems"            % "0.2.0",
       "eu.timepit"                 %% "refined-scalaz"     % refinedVersion,
       "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test))
   .settings(commonSettings)

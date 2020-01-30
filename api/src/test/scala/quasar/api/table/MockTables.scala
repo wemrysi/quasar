@@ -31,6 +31,8 @@ import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 
+import shims._
+
 final class MockTables[F[_]: Monad: MockTables.TablesMockState]
     extends Tables[F, UUID, String] {
 

@@ -14,21 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.api.destination
 
-import slamdata.Predef._
+import quasar.api.destination.param._
 
-import cats.{Eq, Show}
-import cats.implicits._
+import scala.Nothing
+import scala.util.{Either, Left}
 
-final case class TableColumn(name: String, tpe: ColumnType.Scalar)
+import skolems.∃
 
-object TableColumn {
-  implicit val equalTableColumn: Eq[TableColumn] =
-    Eq.by(c => (c.name, c.tpe))
+trait UnparameterizedDestination[F[_]] extends Destination[F] {
+  type Type = TypeId
+  type Constructor[P] = Nothing
 
-  implicit val showTableColumn: Show[TableColumn] =
-    Show show { tc =>
-      "TableColumn(" + tc.name + ", " + tc.tpe.show + ")"
-    }
+  def construct(id: TypeId): Either[Type, ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]] =
+    Left(id)
 }

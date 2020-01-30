@@ -14,21 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.api.push
 
-import slamdata.Predef._
+import scala.Int
 
-import cats.{Eq, Show}
-import cats.implicits._
-
-final case class TableColumn(name: String, tpe: ColumnType.Scalar)
-
-object TableColumn {
-  implicit val equalTableColumn: Eq[TableColumn] =
-    Eq.by(c => (c.name, c.tpe))
-
-  implicit val showTableColumn: Show[TableColumn] =
-    Show show { tc =>
-      "TableColumn(" + tc.name + ", " + tc.tpe.show + ")"
-    }
-}
+final case class TypeIndex(ordinal: Int) extends scala.AnyVal

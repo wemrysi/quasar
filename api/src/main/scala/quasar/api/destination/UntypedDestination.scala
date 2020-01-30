@@ -14,21 +14,27 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.api.destination
 
-import slamdata.Predef._
+import cats.data.NonEmptyList
 
-import cats.{Eq, Show}
-import cats.implicits._
+import monocle.Prism
 
-final case class TableColumn(name: String, tpe: ColumnType.Scalar)
+import quasar.api.table.ColumnType
 
-object TableColumn {
-  implicit val equalTableColumn: Eq[TableColumn] =
-    Eq.by(c => (c.name, c.tpe))
+import scala.{Int, Unit}
 
-  implicit val showTableColumn: Show[TableColumn] =
-    Show show { tc =>
-      "TableColumn(" + tc.name + ", " + tc.tpe.show + ")"
-    }
+import scalaz.std.anyVal._
+
+trait UntypedDestination[F[_]] extends UnparameterizedDestination[F] {
+  type TypeId = Unit
+
+  val typeIdOrdinal: Prism[Int, Unit] =
+    Prism.only[Int](0)
+
+  implicit val typeIdLabel: Label[Unit] =
+    Label.label[Unit](_ => "()")
+
+  final def coerce(tpe: ColumnType.Scalar): TypeCoercion[Type] =
+    TypeCoercion.Satisfied(NonEmptyList.one(()))
 }
