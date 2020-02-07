@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.{MonadResourceErr, ResourceError}
+import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
 
 import cats.data.OptionT
@@ -60,23 +60,31 @@ object MapBasedDatasourceSpec extends DatasourceSpec[IO, List, ResourcePathType.
         .map(_.toSet).map(_ must_== expected)
     } yield res
 
+  def full(path: ResourcePath) = {
+    val loader = datasource.loaders.toList collectFirst {
+      case Loader.Batch(BatchLoader.Full(f)) => f
+    }
+
+    loader.fold(IO.pure(-1))(_(path))
+  }
+
+
   "evaluation" >> {
-    "known resource returns result" >>* {
-      datasource
-        .evaluate(ResourcePath.root() / ResourceName("d") / ResourceName("e"))
+    "known resource returns result" >>* {   
+      full(ResourcePath.root() / ResourceName("d") / ResourceName("e"))
         .map(_ must_=== 4)
     }
 
     "known prefix errors with 'not a resource'" >>* {
       val pfx = ResourcePath.root() / ResourceName("d")
 
-      MonadResourceErr[IO].attempt(datasource.evaluate(pfx)).map(_ must be_-\/.like {
+      MonadResourceErr[IO].attempt(full(pfx)).map(_ must be_-\/.like {
         case ResourceError.NotAResource(p) => p must equal(pfx)
       })
     }
 
     "unknown path errors with 'not found'" >>* {
-      MonadResourceErr[IO].attempt(datasource.evaluate(nonExistentPath)).map(_ must be_-\/.like {
+      MonadResourceErr[IO].attempt(full(nonExistentPath)).map(_ must be_-\/.like {
         case ResourceError.PathNotFound(p) => p must equal(nonExistentPath)
       })
     }

@@ -17,20 +17,31 @@
 package quasar.connector.datasource
 
 import slamdata.Predef.{Array, Boolean, Option, SuppressWarnings}
-import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 
-import monocle.{Lens, PLens}
+import cats.Applicative
+import cats.data.{NonEmptyList, OptionT}
+import cats.instances.option._
+import cats.syntax.traverse._
+
+import monocle.{PTraversal, Traversal}
+
+import scalaz.syntax.functor._
+
+import shims.applicativeToCats
 
 /** @tparam F effects
   * @tparam G multiple results
   * @tparam Q query
   */
-trait Datasource[F[_], G[_], Q, R, P <: ResourcePathType] extends QueryEvaluator[F, Q, R] {
+trait Datasource[F[_], G[_], Q, R, P <: ResourcePathType] {
 
   /** The type of this datasource. */
   def kind: DatasourceType
+
+  /** The set of `Loader`s provided by this datasource. */
+  def loaders: NonEmptyList[Loader[F, Q, R]]
 
   /** Returns whether or not the specified path refers to a resource in the
     * specified datasource.
@@ -42,25 +53,39 @@ trait Datasource[F[_], G[_], Q, R, P <: ResourcePathType] extends QueryEvaluator
     */
   def prefixedChildPaths(prefixPath: ResourcePath)
       : F[Option[G[(ResourceName, P)]]]
+
+  /** Attempts a 'full' load, returning `None` if unsupported by this datasource. */
+  def loadFull(q: Q)(implicit F: Applicative[F]): OptionT[F, R] =
+    OptionT {
+      loaders
+        .toList
+        .collectFirst { case Loader.Batch(BatchLoader.Full(f)) => f }
+        .traverse(_(q))
+    }
 }
 
 object Datasource {
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def widenPathType[F[_], G[_], Q, R, PI <: ResourcePathType, PO >: PI <: ResourcePathType](
-      ds: Datasource[F, G, Q, R, PI]): Datasource[F, G, Q, R, PO] =
+      ds: Datasource[F, G, Q, R, PI])
+      : Datasource[F, G, Q, R, PO] =
     ds.asInstanceOf[Datasource[F, G, Q, R, PO]]
 
-  def evaluator[F[_], G[_], Q, R, P <: ResourcePathType]: Lens[Datasource[F, G, Q, R, P], QueryEvaluator[F, Q, R]] =
-    pevaluator[F, G, Q, R, Q, R, P]
+  def loaders[F[_], G[_], Q, R, P <: ResourcePathType]
+      : Traversal[Datasource[F, G, Q, R ,P], Loader[F, Q, R]] =
+    ploaders[F, G, Q, R, Q, R, P]
 
-  def pevaluator[F[_], G[_], Q1, R1, Q2, R2, P <: ResourcePathType]
-      : PLens[Datasource[F, G, Q1, R1, P], Datasource[F, G, Q2, R2, P], QueryEvaluator[F, Q1, R1], QueryEvaluator[F, Q2, R2]] =
-    PLens((ds: Datasource[F, G, Q1, R1, P]) => ds: QueryEvaluator[F, Q1, R1]) { qe: QueryEvaluator[F, Q2, R2] => ds =>
-      new Datasource[F, G, Q2, R2, P] {
-        val kind = ds.kind
-        def evaluate(q: Q2) = qe.evaluate(q)
-        def pathIsResource(p: ResourcePath) = ds.pathIsResource(p)
-        def prefixedChildPaths(pfx: ResourcePath) = ds.prefixedChildPaths(pfx)
-      }
+  def ploaders[F[_], G[_], Q1, R1, Q2, R2, P <: ResourcePathType]
+      : PTraversal[Datasource[F, G, Q1, R1, P], Datasource[F, G, Q2, R2, P], Loader[F, Q1, R1], Loader[F, Q2, R2]] =
+    new PTraversal[Datasource[F, G, Q1, R1, P], Datasource[F, G, Q2, R2, P], Loader[F, Q1, R1], Loader[F, Q2, R2]] {
+      def modifyF[H[_]: scalaz.Applicative](f: Loader[F, Q1, R1] => H[Loader[F, Q2, R2]])(s: Datasource[F, G, Q1, R1, P]) =
+        s.loaders.traverse(f) map { ls =>
+          new Datasource[F, G, Q2, R2, P] {
+            val kind = s.kind
+            val loaders = ls
+            def pathIsResource(p: ResourcePath) = s.pathIsResource(p)
+            def prefixedChildPaths(pfx: ResourcePath) = s.prefixedChildPaths(pfx)
+          }
+        }
     }
 }

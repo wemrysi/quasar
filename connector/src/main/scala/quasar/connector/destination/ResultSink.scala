@@ -26,17 +26,17 @@ import cats.data.NonEmptyList
 
 import fs2.Stream
 
-sealed trait ResultSink[F[_], T]
+sealed trait ResultSink[F[_], T] extends Product with Serializable
 
 object ResultSink {
-  final case class Csv[F[_], T](
-      config: RenderConfig.Csv,
-      run: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
+  final case class CreateSink[F[_], T](
+      config: RenderConfig,
+      consume: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
       extends ResultSink[F, T]
 
-  def csv[F[_], T](
-      config: RenderConfig.Csv)(
-      run: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
+  def create[F[_], T](
+      config: RenderConfig)(
+      consume: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
       : ResultSink[F, T] =
-    Csv[F, T](config, run)
+    CreateSink[F, T](config, consume)
 }

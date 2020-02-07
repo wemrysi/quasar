@@ -25,6 +25,7 @@ import quasar.connector.datasource._
 import quasar.contrib.fs2.stream._
 import quasar.contrib.scalaz.MonadError_
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 
 import eu.timepit.refined.auto._
@@ -81,8 +82,9 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
         new PhysicalDatasource[IO, Stream[IO, ?], ResourcePath, Int] {
           val kind = DatasourceType("prefixed", 6L)
 
-          def evaluate(rp: ResourcePath): IO[Int] =
+          val loaders = NonEmptyList.of(Loader.Batch(BatchLoader.Full { (rp: ResourcePath) =>
             IO.pure(paths.lookup(rp) getOrElse -1)
+          }))
 
           def pathIsResource(rp: ResourcePath): IO[Boolean] =
             IO.pure(paths.member(rp))
@@ -108,12 +110,12 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
       for {
         dres <- ds.prefixedChildPaths(ResourcePath.root())
         meta <- dres.traverse(_.compile.to(List))
-        qres <- ds.evaluate(z)
+        qres <- ds.loadFull(z).value
       } yield {
         meta must beSome(equal[List[(ResourceName, ResourcePathType)]](List(
           ResourceName("**") -> ResourcePathType.AggregateResource,
           ResourceName("z") -> ResourcePathType.prefixResource)))
-        qres must beLeft(1)
+        qres must beSome(beLeft(1))
       }
     }
 
@@ -137,15 +139,15 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
 
   "evaluation" >> {
     "querying a non-existent path is not found" >>* {
-      MonadResourceErr[IO].attempt(datasource.evaluate(nonExistentPath)).map(_ must be_-\/.like {
+      MonadResourceErr[IO].attempt(datasource.loadFull(nonExistentPath).value).map(_ must be_-\/.like {
         case ResourceError.PathNotFound(p) => p must equal(nonExistentPath)
       })
     }
 
     "querying an underlying resource is unaffected" >>* {
-      datasource
-        .evaluate(ResourcePath.root() / ResourceName("d"))
-        .map(_ must beLeft(6))
+      datasource.loadFull(ResourcePath.root() / ResourceName("d"))
+        .value
+        .map(_ must beSome(beLeft(6)))
     }
 
     "querying an agg resource aggregates descendant leafs" >>* {
@@ -155,10 +157,10 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
       val s = ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s")
       val t = ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s") / ResourceName("t")
 
-      datasource
-        .evaluate(ResourcePath.root() / ResourceName("a") / ResourceName("**"))
-        .flatMap(_.traverse(_.compile.to(List)))
-        .map(_ must beRight(contain(exactly((b, 1), (c, 2), (r, 3), (s, 4), (t, 5)))))
+      datasource.loadFull(ResourcePath.root() / ResourceName("a") / ResourceName("**"))
+        .semiflatMap(_.traverse(_.compile.to(List)))
+        .value
+        .map(_ must beSome(beRight(contain(exactly((b, 1), (c, 2), (r, 3), (s, 4), (t, 5))))))
     }
   }
 }

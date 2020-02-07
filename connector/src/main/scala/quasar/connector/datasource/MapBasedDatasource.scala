@@ -17,9 +17,12 @@
 package quasar.connector.datasource
 
 import slamdata.Predef._
+
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.{MonadResourceErr, ResourceError}
+import quasar.connector._
+
+import cats.data.NonEmptyList
 
 import scalaz.{Applicative, ApplicativePlus, ICons, IList, IMap, INil, ISet, Scalaz}
 import Scalaz._
@@ -31,12 +34,14 @@ final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: Applic
 
   import ResourceError._
 
-  def evaluate(rp: ResourcePath): F[R] =
-    content.lookup(rp) getOrElse {
+  val loaders = NonEmptyList.of(
+    Loader.Batch(BatchLoader.Full { (rp: ResourcePath) =>
+      content.lookup(rp) getOrElse {
         MonadResourceErr[F].raiseError(
           if (prefixes.contains(rp)) notAResource(rp)
           else pathNotFound(rp))
-    }
+      }
+    }))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     content.member(path).point[F]

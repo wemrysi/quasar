@@ -20,7 +20,9 @@ import slamdata.Predef.{Boolean, Option}
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.datasource.Datasource
+import quasar.connector.datasource._
+
+import cats.data.NonEmptyList
 
 import scalaz.{Applicative, PlusEmpty}
 import scalaz.std.option._
@@ -32,8 +34,8 @@ final class EmptyDatasource[F[_]: Applicative, G[_]: PlusEmpty, Q, R, P <: Resou
     emptyResult: R)
     extends Datasource[F, G, Q, R, P] {
 
-  def evaluate(q: Q): F[R] =
-    emptyResult.pure[F]
+  val loaders =
+    NonEmptyList.of(Loader.Batch(BatchLoader.Full((q: Q) => emptyResult.pure[F])))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     false.pure[F]

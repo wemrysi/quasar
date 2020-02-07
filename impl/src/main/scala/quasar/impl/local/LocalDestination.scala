@@ -37,10 +37,10 @@ final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] priva
   val destinationType = LocalDestinationType
 
   def sinks: NonEmptyList[ResultSink[F, Unit]] =
-    NonEmptyList.of(csvSink(root, blocker))
+    NonEmptyList.of(createSink(root, blocker))
 
-  private def csvSink(root: JPath, blocker: Blocker): ResultSink[F, Unit] =
-    ResultSink.csv(RenderConfig.Csv())((dst, columns, bytes) =>
+  private def createSink(root: JPath, blocker: Blocker): ResultSink[F, Unit] =
+    ResultSink.create(RenderConfig.Csv())((dst, columns, bytes) =>
         Stream.eval(resolvedResourcePath[F](root, dst)) >>= {
           case Some(writePath) =>
             val fileSink = io.file.writeAll[F](writePath, blocker)

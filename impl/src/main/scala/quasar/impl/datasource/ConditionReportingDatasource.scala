@@ -20,8 +20,11 @@ import slamdata.Predef.{Boolean, None, Option, Some, Unit}
 import quasar.Condition
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.datasource.Datasource
+import quasar.connector.datasource.{Datasource, Loader}
 import quasar.contrib.scalaz.MonadError_
+
+import cats.~>
+import cats.data.NonEmptyList
 
 import scalaz.Monad
 
@@ -33,8 +36,8 @@ final class ConditionReportingDatasource[
 
   val kind: DatasourceType = underlying.kind
 
-  def evaluate(query: Q): F[R] =
-    reportCondition(underlying.evaluate(query))
+  lazy val loaders: NonEmptyList[Loader[F, Q, R]] =
+    underlying.loaders.map(_.mapK(reportCondition))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     reportCondition(underlying.pathIsResource(path))
@@ -45,10 +48,12 @@ final class ConditionReportingDatasource[
 
   ////
 
-  private def reportCondition[A](fa: F[A]): F[A] =
-    MonadError_[F, E].ensuring(fa) {
-      case Some(e) => report(Condition.abnormal(e))
-      case None    => report(Condition.normal())
+  private val reportCondition: F ~> F =
+    λ[F ~> F] { fa =>
+      MonadError_[F, E].ensuring(fa) {
+        case Some(e) => report(Condition.abnormal(e))
+        case None    => report(Condition.normal())
+      }
     }
 }
 
