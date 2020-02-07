@@ -21,7 +21,7 @@ import slamdata.Predef.{Boolean, List, None, Option, Unit}
 import quasar.{Condition, ConditionMatchers, ScalarStages}
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.Datasource
+import quasar.connector._
 import quasar.impl.datasources.ManagedDatasource
 import quasar.qscript.InterpretedRead
 
@@ -29,6 +29,7 @@ import java.lang.{Exception, IllegalArgumentException}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.concurrent.Ref
 
@@ -45,11 +46,12 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
   object TestDs extends Datasource[IO, List, InterpretedRead[ResourcePath], Unit, ResourcePathType] {
     val kind: DatasourceType = DatasourceType("tester", 7L)
 
-    def evaluate(query: InterpretedRead[ResourcePath]): IO[Unit] =
-      if (ResourcePath.root.nonEmpty(query.path))
+    val loaders = NonEmptyList.of(Loader.Batch(BatchLoader.Full { (ir: InterpretedRead[ResourcePath]) =>
+      if (ResourcePath.root.nonEmpty(ir.path))
         IO.raiseError(thatsRoot)
       else
         IO.pure(())
+    }))
 
     def pathIsResource(path: ResourcePath): IO[Boolean] =
       IO.pure(false)
@@ -87,7 +89,7 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
       r <- Ref[IO].of(List[Condition[Exception]]())
       ds <- ConditionReportingMiddleware[IO, Unit]((_, c) => r.update(c :: _))((), managedTester)
       res = ds match {
-        case ManagedDatasource.ManagedLightweight(lw) => lw.evaluate(InterpretedRead(ResourcePath.root(), ScalarStages.Id))
+        case ManagedDatasource.ManagedLightweight(lw) => lw.loadFull(InterpretedRead(ResourcePath.root(), ScalarStages.Id)).value
         case _ => IO.pure(())
       }
       _ <- res.attempt

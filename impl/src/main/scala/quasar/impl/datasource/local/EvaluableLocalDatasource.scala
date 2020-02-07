@@ -31,6 +31,7 @@ import scala.Predef.classOf
 import java.nio.file.{Files, NoSuchFileException, Path => JPath}
 import java.nio.file.attribute.BasicFileAttributes
 
+import cats.data.NonEmptyList
 import cats.effect.{ContextShift, Effect, Timer}
 import fs2.Stream
 import scalaz.{OptionT, Scalaz}, Scalaz._
@@ -55,13 +56,15 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
 
   val kind: DatasourceType = dsType
 
-  def evaluate(ir: InterpretedRead[ResourcePath]): F[QueryResult[F]] =
-    for {
-      (jp, _) <- attributesOf(ir.path).getOrElseF(RE.raiseError(pathNotFound(ir.path)))
-      candidate <- isCandidate(jp)
-      _ <- candidate.unlessM(RE.raiseError(notAResource(ir.path)))
-    } yield queryResult(InterpretedRead(jp, ir.stages))
-
+  val loaders: NonEmptyList[Loader[F, InterpretedRead[ResourcePath], QueryResult[F]]] =
+    NonEmptyList.of(Loader.Batch(BatchLoader.Full { (ir: InterpretedRead[ResourcePath]) =>
+      for {
+        (jp, _) <- attributesOf(ir.path).getOrElseF(RE.raiseError(pathNotFound(ir.path)))
+        candidate <- isCandidate(jp)
+        _ <- candidate.unlessM(RE.raiseError(notAResource(ir.path)))
+      } yield queryResult(InterpretedRead(jp, ir.stages))
+    }))
+ 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     resolvedResourcePath[F](root, path)
       .flatMap(_.fold(false.pure[F])(isCandidate))

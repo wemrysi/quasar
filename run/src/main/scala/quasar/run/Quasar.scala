@@ -145,7 +145,7 @@ object Quasar extends Logging {
       : Datasource[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource[F, G, ?, EvalResult[F], P] =
     new (Datasource[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource[F, G, ?, EvalResult[F], P]) {
       def apply[A](ds: Datasource[F, G, A, CompositeResult[F, QueryResult[F]], P]) = {
-        val l = Datasource.pevaluator[F, G, A, CompositeResult[F, QueryResult[F]], A, EvalResult[F], P]
+        val l = Datasource.ploaders[F, G, A, CompositeResult[F, QueryResult[F]], A, EvalResult[F], P]
         l.modify(_.map(_.map(reifyAggregateStructure)))(ds)
       }
     }

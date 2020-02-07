@@ -136,7 +136,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     def sinks = NonEmptyList.one(csvSink)
 
-    val csvSink: ResultSink[IO, Type] = ResultSink.csv[IO, Type](RenderConfig.Csv()) {
+    val csvSink: ResultSink[IO, Type] = ResultSink.create[IO, Type](RenderConfig.Csv()) {
       case (dst, _, bytes) =>
         bytes.through(text.utf8Decode)
           .evalMap(s => q.enqueue1(Some(Map(dst -> s))))
@@ -152,21 +152,13 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   }
 
   final class MockResultRender extends ResultRender[IO, String] {
-    def renderCsv(
+    def render(
         input: String,
         columns: List[TableColumn],
-        config: RenderConfig.Csv,
+        config: RenderConfig,
         limit: Option[Long])
         : Stream[IO, Byte] =
       Stream(input).through(text.utf8Encode)
-
-    def renderJson(
-        input: String,
-        prefix: String,
-        delimiter: String,
-        suffix: String)
-        : Stream[IO, Byte] =
-      Stream.empty
   }
 
   def mkEvaluator(fn: String => IO[Stream[IO, String]]): QueryEvaluator[IO, String, Stream[IO, String]] =

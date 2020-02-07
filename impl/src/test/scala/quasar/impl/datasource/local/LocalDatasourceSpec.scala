@@ -83,7 +83,7 @@ abstract class LocalDatasourceSpec
 
     "prevents escaping root directory during evaluation" >>* {
       MonadResourceErr[IO]
-        .attempt(datasource.evaluate(InterpretedRead(tio, ScalarStages.Id)))
+        .attempt(datasource.loadFull(InterpretedRead(tio, ScalarStages.Id)).value)
         .map(_.toEither must beLeft.like {
           case ResourceError.PathNotFound(p) => p must equal(tio)
         })
@@ -92,9 +92,10 @@ abstract class LocalDatasourceSpec
 
   "returns data from a nonempty file" >>* {
     datasource
-      .evaluate(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.ldjson"), ScalarStages.Id))
-      .flatMap(compileData)
-      .map(_ must be_>(0))
+      .loadFull(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.ldjson"), ScalarStages.Id))
+      .semiflatMap(compileData)
+      .value
+      .map(_ must beSome(be_>(0)))
   }
 }
 
@@ -142,9 +143,10 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json"), ScalarStages.Id)
 
-    ds.evaluate(iread)
-      .flatMap(compileData)
-      .map(_ must_=== 100)
+    ds.loadFull(iread)
+      .semiflatMap(compileData)
+      .value
+      .map(_ must_=== Some(100))
   }
 
   "decompresses gzipped resources" >>* {
@@ -158,9 +160,10 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.gz"), ScalarStages.Id)
 
-    ds.evaluate(iread)
-      .flatMap(compileData)
-      .map(_ must_=== 100)
+    ds.loadFull(iread)
+      .semiflatMap(compileData)
+      .value
+      .map(_ must_=== Some(100))
   }
 
   "parses csv" >>* {
@@ -172,8 +175,9 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.csv"), ScalarStages.Id)
 
-    ds.evaluate(iread)
-      .flatMap(compileData)
-      .map(_ must_=== 100)
+    ds.loadFull(iread)
+      .semiflatMap(compileData)
+      .value
+      .map(_ must_=== Some(100))
   }
 }

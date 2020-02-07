@@ -23,18 +23,10 @@ import quasar.api.table.TableColumn
 import fs2.Stream
 
 trait ResultRender[F[_], I] {
-
-  def renderCsv(
+  def render(
       input: I,
       columns: List[TableColumn],
-      config: RenderConfig.Csv,
-      limit: Option[Long])
-      : Stream[F, Byte]
-
-  def renderJson(
-      input: I,
-      prefix: String,
-      delimiter: String,
-      suffix: String)
+      config: RenderConfig,
+      rowLimit: Option[Long])
       : Stream[F, Byte]
 }

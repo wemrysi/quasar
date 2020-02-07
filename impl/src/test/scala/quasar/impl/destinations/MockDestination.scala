@@ -53,7 +53,7 @@ class MockDestination[F[_]: Applicative] extends UntypedDestination[F] {
 
   def sinks = NonEmptyList.one(mockCsvSink)
 
-  val mockCsvSink = ResultSink.csv[F, Unit](RenderConfig.Csv()) {
+  val mockCsvSink = ResultSink.create[F, Unit](RenderConfig.Csv()) {
     case (_, _, _) => Stream(())
   }
 }

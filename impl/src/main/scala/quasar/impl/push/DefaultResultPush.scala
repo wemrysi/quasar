@@ -173,7 +173,7 @@ final class DefaultResultPush[
 
       sink <- format match {
         case ResultType.Csv =>
-          EitherT.fromOptionF[F, Errs, ResultSink.Csv[F, dest.Type]](
+          EitherT.fromOptionF[F, Errs, ResultSink.CreateSink[F, dest.Type]](
             findCsvSink(dest.sinks).pure[F],
             err(ResultPushError.FormatNotSupported(destinationId, format.show)))
       }
@@ -182,13 +182,11 @@ final class DefaultResultPush[
         EitherT.fromEither[F](
           columns.traverse(c => c.traverse(constructType(dest, c.name, _)).toValidatedNel).toEither)
 
-      evaluated = format match {
-        case ResultType.Csv =>
-          evaluator.evaluate(tableRef.query)
-            .map(_.flatMap(render.renderCsv(_, tableRef.columns, sink.config, limit)))
-      }
+      evaluated =
+        evaluator.evaluate(tableRef.query)
+          .map(_.flatMap(render.render(_, tableRef.columns, sink.config, limit)))
 
-      sinked = sink.run(path, typedColumns, Stream.force(evaluated)).map(Right(_))
+      sinked = sink.consume(path, typedColumns, Stream.force(evaluated)).map(Right(_))
 
       now <- EitherT.right[Errs](instantNow)
       submitted <- EitherT.right[Errs](jobManager.submit(Job((destinationId, tableId), sinked)))
@@ -254,9 +252,9 @@ final class DefaultResultPush[
     Timer[F].clock.realTime(MILLISECONDS)
       .map(Instant.ofEpochMilli(_))
 
-  private def findCsvSink[T](sinks: NonEmptyList[ResultSink[F, T]]): Option[ResultSink.Csv[F, T]] =
+  private def findCsvSink[T](sinks: NonEmptyList[ResultSink[F, T]]): Option[ResultSink.CreateSink[F, T]] =
     sinks collectFirstSome {
-      case csvSink @ ResultSink.Csv(_, _) => Some(csvSink)
+      case csvSink @ ResultSink.CreateSink(RenderConfig.Csv(_, _, _, _, _, _, _, _, _), _) => Some(csvSink)
       case _ => None
     }
 

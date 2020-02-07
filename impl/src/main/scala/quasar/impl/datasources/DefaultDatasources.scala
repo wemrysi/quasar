@@ -23,6 +23,7 @@ import quasar.api.SchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
+import quasar.connector.{BatchLoader, Loader}
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
@@ -144,9 +145,16 @@ private[quasar] final class DefaultDatasources[
       mds <- getMDS[DiscoveryError[I]](i)
       fr = mds match {
         case ManagedDatasource.ManagedLightweight(lw) =>
-          lw.evaluate(InterpretedRead(path, ScalarStages.Id))
+          lw.loaders.head match {
+            case Loader.Batch(BatchLoader.Full(f)) =>
+              f(InterpretedRead(path, ScalarStages.Id))
+          }
+
         case ManagedDatasource.ManagedHeavyweight(hw) =>
-          hw.evaluate(dsl.Read(path, IdStatus.ExcludeId))
+          hw.loaders.head match {
+            case Loader.Batch(BatchLoader.Full(f)) =>
+              f(dsl.Read(path, IdStatus.ExcludeId))
+          }
       }
       r <- EitherT.rightT(fr)
       res <- EitherT.rightT(schema(schemaConfig, (path, r)))
