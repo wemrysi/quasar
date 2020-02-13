@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import quasar.api.push.RenderConfig
 import quasar.api.resource.ResourcePath
+import quasar.api.table.Column
 
 import cats.data.NonEmptyList
 
@@ -30,12 +31,12 @@ sealed trait ResultSink[F[_], T]
 object ResultSink {
   final case class Csv[F[_], T](
       config: RenderConfig.Csv,
-      run: (ResourcePath, NonEmptyList[DestinationColumn[T]], Stream[F, Byte]) => Stream[F, Unit])
+      run: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
       extends ResultSink[F, T]
 
   def csv[F[_], T](
       config: RenderConfig.Csv)(
-      run: (ResourcePath, NonEmptyList[DestinationColumn[T]], Stream[F, Byte]) => Stream[F, Unit])
+      run: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
       : ResultSink[F, T] =
     Csv[F, T](config, run)
 }

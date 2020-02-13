@@ -19,14 +19,13 @@ package quasar.impl.push
 import slamdata.Predef.{Boolean => SBoolean, _}
 
 import quasar.Condition
-import quasar.api.destination.{Destination, DestinationColumn, ResultSink, TypeCoercion}
 import quasar.api.QueryEvaluator
-import quasar.api.destination.{Labeled, ResultType}
+import quasar.api.destination.{Destination, Labeled, ResultSink, ResultType, TypeCoercion}
 import quasar.api.destination.Label.Syntax._
 import quasar.api.destination.param._
 import quasar.api.push._
 import quasar.api.resource.ResourcePath
-import quasar.api.table.{ColumnType, TableRef}
+import quasar.api.table.{Column, ColumnType, TableRef}
 
 import java.time.Instant
 import java.util.{Map => JMap}
@@ -88,7 +87,7 @@ final class DefaultResultPush[
 
   def start(
       tableId: T,
-      columns: NonEmptyList[DestinationColumn[SelectedType]],
+      columns: NonEmptyList[Column[SelectedType]],
       destinationId: D,
       path: ResourcePath,
       format: ResultType,

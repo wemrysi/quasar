@@ -38,7 +38,7 @@ import quasar.api.destination.param._
 import quasar.api.push._
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
-import quasar.api.table.{ColumnType, TableColumn, TableName, TableRef}
+import quasar.api.table.{Column, ColumnType, TableColumn, TableName, TableRef}
 
 import shims.{eqToScalaz, orderToCats, showToCats, showToScalaz}
 
@@ -273,7 +273,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       .timeoutTo(Timeout, IO.raiseError(new RuntimeException(s"Expected a matching `PushMeta` $Timeout.")))
   }
 
-  val colX = NonEmptyList.one(DestinationColumn("X", SelectedType(TypeIndex(0), None)))
+  val colX = NonEmptyList.one(Column("X", SelectedType(TypeIndex(0), None)))
 
   "start" >> {
     "asynchronously pushes a table to a destination" >>* {
@@ -406,7 +406,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             mkEvaluator(_ => IO(Stream())))
 
           idx = TypeIndex(-1)
-          cols = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, None)))
+          cols = NonEmptyList.one(Column("A", SelectedType(idx, None)))
 
           startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
         } yield {
@@ -430,7 +430,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             mkEvaluator(_ => IO(Stream())))
 
           idx = TypeIndex(1)
-          cols = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, None)))
+          cols = NonEmptyList.one(Column("A", SelectedType(idx, None)))
 
           startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
         } yield {
@@ -460,7 +460,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             mkEvaluator(_ => IO(Stream())))
 
           idx = TypeIndex(1)
-          cols = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.boolean(false))))))
+          cols = NonEmptyList.one(Column("A", SelectedType(idx, Some(∃(Actual.boolean(false))))))
 
           startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
         } yield {
@@ -491,10 +491,10 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
           idx = TypeIndex(1)
 
-          colsLow = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.integer(0))))))
+          colsLow = NonEmptyList.one(Column("A", SelectedType(idx, Some(∃(Actual.integer(0))))))
           startLow <- push.start(TableId, colsLow, DestinationId, path, ResultType.Csv, None)
 
-          colsHigh = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.integer(300))))))
+          colsHigh = NonEmptyList.one(Column("A", SelectedType(idx, Some(∃(Actual.integer(300))))))
           startHigh <- push.start(TableId, colsHigh, DestinationId, path, ResultType.Csv, None)
         } yield {
           startLow must beLike {
@@ -531,7 +531,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             mkEvaluator(_ => IO(Stream())))
 
           idx = TypeIndex(2)
-          cols = NonEmptyList.one(DestinationColumn("B", SelectedType(idx, Some(∃(Actual.enumSelect("32-bits"))))))
+          cols = NonEmptyList.one(Column("B", SelectedType(idx, Some(∃(Actual.enumSelect("32-bits"))))))
 
           startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
         } yield {
