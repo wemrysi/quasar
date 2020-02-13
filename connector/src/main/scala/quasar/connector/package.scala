@@ -18,6 +18,7 @@ package quasar
 
 import scala.{Array, Byte}
 
+import quasar.api.table.Column
 import quasar.contrib.scalaz.MonadError_
 
 import java.lang.String
@@ -25,10 +26,15 @@ import java.lang.String
 import cats.Id
 import cats.data.Const
 
+import skolems.∃
+
 package object connector {
+  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
+
   type ActualKey[A] = Key[Id, A]
   type TypedKey[T, A] = Key[Const[T, ?], A]
-  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
+
+  type Offset = Column[∃[ActualKey]]
 
   type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
 
