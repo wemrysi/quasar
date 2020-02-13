@@ -17,9 +17,12 @@
 package quasar.api.table
 
 import slamdata.Predef._
+
+import quasar.api.ColumnType
 import quasar.contrib.cats.stateT._
 import quasar.contrib.scalaz.MonadState_
 import quasar.contrib.std.uuid._
+
 import java.util.UUID
 
 import cats.data.StateT

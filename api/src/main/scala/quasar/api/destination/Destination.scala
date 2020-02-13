@@ -20,8 +20,8 @@ import cats.data.NonEmptyList
 
 import monocle.Prism
 
+import quasar.api.ColumnType
 import quasar.api.destination.param._
-import quasar.api.table.ColumnType
 
 import java.lang.String
 import scala.Int

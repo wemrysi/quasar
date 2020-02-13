@@ -20,7 +20,7 @@ import cats.data.NonEmptyList
 
 import monocle.Prism
 
-import quasar.api.table.ColumnType
+import quasar.api.ColumnType
 
 import scala.Int
 

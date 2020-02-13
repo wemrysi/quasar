@@ -14,21 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.api
 
-import slamdata.Predef._
+import java.lang.String
 
-import cats.{Eq, Show}
-import cats.implicits._
+package object table {
+  type TableColumn = Column[ColumnType.Scalar]
 
-final case class TableColumn(name: String, tpe: ColumnType.Scalar)
-
-object TableColumn {
-  implicit val equalTableColumn: Eq[TableColumn] =
-    Eq.by(c => (c.name, c.tpe))
-
-  implicit val showTableColumn: Show[TableColumn] =
-    Show show { tc =>
-      "TableColumn(" + tc.name + ", " + tc.tpe.show + ")"
-    }
+  object TableColumn {
+    def apply(name: String, tpe: ColumnType.Scalar): TableColumn =
+      Column(name, tpe)
+  }
 }

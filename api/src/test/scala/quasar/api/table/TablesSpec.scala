@@ -19,6 +19,7 @@ package quasar.api.table
 import slamdata.Predef._
 
 import quasar.{ConditionMatchers, Qspec}
+import quasar.api.ColumnType
 
 import cats.effect.Sync
 import org.specs2.execute.AsResult

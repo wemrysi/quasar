@@ -20,10 +20,10 @@ import slamdata.Predef._
 
 import quasar.EffectfulQSpec
 
+import quasar.api.ColumnType
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.api.push.RenderConfig
-import quasar.api.table.ColumnType
 import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
 

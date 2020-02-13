@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 
-import quasar.api.table.ColumnType
+import quasar.api.ColumnType
 import quasar.common.{CPath, CPathField}
 
 import org.specs2.execute.PendingUntilFixed._

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.api
 
 import slamdata.Predef.{Int, Product, Serializable, Set}
 

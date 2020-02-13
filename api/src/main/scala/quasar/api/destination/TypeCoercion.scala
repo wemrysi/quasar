@@ -20,7 +20,7 @@ import cats.{Applicative, Eq, Eval, Show, Traverse}
 import cats.data.NonEmptyList
 import cats.implicits._
 
-import quasar.api.table.ColumnType
+import quasar.api.ColumnType
 
 import scala.{List, Option, Product, Serializable, StringContext}
 

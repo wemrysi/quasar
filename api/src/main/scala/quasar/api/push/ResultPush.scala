@@ -19,9 +19,9 @@ package quasar.api.push
 import slamdata.Predef._
 
 import quasar.{Condition, Exhaustive}
-import quasar.api.destination.{DestinationColumn, ResultType, TypeCoercion}
+import quasar.api.{Column, ColumnType}
+import quasar.api.destination.{ResultType, TypeCoercion}
 import quasar.api.resource.ResourcePath
-import quasar.api.table.ColumnType
 
 import scala.collection.immutable.SortedMap
 
@@ -55,7 +55,7 @@ trait ResultPush[F[_], TableId, DestinationId] {
 
   def start(
       tableId: TableId,
-      columns: NonEmptyList[DestinationColumn[SelectedType]],
+      columns: NonEmptyList[Column[SelectedType]],
       destinationId: DestinationId,
       path: ResourcePath,
       format: ResultType,
@@ -92,7 +92,7 @@ trait ResultPush[F[_], TableId, DestinationId] {
     */
   def startThese(
       destinationId: DestinationId,
-      tables: NonEmptyMap[TableId, (NonEmptyList[DestinationColumn[SelectedType]], ResourcePath, ResultType, Option[Long])])(
+      tables: NonEmptyMap[TableId, (NonEmptyList[Column[SelectedType]], ResourcePath, ResultType, Option[Long])])(
       implicit F: Applicative[F])
       : F[Map[TableId, NonEmptyList[ResultPushError[TableId, DestinationId]]]] = {
 

@@ -17,7 +17,7 @@
 package quasar.impl.table
 
 import slamdata.Predef._
-import quasar.api.QueryEvaluator
+import quasar.api.{ColumnType, QueryEvaluator}
 import quasar.api.table._
 import quasar.contrib.scalaz.MonadState_
 import quasar.contrib.std.uuid._
