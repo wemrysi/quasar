@@ -22,7 +22,12 @@ import quasar.contrib.scalaz.MonadError_
 
 import java.lang.String
 
+import cats.Id
+import cats.data.Const
+
 package object connector {
+  type ActualKey[A] = Key[Id, A]
+  type TypedKey[T, A] = Key[Const[T, ?], A]
   type ByteStore[F[_]] = Store[F, String, Array[Byte]]
 
   type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
