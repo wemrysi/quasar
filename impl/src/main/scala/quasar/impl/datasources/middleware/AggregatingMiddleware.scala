@@ -18,7 +18,8 @@ package quasar.impl
 package datasources.middleware
 
 import quasar.api.resource.{ResourcePath, ResourcePathType}
-import quasar.connector.{Datasource, MonadResourceErr}
+import quasar.connector.MonadResourceErr
+import quasar.connector.datasource.Datasource
 import quasar.impl.datasource.{AggregateResult, AggregatingDatasource, MonadCreateErr}
 import quasar.impl.datasources.ManagedDatasource
 import quasar.qscript.{InterpretedRead, QScriptEducated}

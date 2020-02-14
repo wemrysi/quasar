@@ -19,7 +19,8 @@ package quasar.impl.datasource
 import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
-import quasar.connector.{Datasource, MonadResourceErr, ResourceError}
+import quasar.connector.{MonadResourceErr, ResourceError}
+import quasar.connector.datasource.Datasource
 import quasar.contrib.scalaz._
 
 import scala.util.{Left, Right}

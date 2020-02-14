@@ -20,7 +20,7 @@ import slamdata.Predef.{Boolean, Option}
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.Datasource
+import quasar.connector.datasource.Datasource
 
 import scalaz.{Applicative, PlusEmpty}
 import scalaz.std.option._

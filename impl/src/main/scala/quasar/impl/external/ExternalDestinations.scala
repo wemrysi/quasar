@@ -17,7 +17,7 @@
 package quasar.impl.external
 
 import slamdata.Predef._
-import quasar.connector.DestinationModule
+import quasar.connector.destination.DestinationModule
 
 import java.lang.{
   Class,

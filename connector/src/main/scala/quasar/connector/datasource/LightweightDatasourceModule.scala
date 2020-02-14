@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.connector.datasource
 
 import quasar.RateLimiting
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource.{ResourcePath, ResourcePathType}
+import quasar.connector.{ByteStore, MonadResourceErr, QueryResult}
 import quasar.qscript.InterpretedRead
 
 import scala.concurrent.ExecutionContext

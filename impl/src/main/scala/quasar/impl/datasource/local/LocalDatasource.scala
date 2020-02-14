@@ -17,8 +17,8 @@
 package quasar.impl.datasource.local
 
 import slamdata.Predef._
-import quasar.connector.LightweightDatasourceModule.DS
 import quasar.connector._
+import quasar.connector.datasource.LightweightDatasourceModule
 
 import java.nio.file.{Path => JPath}
 
@@ -34,7 +34,7 @@ object LocalDatasource {
       readChunkSizeBytes: Int,
       format: DataFormat,
       blocker: Blocker)
-      : DS[F] = { 
+      : LightweightDatasourceModule.DS[F] = {
 
     EvaluableLocalDatasource[F](LocalType, root) { iRead =>
       val content =

@@ -20,9 +20,9 @@ import slamdata.Predef.{Seq => _, _}
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector._, LightweightDatasourceModule.DS
+import quasar.connector._
 import quasar.connector.ResourceError._
-import quasar.connector.datasource.LightweightDatasource
+import quasar.connector.datasource.{LightweightDatasource, LightweightDatasourceModule}
 import quasar.contrib.fs2.convert
 import quasar.qscript.InterpretedRead
 
@@ -106,6 +106,6 @@ object EvaluableLocalDatasource {
       dsType: DatasourceType,
       root: JPath)(
       queryResult: InterpretedRead[JPath] => QueryResult[F])
-      : DS[F] =
+      : LightweightDatasourceModule.DS[F] =
     new EvaluableLocalDatasource[F](dsType, root, queryResult)
 }

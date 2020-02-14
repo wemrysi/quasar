@@ -19,7 +19,7 @@ package quasar.impl.datasources.middleware
 import slamdata.Predef.{Exception, Unit}
 import quasar.Condition
 import quasar.api.resource.ResourcePathType
-import quasar.connector.Datasource
+import quasar.connector.datasource.Datasource
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.datasource.ConditionReportingDatasource
 import quasar.impl.datasources.ManagedDatasource

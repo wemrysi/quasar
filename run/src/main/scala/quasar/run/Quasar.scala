@@ -26,7 +26,9 @@ import quasar.api.push.{ResultPush, ResultRender}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.table.{TableRef, Tables}
 import quasar.common.PhaseResultTell
-import quasar.connector.{Datasource, DestinationModule, QueryResult}
+import quasar.connector.QueryResult
+import quasar.connector.datasource.Datasource
+import quasar.connector.destination.DestinationModule
 import quasar.contrib.std.uuid._
 import quasar.ejson.implicits._
 import quasar.impl.{DatasourceModule, ResourceManager}

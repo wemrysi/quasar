@@ -21,7 +21,7 @@ import slamdata.Predef.{Boolean, List, None, Option, Unit}
 import quasar.{Condition, ConditionMatchers, ScalarStages}
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.Datasource
+import quasar.connector.datasource.Datasource
 import quasar.impl.datasources.ManagedDatasource
 import quasar.qscript.InterpretedRead
 

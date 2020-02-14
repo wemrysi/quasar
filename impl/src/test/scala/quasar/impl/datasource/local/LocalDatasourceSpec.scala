@@ -29,6 +29,7 @@ import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.common.data.RValue
 import quasar.{concurrent => qc}
 import quasar.connector._
+import quasar.connector.datasource._
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.κ
 import quasar.qscript.InterpretedRead

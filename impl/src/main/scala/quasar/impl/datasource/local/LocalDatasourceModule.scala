@@ -23,7 +23,8 @@ import quasar.api.datasource.DatasourceError.{
   malformedConfiguration
 }
 import quasar.{concurrent => qc}
-import quasar.connector._, LightweightDatasourceModule.DS
+import quasar.connector._
+import quasar.connector.datasource.LightweightDatasourceModule
 
 import scala.concurrent.ExecutionContext
 
@@ -47,7 +48,7 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
       rateLimiting: RateLimiting[F, A],
       stateStore: ByteStore[F])(
       implicit ec: ExecutionContext)
-      : Resource[F, Either[InitializationError[Json], DS[F]]] = {
+      : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]] = {
     val ds = for {
       lc <- attemptConfig[F, LocalConfig, InitializationError[Json]](
         config,

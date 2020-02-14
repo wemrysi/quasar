@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.connector.datasource
 
 import quasar.RenderTreeT
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource.ResourcePathType
+import quasar.connector.{ByteStore, QueryResult}
 import quasar.qscript.{MonadPlannerErr, QScriptEducated}
 
 import scala.concurrent.ExecutionContext

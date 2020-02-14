@@ -32,7 +32,8 @@ import fs2.Stream
 import quasar.api.destination.DestinationError.InitializationError
 import quasar.api.destination.{Destination, UntypedDestination, DestinationType, ResultSink}
 import quasar.api.push.RenderConfig
-import quasar.connector.{DestinationModule, MonadResourceErr}
+import quasar.connector.MonadResourceErr
+import quasar.connector.destination.DestinationModule
 
 object MockDestinationModule extends DestinationModule {
   def destinationType = DestinationType("mock", 1L)

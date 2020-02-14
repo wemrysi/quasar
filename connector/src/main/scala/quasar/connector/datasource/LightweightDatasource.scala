@@ -17,7 +17,7 @@
 package quasar.connector.datasource
 
 import quasar.api.resource.ResourcePath
-import quasar.connector.{MonadResourceErr, PhysicalDatasource}
+import quasar.connector.MonadResourceErr
 import quasar.qscript.InterpretedRead
 
 /** A Datasource capable of returning the contents of resources. */

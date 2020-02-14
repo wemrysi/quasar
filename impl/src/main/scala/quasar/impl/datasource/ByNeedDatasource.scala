@@ -19,7 +19,7 @@ package quasar.impl.datasource
 import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.Datasource
+import quasar.connector.datasource.Datasource
 
 import cats.effect.{Async, Resource}
 import cats.effect.concurrent.MVar

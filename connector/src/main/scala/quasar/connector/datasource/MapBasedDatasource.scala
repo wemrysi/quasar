@@ -19,7 +19,7 @@ package quasar.connector.datasource
 import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.{MonadResourceErr, PhysicalDatasource, ResourceError}
+import quasar.connector.{MonadResourceErr, ResourceError}
 
 import scalaz.{Applicative, ApplicativePlus, ICons, IList, IMap, INil, ISet, Scalaz}
 import Scalaz._

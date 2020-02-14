@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.connector.destination
 
 import quasar.api.destination.DestinationError.InitializationError
 import quasar.api.destination.{Destination, DestinationType}
+import quasar.connector.MonadResourceErr
 
 import scala.util.Either
 

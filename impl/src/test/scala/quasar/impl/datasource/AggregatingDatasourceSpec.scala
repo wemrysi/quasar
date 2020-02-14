@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector._
-import quasar.connector.datasource.MapBasedDatasource
+import quasar.connector.datasource._
 import quasar.contrib.fs2.stream._
 import quasar.contrib.scalaz.MonadError_
 

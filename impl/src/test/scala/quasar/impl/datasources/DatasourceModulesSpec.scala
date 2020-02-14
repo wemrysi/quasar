@@ -25,7 +25,7 @@ import quasar.api.resource._
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.EmptyDatasource
 import quasar.connector._
-import quasar.connector.DataFormat
+import quasar.connector.datasource._
 import quasar.contrib.scalaz._
 import quasar.qscript.{MonadPlannerErr, PlannerError, InterpretedRead, QScriptEducated}
 

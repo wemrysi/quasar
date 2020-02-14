@@ -25,6 +25,7 @@ import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.api.push.RenderConfig
 import quasar.connector._
+import quasar.connector.destination.DestinationModule
 import quasar.contrib.scalaz.MonadError_
 
 import cats.Show

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.connector.datasource
 
 import quasar.api.resource.ResourcePathType
 

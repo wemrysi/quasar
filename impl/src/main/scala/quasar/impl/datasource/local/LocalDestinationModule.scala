@@ -21,7 +21,8 @@ import quasar.api.destination.DestinationError.{
   InitializationError,
   malformedConfiguration
 }
-import quasar.connector.{DestinationModule, MonadResourceErr}
+import quasar.connector.MonadResourceErr
+import quasar.connector.destination.DestinationModule
 
 import scala.util.Either
 

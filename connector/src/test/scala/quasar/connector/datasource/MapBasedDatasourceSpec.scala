@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.{DatasourceSpec, MonadResourceErr, ResourceError}
+import quasar.connector.{MonadResourceErr, ResourceError}
 import quasar.contrib.scalaz.MonadError_
 
 import cats.data.OptionT
