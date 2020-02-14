@@ -55,7 +55,11 @@ final class AggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
 
   lazy val loaders: NonEmptyList[Loader[F, Q, CompositeResult[F, R]]] =
     underlying.loaders map {
-      case Loader.Batch(BatchLoader.Full(full)) => Loader.Batch(BatchLoader.Full(aggregateFull(full)))
+      case Loader.Batch(BatchLoader.Full(full)) =>
+        Loader.Batch(BatchLoader.Full(aggregateFull(full)))
+
+      case Loader.Batch(seek @ BatchLoader.Seek(_)) =>
+        Loader.Batch(seek.map[CompositeResult[F, R]](Left(_)))
     }
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
