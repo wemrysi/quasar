@@ -18,7 +18,7 @@ package quasar
 
 import scala.{Array, Byte}
 
-import quasar.api.table.Column
+import quasar.api.Column
 import quasar.contrib.scalaz.MonadError_
 
 import java.lang.String
