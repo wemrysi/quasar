@@ -14,12 +14,27 @@
  * limitations under the License.
  */
 
-package quasar.api.push
+package quasar.connector.render
 
-import quasar.api.push.param.Actual
+import slamdata.Predef._
 
-import scala.Option
+import quasar.api.table.TableColumn
 
-import skolems.∃
+import fs2.Stream
 
-final case class SelectedType(index: TypeIndex, arg: Option[∃[Actual]])
+trait ResultRender[F[_], I] {
+
+  def renderCsv(
+      input: I,
+      columns: List[TableColumn],
+      config: RenderConfig.Csv,
+      limit: Option[Long])
+      : Stream[F, Byte]
+
+  def renderJson(
+      input: I,
+      prefix: String,
+      delimiter: String,
+      suffix: String)
+      : Stream[F, Byte]
+}

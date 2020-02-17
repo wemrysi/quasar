@@ -19,14 +19,14 @@ package quasar.impl.push
 import slamdata.Predef.{Boolean => SBoolean, _}
 
 import quasar.Condition
-import quasar.api.QueryEvaluator
-import quasar.api.{Column, ColumnType}
-import quasar.api.destination.{Destination, Labeled, ResultSink, ResultType, TypeCoercion}
-import quasar.api.destination.Label.Syntax._
-import quasar.api.destination.param._
+import quasar.api.{Column, ColumnType, Labeled, QueryEvaluator}
+import quasar.api.Label.Syntax._
 import quasar.api.push._
+import quasar.api.push.param._
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
+import quasar.connector.destination._
+import quasar.connector.render.ResultRender
 
 import java.time.Instant
 import java.util.{Map => JMap}

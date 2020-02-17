@@ -29,11 +29,11 @@ import eu.timepit.refined.auto._
 
 import fs2.Stream
 
+import quasar.api.destination.DestinationType
 import quasar.api.destination.DestinationError.InitializationError
-import quasar.api.destination.{Destination, UntypedDestination, DestinationType, ResultSink}
-import quasar.api.push.RenderConfig
 import quasar.connector.MonadResourceErr
-import quasar.connector.destination.DestinationModule
+import quasar.connector.destination._
+import quasar.connector.render.RenderConfig
 
 object MockDestinationModule extends DestinationModule {
   def destinationType = DestinationType("mock", 1L)

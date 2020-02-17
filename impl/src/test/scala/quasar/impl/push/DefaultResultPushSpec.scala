@@ -32,13 +32,15 @@ import fs2.job.JobManager
 import monocle.Prism
 
 import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
-import quasar.api.{Column, ColumnType, QueryEvaluator}
+import quasar.api.{Column, ColumnType, Label, Labeled, QueryEvaluator}
 import quasar.api.destination._
-import quasar.api.destination.param._
 import quasar.api.push._
+import quasar.api.push.param._
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
 import quasar.api.table.{TableColumn, TableName, TableRef}
+import quasar.connector.destination._
+import quasar.connector.render._
 
 import shims.{eqToScalaz, orderToCats, showToCats, showToScalaz}
 

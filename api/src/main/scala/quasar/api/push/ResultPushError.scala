@@ -18,7 +18,7 @@ package quasar.api.push
 
 import slamdata.Predef._
 
-import quasar.api.destination.param.ParamError
+import quasar.api.push.param.ParamError
 
 import cats.data.NonEmptyList
 

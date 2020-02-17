@@ -14,12 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.api.push
+package quasar.connector.destination
 
-import quasar.api.push.param.Actual
+import quasar.api.Labeled
+import quasar.api.push.param._
 
-import scala.Option
+import scala.Nothing
+import scala.util.{Either, Left}
 
 import skolems.∃
 
-final case class SelectedType(index: TypeIndex, arg: Option[∃[Actual]])
+trait UnparameterizedDestination[F[_]] extends Destination[F] {
+  type Type = TypeId
+  type Constructor[P] = Nothing
+
+  def construct(id: TypeId): Either[Type, ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]] =
+    Left(id)
+}

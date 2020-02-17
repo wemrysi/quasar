@@ -16,10 +16,20 @@
 
 package quasar.api.push
 
-import quasar.api.push.param.Actual
+import slamdata.Predef._
 
-import scala.Option
+import scalaz.{Equal, Show}
 
-import skolems.∃
+sealed trait ResultType extends Product with Serializable
 
-final case class SelectedType(index: TypeIndex, arg: Option[∃[Actual]])
+object ResultType {
+  case object Csv extends ResultType
+
+  implicit def equal: Equal[ResultType] =
+    Equal.equalA[ResultType]
+
+  implicit def show: Show[ResultType] =
+    Show.shows[ResultType] {
+      case ResultType.Csv => "csv"
+    }
+}

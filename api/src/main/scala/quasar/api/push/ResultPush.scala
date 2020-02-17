@@ -20,7 +20,6 @@ import slamdata.Predef._
 
 import quasar.{Condition, Exhaustive}
 import quasar.api.{Column, ColumnType}
-import quasar.api.destination.{ResultType, TypeCoercion}
 import quasar.api.resource.ResourcePath
 
 import scala.collection.immutable.SortedMap

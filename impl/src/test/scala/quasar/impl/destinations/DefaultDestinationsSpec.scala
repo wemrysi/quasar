@@ -23,6 +23,7 @@ import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.{concurrent => qc}
 import quasar.connector.ResourceError
+import quasar.connector.destination.Destination
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.ResourceManager
 import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}

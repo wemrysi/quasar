@@ -16,8 +16,8 @@
 
 package quasar.connector.destination
 
+import quasar.api.destination.DestinationType
 import quasar.api.destination.DestinationError.InitializationError
-import quasar.api.destination.{Destination, DestinationType}
 import quasar.connector.MonadResourceErr
 
 import scala.util.Either

@@ -23,9 +23,9 @@ import quasar.EffectfulQSpec
 import quasar.api.ColumnType
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
-import quasar.api.push.RenderConfig
 import quasar.connector._
-import quasar.connector.destination.DestinationModule
+import quasar.connector.destination._
+import quasar.connector.render.RenderConfig
 import quasar.contrib.scalaz.MonadError_
 
 import cats.Show

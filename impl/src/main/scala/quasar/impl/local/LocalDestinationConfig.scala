@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.api.push
+package quasar.impl.local
 
-import quasar.api.push.param.Actual
+import slamdata.Predef.String
 
-import scala.Option
+import argonaut.{Argonaut, DecodeJson}
 
-import skolems.∃
+final case class LocalDestinationConfig(rootDir: String)
 
-final case class SelectedType(index: TypeIndex, arg: Option[∃[Actual]])
+object LocalDestinationConfig {
+  implicit val decodeJson: DecodeJson[LocalDestinationConfig] =
+    Argonaut.jdecode1L(LocalDestinationConfig.apply)("rootDir")
+}

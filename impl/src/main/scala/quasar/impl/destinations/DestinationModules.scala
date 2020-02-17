@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.connector.MonadResourceErr
-import quasar.connector.destination.DestinationModule
+import quasar.connector.destination.{Destination, DestinationModule}
 import quasar.impl.IncompatibleModuleException.linkDestination
 
 import argonaut.Json

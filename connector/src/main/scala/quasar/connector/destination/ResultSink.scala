@@ -14,14 +14,29 @@
  * limitations under the License.
  */
 
-package quasar.api.push
+package quasar.connector.destination
 
 import slamdata.Predef._
 
+import quasar.api.Column
 import quasar.api.resource.ResourcePath
+import quasar.connector.render.RenderConfig
 
-final case class PushMeta(
-    path: ResourcePath,
-    resultType: ResultType,
-    limit: Option[Long],
-    status: Status)
+import cats.data.NonEmptyList
+
+import fs2.Stream
+
+sealed trait ResultSink[F[_], T]
+
+object ResultSink {
+  final case class Csv[F[_], T](
+      config: RenderConfig.Csv,
+      run: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
+      extends ResultSink[F, T]
+
+  def csv[F[_], T](
+      config: RenderConfig.Csv)(
+      run: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
+      : ResultSink[F, T] =
+    Csv[F, T](config, run)
+}
