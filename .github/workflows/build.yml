@@ -54,8 +54,12 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: ${{ env.JDK }}
-      - name: Run tectonicPublishAndTag
-        run: ./scripts/tectonicPublishAndTag
+      - name: Run transferCommonResources
+        run: $SBT transferCommonResources
+      - name: Export common secrets
+        run: $SBT exportSecretsForActions
+      - name: Run quasarPublishAndTag
+        run: ./scripts/quasarPublishAndTag
 
   common-resources:
     name: Auto Merge
@@ -71,15 +75,17 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: target
-      - name: Setup Git Actor
-        run: git config github.actor slamdata-bot
-      - name: Install common resources
-        run: $SBT transferCommonResources
       - name: Install ruby
         uses: actions/setup-ruby@v1
         with:
           ruby-version: '2.6'
-      - name: Common setup
+      - name: Setup Git Actor
+        run: git config github.actor slamdata-bot
+      - name: Install common resources
+        run: $SBT transferCommonResources
+      - name: Export common secrets
+        run: $SBT exportSecretsForActions
+      - name: Run common setup
         run: ./scripts/core/commonSetup
       - name: Set env vars
         run: |
