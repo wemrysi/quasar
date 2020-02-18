@@ -17,7 +17,7 @@
 package quasar.impl
 
 import quasar.api.datasource.DatasourceType
-import quasar.connector.{HeavyweightDatasourceModule, LightweightDatasourceModule}
+import quasar.connector.datasource.{HeavyweightDatasourceModule, LightweightDatasourceModule}
 import argonaut.Json
 
 sealed trait DatasourceModule {

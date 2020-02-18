@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import quasar.RenderTree
-import quasar.api.table.ColumnType
+import quasar.api.ColumnType
 
 import scala.{Product, Serializable}
 import scalaz.{Equal, Show}

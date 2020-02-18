@@ -18,7 +18,7 @@ package quasar.connector.datasource
 
 import quasar.RenderTreeT
 import quasar.common.PhaseResultTell
-import quasar.connector.{PhysicalDatasource, QScriptEvaluator}
+import quasar.connector.QScriptEvaluator
 import quasar.qscript.{MonadPlannerErr, QScriptEducated}
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}

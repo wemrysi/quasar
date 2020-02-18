@@ -16,7 +16,7 @@
 
 package quasar.api.push
 
-import quasar.api.destination.param.Actual
+import quasar.api.push.param.Actual
 
 import scala.Option
 

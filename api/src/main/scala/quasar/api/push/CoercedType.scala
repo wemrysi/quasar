@@ -16,8 +16,8 @@
 
 package quasar.api.push
 
-import quasar.api.destination.Labeled
-import quasar.api.destination.param.Formal
+import quasar.api.Labeled
+import quasar.api.push.param.Formal
 
 import scala.Option
 

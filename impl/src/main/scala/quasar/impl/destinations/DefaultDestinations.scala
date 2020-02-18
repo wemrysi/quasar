@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
+import quasar.connector.destination.Destination
 import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 

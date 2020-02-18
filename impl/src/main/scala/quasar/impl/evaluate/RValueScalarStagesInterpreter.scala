@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.{IdStatus, ScalarStage, ScalarStages}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.ScalarStage.{Cartesian, Mask, Pivot, Project, Wrap}
-import quasar.api.table.ColumnType
+import quasar.api.ColumnType
 import quasar.common.{CPathField, CPathIndex, CPathNode}
 import quasar.common.data._
 

@@ -18,7 +18,6 @@ package quasar.api.push
 
 import slamdata.Predef._
 
-import quasar.api.destination.ResultType
 import quasar.api.resource.ResourcePath
 
 final case class PushMeta(

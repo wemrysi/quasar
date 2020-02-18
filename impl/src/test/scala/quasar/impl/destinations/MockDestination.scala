@@ -29,10 +29,11 @@ import eu.timepit.refined.auto._
 
 import fs2.Stream
 
+import quasar.api.destination.DestinationType
 import quasar.api.destination.DestinationError.InitializationError
-import quasar.api.destination.{Destination, UntypedDestination, DestinationType, ResultSink}
-import quasar.api.push.RenderConfig
-import quasar.connector.{DestinationModule, MonadResourceErr}
+import quasar.connector.MonadResourceErr
+import quasar.connector.destination._
+import quasar.connector.render.RenderConfig
 
 object MockDestinationModule extends DestinationModule {
   def destinationType = DestinationType("mock", 1L)
@@ -53,7 +54,7 @@ class MockDestination[F[_]: Applicative] extends UntypedDestination[F] {
 
   def sinks = NonEmptyList.one(mockCsvSink)
 
-  val mockCsvSink = ResultSink.csv[F, Unit](RenderConfig.Csv()) {
+  val mockCsvSink = ResultSink.create[F, Unit](RenderConfig.Csv()) {
     case (_, _, _) => Stream(())
   }
 }

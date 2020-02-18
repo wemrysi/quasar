@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar._
 import quasar.ScalarStage.{Cartesian, Pivot}
-import quasar.api.table.ColumnType
+import quasar.api.ColumnType
 import quasar.common._
 import quasar.common.data._
 

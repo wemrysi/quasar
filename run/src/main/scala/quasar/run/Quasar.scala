@@ -21,12 +21,15 @@ import slamdata.Predef._
 import quasar.RateLimiting
 import quasar.api.{QueryEvaluator, SchemaConfig}
 import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
-import quasar.api.destination.{Destination, DestinationRef, DestinationType, Destinations}
-import quasar.api.push.{ResultPush, ResultRender}
+import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
+import quasar.api.push.ResultPush
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.table.{TableRef, Tables}
 import quasar.common.PhaseResultTell
-import quasar.connector.{Datasource, DestinationModule, QueryResult}
+import quasar.connector.QueryResult
+import quasar.connector.datasource.Datasource
+import quasar.connector.destination.{Destination, DestinationModule}
+import quasar.connector.render.ResultRender
 import quasar.contrib.std.uuid._
 import quasar.ejson.implicits._
 import quasar.impl.{DatasourceModule, ResourceManager}
@@ -145,7 +148,7 @@ object Quasar extends Logging {
       : Datasource[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource[F, G, ?, EvalResult[F], P] =
     new (Datasource[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource[F, G, ?, EvalResult[F], P]) {
       def apply[A](ds: Datasource[F, G, A, CompositeResult[F, QueryResult[F]], P]) = {
-        val l = Datasource.pevaluator[F, G, A, CompositeResult[F, QueryResult[F]], A, EvalResult[F], P]
+        val l = Datasource.ploaders[F, G, A, CompositeResult[F, QueryResult[F]], A, EvalResult[F], P]
         l.modify(_.map(_.map(reifyAggregateStructure)))(ds)
       }
     }

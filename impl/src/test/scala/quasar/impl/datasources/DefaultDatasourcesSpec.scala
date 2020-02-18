@@ -25,7 +25,7 @@ import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.{concurrent => qc}
 import quasar.connector._
-import quasar.connector.DataFormat
+import quasar.connector.datasource._
 import quasar.contrib.scalaz._
 import quasar.impl.{DatasourceModule, ResourceManager}
 import quasar.impl.datasource.EmptyDatasource

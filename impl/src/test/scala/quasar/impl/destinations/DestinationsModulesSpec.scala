@@ -20,11 +20,12 @@ import slamdata.Predef._
 
 import quasar.EffectfulQSpec
 
+import quasar.api.ColumnType
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
-import quasar.api.push.RenderConfig
-import quasar.api.table.ColumnType
 import quasar.connector._
+import quasar.connector.destination._
+import quasar.connector.render.RenderConfig
 import quasar.contrib.scalaz.MonadError_
 
 import cats.Show
@@ -75,7 +76,7 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
       val dest: Destination[F] = new LegacyDestination[F] {
         def destinationType = kind
         def sinks = NonEmptyList.of(mock)
-        val mock = ResultSink.csv[F, ColumnType.Scalar](RenderConfig.Csv()) {
+        val mock = ResultSink.create[F, ColumnType.Scalar](RenderConfig.Csv()) {
           case _ => Stream(())
         }
       }
