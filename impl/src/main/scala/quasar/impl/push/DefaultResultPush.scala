@@ -184,7 +184,7 @@ final class DefaultResultPush[
           columns.traverse(c => c.traverse(constructType(dest, c.name, _)).toValidatedNel).toEither)
 
       evaluated =
-        evaluator.evaluate(tableRef.query)
+        evaluator(tableRef.query)
           .map(_.flatMap(render.render(_, tableRef.columns, sink.config, limit)))
 
       sinked = sink.consume(path, typedColumns, Stream.force(evaluated)).map(Right(_))

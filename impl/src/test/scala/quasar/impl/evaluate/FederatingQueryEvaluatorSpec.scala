@@ -17,43 +17,50 @@
 package quasar.impl.evaluate
 
 import slamdata.Predef._
+
 import quasar.{IdStatus, Qspec, TreeMatchers}
 import quasar.api.resource._
 import quasar.connector.ResourceError
+import quasar.connector.evaluate._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.iota.{copkTraverse, copkEqual}
 import quasar.fp.constEqual
 import quasar.qscript._
 
+import scala.collection.immutable.SortedMap
+
+import cats.{Order, Show}
+import cats.implicits._
+
 import matryoshka._
 import matryoshka.data.Fix
+
 import pathy.Path._
-import scalaz.{\/, IMap, Show, Tree}
-import scalaz.std.anyVal._
-import scalaz.std.option._
-import scalaz.syntax.either._
+
+import scalaz.Tree
+
+import shims.{eqToScalaz, equalToCats, orderToCats, showToCats, showToScalaz}
 
 final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
   import ResourceError._
   import IdStatus.ExcludeId
 
   implicit val showTree: Show[Tree[ResourceName]] =
-    Show.shows(_.drawTree)
+    Show.show(_.drawTree)
 
   val abs = ResourcePath.root() / ResourceName("resource") / ResourceName("abs")
   val xys = ResourcePath.root() / ResourceName("resource") / ResourceName("xys")
 
-  val srcs = IMap(
+  val srcs = SortedMap(
     abs -> Source(abs, 1),
-    xys -> Source(xys, 2))
+    xys -> Source(xys, 2))(
+    Order[ResourcePath].toOrdering)
 
-  val qfed = new QueryFederation[Fix, ResourceError \/ ?, Int, FederatedQuery[Fix, Int]] {
-    def evaluateFederated(q: FederatedQuery[Fix, Int]) = q.right[ResourceError]
-  }
+  val qfed = QueryFederation((q: FederatedQuery[Fix, Int]) => q.asRight[ResourceError])
 
   val fqe =
-    FederatingQueryEvaluator[Fix, ResourceError \/ ?, Int, FederatedQuery[Fix, Int]](
-      qfed, f => srcs.lookup(ResourcePath.leaf(f)).right[ResourceError])
+    FederatingQueryEvaluator[Fix, Either[ResourceError, ?], Int, FederatedQuery[Fix, Int]](
+      qfed, f => srcs.get(ResourcePath.leaf(f)).asRight[ResourceError])
 
   "evaluate" >> {
     val qs = construction.mkDefaults[Fix, QScriptEducated[Fix, ?]]
@@ -64,7 +71,7 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
           qs.fix.Read[ResourcePath](ResourcePath.Root, ExcludeId),
           qs.recFunc.MakeMapS("value", qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "value")))
 
-      fqe.evaluate(query).swap.toOption must_= Some(notAResource(ResourcePath.root()))
+      fqe(query).swap.toOption must_= Some(notAResource(ResourcePath.root()))
     }
 
     "returns PNF when no source" >> {
@@ -76,7 +83,7 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
       val rp =
         ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
 
-      fqe.evaluate(query).swap.toOption must_= Some(pathNotFound(rp))
+      fqe(query).swap.toOption must_= Some(pathNotFound(rp))
     }
 
     "returns PNF when no source in branch" >> {
@@ -89,7 +96,7 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
       val rp =
         ResourcePath.root() / ResourceName("abs") / ResourceName("a")
 
-      fqe.evaluate(query).swap.toOption must_= Some(pathNotFound(rp))
+      fqe(query).swap.toOption must_= Some(pathNotFound(rp))
     }
 
     "builds federated query when all sources found" >> {
@@ -109,7 +116,7 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
             qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
             qs.recFunc.Now))
 
-      fqe.evaluate(query) map { fq =>
+      fqe(query) map { fq =>
         fq.query must beTreeEqual(query)
         fq.sources(absf) must_= Some(Source(ResourcePath.leaf(absf), 1))
         fq.sources(xysf) must_= Some(Source(ResourcePath.leaf(xysf), 2))

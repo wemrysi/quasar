@@ -14,21 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar
 
-import quasar._
-import quasar.api.QueryEvaluator
-import quasar.common.PhaseResultTell
-import quasar.qscript._
+import cats.data.Kleisli
 
-import matryoshka._
+package object api {
+  type QueryEvaluator[F[_], -Q, R] = Kleisli[F, Q, R]
 
-import cats.Monad
-
-object RegressionQueryEvaluator {
-  def apply[
-      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Monad: MonadPlannerErr: PhaseResultTell]
-      : QueryEvaluator[F, T[QScriptEducated[T, ?]], QScriptCount] =
-    QueryEvaluator((new RegressionQScriptEvaluator[T, F]).evaluate)
+  object QueryEvaluator {
+    def apply[F[_], Q, R](f: Q => F[R]): QueryEvaluator[F, Q, R] =
+      Kleisli(f)
+  }
 }

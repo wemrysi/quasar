@@ -17,47 +17,68 @@
 package quasar.impl.evaluate
 
 import slamdata.Predef.{None, Option, Some}
+
 import quasar.api.QueryEvaluator
 import quasar.api.resource.ResourcePath
 import quasar.connector.{MonadResourceErr, ResourceError}
+import quasar.connector.evaluate._
+import quasar.contrib.cats.writerT._
 import quasar.contrib.iota.copkTraverse
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
 import quasar.fp.PrismNT
 import quasar.qscript.{Read => QRead, _}
 
-import matryoshka._
-import scalaz._, Scalaz._
+import scala.collection.immutable.SortedMap
+
 import iotaz.CopK
 
+import matryoshka._
+
+import cats.{Monad, Order}
+import cats.data.{Chain, WriterT}
+import cats.syntax.applicative._
+import cats.syntax.flatMap._
+import cats.syntax.functor._
+
+import scalaz.{~>, Const}
+
+import shims.{orderToCats, monadToScalaz}
+
+object FederatingQueryEvaluator {
+  def apply[T[_[_]]: BirecursiveT, F[_]: Monad: MonadResourceErr, S, R](
+      queryFederation: QueryFederation[T, F, S, R],
+      sources: AFile => F[Option[Source[S]]])
+      : QueryEvaluator[F, T[QScriptEducated[T, ?]], R] =
+    QueryEvaluator(new FederatingQueryEvaluatorImpl(queryFederation, sources))
+}
+
 /** A `QueryEvaluator` capable of executing queries against multiple sources. */
-final class FederatingQueryEvaluator[
+private[evaluate] final class FederatingQueryEvaluatorImpl[
     T[_[_]]: BirecursiveT,
     F[_]: Monad: MonadResourceErr,
-    S, R] private (
+    S, R](
     queryFederation: QueryFederation[T, F, S, R],
     sources: AFile => F[Option[Source[S]]])
-    extends QueryEvaluator[F, T[QScriptEducated[T, ?]], R] {
+    extends (T[QScriptEducated[T, ?]] => F[R]) {
 
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-  import WriterT.writerTMonadListen
-
-  def evaluate(q: T[QScriptEducated[T, ?]]): F[R] =
+  def apply(q: T[QScriptEducated[T, ?]]): F[R] =
     for {
       wa <- Trans.applyTrans(federate, ReadPath)(q).run
 
       (srcs, qr) = wa
 
-      srcMap = IMap.fromFoldable(srcs)
+      srcMap = srcs.foldLeft(SortedMap.empty[AFile, Source[S]](Order[AFile].toOrdering))(_ + _)
 
-      fq = FederatedQuery(qr, srcMap.lookup)
+      fq = FederatedQuery(qr, srcMap.get)
 
-      r <- queryFederation.evaluateFederated(fq)
+      r <- queryFederation(fq)
     } yield r
 
   ////
 
-  private type SrcsT[X[_], A] = WriterT[X, DList[(AFile, Source[S])], A]
+  private type W = Chain[(AFile, Source[S])]
+  private type SrcsT[X[_], A] = WriterT[X, W, A]
   private type M[A] = SrcsT[F, A]
 
   private val QR = CopK.Inject[Const[QRead[ResourcePath], ?], QScriptEducated[T, ?]]
@@ -73,7 +94,7 @@ final class FederatingQueryEvaluator[
   // Record all sources in the query, erroring unless all are known.
   private val federate: Trans[Const[QRead[ResourcePath], ?], M] =
     new Trans[Const[QRead[ResourcePath], ?], M] {
-      def trans[U, G[_]: Functor]
+      def trans[U, G[_]: scalaz.Functor]
           (GtoF: PrismNT[G, Const[QRead[ResourcePath], ?]])
           (implicit UC: Corecursive.Aux[U, G], UR: Recursive.Aux[U, G])
           : Const[QRead[ResourcePath], U] => M[G[U]] = {
@@ -82,6 +103,7 @@ final class FederatingQueryEvaluator[
           val sourceM: M[(AFile, Source[S])] = path match {
             case ResourcePath.Leaf(file) =>
               lookupLeaf(file).map(s => (file, s))
+
             case root @ ResourcePath.Root =>
               MonadResourceErr[M].raiseError(
                 ResourceError.notAResource(root))
@@ -89,29 +111,18 @@ final class FederatingQueryEvaluator[
 
           for {
             source <- sourceM
-            _ <- MonadTell_[M, DList[(AFile, Source[S])]].tell(DList(source))
+            _ <- MonadTell_[M, W].tell(Chain.one(source))
           } yield GtoF(Const(QRead(path, idStatus)))
       }
     }
 
   private def lookupLeaf(file: AFile): M[Source[S]] =
-    sources(file).liftM[SrcsT] flatMap {
+    WriterT.liftF[F, W, Option[Source[S]]](sources(file)) flatMap {
       case Some(src) =>
-        src.point[M]
+        src.pure[M]
 
       case None =>
         MonadResourceErr[M].raiseError(
           ResourceError.pathNotFound(ResourcePath.leaf(file)))
     }
-}
-
-object FederatingQueryEvaluator {
-  def apply[
-      T[_[_]]: BirecursiveT,
-      F[_]: Monad: MonadResourceErr,
-      S, R](
-    queryFederation: QueryFederation[T, F, S, R],
-    sources: AFile => F[Option[Source[S]]])
-    : QueryEvaluator[F, T[QScriptEducated[T, ?]], R] =
-  new FederatingQueryEvaluator(queryFederation, sources)
 }

@@ -48,9 +48,7 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String] {
     PureIndexedStore[IO, UUID, String]
 
   val evaluator: QueryEvaluator[IO, String, String] =
-    new QueryEvaluator[IO, String, String] {
-      def evaluate(query: String): IO[String] = IO(query)
-    }
+    QueryEvaluator(IO.pure(_))
 
   val tables: Tables[IO, UUID, String] =
     DefaultTables[IO, UUID, String](freshId, tableStore)

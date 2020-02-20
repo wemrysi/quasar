@@ -164,10 +164,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   }
 
   def mkEvaluator(fn: String => IO[Stream[IO, String]]): QueryEvaluator[IO, String, Stream[IO, String]] =
-    new QueryEvaluator[IO, String, Stream[IO, String]] {
-      def evaluate(query: String): IO[Stream[IO, String]] =
-        fn(query)
-    }
+    QueryEvaluator(fn)
 
   trait StreamControl[F[_]] {
     // Cause the stream to emit a value
