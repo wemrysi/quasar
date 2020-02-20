@@ -32,14 +32,11 @@ jobs:
       - name: Run Tests
         run: |
           $SBT ++${{ matrix.scala }} ci
-      - name: Export target names
-        id: export-target-names
-        run: echo "::set-output name=dir::$(find . -type d -name target)"
-      - name: Upload target
+      - name: Upload working directory
         uses: actions/upload-artifact@v1
         with:
-          name: target
-          path: ${{ steps.export-target-names.outputs.dir }}
+          name: working-dir
+          path: .
 
   publish-and-tag:
     name: Publish and Tag
@@ -49,10 +46,10 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v2
-      - name: Download target artifacts
+      - name: Download working directory
         uses: actions/download-artifact@v1
         with:
-          name: target
+          name: working-dir
       - name: Set up JDK ${{ env.JDK }}
         uses: actions/setup-java@v1
         with:
@@ -74,10 +71,10 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 2
-      - name: Download target artifacts
+      - name: Download working directory
         uses: actions/download-artifact@v1
         with:
-          name: target
+          name: working-dir
       - name: Install ruby
         uses: actions/setup-ruby@v1
         with:
