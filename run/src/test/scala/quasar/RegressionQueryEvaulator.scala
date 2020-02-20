@@ -22,7 +22,8 @@ import quasar.common.PhaseResultTell
 import quasar.qscript._
 
 import matryoshka._
-import scalaz.Monad
+
+import cats.Monad
 
 final class RegressionQueryEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,

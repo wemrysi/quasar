@@ -24,8 +24,8 @@ import quasar.qscript._
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 
-import scalaz.Monad
-import scalaz.syntax.applicative._
+import cats.Monad
+import cats.syntax.applicative._
 
 final class RegressionQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
@@ -33,5 +33,5 @@ final class RegressionQScriptEvaluator[
     extends CountingQScriptEvaluator[T, F] {
 
   def optimize(norm: T[QScriptNormalized[T, ?]]): F[T[QSM]] =
-    norm.transCata[T[QSM]](QSNormToQSM.inject(_)).point[F]
+    norm.transCata[T[QSM]](QSNormToQSM.inject(_)).pure[F]
 }

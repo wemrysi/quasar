@@ -18,7 +18,7 @@ package quasar.run
 
 import slamdata.Predef._
 
-import scalaz.Monoid
+import cats.Monoid
 
 final case class QScriptCount(
     interpretedRead: QScriptCount.InterpretedReadCount,
@@ -32,22 +32,22 @@ object QScriptCount {
 
   implicit val monoid: Monoid[QScriptCount] =
     new Monoid[QScriptCount] {
-      def zero: QScriptCount =
+      val empty: QScriptCount =
         QScriptCount(InterpretedReadCount(0), ReadCount(0), LeftShiftCount(0))
 
-      def append(f1: QScriptCount, f2: => QScriptCount): QScriptCount =
+      def combine(f1: QScriptCount, f2: QScriptCount): QScriptCount =
         QScriptCount(
           InterpretedReadCount(f1.interpretedRead.count + f2.interpretedRead.count),
           ReadCount(f1.read.count + f2.read.count),
           LeftShiftCount(f1.leftShift.count + f2.leftShift.count))
     }
 
-  def incrementInterpretedRead: QScriptCount =
+  val oneInterpretedRead: QScriptCount =
     QScriptCount(InterpretedReadCount(1), ReadCount(0), LeftShiftCount(0))
 
-  def incrementRead: QScriptCount =
+  val oneRead: QScriptCount =
     QScriptCount(InterpretedReadCount(0), ReadCount(1), LeftShiftCount(0))
 
-  def incrementLeftShift: QScriptCount =
+  val oneLeftShift: QScriptCount =
     QScriptCount(InterpretedReadCount(0), ReadCount(0), LeftShiftCount(1))
 }

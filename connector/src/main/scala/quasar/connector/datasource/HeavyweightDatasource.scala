@@ -16,19 +16,8 @@
 
 package quasar.connector.datasource
 
-import quasar.RenderTreeT
-import quasar.common.PhaseResultTell
-import quasar.connector.QScriptEvaluator
-import quasar.qscript.{MonadPlannerErr, QScriptEducated}
-
-import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.Monad
+import quasar.qscript.QScriptEducated
 
 /** A Datasource capable of executing QScript. */
-abstract class HeavyweightDatasource[
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: MonadPlannerErr: PhaseResultTell,
-    G[_],
-    R]
-    extends QScriptEvaluator[T, F, R]
-    with PhysicalDatasource[F, G, T[QScriptEducated[T, ?]], R]
+abstract class HeavyweightDatasource[T[_[_]], F[_], G[_], R]
+    extends PhysicalDatasource[F, G, T[QScriptEducated[T, ?]], R]
