@@ -33,7 +33,7 @@ lazy val buildSettings = Seq(
 
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive", "showtimes")),
 
-  logBuffered in Test := isTravisBuild.value,
+  logBuffered in Test := githubIsWorkflowBuild.value,
 
   console := { (console in Test).value }, // console alias test:console
 
@@ -50,7 +50,7 @@ lazy val buildSettings = Seq(
 // actually available to run.
 concurrentRestrictions in Global := {
   val maxTasks = 4
-  if (isTravisBuild.value)
+  if (githubIsWorkflowBuild.value)
     // Recreate the default rules with the task limit hard-coded:
     Seq(Tags.limitAll(maxTasks), Tags.limit(Tags.ForkedTestGroup, 1))
   else
