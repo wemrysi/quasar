@@ -45,7 +45,7 @@ abstract class CountingRegressionSpec extends Qspec {
     MonadTell_.ignore[IO, PhaseResults]
 
   lazy val sql2Evaluator: QueryEvaluator[IO, SqlQuery, QScriptCount] =
-    Sql2QueryEvaluator[Fix, IO, QScriptCount](countingEvaluator)
+    Sql2Compiler[Fix, IO] andThen countingEvaluator
 
   def query(q: String): SqlQuery =
     SqlQuery(Query(q), Variables(SMap()), Path.rootDir)

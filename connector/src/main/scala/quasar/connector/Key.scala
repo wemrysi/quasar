@@ -28,22 +28,24 @@ sealed trait Key[F[_], A] extends Product with Serializable {
   val reify: A === Repr
 }
 
-final case class DoubleKey[F[_]](value: F[Double]) extends Key[F, Double] {
-  type Repr = Double
-  val reify = Is.refl
-}
+object Key {
+  final case class DoubleKey[F[_]](value: F[Double]) extends Key[F, Double] {
+    type Repr = Double
+    val reify = Is.refl
+  }
 
-final case class LongKey[F[_]](value: F[Long]) extends Key[F, Long] {
-  type Repr = Long
-  val reify = Is.refl
-}
+  final case class LongKey[F[_]](value: F[Long]) extends Key[F, Long] {
+    type Repr = Long
+    val reify = Is.refl
+  }
 
-final case class StringKey[F[_]](value: F[String]) extends Key[F, String] {
-  type Repr = String
-  val reify = Is.refl
-}
+  final case class StringKey[F[_]](value: F[String]) extends Key[F, String] {
+    type Repr = String
+    val reify = Is.refl
+  }
 
-final case class DateTimeKey[F[_]](value: F[OffsetDateTime]) extends Key[F, OffsetDateTime] {
-  type Repr = OffsetDateTime
-  val reify = Is.refl
+  final case class DateTimeKey[F[_]](value: F[OffsetDateTime]) extends Key[F, OffsetDateTime] {
+    type Repr = OffsetDateTime
+    val reify = Is.refl
+  }
 }

@@ -22,8 +22,7 @@ import quasar.{EffectfulQSpec, RateLimiter, RateLimiting, RenderTreeT, ScalarSta
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
-import quasar.impl.DatasourceModule
-import quasar.impl.datasource.EmptyDatasource
+import quasar.impl.{DatasourceModule, EmptyDatasource, QuasarDatasource}
 import quasar.connector._
 import quasar.connector.datasource._
 import quasar.contrib.scalaz._
@@ -54,7 +53,7 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import shims.{monadToScalaz, monoidKToScalaz, showToCats, showToScalaz, applicativeToScalaz}
+import shims.{showToCats, showToScalaz}
 
 object DatasourceModulesSpec extends EffectfulQSpec[IO] {
   implicit val tmr = IO.timer(global)
@@ -206,8 +205,8 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
         _ <- finalizer1
         _ <- finalizer2
       } yield {
-        lightRes must beLike { case \/-(ManagedDatasource.ManagedLightweight(lw)) => lw.kind === lightType }
-        heavyRes must beLike { case \/-(ManagedDatasource.ManagedHeavyweight(hw)) => hw.kind === heavyType }
+        lightRes must beLike { case \/-(QuasarDatasource.Lightweight(lw)) => lw.kind === lightType }
+        heavyRes must beLike { case \/-(QuasarDatasource.Heavyweight(hw)) => hw.kind === heavyType }
       }
     }
     "errors with incompatible refs" >>* {

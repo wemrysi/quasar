@@ -90,12 +90,12 @@ private[quasar] final class DefaultDatasources[
       .run
 
   def pathIsResource(i: I, path: ResourcePath): F[ExistentialError[I] \/ Boolean] =
-    getMDS[ExistentialError[I]](i)
+    getQDS[ExistentialError[I]](i)
       .flatMap(ds => EitherT.rightT(ds.pathIsResource(path)))
       .run
 
   def prefixedChildPaths(i: I, prefixPath: ResourcePath): F[DiscoveryError[I] \/ Stream[F, (ResourceName, ResourcePathType)]] =
-    getMDS[DiscoveryError[I]](i)
+    getQDS[DiscoveryError[I]](i)
       .flatMapF(_.prefixedChildPaths(prefixPath) map {
         _.toRightDisjunction(pathNotFound[DiscoveryError[I]](prefixPath))
       })
@@ -142,7 +142,7 @@ private[quasar] final class DefaultDatasources[
 
   def resourceSchema(i: I, path: ResourcePath, schemaConfig: S): F[DiscoveryError[I] \/ schemaConfig.Schema] = {
     val action = for {
-      mds <- getMDS[DiscoveryError[I]](i)
+      mds <- getQDS[DiscoveryError[I]](i)
       fr = mds match {
         case QuasarDatasource.Lightweight(lw) =>
           lw.loaders.head match {
@@ -164,16 +164,16 @@ private[quasar] final class DefaultDatasources[
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     modules.supportedTypes
 
-  type MDS = QuasarDatasource[T, F, Stream[F, ?], R, PathType]
+  type QDS = QuasarDatasource[T, F, Stream[F, ?], R, PathType]
 
-  def managedDatasourceOf(i: I): F[Option[MDS]] =
-    getMDS[ExistentialError[I]](i).toOption.run
+  def quasarDatasourceOf(i: I): F[Option[QDS]] =
+    getQDS[ExistentialError[I]](i).toOption.run
 
-  private def getMDS[E >: ExistentialError[I] <: DatasourceError[I, C]](i: I): EitherT[F, E, MDS] = {
+  private def getQDS[E >: ExistentialError[I] <: DatasourceError[I, C]](i: I): EitherT[F, E, QDS] = {
     type Res[A] = EitherT[F, E, A]
     type L[M[_], A] = EitherT[M, E, A]
-    lazy val error: Res[MDS] = EitherT.pureLeft(datasourceNotFound[I, E](i))
-    lazy val fromCache: Res[MDS] = cache.get(i).liftM[L] flatMap {
+    lazy val error: Res[QDS] = EitherT.pureLeft(datasourceNotFound[I, E](i))
+    lazy val fromCache: Res[QDS] = cache.get(i).liftM[L] flatMap {
       case None => error
       case Some(a) => EitherT.pure(a)
     }
