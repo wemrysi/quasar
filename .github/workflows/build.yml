@@ -58,6 +58,8 @@ jobs:
         uses: actions/setup-ruby@v1
         with:
           ruby-version: '2.6'
+      - name: Setup Git Actor
+        run: git config github.actor slamdata-bot
       - name: Run transferCommonResources
         run: $SBT transferCommonResources
       - name: Export common secrets
