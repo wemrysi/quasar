@@ -26,7 +26,7 @@ import quasar.api.resource._
 import quasar.connector.datasource.Loader
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
-import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
+import quasar.impl.{CachedGetter, IndexedSemaphore, QuasarDatasource, ResourceManager}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 import quasar.qscript.{construction, educatedToTotal, InterpretedRead, QScriptEducated}
 
@@ -57,7 +57,7 @@ private[quasar] final class DefaultDatasources[
     refs: IndexedStore[F, I, DatasourceRef[C]],
     modules: DatasourceModules[T, F, Stream[F, ?], I, C, R, ResourcePathType],
     getter: CachedGetter[F, I, DatasourceRef[C]],
-    cache: ResourceManager[F, I, ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
+    cache: ResourceManager[F, I, QuasarDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
     errors: DatasourceErrors[F, I],
     schema: ResourceSchema[F, S, (ResourcePath, R)],
     byteStores: ByteStores[F, I])
@@ -144,12 +144,12 @@ private[quasar] final class DefaultDatasources[
     val action = for {
       mds <- getMDS[DiscoveryError[I]](i)
       fr = mds match {
-        case ManagedDatasource.ManagedLightweight(lw) =>
+        case QuasarDatasource.Lightweight(lw) =>
           lw.loaders.head match {
             case Loader.Batch(b) => b.loadFull(InterpretedRead(path, ScalarStages.Id))
           }
 
-        case ManagedDatasource.ManagedHeavyweight(hw) =>
+        case QuasarDatasource.Heavyweight(hw) =>
           hw.loaders.head match {
             case Loader.Batch(b) => b.loadFull(dsl.Read(path, IdStatus.ExcludeId))
           }
@@ -164,7 +164,7 @@ private[quasar] final class DefaultDatasources[
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     modules.supportedTypes
 
-  type MDS = ManagedDatasource[T, F, Stream[F, ?], R, PathType]
+  type MDS = QuasarDatasource[T, F, Stream[F, ?], R, PathType]
 
   def managedDatasourceOf(i: I): F[Option[MDS]] =
     getMDS[ExistentialError[I]](i).toOption.run
@@ -266,7 +266,7 @@ object DefaultDatasources {
       freshId: F[I],
       refs: IndexedStore[F, I, DatasourceRef[C]],
       modules: DatasourceModules[T, F, Stream[F, ?], I, C, R, ResourcePathType],
-      cache: ResourceManager[F, I, ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
+      cache: ResourceManager[F, I, QuasarDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
       errors: DatasourceErrors[F, I],
       schema: ResourceSchema[F, S, (ResourcePath, R)],
       byteStores: ByteStores[F, I])
