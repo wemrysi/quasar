@@ -31,7 +31,7 @@ jobs:
         run: git config github.actor slamdata-bot
       - name: Run Tests
         run: |
-          $SBT ++${{ matrix.scala }} sci
+          $SBT ++${{ matrix.scala }} ci
       - name: Export target names
         id: export-target-names
         run: echo "::set-output name=dir::$(find . -type d -name target)"
