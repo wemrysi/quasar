@@ -24,7 +24,7 @@ import matryoshka.data.Fix
 
 object QScriptRegressionSpec extends CountingRegressionSpec {
 
-  val countingEvaluator = new RegressionQueryEvaluator[Fix, IO]
+  val countingEvaluator = RegressionQueryEvaluator[Fix, IO]
 
   "optimized qscript" should {
 

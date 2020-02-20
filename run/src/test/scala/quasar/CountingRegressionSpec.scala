@@ -51,7 +51,7 @@ abstract class CountingRegressionSpec extends Qspec {
     SqlQuery(Query(q), Variables(SMap()), Path.rootDir)
 
   def count(sql2: String): QScriptCount =
-    sql2Evaluator.evaluate(query(sql2)).unsafeRunSync()
+    sql2Evaluator(query(sql2)).unsafeRunSync()
 
   def countInterpretedReadAs(expected: Int): Matcher[QScriptCount] =
     new Matcher[QScriptCount] {

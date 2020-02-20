@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.impl.evaluate
+package quasar.connector.evaluate
 
 import slamdata.Predef.Option
 import quasar.contrib.pathy.AFile
 import quasar.qscript.QScriptEducated
 
+import cats.{Functor, Show}
+
 import monocle.macros.Lenses
-import scalaz.{Functor, Show}
 
 /** A QScript query over possibly many sources.
   *
@@ -39,12 +40,12 @@ final case class FederatedQuery[T[_[_]], S](
 object FederatedQuery extends FederatedQueryInstances
 
 sealed abstract class FederatedQueryInstances {
-  implicit def functor[T[_[_]]]: Functor[FederatedQuery[T, ?]] =
+  implicit def federatedQueryFunctor[T[_[_]]]: Functor[FederatedQuery[T, ?]] =
     new Functor[FederatedQuery[T, ?]] {
       def map[A, B](fa: FederatedQuery[T, A])(f: A => B) =
         FederatedQuery(fa.query, p => fa.sources(p).map(_.map(f)))
     }
 
-  implicit def show[T[_[_]], A]: Show[FederatedQuery[T, A]] =
-    Show.shows(_ => "FederatedQuery")
+  implicit def federatedQueryShow[T[_[_]], A]: Show[FederatedQuery[T, A]] =
+    Show.show(_ => "FederatedQuery")
 }

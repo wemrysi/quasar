@@ -38,15 +38,14 @@ import scalaz.syntax.bind._
 
 object Sql2QueryEvaluator extends Logging {
   def apply[
-    T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
-    F[_]: Monad: MonadQuasarErr: PhaseResultTell,
-    R](
-    qScriptEvaluator: QueryEvaluator[F, T[QScriptEducated[T, ?]], R])
-    : QueryEvaluator[F, SqlQuery, R] =
-    QueryEvaluator.mapEval(qScriptEvaluator) { eval => squery => {
-        log.debug(s"Evaluating query=${squery.query.value}, basePath=${pathy.Path.posixCodec.printPath(squery.basePath)}")
-        sql2ToQScript[T, F](squery) >>= eval
-      }
+      T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
+      F[_]: Monad: MonadQuasarErr: PhaseResultTell,
+      R](
+      qScriptEvaluator: QueryEvaluator[F, T[QScriptEducated[T, ?]], R])
+      : QueryEvaluator[F, SqlQuery, R] =
+    QueryEvaluator { (squery: SqlQuery) =>
+      log.debug(s"Evaluating query=${squery.query.value}, basePath=${pathy.Path.posixCodec.printPath(squery.basePath)}")
+      sql2ToQScript[T, F](squery) >>= qScriptEvaluator.run
     }
 
   def sql2ToQScript[
