@@ -1,4 +1,4 @@
-name: quasarbuild
+name: build
 
 on:
   pull_request:
@@ -31,17 +31,20 @@ jobs:
         run: git config github.actor slamdata-bot
       - name: Run Tests
         run: |
-          $SBT ++${{ matrix.scala }} ci
+          $SBT ++${{ matrix.scala }} sci
+      - name: Export target names
+        id: export-target-names
+        run: echo "::set-output name=dir::$(find . -type d -name target)"
       - name: Upload target
         uses: actions/upload-artifact@v1
         with:
           name: target
-          path: target
+          path: ${{ steps.export-target-names.outputs.dir }}
 
   publish-and-tag:
     name: Publish and Tag
     needs: [build]
-    if: github.event_name != 'pull_request' && (contains(github.head_ref, 'backport/v.*') || contains(github.head_ref, 'master'))
+    if: github.event_name != 'pull_request' && (contains(github.ref, 'backport/v.*') || contains(github.ref, 'master'))
     runs-on: [ubuntu-latest]
     steps:
       - name: Checkout branch
