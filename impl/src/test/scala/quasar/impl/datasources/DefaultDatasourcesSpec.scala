@@ -27,8 +27,7 @@ import quasar.{concurrent => qc}
 import quasar.connector._
 import quasar.connector.datasource._
 import quasar.contrib.scalaz._
-import quasar.impl.{DatasourceModule, ResourceManager}
-import quasar.impl.datasource.EmptyDatasource
+import quasar.impl.{DatasourceModule, EmptyDatasource, QuasarDatasource, ResourceManager}
 import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
 import quasar.qscript.{PlannerError, InterpretedRead}
 
@@ -61,7 +60,7 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import shims.{orderToScalaz, showToScalaz, applicativeToScalaz, monoidKToScalaz, showToCats, monadToScalaz}
+import shims.{orderToScalaz, showToScalaz, applicativeToScalaz, showToCats, monadToScalaz}
 
 object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type] with ConditionMatchers {
 
@@ -72,7 +71,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
   type PathType = ResourcePathType
   type Self = Datasources[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type]
   type R[F[_], A] = Either[InitializationError[Json], Datasource[F, Stream[F, ?], A, QueryResult[F], ResourcePathType.Physical]]
-  type MDS = ManagedDatasource[Fix, IO, Stream[IO, ?], QueryResult[IO], PathType]
+  type QDS = QuasarDatasource[Fix, IO, Stream[IO, ?], QueryResult[IO], PathType]
 
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
@@ -157,7 +156,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
         ConcurrentMapIndexedStore.unhooked[IO, String, DatasourceRef[Json]](mp, blocker)
       }
 
-    val rCache = ResourceManager[IO, String, ManagedDatasource[Fix, IO, Stream[IO, ?], QueryResult[IO], PathType]]
+    val rCache = ResourceManager[IO, String, QuasarDatasource[Fix, IO, Stream[IO, ?], QueryResult[IO], PathType]]
 
     val schema =
       new ResourceSchema[IO, MockSchemaConfig.type, (ResourcePath, QueryResult[IO])] {
@@ -182,8 +181,8 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       modules = {
         DatasourceModules[Fix, IO, String, UUID](List(lightMod(mp, sanitize)), rateLimiting, byteStores)
           .widenPathType[PathType]
-          .withMiddleware((i: String, mds: MDS) => starts.update(i :: _) as mds)
-          .withFinalizer((i: String, mds: MDS) => shuts.update(i :: _))
+          .withMiddleware((i: String, mds: QDS) => starts.update(i :: _) as mds)
+          .withFinalizer((i: String, mds: QDS) => shuts.update(i :: _))
       }
       refs <- Resource.liftF(fRefs)
       cache <- rCache
