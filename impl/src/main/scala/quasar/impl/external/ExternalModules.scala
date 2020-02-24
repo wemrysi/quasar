@@ -16,7 +16,6 @@
 
 package quasar.impl.external
 
-import quasar.contrib.argonaut.JawnParser, JawnParser._
 import quasar.contrib.fs2.convert
 import slamdata.Predef._
 
@@ -29,7 +28,7 @@ import java.lang.{
 import java.nio.file.{Files, Path}
 import java.util.jar.JarFile
 
-import argonaut.Json
+import argonaut.{JawnParser, Json}, JawnParser._
 import cats.effect.{Blocker, ConcurrentEffect, ContextShift, Effect, Sync, Timer}
 import cats.syntax.applicativeError._
 import fs2.io.file
