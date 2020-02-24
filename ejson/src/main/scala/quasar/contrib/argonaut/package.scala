@@ -56,7 +56,7 @@ package object argonaut {
           case CJ(ejson.Dec(d))  => jNumber(d)
           case CJ(ejson.Str(s))  => jString(s)
           case CJ(ejson.Arr(a))  => jArray(a)
-          case OJ(ejson.Obj(o))  => jObject(JsonObject.fromTraversableOnce(o))
+          case OJ(ejson.Obj(o))  => jObject(JsonObject.fromIterable(o))
         }
     }
 
