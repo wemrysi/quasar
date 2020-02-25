@@ -71,8 +71,7 @@ final class Quasar[F[_], R, C <: SchemaConfig](
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
     val tables: Tables[F, UUID, SqlQuery],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, R]],
-    val resultPush: ResultPush[F, UUID, UUID],
-    val resultRender: ResultRender[F, R])
+    val resultPush: ResultPush[F, UUID, UUID])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 object Quasar extends Logging {
@@ -137,7 +136,7 @@ object Quasar extends Logging {
         jobManager,
         resultRender))
 
-    } yield new Quasar(datasources, destinations, tables, sqlEvaluator, push, resultRender)
+    } yield new Quasar(datasources, destinations, tables, sqlEvaluator, push)
   }
 
   ////
