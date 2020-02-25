@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasources
+package quasar.connector
 
 import quasar.api.SchemaConfig
 

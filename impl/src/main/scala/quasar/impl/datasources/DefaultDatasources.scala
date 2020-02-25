@@ -23,6 +23,7 @@ import quasar.api.SchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
+import quasar.connector.ResourceSchema
 import quasar.connector.datasource.Loader
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
