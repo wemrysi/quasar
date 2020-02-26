@@ -152,7 +152,7 @@ final class QueryFederatorSpec extends Qspec with TreeMatchers {
           qs.recFunc.Now))
 
     federator((query, Some(Column("ts", ∃(ActualKey.long(100)))))) must beLike {
-      case Left(ResourceError.SeekUnspported(p)) => p must_= abs
+      case Left(ResourceError.SeekUnsupported(p)) => p must_= abs
     }
   }
 

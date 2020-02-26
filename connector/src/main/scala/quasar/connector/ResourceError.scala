@@ -64,7 +64,7 @@ object ResourceError extends ResourceErrorInstances {
     val cause = None
   }
 
-  final case class SeekUnspported(path: ResourcePath) extends ResourceError {
+  final case class SeekUnsupported(path: ResourcePath) extends ResourceError {
     val detail = None
     val cause = None
   }
@@ -110,8 +110,8 @@ object ResourceError extends ResourceErrorInstances {
 
   val seekUnsupported: Prism[ResourceError, ResourcePath] =
     Prism.partial[ResourceError, ResourcePath] {
-      case SeekUnspported(p) => p
-    } (SeekUnspported(_))
+      case SeekUnsupported(p) => p
+    } (SeekUnsupported(_))
 
   val tooManyResources: Prism[ResourceError, (NonEmptyList[ResourcePath], String)] =
     Prism.partial[ResourceError, (NonEmptyList[ResourcePath], String)] {
@@ -166,7 +166,7 @@ sealed abstract class ResourceErrorInstances {
       case ResourceError.PathNotFound(p) =>
         s"PathNotFound(${p.shows})"
 
-      case ResourceError.SeekUnspported(p) =>
+      case ResourceError.SeekUnsupported(p) =>
         s"SeekUnsupported(${p.shows})"
 
       case ResourceError.TooManyResources(ps, r) =>
