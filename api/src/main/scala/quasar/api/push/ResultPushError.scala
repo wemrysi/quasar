@@ -27,13 +27,20 @@ sealed trait ResultPushError[+T, +D] extends Product with Serializable
 object ResultPushError {
   sealed trait ExistentialError[+T, +D] extends ResultPushError[T, D]
 
-  final case class DestinationNotFound[D](destinationId: D) extends ExistentialError[Nothing, D]
+  final case class DestinationNotFound[D](destinationId: D)
+      extends ExistentialError[Nothing, D]
 
-  final case class TableNotFound[T](tableId: T) extends ExistentialError[T, Nothing]
+  final case class TableNotFound[T](tableId: T)
+      extends ExistentialError[T, Nothing]
 
-  final case class FormatNotSupported[D](destinationId: D, format: String) extends ResultPushError[Nothing, D]
+  final case class FormatNotSupported[D](destinationId: D, format: String)
+      extends ResultPushError[Nothing, D]
 
-  final case class PushAlreadyRunning[T, D](tableId: T, destinationId: D) extends ResultPushError[T, D]
+  final case class PushAlreadyRunning[T, D](tableId: T, destinationId: D)
+      extends ResultPushError[T, D]
+
+  final case class PushNotIncremental[T, D](tableId: T, destinationId: D)
+      extends ResultPushError[T, D]
 
   final case class TypeNotFound[D](destinationId: D, column: String, index: TypeIndex)
       extends ResultPushError[Nothing, D]

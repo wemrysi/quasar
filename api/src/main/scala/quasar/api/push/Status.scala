@@ -20,39 +20,56 @@ import slamdata.Predef._
 
 import java.time.Instant
 
-import scalaz.{Equal, Show}
+import cats.{Eq, Show}
 
-sealed trait Status extends Product with Serializable
+import monocle.Prism
+
+sealed trait Status extends Product with Serializable {
+  def startedAt: Instant
+  def limit: Option[Long]
+}
 
 object Status {
-  final case class Finished(startedAt: Instant, finishedAt: Instant) extends Status
-  final case class Running(startedAt: Instant) extends Status
-  final case class Canceled(startedAt: Instant, canceledAt: Instant) extends Status
-  final case class Failed(th: Throwable, startedAt: Instant, failedAt: Instant) extends Status
+  final case class Finished(startedAt: Instant, finishedAt: Instant, limit: Option[Long])
+      extends Status
+  final case class Running(startedAt: Instant, limit: Option[Long])
+      extends Status
+  final case class Canceled(startedAt: Instant, canceledAt: Instant, limit: Option[Long])
+      extends Status
+  final case class Failed(startedAt: Instant, failedAt: Instant, limit: Option[Long], cause: Throwable)
+      extends Status
 
-  implicit val equal: Equal[Status] =
-    Equal.equalA
+  val finished: Prism[Status, (Instant, Instant, Option[Long])] =
+    Prism.partial[Status, (Instant, Instant, Option[Long])] {
+      case Finished(st, fn, lm) => (st, fn, lm)
+    } (Finished.tupled)
 
-  implicit val show: Show[Status] = Show.shows {
-    case Finished(startedAt, finishedAt) =>
-      s"Finished($startedAt, $finishedAt)"
-    case Running(startedAt) =>
-      s"Running($startedAt)"
-    case Canceled(startedAt, canceledAt) =>
-      s"Canceled($startedAt, $canceledAt)"
-    case Failed(ex, startedAt, finishedAt) =>
-      s"Failed(${ex.getMessage}, $startedAt, $finishedAt)" + "\n\n" + s"$ex"
+  val running: Prism[Status, (Instant, Option[Long])] =
+    Prism.partial[Status, (Instant, Option[Long])] {
+      case Running(st, lm) => (st, lm)
+    } (Running.tupled)
+
+  val canceled: Prism[Status, (Instant, Instant, Option[Long])] =
+    Prism.partial[Status, (Instant, Instant, Option[Long])] {
+      case Canceled(st, fn, lm) => (st, fn, lm)
+    } (Canceled.tupled)
+
+  val failed: Prism[Status, (Instant, Instant, Option[Long], Throwable)] =
+    Prism.partial[Status, (Instant, Instant, Option[Long], Throwable)] {
+      case Failed(st, fn, lm, th) => (st, fn, lm, th)
+    } (Failed.tupled)
+
+  implicit val statusEq: Eq[Status] =
+    Eq.fromUniversalEquals
+
+  implicit val statusShow: Show[Status] = Show show {
+    case Finished(startedAt, finishedAt, limit) =>
+      s"Finished($startedAt, $finishedAt, $limit)"
+    case Running(startedAt, limit) =>
+      s"Running($startedAt, $limit)"
+    case Canceled(startedAt, canceledAt, limit) =>
+      s"Canceled($startedAt, $canceledAt, $limit)"
+    case Failed(startedAt, finishedAt, limit, cause) =>
+      s"Failed($startedAt, $finishedAt, $limit)\n\n$cause"
   }
-
-  def finished(startedAt: Instant, finishedAt: Instant): Status =
-    Finished(startedAt, finishedAt)
-
-  def running(startedAt: Instant): Status =
-    Running(startedAt)
-
-  def canceled(startedAt: Instant, canceledAt: Instant): Status =
-    Canceled(startedAt, canceledAt)
-
-  def failed(ex: Throwable, startedAt: Instant, failedAt: Instant): Status =
-    Failed(ex, startedAt, failedAt)
 }

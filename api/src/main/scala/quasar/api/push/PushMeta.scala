@@ -20,8 +20,55 @@ import slamdata.Predef._
 
 import quasar.api.resource.ResourcePath
 
-final case class PushMeta(
-    path: ResourcePath,
-    resultType: ResultType,
-    limit: Option[Long],
-    status: Status)
+import java.time.Instant
+
+import cats.{Eq, Show}
+import cats.implicits._
+
+import monocle.Prism
+
+import shims.{equalToCats, showToCats}
+
+sealed trait PushMeta[O] extends Product with Serializable {
+  def path: ResourcePath
+  def latestStatus: Status
+}
+
+object PushMeta {
+  final case class Full[O](
+      path: ResourcePath,
+      latestStatus: Status)
+      extends PushMeta[O]
+
+  final case class Incremental[O](
+      path: ResourcePath,
+      latestStatus: Status,
+      createdAt: Instant,
+      resumeConfig: ResumeConfig[O],
+      initialOffset: Option[OffsetKey.Actual[O]])
+      extends PushMeta[O]
+
+  def full[O]: Prism[PushMeta[O], (ResourcePath, Status)] =
+    Prism.partial[PushMeta[O], (ResourcePath, Status)] {
+      case Full(p, s) => (p, s)
+    } ((Full[O] _).tupled)
+
+  def incremental[O]: Prism[PushMeta[O], (ResourcePath, Status, Instant, ResumeConfig[O], Option[OffsetKey.Actual[O]])] =
+    Prism.partial[PushMeta[O], (ResourcePath, Status, Instant, ResumeConfig[O], Option[OffsetKey.Actual[O]])] {
+      case Incremental(p, s, t, r, o) => (p, s, t, r, o)
+    } ((Incremental[O] _).tupled)
+
+  implicit def pushMetaEq[O]: Eq[PushMeta[O]] = {
+    implicit val instantEq = Eq.fromUniversalEquals[Instant]
+    Eq.by(m => (full[O].getOption(m), incremental[O].getOption(m)))
+  }
+
+  implicit def pushMetaShow[O]: Show[PushMeta[O]] =
+    Show show {
+      case Full(p, s) =>
+        s"Full(${p.show}, ${s.show})"
+
+      case Incremental(p, s, i, c, o) =>
+        s"Incremental(${p.show}, ${s.show}, $i, ${c.show}, ${o.show})"
+    }
+}
