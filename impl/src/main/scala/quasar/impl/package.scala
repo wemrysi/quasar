@@ -14,21 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar
 
-import quasar._
-import quasar.api.QueryEvaluator
-import quasar.common.PhaseResultTell
-import quasar.qscript._
+import java.lang.String
+import java.util.UUID
 
-import matryoshka._
+import monocle.Prism
 
-import cats.Monad
+import scala.util.Try
 
-object RegressionQueryEvaluator {
-  def apply[
-      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Monad: MonadPlannerErr: PhaseResultTell]
-      : QueryEvaluator[F, T[QScriptEducated[T, ?]], QScriptCount] =
-    QueryEvaluator((new RegressionQScriptEvaluator[T, F]).evaluate)
+package object impl {
+  val UuidString: Prism[String, UUID] =
+    Prism[String, UUID](
+      s => Try(UUID.fromString(s)).toOption)(
+      u => u.toString)
 }

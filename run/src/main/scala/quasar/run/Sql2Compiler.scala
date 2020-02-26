@@ -18,7 +18,6 @@ package quasar.run
 
 import slamdata.Predef.{Long, None, StringContext}
 import quasar.RenderTreeT
-import quasar.api.QueryEvaluator
 import quasar.common.{phaseM, PhaseResultTell}
 import quasar.compile.queryPlan
 import quasar.contrib.iota._
@@ -30,23 +29,27 @@ import quasar.qsu.LPtoQS
 import quasar.run.implicits._
 import quasar.sql.parser
 
+import cats.data.Kleisli
+
 import eu.timepit.refined.auto._
+
 import matryoshka._
+
 import org.slf4s.Logging
+
+import pathy.Path.posixCodec
+
 import scalaz.{Monad, StateT}
 import scalaz.syntax.bind._
 
-object Sql2QueryEvaluator extends Logging {
+object Sql2Compiler extends Logging {
   def apply[
-    T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
-    F[_]: Monad: MonadQuasarErr: PhaseResultTell,
-    R](
-    qScriptEvaluator: QueryEvaluator[F, T[QScriptEducated[T, ?]], R])
-    : QueryEvaluator[F, SqlQuery, R] =
-    QueryEvaluator.mapEval(qScriptEvaluator) { eval => squery => {
-        log.debug(s"Evaluating query=${squery.query.value}, basePath=${pathy.Path.posixCodec.printPath(squery.basePath)}")
-        sql2ToQScript[T, F](squery) >>= eval
-      }
+      T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
+      F[_]: Monad: MonadQuasarErr: PhaseResultTell]
+      : Kleisli[F, SqlQuery, T[QScriptEducated[T, ?]]] =
+    Kleisli(sql2ToQScript[T, F]) local { squery =>
+      log.debug(s"Evaluating query=${squery.query.value}, basePath=${posixCodec.printPath(squery.basePath)}")
+      squery
     }
 
   def sql2ToQScript[

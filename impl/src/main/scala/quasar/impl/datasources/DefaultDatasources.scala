@@ -23,10 +23,11 @@ import quasar.api.SchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
-import quasar.connector.datasource.{BatchLoader, Loader}
+import quasar.connector.ResourceSchema
+import quasar.connector.datasource.Loader
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
-import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
+import quasar.impl.{CachedGetter, IndexedSemaphore, QuasarDatasource, ResourceManager}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 import quasar.qscript.{construction, educatedToTotal, InterpretedRead, QScriptEducated}
 
@@ -57,7 +58,7 @@ private[quasar] final class DefaultDatasources[
     refs: IndexedStore[F, I, DatasourceRef[C]],
     modules: DatasourceModules[T, F, Stream[F, ?], I, C, R, ResourcePathType],
     getter: CachedGetter[F, I, DatasourceRef[C]],
-    cache: ResourceManager[F, I, ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
+    cache: ResourceManager[F, I, QuasarDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
     errors: DatasourceErrors[F, I],
     schema: ResourceSchema[F, S, (ResourcePath, R)],
     byteStores: ByteStores[F, I])
@@ -90,12 +91,12 @@ private[quasar] final class DefaultDatasources[
       .run
 
   def pathIsResource(i: I, path: ResourcePath): F[ExistentialError[I] \/ Boolean] =
-    getMDS[ExistentialError[I]](i)
+    getQDS[ExistentialError[I]](i)
       .flatMap(ds => EitherT.rightT(ds.pathIsResource(path)))
       .run
 
   def prefixedChildPaths(i: I, prefixPath: ResourcePath): F[DiscoveryError[I] \/ Stream[F, (ResourceName, ResourcePathType)]] =
-    getMDS[DiscoveryError[I]](i)
+    getQDS[DiscoveryError[I]](i)
       .flatMapF(_.prefixedChildPaths(prefixPath) map {
         _.toRightDisjunction(pathNotFound[DiscoveryError[I]](prefixPath))
       })
@@ -142,18 +143,16 @@ private[quasar] final class DefaultDatasources[
 
   def resourceSchema(i: I, path: ResourcePath, schemaConfig: S): F[DiscoveryError[I] \/ schemaConfig.Schema] = {
     val action = for {
-      mds <- getMDS[DiscoveryError[I]](i)
+      mds <- getQDS[DiscoveryError[I]](i)
       fr = mds match {
-        case ManagedDatasource.ManagedLightweight(lw) =>
+        case QuasarDatasource.Lightweight(lw) =>
           lw.loaders.head match {
-            case Loader.Batch(BatchLoader.Full(f)) =>
-              f(InterpretedRead(path, ScalarStages.Id))
+            case Loader.Batch(b) => b.loadFull(InterpretedRead(path, ScalarStages.Id))
           }
 
-        case ManagedDatasource.ManagedHeavyweight(hw) =>
+        case QuasarDatasource.Heavyweight(hw) =>
           hw.loaders.head match {
-            case Loader.Batch(BatchLoader.Full(f)) =>
-              f(dsl.Read(path, IdStatus.ExcludeId))
+            case Loader.Batch(b) => b.loadFull(dsl.Read(path, IdStatus.ExcludeId))
           }
       }
       r <- EitherT.rightT(fr)
@@ -166,16 +165,16 @@ private[quasar] final class DefaultDatasources[
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     modules.supportedTypes
 
-  type MDS = ManagedDatasource[T, F, Stream[F, ?], R, PathType]
+  type QDS = QuasarDatasource[T, F, Stream[F, ?], R, PathType]
 
-  def managedDatasourceOf(i: I): F[Option[MDS]] =
-    getMDS[ExistentialError[I]](i).toOption.run
+  def quasarDatasourceOf(i: I): F[Option[QDS]] =
+    getQDS[ExistentialError[I]](i).toOption.run
 
-  private def getMDS[E >: ExistentialError[I] <: DatasourceError[I, C]](i: I): EitherT[F, E, MDS] = {
+  private def getQDS[E >: ExistentialError[I] <: DatasourceError[I, C]](i: I): EitherT[F, E, QDS] = {
     type Res[A] = EitherT[F, E, A]
     type L[M[_], A] = EitherT[M, E, A]
-    lazy val error: Res[MDS] = EitherT.pureLeft(datasourceNotFound[I, E](i))
-    lazy val fromCache: Res[MDS] = cache.get(i).liftM[L] flatMap {
+    lazy val error: Res[QDS] = EitherT.pureLeft(datasourceNotFound[I, E](i))
+    lazy val fromCache: Res[QDS] = cache.get(i).liftM[L] flatMap {
       case None => error
       case Some(a) => EitherT.pure(a)
     }
@@ -268,7 +267,7 @@ object DefaultDatasources {
       freshId: F[I],
       refs: IndexedStore[F, I, DatasourceRef[C]],
       modules: DatasourceModules[T, F, Stream[F, ?], I, C, R, ResourcePathType],
-      cache: ResourceManager[F, I, ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
+      cache: ResourceManager[F, I, QuasarDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
       errors: DatasourceErrors[F, I],
       schema: ResourceSchema[F, S, (ResourcePath, R)],
       byteStores: ByteStores[F, I])

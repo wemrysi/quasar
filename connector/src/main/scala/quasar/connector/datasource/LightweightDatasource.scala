@@ -17,9 +17,8 @@
 package quasar.connector.datasource
 
 import quasar.api.resource.ResourcePath
-import quasar.connector.MonadResourceErr
 import quasar.qscript.InterpretedRead
 
 /** A Datasource capable of returning the contents of resources. */
-abstract class LightweightDatasource[F[_]: MonadResourceErr, G[_], R]
+abstract class LightweightDatasource[F[_], G[_], R]
     extends PhysicalDatasource[F, G, InterpretedRead[ResourcePath], R]

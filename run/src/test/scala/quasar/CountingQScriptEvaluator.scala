@@ -19,7 +19,7 @@ package quasar.run
 import quasar._
 import quasar.api.resource.ResourcePath
 import quasar.common.PhaseResultTell
-import quasar.connector.QScriptEvaluator
+import quasar.connector.evaluate.QScriptEvaluator
 import quasar.contrib.iota._
 import quasar.contrib.std.errorImpossible
 import quasar.fp._
@@ -34,11 +34,12 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns.interpret
 
-import scalaz.{Const, Functor, Monad}
-import scalaz.syntax.applicative._
-import scalaz.syntax.monoid._
+import cats.{Functor, Monad, Monoid}
+import cats.implicits._
 
-import shims.monadToScalaz
+import scalaz.Const
+
+import shims.{functorToCats, monadToScalaz}
 
 abstract class CountingQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
@@ -62,7 +63,7 @@ abstract class CountingQScriptEvaluator[
   }
 
   def execute(repr: Repr): F[QScriptCount] =
-    repr.point[F]
+    repr.pure[F]
 
   def plan(cp: T[QSM]): F[Repr] = {
     val QScriptCore = CopK.Inject[QScriptCore[T, ?], QSM]
@@ -72,10 +73,10 @@ abstract class CountingQScriptEvaluator[
 
     def count: QSM[QScriptCount] => QScriptCount = {
       case InterpretedRead(_) =>
-        QScriptCount.incrementInterpretedRead
+        QScriptCount.oneInterpretedRead
 
       case Read(_) =>
-        QScriptCount.incrementRead
+        QScriptCount.oneRead
 
       case EquiJoin(value) =>
         value.src |+| countBranch(value.lBranch) |+| countBranch(value.rBranch)
@@ -84,7 +85,7 @@ abstract class CountingQScriptEvaluator[
         case Map(src, _) => src
 
         case LeftShift(src, _, _, _, _, _) =>
-          src |+| QScriptCount.incrementLeftShift
+          src |+| QScriptCount.oneLeftShift
 
         case Reduce(src, _, _, _) => src
 
@@ -98,7 +99,7 @@ abstract class CountingQScriptEvaluator[
         case Subset(src, from, _, count) =>
           src |+| countBranch(from) |+| countBranch(count)
 
-        case Unreferenced() => mzero[QScriptCount]
+        case Unreferenced() => Monoid[QScriptCount].empty
       }
     }
 
@@ -108,8 +109,8 @@ abstract class CountingQScriptEvaluator[
         .fold(errorImpossible)(count)
 
     def countBranch(freeqs: FreeQS[T]): QScriptCount =
-      freeqs.cata(interpret(κ(mzero[QScriptCount]), countT))
+      freeqs.cata(interpret(κ(Monoid[QScriptCount].empty), countT))
 
-    cp.cata[QScriptCount](count).point[F]
+    cp.cata[QScriptCount](count).pure[F]
   }
 }

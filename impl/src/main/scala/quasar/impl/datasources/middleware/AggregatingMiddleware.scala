@@ -21,7 +21,6 @@ import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.connector.MonadResourceErr
 import quasar.connector.datasource.Datasource
 import quasar.impl.datasource.{AggregateResult, AggregatingDatasource, MonadCreateErr}
-import quasar.impl.datasources.ManagedDatasource
 import quasar.qscript.{InterpretedRead, QScriptEducated}
 
 import scala.util.{Either, Left}
@@ -29,25 +28,27 @@ import scala.util.{Either, Left}
 import cats.Monad
 import cats.effect.Sync
 import cats.syntax.functor._
+
 import fs2.Stream
+
 import shims.{functorToCats, functorToScalaz}
 
 object AggregatingMiddleware {
   def apply[T[_[_]], F[_]: MonadResourceErr: MonadCreateErr: Sync, I, R](
       datasourceId: I,
-      mds: ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType.Physical])
-      : F[ManagedDatasource[T, F, Stream[F, ?], Either[R, AggregateResult[F, R]], ResourcePathType]] =
+      mds: QuasarDatasource[T, F, Stream[F, ?], R, ResourcePathType.Physical])
+      : F[QuasarDatasource[T, F, Stream[F, ?], Either[R, AggregateResult[F, R]], ResourcePathType]] =
     Monad[F].pure(mds) map {
-      case ManagedDatasource.ManagedLightweight(lw) =>
+      case QuasarDatasource.Lightweight(lw) =>
         val ds: Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], R, ResourcePathType.Physical] = lw
-        ManagedDatasource.lightweight[T](AggregatingDatasource(ds, InterpretedRead.path))
+        QuasarDatasource.lightweight[T](AggregatingDatasource(ds, InterpretedRead.path))
 
       // TODO: union all in QScript?
-      case ManagedDatasource.ManagedHeavyweight(hw) =>
+      case QuasarDatasource.Heavyweight(hw) =>
         type Q = T[QScriptEducated[T, ?]]
         val ds: Datasource[F, Stream[F, ?], Q, Either[R, AggregateResult[F, R]], ResourcePathType.Physical] =
           Datasource.ploaders[F, Stream[F, ?], Q, R, Q, Either[R, AggregateResult[F, R]], ResourcePathType.Physical]
             .modify(_.map(Left(_)))(hw)
-        ManagedDatasource.heavyweight(Datasource.widenPathType(ds))
+        QuasarDatasource.heavyweight(Datasource.widenPathType(ds))
     }
 }

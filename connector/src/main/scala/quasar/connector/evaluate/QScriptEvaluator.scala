@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.connector.evaluate
 
 import quasar.{RenderTree, RenderTreeT}
 import quasar.common.PhaseResultTell
@@ -28,11 +28,15 @@ import quasar.qscript.rewrites.{
   ThetaToEquiJoin
 }
 
+import cats.{Functor, Monad}
+import cats.syntax.applicative._
+import cats.syntax.flatMap._
+import cats.syntax.functor._
+
 import iotaz.{CopK, TListK}
+
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
-import scalaz.{Functor, Monad}
-import scalaz.syntax.monad._
 
 /** Provides for evaluating QScript to a result. */
 abstract class QScriptEvaluator[
@@ -64,13 +68,13 @@ abstract class QScriptEvaluator[
 
   def evaluate(qsr: T[QSEd]): F[R] =
     for {
-      equiJoin <- toEquiJoin(qsr).point[F]
+      equiJoin <- toEquiJoin(qsr).pure[F]
       _ <- phase[F][T[QSNorm]]("QScript (EquiJoin)", equiJoin)
 
-      normQS <- NormalizeQScript[T](equiJoin).point[F]
+      normQS <- NormalizeQScript[T](equiJoin).pure[F]
       _ <- phase[F][T[QSNorm]]("QScript (Normalized QScript)", normQS)
 
-      normMF <- NormalizeQScriptFreeMap(normQS).point[F]
+      normMF <- NormalizeQScriptFreeMap(normQS).pure[F]
       _ <- phase[F][T[QSNorm]]("QScript (Normalized FreeMap)", normMF)
 
       optimized <- optimize(normMF)

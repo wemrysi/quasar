@@ -22,11 +22,9 @@ import cats.effect.IO
 
 import matryoshka.data.Fix
 
-import shims.monadToScalaz
-
 object QScriptRegressionSpec extends CountingRegressionSpec {
 
-  val countingEvaluator = new RegressionQueryEvaluator[Fix, IO]
+  val countingEvaluator = RegressionQueryEvaluator[Fix, IO]
 
   "optimized qscript" should {
 

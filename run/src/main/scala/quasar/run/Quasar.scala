@@ -26,21 +26,23 @@ import quasar.api.push.ResultPush
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.table.{TableRef, Tables}
 import quasar.common.PhaseResultTell
-import quasar.connector.QueryResult
+import quasar.connector.{QueryResult, ResourceSchema}
 import quasar.connector.datasource.Datasource
 import quasar.connector.destination.{Destination, DestinationModule}
+import quasar.connector.evaluate._
 import quasar.connector.render.ResultRender
 import quasar.contrib.std.uuid._
 import quasar.ejson.implicits._
-import quasar.impl.{DatasourceModule, ResourceManager}
+import quasar.impl.{DatasourceModule, QuasarDatasource, ResourceManager, UuidString}
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources._
 import quasar.impl.datasources.middleware._
 import quasar.impl.destinations._
+import quasar.impl.evaluate._
 import quasar.impl.push.DefaultResultPush
 import quasar.impl.storage.IndexedStore
 import quasar.impl.table.DefaultTables
-import quasar.qscript.{QScriptEducated, construction, Map => QSMap}
+import quasar.qscript.{construction, Map => QSMap}
 import quasar.run.implicits._
 
 import java.util.UUID
@@ -48,39 +50,40 @@ import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import argonaut.JsonScalaz._
-import cats.Functor
+
+import cats.{~>, Functor, Show}
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import cats.kernel.Hash
 import cats.syntax.functor._
+import cats.syntax.show._
+
 import fs2.Stream
 import fs2.job.JobManager
+
 import matryoshka.data.Fix
+
 import org.slf4s.Logging
-import scalaz.{Show, ~>}
-import scalaz.syntax.show._
-import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz}
+
+import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, showToCats}
 
 final class Quasar[F[_], R, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json, C],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
     val tables: Tables[F, UUID, SqlQuery],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, R]],
-    val resultPush: ResultPush[F, UUID, UUID],
-    val resultRender: ResultRender[F, R])
+    val resultPush: ResultPush[F, UUID, UUID])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 object Quasar extends Logging {
 
   type EvalResult[F[_]] = Either[QueryResult[F], AggregateResult[F, QSMap[Fix, QueryResult[F]]]]
 
-  type LookupRunning[F[_]] = UUID => F[Option[ManagedDatasource[Fix, F, Stream[F, ?], EvalResult[F], ResourcePathType]]]
-
   /** What it says on the tin. */
   def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer, R, C <: SchemaConfig, A: Hash](
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
-      qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], Stream[F, R]],
+      queryFederation: QueryFederation[Fix, F, QueryAssociate[Fix, F, EvalResult[F]], Stream[F, R]],
       resultRender: ResultRender[F, R],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
       rateLimiting: RateLimiting[F, A],
@@ -107,16 +110,20 @@ object Quasar extends Logging {
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
 
-      dsCache <- ResourceManager[F, UUID, ManagedDatasource[Fix, F, Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
+      dsCache <- ResourceManager[F, UUID, QuasarDatasource[Fix, F, Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
       datasources <- Resource.liftF(DefaultDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, resourceSchema, byteStores))
 
       destCache <- ResourceManager[F, UUID, Destination[F]]
       destinations <- Resource.liftF(DefaultDestinations(freshUUID, destinationRefs, destCache, destModules))
 
       lookupRunning =
-        (id: UUID) => datasources.managedDatasourceOf(id).map(_.map(_.modify(reifiedAggregateDs)))
+        (id: UUID) => datasources.quasarDatasourceOf(id).map(_.map(_.modify(reifiedAggregateDs)))
 
-      sqlEvaluator = Sql2QueryEvaluator(qscriptEvaluator(lookupRunning))
+      sqlEvaluator =
+        Sql2Compiler[Fix, F]
+          .map((_, None))
+          .andThen(QueryFederator(ResourceRouter(UuidString, lookupRunning)))
+          .andThen(queryFederation)
 
       tables = DefaultTables(freshUUID, tableRefs)
 
@@ -129,16 +136,16 @@ object Quasar extends Logging {
         jobManager,
         resultRender))
 
-    } yield new Quasar(datasources, destinations, tables, sqlEvaluator, push, resultRender)
+    } yield new Quasar(datasources, destinations, tables, sqlEvaluator, push)
   }
 
   ////
 
   private def warnDuplicates[F[_]: Sync, A, B: Show](l: List[A])(fn: A => B): F[Unit] =
     Sync[F].delay(l.groupBy(fn) foreach {
-      case (a, grouped) =>
+      case (b, grouped) =>
         if (grouped.length > 1) {
-          log.warn(s"Found duplicate modules for type ${a.shows}")
+          log.warn(s"Found duplicate modules for type ${b.show}")
         }
     })
 

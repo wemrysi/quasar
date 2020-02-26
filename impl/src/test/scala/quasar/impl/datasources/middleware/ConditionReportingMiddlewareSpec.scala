@@ -22,7 +22,7 @@ import quasar.{Condition, ConditionMatchers, ScalarStages}
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.datasource._
-import quasar.impl.datasources.ManagedDatasource
+import quasar.impl.QuasarDatasource
 import quasar.qscript.InterpretedRead
 
 import java.lang.{Exception, IllegalArgumentException}
@@ -34,8 +34,6 @@ import cats.effect.IO
 import cats.effect.concurrent.Ref
 
 import eu.timepit.refined.auto._
-
-import shims.monadToScalaz
 
 object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with ConditionMatchers {
 
@@ -61,7 +59,7 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
       IO.pure(None)
   }
 
-  val managedTester = ManagedDatasource.lightweight[T](TestDs)
+  val managedTester = QuasarDatasource.lightweight[T](TestDs)
 
   "initial condition is normal" >>* {
     for {
@@ -89,7 +87,7 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
       r <- Ref[IO].of(List[Condition[Exception]]())
       ds <- ConditionReportingMiddleware[IO, Unit]((_, c) => r.update(c :: _))((), managedTester)
       res = ds match {
-        case ManagedDatasource.ManagedLightweight(lw) => lw.loadFull(InterpretedRead(ResourcePath.root(), ScalarStages.Id)).value
+        case QuasarDatasource.Lightweight(lw) => lw.loadFull(InterpretedRead(ResourcePath.root(), ScalarStages.Id)).value
         case _ => IO.pure(())
       }
       _ <- res.attempt

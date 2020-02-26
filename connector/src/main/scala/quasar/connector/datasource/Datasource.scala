@@ -16,9 +16,10 @@
 
 package quasar.connector.datasource
 
-import slamdata.Predef.{Array, Boolean, Option, SuppressWarnings}
+import slamdata.Predef.{Array, Boolean, Option, Some, SuppressWarnings}
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
+import quasar.connector.Offset
 
 import cats.Applicative
 import cats.data.{NonEmptyList, OptionT}
@@ -59,8 +60,19 @@ trait Datasource[F[_], G[_], Q, R, P <: ResourcePathType] {
     OptionT {
       loaders
         .toList
-        .collectFirst { case Loader.Batch(BatchLoader.Full(f)) => f }
-        .traverse(_(q))
+        .collectFirst { case Loader.Batch(b) => b }
+        .traverse(_.loadFull(q))
+    }
+
+  /** Attempts to seek and load from the supplied offset, returning `None`
+    * if unsupported by this datasource.
+    */
+  def loadFrom(q: Q, offset: Offset)(implicit F: Applicative[F]): OptionT[F, R] =
+    OptionT {
+      loaders
+        .toList
+        .collectFirst { case Loader.Batch(BatchLoader.Seek(f)) => f }
+        .traverse(_(q, Some(offset)))
     }
 }
 

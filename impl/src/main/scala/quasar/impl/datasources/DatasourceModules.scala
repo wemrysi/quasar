@@ -22,40 +22,42 @@ import quasar.{RateLimiting, RenderTreeT}
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
-import quasar.impl.DatasourceModule
+import quasar.impl.{DatasourceModule, QuasarDatasource}
 import quasar.impl.IncompatibleModuleException.linkDatasource
 import quasar.connector.{MonadResourceErr, QueryResult}
 import quasar.qscript.MonadPlannerErr
 
+import scala.concurrent.ExecutionContext
+
 import argonaut.Json
 import argonaut.Argonaut.jEmptyObject
-
-import fs2.Stream
 
 import cats.{Monad, MonadError}
 import cats.effect.{Resource, ConcurrentEffect, ContextShift, Timer, Bracket}
 import cats.kernel.Hash
 import cats.syntax.applicative._
+
+import fs2.Stream
+
 import matryoshka.{BirecursiveT, EqualT, ShowT}
+
 import scalaz.{ISet, EitherT, -\/, \/-}
 
 import shims.{monadToScalaz, monadToCats}
 
-import scala.concurrent.ExecutionContext
-
 trait DatasourceModules[T[_[_]], F[_], G[_], I, C, R, P <: ResourcePathType] { self =>
-  def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], ManagedDatasource[T, F, G, R, P]]
+  def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, F, G, R, P]]
   def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C]
   def supportedTypes: F[ISet[DatasourceType]]
 
   def withMiddleware[H[_], S, Q <: ResourcePathType](
-      f: (I, ManagedDatasource[T, F, G, R, P]) => F[ManagedDatasource[T, F, H, S, Q]])(
+      f: (I, QuasarDatasource[T, F, G, R, P]) => F[QuasarDatasource[T, F, H, S, Q]])(
       implicit
       AF: Monad[F])
       : DatasourceModules[T, F, H, I, C, S, Q] =
     new DatasourceModules[T, F, H, I, C, S, Q] {
-      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], ManagedDatasource[T, F, H, S, Q]] =
-        self.create(i, ref) flatMap { (mds: ManagedDatasource[T, F, G, R, P]) =>
+      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, F, H, S, Q]] =
+        self.create(i, ref) flatMap { (mds: QuasarDatasource[T, F, G, R, P]) =>
           EitherT.rightT(Resource.liftF(f(i, mds)))
         }
 
@@ -67,12 +69,12 @@ trait DatasourceModules[T[_[_]], F[_], G[_], I, C, R, P <: ResourcePathType] { s
     }
 
   def withFinalizer(
-      f: (I, ManagedDatasource[T, F, G, R, P]) => F[Unit])(
+      f: (I, QuasarDatasource[T, F, G, R, P]) => F[Unit])(
       implicit F: Monad[F])
       : DatasourceModules[T, F, G, I, C, R, P] =
     new DatasourceModules[T, F, G, I, C, R, P] {
-      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], ManagedDatasource[T, F, G, R, P]] =
-        self.create(i, ref) flatMap { (mds: ManagedDatasource[T, F, G, R, P]) =>
+      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, F, G, R, P]] =
+        self.create(i, ref) flatMap { (mds: QuasarDatasource[T, F, G, R, P]) =>
           EitherT.rightT(Resource.make(mds.pure[F])(x => f(i, x)))
         }
 
@@ -86,8 +88,8 @@ trait DatasourceModules[T[_[_]], F[_], G[_], I, C, R, P <: ResourcePathType] { s
   def widenPathType[PP >: P <: ResourcePathType](implicit AF: Monad[F])
       : DatasourceModules[T, F, G, I, C, R, PP] =
     new DatasourceModules[T, F, G, I, C, R, PP] {
-      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], ManagedDatasource[T, F, G, R, PP]] =
-        self.create(i, ref) map { ManagedDatasource.widenPathType[T, F, G, R, P, PP](_) }
+      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, F, G, R, PP]] =
+        self.create(i, ref) map { QuasarDatasource.widenPathType[T, F, G, R, P, PP](_) }
 
       def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
         self.sanitizeRef(inp)
@@ -100,7 +102,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], I, C, R, P <: ResourcePathType] { s
 
 object DatasourceModules {
   type Modules[T[_[_]], F[_], I] = DatasourceModules[T, F, Stream[F, ?], I, Json, QueryResult[F], ResourcePathType.Physical]
-  type MDS[T[_[_]], F[_]] = ManagedDatasource[T, F, Stream[F, ?], QueryResult[F], ResourcePathType.Physical]
+  type MDS[T[_[_]], F[_]] = QuasarDatasource[T, F, Stream[F, ?], QueryResult[F], ResourcePathType.Physical]
 
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
@@ -129,11 +131,11 @@ object DatasourceModules {
             module match {
               case DatasourceModule.Lightweight(lw) =>
                 handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting, store))
-                  .map(ManagedDatasource.lightweight[T](_))
+                  .map(QuasarDatasource.lightweight[T](_))
 
               case DatasourceModule.Heavyweight(hw) =>
                 handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config, store))
-                  .map(ManagedDatasource.heavyweight(_))
+                  .map(QuasarDatasource.heavyweight(_))
             }
           }
       }

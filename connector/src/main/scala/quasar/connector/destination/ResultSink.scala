@@ -20,11 +20,14 @@ import slamdata.Predef._
 
 import quasar.api.Column
 import quasar.api.resource.ResourcePath
+import quasar.connector._
 import quasar.connector.render.RenderConfig
 
 import cats.data.NonEmptyList
 
 import fs2.Stream
+
+import skolems.∀
 
 sealed trait ResultSink[F[_], T] extends Product with Serializable
 
@@ -34,9 +37,28 @@ object ResultSink {
       consume: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
       extends ResultSink[F, T]
 
+  object UpsertSink {
+    final case class Args[F[_], T, A](
+        path: ResourcePath,
+        columns: NonEmptyList[Column[T]],
+        correlationId: Column[TypedKey[T, A]],
+        input: Stream[F, DataEvent.Primitive[A, Offset]])
+  }
+
+  final case class UpsertSink[F[_], T](
+      renderConfig: RenderConfig,
+      consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, Offset]]])
+      extends ResultSink[F, T]
+
   def create[F[_], T](
       config: RenderConfig)(
       consume: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
       : ResultSink[F, T] =
-    CreateSink[F, T](config, consume)
+    CreateSink(config, consume)
+
+  def upsert[F[_], T](
+      config: RenderConfig)(
+      consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, Offset]]])
+      : ResultSink[F, T] =
+    UpsertSink(config, consume)
 }

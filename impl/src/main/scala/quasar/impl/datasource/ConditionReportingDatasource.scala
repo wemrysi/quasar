@@ -23,10 +23,10 @@ import quasar.api.resource._
 import quasar.connector.datasource.{Datasource, Loader}
 import quasar.contrib.scalaz.MonadError_
 
-import cats.~>
+import cats.{Monad, ~>}
 import cats.data.NonEmptyList
 
-import scalaz.Monad
+import shims.monadToScalaz
 
 final class ConditionReportingDatasource[
     E, F[_]: Monad: MonadError_[?[_], E], G[_], Q, R, P <: ResourcePathType] private (

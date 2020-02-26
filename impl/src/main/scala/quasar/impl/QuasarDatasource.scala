@@ -14,75 +14,75 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasources
+package quasar.impl
 
 import slamdata.Predef._
+
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.datasource.Datasource
 import quasar.qscript.{InterpretedRead, QScriptEducated}
 
-import scalaz.~>
+import cats.~>
 
-/** An active datasource with a lifecycle under the control of a `DatasourceManager`. */
-sealed trait ManagedDatasource[T[_[_]], F[_], G[_], R, P <: ResourcePathType] {
-  import ManagedDatasource._
+sealed trait QuasarDatasource[T[_[_]], F[_], G[_], R, P <: ResourcePathType] {
+  import QuasarDatasource._
 
   def kind: DatasourceType =
     this match {
-      case ManagedLightweight(lw) => lw.kind
-      case ManagedHeavyweight(hw) => hw.kind
+      case Lightweight(lw) => lw.kind
+      case Heavyweight(hw) => hw.kind
     }
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     this match {
-      case ManagedLightweight(lw) => lw.pathIsResource(path)
-      case ManagedHeavyweight(hw) => hw.pathIsResource(path)
+      case Lightweight(lw) => lw.pathIsResource(path)
+      case Heavyweight(hw) => hw.pathIsResource(path)
     }
 
   def prefixedChildPaths(prefixPath: ResourcePath)
       : F[Option[G[(ResourceName, P)]]] =
     this match {
-      case ManagedLightweight(lw) => lw.prefixedChildPaths(prefixPath)
-      case ManagedHeavyweight(hw) => hw.prefixedChildPaths(prefixPath)
+      case Lightweight(lw) => lw.prefixedChildPaths(prefixPath)
+      case Heavyweight(hw) => hw.prefixedChildPaths(prefixPath)
     }
 
   def modify[V[_], W[_], S](
       f: Datasource[F, G, ?, R, P] ~> Datasource[V, W, ?, S, P])
-      : ManagedDatasource[T, V, W, S, P] =
+      : QuasarDatasource[T, V, W, S, P] =
     this match {
-      case ManagedLightweight(lw) => ManagedLightweight(f(lw))
-      case ManagedHeavyweight(hw) => ManagedHeavyweight(f(hw))
+      case Lightweight(lw) => Lightweight(f(lw))
+      case Heavyweight(hw) => Heavyweight(f(hw))
     }
 }
 
-object ManagedDatasource {
-  final case class ManagedLightweight[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
+object QuasarDatasource {
+  final case class Lightweight[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
       lw: Datasource[F, G, InterpretedRead[ResourcePath], R, P])
-      extends ManagedDatasource[T, F, G, R, P]
+      extends QuasarDatasource[T, F, G, R, P]
 
-  final case class ManagedHeavyweight[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
+  final case class Heavyweight[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
       hw: Datasource[F, G, T[QScriptEducated[T, ?]], R, P])
-      extends ManagedDatasource[T, F, G, R, P]
+      extends QuasarDatasource[T, F, G, R, P]
 
   def lightweight[T[_[_]]] = new PartiallyAppliedLw[T]
+
   final class PartiallyAppliedLw[T[_[_]]] {
     def apply[F[_], G[_], R, P <: ResourcePathType](
         ds: Datasource[F, G, InterpretedRead[ResourcePath], R, P])
-        : ManagedDatasource[T, F, G, R, P] =
-      ManagedLightweight(ds)
+        : QuasarDatasource[T, F, G, R, P] =
+      Lightweight(ds)
   }
 
   def heavyweight[T[_[_]], F[_], G[_], R, P <: ResourcePathType](
       ds: Datasource[F, G, T[QScriptEducated[T, ?]], R, P])
-      : ManagedDatasource[T, F, G, R, P] =
-    ManagedHeavyweight(ds)
+      : QuasarDatasource[T, F, G, R, P] =
+    Heavyweight(ds)
 
   def widenPathType[T[_[_]], F[_], G[_], R, PI <: ResourcePathType, P0 >: PI <: ResourcePathType](
-      mds: ManagedDatasource[T, F, G, R, PI])
-      : ManagedDatasource[T, F, G, R, P0] = mds match {
-    case ManagedLightweight(lw) => ManagedLightweight(Datasource.widenPathType(lw))
-    case ManagedHeavyweight(hw) => ManagedHeavyweight(Datasource.widenPathType(hw))
+      mds: QuasarDatasource[T, F, G, R, PI])
+      : QuasarDatasource[T, F, G, R, P0] = mds match {
+    case Lightweight(lw) => Lightweight(Datasource.widenPathType(lw))
+    case Heavyweight(hw) => Heavyweight(Datasource.widenPathType(hw))
   }
-
 }
