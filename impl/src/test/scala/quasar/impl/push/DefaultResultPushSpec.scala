@@ -255,6 +255,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       Stream.eval(p.destinationStatus(destinationId))
         .map(_.toOption.flatMap(_.get(tableId)))
         .unNone
+        .repeat
 
     Stream.fixedDelay[IO](100.millis)
       .zipRight(metas)
