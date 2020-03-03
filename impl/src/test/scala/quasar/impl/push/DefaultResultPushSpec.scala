@@ -538,6 +538,14 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         }
       }
     }
+
+    "fails when column not present in table definition" >> ko
+    "fails unless all table columns are specified" >> ko
+    "fails when column type not a valid coercion of corresponding table column type" >> ko
+
+    "start an incremental when previous was full" >> ko
+    "start an incremental when previous was incremental" >> ko
+    "start a full when prevous was incremental" >> ko
   }
 
   "start these" >> {
@@ -604,8 +612,14 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
   }
 
+  "resume" >> {
+    "resumes previous incremental push from saved offset" >> ko
+    "fails if no incremental state" >> ko
+    "fails if already running" >> ko
+  }
+
   "cancel" >> {
-    "aborts a running push" >>* {
+    "aborts a running full push" >>* {
       val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
       val query = "query"
       val testTable = TableRef(TableName("foo"), query, List())
@@ -640,6 +654,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         }
       }
     }
+
+    // check that state is preserved
+    "aborts a running incremental push" >> ko
 
     "no-op when push already completed" >>* {
       val testTable = TableRef(TableName("foo"), "query", List())

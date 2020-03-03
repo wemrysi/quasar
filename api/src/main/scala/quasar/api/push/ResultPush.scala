@@ -34,16 +34,12 @@ import skolems.∃
 trait ResultPush[F[_], TableId, DestinationId, Query] {
   import ResultPushError._
 
-  def cancel(
-      tableId: TableId,
-      destinationId: DestinationId)
+  def cancel(tableId: TableId, destinationId: DestinationId)
       : F[Condition[ExistentialError[TableId, DestinationId]]]
 
   def cancelAll: F[Unit]
 
-  def coerce(
-      destinationId: DestinationId,
-      tpe: ColumnType.Scalar)
+  def coerce(destinationId: DestinationId, tpe: ColumnType.Scalar)
       : F[Either[DestinationNotFound[DestinationId], TypeCoercion[CoercedType]]]
 
   def destinationStatus(destinationId: DestinationId)
@@ -107,8 +103,7 @@ trait ResultPush[F[_], TableId, DestinationId, Query] {
     }
   }
 
-  def coercions(destinationId: DestinationId)
-      (implicit F: Monad[F])
+  def coercions(destinationId: DestinationId)(implicit F: Monad[F])
       : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, TypeCoercion[CoercedType]]]] = {
 
     // Ensures the map contains an entry for every ColumType.Scalar

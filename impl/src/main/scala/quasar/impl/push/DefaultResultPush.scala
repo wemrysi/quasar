@@ -25,6 +25,7 @@ import quasar.api.push._
 import quasar.api.push.param._
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
+import quasar.connector.Offset
 import quasar.connector.destination._
 import quasar.connector.render.{ResultRender, RenderConfig}
 
@@ -46,15 +47,32 @@ import shims.showToCats
 
 import skolems.∃
 
+// hm, could use an in-memory mapdb directly
+// TODO: hm, can we build a pure prefix store?
+// start a push, does it happen immediately or
+//
+// now that we're persisting, what do we do about tables that
+// are deleted/archived? they'll show up in push output.
+//
+// pending/running <- ephemeral, used to prevent duplicates
+//
+// terminated <- persistent
+//
+// also need to store the incremental state
+//  - current offset
+//  - ???
+//
 final class DefaultResultPush[
-    F[_]: Concurrent: Timer, T, D, Q, R] private (
+    F[_]: Concurrent: Timer, T, D, Q, R, O] private (
     lookupTable: T => F[Option[TableRef[Q]]],
     evaluator: QueryEvaluator[Resource[F, ?], Q, Stream[F, R]],
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, (D, T), Nothing],
     render: ResultRender[F, R],
-    pushStatus: JMap[D, JMap[T, PushMeta]])
-    extends ResultPush[F, T, D] {
+    running: ConcurrentHashMap[(D, T), PushMeta[O]],
+    terminated: PrefixStore[F, D :: T :: HNil, PushMeta[O]],
+    offsets: IndexedStore[F, (D, T), Offset])
+    extends ResultPush[F, T, D, O] {
 
   import ResultPushError._
 
@@ -88,10 +106,8 @@ final class DefaultResultPush[
 
   def start(
       tableId: T,
-      columns: NonEmptyList[Column[SelectedType]],
       destinationId: D,
-      path: ResourcePath,
-      format: ResultType,
+      push: Push[O],
       limit: Option[Long])
       : F[Condition[NonEmptyList[ResultPushError[T, D]]]] = {
 
@@ -257,6 +273,12 @@ final class DefaultResultPush[
       .value
       .map(Condition.eitherIso.reverseGet(_))
   }
+
+  def resume(
+      tableId: TableId,
+      destinationId: DestinationId,
+      limit: Option[Long])
+      : F[Condition[ResultPushError[TableId, DestinationId]]] = ???
 
   def destinationStatus(destinationId: D): F[Either[DestinationNotFound[D], Map[T, PushMeta]]] =
     ensureDestinationExists[DestinationNotFound[D]](destinationId)
