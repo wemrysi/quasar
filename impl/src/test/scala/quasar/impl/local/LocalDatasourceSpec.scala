@@ -48,7 +48,8 @@ abstract class LocalDatasourceSpec
 
   def local: Datasource[Resource[IO, ?], Stream[IO, ?], InterpretedRead[ResourcePath], QueryResult[IO], ResourcePathType.Physical]
 
-  def datasource = Resource.pure(local)
+  def datasource =
+    Resource.pure[IO, Datasource[Resource[IO, ?], Stream[IO, ?], _, _, ResourcePathType.Physical]](local)
 
   val nonExistentPath =
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")

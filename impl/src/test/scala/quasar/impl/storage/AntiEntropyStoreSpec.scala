@@ -23,13 +23,7 @@ import quasar.impl.cluster.{Timestamped, Atomix, Message}, Atomix.NodeInfo, Mess
 
 import cats.effect.{IO, Resource, Timer}
 import cats.effect.concurrent.Ref
-import cats.syntax.contravariant._
-import cats.syntax.flatMap._
-import cats.syntax.parallel._
-import cats.syntax.traverse._
-import cats.instances.list._
-
-import scalaz.std.string._
+import cats.implicits._
 
 import scodec._
 import scodec.codecs._

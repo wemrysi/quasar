@@ -16,8 +16,13 @@
 
 package quasar.impl.datasources
 
+import quasar.impl.storage.MapDbPrefixStore
+
+import scala.Predef.classOf
+
 import cats.Eq
-import cats.effect.{IO, Resource}
+import cats.effect.{Blocker, IO, Resource}
+import cats.implicits._
 
 import org.mapdb.{DBMaker, Serializer}
 
@@ -25,18 +30,29 @@ import java.lang.Integer
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import MapDbByteStoresSpec._
+import shapeless._
 
-final class MapDbByteStoresSpec extends ByteStoresSpec[IO, Integer] {
+import PrefixByteStoresSpec._
+
+final class PrefixByteStoresSpec extends ByteStoresSpec[IO, Integer] {
   val byteStores =
-    Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close()))
-      .evalMap(db => MapDbByteStores("mapdb-bytestores-spec", db, Serializer.INTEGER))
+    Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close())) evalMap { db =>
+      val prefixStore =
+        MapDbPrefixStore[IO](
+          "prefix-bytestores-spec",
+          db,
+          Serializer.INTEGER :: Serializer.STRING :: HNil,
+          Serializer.BYTE_ARRAY,
+          Blocker.liftExecutionContext(global))
+
+      prefixStore.map(PrefixByteStores(_))
+    }
 
   val k1 = new Integer(3)
   val k2 = new Integer(7)
 }
 
-object MapDbByteStoresSpec {
-  implicit val integerEq: Eq[Integer] =
-    Eq.fromUniversalEquals
+object PrefixByteStoresSpec {
+  implicit val jIntegerEq: Eq[Integer] =
+    Eq.by(_.intValue)
 }

@@ -246,7 +246,7 @@ object AntiEntropyStore {
         _ <- Resource.liftF(stopper.get)
       } yield resource
     }
-    Resource.suspend(res).mapK[F](λ[F ~> F](ContextShift[F].blockOn(blocker)(_)))
+    Resource.suspend(res).mapK(λ[F ~> F](ContextShift[F].blockOn(blocker)(_)))
   }
   def default[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
       name: String,

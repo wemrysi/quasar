@@ -16,26 +16,23 @@
 
 package quasar.impl.storage
 
-import slamdata.Predef.{Int, String}
+import scala.{AnyRef, Array, Unit}
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import fs2.Stream
 
-import cats.effect.{IO, Resource}
-import cats.effect.concurrent.Ref
-import cats.implicits._
+import shapeless._
+import shapeless.ops.hlist._
 
-import scalaz.IMap
-import scalaz.std.anyVal._
+trait PrefixStore[F[_], K <: HList, V] extends IndexedStore[F, K, V] {
+  def prefixedEntries[P <: HList](p: P)(
+      implicit
+      pfx: IsPrefix[P, K],
+      toArray: ToTraversable.Aux[P, Array, AnyRef])
+      : Stream[F, (K, V)]
 
-object RefIndexedStoreSpec extends RefSpec(Ref.unsafe[IO, Int](0))
-
-abstract class RefSpec(idxRef: Ref[IO, Int]) extends IndexedStoreSpec[IO, Int, String] {
-  val emptyStore =
-    Resource.liftF(Ref.of[IO, IMap[Int, String]](IMap.empty).map(RefIndexedStore(_)))
-
-  val freshIndex = idxRef.modify(i => (i + 1, i + 1))
-
-  val valueA = "A"
-
-  val valueB = "B"
+  def deletePrefixed[P <: HList](p: P)(
+      implicit
+      pfx: IsPrefix[P, K],
+      toArray: ToTraversable.Aux[P, Array, AnyRef])
+      : F[Unit]
 }

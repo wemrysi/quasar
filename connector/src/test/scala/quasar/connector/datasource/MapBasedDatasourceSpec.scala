@@ -49,7 +49,7 @@ object MapBasedDatasourceSpec extends DatasourceSpec[IO, List, ResourcePathType.
         ResourcePath.root() / ResourceName("f") -> 5))
 
   val datasource =
-    Resource.pure(mapDatasource)
+    Resource.pure[IO, Datasource[Resource[IO, ?], List, _, _, ResourcePathType.Physical]](mapDatasource)
 
   def nonExistentPath: ResourcePath =
     ResourcePath.root() / ResourceName("x") / ResourceName("y")
