@@ -283,5 +283,7 @@ lazy val impl = project
       "eu.timepit"     %% "refined-scalacheck"       % refinedVersion % Test,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
-      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2"))
+      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2",
+
+      "org.typelevel" %% "kittens" % kittensVersion % Test))
   .evictToLocal("FS2_JOB_PATH", "core")

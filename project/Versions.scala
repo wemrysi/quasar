@@ -4,7 +4,7 @@ object Versions {
   val algebraVersion      = "2.0.0"
   val argonautVersion     = "6.3.0-M2"
   val catsVersion         = "2.1.0"
-  val catsEffectVersion   = "2.0.0"
+  val catsEffectVersion   = "2.1.0"
   val disciplineVersion   = "0.11.1"
   val jawnVersion         = "1.0.0"
   val jawnfs2Version      = "1.0.0-RC2"
@@ -26,4 +26,5 @@ object Versions {
   val mapdbVersion        = "3.0.8"
   val nettyVersion        = "4.1.47.Final"
   val skolemsVersion      = "0.2.0"
+  val kittensVersion      = "2.0.0"
 }

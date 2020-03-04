@@ -25,7 +25,8 @@ import scala.util.Random
 
 import cats.data.StateT
 import cats.effect.{Resource, IO}
-import cats.syntax.applicative._
+import cats.implicits._
+
 import scalaz.IMap
 import scalaz.std.anyVal._
 import scalaz.std.string._

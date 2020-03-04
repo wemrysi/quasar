@@ -23,14 +23,11 @@ import quasar.{concurrent => qc}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
+import java.util.concurrent.ConcurrentHashMap
+
 import cats.data.StateT
 import cats.effect.{Blocker, IO, Resource, Sync}
-import scalaz.std.anyVal._
-import scalaz.std.string._
-
-import shims.monoidToCats
-
-import java.util.concurrent.ConcurrentHashMap
+import cats.implicits._
 
 final class ConcurrentMapIndexedStoreSpec extends
     IndexedStoreSpec[StateT[IO, Int, ?], Int, String] {

@@ -21,13 +21,15 @@ import quasar.EffectfulQSpec
 
 import scala.concurrent.ExecutionContext
 
+import cats.{Eq, Show}
 import cats.effect.{Effect, Resource}
 import cats.syntax.functor._
 import cats.syntax.flatMap._
-import scalaz.{Equal, Show}
 import scalaz.std.option._
 
-abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
+import shims.{eqToScalaz, showToScalaz}
+
+abstract class IndexedStoreSpec[F[_]: Effect, I: Eq: Show, V: Eq: Show](
     implicit ec: ExecutionContext)
     extends EffectfulQSpec[F] {
 
