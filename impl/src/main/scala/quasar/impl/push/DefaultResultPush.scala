@@ -190,20 +190,42 @@ final class DefaultResultPush[
       sinked = sink.consume(path, typedColumns, Stream.force(evaluated)).map(Right(_))
 
       now <- EitherT.right[Errs](instantNow)
+
+      currentMeta = PushMeta(path, format, limit, Status.running(now))
+
+      // This needs to happen prior to submit to avoid the race condition where the submitted
+      // job fails/completes before the initial meta is set
+      prevMeta <- EitherT.right[Errs](Concurrent[F] delay {
+        Option(pushStatus
+          .computeIfAbsent(destinationId, _ => new ConcurrentHashMap[T, PushMeta]())
+          .put(tableId, currentMeta))
+      })
+
       submitted <- EitherT.right[Errs](jobManager.submit(Job((destinationId, tableId), sinked)))
 
-      _ <- EitherT.cond[F](
-        submitted,
-        (),
-        err(ResultPushError.PushAlreadyRunning(tableId, destinationId)))
+      // If submit fails, we'll restore the previous status if nothing else changed it.
+      restorePrev = Concurrent[F] delay {
+        prevMeta match {
+          case Some(pm) =>
+            pushStatus.computeIfPresent(destinationId, (_, mm) => {
+              mm.replace(tableId, currentMeta, pm)
+              mm
+            })
 
-      pushMeta = PushMeta(path, format, limit, Status.running(now))
+          case None =>
+            pushStatus.computeIfPresent(destinationId, (_, mm) => {
+              mm.remove(tableId, currentMeta)
+              mm
+            })
+        }
+      }
 
-      _ <- EitherT.right[Errs](Concurrent[F] delay {
-        pushStatus
-          .computeIfAbsent(destinationId, _ => new ConcurrentHashMap[T, PushMeta]())
-          .put(tableId, pushMeta)
-      })
+      _ <- if (submitted)
+        EitherT.rightT[F, Errs](())
+      else
+        EitherT.left[Unit](restorePrev.as(err(
+          ResultPushError.PushAlreadyRunning(tableId, destinationId))))
+
     } yield ()
 
     writing.value.map(Condition.eitherIso.reverseGet(_))
