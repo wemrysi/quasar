@@ -25,6 +25,9 @@ lazy val qdataVersion = Def.setting[String](
 lazy val tectonicVersion = Def.setting[String](
   managedVersions.value("slamdata-tectonic"))
 
+lazy val fs2JobVersion = Def.setting[String](
+  managedVersions.value("slamdata-fs2-job"))
+
 lazy val buildSettings = Seq(
   initialize := {
     val version = sys.props("java.specification.version")
@@ -272,7 +275,7 @@ lazy val impl = project
   .settings(
 
     libraryDependencies ++= Seq(
-      "com.slamdata"   %% "fs2-job"                  % fs2JobVersion,
+      "com.slamdata"   %% "fs2-job"                  % fs2JobVersion.value,
       "com.slamdata"   %% "qdata-tectonic"           % qdataVersion.value,
       "com.slamdata"   %% "tectonic-fs2"             % tectonicVersion.value,
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
