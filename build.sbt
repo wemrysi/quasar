@@ -11,14 +11,19 @@ import Versions._
 
 ThisBuild / scalaVersion := "2.12.10"
 
-def readVersion(path: File): String =
-  IO.read(path).trim
+ThisBuild / homepage := Some(url("https://github.com/slamdata/quasar"))
+ThisBuild / scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/slamdata/quasar"),
+    "scm:git@github.com:slamdata/quasar.git"
+  )
+)
 
 lazy val qdataVersion = Def.setting[String](
-  readVersion(baseDirectory.value / ".." / "qdata-version"))
+  managedVersions.value("slamdata-qdata"))
 
 lazy val tectonicVersion = Def.setting[String](
-  readVersion(baseDirectory.value / ".." / "tectonic-version"))
+  managedVersions.value("slamdata-tectonic"))
 
 lazy val buildSettings = Seq(
   initialize := {
@@ -59,13 +64,6 @@ concurrentRestrictions in Global := {
 
 lazy val publishSettings = Seq(
   performMavenCentralSync := false,   // publishes quasar to bintray only, skipping sonatype and maven central
-  homepage := Some(url("https://github.com/slamdata/quasar")),
-  scmInfo := Some(
-    ScmInfo(
-      url("https://github.com/slamdata/quasar"),
-      "scm:git@github.com:slamdata/quasar.git"
-    )
-  ),
   publishArtifact in (Compile, packageDoc) := false,
   publishArtifact in (Test, packageBin) := true
 )
