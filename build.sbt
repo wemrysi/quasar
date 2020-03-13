@@ -11,22 +11,24 @@ import Versions._
 
 ThisBuild / scalaVersion := "2.12.10"
 
-ThisBuild / homepage := Some(url("https://github.com/slamdata/quasar"))
+ThisBuild / githubRepository := "quasar"
+
+ThisBuild / homepage := Some(url("https://github.com/precog/quasar"))
 ThisBuild / scmInfo := Some(
   ScmInfo(
-    url("https://github.com/slamdata/quasar"),
-    "scm:git@github.com:slamdata/quasar.git"
+    url("https://github.com/precog/quasar"),
+    "scm:git@github.com:precog/quasar.git"
   )
 )
 
 lazy val qdataVersion = Def.setting[String](
-  managedVersions.value("slamdata-qdata"))
+  managedVersions.value("precog-qdata"))
 
 lazy val tectonicVersion = Def.setting[String](
-  managedVersions.value("slamdata-tectonic"))
+  managedVersions.value("precog-tectonic"))
 
 lazy val fs2JobVersion = Def.setting[String](
-  managedVersions.value("slamdata-fs2-job"))
+  managedVersions.value("precog-fs2-job"))
 
 lazy val buildSettings = Seq(
   initialize := {
@@ -88,8 +90,7 @@ lazy val root = project.in(file("."))
     impl,
     qscript, qsu,
     runp,
-    sql
-  ).enablePlugins(AutomateHeaderPlugin)
+    sql)
 
 /** Very general utilities, ostensibly not Quasar-specific, but they just aren’t
   * in other places yet. This also contains `contrib` packages for things we’d
@@ -120,7 +121,7 @@ lazy val foundation = project
       "com.slamdata"               %% "matryoshka-core"           % matryoshkaVersion,
       "com.slamdata"               %% "pathy-core"                % pathyVersion,
       "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
-      "com.slamdata"               %% "qdata-time"                % qdataVersion.value,
+      "com.precog"                 %% "qdata-time"                % qdataVersion.value,
       "eu.timepit"                 %% "refined"                   % refinedVersion,
       "com.chuusai"                %% "shapeless"                 % shapelessVersion,
       "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
@@ -136,7 +137,6 @@ lazy val foundation = project
       "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
       "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.14") % Test,
       "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.3"                              % Test))
-  .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
 lazy val api = project
@@ -152,7 +152,6 @@ lazy val api = project
       "eu.timepit"                 %% "refined-scalaz"     % refinedVersion,
       "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test))
   .settings(commonSettings)
-  .enablePlugins(AutomateHeaderPlugin)
 
 /** A fixed-point implementation of the EJson spec. This should probably become
   * a standalone library.
@@ -162,12 +161,11 @@ lazy val ejson = project
   .dependsOn(foundation % BothScopes)
   .settings(
     libraryDependencies ++= Seq(
-      "com.slamdata" %% "qdata-core" % qdataVersion.value,
-      "com.slamdata" %% "qdata-time" % qdataVersion.value,
-      "com.slamdata" %% "qdata-core" % qdataVersion.value % "test->test" classifier "tests",
-      "com.slamdata" %% "qdata-time" % qdataVersion.value % "test->test" classifier "tests"))
+      "com.precog" %% "qdata-core" % qdataVersion.value,
+      "com.precog" %% "qdata-time" % qdataVersion.value,
+      "com.precog" %% "qdata-core" % qdataVersion.value % "test->test" classifier "tests",
+      "com.precog" %% "qdata-time" % qdataVersion.value % "test->test" classifier "tests"))
   .settings(commonSettings)
-  .enablePlugins(AutomateHeaderPlugin)
 
 /** Quasar components shared by both frontend and connector. This includes
   * things like data models, types, etc.
@@ -179,11 +177,10 @@ lazy val common = project
     ejson)
   .settings(
     libraryDependencies ++= Seq(
-      "com.slamdata" %% "qdata-core" % qdataVersion.value,
-      "com.slamdata" %% "qdata-core" % qdataVersion.value % "test->test" classifier "tests",
-      "com.slamdata" %% "qdata-time" % qdataVersion.value % "test->test" classifier "tests"))
+      "com.precog" %% "qdata-core" % qdataVersion.value,
+      "com.precog" %% "qdata-core" % qdataVersion.value % "test->test" classifier "tests",
+      "com.precog" %% "qdata-time" % qdataVersion.value % "test->test" classifier "tests"))
   .settings(commonSettings)
-  .enablePlugins(AutomateHeaderPlugin)
 
 /** Types and operations needed by query language implementations.
   */
@@ -196,10 +193,9 @@ lazy val frontend = project
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "com.slamdata"               %% "qdata-json"    % qdataVersion.value,
+      "com.precog"                 %% "qdata-json"    % qdataVersion.value,
       "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
       "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test))
-  .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the SQL² query language.
   */
@@ -212,7 +208,6 @@ lazy val sql = project
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
       "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.1.2"))
-  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qscript = project
   .settings(name := "quasar-qscript")
@@ -220,7 +215,6 @@ lazy val qscript = project
     api,
     frontend % BothScopes)
   .settings(commonSettings)
-  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qsu = project
   .settings(name := "quasar-qsu")
@@ -238,7 +232,6 @@ lazy val qsu = project
       case _ => Seq()
     }
   })
-  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val connector = project
   .settings(name := "quasar-connector")
@@ -248,8 +241,7 @@ lazy val connector = project
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "com.slamdata" %% "tectonic" % tectonicVersion.value))
-  .enablePlugins(AutomateHeaderPlugin)
+      "com.precog" %% "tectonic" % tectonicVersion.value))
 
 lazy val core = project
   .settings(name := "quasar-core")
@@ -261,7 +253,6 @@ lazy val core = project
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
       "com.slamdata"               %% "pathy-argonaut"            % pathyVersion))
-  .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementations of the Quasar API. */
 lazy val impl = project
@@ -275,9 +266,9 @@ lazy val impl = project
   .settings(
 
     libraryDependencies ++= Seq(
-      "com.slamdata"   %% "fs2-job"                  % fs2JobVersion.value,
-      "com.slamdata"   %% "qdata-tectonic"           % qdataVersion.value,
-      "com.slamdata"   %% "tectonic-fs2"             % tectonicVersion.value,
+      "com.precog"     %% "fs2-job"                  % fs2JobVersion.value,
+      "com.precog"     %% "qdata-tectonic"           % qdataVersion.value,
+      "com.precog"     %% "tectonic-fs2"             % tectonicVersion.value,
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
       "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
       "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
@@ -290,7 +281,6 @@ lazy val impl = project
       // see ch3385 for details
       "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2"))
   .evictToLocal("FS2_JOB_PATH", "core")
-  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))
   .settings(name := "quasar-run")
@@ -303,4 +293,3 @@ lazy val runp = (project in file("run"))
     libraryDependencies ++= Seq(
       "org.mapdb" %  "mapdb"  % mapdbVersion,
       "eu.timepit" %% "refined-scalacheck" % refinedVersion % Test))
-  .enablePlugins(AutomateHeaderPlugin)
