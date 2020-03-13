@@ -137,6 +137,7 @@ lazy val foundation = project
       "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
       "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.14") % Test,
       "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.3"                              % Test))
+  .enablePlugins(BuildInfoPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
 lazy val api = project
