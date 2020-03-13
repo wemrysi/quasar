@@ -1,8 +1,8 @@
-# Quasar [![Travis](https://travis-ci.com/slamdata/quasar.svg?branch=master)](https://travis-ci.com/slamdata/quasar) [![Discord](https://img.shields.io/discord/373302030460125185.svg?logo=discord)](https://discord.gg/QNjwCg6)
+# Quasar [![Discord](https://img.shields.io/discord/373302030460125185.svg?logo=discord)](https://discord.gg/QNjwCg6)
 
-Quasar is a purely-functional compiler and optimizing planner for queries expressed in terms of the [Multidimensional Relational Algebra (MRA)](https://slamdata.com/how-it-works/). Quasar has support for arbitrary backends, both heavyweight (full evaluation engines) and lightweight (simple reads with optional pushdown of structural operations and columnar predicates), including full classpath isolation for lightweight backends.
+Quasar is a purely-functional compiler and optimizing planner for queries expressed in terms of the Multidimensional Relational Algebra (MRA). Quasar has support for arbitrary backends, both heavyweight (full evaluation engines) and lightweight (simple reads with optional pushdown of structural operations and columnar predicates), including full classpath isolation for lightweight backends.
 
-It's important to note that Quasar is not, in and of itself, a runnable application. It is a library which is used by the broader SlamData product, much of which is closed-source. Contributions are very much welcome, as is feedback, questions, and general conversation. Join the Discord!
+It's important to note that Quasar is not, in and of itself, a runnable application. It is a library which is used by the broader Precog product, much of which is closed-source. Contributions are very much welcome, as is feedback, questions, and general conversation. Join the Discord!
 
 ## Building and Testing
 
@@ -51,7 +51,7 @@ Configuration for the local datasource has the following JSON format
 
 ## Legal
 
-Copyright &copy; 2014 - 2019 SlamData Inc.
+Copyright &copy; 2020 Precog Data
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
