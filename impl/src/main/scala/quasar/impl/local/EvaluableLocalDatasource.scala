@@ -32,7 +32,7 @@ import java.nio.file.{Files, NoSuchFileException, Path => JPath}
 import java.nio.file.attribute.BasicFileAttributes
 
 import cats.data.NonEmptyList
-import cats.effect.{ContextShift, Effect, Timer}
+import cats.effect.{ContextShift, Effect, Resource, Timer}
 import fs2.Stream
 import scalaz.{OptionT, Scalaz}, Scalaz._
 
@@ -52,24 +52,25 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
     root: JPath,
     queryResult: InterpretedRead[JPath] => QueryResult[F])(
     implicit F: Effect[F], RE: MonadResourceErr[F])
-    extends LightweightDatasource[F, Stream[F, ?], QueryResult[F]] {
+    extends LightweightDatasource[Resource[F, ?], Stream[F, ?], QueryResult[F]] {
 
   val kind: DatasourceType = dsType
 
-  val loaders: NonEmptyList[Loader[F, InterpretedRead[ResourcePath], QueryResult[F]]] =
+  val loaders: NonEmptyList[Loader[Resource[F, ?], InterpretedRead[ResourcePath], QueryResult[F]]] =
     NonEmptyList.of(Loader.Batch(BatchLoader.Full { (ir: InterpretedRead[ResourcePath]) =>
-      for {
+      Resource.liftF(for {
         (jp, _) <- attributesOf(ir.path).getOrElseF(RE.raiseError(pathNotFound(ir.path)))
         candidate <- isCandidate(jp)
         _ <- candidate.unlessM(RE.raiseError(notAResource(ir.path)))
-      } yield queryResult(InterpretedRead(jp, ir.stages))
+      } yield queryResult(InterpretedRead(jp, ir.stages)))
     }))
- 
-  def pathIsResource(path: ResourcePath): F[Boolean] =
-    resolvedResourcePath[F](root, path)
-      .flatMap(_.fold(false.pure[F])(isCandidate))
 
-  def prefixedChildPaths(path: ResourcePath): F[Option[Stream[F, (ResourceName, ResourcePathType.Physical)]]] = {
+  def pathIsResource(path: ResourcePath): Resource[F, Boolean] =
+    Resource.liftF(
+      resolvedResourcePath[F](root, path)
+        .flatMap(_.fold(false.pure[F])(isCandidate)))
+
+  def prefixedChildPaths(path: ResourcePath): Resource[F, Option[Stream[F, (ResourceName, ResourcePathType.Physical)]]] = {
     def withType(jp: JPath): F[(ResourceName, ResourcePathType.Physical)] =
       isCandidate(jp)
         .map(_.fold(ResourcePathType.leafResource, ResourcePathType.prefix))
@@ -82,7 +83,7 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
       case _ => Stream.empty
     }
 
-    res.run
+    Resource.liftF(res.run)
   }
 
   ////
