@@ -36,9 +36,12 @@ object CachedGetter {
   object Signal {
     final case object Empty extends Signal[Nothing]
     final case class Removed[A](value: A) extends Signal[A]
-    final case class Inserted[A](value: A) extends Signal[A]
-    final case class Updated[A](incoming:A, persisted: A) extends Signal[A]
-    final case class Preserved[A](value: A) extends Signal[A]
+    sealed trait Exists[+A] extends Signal[A] {
+      def value: A
+    }
+    final case class Inserted[A](value: A) extends Exists[A]
+    final case class Updated[A](value: A, previous: A) extends Exists[A]
+    final case class Preserved[A](value: A) extends Exists[A]
 
     def fromOptions[A: Eq](incoming: Option[A], persisted: Option[A]): Signal[A] = (incoming, persisted) match {
       case (None, None) => Empty

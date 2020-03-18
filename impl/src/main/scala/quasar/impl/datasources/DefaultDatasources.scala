@@ -31,11 +31,12 @@ import cats.effect.{Concurrent, ContextShift, Sync, Resource}
 
 import fs2.Stream
 
-import scalaz.{\/, -\/, \/-, ISet, EitherT, Equal}
+import scalaz.{\/, -\/, \/-, ISet, EitherT, Equal, OptionT}
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.boolean._
+import scalaz.syntax.std.option._
 
 import shims.{monadToScalaz, equalToCats}
 
@@ -83,93 +84,70 @@ private[impl] final class DefaultDatasources[
       dispose(i).as(Condition.normal[ExistentialError[I]]()),
       Condition.abnormal(datasourceNotFound[I, ExistentialError[I]](i)).point[F])
 
-  def replaceDatasource(i: I, ref: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] =
-    throughSemaphore(i) {
-      lazy val notFound = Condition.abnormal(datasourceNotFound[I, DatasourceError[I, C]](i))
+  def replaceDatasource(i: I, ref: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] = {
+    lazy val notFound =
+      Condition.abnormal(datasourceNotFound[I, DatasourceError[I, C]](i))
 
+    def doReplace(prev: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] =
+      if (ref === prev)
+        Condition.normal[DatasourceError[I, C]]().point[F]
+      else if (DatasourceRef.atMostRenamed(ref, prev))
+        setRef(i, ref)
+      else
+        addRef[DatasourceError[I, C]](i, ref)
+
+    throughSemaphore(i) {
       getter(i) flatMap {
         // We're replacing, emit abnormal condition if there was no ref
         case Empty =>
           notFound.point[F]
+
+        // it's removed, but resource hasn't been finalized
         case Removed(_) =>
-          // it's removed, but resource hasn't been finalized
           dispose(i).as(notFound)
-        case existed => for {
-          // We have a ref, start replacement
-          _ <- refs.insert(i, ref)
-          signal <- getter(i)
-          res <- signal match {
-            case Inserted(_) =>
-              addRef[DatasourceError[I, C]](i, ref)
-            case Preserved(_) =>
-              Condition.normal[DatasourceError[I, C]]().point[F]
-            case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
-              setRef(i, incoming)
-            case Updated(_, _) =>
-              dispose(i) >> addRef[DatasourceError[I, C]](i, ref)
-            // These two cases can't happen.
-            case Empty =>
-              notFound.point[F]
-            case Removed(_) =>
-              dispose(i).as(notFound)
-          }
-        } yield res
+
+        // The last value we knew about has since been externally updated,
+        // but our update replaces it, so we ignore the new value and
+        // replace the old.
+        case Updated(_, old) =>
+          doReplace(old)
+
+        case exists: Exists[DatasourceRef[C]] =>
+          doReplace(exists.value)
       }
     }
+  }
 
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     modules.supportedTypes
 
   type QDS = QuasarDatasource[T, G, H, R, ResourcePathType]
 
-  def quasarDatasourceOf(i: I): F[Option[QDS]] =
-    getQDS[ExistentialError[I]](i).toOption.run
+  def quasarDatasourceOf(i: I): F[Option[QDS]] = {
+    def create(ref: DatasourceRef[C]): F[QDS] =
+      for {
+        allocated <- createErrorHandling(modules.create(i, ref)).allocated
+        _ <- cache.manage(i, allocated)
+      } yield allocated._1
 
-  private def getQDS[E >: ExistentialError[I] <: DatasourceError[I, C]](i: I): EitherT[F, E, QDS] = {
-    type Res[A] = EitherT[F, E, A]
-    type L[M[_], A] = EitherT[M, E, A]
+    def fromCacheOrCreate(ref: DatasourceRef[C]): F[QDS] =
+      OptionT(cache.get(i)) getOrElseF create(ref)
 
-    lazy val error: F[E \/ QDS] =
-      datasourceNotFound[I, E](i).left[QDS].pure[F]
-
-    lazy val fromCache: F[E \/ QDS] =
-      cache.get(i) flatMap {
-        case None => error
-        case Some(a) => a.right[E].pure[F]
-      }
-
-    EitherT(throughSemaphore(i)(
+    throughSemaphore(i) {
       getter(i) flatMap {
         case Empty =>
-          error
+          (None: Option[QDS]).pure[F]
 
         case Removed(_) =>
-          dispose(i) >> error
+          dispose(i).as(None: Option[QDS])
 
-        case Inserted(ref) =>
-          cache.get(i) flatMap {
-            case None =>
-              for {
-                allocated <- createErrorHandling(modules.create(i, ref)).allocated
-                _ <- cache.manage(i, allocated)
-              } yield allocated._1.right[E]
+        case Updated(incoming, old) if !DatasourceRef.atMostRenamed(incoming, old) =>
+          dispose(i) >> create(incoming).map(_.some)
 
-            case Some(a) => a.right[E].pure[F]
-          }
-
-        case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
-          fromCache
-
-        case Preserved(_) =>
-          fromCache
-
-        case Updated(ref, _) =>
-          for {
-            _ <- dispose(i)
-            allocated <- createErrorHandling(modules.create(i, ref)).allocated
-            _ <- cache.manage(i, allocated)
-          } yield allocated._1.right[E]
-      }))
+        case exists: Exists[DatasourceRef[C]] =>
+          fromCacheOrCreate(exists.value).map(_.some)
+      }
+    }
   }
 
   private def addRef[E >: CreateError[C] <: DatasourceError[I, C]](i: I, ref: DatasourceRef[C]): F[Condition[E]] = {
