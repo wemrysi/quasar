@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.discovery
 
 /** Configuration required in order to obtain a information about the structure
   * of a dataset.

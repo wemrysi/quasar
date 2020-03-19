@@ -16,10 +16,9 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{Boolean, Exception}
 import quasar.Condition
-import quasar.api.SchemaConfig
-import quasar.api.resource._
+
+import scala.Exception
 
 import scalaz.{\/, ISet}
 
@@ -27,13 +26,9 @@ import scalaz.{\/, ISet}
   * @tparam G multple results
   * @tparam I identity
   * @tparam C configuration
-  * @tparam OldS old schema configuration
-  * @tparam S schema configuration
   */
-trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
+trait Datasources[F[_], G[_], I, C] {
   import DatasourceError._
-
-  type PathType <: ResourcePathType
 
   /** Adds the datasource described by the given `DatasourceRef` to the
     * set of datasources, returning its identifier or an error if it could
@@ -54,32 +49,12 @@ trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
     */
   def datasourceStatus(datasourceId: I): F[ExistentialError[I] \/ Condition[Exception]]
 
-  /** Returns whether or not the specified path refers to a resource in the
-    * specified datasource.
-    */
-  def pathIsResource(datasourceId: I, path: ResourcePath)
-      : F[ExistentialError[I] \/ Boolean]
-
-  /** Returns the name and type of the `ResourcePath`s within the specified
-    * datasource implied by concatenating each name to `prefixPath`.
-    */
-  def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
-      : F[DiscoveryError[I] \/ G[(ResourceName, PathType)]]
-
   /** Removes the specified datasource, making its resources unavailable. */
   def removeDatasource(datasourceId: I): F[Condition[ExistentialError[I]]]
 
   /** Replaces the reference to the specified datasource. */
   def replaceDatasource(datasourceId: I, ref: DatasourceRef[C])
       : F[Condition[DatasourceError[I, C]]]
-
-  /** Retrieves the schema of the resource at the given `path`.
-    */
-  def resourceSchema(
-      datasourceId: I,
-      path: ResourcePath,
-      schemaConfig: S)
-      : F[DiscoveryError[I] \/ schemaConfig.Schema]
 
   /** The set of supported datasource types. */
   def supportedDatasourceTypes: F[ISet[DatasourceType]]
