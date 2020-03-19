@@ -19,9 +19,10 @@ package quasar.run
 import slamdata.Predef._
 
 import quasar.RateLimiting
-import quasar.api.{QueryEvaluator, SchemaConfig}
+import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
 import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
+import quasar.api.discovery.{Discovery, SchemaConfig}
 import quasar.api.push.ResultPush
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.table.{TableRef, Tables}
@@ -67,10 +68,11 @@ import org.slf4s.Logging
 import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, showToCats}
 
 final class Quasar[F[_], R, C <: SchemaConfig](
-    val datasources: Datasources[F, Stream[F, ?], UUID, Json, C],
+    val datasources: Datasources[F, Stream[F, ?], UUID, Json],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
     val tables: Tables[F, UUID, SqlQuery],
-    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, R]],
+    val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, Stream[F, R]],
+    val discovery: Discovery[Resource[F, ?], Stream[F, ?], UUID, C],
     val resultPush: ResultPush[F, UUID, UUID])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -83,7 +85,7 @@ object Quasar extends Logging {
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
-      queryFederation: QueryFederation[Fix, F, QueryAssociate[Fix, F, EvalResult[F]], Stream[F, R]],
+      queryFederation: QueryFederation[Fix, Resource[F, ?], QueryAssociate[Fix, Resource[F, ?], EvalResult[F]], Stream[F, R]],
       resultRender: ResultRender[F, R],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
       rateLimiting: RateLimiting[F, A],
