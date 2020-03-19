@@ -11,7 +11,7 @@ env:
   JDK: 1.8
   REPO_SLUG: ${{ github.repository }}
   ENCRYPTION_PASSWORD: ${{ secrets.ENCRYPTION_PASSWORD }}
-  GITHUB_ACTOR: slamdata-bot
+  GITHUB_ACTOR: precog-bot
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
         with:
           java-version: ${{ env.JDK }}
       - name: Setup Git Actor
-        run: git config github.actor slamdata-bot
+        run: git config github.actor precog-bot
       - name: Run Tests
         run: $SBT ++${{ matrix.scala }} ci
       - name: Upload working directory
@@ -62,7 +62,7 @@ jobs:
         with:
           ruby-version: '2.6'
       - name: Setup Git Actor
-        run: git config github.actor slamdata-bot
+        run: git config github.actor precog-bot
       - name: Run transferCommonResources
         run: $SBT transferCommonResources
       - name: Export common secrets
@@ -72,7 +72,7 @@ jobs:
       - name: Common setup
         run: ./scripts/commonSetup
       - name: Publish Tag
-        run: scripts/publishAndTag 'slamdata/quasar'
+        run: scripts/publishAndTag 'precog/quasar'
 
   auto-merge:
     name: Auto Merge
@@ -96,7 +96,7 @@ jobs:
         with:
           ruby-version: '2.6'
       - name: Setup Git Actor
-        run: git config github.actor slamdata-bot
+        run: git config github.actor precog-bot
       - name: Install common resources
         run: $SBT transferCommonResources
       - name: Export common secrets
@@ -105,7 +105,7 @@ jobs:
         run: ./scripts/commonSetup
       - name: Set env vars
         run: |
-          echo ::set-env name=CLONE_DIR::$(mktemp -d "/tmp/slamdata-bump.XXXXXXXX")
+          echo ::set-env name=CLONE_DIR::$(mktemp -d "/tmp/precog-bump.XXXXXXXX")
           echo ::set-env name=PR_NUMBER::$(echo "$GITHUB_REF" | cut -d'/' -f3)
           echo ::set-env name=PULL_REQUEST::$(echo "true")
       - name: Check auto merge
