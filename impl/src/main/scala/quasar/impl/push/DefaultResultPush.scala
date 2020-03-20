@@ -36,7 +36,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
 import cats.data.{Const, EitherT, Ior, OptionT, NonEmptyList}
-import cats.effect.{Concurrent, Timer}
+import cats.effect.{Concurrent, Resource, Timer}
 import cats.implicits._
 
 import fs2.Stream
@@ -49,7 +49,7 @@ import skolems.∃
 final class DefaultResultPush[
     F[_]: Concurrent: Timer, T, D, Q, R] private (
     lookupTable: T => F[Option[TableRef[Q]]],
-    evaluator: QueryEvaluator[F, Q, Stream[F, R]],
+    evaluator: QueryEvaluator[Resource[F, ?], Q, Stream[F, R]],
     lookupDestination: D => F[Option[Destination[F]]],
     jobManager: JobManager[F, (D, T), Nothing],
     render: ResultRender[F, R],
@@ -184,10 +184,11 @@ final class DefaultResultPush[
           columns.traverse(c => c.traverse(constructType(dest, c.name, _)).toValidatedNel).toEither)
 
       evaluated =
-        evaluator(tableRef.query)
-          .map(_.flatMap(render.render(_, tableRef.columns, sink.config, limit)))
+        Stream.resource(evaluator(tableRef.query))
+          .flatten
+          .flatMap(render.render(_, tableRef.columns, sink.config, limit))
 
-      sinked = sink.consume(path, typedColumns, Stream.force(evaluated)).map(Right(_))
+      sinked = sink.consume(path, typedColumns, evaluated).map(Right(_))
 
       now <- EitherT.right[Errs](instantNow)
 
@@ -305,7 +306,7 @@ final class DefaultResultPush[
 object DefaultResultPush {
   def apply[F[_]: Concurrent: Timer, T, D, Q, R](
       lookupTable: T => F[Option[TableRef[Q]]],
-      evaluator: QueryEvaluator[F, Q, Stream[F, R]],
+      evaluator: QueryEvaluator[Resource[F, ?], Q, Stream[F, R]],
       lookupDestination: D => F[Option[Destination[F]]],
       jobManager: JobManager[F, (D, T), Nothing],
       render: ResultRender[F, R])

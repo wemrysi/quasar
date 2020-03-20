@@ -93,3 +93,14 @@ final class DefaultDiscovery[
       : EitherT[Resource[F, ?], E, QDS] =
     OptionT(Resource.liftF(quasarDatasource(i))).toRight(datasourceNotFound[I, E](i))
 }
+
+object DefaultDiscovery {
+  def apply[
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+      F[_]: Monad, G[_],
+      I, S <: SchemaConfig, R](
+      quasarDatasource: I => F[Option[QuasarDatasource[T, Resource[F, ?], G, R, ResourcePathType]]],
+      schema: ResourceSchema[F, S, (ResourcePath, R)])
+      : Discovery[Resource[F, ?], G, I, S] =
+    new DefaultDiscovery(quasarDatasource, schema)
+}

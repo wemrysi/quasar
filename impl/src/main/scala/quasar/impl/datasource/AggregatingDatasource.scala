@@ -21,62 +21,62 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.connector.{MonadResourceErr, ResourceError}
 import quasar.connector.datasource._
-import quasar.contrib.scalaz._
 
 import scala.util.{Left, Right}
 
 import cats.data.NonEmptyList
-import cats.effect.Sync
-import cats.instances.option._
-import cats.syntax.applicative._
-import cats.syntax.eq._
-import cats.syntax.flatMap._
-import cats.syntax.functor._
-import cats.syntax.option._
-import cats.syntax.traverse._
+import cats.effect.{Resource, Sync}
+import cats.implicits._
 
 import fs2.{Pull, Stream}
 
 import monocle.Lens
 
-import shims.{equalToCats, monadToScalaz}
+import shims.equalToCats
 
 /** A datasource transformer that augments underlying datasources by adding an aggregate resource
   * `p / **` for every prefix `p`. An aggregate resource `p / **` will aggregate
   * all descendant resources of the prefix `p`.
   */
 final class AggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
-    underlying: Datasource[F, Stream[F, ?], Q, R, ResourcePathType.Physical],
+    underlying: Datasource[Resource[F, ?], Stream[F, ?], Q, R, ResourcePathType.Physical],
     queryPath: Lens[Q, ResourcePath])
-    extends Datasource[F, Stream[F, ?], Q, CompositeResult[F, R], ResourcePathType] {
+    extends Datasource[Resource[F, ?], Stream[F, ?], Q, CompositeResult[F, R], ResourcePathType] {
 
   def kind: DatasourceType =
     underlying.kind
 
-  lazy val loaders: NonEmptyList[Loader[F, Q, CompositeResult[F, R]]] =
+  lazy val loaders: NonEmptyList[Loader[Resource[F, ?], Q, CompositeResult[F, R]]] =
     underlying.loaders map {
       case Loader.Batch(BatchLoader.Full(full)) =>
         Loader.Batch(BatchLoader.Full(aggregateFull(full)))
 
-      case Loader.Batch(seek @ BatchLoader.Seek(_)) =>
-        Loader.Batch(seek.map[CompositeResult[F, R]](Left(_)))
+      case Loader.Batch(BatchLoader.Seek(seek)) =>
+        Loader.Batch(BatchLoader.Seek {
+          case (q, Some(o)) =>
+            seek(q, Some(o)).map(Left(_))
+
+          case (q, None) =>
+            aggregateFull(seek(_, None))(q)
+        })
     }
 
-  def pathIsResource(path: ResourcePath): F[Boolean] =
-    underlying.pathIsResource(path).ifM(true.pure[F], aggPathExists(path))
+  def pathIsResource(path: ResourcePath): Resource[F, Boolean] =
+    underlying.pathIsResource(path)
+      .ifM(true.pure[Resource[F, ?]], aggPathExists(path))
 
   def prefixedChildPaths(prefixPath: ResourcePath)
-      : F[Option[Stream[F, (ResourceName, ResourcePathType)]]] =
+      : Resource[F, Option[Stream[F, (ResourceName, ResourcePathType)]]] =
     aggPath(prefixPath) match {
       case None =>
         underlying.prefixedChildPaths(prefixPath)
           .flatMap(os => ofPrefix(os).ifM(
-            os.map(s => Stream.emit((AggName, ResourcePathType.AggregateResource)) ++ s).pure[F],
-            os.map(_.covaryOutput[(ResourceName, ResourcePathType)]).pure[F]))
+            os.map(s => Stream.emit((AggName, ResourcePathType.AggregateResource)) ++ s).pure[Resource[F, ?]],
+            os.map(_.covaryOutput[(ResourceName, ResourcePathType)]).pure[Resource[F, ?]]))
       case Some(_) =>
         pathIsResource(prefixPath).ifM(
-          Stream.empty.covary[F].covaryOutput[(ResourceName, ResourcePathType)].some.pure[F],
-          none.pure[F])
+          Stream.empty.covary[F].covaryOutput[(ResourceName, ResourcePathType)].some.pure[Resource[F, ?]],
+          none.pure[Resource[F, ?]])
     }
 
   ////
@@ -89,31 +89,33 @@ final class AggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
     }
 
   // `p / *` exists iff underlying `p` is prefix/prefixresource
-  private def aggPathExists(path: ResourcePath): F[Boolean] =
+  private def aggPathExists(path: ResourcePath): Resource[F, Boolean] =
     aggPath(path)
       .map(p => underlying.prefixedChildPaths(p).flatMap(ofPrefix))
-      .getOrElse(false.pure[F])
+      .getOrElse(false.pure[Resource[F, ?]])
 
   // checks whether the provided stream is that of a prefix/prefixresource
-  private def ofPrefix[A](os: Option[Stream[F, A]]): F[Boolean] =
-    os.traverse(s => s.pull.peek1.flatMap {
+  private def ofPrefix[A](os: Option[Stream[F, A]]): Resource[F, Boolean] =
+    Resource.liftF(os.traverse(_.pull.peek1.flatMap {
       case None => Pull.output1(false)
       case _ => Pull.output1(true)
-    }.stream.compile.last).map(_.flatten getOrElse false)
+    }.stream.compile.last).map(_.flatten getOrElse false))
 
-  private def aggregateFull(full: Q => F[R])(q: Q): F[CompositeResult[F, R]] = {
-    def aggregate(p: ResourcePath): F[AggregateResult[F, R]] =
-      aggPath(p).map(doAggregate).getOrElse(MonadResourceErr[F].raiseError(ResourceError.pathNotFound(p)))
+  private def aggregateFull(full: Q => Resource[F, R])(q: Q): Resource[F, CompositeResult[F, R]] = {
+    def aggregate(p: ResourcePath): Resource[F, AggregateResult[F, R]] =
+      aggPath(p)
+        .map(doAggregate)
+        .getOrElse(Resource.liftF(MonadResourceErr[F].raiseError(ResourceError.pathNotFound(p))))
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def doAggregate(p: ResourcePath): F[AggregateResult[F, R]] =
+    def doAggregate(p: ResourcePath): Resource[F, AggregateResult[F, R]] =
       underlying.prefixedChildPaths(p) flatMap {
         case Some(s) =>
           val children: AggregateResult[F, R] =
             s.collect {
               case (n, ResourcePathType.LeafResource) => p / n
               case (n, ResourcePathType.PrefixResource) => p / n
-            } .evalMap(r => full(queryPath.set(r)(q)).tupleLeft(r).attempt)
+            } .flatMap(r => Stream.resource(full(queryPath.set(r)(q)).tupleLeft(r).attempt))
               .map(_.toOption)
               .unNone
 
@@ -121,12 +123,12 @@ final class AggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
             s.collect {
               case (n, ResourcePathType.Prefix) => p / n
               case (n, ResourcePathType.PrefixResource) => p / n
-            } .evalMap(doAggregate).flatten
+            } .flatMap(r => Stream.resource(doAggregate(r))).flatten
 
-          (children ++ nested).pure[F]
+          (children ++ nested).pure[Resource[F, ?]]
 
         case None =>
-          MonadResourceErr[F].raiseError(ResourceError.pathNotFound(p))
+          Resource.liftF(MonadResourceErr[F].raiseError(ResourceError.pathNotFound(p)))
       }
 
     val qpath = queryPath.get(q)
@@ -139,8 +141,8 @@ final class AggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
 
 object AggregatingDatasource {
   def apply[F[_]: MonadResourceErr: Sync, Q, R](
-      underlying: Datasource[F, Stream[F, ?], Q, R, ResourcePathType.Physical],
+      underlying: Datasource[Resource[F, ?], Stream[F, ?], Q, R, ResourcePathType.Physical],
       queryPath: Lens[Q, ResourcePath])
-      : Datasource[F, Stream[F, ?], Q, CompositeResult[F, R], ResourcePathType] =
+      : Datasource[Resource[F, ?], Stream[F, ?], Q, CompositeResult[F, R], ResourcePathType] =
     new AggregatingDatasource(underlying, queryPath)
 }

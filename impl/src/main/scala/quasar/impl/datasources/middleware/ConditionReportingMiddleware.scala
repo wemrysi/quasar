@@ -16,31 +16,32 @@
 
 package quasar.impl.datasources.middleware
 
-import slamdata.Predef.{Exception, Unit}
 import quasar.Condition
 import quasar.api.resource.ResourcePathType
 import quasar.connector.datasource.Datasource
-import quasar.contrib.scalaz.MonadError_
 import quasar.impl.QuasarDatasource
 import quasar.impl.datasource.ConditionReportingDatasource
 
-import cats.{Monad, ~>}
+import scala.Unit
+
+import cats.{MonadError, ~>}
+import cats.effect.Resource
 import cats.syntax.functor._
 
 object ConditionReportingMiddleware {
-  def apply[F[_], I](onChange: (I, Condition[Exception]) => F[Unit]): PartiallyApplied[F, I] =
+  def apply[F[_], I, E](onChange: (I, Condition[E]) => F[Unit])
+      : PartiallyApplied[F, I, E] =
     new PartiallyApplied(onChange)
 
-  final class PartiallyApplied[F[_], I](onChange: (I, Condition[Exception]) => F[Unit]) {
+  final class PartiallyApplied[F[_], I, E](onChange: (I, Condition[E]) => F[Unit]) {
     def apply[T[_[_]], G[_], R, P <: ResourcePathType](
-        id: I, mds: QuasarDatasource[T, F, G, R, P])(
+        id: I, mds: QuasarDatasource[T, Resource[F, ?], G, R, P])(
         implicit
-        F0: Monad[F],
-        F1: MonadError_[F, Exception])
-        : F[QuasarDatasource[T, F, G, R, P]] =
+        F: MonadError[F, E])
+        : F[QuasarDatasource[T, Resource[F, ?], G, R, P]] =
       onChange(id, Condition.normal()) as {
-        mds.modify(λ[Datasource[F, G, ?, R, P] ~> Datasource[F, G, ?, R, P]] { ds =>
-          ConditionReportingDatasource(onChange(id, _: Condition[Exception]), ds)
+        mds.modify(λ[Datasource[Resource[F, ?], G, ?, R, P] ~> Datasource[Resource[F, ?], G, ?, R, P]] { ds =>
+          ConditionReportingDatasource((c: Condition[E]) => Resource.liftF(onChange(id, c)), ds)
         })
       }
   }

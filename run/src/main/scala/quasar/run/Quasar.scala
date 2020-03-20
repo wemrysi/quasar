@@ -18,7 +18,7 @@ package quasar.run
 
 import slamdata.Predef._
 
-import quasar.RateLimiting
+import quasar.{Condition, RateLimiting}
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
 import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
@@ -39,6 +39,7 @@ import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources._
 import quasar.impl.datasources.middleware._
 import quasar.impl.destinations._
+import quasar.impl.discovery.DefaultDiscovery
 import quasar.impl.evaluate._
 import quasar.impl.push.DefaultResultPush
 import quasar.impl.storage.IndexedStore
@@ -55,6 +56,7 @@ import argonaut.JsonScalaz._
 import cats.{~>, Functor, Show}
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import cats.kernel.Hash
+import cats.syntax.applicative._
 import cats.syntax.functor._
 import cats.syntax.show._
 
@@ -107,13 +109,19 @@ object Quasar extends Logging {
 
       (dsErrors, onCondition) <- Resource.liftF(DefaultDatasourceErrors[F, UUID])
 
+      report = (id: UUID, c: Condition[Throwable]) => c match {
+        case cond @ Condition.Abnormal(ex: Exception) => onCondition(id, Condition.abnormal(ex))
+        case Condition.Abnormal(_) => ().pure[F]
+        case Condition.Normal() => onCondition(id, Condition.normal())
+      }
+
       dsModules =
         DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiting, byteStores)
           .withMiddleware(AggregatingMiddleware(_, _))
-          .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
+          .withMiddleware(ConditionReportingMiddleware(report)(_, _))
 
-      dsCache <- ResourceManager[F, UUID, QuasarDatasource[Fix, F, Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
-      datasources <- Resource.liftF(DefaultDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, resourceSchema, byteStores))
+      dsCache <- ResourceManager[F, UUID, QuasarDatasource[Fix, Resource[F, ?], Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
+      datasources <- Resource.liftF(DefaultDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, byteStores))
 
       destCache <- ResourceManager[F, UUID, Destination[F]]
       destinations <- Resource.liftF(DefaultDestinations(freshUUID, destinationRefs, destCache, destModules))
@@ -125,9 +133,12 @@ object Quasar extends Logging {
         Sql2Compiler[Fix, F]
           .map((_, None))
           .andThen(QueryFederator(ResourceRouter(UuidString, lookupRunning)))
+          .mapF(Resource.liftF(_))
           .andThen(queryFederation)
 
       tables = DefaultTables(freshUUID, tableRefs)
+
+      discovery = DefaultDiscovery(datasources.quasarDatasourceOf, resourceSchema)
 
       jobManager <- JobManager[F, (UUID, UUID), Nothing]()
 
@@ -138,7 +149,7 @@ object Quasar extends Logging {
         jobManager,
         resultRender))
 
-    } yield new Quasar(datasources, destinations, tables, sqlEvaluator, push)
+    } yield new Quasar(datasources, destinations, tables, sqlEvaluator, discovery, push)
   }
 
   ////
@@ -153,11 +164,11 @@ object Quasar extends Logging {
 
   private val rec = construction.RecFunc[Fix]
 
-  private def reifiedAggregateDs[F[_]: Functor, G[_], P <: ResourcePathType]
-      : Datasource[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource[F, G, ?, EvalResult[F], P] =
-    new (Datasource[F, G, ?, CompositeResult[F, QueryResult[F]], P] ~> Datasource[F, G, ?, EvalResult[F], P]) {
-      def apply[A](ds: Datasource[F, G, A, CompositeResult[F, QueryResult[F]], P]) = {
-        val l = Datasource.ploaders[F, G, A, CompositeResult[F, QueryResult[F]], A, EvalResult[F], P]
+  private def reifiedAggregateDs[F[_]: Functor, G[_], H[_], P <: ResourcePathType]
+      : Datasource[F, G, ?, CompositeResult[H, QueryResult[H]], P] ~> Datasource[F, G, ?, EvalResult[H], P] =
+    new (Datasource[F, G, ?, CompositeResult[H, QueryResult[H]], P] ~> Datasource[F, G, ?, EvalResult[H], P]) {
+      def apply[A](ds: Datasource[F, G, A, CompositeResult[H, QueryResult[H]], P]) = {
+        val l = Datasource.ploaders[F, G, A, CompositeResult[H, QueryResult[H]], A, EvalResult[H], P]
         l.modify(_.map(_.map(reifyAggregateStructure)))(ds)
       }
     }
