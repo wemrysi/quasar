@@ -18,21 +18,18 @@ package quasar.api.datasource
 
 import slamdata.Predef._
 import quasar.Condition
-import quasar.api.MockSchemaConfig
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource._
 import quasar.contrib.scalaz.MonadState_
 
 import scalaz.{\/, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags, Tree}
 import scalaz.std.anyVal._
-import scalaz.std.stream._
 import scalaz.syntax.either._
 import scalaz.syntax.foldable._
 import scalaz.syntax.monad._
 import scalaz.syntax.order._
 import scalaz.syntax.plusEmpty._
 import scalaz.syntax.semigroup._
-import scalaz.syntax.std.boolean._
 import scalaz.syntax.std.option._
 
 import MockDatasources.MockState
@@ -46,7 +43,7 @@ final class MockDatasources[
     supportedTypes: ISet[DatasourceType],
     errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
     structure: SStream[Tree[ResourceName]])
-  extends Datasources[F, G, Int, C, MockSchemaConfig.type] {
+    extends Datasources[F, G, Int, C] {
 
   import DatasourceError._
 
@@ -89,33 +86,6 @@ final class MockDatasources[
         .map { case (DatasourceMeta(_, _, c), _) => c }
         .toRightDisjunction(datasourceNotFound[Int, ExistentialError[Int]](id)))
 
-  def pathIsResource(id: Int, path: ResourcePath): F[ExistentialError[Int] \/ Boolean] =
-    mockState.gets { s =>
-      if (s.dss member id)
-        forestAt(path).exists(_.isEmpty).right[ExistentialError[Int]]
-      else
-        datasourceNotFound[Int, ExistentialError[Int]](id).left[Boolean]
-    }
-
-  def prefixedChildPaths(id: Int, prefixPath: ResourcePath)
-      : F[DiscoveryError[Int] \/ G[(ResourceName, ResourcePathType)]] =
-    mockState.gets { s =>
-      if (s.dss member id) {
-        val progeny =
-          forestAt(prefixPath).map(_.foldMap(t =>
-            (
-              t.rootLabel,
-              t.subForest.isEmpty.fold(
-                (ResourcePathType.leafResource : ResourcePathType),
-                (ResourcePathType.prefix : ResourcePathType))
-            ).point[G])(ApplicativePlus[G].monoid))
-
-        progeny \/> pathNotFound[DiscoveryError[Int]](prefixPath)
-      } else {
-        datasourceNotFound[Int, DiscoveryError[Int]](id).left[G[(ResourceName, ResourcePathType)]]
-      }
-    }
-
   def replaceDatasource(id: Int, ref: DatasourceRef[C])
       : F[Condition[DatasourceError[Int, C]]] =
     mockState.get flatMap { s =>
@@ -135,41 +105,9 @@ final class MockDatasources[
         Condition.abnormal(datasourceNotFound[Int, ExistentialError[Int]](id)).point[F]
     }
 
-  def resourceSchema(
-      id: Int,
-      path: ResourcePath,
-      cfg: MockSchemaConfig.type)
-      : F[DiscoveryError[Int] \/ cfg.Schema] =
-    mockState.gets { s =>
-      if (s.dss member id)
-        forestAt(path) match {
-          case Some(forest) if forest.isEmpty => MockSchemaConfig.MockSchema.right
-          case Some(_) => pathNotAResource[DiscoveryError[Int]](path).left
-          case None => pathNotFound[DiscoveryError[Int]](path).left
-        }
-      else
-        datasourceNotFound[Int, ExistentialError[Int]](id).left
-    }
-
   val supportedDatasourceTypes: F[ISet[DatasourceType]] = supportedTypes.point[F]
 
   ////
-
-  private def forestAt(path: ResourcePath): Option[SStream[Tree[ResourceName]]] = {
-    @tailrec
-    def go(p: ResourcePath, f: SStream[Tree[ResourceName]]): Option[SStream[Tree[ResourceName]]] =
-      p.uncons match {
-        case Some((n, p1)) =>
-          f.find(_.rootLabel === n) match {
-            case Some(f0) => go(p1, f0.subForest)
-            case None => None
-          }
-
-        case None => Some(f)
-      }
-
-    go(path, structure)
-  }
 
   private def insertRef[E >: CreateError[C] <: DatasourceError[Int, C]](
       id: Int,
@@ -222,6 +160,6 @@ object MockDatasources {
       supportedTypes: ISet[DatasourceType],
       errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
       structure: SStream[Tree[ResourceName]])
-      : Datasources[F, G, Int, C, MockSchemaConfig.type] =
+      : Datasources[F, G, Int, C] =
     new MockDatasources[C, F, G](supportedTypes, errorCondition, structure)
 }

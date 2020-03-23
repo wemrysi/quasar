@@ -19,7 +19,7 @@ package quasar.impl.push
 import slamdata.Predef._
 
 import cats.data.{Ior, NonEmptyList, NonEmptyMap, NonEmptySet}
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import cats.effect.concurrent.Deferred
 import cats.implicits._
 
@@ -163,8 +163,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       Stream(input).through(text.utf8Encode)
   }
 
-  def mkEvaluator(fn: String => IO[Stream[IO, String]]): QueryEvaluator[IO, String, Stream[IO, String]] =
-    QueryEvaluator(fn)
+  def mkEvaluator(fn: String => IO[Stream[IO, String]]): QueryEvaluator[Resource[IO, ?], String, Stream[IO, String]] =
+    QueryEvaluator(fn).mapF(Resource.liftF(_))
 
   trait StreamControl[F[_]] {
     // Cause the stream to emit a value
@@ -207,7 +207,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       tables: Map[Int, TableRef[String]],
       destinations: Map[Int, Destination[IO]],
       manager: JobManager[IO, (Int, Int), Nothing],
-      evaluator: QueryEvaluator[IO, String, Stream[IO, String]])
+      evaluator: QueryEvaluator[Resource[IO, ?], String, Stream[IO, String]])
       : IO[ResultPush[IO, Int, Int]] = {
 
     val lookupTable: Int => IO[Option[TableRef[String]]] =

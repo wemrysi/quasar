@@ -215,7 +215,6 @@ private[quasar] final class DefaultDatasources[
 
 object DefaultDatasources {
   def apply[
-      //T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       T[_[_]],
       F[_]: Concurrent: ContextShift: MonadError_[?[_], CreateError[C]],
       G[_], H[_],

@@ -23,7 +23,7 @@ import quasar.api.resource._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
-import cats.effect.Effect
+import cats.effect.{Effect, Resource}
 
 import org.specs2.matcher.MatchResult
 
@@ -34,11 +34,11 @@ import shims.monadToScalaz
 abstract class DatasourceSpec[F[_]: Effect, G[_], P <: ResourcePathType]
     extends EffectfulQSpec[F] {
 
-  def datasource: Datasource[F, G, _, _, P]
+  def datasource: Resource[F, Datasource[Resource[F, ?], G, _, _, P]]
 
   def nonExistentPath: ResourcePath
 
-  def nonExistentPathWithAsterisk: ResourcePath = nonExistentPath / ResourceName("*")
+  def nonExistentPathWithAsterisk: ResourcePath = nonExistentPath / ResourceName("**")
 
   def gatherMultiple[A](fga: G[A]): F[List[A]]
 
@@ -48,40 +48,40 @@ abstract class DatasourceSpec[F[_]: Effect, G[_], P <: ResourcePathType]
     * resource paths are confirmed as such by `pathIsResource`.
     */
   private def checkAgreementUnder(pfx: ResourcePath): F[MatchResult[Any]] =
-    for {
-      r <- datasource.prefixedChildPaths(pfx)
+    datasource.flatMap(_.prefixedChildPaths(pfx)) use { r =>
+      for {
+        children <- r.traverse(gatherMultiple)
 
-      children <- r.traverse(gatherMultiple)
-
-      // Try and keep the test reasonably fast if executed on a dense datasource
-      limited <- children traverse { xs =>
-        Effect[F].delay(Random.shuffle(xs).take(widthLimit))
-      }
-
-      agree <- limited.fold(ko(s"Expected ${pfx.shows} to exist.").point[F]) { xs =>
-        xs.foldLeftM(ok) { case (mr, (n, tpe)) =>
-          val path = pfx / n
-
-          val tpeResult =
-            if (tpe.isResource)
-              datasource.pathIsResource(path).ifM(
-                checkAgreementUnder(path),
-                ko(s"Expected ${path.shows} to be a resource.").point[F])
-            else
-              datasource.pathIsResource(path).ifM(
-                ko(s"Expected ${path.shows} not to be a resource.").point[F],
-                checkAgreementUnder(path))
-
-          tpeResult.map(mr and _)
+        // Try and keep the test reasonably fast if executed on a dense datasource
+        limited <- children traverse { xs =>
+          Effect[F].delay(Random.shuffle(xs).take(widthLimit))
         }
-      }
-    } yield agree
+
+        agree <- limited.fold(ko(s"Expected ${pfx.shows} to exist.").point[F]) { xs =>
+          xs.foldLeftM(ok) { case (mr, (n, tpe)) =>
+            val path = pfx / n
+
+            val tpeResult =
+              if (tpe.isResource)
+                datasource.flatMap(_.pathIsResource(path)).use(_.point[F]).ifM(
+                  checkAgreementUnder(path),
+                  ko(s"Expected ${path.shows} to be a resource.").point[F])
+              else
+                datasource.flatMap(_.pathIsResource(path)).use(_.point[F]).ifM(
+                  ko(s"Expected ${path.shows} not to be a resource.").point[F],
+                  checkAgreementUnder(path))
+
+            tpeResult.map(mr and _)
+          }
+        }
+      } yield agree
+    }
 
   "resource discovery" >> {
     "must not be empty" >>* {
       datasource
-        .prefixedChildPaths(ResourcePath.root())
-        .flatMap(_.traverse(gatherMultiple))
+        .flatMap(_.prefixedChildPaths(ResourcePath.root()))
+        .use(_.traverse(gatherMultiple))
         .map(_.any(g => !g.empty))
     }
 
@@ -91,20 +91,20 @@ abstract class DatasourceSpec[F[_]: Effect, G[_], P <: ResourcePathType]
 
     "children of non-existent is not found" >>* {
       datasource
-        .prefixedChildPaths(nonExistentPath)
-        .map(_ must beNone)
+        .flatMap(_.prefixedChildPaths(nonExistentPath))
+        .use(r => (r must beNone).pure[F])
     }
 
     "non-existent is not a resource" >>* {
       datasource
-        .pathIsResource(nonExistentPath)
-        .map(_ must beFalse)
+        .flatMap(_.pathIsResource(nonExistentPath))
+        .use(b => (b must beFalse).pure[F])
     }
 
     "non-existent * is not a resource" >>* {
       datasource
-        .pathIsResource(nonExistentPathWithAsterisk)
-        .map(_ must beFalse)
+        .flatMap(_.pathIsResource(nonExistentPathWithAsterisk))
+        .use(b => (b must beFalse).pure[F])
     }
   }
 }
