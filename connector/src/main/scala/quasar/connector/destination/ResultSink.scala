@@ -24,6 +24,7 @@ import quasar.connector._
 import quasar.connector.render.RenderConfig
 
 import cats.data.NonEmptyList
+import cats.syntax.functor._
 
 import fs2.Stream
 
@@ -40,9 +41,14 @@ object ResultSink {
   object UpsertSink {
     final case class Args[F[_], T, A](
         path: ResourcePath,
-        columns: NonEmptyList[Column[T]],
-        correlationId: Column[TypedKey[T, A]],
-        input: Stream[F, DataEvent.Primitive[A, Offset]])
+        idColumn: Column[TypedKey[T, A]],
+        otherColumns: NonEmptyList[Column[T]],
+        writeMode: WriteMode,
+        input: Stream[F, DataEvent.Primitive[A, Offset]]) {
+
+      def columns =
+        idColumn.map(_.value.getConst) :: otherColumns
+    }
   }
 
   final case class UpsertSink[F[_], T](
