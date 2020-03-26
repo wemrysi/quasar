@@ -74,13 +74,13 @@ object MinimizeAutoJoinsSpec
   val qprov = ProvImpl[Fix[EJson], IdAccess, IdType]
 
   // These instances are an optimization to reduce compile time by an order of magnitude
-  implicit val provScalazEqual: scalaz.Equal[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
+  implicit def provScalazEqual: scalaz.Equal[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
     scalaz.Equal.equal(cats.Eq[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]].eqv)
 
-  implicit val provScalazShow: scalaz.Show[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
-    scalaz.Show.shows(cats.Show[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]].show)
+  implicit def provScalazShow: scalaz.Show[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
+    scalaz.Show.shows(Uop.show[Vecs[Dim[Fix[EJson], IdAccess, IdType]]].show)
 
-  implicit val qsuEqual: scalaz.Equal[Fix[QScriptUniform]] =
+  implicit def qsuEqual: scalaz.Equal[Fix[QScriptUniform]] =
     matryoshka.equalTEqual[Fix, QScriptUniform]
 
   implicit def recFreeMapEqual[A: scalaz.Equal]: scalaz.Equal[RecFreeMapA[A]] =

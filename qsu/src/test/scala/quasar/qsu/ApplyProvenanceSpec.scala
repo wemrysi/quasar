@@ -20,6 +20,7 @@ import slamdata.Predef.{Map => SMap, _}
 
 import quasar.{IdStatus, Qspec, Type}, IdStatus.{ExcludeId, IncludeId}
 import quasar.common.JoinType
+import quasar.contrib.iota._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
@@ -75,11 +76,11 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
   val app = ApplyProvenance[Fix, F](qprov, _: QSUGraph)
 
   // These instances are an optimization to reduce compile time by almost two orders of magnitude
-  implicit val provScalazEqual: scalaz.Equal[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
+  implicit def provScalazEqual: scalaz.Equal[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
     scalaz.Equal.equal(cats.Eq[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]].eqv)
 
-  implicit val provScalazShow: scalaz.Show[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
-    scalaz.Show.shows(cats.Show[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]].show)
+  implicit def provScalazShow: scalaz.Show[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
+    scalaz.Show.shows(Uop.show[Vecs[Dim[Fix[EJson], IdAccess, IdType]]].show)
 
   import qprov.syntax._
 
