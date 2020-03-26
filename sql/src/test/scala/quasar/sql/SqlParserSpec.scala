@@ -739,13 +739,13 @@ class SQLParserSpec extends quasar.Qspec {
         p => if (p ≠ node) println(pprint(p) + "\n" + (node.render diff p.render).show))
 
       parsed must beRightDisjOrDiff(node)
-    }.set(minTestsOk = 1000) // one cannot test a parser too much
+    }
 
     "round-trip module" >> prop { module: List[Statement[Fix[Sql]]] =>
       val back = fixParser.parseModule(module.pprint)
 
       back must beRightDisjOrDiff(module)
-    }
+    }.set(maxSize = 10)
 
     "pprint an import statement should escpae backticks" >> {
       val `import` = Import[Fix[Sql]](currentDir </> dir("di") </> dir("k`~ireW.5u1+fOh") </> dir("j"))
