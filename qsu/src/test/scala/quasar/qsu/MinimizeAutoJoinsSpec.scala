@@ -16,6 +16,7 @@
 
 package quasar.qsu
 
+
 import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers, Type}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
@@ -30,16 +31,15 @@ import quasar.qscript.{
   MapFuncsCore,
   OnUndefined,
   PlannerError,
+  RecFreeS,
   ReduceFuncs,
   ReduceIndex,
   RightSide,
   SrcHole
 }
-import quasar.qsu.mra.ProvImpl
+import quasar.qsu.mra.{Dim, ProvImpl, Uop}
 
-import matryoshka._
 import matryoshka.data.Fix
-import matryoshka.data.free._
 
 import org.specs2.matcher.{Matcher, MatchersImplicits}
 
@@ -53,7 +53,7 @@ import scalaz.syntax.equal._
 //import scalaz.syntax.show._
 import scalaz.syntax.tag._
 
-import shims.{eqToScalaz, monoidToCats, orderToCats, orderToScalaz, showToCats, showToScalaz}
+import shims.{monoidToCats, orderToCats, showToCats}
 
 object MinimizeAutoJoinsSpec
     extends Qspec
@@ -64,6 +64,7 @@ object MinimizeAutoJoinsSpec
   import QSUGraph.Extractors._
   import ApplyProvenance.AuthenticatedQSU
   import QScriptUniform.{DTrans, Retain, Rotation}
+  import ProvImpl.Vecs
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
@@ -71,6 +72,22 @@ object MinimizeAutoJoinsSpec
   val func = construction.Func[Fix]
   val recFunc = construction.RecFunc[Fix]
   val qprov = ProvImpl[Fix[EJson], IdAccess, IdType]
+
+  // These instances are an optimization to reduce compile time by an order of magnitude
+  implicit def provScalazEqual: scalaz.Equal[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
+    scalaz.Equal.equal(cats.Eq[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]].eqv)
+
+  implicit def provScalazShow: scalaz.Show[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
+    scalaz.Show.shows(Uop.show[Vecs[Dim[Fix[EJson], IdAccess, IdType]]].show)
+
+  implicit def qsuEqual: scalaz.Equal[Fix[QScriptUniform]] =
+    matryoshka.equalTEqual[Fix, QScriptUniform]
+
+  implicit def recFreeMapEqual[A: scalaz.Equal]: scalaz.Equal[RecFreeMapA[A]] =
+    RecFreeS.equal[MapFunc, A]
+
+  implicit def freeMapEqual[A: scalaz.Equal]: scalaz.Equal[FreeMapA[A]] =
+    matryoshka.data.free.freeEqual[MapFunc].apply(scalaz.Equal[A])
 
   type J = Fix[EJson]
   val J = Fixed[Fix[EJson]]
