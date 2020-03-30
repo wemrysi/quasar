@@ -29,7 +29,7 @@ import cats.syntax.applicative._
 
 final class RegressionQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: MonadPlannerErr: PhaseResultTell]
+    F[_]: Monad: PhaseResultTell]
     extends CountingQScriptEvaluator[T, F] {
 
   def optimize(norm: T[QScriptNormalized[T, ?]]): F[T[QSM]] =
