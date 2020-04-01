@@ -34,8 +34,6 @@ import scalaz.std.string._
 import shims.{monadToScalaz, monoidToCats}
 import MockDatasourcesSpec._
 
-import scala.{Stream => SStream}
-
 final class MockDatasourcesSpec
   extends DatasourcesSpec[MockM, List, Int, String] {
 
@@ -46,8 +44,7 @@ final class MockDatasourcesSpec
 
   def datasources: Resource[MockM, Datasources[MockM, List, Int, String]] =
     Resource.pure[MockM, Datasources[MockM, List, Int, String]] {
-      MockDatasources[String, MockM, List](
-        acceptedSet, _ => Condition.normal(), SStream.empty)
+      MockDatasources[String, MockM, List](acceptedSet, _ => Condition.normal())
     }
 
   def supportedType = DatasourceType("s3", 1L)

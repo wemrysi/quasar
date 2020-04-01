@@ -101,3 +101,11 @@ final class MockDiscovery[F[_]: Applicative, G[_]: Applicative: MonoidK, I](
     go(path, structure)
   }
 }
+
+object MockDiscovery {
+  def apply[F[_]: Applicative, G[_]: Applicative: MonoidK, I](
+      extant: Set[I],
+      structure: SStream[Tree[ResourceName]])
+      : Discovery[F, G, I, MockSchemaConfig.type] =
+    new MockDiscovery[F, G, I](extant, structure)
+}

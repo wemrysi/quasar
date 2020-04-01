@@ -22,7 +22,7 @@ import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource._
 import quasar.contrib.scalaz.MonadState_
 
-import scalaz.{\/, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags, Tree}
+import scalaz.{\/, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags}
 import scalaz.std.anyVal._
 import scalaz.syntax.either._
 import scalaz.syntax.foldable._
@@ -34,15 +34,12 @@ import scalaz.syntax.std.option._
 
 import MockDatasources.MockState
 
-import scala.{Stream => SStream}
-
 final class MockDatasources[
     C,
     F[_]: Monad: MonadState_[?[_], MockState[C]],
     G[_]: ApplicativePlus] private (
     supportedTypes: ISet[DatasourceType],
-    errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
-    structure: SStream[Tree[ResourceName]])
+    errorCondition: DatasourceRef[C] => Condition[InitializationError[C]])
     extends Datasources[F, G, Int, C] {
 
   import DatasourceError._
@@ -158,8 +155,7 @@ object MockDatasources {
       F[_]: Monad: MonadState_[?[_], MockState[C]],
       G[_]: ApplicativePlus](
       supportedTypes: ISet[DatasourceType],
-      errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
-      structure: SStream[Tree[ResourceName]])
+      errorCondition: DatasourceRef[C] => Condition[InitializationError[C]])
       : Datasources[F, G, Int, C] =
-    new MockDatasources[C, F, G](supportedTypes, errorCondition, structure)
+    new MockDatasources[C, F, G](supportedTypes, errorCondition)
 }
