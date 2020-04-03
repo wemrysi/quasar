@@ -48,22 +48,22 @@ import shims.{orderToCats, monadToScalaz}
   * request given their current capabilities.
   */
 object QueryFederator {
-  def apply[T[_[_]]: BirecursiveT, F[_]: Monad: MonadResourceErr, G[_], R, P <: ResourcePathType](
-      sources: AFile => F[Option[Source[QuasarDatasource[T, F, G, R, P]]]])
-      : Kleisli[F, (T[QScriptEducated[T, ?]], Option[Offset]), FederatedQuery[T, QueryAssociate[T, F, R]]] =
+  def apply[T[_[_]]: BirecursiveT, F[_]: Monad: MonadResourceErr, G[_], H[_], R, P <: ResourcePathType](
+      sources: AFile => F[Option[Source[QuasarDatasource[T, G, H, R, P]]]])
+      : Kleisli[F, (T[QScriptEducated[T, ?]], Option[Offset]), FederatedQuery[T, QueryAssociate[T, G, R]]] =
     Kleisli(new QueryFederatorImpl(sources).tupled)
 }
 
 private[evaluate] final class QueryFederatorImpl[
     T[_[_]]: BirecursiveT,
     F[_]: Monad: MonadResourceErr,
-    G[_],
+    G[_], H[_],
     R, P <: ResourcePathType](
-    sources: AFile => F[Option[Source[QuasarDatasource[T, F, G, R, P]]]])
-    extends ((T[QScriptEducated[T, ?]], Option[Offset]) => F[FederatedQuery[T, QueryAssociate[T, F, R]]]) {
+    sources: AFile => F[Option[Source[QuasarDatasource[T, G, H, R, P]]]])
+    extends ((T[QScriptEducated[T, ?]], Option[Offset]) => F[FederatedQuery[T, QueryAssociate[T, G, R]]]) {
 
   def apply(query: T[QScriptEducated[T, ?]], offset: Option[Offset])
-      : F[FederatedQuery[T, QueryAssociate[T, F, R]]] =
+      : F[FederatedQuery[T, QueryAssociate[T, G, R]]] =
     for {
       (srcs, qr) <- Trans.applyTrans(federate, ReadPath)(query).run
 
@@ -75,7 +75,7 @@ private[evaluate] final class QueryFederatorImpl[
 
   ////
 
-  private type Src = Source[QuasarDatasource[T, F, G, R, P]]
+  private type Src = Source[QuasarDatasource[T, G, H, R, P]]
   private type Srcs = Chain[(AFile, Src)]
   private type SrcsT[X[_], A] = WriterT[X, Srcs, A]
   private type M[A] = SrcsT[F, A]
@@ -117,7 +117,7 @@ private[evaluate] final class QueryFederatorImpl[
     }
 
   private def extractAssocs(srcs: SortedMap[AFile, Src], offset0: Option[Offset])
-      : F[SortedMap[AFile, Source[QueryAssociate[T, F, R]]]] = {
+      : F[SortedMap[AFile, Source[QueryAssociate[T, G, R]]]] = {
 
     def orElseSeekUnsupported[A](file: AFile, a: Option[A]): F[A] =
       a match {

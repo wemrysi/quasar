@@ -42,5 +42,9 @@ trait HeavyweightDatasourceModule {
       config: Json,
       byteStore: ByteStore[F])(
       implicit ec: ExecutionContext)
-      : Resource[F, Either[InitializationError[Json], Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]]
+      : Resource[F, Either[InitializationError[Json], HeavyweightDatasourceModule.DS[T, F]]]
+}
+
+object HeavyweightDatasourceModule {
+  type DS[T[_[_]], F[_]] = Datasource[Resource[F, ?], Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]
 }

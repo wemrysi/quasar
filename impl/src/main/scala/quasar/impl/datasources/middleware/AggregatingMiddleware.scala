@@ -25,9 +25,7 @@ import quasar.qscript.{InterpretedRead, QScriptEducated}
 
 import scala.util.{Either, Left}
 
-import cats.Monad
-import cats.effect.Sync
-import cats.syntax.functor._
+import cats.effect.{Resource, Sync}
 
 import fs2.Stream
 
@@ -36,19 +34,19 @@ import shims.{functorToCats, functorToScalaz}
 object AggregatingMiddleware {
   def apply[T[_[_]], F[_]: MonadResourceErr: MonadCreateErr: Sync, I, R](
       datasourceId: I,
-      mds: QuasarDatasource[T, F, Stream[F, ?], R, ResourcePathType.Physical])
-      : F[QuasarDatasource[T, F, Stream[F, ?], Either[R, AggregateResult[F, R]], ResourcePathType]] =
-    Monad[F].pure(mds) map {
+      mds: QuasarDatasource[T, Resource[F, ?], Stream[F, ?], R, ResourcePathType.Physical])
+      : F[QuasarDatasource[T, Resource[F, ?], Stream[F, ?], Either[R, AggregateResult[F, R]], ResourcePathType]] =
+    Sync[F].pure(mds match {
       case QuasarDatasource.Lightweight(lw) =>
-        val ds: Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], R, ResourcePathType.Physical] = lw
+        val ds: Datasource[Resource[F, ?], Stream[F, ?], InterpretedRead[ResourcePath], R, ResourcePathType.Physical] = lw
         QuasarDatasource.lightweight[T](AggregatingDatasource(ds, InterpretedRead.path))
 
       // TODO: union all in QScript?
       case QuasarDatasource.Heavyweight(hw) =>
         type Q = T[QScriptEducated[T, ?]]
-        val ds: Datasource[F, Stream[F, ?], Q, Either[R, AggregateResult[F, R]], ResourcePathType.Physical] =
-          Datasource.ploaders[F, Stream[F, ?], Q, R, Q, Either[R, AggregateResult[F, R]], ResourcePathType.Physical]
+        val ds: Datasource[Resource[F, ?], Stream[F, ?], Q, Either[R, AggregateResult[F, R]], ResourcePathType.Physical] =
+          Datasource.ploaders[Resource[F, ?], Stream[F, ?], Q, R, Q, Either[R, AggregateResult[F, R]], ResourcePathType.Physical]
             .modify(_.map(Left(_)))(hw)
         QuasarDatasource.heavyweight(Datasource.widenPathType(ds))
-    }
+    })
 }

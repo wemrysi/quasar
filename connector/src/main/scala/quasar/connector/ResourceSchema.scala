@@ -16,7 +16,7 @@
 
 package quasar.connector
 
-import quasar.api.SchemaConfig
+import quasar.api.discovery.SchemaConfig
 
 import cats.Contravariant
 

@@ -43,7 +43,7 @@ import shims.{functorToCats, monadToScalaz}
 
 abstract class CountingQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: MonadPlannerErr: PhaseResultTell]
+    F[_]: Monad: PhaseResultTell]
     extends QScriptEvaluator[T, F, QScriptCount] {
 
   type QS[U[_[_]]] = Const[InterpretedRead[ResourcePath], ?] ::: QScriptNormalizedList[U]

@@ -18,7 +18,7 @@ package quasar.impl.local
 
 import slamdata.Predef._
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import fs2.Stream
 
 import java.nio.file.Paths
@@ -46,8 +46,9 @@ abstract class LocalDatasourceSpec
 
   implicit val tmr = IO.timer(ExecutionContext.Implicits.global)
 
-  override def datasource
-      : Datasource[IO, Stream[IO, ?], InterpretedRead[ResourcePath], QueryResult[IO], ResourcePathType.Physical]
+  def local: Datasource[Resource[IO, ?], Stream[IO, ?], InterpretedRead[ResourcePath], QueryResult[IO], ResourcePathType.Physical]
+
+  def datasource = Resource.pure(local)
 
   val nonExistentPath =
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")
@@ -79,31 +80,36 @@ abstract class LocalDatasourceSpec
     val tio = ResourcePath.root() / ResourceName("..") / ResourceName("scala")
 
     "prevents escaping root directory during discovery" >>* {
-      datasource.prefixedChildPaths(tio).map(_ must beNone)
+      local.prefixedChildPaths(tio)
+        .use(o => IO.pure(o must beNone))
     }
 
     "prevents escaping root directory during evaluation" >>* {
-      MonadResourceErr[IO]
-        .attempt(datasource.loadFull(InterpretedRead(tio, ScalarStages.Id)).value)
-        .map(_.toEither must beLeft.like {
-          case ResourceError.PathNotFound(p) => p must equal(tio)
-        })
+      val load =
+        local
+          .loadFull(InterpretedRead(tio, ScalarStages.Id))
+          .value
+          .use(IO.pure(_))
+
+      MonadResourceErr[IO].attempt(load).map(_.toEither must beLeft.like {
+        case ResourceError.PathNotFound(p) => p must equal(tio)
+      })
     }
   }
 
   "returns data from a nonempty file" >>* {
-    datasource
+    local
       .loadFull(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.ldjson"), ScalarStages.Id))
-      .semiflatMap(compileData)
+      .semiflatMap(qr => Resource.liftF(compileData(qr)))
       .value
-      .map(_ must beSome(be_>(0)))
+      .use(r => IO.pure(r must beSome(be_>(0))))
   }
 }
 
 object LocalDatasourceSpec extends LocalDatasourceSpec {
   val blocker = qc.Blocker.cached("local-datasource-spec")
 
-  def datasource =
+  val local =
     LocalDatasource[IO](
       Paths.get("./impl/src/test/resources"),
       1024,
@@ -114,7 +120,7 @@ object LocalDatasourceSpec extends LocalDatasourceSpec {
 object LocalStatefulDatasourceSpec extends LocalDatasourceSpec {
   val blocker = qc.Blocker.cached("local-stateful-datasource-spec")
 
-  def datasource =
+  val local =
     LocalStatefulDatasource[IO](
       Paths.get("./impl/src/test/resources"),
       1024,
@@ -126,7 +132,7 @@ object LocalStatefulDatasourceSpec extends LocalDatasourceSpec {
 object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
   val blocker = qc.Blocker.cached("local-parsed-datasource-spec")
 
-  def datasource =
+  val local =
     LocalParsedDatasource[IO, RValue](
       Paths.get("./impl/src/test/resources"),
       1024,
@@ -145,9 +151,9 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json"), ScalarStages.Id)
 
     ds.loadFull(iread)
-      .semiflatMap(compileData)
+      .semiflatMap(qr => Resource.liftF(compileData(qr)))
       .value
-      .map(_ must_=== Some(100))
+      .use(r => IO.pure(r must_=== Some(100)))
   }
 
   "decompresses gzipped resources" >>* {
@@ -162,9 +168,9 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.gz"), ScalarStages.Id)
 
     ds.loadFull(iread)
-      .semiflatMap(compileData)
+      .semiflatMap(qr => Resource.liftF(compileData(qr)))
       .value
-      .map(_ must_=== Some(100))
+      .use(r => IO.pure(r must_=== Some(100)))
   }
 
   "parses csv" >>* {
@@ -173,12 +179,13 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       1024,
       DataFormat.SeparatedValues.Default,
       blocker)
+
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.csv"), ScalarStages.Id)
 
     ds.loadFull(iread)
-      .semiflatMap(compileData)
+      .semiflatMap(qr => Resource.liftF(compileData(qr)))
       .value
-      .map(_ must_=== Some(100))
+      .use(r => IO.pure(r must_=== Some(100)))
   }
 }

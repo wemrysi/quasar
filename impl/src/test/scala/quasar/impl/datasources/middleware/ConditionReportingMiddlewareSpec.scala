@@ -25,12 +25,12 @@ import quasar.connector.datasource._
 import quasar.impl.QuasarDatasource
 import quasar.qscript.InterpretedRead
 
-import java.lang.{Exception, IllegalArgumentException}
+import java.lang.{Throwable, IllegalArgumentException}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.data.NonEmptyList
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import cats.effect.concurrent.Ref
 
 import eu.timepit.refined.auto._
@@ -41,30 +41,32 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
 
   val thatsRoot = new IllegalArgumentException("THAT'S ROOT!")
 
-  object TestDs extends Datasource[IO, List, InterpretedRead[ResourcePath], Unit, ResourcePathType] {
+  object TestDs extends Datasource[Resource[IO, ?], List, InterpretedRead[ResourcePath], Unit, ResourcePathType] {
     val kind: DatasourceType = DatasourceType("tester", 7L)
 
     val loaders = NonEmptyList.of(Loader.Batch(BatchLoader.Full { (ir: InterpretedRead[ResourcePath]) =>
-      if (ResourcePath.root.nonEmpty(ir.path))
-        IO.raiseError(thatsRoot)
-      else
-        IO.pure(())
+      Resource liftF {
+        if (ResourcePath.root.nonEmpty(ir.path))
+          IO.raiseError(thatsRoot)
+        else
+          IO.pure(())
+      }
     }))
 
-    def pathIsResource(path: ResourcePath): IO[Boolean] =
-      IO.pure(false)
+    def pathIsResource(path: ResourcePath): Resource[IO, Boolean] =
+      Resource.pure(false)
 
     def prefixedChildPaths(path: ResourcePath)
-        : IO[Option[List[(ResourceName, ResourcePathType)]]] =
-      IO.pure(None)
+        : Resource[IO, Option[List[(ResourceName, ResourcePathType)]]] =
+      Resource.pure(None)
   }
 
   val managedTester = QuasarDatasource.lightweight[T](TestDs)
 
   "initial condition is normal" >>* {
     for {
-      r <- Ref[IO].of(List[Condition[Exception]]())
-      ds <- ConditionReportingMiddleware[IO, Unit]((_, c) => r.update(c :: _))((), managedTester)
+      r <- Ref[IO].of(List[Condition[Throwable]]())
+      ds <- ConditionReportingMiddleware[IO, Unit, Throwable]((_, c) => r.update(c :: _))((), managedTester)
       cs <- r.get
     } yield {
       cs must_=== List(Condition.normal())
@@ -73,9 +75,9 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
 
   "operations that succeed emit normal" >>* {
     for {
-      r <- Ref[IO].of(List[Condition[Exception]]())
-      ds <- ConditionReportingMiddleware[IO, Unit]((_, c) => r.update(c :: _))((), managedTester)
-      _ <- ds.pathIsResource(ResourcePath.root())
+      r <- Ref[IO].of(List[Condition[Throwable]]())
+      ds <- ConditionReportingMiddleware[IO, Unit, Throwable]((_, c) => r.update(c :: _))((), managedTester)
+      _ <- ds.pathIsResource(ResourcePath.root()).use(IO.pure(_))
       cs <- r.get
     } yield {
       cs must_=== List(Condition.normal(), Condition.normal())
@@ -84,13 +86,13 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
 
   "operations that throw emit abnormal" >>* {
     for {
-      r <- Ref[IO].of(List[Condition[Exception]]())
-      ds <- ConditionReportingMiddleware[IO, Unit]((_, c) => r.update(c :: _))((), managedTester)
+      r <- Ref[IO].of(List[Condition[Throwable]]())
+      ds <- ConditionReportingMiddleware[IO, Unit, Throwable]((_, c) => r.update(c :: _))((), managedTester)
       res = ds match {
         case QuasarDatasource.Lightweight(lw) => lw.loadFull(InterpretedRead(ResourcePath.root(), ScalarStages.Id)).value
-        case _ => IO.pure(())
+        case _ => Resource.pure[IO, Unit](())
       }
-      _ <- res.attempt
+      _ <- res.use(IO.pure(_)).attempt
       cs <- r.get
     } yield {
       cs must_=== List(Condition.abnormal(thatsRoot), Condition.normal())

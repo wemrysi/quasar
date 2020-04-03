@@ -21,23 +21,24 @@ import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector._
-import quasar.contrib.scalaz.MonadError_
+import quasar.contrib.cats.monadError
 
+import cats.MonadError
 import cats.data.OptionT
-import cats.effect.IO
-import eu.timepit.refined.auto._
-import scalaz.IMap
-import scalaz.std.list._
+import cats.effect.{IO, Resource}
+import cats.instances.list._
 
-import shims.monadToScalaz
+import eu.timepit.refined.auto._
+
+import scalaz.IMap
 
 object MapBasedDatasourceSpec extends DatasourceSpec[IO, List, ResourcePathType.Physical] {
 
-  implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
-    MonadError_.facet[IO](ResourceError.throwableP)
+  implicit val ioMonadResourceErr: MonadError[IO, ResourceError] =
+    monadError.facet[IO](ResourceError.throwableP)
 
-  val datasource =
-    MapBasedDatasource.pure[IO, List](
+  val mapDatasource =
+    MapBasedDatasource.pure[Resource[IO, ?], List](
       DatasourceType("pure-test", 1L),
       IMap(
         ResourcePath.root() / ResourceName("a") -> 0,
@@ -47,6 +48,9 @@ object MapBasedDatasourceSpec extends DatasourceSpec[IO, List, ResourcePathType.
         ResourcePath.root() / ResourceName("d") / ResourceName("e") -> 4,
         ResourcePath.root() / ResourceName("f") -> 5))
 
+  val datasource =
+    Resource.pure(mapDatasource)
+
   def nonExistentPath: ResourcePath =
     ResourcePath.root() / ResourceName("x") / ResourceName("y")
 
@@ -54,23 +58,23 @@ object MapBasedDatasourceSpec extends DatasourceSpec[IO, List, ResourcePathType.
     IO.pure(fga)
 
   def assertPrefixedChildPaths(path: ResourcePath, expected: Set[(ResourceName, ResourcePathType)]) =
-    for {
-      res <- OptionT(datasource.prefixedChildPaths(path))
-        .getOrElseF(IO.raiseError(new Exception(s"Failed to list resources under $path")))
-        .map(_.toSet).map(_ must_== expected)
-    } yield res
+    OptionT(mapDatasource.prefixedChildPaths(path))
+      .getOrElseF(MonadError[Resource[IO, ?], Throwable].raiseError(
+        new Exception(s"Failed to list resources under $path")))
+      .use(r => IO.pure(r.toSet must_== expected))
 
-  def full(path: ResourcePath) = {
-    val loader = datasource.loaders.toList collectFirst {
+  def full(path: ResourcePath): IO[Int] = {
+    val loader = mapDatasource.loaders.toList collectFirst {
       case Loader.Batch(BatchLoader.Full(f)) => f
     }
 
-    loader.fold(IO.pure(-1))(_(path))
+    loader.fold(Resource.pure[IO, Int](-1))(_(path))
+      .use(IO.pure(_))
   }
 
 
   "evaluation" >> {
-    "known resource returns result" >>* {   
+    "known resource returns result" >>* {
       full(ResourcePath.root() / ResourceName("d") / ResourceName("e"))
         .map(_ must_=== 4)
     }
@@ -78,13 +82,13 @@ object MapBasedDatasourceSpec extends DatasourceSpec[IO, List, ResourcePathType.
     "known prefix errors with 'not a resource'" >>* {
       val pfx = ResourcePath.root() / ResourceName("d")
 
-      MonadResourceErr[IO].attempt(full(pfx)).map(_ must be_-\/.like {
+      MonadError[IO, ResourceError].attempt(full(pfx)).map(_ must beLeft.like {
         case ResourceError.NotAResource(p) => p must equal(pfx)
       })
     }
 
     "unknown path errors with 'not found'" >>* {
-      MonadResourceErr[IO].attempt(full(nonExistentPath)).map(_ must be_-\/.like {
+      MonadError[IO, ResourceError].attempt(full(nonExistentPath)).map(_ must beLeft.like {
         case ResourceError.PathNotFound(p) => p must equal(nonExistentPath)
       })
     }

@@ -16,22 +16,23 @@
 
 package quasar.impl.datasource
 
-import slamdata.Predef.{Boolean, None, Option, Some, Unit}
+import slamdata.Predef.{Boolean, Option, Unit}
 import quasar.Condition
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.datasource.{Datasource, Loader}
-import quasar.contrib.scalaz.MonadError_
 
-import cats.{Monad, ~>}
+import scala.util.{Left, Right}
+
+import cats.{MonadError, ~>}
 import cats.data.NonEmptyList
-
-import shims.monadToScalaz
+import cats.implicits._
 
 final class ConditionReportingDatasource[
-    E, F[_]: Monad: MonadError_[?[_], E], G[_], Q, R, P <: ResourcePathType] private (
+    E, F[_], G[_], Q, R, P <: ResourcePathType] private (
     report: Condition[E] => F[Unit],
-    val underlying: Datasource[F, G, Q, R, P])
+    val underlying: Datasource[F, G, Q, R, P])(
+    implicit ME: MonadError[F, E])
     extends Datasource[F, G, Q, R, P] {
 
   val kind: DatasourceType = underlying.kind
@@ -50,15 +51,18 @@ final class ConditionReportingDatasource[
 
   private val reportCondition: F ~> F =
     λ[F ~> F] { fa =>
-      MonadError_[F, E].ensuring(fa) {
-        case Some(e) => report(Condition.abnormal(e))
-        case None    => report(Condition.normal())
+      ME.attempt(fa) flatMap {
+        case Left(e) =>
+          report(Condition.abnormal(e)) >> ME.raiseError(e)
+
+        case Right(a) =>
+          report(Condition.normal()).as(a)
       }
     }
 }
 
 object ConditionReportingDatasource {
-  def apply[E, F[_]: Monad: MonadError_[?[_], E], G[_], Q, R, P <: ResourcePathType](
+  def apply[E, F[_]: MonadError[?[_], E], G[_], Q, R, P <: ResourcePathType](
       f: Condition[E] => F[Unit],
       ds: Datasource[F, G, Q, R, P])
       : Datasource[F, G, Q, R, P] =

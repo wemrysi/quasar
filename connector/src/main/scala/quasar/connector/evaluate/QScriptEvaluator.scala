@@ -41,7 +41,7 @@ import matryoshka.implicits._
 /** Provides for evaluating QScript to a result. */
 abstract class QScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: MonadPlannerErr: PhaseResultTell,
+    F[_]: Monad: PhaseResultTell,
     R] {
 
   type QSEd[A] = QScriptEducated[T, A]

@@ -19,7 +19,6 @@ package quasar.impl.datasources
 import slamdata.Predef._
 
 import quasar.{RateLimiter, RateLimiting, ScalarStages, ConditionMatchers, Condition, NoopRateLimitUpdater}
-import quasar.api.MockSchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
@@ -62,16 +61,16 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import shims.{orderToScalaz, showToScalaz, applicativeToScalaz, showToCats, monadToScalaz}
 
-object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type] with ConditionMatchers {
+object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json] with ConditionMatchers {
 
   sequential
 
   implicit val tmr = IO.timer(global)
 
   type PathType = ResourcePathType
-  type Self = Datasources[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type]
-  type R[F[_], A] = Either[InitializationError[Json], Datasource[F, Stream[F, ?], A, QueryResult[F], ResourcePathType.Physical]]
-  type QDS = QuasarDatasource[Fix, IO, Stream[IO, ?], QueryResult[IO], PathType]
+  type Self = Datasources[IO, Stream[IO, ?], String, Json]
+  type R[F[_], A] = Either[InitializationError[Json], Datasource[Resource[F, ?], Stream[F, ?], A, QueryResult[F], ResourcePathType.Physical]]
+  type QDS = QuasarDatasource[Fix, Resource[IO, ?], Stream[IO, ?], QueryResult[IO], PathType]
 
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
@@ -122,20 +121,21 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           byteStore: ByteStore[F])(
           implicit ec: ExecutionContext)
           : Resource[F, R[F, InterpretedRead[ResourcePath]]] = {
+
         lazy val ds: R[F, InterpretedRead[ResourcePath]] =
           Right {
-            EmptyDatasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], ResourcePathType.Physical](
+            EmptyDatasource[Resource[F, ?], Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], ResourcePathType.Physical](
               supportedType,
               QueryResult.typed(
                 DataFormat.ldjson,
                 Stream.empty,
                 ScalarStages.Id))
           }
-        val result = mp.get(config) match {
+
+        Resource.pure(mp.get(config) match {
           case None => ds
           case Some(e) => Left(e): R[F, InterpretedRead[ResourcePath]]
-        }
-        Resource.make(result.pure[F])(x => ().pure[F])
+        })
       }
     }
   }
@@ -156,13 +156,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
         ConcurrentMapIndexedStore.unhooked[IO, String, DatasourceRef[Json]](mp, blocker)
       }
 
-    val rCache = ResourceManager[IO, String, QuasarDatasource[Fix, IO, Stream[IO, ?], QueryResult[IO], PathType]]
-
-    val schema =
-      new ResourceSchema[IO, MockSchemaConfig.type, (ResourcePath, QueryResult[IO])] {
-        def apply(c: MockSchemaConfig.type, r: (ResourcePath, QueryResult[IO])) =
-          MockSchemaConfig.MockSchema.pure[IO]
-      }
+    val rCache = ResourceManager[IO, String, QDS]
 
     val errors = DatasourceErrors fromMap {
       errorMap match {
@@ -178,23 +172,22 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
 
       byteStores = ByteStores.void[IO, String]
 
-      modules = {
+      modules =
         DatasourceModules[Fix, IO, String, UUID](List(lightMod(mp, sanitize)), rateLimiting, byteStores)
           .widenPathType[PathType]
           .withMiddleware((i: String, mds: QDS) => starts.update(i :: _) as mds)
           .withFinalizer((i: String, mds: QDS) => shuts.update(i :: _))
-      }
+
       refs <- Resource.liftF(fRefs)
       cache <- rCache
       result <- Resource.liftF {
-        DefaultDatasources[Fix, IO, String, Json, MockSchemaConfig.type, QueryResult[IO]](freshId, refs, modules, cache, errors, schema, byteStores)
+        DefaultDatasources[Fix, IO, Resource[IO, ?], Stream[IO, ?], String, Json, QueryResult[IO]](freshId, refs, modules, cache, errors, byteStores)
       }
     } yield (result, refs, starts, shuts)
   }
 
   def supportedType = DatasourceType("test-type", 3L)
   def validConfigs = (jString("one"), jString("two"))
-  val schemaConfig = MockSchemaConfig
   def gatherMultiple[A](as: Stream[IO, A]) = as.compile.toList
 
   "implementation specific" >> {
@@ -330,11 +323,11 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           ((dses, refs, starts, _), finalize) <- prepare(Map()).allocated
           a <- refA
           _ <- refs.insert("foo", a)
-          res <- dses.pathIsResource("foo", ResourcePath.root())
+          res <- dses.quasarDatasourceOf("foo")
           started <- starts.get
           _ <- finalize
         } yield {
-          res.toOption must beSome(false)
+          res must beSome
           started === List("foo")
         }
       }
@@ -344,16 +337,17 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           a <- refA
           r <- dses.addDatasource(a)
           i = r.toOption.get
-          res0 <- dses.pathIsResource(i, ResourcePath.root())
+          res0 <- dses.quasarDatasourceOf(i)
           _ <- refs.delete(i)
-          res1 <- dses.pathIsResource(i, ResourcePath.root())
+          res1 <- dses.quasarDatasourceOf(i)
           ended <- shuts.get
           started <- starts.get
           _ <- finalize
         } yield {
           // Note, that we count resource init and finalize by datasource modules, I couldn't come up
           // with any way of unifying inner `F[_]` in lightweightdatasource :(
-          res1 must be_-\/
+          res0 must beSome
+          res1 must beNone
           started === List(i, i)
           ended === List(i, i)
         }
@@ -363,16 +357,16 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           ((dses, refs, starts, shuts), finalize) <- prepare(Map()).allocated
           a <- refA
           _ <- refs.insert("foo", a)
-          res0 <- dses.pathIsResource("foo", ResourcePath.root())
+          res0 <- dses.quasarDatasourceOf("foo")
           b <- refB
           _ <- refs.insert("foo", b)
-          res1 <- dses.pathIsResource("foo", ResourcePath.root())
+          res1 <- dses.quasarDatasourceOf("foo")
           ended <- shuts.get
           started <- starts.get
           _ <- finalize
         } yield {
-          res0.toOption must beSome(false)
-          res1.toOption must beSome(false)
+          res0 must beSome
+          res1 must beSome
           started === List("foo", "foo")
           ended === List("foo")
         }

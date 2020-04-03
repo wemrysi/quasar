@@ -38,9 +38,6 @@ abstract class CountingRegressionSpec extends Qspec {
   implicit val ioQuasarError: MonadQuasarErr[IO] =
     MonadError_.facet[IO](QuasarError.throwableP)
 
-  implicit val ioPlannerError: MonadPlannerErr[IO] =
-    MonadError_.facet[IO](QuasarError.planning)
-
   implicit val ioMonadTell: PhaseResultTell[IO] =
     MonadTell_.ignore[IO, PhaseResults]
 

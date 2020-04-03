@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.contrib.cats.effect
 
-/** Configuration required in order to obtain a information about the structure
-  * of a dataset.
-  */
-trait SchemaConfig {
-  /** Representation describing of the structure of a dataset. */
-  type Schema
-}
+import quasar.contrib.scalaz.MonadTell_
 
-object SchemaConfig {
-  type Aux[Schema0] = SchemaConfig { type Schema = Schema0 }
+import cats.Applicative
+import cats.effect.Resource
+
+object resource {
+  implicit def catsEffectResourceMonadTell_[F[_]: Applicative, W](
+      implicit F: MonadTell_[F, W])
+      : MonadTell_[Resource[F, ?], W] =
+    new MonadTell_[Resource[F, ?], W] {
+      def writer[A](w: W, a: A) = Resource.liftF(F.writer(w, a))
+    }
 }

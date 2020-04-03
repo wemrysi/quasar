@@ -28,7 +28,7 @@ import cats.Monad
 object RegressionQueryEvaluator {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Monad: MonadPlannerErr: PhaseResultTell]
+      F[_]: Monad: PhaseResultTell]
       : QueryEvaluator[F, T[QScriptEducated[T, ?]], QScriptCount] =
     QueryEvaluator((new RegressionQScriptEvaluator[T, F]).evaluate)
 }
