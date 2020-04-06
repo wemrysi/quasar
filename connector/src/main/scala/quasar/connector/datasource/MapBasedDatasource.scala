@@ -22,14 +22,19 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector._
 
+import cats.{Applicative, ApplicativeError, MonoidK}
 import cats.data.NonEmptyList
+import cats.syntax.applicative._
 
-import scalaz.{Applicative, ApplicativePlus, ICons, IList, IMap, INil, ISet, Scalaz}
-import Scalaz._
+import scalaz.{ICons, IList, IMap, INil, ISet}
+import scalaz.std.option._
+import scalaz.std.tuple._
+import scalaz.syntax.foldable._
 
-final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: ApplicativePlus, R] private(
+final class MapBasedDatasource[F[_], G[_]: Applicative, R] private(
     val kind: DatasourceType,
-    content: IMap[ResourcePath, F[R]])
+    content: IMap[ResourcePath, F[R]])(
+    implicit RE: ApplicativeError[F, ResourceError], G: MonoidK[G])
     extends PhysicalDatasource[F, G, ResourcePath, R] {
 
   import ResourceError._
@@ -37,26 +42,25 @@ final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: Applic
   val loaders = NonEmptyList.of(
     Loader.Batch(BatchLoader.Full { (rp: ResourcePath) =>
       content.lookup(rp) getOrElse {
-        MonadResourceErr[F].raiseError(
+        RE.raiseError(
           if (prefixes.contains(rp)) notAResource(rp)
           else pathNotFound(rp))
       }
     }))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
-    content.member(path).point[F]
+    content.member(path).pure[F]
 
   def prefixedChildPaths(prefixPath: ResourcePath)
       : F[Option[G[(ResourceName, ResourcePathType.Physical)]]] =
-    prefixedChildPaths0(prefixPath).point[F]
+    prefixedChildPaths0(prefixPath).pure[F]
 
   ////
 
   private val prefixes =
-    content.keySet.foldLeft(ISet.empty[ResourcePath])
-      { case (acc, key) =>
-          acc union ancestors(key)
-      }
+    content.keySet.foldLeft(ISet.empty[ResourcePath]) {
+      case (acc, key) => acc union ancestors(key)
+    }
 
   private def ancestors(p: ResourcePath): ISet[ResourcePath] = {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -79,10 +83,12 @@ final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: Applic
 
   private def prefixedChildPaths0(pfx: ResourcePath)
       : Option[G[(ResourceName, ResourcePathType.Physical)]] =
-    if (!prefixes.contains(pfx))
-      if (content.keySet.contains(pfx)) some(mempty[G, (ResourceName, ResourcePathType.Physical)])
-      else None
-    else {
+    if (!prefixes.contains(pfx)) {
+      if (content.keySet.contains(pfx))
+        Some(G.empty[(ResourceName, ResourcePathType.Physical)])
+      else
+        None
+    } else {
       val childResources = children(content.keySet, pfx)
       val childPrefixes = children(prefixes, pfx)
       val both = childPrefixes intersection childResources
@@ -91,11 +97,9 @@ final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: Applic
         (childResources \\ both).map((_, ResourcePathType.leafResource)) union
         (childPrefixes \\ both).map((_, ResourcePathType.prefix))
 
-      res.foldLeft(
-        ApplicativePlus[G].empty[(ResourceName, ResourcePathType.Physical)]) {
-        case (acc, p) =>
-          ApplicativePlus[G].plus(acc, p.pure[G])
-        }.some
+      Some(res.foldLeft(G.empty[(ResourceName, ResourcePathType.Physical)]) {
+        case (acc, p) => G.combineK(acc, p.pure[G])
+      })
     }
 }
 
@@ -107,9 +111,9 @@ object MapBasedDatasource {
     def apply[R](
         kind: DatasourceType, content: IMap[ResourcePath, F[R]])(
         implicit
-        F0: Applicative[F],
-        F1: MonadResourceErr[F],
-        G0: ApplicativePlus[G])
+        F: ApplicativeError[F, ResourceError],
+        G0: Applicative[G],
+        G1: MonoidK[G])
         : PhysicalDatasource[F, G, ResourcePath, R] =
       new MapBasedDatasource[F, G, R](kind, content)
   }
@@ -121,11 +125,11 @@ object MapBasedDatasource {
     def apply[R](
         kind: DatasourceType, content: IMap[ResourcePath, R])(
         implicit
-        F0: Applicative[F],
-        F1: MonadResourceErr[F],
-        G0: ApplicativePlus[G])
+        F: ApplicativeError[F, ResourceError],
+        G0: Applicative[G],
+        G1: MonoidK[G])
         : PhysicalDatasource[F, G, ResourcePath, R] =
-      new MapBasedDatasource[F, G, R](kind, content.map(_.point[F]))
+      new MapBasedDatasource[F, G, R](kind, content.map(_.pure[F]))
   }
 
 }

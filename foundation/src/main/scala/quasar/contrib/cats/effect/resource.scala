@@ -14,24 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar.contrib.cats.effect
 
-import quasar._
-import quasar.common.PhaseResultTell
-import quasar.contrib.iota._
-import quasar.qscript._
+import quasar.contrib.scalaz.MonadTell_
 
-import matryoshka.{Hole => _, _}
-import matryoshka.implicits._
+import cats.Applicative
+import cats.effect.Resource
 
-import cats.Monad
-import cats.syntax.applicative._
-
-final class RegressionQScriptEvaluator[
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: PhaseResultTell]
-    extends CountingQScriptEvaluator[T, F] {
-
-  def optimize(norm: T[QScriptNormalized[T, ?]]): F[T[QSM]] =
-    norm.transCata[T[QSM]](QSNormToQSM.inject(_)).pure[F]
+object resource {
+  implicit def catsEffectResourceMonadTell_[F[_]: Applicative, W](
+      implicit F: MonadTell_[F, W])
+      : MonadTell_[Resource[F, ?], W] =
+    new MonadTell_[Resource[F, ?], W] {
+      def writer[A](w: W, a: A) = Resource.liftF(F.writer(w, a))
+    }
 }

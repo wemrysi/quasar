@@ -18,23 +18,16 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.{Condition, IdStatus, RenderTreeT, ScalarStages}
-import quasar.api.SchemaConfig
+import quasar.Condition
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
-import quasar.connector.ResourceSchema
-import quasar.connector.datasource.Loader
-import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.{CachedGetter, IndexedSemaphore, QuasarDatasource, ResourceManager}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
-import quasar.qscript.{construction, educatedToTotal, InterpretedRead, QScriptEducated}
 
 import cats.effect.{Concurrent, ContextShift, Sync, Resource}
 import cats.~>
-
-import matryoshka.{BirecursiveT, EqualT, ShowT}
 
 import fs2.Stream
 
@@ -43,28 +36,24 @@ import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.option._
 
 import shims.{monadToScalaz, equalToCats}
 import shims.effect.scalazEitherTSync
 
 private[quasar] final class DefaultDatasources[
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    T[_[_]],
     F[_]: Sync: MonadError_[?[_], CreateError[C]],
-    I: Equal, C: Equal, S <: SchemaConfig,
-    R] private(
+    G[_], H[_],
+    I: Equal, C: Equal, R] private (
     semaphore: IndexedSemaphore[F, I],
     freshId: F[I],
     refs: IndexedStore[F, I, DatasourceRef[C]],
-    modules: DatasourceModules[T, F, Stream[F, ?], I, C, R, ResourcePathType],
+    modules: DatasourceModules[T, F, G, H, I, C, R, ResourcePathType],
     getter: CachedGetter[F, I, DatasourceRef[C]],
-    cache: ResourceManager[F, I, QuasarDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
+    cache: ResourceManager[F, I, QuasarDatasource[T, G, H, R, ResourcePathType]],
     errors: DatasourceErrors[F, I],
-    schema: ResourceSchema[F, S, (ResourcePath, R)],
     byteStores: ByteStores[F, I])
-    extends Datasources[F, Stream[F, ?], I, C, S] {
-
-  type PathType = ResourcePathType
+    extends Datasources[F, Stream[F, ?], I, C] {
 
   def addDatasource(ref: DatasourceRef[C]): F[CreateError[C] \/ I] = for {
     i <- freshId
@@ -88,18 +77,6 @@ private[quasar] final class DefaultDatasources[
     EitherT(lookupRef[ExistentialError[I]](i))
       .flatMap(_ => EitherT.rightT(errors.datasourceError(i)))
       .map(Condition.optionIso.reverseGet(_))
-      .run
-
-  def pathIsResource(i: I, path: ResourcePath): F[ExistentialError[I] \/ Boolean] =
-    getQDS[ExistentialError[I]](i)
-      .flatMap(ds => EitherT.rightT(ds.pathIsResource(path)))
-      .run
-
-  def prefixedChildPaths(i: I, prefixPath: ResourcePath): F[DiscoveryError[I] \/ Stream[F, (ResourceName, ResourcePathType)]] =
-    getQDS[DiscoveryError[I]](i)
-      .flatMapF(_.prefixedChildPaths(prefixPath) map {
-        _.toRightDisjunction(pathNotFound[DiscoveryError[I]](prefixPath))
-      })
       .run
 
   def removeDatasource(i: I): F[Condition[ExistentialError[I]]] =
@@ -141,31 +118,10 @@ private[quasar] final class DefaultDatasources[
       }
     }
 
-  def resourceSchema(i: I, path: ResourcePath, schemaConfig: S): F[DiscoveryError[I] \/ schemaConfig.Schema] = {
-    val action = for {
-      mds <- getQDS[DiscoveryError[I]](i)
-      fr = mds match {
-        case QuasarDatasource.Lightweight(lw) =>
-          lw.loaders.head match {
-            case Loader.Batch(b) => b.loadFull(InterpretedRead(path, ScalarStages.Id))
-          }
-
-        case QuasarDatasource.Heavyweight(hw) =>
-          hw.loaders.head match {
-            case Loader.Batch(b) => b.loadFull(dsl.Read(path, IdStatus.ExcludeId))
-          }
-      }
-      r <- EitherT.rightT(fr)
-      res <- EitherT.rightT(schema(schemaConfig, (path, r)))
-    } yield res
-
-    action.run
-  }
-
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     modules.supportedTypes
 
-  type QDS = QuasarDatasource[T, F, Stream[F, ?], R, PathType]
+  type QDS = QuasarDatasource[T, G, H, R, ResourcePathType]
 
   def quasarDatasourceOf(i: I): F[Option[QDS]] =
     getQDS[ExistentialError[I]](i).toOption.run
@@ -201,7 +157,6 @@ private[quasar] final class DefaultDatasources[
     }
   }
 
-  private val dsl = construction.mkGeneric[T, QScriptEducated[T, ?]]
 
   private def addRef[E >: CreateError[C] <: DatasourceError[I, C]](i: I, ref: DatasourceRef[C]): F[Condition[E]] = {
     val action = for {
@@ -260,19 +215,18 @@ private[quasar] final class DefaultDatasources[
 
 object DefaultDatasources {
   def apply[
-      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+      T[_[_]],
       F[_]: Concurrent: ContextShift: MonadError_[?[_], CreateError[C]],
-      I: Equal, C: Equal, S <: SchemaConfig,
-      R](
+      G[_], H[_],
+      I: Equal, C: Equal, R](
       freshId: F[I],
       refs: IndexedStore[F, I, DatasourceRef[C]],
-      modules: DatasourceModules[T, F, Stream[F, ?], I, C, R, ResourcePathType],
-      cache: ResourceManager[F, I, QuasarDatasource[T, F, Stream[F, ?], R, ResourcePathType]],
+      modules: DatasourceModules[T, F, G, H, I, C, R, ResourcePathType],
+      cache: ResourceManager[F, I, QuasarDatasource[T, G, H, R, ResourcePathType]],
       errors: DatasourceErrors[F, I],
-      schema: ResourceSchema[F, S, (ResourcePath, R)],
       byteStores: ByteStores[F, I])
-      : F[DefaultDatasources[T, F, I, C, S, R]] = for {
+      : F[DefaultDatasources[T, F, G, H, I, C, R]] = for {
     semaphore <- IndexedSemaphore[F, I]
     getter <- CachedGetter(refs.lookup(_))
-  } yield new DefaultDatasources(semaphore, freshId, refs, modules, getter, cache, errors, schema, byteStores)
+  } yield new DefaultDatasources(semaphore, freshId, refs, modules, getter, cache, errors, byteStores)
 }

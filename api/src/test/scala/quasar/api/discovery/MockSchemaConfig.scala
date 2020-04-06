@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.api.discovery
 
 object MockSchemaConfig extends SchemaConfig {
   object MockSchema

@@ -14,24 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar.api.discovery
 
-import quasar._
-import quasar.common.PhaseResultTell
-import quasar.contrib.iota._
-import quasar.qscript._
+/** Configuration required in order to obtain a information about the structure
+  * of a dataset.
+  */
+trait SchemaConfig {
+  /** Representation describing of the structure of a dataset. */
+  type Schema
+}
 
-import matryoshka.{Hole => _, _}
-import matryoshka.implicits._
-
-import cats.Monad
-import cats.syntax.applicative._
-
-final class RegressionQScriptEvaluator[
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: PhaseResultTell]
-    extends CountingQScriptEvaluator[T, F] {
-
-  def optimize(norm: T[QScriptNormalized[T, ?]]): F[T[QSM]] =
-    norm.transCata[T[QSM]](QSNormToQSM.inject(_)).pure[F]
+object SchemaConfig {
+  type Aux[Schema0] = SchemaConfig { type Schema = Schema0 }
 }

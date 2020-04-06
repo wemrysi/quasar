@@ -18,8 +18,7 @@ package quasar.api.datasource
 
 import slamdata.Predef._
 import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
-import quasar.api.SchemaConfig
-import quasar.api.resource.{ResourcePath, ResourceName, ResourcePathType}
+import quasar.api.resource.ResourcePath
 
 import scala.Predef.assert
 import scala.concurrent.ExecutionContext
@@ -29,7 +28,6 @@ import cats.effect.{Resource, Effect}
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import cats.instances.tuple._
 import eu.timepit.refined.auto._
 import org.specs2.matcher.Matcher
 import scalaz.{Equal, IMap, Order, Show, \/}
@@ -40,27 +38,25 @@ import scalaz.std.list._
 import shims.{eqToScalaz, equalToCats, showToCats, showToScalaz}
 
 abstract class DatasourcesSpec[
-    F[_], G[_], I: Order: Show, C: Equal: Show, S <: SchemaConfig](
+    F[_], G[_], I: Order: Show, C: Equal: Show](
     implicit F: Effect[F], ec: ExecutionContext)
     extends EffectfulQSpec[F]
     with ConditionMatchers {
 
   import DatasourceError._
 
-  def datasources: Resource[F, Datasources[F, G, I, C, S]]
+  def datasources: Resource[F, Datasources[F, G, I, C]]
 
   def supportedType: DatasourceType
 
   // Must be distinct.
   def validConfigs: (C, C)
 
-  val schemaConfig: S
-
   def gatherMultiple[A](fga: G[A]): F[List[A]]
 
   assert(validConfigs._1 =/= validConfigs._2, "validConfigs must be distinct!")
 
-  def mutationExamples(f: (Datasources[F, G, I, C, S], DatasourceRef[C]) => F[Err \/ I]) = {
+  def mutationExamples(f: (Datasources[F, G, I, C], DatasourceRef[C]) => F[Err \/ I]) = {
     "lookup on success" >>* datasources.use { dses => for {
       a <- refA
 
@@ -113,7 +109,7 @@ abstract class DatasourcesSpec[
     }
   }
 
-  def resultsInNotFound[E >: ExistentialError[I] <: Err, A](f: (Datasources[F, G, I, C, S], I) => F[E \/ A]) =
+  def resultsInNotFound[E >: ExistentialError[I] <: Err, A](f: (Datasources[F, G, I, C], I) => F[E \/ A]) =
     datasources.use { dses => for {
       i <- refA >>= createRef(dses)
 
@@ -125,7 +121,7 @@ abstract class DatasourcesSpec[
       fr must beNotFound[E](i)
     }}
 
-  def discoveryExamples[E >: ExistentialError[I] <: Err, A](f: (Datasources[F, G, I, C, S], I, ResourcePath) => F[E \/ A]) = {
+  def discoveryExamples[E >: ExistentialError[I] <: Err, A](f: (Datasources[F, G, I, C], I, ResourcePath) => F[E \/ A]) = {
     "error when datasource not found" >>* {
       resultsInNotFound((dses, i) => f(dses, i, ResourcePath.root()))
     }
@@ -199,24 +195,6 @@ abstract class DatasourcesSpec[
     }
   }
 
-  "path is resource" >> {
-    discoveryExamples((ds, i, pr) => ds.pathIsResource(i, pr))
-  }
-
-  "prefixed child paths" >> {
-    // OMG!!!
-    discoveryExamples { (ds, i, pr) =>
-      val raw: F[DiscoveryError[I] \/ G[(ResourceName, ds.PathType)]] = ds.prefixedChildPaths(i, pr)
-      raw map { (ei: DiscoveryError[I] \/ G[(ResourceName, ds.PathType)]) =>
-        ei map { (g: G[(ResourceName, ds.PathType)]) =>
-          gatherMultiple(g) map { (lst: List[(ResourceName, ds.PathType)]) =>
-            lst.map(_.map(x => x: ResourcePathType))
-          }
-        }
-      }
-    }
-  }
-
   "remove datasource" >> {
     "error when not found" >>* {
       resultsInNotFound { (dses, id) =>
@@ -242,10 +220,6 @@ abstract class DatasourcesSpec[
     }}
   }
 
-  "resource schema" >> {
-    discoveryExamples((dses, a, b) => dses.resourceSchema(a, b, schemaConfig))
-  }
-
   ////
 
   type Err = DatasourceError[I, C]
@@ -263,7 +237,7 @@ abstract class DatasourcesSpec[
   def sanitizedRefB: F[DatasourceRef[C]] =
     randomName map (DatasourceRef(supportedType, _, validConfigs._2))
 
-  def createRef(dses: Datasources[F, G, I, C, S]): DatasourceRef[C] => F[I] = r =>
+  def createRef(dses: Datasources[F, G, I, C]): DatasourceRef[C] => F[I] = r =>
     dses.addDatasource(r) >>= expectSuccess
 
   def expectSuccess[E <: Err, A](r: E \/ A): F[A] =

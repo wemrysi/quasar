@@ -34,12 +34,11 @@ import argonaut.Json
 import argonaut.JsonScalaz._
 import argonaut.Argonaut.{jEmptyObject, jString}
 
-import cats.{Applicative, Show}
+import cats.{Monad, Show}
 import cats.effect.{IO, ContextShift, ConcurrentEffect, Timer, Resource}
 import cats.instances.int._
 import cats.kernel.Hash
 import cats.kernel.instances.uuid._
-import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 
 import eu.timepit.refined.auto._
@@ -89,11 +88,11 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
-  type R[F[_], A] = Either[InitializationError[Json], Datasource[F, Stream[F, ?], A, QueryResult[F], ResourcePathType.Physical]]
+  type R[F[_], A] = Either[InitializationError[Json], Datasource[Resource[F, ?], Stream[F, ?], A, QueryResult[F], ResourcePathType.Physical]]
 
-  def mkDatasource[F[_]: Applicative, Q, P <: ResourcePathType](kind: DatasourceType)
-      : Datasource[F, Stream[F, ?], Q, QueryResult[F], P] = {
-    EmptyDatasource[F, Stream[F, ?], Q, QueryResult[F], P](
+  def mkDatasource[F[_]: Monad, Q](kind: DatasourceType)
+      : Datasource[Resource[F, ?], Stream[F, ?], Q, QueryResult[F], ResourcePathType.Physical] = {
+    EmptyDatasource[Resource[F, ?], Stream[F, ?], Q, QueryResult[F], ResourcePathType.Physical](
       kind,
       QueryResult.typed(
         DataFormat.ldjson,
@@ -101,8 +100,8 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
         ScalarStages.Id))
   }
 
-  def lightMod(k: DatasourceType, err: Option[InitializationError[Json]] = None): DatasourceModule = DatasourceModule.Lightweight {
-    new LightweightDatasourceModule {
+  def lightMod(k: DatasourceType, err: Option[InitializationError[Json]] = None): DatasourceModule =
+    DatasourceModule.Lightweight(new LightweightDatasourceModule {
       val kind = k
       def sanitizeConfig(config: Json): Json = jString("sanitized")
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
@@ -111,17 +110,16 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
           byteStore: ByteStore[F])(
           implicit ec: ExecutionContext)
           : Resource[F, R[F, InterpretedRead[ResourcePath]]] = {
-        val ds: R[F, InterpretedRead[ResourcePath]] = err match {
+
+        Resource.pure(err match {
           case None => Right(mkDatasource(k))
           case Some(e) => Left(e)
-        }
-        Resource.make(ds.pure[F])(x => ().pure[F])
+        })
       }
-    }
-  }
+    })
 
-  def heavyMod(k: DatasourceType, err: Option[InitializationError[Json]] = None) = DatasourceModule.Heavyweight {
-    new HeavyweightDatasourceModule {
+  def heavyMod(k: DatasourceType, err: Option[InitializationError[Json]] = None): DatasourceModule =
+    DatasourceModule.Heavyweight(new HeavyweightDatasourceModule {
       val kind = k
       def sanitizeConfig(config: Json): Json = jString("sanitized")
       def heavyweightDatasource[
@@ -131,14 +129,13 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
           byteStore: ByteStore[F])(
           implicit ec: ExecutionContext)
           : Resource[F, R[F, T[QScriptEducated[T, ?]]]] = {
-        val ds: R[F, T[QScriptEducated[T, ?]]] = err match {
+
+        Resource.pure(err match {
           case None => Right(mkDatasource(k))
           case Some(e) => Left(e)
-        }
-        Resource.make(ds.pure[F])(x => ().pure[F])
+        })
       }
-    }
-  }
+    })
 
   "supported types" >> {
     "empty" >>* {

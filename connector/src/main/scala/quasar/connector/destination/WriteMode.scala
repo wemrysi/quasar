@@ -14,16 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.connector.destination
 
-/** Configuration required in order to obtain a information about the structure
-  * of a dataset.
-  */
-trait SchemaConfig {
-  /** Representation describing of the structure of a dataset. */
-  type Schema
-}
+import slamdata.Predef.{Product, Serializable}
 
-object SchemaConfig {
-  type Aux[Schema0] = SchemaConfig { type Schema = Schema0 }
+import cats.{Eq, Show}
+
+sealed trait WriteMode extends Product with Serializable
+
+object WriteMode {
+  case object Append extends WriteMode
+  case object Replace extends WriteMode
+
+  implicit val writeModeEq: Eq[WriteMode] =
+    Eq.fromUniversalEquals
+
+  implicit val writeModeShow: Show[WriteMode] =
+    Show.fromToString
 }

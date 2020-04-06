@@ -22,11 +22,12 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector._
 import quasar.connector.datasource._
-import quasar.contrib.fs2.stream._
+import quasar.contrib.cats.monadError
 import quasar.contrib.scalaz.MonadError_
 
+import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 
 import eu.timepit.refined.auto._
 
@@ -50,8 +51,11 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
+  implicit val ioCatsMonadResourceErr: MonadError[IO, ResourceError] =
+    monadError.facet[IO](ResourceError.throwableP)
+
   val underlying =
-    MapBasedDatasource.pure[IO, Stream[IO, ?]](
+    MapBasedDatasource.pure[Resource[IO, ?], Stream[IO, ?]](
       DatasourceType("pure-test", 1L),
       IMap(
         ResourcePath.root() / ResourceName("a") / ResourceName("b") -> 1,
@@ -61,8 +65,11 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
         ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s") / ResourceName("t") -> 5,
         ResourcePath.root() / ResourceName("d") -> 6))
 
-  val datasource =
+  val aggregating =
     AggregatingDatasource(underlying, Lens.id)
+
+  val datasource =
+    Resource.pure(aggregating)
 
   def nonExistentPath: ResourcePath =
     ResourcePath.root() / ResourceName("x") / ResourceName("y")
@@ -79,19 +86,19 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
       val paths = IMap(z -> 1, (z / x) -> 2, (z / y) -> 3)
 
       val uds =
-        new PhysicalDatasource[IO, Stream[IO, ?], ResourcePath, Int] {
+        new PhysicalDatasource[Resource[IO, ?], Stream[IO, ?], ResourcePath, Int] {
           val kind = DatasourceType("prefixed", 6L)
 
           val loaders = NonEmptyList.of(Loader.Batch(BatchLoader.Full { (rp: ResourcePath) =>
-            IO.pure(paths.lookup(rp) getOrElse -1)
+            Resource.pure[IO, Int](paths.lookup(rp) getOrElse -1)
           }))
 
-          def pathIsResource(rp: ResourcePath): IO[Boolean] =
-            IO.pure(paths.member(rp))
+          def pathIsResource(rp: ResourcePath): Resource[IO, Boolean] =
+            Resource.pure(paths.member(rp))
 
           def prefixedChildPaths(rp: ResourcePath)
-              : IO[Option[Stream[IO, (ResourceName, ResourcePathType.Physical)]]] =
-            IO pure {
+              : Resource[IO, Option[Stream[IO, (ResourceName, ResourcePathType.Physical)]]] =
+            Resource pure {
               if (rp ≟ ResourcePath.root())
                 Some(Stream(ResourceName("z") -> ResourcePathType.prefixResource))
               else if (rp ≟ z)
@@ -107,9 +114,9 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
 
       val ds = AggregatingDatasource(uds, Lens.id)
 
-      for {
+      val result = for {
         dres <- ds.prefixedChildPaths(ResourcePath.root())
-        meta <- dres.traverse(_.compile.to(List))
+        meta <- Resource.liftF(dres.traverse(_.compile.to(List)))
         qres <- ds.loadFull(z).value
       } yield {
         meta must beSome(equal[List[(ResourceName, ResourcePathType)]](List(
@@ -117,18 +124,20 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
           ResourceName("z") -> ResourcePathType.prefixResource)))
         qres must beSome(beLeft(1))
       }
+
+      result.use(IO.pure(_))
     }
 
     "agg resource is recognized via pathIsResource" >>* {
-      datasource
+      aggregating
         .pathIsResource(ResourcePath.root() / ResourceName("a") / ResourceName("**"))
-        .map(_ must beTrue)
+        .use(b => IO.pure(b must beTrue))
     }
 
     "children of prefix = agg resource + underlying children" >>* {
-      datasource
+      aggregating
         .prefixedChildPaths(ResourcePath.root() / ResourceName("a"))
-        .flatMap(_.cata(_.compile.to(List), IO.pure(Nil)))
+        .use(_.cata(_.compile.to(List), IO.pure(Nil)))
         .map(_ must equal[List[(ResourceName, ResourcePathType)]](List(
           ResourceName("**") -> ResourcePathType.AggregateResource,
           ResourceName("b") -> ResourcePathType.LeafResource,
@@ -139,15 +148,22 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
 
   "evaluation" >> {
     "querying a non-existent path is not found" >>* {
-      MonadResourceErr[IO].attempt(datasource.loadFull(nonExistentPath).value).map(_ must be_-\/.like {
+      val result =
+        aggregating
+          .loadFull(nonExistentPath)
+          .value
+          .use(IO.pure(_))
+
+      MonadResourceErr[IO].attempt(result).map(_ must be_-\/.like {
         case ResourceError.PathNotFound(p) => p must equal(nonExistentPath)
       })
     }
 
     "querying an underlying resource is unaffected" >>* {
-      datasource.loadFull(ResourcePath.root() / ResourceName("d"))
+      aggregating
+        .loadFull(ResourcePath.root() / ResourceName("d"))
         .value
-        .map(_ must beSome(beLeft(6)))
+        .use(r => IO.pure(r must beSome(beLeft(6))))
     }
 
     "querying an agg resource aggregates descendant leafs" >>* {
@@ -157,10 +173,11 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
       val s = ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s")
       val t = ResourcePath.root() / ResourceName("a") / ResourceName("q") / ResourceName("s") / ResourceName("t")
 
-      datasource.loadFull(ResourcePath.root() / ResourceName("a") / ResourceName("**"))
-        .semiflatMap(_.traverse(_.compile.to(List)))
+      aggregating
+        .loadFull(ResourcePath.root() / ResourceName("a") / ResourceName("**"))
+        .semiflatMap(r => Resource.liftF(r.traverse(_.compile.to(List))))
         .value
-        .map(_ must beSome(beRight(contain(exactly((b, 1), (c, 2), (r, 3), (s, 4), (t, 5))))))
+        .use(x => IO.pure(x must beSome(beRight(contain(exactly((b, 1), (c, 2), (r, 3), (s, 4), (t, 5)))))))
     }
   }
 }

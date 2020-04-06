@@ -18,7 +18,6 @@ package quasar.api.datasource
 
 import slamdata.Predef.{Int, List, String}
 import quasar.Condition
-import quasar.api.MockSchemaConfig
 import quasar.contrib.cats.stateT._
 import quasar.contrib.cats.effect.stateT.catsStateTEffect
 
@@ -35,29 +34,22 @@ import scalaz.std.string._
 import shims.{monadToScalaz, monoidToCats}
 import MockDatasourcesSpec._
 
-import scala.{Stream => SStream}
-
 final class MockDatasourcesSpec
-  extends DatasourcesSpec[MockM, List, Int, String, MockSchemaConfig.type] {
+  extends DatasourcesSpec[MockM, List, Int, String] {
 
   val s3: DatasourceType = DatasourceType("s3", 1L)
   val azure: DatasourceType = DatasourceType("azure", 1L)
   val mongo: DatasourceType = DatasourceType("mongodb", 1L)
   val acceptedSet: ISet[DatasourceType] = ISet.fromList(List(s3, azure, mongo))
 
-  def datasources: Resource[MockM, Datasources[MockM, List, Int, String, MockSchemaConfig.type]] =
-    Resource.pure[MockM, Datasources[MockM, List, Int, String, MockSchemaConfig.type]] {
-      MockDatasources[String, MockM, List](
-        acceptedSet, _ => Condition.normal(), SStream.empty)
+  def datasources: Resource[MockM, Datasources[MockM, List, Int, String]] =
+    Resource.pure[MockM, Datasources[MockM, List, Int, String]] {
+      MockDatasources[String, MockM, List](acceptedSet, _ => Condition.normal())
     }
 
   def supportedType = DatasourceType("s3", 1L)
 
   def validConfigs = ("bucket1", "bucket2")
-
-  val oldSchemaConfig = MockSchemaConfig
-
-  val schemaConfig = MockSchemaConfig
 
   def gatherMultiple[A](xs: List[A]) = xs.pure[MockM]
 }

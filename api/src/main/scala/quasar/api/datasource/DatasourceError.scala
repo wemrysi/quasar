@@ -27,8 +27,6 @@ import cats.syntax.show._
 
 import monocle.Prism
 
-import quasar.api.resource.ResourcePath
-
 import scalaz.{ISet, NonEmptyList}
 
 import shims.{eqToScalaz, equalToCats, showToCats, showToScalaz}
@@ -58,15 +56,7 @@ object DatasourceError extends DatasourceErrorInstances {
   final case class AccessDenied[C](kind: DatasourceType, config: C, reason: String)
     extends InitializationError[C]
 
-  sealed trait DiscoveryError[+I] extends DatasourceError[I, Nothing]
-
-  final case class PathNotFound(path: ResourcePath)
-    extends DiscoveryError[Nothing]
-
-  final case class PathNotAResource(path: ResourcePath)
-    extends DiscoveryError[Nothing]
-
-  sealed trait ExistentialError[+I] extends DiscoveryError[I]
+  sealed trait ExistentialError[+I] extends DatasourceError[I, Nothing]
 
   final case class DatasourceNotFound[I](datasourceId: I)
       extends ExistentialError[I]
@@ -112,18 +102,6 @@ object DatasourceError extends DatasourceErrorInstances {
     Prism.partial[E, (DatasourceType, C, String)] {
       case MalformedConfiguration(t, c, r) => (t, c, r)
     } ((MalformedConfiguration[C](_, _, _)).tupled)
-
-  def pathNotAResource[E >: DiscoveryError[Nothing] <: DatasourceError[_, _]]
-      : Prism[E, ResourcePath] =
-    Prism.partial[E, ResourcePath] {
-      case PathNotAResource(p) => p
-    } (PathNotAResource(_))
-
-  def pathNotFound[E >: DiscoveryError[Nothing] <: DatasourceError[_, _]]
-      : Prism[E, ResourcePath] =
-    Prism.partial[E, ResourcePath] {
-      case PathNotFound(p) => p
-    } (PathNotFound(_))
 }
 
 sealed abstract class DatasourceErrorInstances {
@@ -139,34 +117,20 @@ sealed abstract class DatasourceErrorInstances {
       datasourceNotFound[I, DatasourceError[I, C]].getOption(de),
       datasourceUnsupported[DatasourceError[I, C]].getOption(de),
       invalidConfiguration[C, DatasourceError[I, C]].getOption(de),
-      malformedConfiguration[C, DatasourceError[I, C]].getOption(de),
-      pathNotAResource[DatasourceError[I, C]].getOption(de),
-      pathNotFound[DatasourceError[I, C]].getOption(de)
+      malformedConfiguration[C, DatasourceError[I, C]].getOption(de)
     )}
   }
 
   implicit def show[I: Show, C: Show]: Show[DatasourceError[I, C]] =
     Show show {
       case e: CreateError[C]    => showCreateError[C].show(e)
-      case e: DiscoveryError[I] => showDiscoveryError[I].show(e)
+      case e: ExistentialError[I] => showExistentialError[I].show(e)
     }
 
   implicit def showExistentialError[I: Show]: Show[ExistentialError[I]] =
     Show show {
       case DatasourceNotFound(i) =>
         "DatasourceNotFound(" + i.show + ")"
-    }
-
-  implicit def showDiscoveryError[I: Show]: Show[DiscoveryError[I]] =
-    Show show {
-      case PathNotAResource(p) =>
-        "PathNotAResource(" + p.show + ")"
-
-      case PathNotFound(p) =>
-        "PathNotFound(" + p.show + ")"
-
-      case e: ExistentialError[I] =>
-        showExistentialError[I].show(e)
     }
 
   implicit def showCreateError[C: Show]: Show[CreateError[C]] =

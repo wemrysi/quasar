@@ -33,11 +33,11 @@ import monocle.Prism
 object ResourceRouter {
   val DatasourceResourcePrefix = "datasource"
 
-  def apply[T[_[_]], F[_]: Applicative, G[_], A, P <: ResourcePathType, I](
+  def apply[T[_[_]], F[_]: Applicative, G[_], H[_], A, P <: ResourcePathType, I](
       IdString: Prism[String, I],
-      lookupRunning: I => F[Option[QuasarDatasource[T, F, G, A, P]]])(
+      lookupRunning: I => F[Option[QuasarDatasource[T, G, H, A, P]]])(
       file: AFile)
-      : F[Option[Source[QuasarDatasource[T, F, G, A, P]]]] =
+      : F[Option[Source[QuasarDatasource[T, G, H, A, P]]]] =
     ResourcePath.leaf(file) match {
       case DatasourceResourcePrefix /: IdString(id) /: srcPath =>
         OptionT(lookupRunning(id))
@@ -45,6 +45,6 @@ object ResourceRouter {
           .value
 
       case _ =>
-        (None: Option[Source[QuasarDatasource[T, F, G, A, P]]]).pure[F]
+        (None: Option[Source[QuasarDatasource[T, G, H, A, P]]]).pure[F]
     }
 }

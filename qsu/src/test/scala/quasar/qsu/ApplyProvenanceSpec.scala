@@ -35,11 +35,10 @@ import quasar.qscript.{
   RightSide
 }
 import quasar.qscript.MapFuncsCore.RecIntLit
-import quasar.qsu.mra.ProvImpl
+import quasar.qsu.mra.{Dim, ProvImpl, Uop}
 
 import cats.instances.list._
 
-import matryoshka._
 import matryoshka.data.Fix
 
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
@@ -55,12 +54,13 @@ import scalaz.std.option._
 import scalaz.std.map._
 import scalaz.std.tuple._
 
-import shims.{eqToScalaz, orderToCats, orderToScalaz, showToCats, showToScalaz}
+import shims.{orderToCats, showToCats}
 
 object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
   import ApplyProvenance.{AuthenticatedQSU, computeFuncDims}
   import QScriptUniform.{DTrans, Rotation}
+  import ProvImpl.Vecs
 
   type F[A] = PlannerError \/ A
   type QSU[A] = QScriptUniform[A]
@@ -74,6 +74,13 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
   val qprov = ProvImpl[Fix[EJson], IdAccess, IdType]
   val B = Bucketing(qprov)
   val app = ApplyProvenance[Fix, F](qprov, _: QSUGraph)
+
+  // These instances are an optimization to reduce compile time by almost two orders of magnitude
+  implicit def provScalazEqual: scalaz.Equal[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
+    scalaz.Equal.equal(cats.Eq[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]].eqv)
+
+  implicit def provScalazShow: scalaz.Show[Uop[Vecs[Dim[Fix[EJson], IdAccess, IdType]]]] =
+    scalaz.Show.shows(Uop.show[Vecs[Dim[Fix[EJson], IdAccess, IdType]]].show)
 
   import qprov.syntax._
 
