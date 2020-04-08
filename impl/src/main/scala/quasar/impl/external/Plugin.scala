@@ -35,8 +35,6 @@ final case class Plugin(mainJar: Path, classPath: ClassPath) {
 
 object Plugin {
   val FileExtension = "plugin"
-  val ManifestAttributeName = "Datasource-Module"
-  val ManifestAttributeDestinationName = "Destination-Module"
   val ManifestVersionName = "Implementation-Version"
 
   def fromJson[F[_]: Sync](json: Json): F[DecodeResult[Plugin]] =

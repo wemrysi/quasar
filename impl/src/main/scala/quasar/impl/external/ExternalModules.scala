@@ -21,15 +21,20 @@ import slamdata.Predef._
 
 import java.lang.{
   Class,
+  ClassCastException,
   ClassLoader,
   ClassNotFoundException,
-  Object
+  ExceptionInInitializerError,
+  IllegalAccessException,
+  IllegalArgumentException,
+  NoSuchFieldException,
+  NullPointerException
 }
 import java.nio.file.{Files, Path}
 import java.util.jar.JarFile
 
 import argonaut.{JawnParser, Json}, JawnParser._
-import cats.effect.{Blocker, ConcurrentEffect, ContextShift, Effect, Sync, Timer}
+import cats.effect.{Blocker, ConcurrentEffect, ContextShift, Effect, Sync}
 import cats.syntax.applicativeError._
 import fs2.io.file
 import fs2.{Chunk, Stream}
@@ -42,12 +47,13 @@ object ExternalModules extends Logging {
 
   val PluginChunkSize = 8192
 
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def apply[F[_]: ConcurrentEffect: ContextShift: Timer](
+  def apply[F[_]: ConcurrentEffect: ContextShift](
       config: ExternalConfig,
-      blocker: Blocker)
-      : Stream[F, (ClassName, ClassLoader, PluginType)] =
-    config match {
+      blocker: Blocker)(
+      instantiate: PartialFunction[(PluginType, AnyRef), ExternalModule])
+      : Stream[F, ExternalModule] = {
+
+    val plugins = config match {
       case PluginDirectory(directory) =>
         Stream.eval(ConcurrentEffect[F].delay((Files.exists(directory), Files.isDirectory(directory)))) flatMap {
           case (true, true) =>
@@ -59,7 +65,7 @@ object ExternalModules extends Logging {
             warnStream[F](s"Unable to load plugins from '$directory', does not appear to be a directory", None)
 
           case _ =>
-            Stream.empty
+            warnStream[F](s"Unable to load plugins from '$directory', does not exist", None)
         }
 
       case PluginFiles(files) =>
@@ -68,33 +74,55 @@ object ExternalModules extends Logging {
 
       case ExplodedDirs(modules) =>
         for {
-          exploded <- Stream.emits(modules)
-
-          (cn, cp) = exploded
-
+          (cn, cp) <- Stream.emits(modules)
           classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, cp))
         } yield (cn, classLoader, PluginType.Datasource)
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  def loadModule[A, F[_]: Sync](clazz: Class[_])(f: Object => A): Stream[F, A] =
-    Stream.eval(Sync[F].delay(f(clazz.getDeclaredField("MODULE$").get(null))))
+    def handle[A](className: ClassName, name: DisplayName, s: Stream[F, A]): Stream[F, A] =
+      s recoverWith {
+        case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
+          ExternalModules.warnStream[F](s"${name.uppercase} module '$className' does not appear to be a singleton object", Some(e))
 
-  def loadClass[F[_]: Sync](cn: ClassName, classLoader: ClassLoader): Stream[F, Class[_]] =
+        case e: ExceptionInInitializerError =>
+          ExternalModules.warnStream[F](s"${name.uppercase} module '$className' failed to load with exception", Some(e))
+
+        case _: ClassCastException =>
+          ExternalModules.warnStream[F](s"${name.uppercase} module '$className' is not actually a subtype of ${name.uppercase}Module", None)
+      }
+
+    plugins flatMap {
+      case (cn, classLoader, tpe) =>
+        val base = for {
+          clazz <- loadClass(cn, classLoader)
+          back <- loadModule(clazz) collect {   // my kingdom for partial application
+            case ar if instantiate.isDefinedAt((tpe, ar)) =>
+              instantiate((tpe, ar))
+          }
+        } yield back
+
+        handle(cn, tpe.displayName, base)
+    }
+  }
+
+  private def loadModule[A, F[_]: Sync](clazz: Class[_]): Stream[F, AnyRef] =
+    Stream.eval(Sync[F].delay(clazz.getDeclaredField("MODULE$").get(null)))
+
+  private def loadClass[F[_]: Sync](cn: ClassName, classLoader: ClassLoader): Stream[F, Class[_]] =
     Stream.eval(Sync[F].delay(classLoader.loadClass(cn.value))) recoverWith {
       case cnf: ClassNotFoundException =>
         warnStream[F](s"Could not locate class for module '${cn.value}'", Some(cnf))
     }
 
-  def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
+  private def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
     Stream.eval(Sync[F].delay(cause.fold(log.warn(msg))(log.warn(msg, _)))).drain
 
-  def infoStream[F[_]: Sync](msg: => String): Stream[F, Unit] =
+  private def infoStream[F[_]: Sync](msg: => String): Stream[F, Unit] =
     Stream.eval(Sync[F].delay(log.info(msg)))
 
   ////
 
-  private def loadPlugin[F[_]: ContextShift: Effect: Timer](
+  private def loadPlugin[F[_]: ContextShift: Effect](
       pluginFile: Path,
       blocker: Blocker)
       : Stream[F, (ClassName, ClassLoader, PluginType)] =
@@ -102,8 +130,8 @@ object ExternalModules extends Logging {
       plugin <- readPlugin(pluginFile, blocker)
       mainJar = new JarFile(plugin.mainJar.toFile)
 
-      datasourceModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestAttributeName)
-      destinationModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestAttributeDestinationName)
+      datasourceModuleAttr <- jarAttribute[F](mainJar, PluginType.Datasource.manifestAttributeName)
+      destinationModuleAttr <- jarAttribute[F](mainJar, PluginType.Destination.manifestAttributeName)
       versionModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestVersionName)
 
       _ <- versionModuleAttr match {
@@ -112,7 +140,7 @@ object ExternalModules extends Logging {
       }
 
       moduleClasses <- (datasourceModuleAttr, destinationModuleAttr) match {
-        case (Some(sourceModules), Some(destinationModules)) => {
+        case (Some(sourceModules), Some(destinationModules)) =>
           val datasourceClasses =
             sourceModules.split(" ").map((_, PluginType.Datasource))
 
@@ -120,22 +148,25 @@ object ExternalModules extends Logging {
             destinationModules.split(" ").map((_, PluginType.Destination))
 
           Stream.emit(datasourceClasses ++ destinationClasses)
-        }
+
         case (Some(sourceModules), None) =>
           Stream.emit(sourceModules.split(" ").map((_, PluginType.Datasource)))
+
         case (None, Some(destinationModules)) =>
           Stream.emit(destinationModules.split(" ").map((_, PluginType.Destination)))
-        case _ => warnStream[F](s"No '${Plugin.ManifestAttributeName}' or '${Plugin.ManifestAttributeDestinationName}' attribute found in Manifest for '$pluginFile'.", None)
+
+        case _ =>
+          warnStream[F](s"No '${PluginType.Datasource.manifestAttributeName}' or '${PluginType.Destination.manifestAttributeName}' attribute found in Manifest for '$pluginFile'.", None)
       }
 
       (moduleClass, pluginType) <- if (moduleClasses.isEmpty)
-        warnStream[F](s"No classes defined for '${Plugin.ManifestAttributeName}' or '${Plugin.ManifestAttributeDestinationName}' attributes in Manifest from '$pluginFile'.", None)
+        warnStream[F](s"No classes defined for '${PluginType.Datasource.manifestAttributeName}' or '${PluginType.Destination.manifestAttributeName}' attributes in Manifest from '$pluginFile'.", None)
       else
         Stream.chunk(Chunk.array(moduleClasses)).covary[F]
       classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, plugin.classPath))
     } yield (ClassName(moduleClass), classLoader, pluginType)
 
-  private def readPlugin[F[_]: ContextShift: Effect: Timer](
+  private def readPlugin[F[_]: ContextShift: Effect](
       pluginFile: Path,
       blocker: Blocker)
       : Stream[F, Plugin] =
