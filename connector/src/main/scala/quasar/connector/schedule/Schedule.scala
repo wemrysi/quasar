@@ -19,16 +19,14 @@ package quasar.connector.schedule
 import slamdata.Predef._
 
 import quasar.Condition
-import quasar.api.schedule.ScheduleError.TaskError
-
-import argonaut.Json
+import quasar.api.schedule.ScheduleError._
 
 import fs2.Stream
 
 trait Schedule[F[_], C, I] {
-  def tasks: Stream[F, (I, C)]
-  def addTask(config: C): F[Either[TaskError[C, I], I]]
-  def getTask(i: I): F[Either[TaskError[C, I], C]]
-  def editTask(i: I, config: C): F[Condition[TaskError[C, I]]]
-  def deleteTask(i: I): F[Condition[TaskError[C, I]]]
+  def intentions: Stream[F, (I, C)]
+  def addIntention(config: C): F[Either[IncorrectIntention[C], I]]
+  def getIntention(i: I): F[Either[IntentionNotFound[I], C]]
+  def editIntention(i: I, config: C): F[Condition[IntentionError[C, I]]]
+  def deleteIntention(i: I): F[Condition[IntentionNotFound[I]]]
 }

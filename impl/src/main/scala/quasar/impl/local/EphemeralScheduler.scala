@@ -79,29 +79,29 @@ object EphemeralScheduler {
       blocker: Blocker)
       : Schedule[F, Json, I] = new Schedule[F, Json, I] {
 
-    def tasks: Stream[F, (I, Json)] =
+    def intentions: Stream[F, (I, Json)] =
       taskStorage.entries map { case (k, tsk) => (k, tsk.asJson) }
 
-    def addTask(config: Json): F[Either[TaskError[Json, I], I]] = config.as[Task[C]].result match {
-      case Left(_) => (Left(IncorrectTask(config)): Either[TaskError[Json, I], I]).pure[F]
+    def addIntention(config: Json): F[Either[IncorrectIntention[Json], I]] = config.as[Task[C]].result match {
+      case Left(_) => (Left(IncorrectIntention(config)): Either[IncorrectIntention[Json], I]).pure[F]
       case Right(tsk) => for {
         id <- freshId
         _ <- taskStorage.insert(id, tsk)
-      } yield (Right(id): Either[TaskError[Json, I], I])
+      } yield (Right(id): Either[IncorrectIntention[Json], I])
     }
 
-    def getTask(i: I): F[Either[TaskError[Json, I], Json]] =
+    def getIntention(i: I): F[Either[IntentionNotFound[I], Json]] =
       taskStorage.lookup(i) flatMap {
-        case None => (Left(TaskNotFound(i)): Either[TaskError[Json, I], Json]).pure[F]
-        case Some(tsk) => (Right(tsk.asJson): Either[TaskError[Json, I], Json]).pure[F]
+        case None => (Left(IntentionNotFound(i)): Either[IntentionNotFound[I], Json]).pure[F]
+        case Some(tsk) => (Right(tsk.asJson): Either[IntentionNotFound[I], Json]).pure[F]
       }
 
-    def editTask(id: I, config: Json): F[Condition[TaskError[Json, I]]] = config.as[Task[C]].result match {
-      case Left(_) => Condition.abnormal[TaskError[Json, I]](IncorrectTask(config)).pure[F]
+    def editIntention(id: I, config: Json): F[Condition[IntentionError[Json, I]]] = config.as[Task[C]].result match {
+      case Left(_) => Condition.abnormal[IntentionError[Json, I]](IncorrectIntention(config)).pure[F]
       case Right(tsk) => taskStorage.insert(id, tsk) as Condition.normal()
     }
 
-    def deleteTask(i: I): F[Condition[TaskError[Json, I]]] =
+    def deleteIntention(i: I): F[Condition[IntentionNotFound[I]]] =
       taskStorage.delete(i) as Condition.normal()
 
   }

@@ -27,7 +27,7 @@ object ScheduleError {
   final case class NotFoundError[I](index: I) extends SchedulerError[Nothing, I]
   final case class InitializationError[C](config: C) extends SchedulerError[C, Nothing]
 
-  trait TaskError[+C, +I] extends ScheduleError[Nothing, C, Nothing, I]
-  final case class IncorrectTask[C](config: C) extends TaskError[C, Nothing]
-  final case class TaskNotFound[I](index: I) extends TaskError[Nothing, I]
+  trait IntentionError[+C, +I] extends ScheduleError[Nothing, C, Nothing, I]
+  final case class IncorrectIntention[C](config: C) extends IntentionError[C, Nothing]
+  final case class IntentionNotFound[I](index: I) extends IntentionError[Nothing, I]
 }
