@@ -27,6 +27,9 @@ sealed trait ExternalModule extends Product with Serializable
 
 object ExternalModule {
 
+  def unapply(ar: AnyRef): Option[ExternalModule] =
+    wrap.lift(ar)
+
   val wrap: PartialFunction[AnyRef, ExternalModule] = {
     case lw: LightweightDatasourceModule =>
       Datasource(DatasourceModule.Lightweight(lw))
