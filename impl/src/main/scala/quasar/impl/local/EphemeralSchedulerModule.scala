@@ -41,8 +41,8 @@ object EphermalSchedulerModule {
 
   object PrintLn {
     implicit val submit: Submit[PrintLn] = new Submit[PrintLn] {
-      def submit[F[_]: ConcurrentEffect](pl: PrintLn): Stream[F, Unit] =
-        Stream.eval(Sync[F].delay(println(pl.value)))
+      def submit[F[_]: ConcurrentEffect](pl: PrintLn): F[Unit] =
+        Sync[F].delay(println(pl.value))
     }
     implicit val encodeJson: EncodeJson[PrintLn] = EncodeJson { pl =>
       Json("println" := pl.value)
@@ -60,23 +60,21 @@ object EphermalSchedulerModule {
 
       def sanitizeConfig(config: Json) = config
 
-      // TODO, here we need to create 3 additional indexed stores preserving identifiers of running tasks
-      // then create 3 sleep+repeat that are looking for `Period` in main indexed stores and those stores ^
-      // if there is nothing, then they run `submit` and put `id+now` into the store otherwise they do nothing.
       def schedule(config: Json): Resource[F, Either[InitializationError[Json], Schedule[F, Json, UUID]]] = {
-        val fMap: F[ConcurrentHashMap[UUID, Task[C]]] =
-          Sync[F].delay(new ConcurrentHashMap[UUID, Task[C]]())
-
-        val fStore: F[IndexedStore[F, UUID, Task[C]]] =
-          fMap map (ConcurrentMapIndexedStore.unhooked(_, blocker))
+        val fStore: F[IndexedStore[F, UUID, Intention[C]]] =
+          Sync[F].delay(new ConcurrentHashMap[UUID, Intention[C]]()) map (ConcurrentMapIndexedStore.unhooked(_, blocker))
 
         val freshId: F[UUID] =
           Sync[F].delay(UUID.randomUUID)
 
-        val fScheduler: F[Schedule[F, Json, UUID]] =
-          fStore map (EphemeralScheduler[F, UUID, C](freshId, _, blocker))
+        val fFlags: F[IndexedStore[F, UUID, Long]] =
+          Sync[F].delay(new ConcurrentHashMap[UUID, Long]()) map (ConcurrentMapIndexedStore.unhooked(_, blocker))
 
-        Resource.liftF(fScheduler map (Right(_)))
+        for {
+          store <- Resource.liftF(fStore)
+          flags <- Resource.liftF(fFlags)
+          scheduler <- EphemeralScheduler[F, UUID, C](freshId, store, flags, blocker)
+        } yield Right(scheduler)
       }
     }
   }
