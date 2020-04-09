@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.connector.schedule
+package quasar.connector.scheduler
 
 import slamdata.Predef._
 
 import quasar.Condition
-import quasar.api.schedule.ScheduleError._
+import quasar.api.scheduler.SchedulerError._
 
 import fs2.Stream
 
-trait Schedule[F[_], C, I] {
+trait Scheduler[F[_], C, I] {
   def intentions: Stream[F, (I, C)]
   def addIntention(config: C): F[Either[IncorrectIntention[C], I]]
   def getIntention(i: I): F[Either[IntentionNotFound[I], C]]

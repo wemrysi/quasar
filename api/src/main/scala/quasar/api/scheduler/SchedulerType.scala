@@ -14,18 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.api.schedule
+package quasar.api.scheduler
 
 import slamdata.Predef._
 
-import quasar.Condition
+import cats.{Order, Show}
+import cats.implicits._
 
-import ScheduleError.SchedulerError
+final case class SchedulerType(name: String, version: Long)
 
-trait Schedules[F[_], C, I] {
-  def addSchedule(ref: ScheduleRef[C]): F[Either[SchedulerError[C, I], I]]
-  def scheduleRef(i: I): F[Either[SchedulerError[C, I], ScheduleRef[C]]]
-  def removeSchedule(i: I): F[Condition[SchedulerError[C, I]]]
-  def replaceSchedule(i: I, ref: ScheduleRef[C]): F[Condition[SchedulerError[C, I]]]
-  def supportedTypes: F[Set[ScheduleType]]
+object SchedulerType {
+  implicit val orderSchedulerType: Order[SchedulerType] = Order.by { t =>
+    (t.name, t.version)
+  }
+
+  implicit val showSchedulerType: Show[SchedulerType] = Show.show { st =>
+    s"SchedulerType(${st.name.show}, ${st.version.show}"
+  }
 }

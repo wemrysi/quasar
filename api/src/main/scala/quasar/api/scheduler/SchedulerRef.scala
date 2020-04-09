@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.api.schedule
+package quasar.api.scheduler
 
 import slamdata.Predef._
 
@@ -23,21 +23,21 @@ import cats.implicits._
 
 import monocle.PLens
 
-final case class ScheduleRef[C](kind: ScheduleType, name: String, config: C)
+final case class SchedulerRef[C](kind: SchedulerType, name: String, config: C)
 
-object ScheduleRef {
-  def atMostRenamed[C: Eq](a: ScheduleRef[C], b: ScheduleRef[C]) =
+object SchedulerRef {
+  def atMostRenamed[C: Eq](a: SchedulerRef[C], b: SchedulerRef[C]) =
     a.kind === b.kind && a.config === b.config
 
-  def pConfig[C, D]: PLens[ScheduleRef[C], ScheduleRef[D], C, D] =
-    PLens[ScheduleRef[C], ScheduleRef[D], C, D](
+  def pConfig[C, D]: PLens[SchedulerRef[C], SchedulerRef[D], C, D] =
+    PLens[SchedulerRef[C], SchedulerRef[D], C, D](
       _.config)(
       d => _.copy(config = d))
 
-  implicit def orderScheduleRef[C: Order]: Order[ScheduleRef[C]] = Order.by { ref =>
+  implicit def orderSchedulerRef[C: Order]: Order[SchedulerRef[C]] = Order.by { ref =>
     (ref.kind, ref.name, ref.config)
   }
-  implicit def showScheduleRef[C: Show]: Show[ScheduleRef[C]] = Show.show { ref =>
-    s"ScheduleRef(${ref.kind.show}, ${ref.name.show}, ${ref.config.show}"
+  implicit def showSchedulerRef[C: Show]: Show[SchedulerRef[C]] = Show.show { ref =>
+    s"SchedulerRef(${ref.kind.show}, ${ref.name.show}, ${ref.config.show}"
   }
 }

@@ -19,8 +19,8 @@ package quasar.impl.local
 import slamdata.Predef._
 
 import quasar.Condition
-import quasar.api.schedule.ScheduleError._
-import quasar.connector.schedule._
+import quasar.api.scheduler.SchedulerError._
+import quasar.connector.scheduler._
 import quasar.impl.storage.IndexedStore
 
 import cats.effect._
@@ -36,7 +36,7 @@ import simulacrum.typeclass
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import scala.concurrent.duration._
 
-object EphemeralScheduler {
+object LocalScheduler {
   trait Period extends Product with Serializable
 
   object Period {
@@ -90,7 +90,7 @@ object EphemeralScheduler {
       storage: IndexedStore[F, I, Intention[C]],
       flags: IndexedStore[F, I, Long],
       blocker: Blocker)
-      : Resource[F, Schedule[F, Json, I]] = {
+      : Resource[F, Scheduler[F, Json, I]] = {
 
     def runIntention(k: I, intention: Intention[C], dt: ZonedDateTime): F[Unit] = for {
       hour <- Sync[F].delay(dt.getHour())
@@ -122,7 +122,7 @@ object EphemeralScheduler {
       }).compile.drain
     } yield ()
 
-    val schedule = new Schedule[F, Json, I] {
+    val scheduler = new Scheduler[F, Json, I] {
 
       def intentions: Stream[F, (I, Json)] =
         storage.entries map { case (k, tsk) => (k, tsk.asJson) }
@@ -160,7 +160,7 @@ object EphemeralScheduler {
         }
     }
 
-    Stream.emit(schedule)
+    Stream.emit(scheduler)
       .concurrently((Stream.eval(run) ++ Stream.sleep(1.minute)).repeat)
       .compile
       .resource

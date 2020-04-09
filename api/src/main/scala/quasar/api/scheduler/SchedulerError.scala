@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.api.schedule
+package quasar.api.scheduler
 
 import slamdata.Predef._
 
-sealed trait ScheduleError[+C, +CC, +I, +II] extends Product with Serializable
+sealed trait SchedulerError[+C, +CC, +I, +II] extends Product with Serializable
 
-object ScheduleError {
-  trait SchedulerError[+C, +I] extends ScheduleError[C, Nothing, I, Nothing]
-  final case class CreateError[C](config: C) extends SchedulerError[C, Nothing]
-  final case class DeleteError[C](config: C) extends SchedulerError[C, Nothing]
-  final case class NotFoundError[I](index: I) extends SchedulerError[Nothing, I]
-  final case class InitializationError[C](config: C) extends SchedulerError[C, Nothing]
+object SchedulerError {
+  trait SchedulerrError[+C, +I] extends SchedulerError[C, Nothing, I, Nothing]
+  final case class CreateError[C](config: C) extends SchedulerrError[C, Nothing]
+  final case class DeleteError[C](config: C) extends SchedulerrError[C, Nothing]
+  final case class NotFoundError[I](index: I) extends SchedulerrError[Nothing, I]
+  final case class InitializationError[C](config: C) extends SchedulerrError[C, Nothing]
 
-  trait IntentionError[+C, +I] extends ScheduleError[Nothing, C, Nothing, I]
+  trait IntentionError[+C, +I] extends SchedulerError[Nothing, C, Nothing, I]
   final case class IncorrectIntention[C](config: C) extends IntentionError[C, Nothing]
   final case class IntentionNotFound[I](index: I) extends IntentionError[Nothing, I]
 }

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.connector.schedule
+package quasar.connector.scheduler
 
-import quasar.api.schedule.ScheduleType
-import quasar.api.schedule.ScheduleError.InitializationError
+import quasar.api.scheduler.SchedulerType
+import quasar.api.scheduler.SchedulerError.InitializationError
 
 import argonaut.Json
 
@@ -25,9 +25,9 @@ import cats.effect._
 
 import scala.util.Either
 
-trait ScheduleModule[F[_], I] {
-  def scheduleType: ScheduleType
+trait SchedulerModule[F[_], I] {
+  def schedulerType: SchedulerType
   def sanitizeConfig(config: Json): Json
-  def schedule(config: Json)
-      : Resource[F, Either[InitializationError[Json], Schedule[F, Json, I]]]
+  def scheduler(config: Json)
+      : Resource[F, Either[InitializationError[Json], Scheduler[F, Json, I]]]
 }
