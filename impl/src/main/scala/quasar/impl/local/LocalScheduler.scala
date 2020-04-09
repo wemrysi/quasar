@@ -25,7 +25,7 @@ import quasar.impl.storage.IndexedStore
 
 import cats.effect._
 import cats.implicits._
-import cats.Eq
+import cats.{Eq, Show}
 
 import argonaut.{Argonaut, Json, EncodeJson, DecodeJson, DecodeResult}, Argonaut._
 
@@ -62,6 +62,7 @@ object LocalScheduler {
       longRes ||| stringRes
     }
     implicit val eqJsonPeriod: Eq[Period] = Eq.fromUniversalEquals
+    implicit val showPeriod: Show[Period] = Show.fromToString
   }
 
   final case class Intention[C](period: Period, content: C)
@@ -75,6 +76,9 @@ object LocalScheduler {
         period <- (c --\ "period").as[Period]
         content <- (c --\ "content").as[C]
       } yield Intention(period, content)
+    }
+    implicit def show[C: Show]: Show[Intention[C]] = Show.show[Intention[C]] { (i: Intention[C]) =>
+      s"Intention(${i.period.show}, ${i.content.show})"
     }
   }
 

@@ -22,17 +22,21 @@ import quasar.api.scheduler.SchedulerType
 import quasar.api.scheduler.SchedulerError.InitializationError
 import quasar.{concurrent => qc}
 import quasar.connector.scheduler._
+import quasar.contrib.scalaz.MonadError_
 import quasar.impl.local.LocalScheduler._
 import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
+import quasar.impl.store.{Store, StoreError}
 
-//import cats.data.EitherT
+import cats.data.EitherT
+import cats.Show
 import cats.effect._
 import cats.implicits._
 
-//import fs2.Stream
+import fs2.Stream
 
-import argonaut.{Argonaut, Json, EncodeJson, DecodeJson}, Argonaut._
+import argonaut.{Argonaut, Json, EncodeJson, DecodeJson, CodecJson}, Argonaut._
 
+import java.nio.file.Path
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -60,9 +64,12 @@ object LocalSchedulerModule {
       (c --\ "path").as[String].map(Config(_))
     }
   }
-/*
-  // TODO, we potentially can use smth like `{directory: <Path>}` and put two MapDB there
-  def apply[F[_]: ContextShift: ConcurentEffect: Timer, C: EncodeJson: DecodeJson: Submit]
+
+  def freshUUID[F[_]: Sync]: F[UUID] = Sync[F].delay(UUID.randomUUID)
+
+  def apply[
+      F[_]: ContextShift: ConcurrentEffect: Timer: MonadError_[?[_], StoreError],
+      C: EncodeJson: DecodeJson: Submit: Show]
       : SchedulerModule[F, UUID] = {
     lazy val blocker: Blocker = qc.Blocker.cached("local-scheduler")
     new SchedulerModule[F, UUID] {
@@ -75,28 +82,30 @@ object LocalSchedulerModule {
 
       def scheduler(config: Json)
           : Resource[F, Either[InitializationError[Json], Scheduler[F, Json, UUID]]] = {
-        val directory: EitherT[F, InitializationError, Path] = for {
+        val directory: EitherT[F, InitializationError[Json], Path] = for {
           conf <- attemptConfig[F, Config, InitializationError[Json]](
             config,
             "Failed to decode LocalScheduler config: ")(
             (c, d) => InitializationError(config))
-          root <- validatePath(c.path, "Invalid path: ") { d =>
+          root <- validatedPath(conf.path, "Invalid path: ") { d =>
             InitializationError(config)
           }
         } yield root
-        for {
+        val eitRes: EitherT[Resource[F, ?], InitializationError[Json], Scheduler[F, Json, UUID]] = for {
           root <- EitherT(Resource.liftF(directory.value))
           intentionsFile = root.resolve(IntentFile)
           flagsFile = root.resolve(FlagsFile)
-          intentDB <- EitherT.right(mapDB(intentionsFile))
-          flagsFile <- EitherT.right(mapDB(flagsFile))
-          intentionsStore <- ConcurrentMapIndexedStore.unhooked
-        } yield ()
+          scheduler <- EitherT.right(for {
+            intentStore <- Store.codecStore(intentionsFile, CodecJson.derived[Intention[C]], blocker)
+            flagsStore <- Store.codecStore(flagsFile, CodecJson.derived[Long], blocker)
+            scheduler <- LocalScheduler(freshUUID, intentStore, flagsStore, blocker)
+          } yield scheduler)
+        } yield scheduler
+        eitRes.value
       }
-
     }
   }
- */
+
   def ephemeral[F[_]: ContextShift: ConcurrentEffect: Timer, C: EncodeJson: DecodeJson: Submit]
       : SchedulerModule[F, UUID] = {
     lazy val blocker: Blocker = qc.Blocker.cached("ephemeral-scheduler")
@@ -110,16 +119,13 @@ object LocalSchedulerModule {
         val fStore: F[IndexedStore[F, UUID, Intention[C]]] =
           Sync[F].delay(new ConcurrentHashMap[UUID, Intention[C]]()) map (ConcurrentMapIndexedStore.unhooked(_, blocker))
 
-        val freshId: F[UUID] =
-          Sync[F].delay(UUID.randomUUID)
-
         val fFlags: F[IndexedStore[F, UUID, Long]] =
           Sync[F].delay(new ConcurrentHashMap[UUID, Long]()) map (ConcurrentMapIndexedStore.unhooked(_, blocker))
 
         for {
           store <- Resource.liftF(fStore)
           flags <- Resource.liftF(fFlags)
-          scheduler <- LocalScheduler[F, UUID, C](freshId, store, flags, blocker)
+          scheduler <- LocalScheduler[F, UUID, C](freshUUID, store, flags, blocker)
         } yield Right(scheduler)
       }
     }
