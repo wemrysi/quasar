@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar.impl
 
 import quasar._
 import quasar.api.resource.ResourcePath

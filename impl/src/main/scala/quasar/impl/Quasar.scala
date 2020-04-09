@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar.impl
 
 import slamdata.Predef._
 
@@ -34,18 +34,17 @@ import quasar.connector.evaluate._
 import quasar.connector.render.ResultRender
 import quasar.contrib.std.uuid._
 import quasar.ejson.implicits._
-import quasar.impl.{DatasourceModule, QuasarDatasource, ResourceManager, UuidString}
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources._
 import quasar.impl.datasources.middleware._
 import quasar.impl.destinations._
 import quasar.impl.discovery.DefaultDiscovery
 import quasar.impl.evaluate._
+import quasar.impl.implicits._
 import quasar.impl.push.DefaultResultPush
 import quasar.impl.storage.IndexedStore
 import quasar.impl.table.DefaultTables
 import quasar.qscript.{construction, Map => QSMap}
-import quasar.run.implicits._
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext

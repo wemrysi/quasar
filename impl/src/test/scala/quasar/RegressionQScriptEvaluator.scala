@@ -14,10 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar.impl
 
-import quasar.Variables
-import quasar.contrib.pathy.ADir
-import quasar.sql.Query
+import quasar._
+import quasar.common.PhaseResultTell
+import quasar.contrib.iota._
+import quasar.qscript._
 
-final case class SqlQuery(query: Query, vars: Variables, basePath: ADir)
+import matryoshka.{Hole => _, _}
+import matryoshka.implicits._
+
+import cats.Monad
+import cats.syntax.applicative._
+
+final class RegressionQScriptEvaluator[
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    F[_]: Monad: PhaseResultTell]
+    extends CountingQScriptEvaluator[T, F] {
+
+  def optimize(norm: T[QScriptNormalized[T, ?]]): F[T[QSM]] =
+    norm.transCata[T[QSM]](QSNormToQSM.inject(_)).pure[F]
+}

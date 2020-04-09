@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar.impl
 
 import quasar.api.datasource.DatasourceError.CreateError
 import quasar.api.destination.DestinationError.{CreateError => DestCreateError}
@@ -22,7 +22,7 @@ import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
 import quasar.contrib.scalaz.MonadError_
 import quasar.qscript.PlannerError
-import quasar.run.store.StoreError
+import quasar.impl.store.StoreError
 
 import argonaut.Json
 

@@ -16,6 +16,8 @@
 
 package quasar
 
+import quasar.contrib.scalaz.MonadError_
+
 import java.lang.String
 import java.util.UUID
 
@@ -28,4 +30,7 @@ package object impl {
     Prism[String, UUID](
       s => Try(UUID.fromString(s)).toOption)(
       u => u.toString)
+
+  type MonadQuasarErr[F[_]] = MonadError_[F, QuasarError]
+  def MonadQuasarErr[F[_]](implicit ev: MonadQuasarErr[F]): MonadQuasarErr[F] = ev
 }

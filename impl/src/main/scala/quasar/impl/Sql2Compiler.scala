@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar.impl
 
 import slamdata.Predef.{Long, None, StringContext}
 import quasar.RenderTreeT
@@ -24,9 +24,9 @@ import quasar.contrib.iota._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
+import quasar.impl.implicits._
 import quasar.qscript.QScriptEducated
 import quasar.qsu.LPtoQS
-import quasar.run.implicits._
 import quasar.sql.parser
 
 import cats.data.Kleisli

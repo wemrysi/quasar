@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.run
+package quasar.impl
 
 import slamdata.Predef.{Exception, Product, Serializable, Throwable}
 
@@ -22,8 +22,8 @@ import quasar.api.datasource.DatasourceError.CreateError
 import quasar.api.destination.DestinationError.{CreateError => DestCreateError}
 import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
+import quasar.impl.store.StoreError
 import quasar.qscript.PlannerError
-import quasar.run.store.StoreError
 import quasar.sql.ParsingError
 
 import argonaut.Json
