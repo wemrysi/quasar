@@ -26,8 +26,8 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.impl.{CachedGetter, IndexedSemaphore, QuasarDatasource, ResourceManager}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 
-import cats.effect.{Concurrent, ContextShift, Sync, Resource}
 import cats.~>
+import cats.effect.{Concurrent, ContextShift, Sync, Resource}
 
 import fs2.Stream
 
@@ -38,7 +38,6 @@ import scalaz.syntax.monad._
 import scalaz.syntax.std.boolean._
 
 import shims.{monadToScalaz, equalToCats}
-import shims.effect.scalazEitherTSync
 
 private[quasar] final class DefaultDatasources[
     T[_[_]],
@@ -85,7 +84,7 @@ private[quasar] final class DefaultDatasources[
       Condition.abnormal(datasourceNotFound[I, ExistentialError[I]](i)).point[F])
 
   def replaceDatasource(i: I, ref: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] =
-    throughSemaphore[F](i, λ[F ~> F](x => x)) apply {
+    throughSemaphore(i) {
       lazy val notFound = Condition.abnormal(datasourceNotFound[I, DatasourceError[I, C]](i))
 
       getter(i) flatMap {
@@ -129,39 +128,49 @@ private[quasar] final class DefaultDatasources[
   private def getQDS[E >: ExistentialError[I] <: DatasourceError[I, C]](i: I): EitherT[F, E, QDS] = {
     type Res[A] = EitherT[F, E, A]
     type L[M[_], A] = EitherT[M, E, A]
-    lazy val error: Res[QDS] = EitherT.pureLeft(datasourceNotFound[I, E](i))
-    lazy val fromCache: Res[QDS] = cache.get(i).liftM[L] flatMap {
-      case None => error
-      case Some(a) => EitherT.pure(a)
-    }
-    throughSemaphore[Res](i, λ[F ~> Res](x => x.liftM[L])).apply {
-      getter(i).liftM[L] flatMap {
+
+    lazy val error: F[E \/ QDS] =
+      datasourceNotFound[I, E](i).left[QDS].pure[F]
+
+    lazy val fromCache: F[E \/ QDS] =
+      cache.get(i) flatMap {
+        case None => error
+        case Some(a) => a.right[E].pure[F]
+      }
+
+    EitherT(throughSemaphore(i)(
+      getter(i) flatMap {
         case Empty =>
           error
+
         case Removed(_) =>
-          dispose(i).liftM[L] >> error
+          dispose(i) >> error
+
         case Inserted(ref) =>
-          cache.get(i).liftM[L] flatMap {
+          cache.get(i) flatMap {
             case None =>
               for {
-                allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
-                _ <- cache.manage(i, allocated).liftM[L]
-              } yield allocated._1
-            case Some(a) => EitherT.pure(a)
+                allocated <- createErrorHandling(modules.create(i, ref)).allocated
+                _ <- cache.manage(i, allocated)
+              } yield allocated._1.right[E]
+
+            case Some(a) => a.right[E].pure[F]
           }
+
         case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
           fromCache
+
         case Preserved(_) =>
           fromCache
-        case Updated(ref, _) => for {
-          _ <- dispose(i).liftM[L]
-          allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
-          _ <- cache.manage(i, allocated).liftM[L]
-        } yield allocated._1
-      }
-    }
-  }
 
+        case Updated(ref, _) =>
+          for {
+            _ <- dispose(i)
+            allocated <- createErrorHandling(modules.create(i, ref)).allocated
+            _ <- cache.manage(i, allocated)
+          } yield allocated._1.right[E]
+      }))
+  }
 
   private def addRef[E >: CreateError[C] <: DatasourceError[I, C]](i: I, ref: DatasourceRef[C]): F[Condition[E]] = {
     val action = for {
@@ -213,9 +222,8 @@ private[quasar] final class DefaultDatasources[
         (x: CreateError[C]) => Resource.liftF(MonadError_[F, CreateError[C]].raiseError(x)),
         _.point[Resource[F, ?]])))
 
-  private def throughSemaphore[G[_]: Sync](i: I, fg: F ~> G): G ~> G = λ[G ~> G]{ ga =>
-    semaphore.get(i).mapK(fg).use(_ => ga)
-  }
+  private def throughSemaphore(i: I): F ~> F =
+    λ[F ~> F](fa => semaphore.get(i).use(_ => fa))
 }
 
 object DefaultDatasources {
