@@ -29,5 +29,5 @@ trait SchedulerModule[F[_], I] {
   def schedulerType: SchedulerType
   def sanitizeConfig(config: Json): Json
   def scheduler(config: Json)
-      : Resource[F, Either[InitializationError[Json], Scheduler[F, Json, I]]]
+      : Resource[F, Either[InitializationError[Json], Scheduler[F, I, Json]]]
 }

@@ -37,6 +37,11 @@ object SchedulerRef {
   implicit def orderSchedulerRef[C: Order]: Order[SchedulerRef[C]] = Order.by { ref =>
     (ref.kind, ref.name, ref.config)
   }
+
+  implicit def eqSchedulerRef[C: Eq]: Eq[SchedulerRef[C]] = Eq.by { ref =>
+    (ref.kind, ref.name, ref.config)
+  }
+
   implicit def showSchedulerRef[C: Show]: Show[SchedulerRef[C]] = Show.show { ref =>
     s"SchedulerRef(${ref.kind.show}, ${ref.name.show}, ${ref.config.show}"
   }

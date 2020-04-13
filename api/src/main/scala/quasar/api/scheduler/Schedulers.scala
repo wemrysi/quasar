@@ -20,12 +20,15 @@ import slamdata.Predef._
 
 import quasar.Condition
 
-import SchedulerError.SchedulerrError
+import fs2.Stream
 
-trait Schedulers[F[_], C, I] {
-  def addScheduler(ref: SchedulerRef[C]): F[Either[SchedulerrError[C, I], I]]
-  def schedulerRef(i: I): F[Either[SchedulerrError[C, I], SchedulerRef[C]]]
-  def removeScheduler(i: I): F[Condition[SchedulerrError[C, I]]]
-  def replaceScheduler(i: I, ref: SchedulerRef[C]): F[Condition[SchedulerrError[C, I]]]
+import SchedulerError._
+
+trait Schedulers[F[_], I, II, C, CC] {
+  def addScheduler(ref: SchedulerRef[C]): F[Either[CreateError[C], I]]
+  def schedulerRef(i: I): F[Either[SchedulerNotFound[I], SchedulerRef[C]]]
+  def removeScheduler(i: I): F[Condition[SchedulerError[I, C]]]
+  def replaceScheduler(i: I, ref: SchedulerRef[C]): F[Condition[SchedulerError[I, C]]]
   def supportedTypes: F[Set[SchedulerType]]
+  def intentions: Stream[F, (I, II, CC)]
 }

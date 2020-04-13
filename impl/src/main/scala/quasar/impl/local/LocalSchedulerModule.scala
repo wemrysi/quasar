@@ -63,7 +63,7 @@ object LocalSchedulerModule {
       def sanitizeConfig(config: Json) = config
 
       def scheduler(config: Json)
-          : Resource[F, Either[InitializationError[Json], Scheduler[F, Json, UUID]]] = {
+          : Resource[F, Either[InitializationError[Json], Scheduler[F, UUID, Json]]] = {
         val directory: EitherT[F, InitializationError[Json], Path] = for {
           conf <- attemptConfig[F, Config, InitializationError[Json]](
             config,
@@ -73,7 +73,7 @@ object LocalSchedulerModule {
             InitializationError(config)
           }
         } yield root
-        val eitRes: EitherT[Resource[F, ?], InitializationError[Json], Scheduler[F, Json, UUID]] = for {
+        val eitRes: EitherT[Resource[F, ?], InitializationError[Json], Scheduler[F, UUID, Json]] = for {
           root <- EitherT(Resource.liftF(directory.value))
           intentionsFile = root.resolve(IntentFile)
           flagsFile = root.resolve(FlagsFile)
@@ -97,7 +97,7 @@ object LocalSchedulerModule {
 
       def sanitizeConfig(config: Json) = config
 
-      def scheduler(config: Json): Resource[F, Either[InitializationError[Json], Scheduler[F, Json, UUID]]] = {
+      def scheduler(config: Json): Resource[F, Either[InitializationError[Json], Scheduler[F, UUID, Json]]] = {
         val fStore: F[IndexedStore[F, UUID, Intention[C]]] =
           Sync[F].delay(new ConcurrentHashMap[UUID, Intention[C]]()) map (ConcurrentMapIndexedStore.unhooked(_, blocker))
 

@@ -38,16 +38,16 @@ import scalaz.syntax.std.either._
 
 import shims.{monadToScalaz, monadToCats}
 
-trait DestinationModules[F[_], I, C] {
+trait DestinationModules[F[_], C] {
   def create(ref: DestinationRef[C]): EitherT[Resource[F, ?], CreateError[C], Destination[F]]
   def sanitizeRef(inp: DestinationRef[C]): DestinationRef[C]
   def supportedTypes: F[ISet[DestinationType]]
 }
 
 object DestinationModules {
-  def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr, I](
+  def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr](
       modules: List[DestinationModule])
-      : DestinationModules[F, I, Json] = {
+      : DestinationModules[F, Json] = {
 
     lazy val moduleSet: ISet[DestinationType] =
       ISet.fromList(modules.map(_.destinationType))
@@ -55,7 +55,7 @@ object DestinationModules {
     lazy val moduleMap: Map[DestinationType, DestinationModule] =
       Map(modules.map(ds => (ds.destinationType, ds)):_*)
 
-    new DestinationModules[F, I, Json] {
+    new DestinationModules[F, Json] {
       def create(ref: DestinationRef[Json]): EitherT[Resource[F, ?], CreateError[Json], Destination[F]] =
         moduleMap.get(ref.kind) match {
           case None =>

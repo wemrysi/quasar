@@ -23,10 +23,10 @@ import quasar.api.scheduler.SchedulerError._
 
 import fs2.Stream
 
-trait Scheduler[F[_], C, I] {
+trait Scheduler[F[_], I, C] {
   def intentions: Stream[F, (I, C)]
   def addIntention(config: C): F[Either[IncorrectIntention[C], I]]
   def getIntention(i: I): F[Either[IntentionNotFound[I], C]]
-  def editIntention(i: I, config: C): F[Condition[IntentionError[C, I]]]
+  def editIntention(i: I, config: C): F[Condition[IntentionError[I, C]]]
   def deleteIntention(i: I): F[Condition[IntentionNotFound[I]]]
 }

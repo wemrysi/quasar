@@ -45,7 +45,7 @@ private[quasar] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
     refs: IndexedStore[F, I, DestinationRef[C]],
     cache: ResourceManager[F, I, Destination[F]],
     getter: CachedGetter[F, I, DestinationRef[C]],
-    modules: DestinationModules[F, I, C],
+    modules: DestinationModules[F, C],
     currentErrors: Ref[F, IMap[I, Exception]])
     extends Destinations[F, Stream[F, ?], I, C] {
 
@@ -212,7 +212,7 @@ object DefaultDestinations {
       freshId: F[I],
       refs: IndexedStore[F, I, DestinationRef[C]],
       cache: ResourceManager[F, I, Destination[F]],
-      modules: DestinationModules[F, I, C])
+      modules: DestinationModules[F, C])
       : F[DefaultDestinations[F, I, C]] = for {
     semaphore <- IndexedSemaphore[F, I]
     errs <- Ref.of[F, IMap[I, Exception]](IMap.empty)

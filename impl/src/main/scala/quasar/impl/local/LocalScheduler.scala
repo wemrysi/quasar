@@ -95,7 +95,7 @@ object LocalScheduler {
       storage: IndexedStore[F, I, Intention[C]],
       flags: IndexedStore[F, I, Long],
       blocker: Blocker)
-      : Resource[F, Scheduler[F, Json, I]] = {
+      : Resource[F, Scheduler[F, I, Json]] = {
 
     def runIntention(k: I, intention: Intention[C], dt: ZonedDateTime): F[Unit] = for {
       hour <- Sync[F].delay(dt.getHour())
@@ -128,7 +128,7 @@ object LocalScheduler {
       }).compile.drain
     } yield ()
 
-    val scheduler = new Scheduler[F, Json, I] {
+    val scheduler = new Scheduler[F, I, Json] {
 
       def intentions: Stream[F, (I, Json)] =
         storage.entries map { case (k, tsk) => (k, tsk.asJson) }
@@ -148,13 +148,13 @@ object LocalScheduler {
           case Some(tsk) => Right(tsk.asJson)
         }
 
-      def editIntention(id: I, config: Json): F[Condition[IntentionError[Json, I]]] = config.as[Intention[C]].result match {
+      def editIntention(id: I, config: Json): F[Condition[IntentionError[I, Json]]] = config.as[Intention[C]].result match {
         case Left(_) =>
-          Condition.abnormal[IntentionError[Json, I]](IncorrectIntention(config)).pure[F]
+          Condition.abnormal[IntentionError[I, Json]](IncorrectIntention(config)).pure[F]
         case Right(tsk) =>
           storage.lookup(id) flatMap {
             case None =>
-              Condition.abnormal[IntentionError[Json, I]](IntentionNotFound(id)).pure[F]
+              Condition.abnormal[IntentionError[I, Json]](IntentionNotFound(id)).pure[F]
             case Some(_) =>
               storage.insert(id, tsk) as Condition.normal()
           }

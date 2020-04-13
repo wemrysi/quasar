@@ -98,7 +98,7 @@ object Quasar extends Logging {
       : Resource[F, Quasar[F, R, C]] = {
 
     val destModules =
-      DestinationModules[F, UUID](destinationModules)
+      DestinationModules[F](destinationModules)
 
     for {
       _ <- Resource.liftF(warnDuplicates[F, DatasourceModule, DatasourceType](datasourceModules)(_.kind))
