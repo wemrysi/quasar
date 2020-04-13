@@ -32,8 +32,6 @@ import cats.Show
 import cats.effect._
 import cats.implicits._
 
-import fs2.Stream
-
 import argonaut.{Argonaut, Json, EncodeJson, DecodeJson, CodecJson}, Argonaut._
 
 import java.nio.file.Path
@@ -41,22 +39,6 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 object LocalSchedulerModule {
-  // For tests
-  final case class PrintLn(value: String)
-
-  object PrintLn {
-    implicit val submit: Submit[PrintLn] = new Submit[PrintLn] {
-      def submit[F[_]: ConcurrentEffect](pl: PrintLn): F[Unit] =
-        Sync[F].delay(println(pl.value))
-    }
-    implicit val encodeJson: EncodeJson[PrintLn] = EncodeJson { pl =>
-      Json("println" := pl.value)
-    }
-    implicit val decodeJson: DecodeJson[PrintLn] = DecodeJson { c =>
-      (c --\ "println").as[String] map (PrintLn(_))
-    }
-  }
-
   case class Config(path: String)
 
   object Config {
@@ -69,7 +51,7 @@ object LocalSchedulerModule {
 
   def apply[
       F[_]: ContextShift: ConcurrentEffect: Timer: MonadError_[?[_], StoreError],
-      C: EncodeJson: DecodeJson: Submit: Show]
+      C: EncodeJson: DecodeJson: Submit[F, ?]: Show]
       : SchedulerModule[F, UUID] = {
     lazy val blocker: Blocker = qc.Blocker.cached("local-scheduler")
     new SchedulerModule[F, UUID] {
@@ -106,7 +88,7 @@ object LocalSchedulerModule {
     }
   }
 
-  def ephemeral[F[_]: ContextShift: ConcurrentEffect: Timer, C: EncodeJson: DecodeJson: Submit]
+  def ephemeral[F[_]: ContextShift: ConcurrentEffect: Timer, C: EncodeJson: DecodeJson: Submit[F, ?]]
       : SchedulerModule[F, UUID] = {
     lazy val blocker: Blocker = qc.Blocker.cached("ephemeral-scheduler")
     new SchedulerModule[F, UUID] {

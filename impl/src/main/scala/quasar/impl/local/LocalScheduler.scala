@@ -31,8 +31,6 @@ import argonaut.{Argonaut, Json, EncodeJson, DecodeJson, DecodeResult}, Argonaut
 
 import fs2.Stream
 
-import simulacrum.typeclass
-
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import scala.concurrent.duration._
 
@@ -82,14 +80,17 @@ object LocalScheduler {
     }
   }
 
-  @typeclass trait Submit[A] {
-    def submit[F[_]: ConcurrentEffect](a: A): F[Unit]
+  trait Submit[F[_], A] {
+    def submit(a: A): F[Unit]
+  }
+
+  object Submit {
+    def apply[F[_], A](implicit ev: Submit[F, A]): Submit[F, A] = ev
   }
 
   import Period._
-  import Submit.ops._
 
-  def apply[F[_]: ContextShift: ConcurrentEffect: Timer, I, C: EncodeJson: DecodeJson: Submit](
+  def apply[F[_]: ContextShift: ConcurrentEffect: Timer, I, C: EncodeJson: DecodeJson: Submit[F, ?]](
       freshId: F[I],
       storage: IndexedStore[F, I, Intention[C]],
       flags: IndexedStore[F, I, Long],
@@ -99,18 +100,19 @@ object LocalScheduler {
     def runIntention(k: I, intention: Intention[C], dt: ZonedDateTime): F[Unit] = for {
       hour <- Sync[F].delay(dt.getHour())
       minute <- Sync[F].delay(dt.getMinute())
+      submit = ((c: C) => Submit[F, C].submit(c))
       _ <- intention.period match {
         case Minutely =>
-          intention.content.submit
+          submit(intention.content)
         case Hourly if minute === 0 =>
-          intention.content.submit
+          submit(intention.content)
         case Daily if (minute === 0 && hour === 0) =>
-          intention.content.submit
+          submit(intention.content)
         case OnceAt(millis) =>
           val nowMS = dt.toInstant().toEpochMilli()
           if (nowMS < millis) ().pure[F]
           else flags.lookup(k) flatMap {
-            case None => intention.content.submit >> flags.insert(k, nowMS)
+            case None => submit(intention.content) >> flags.insert(k, nowMS)
             case Some(_) => ().pure[F]
           }
         case _ => ().pure[F]
