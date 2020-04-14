@@ -26,6 +26,7 @@ import quasar.api.discovery.{Discovery, SchemaConfig}
 import quasar.api.push.ResultPush
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.table.{TableRef, Tables}
+import quasar.api.scheduler.{Scheduler, Schedulers, SchedulerRef, SchedulerModule}
 import quasar.common.PhaseResultTell
 import quasar.connector.{QueryResult, ResourceSchema}
 import quasar.connector.datasource.Datasource
@@ -42,6 +43,7 @@ import quasar.impl.discovery.DefaultDiscovery
 import quasar.impl.evaluate._
 import quasar.impl.implicits._
 import quasar.impl.push.DefaultResultPush
+import quasar.impl.scheduler._
 import quasar.impl.storage.IndexedStore
 import quasar.impl.table.DefaultTables
 import quasar.qscript.{construction, Map => QSMap}
@@ -66,7 +68,7 @@ import matryoshka.data.Fix
 
 import org.slf4s.Logging
 
-import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, showToCats}
+import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, showToCats, equalToCats}
 
 final class Quasar[F[_], R, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json],
@@ -74,7 +76,8 @@ final class Quasar[F[_], R, C <: SchemaConfig](
     val tables: Tables[F, UUID, SqlQuery],
     val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, Stream[F, R]],
     val discovery: Discovery[Resource[F, ?], Stream[F, ?], UUID, C],
-    val resultPush: ResultPush[F, UUID, UUID])
+    val resultPush: ResultPush[F, UUID, UUID],
+    val schedulers: Schedulers[F, UUID, UUID, Json, Json])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 object Quasar extends Logging {
@@ -85,6 +88,7 @@ object Quasar extends Logging {
   def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer, R, C <: SchemaConfig, A: Hash](
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
+      schedulerRefs: IndexedStore[F, UUID, SchedulerRef[Json]],
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
       queryFederation: QueryFederation[Fix, Resource[F, ?], QueryAssociate[Fix, Resource[F, ?], EvalResult[F]], Stream[F, R]],
       resultRender: ResultRender[F, R],
@@ -92,13 +96,18 @@ object Quasar extends Logging {
       rateLimiting: RateLimiting[F, A],
       byteStores: ByteStores[F, UUID])(
       datasourceModules: List[DatasourceModule],
-      destinationModules: List[DestinationModule])(
+      destinationModules: List[DestinationModule],
+      schedulerModules: List[SchedulerModule[F, UUID]])(
       implicit
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
 
     val destModules =
       DestinationModules[F](destinationModules)
+
+    val sModules =
+      SchedulerModules[F, UUID](schedulerModules)
+
 
     for {
       _ <- Resource.liftF(warnDuplicates[F, DatasourceModule, DatasourceType](datasourceModules)(_.kind))
@@ -125,6 +134,9 @@ object Quasar extends Logging {
       destCache <- ResourceManager[F, UUID, Destination[F]]
       destinations <- Resource.liftF(DefaultDestinations(freshUUID, destinationRefs, destCache, destModules))
 
+      sCache <- ResourceManager[F, UUID, Scheduler[F, UUID, Json]]
+      schedulers <- Resource.liftF(DefaultSchedulers(freshUUID, schedulerRefs, sCache, sModules))
+
       lookupRunning =
         (id: UUID) => datasources.quasarDatasourceOf(id).map(_.map(_.modify(reifiedAggregateDs)))
 
@@ -148,7 +160,7 @@ object Quasar extends Logging {
         jobManager,
         resultRender))
 
-    } yield new Quasar(datasources, destinations, tables, sqlEvaluator, discovery, push)
+    } yield new Quasar(datasources, destinations, tables, sqlEvaluator, discovery, push, schedulers)
   }
 
   ////
