@@ -19,6 +19,7 @@ package quasar.impl.external
 import quasar.impl.DatasourceModule
 import quasar.connector.destination.DestinationModule
 import quasar.connector.datasource.{HeavyweightDatasourceModule, LightweightDatasourceModule}
+import quasar.connector.scheduler.SchedulerModule
 
 import slamdata.Predef._
 
@@ -39,8 +40,12 @@ object ExternalModule {
 
     case dm: DestinationModule =>
       Destination(dm)
+
+    case sm: SchedulerModule =>
+      Scheduler(sm)
   }
 
   final case class Datasource(mod: DatasourceModule) extends ExternalModule
   final case class Destination(mod: DestinationModule) extends ExternalModule
+  final case class Scheduler(mod: SchedulerModule) extends ExternalModule
 }

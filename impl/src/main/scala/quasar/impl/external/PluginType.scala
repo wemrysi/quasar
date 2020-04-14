@@ -29,6 +29,7 @@ sealed abstract class PluginType(
 object PluginType {
   case object Datasource extends PluginType("Datasource-Module", DisplayName("datasource", "Datasource", "datasources"))
   case object Destination extends PluginType("Destination-Module", DisplayName("destination", "Destination", "destinations"))
+  case object Scheduler extends PluginType("Scheduler-Module", DisplayName("scheduler", "Scheduler", "schedulers"))
 
   implicit val equal: Eq[PluginType] =
     Eq.fromUniversalEquals
