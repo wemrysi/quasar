@@ -18,9 +18,7 @@ package quasar.impl.scheduler
 
 import slamdata.Predef._
 
-import quasar.EffectfulQSpec
-
-import quasar.Condition
+import quasar.{Condition, EffectfulQSpec}
 import quasar.api.scheduler._, SchedulerError._
 import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
@@ -91,6 +89,7 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
       }
     }
     "non-empty" >>* {
+
       val expected = Set(fooKind)
       for {
         actual <- mkModules(List(module(fooKind))).supportedTypes

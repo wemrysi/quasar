@@ -39,6 +39,8 @@ import java.util.concurrent.ConcurrentHashMap
 import LocalSchedulerSpec._
 
 class LocalSchedulerSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[IO] with ConditionMatchers {
+  sequential
+
   lazy val blocker: Blocker = qc.Blocker.cached("local-scheduler-tests")
 
   val defaultTimer: Timer[IO] = IO.timer(ec)
@@ -101,6 +103,7 @@ class LocalSchedulerSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[I
             _ <- (1 to 10).toList.traverse { i =>
               ref.set(i * 60000L) >> timer.sleep(1.minute)
             }
+            _ <- timer.sleep(10.seconds)
             result <- resultRef.get
           } yield result
         }
@@ -128,7 +131,7 @@ class LocalSchedulerSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[I
             _ <- timer.sleep(1.minute)
             _ <- scheduler.addIntention(Intention(Period.Minutely, StringTrail("1")).asJson)
             _ <- ref.set(2 * 60000L)
-            _ <- timer.sleep(1.minute)
+            _ <- timer.sleep(1.minute + 10.seconds)
             result <- resultRef.get
           } yield result
         }

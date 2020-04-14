@@ -93,7 +93,7 @@ object LocalSchedulerModule {
 
       val schedulerType: SchedulerType = SchedulerType("ephemeral", 1L)
 
-      def sanitizeConfig(config: Json) = config
+      def sanitizeConfig(config: Json) = Json.jString("sanitized")
 
       def scheduler(config: Json): Resource[F, Either[InitializationError[Json], Scheduler[F, UUID, Json]]] = {
         val fStore: F[IndexedStore[F, UUID, Intention[C]]] =
