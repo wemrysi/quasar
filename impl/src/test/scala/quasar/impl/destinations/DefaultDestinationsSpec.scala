@@ -18,7 +18,7 @@ package quasar.impl.destinations
 
 import slamdata.Predef._
 
-import quasar.ConditionMatchers
+import quasar.{Condition, ConditionMatchers}
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.{concurrent => qc}
@@ -37,12 +37,13 @@ import cats.instances.string._
 import cats.instances.option._
 import cats.effect.{Blocker, IO, Resource}
 import cats.effect.concurrent.Ref
+import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 import cats.syntax.traverse._
 
 import eu.timepit.refined.auto._
 
-import scalaz.ISet
+import scalaz.{\/-, -\/, ISet}
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -108,6 +109,26 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         } yield {
           result must be_\/-
           foundRef must beSome
+        }
+      }
+      "returns created destinations" >>* {
+        mkDestinations use { case (store, dests, cache) =>
+          for {
+            md0 <- dests.allDestinationMetadata.flatMap(_.compile.toList)
+            addStatus <- dests.addDestination(testRef)
+            md1 <- dests.allDestinationMetadata.flatMap(_.compile.toList)
+            d <- addStatus match {
+              case -\/(_) => None.pure[IO]
+              case \/-(s) => dests.destinationOf(s).map(_.toOption)
+            }
+          } yield {
+            md0 must_== List[(String, quasar.api.destination.DestinationMeta)]()
+            addStatus must be_\/-
+            md1.map(_._2) must_== List(
+              DestinationMeta(MockDestinationType, testRef.name, Condition.Normal[Exception])
+            )
+            d must beSome
+          }
         }
       }
       "rejects duplicate names" >>* {

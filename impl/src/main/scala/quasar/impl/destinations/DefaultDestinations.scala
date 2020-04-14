@@ -88,10 +88,15 @@ private[quasar] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
             error
           case Removed(_) =>
             cache.shutdown(i).liftM[L] >> error
-          case Inserted(ref) => for {
-            allocated <- allocateDestination[DE](ref)
-            _ <- cache.manage(i, allocated).liftM[L]
-          } yield allocated._1
+          case Inserted(ref) =>
+            cache.get(i).liftM[L] flatMap {
+              case None =>
+                for {
+                  allocated <- allocateDestination[DE](ref)
+                  _ <- cache.manage(i, allocated).liftM[L]
+                } yield allocated._1
+              case Some(a) => EitherT.pure(a)
+            }
           case Updated(incoming, old) if DestinationRef.atMostRenamed(incoming, old) =>
             fromCache
           case Preserved(_) =>
