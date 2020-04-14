@@ -37,6 +37,7 @@ import scala.concurrent.ExecutionContext
 import SchedulerModulesSpec._
 
 final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[IO] {
+
   implicit val timer = IO.timer(ec)
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
