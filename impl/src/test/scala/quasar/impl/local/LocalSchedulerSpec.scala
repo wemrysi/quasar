@@ -38,6 +38,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 import LocalSchedulerSpec._
 
+// This is hacky because I'm not sure how to define Timer[IO] that works x times faster than default one
+// So, there is a timer that works x times fiaster and have a clock that returns predefined time.
 class LocalSchedulerSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[IO] with ConditionMatchers {
   sequential
 
@@ -77,6 +79,7 @@ class LocalSchedulerSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[I
             _ <- scheduler.addIntention(Intention(Period.Minutely, StringTrail("trail")).asJson)
             _ <- ref.set(60000L)
             _ <- timer.sleep(1.minute)
+            _ <- ref.set(60001L)
             result <- resultRef.get
           } yield result
         }
@@ -103,7 +106,7 @@ class LocalSchedulerSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[I
             _ <- (1 to 10).toList.traverse { i =>
               ref.set(i * 60000L) >> timer.sleep(1.minute)
             }
-            _ <- timer.sleep(10.seconds)
+            _ <- timer.sleep(50.seconds)
             result <- resultRef.get
           } yield result
         }
@@ -131,7 +134,7 @@ class LocalSchedulerSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[I
             _ <- timer.sleep(1.minute)
             _ <- scheduler.addIntention(Intention(Period.Minutely, StringTrail("1")).asJson)
             _ <- ref.set(2 * 60000L)
-            _ <- timer.sleep(1.minute + 10.seconds)
+            _ <- timer.sleep(2.minute)
             result <- resultRef.get
           } yield result
         }
