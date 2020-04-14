@@ -22,7 +22,6 @@ import quasar.{Condition, EffectfulQSpec}
 import quasar.api.scheduler._, SchedulerError._
 import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
-import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
 
 import argonaut.Json
 import argonaut.JsonCats._

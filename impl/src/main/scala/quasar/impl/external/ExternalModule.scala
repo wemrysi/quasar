@@ -16,10 +16,13 @@
 
 package quasar.impl.external
 
+import quasar.api.scheduler.SchedulerModule
 import quasar.impl.DatasourceModule
 import quasar.connector.destination.DestinationModule
 import quasar.connector.datasource.{HeavyweightDatasourceModule, LightweightDatasourceModule}
-import quasar.connector.scheduler.SchedulerModule
+
+import cats.effect.IO
+import java.util.UUID
 
 import slamdata.Predef._
 
@@ -41,11 +44,14 @@ object ExternalModule {
     case dm: DestinationModule =>
       Destination(dm)
 
-    case sm: SchedulerModule =>
+    case sm: ConcreteSchedulerModule =>
       Scheduler(sm)
   }
 
+  final case class ConcreteSchedulerModule(value: SchedulerModule[IO, UUID])
+
+
   final case class Datasource(mod: DatasourceModule) extends ExternalModule
   final case class Destination(mod: DestinationModule) extends ExternalModule
-  final case class Scheduler(mod: SchedulerModule) extends ExternalModule
+  final case class Scheduler(mod: ConcreteSchedulerModule) extends ExternalModule
 }
