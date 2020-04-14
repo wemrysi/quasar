@@ -21,7 +21,6 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.scheduler._
 import quasar.api.scheduler.SchedulerError._
-import quasar.connector.scheduler.Scheduler
 import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 

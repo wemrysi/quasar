@@ -18,10 +18,8 @@ package quasar.impl.local
 
 import slamdata.Predef._
 
-import quasar.api.scheduler.SchedulerType
-import quasar.api.scheduler.SchedulerError.InitializationError
+import quasar.api.scheduler._, SchedulerError._
 import quasar.{concurrent => qc}
-import quasar.connector.scheduler._
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.local.LocalScheduler._
 import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
@@ -68,9 +66,9 @@ object LocalSchedulerModule {
           conf <- attemptConfig[F, Config, InitializationError[Json]](
             config,
             "Failed to decode LocalScheduler config: ")(
-            (c, d) => InitializationError(config))
+            (c, d) => MalformedConfiguration(schedulerType, c, d): InitializationError[Json])
           root <- validatedPath(conf.path, "Invalid path: ") { d =>
-            InitializationError(config)
+            InvalidConfiguration(schedulerType, config, Set(d)): InitializationError[Json]
           }
         } yield root
         val eitRes: EitherT[Resource[F, ?], InitializationError[Json], Scheduler[F, UUID, Json]] = for {

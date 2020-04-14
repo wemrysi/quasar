@@ -14,19 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.connector.scheduler
+package quasar.api.scheduler
 
-import slamdata.Predef._
 
-import quasar.Condition
-import quasar.api.scheduler.SchedulerError._
+import argonaut.Json
 
-import fs2.Stream
+import cats.effect._
 
-trait Scheduler[F[_], I, C] {
-  def intentions: Stream[F, (I, C)]
-  def addIntention(config: C): F[Either[IncorrectIntention[C], I]]
-  def getIntention(i: I): F[Either[IntentionNotFound[I], C]]
-  def editIntention(i: I, config: C): F[Condition[IntentionError[I, C]]]
-  def deleteIntention(i: I): F[Condition[IntentionNotFound[I]]]
+import scala.util.Either
+
+import SchedulerError._
+
+trait SchedulerModule[F[_], I] {
+  def schedulerType: SchedulerType
+  def sanitizeConfig(config: Json): Json
+  def scheduler(config: Json)
+      : Resource[F, Either[InitializationError[Json], Scheduler[F, I, Json]]]
 }

@@ -20,7 +20,6 @@ import slamdata.Predef._
 
 import quasar.api.scheduler._
 import quasar.api.scheduler.SchedulerError._
-import quasar.connector.scheduler.{Scheduler, SchedulerModule}
 import quasar.connector.MonadResourceErr
 
 import argonaut.Json

@@ -31,4 +31,5 @@ trait Schedulers[F[_], I, II, C, CC] {
   def replaceScheduler(i: I, ref: SchedulerRef[C]): F[Condition[SchedulerError[I, C]]]
   def supportedTypes: F[Set[SchedulerType]]
   def intentions: Stream[F, (I, II, CC)]
+  def schedulerOf(i: I): F[Either[SchedulerError[I, C], Scheduler[F, II, CC]]]
 }

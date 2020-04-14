@@ -19,8 +19,7 @@ package quasar.impl.local
 import slamdata.Predef._
 
 import quasar.Condition
-import quasar.api.scheduler.SchedulerError._
-import quasar.connector.scheduler._
+import quasar.api.scheduler._, SchedulerError._
 import quasar.impl.storage.IndexedStore
 
 import cats.effect._
