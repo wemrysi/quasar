@@ -10,6 +10,7 @@ name: Continuous Integration
 on:
   pull_request:
     branches: [master, backport/v*]
+    types: [opened, reopened, synchronize, ready_for_review]
   push:
     branches: [master, backport/v*]
 
@@ -23,6 +24,7 @@ env:
 jobs:
   build:
     name: Build and Test
+    if: '!(github.event_name == ''pull_request'' && github.event.pull_request.draft)'
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -76,6 +78,10 @@ jobs:
         with:
           path: ~/.sbt
           key: ${{ runner.os }}-sbt-cache-${{ hashFiles('**/*.sbt') }}-${{ hashFiles('project/build.properties') }}-${{ hashFiles('.versions.json') }}
+
+      - name: Common sbt setup
+        if: env.ENCRYPTION_PASSWORD != null
+        run: $SBT ++${{ matrix.scala }} transferCommonResources exportSecretsForActions
 
       - name: Check that workflows are up to date
         run: $SBT ++${{ matrix.scala }} githubWorkflowCheck
@@ -228,71 +234,85 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-sql_target
+          path: sql/target
 
       - name: Download target directory 'run/target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-run_target
+          path: run/target
 
       - name: Download target directory 'qsu/target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-qsu_target
+          path: qsu/target
 
       - name: Download target directory 'target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-target
+          path: target
 
       - name: Download target directory 'impl/target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-impl_target
+          path: impl/target
 
       - name: Download target directory 'qscript/target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-qscript_target
+          path: qscript/target
 
       - name: Download target directory 'foundation/target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-foundation_target
+          path: foundation/target
 
       - name: Download target directory 'common/target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-common_target
+          path: common/target
 
       - name: Download target directory 'connector/target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-connector_target
+          path: connector/target
 
       - name: Download target directory 'api/target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-api_target
+          path: api/target
 
       - name: Download target directory 'ejson/target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-ejson_target
+          path: ejson/target
 
       - name: Download target directory 'core/target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-core_target
+          path: core/target
 
       - name: Download target directory 'frontend/target' (2.12.10)
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-frontend_target
+          path: frontend/target
 
       - name: Download target directory 'project/target'
         uses: actions/download-artifact@v1
         with:
           name: target-${{ matrix.os }}-${{ matrix.java }}-project_target
+          path: project/target
 
       - name: Install Ruby
         uses: actions/setup-ruby@v1
