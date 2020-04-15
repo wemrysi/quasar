@@ -21,37 +21,15 @@ import quasar.impl.DatasourceModule
 import quasar.connector.destination.DestinationModule
 import quasar.connector.datasource.{HeavyweightDatasourceModule, LightweightDatasourceModule}
 
-import cats.effect.IO
 import java.util.UUID
 
 import slamdata.Predef._
 
 // this trait exists mostly because we can't have a sealed algebra that covers *all* modules, so we project one here
-sealed trait ExternalModule extends Product with Serializable
+sealed trait ExternalModule[+F[_]] extends Product with Serializable
 
 object ExternalModule {
-
-  def unapply(ar: AnyRef): Option[ExternalModule] =
-    wrap.lift(ar)
-
-  val wrap: PartialFunction[AnyRef, ExternalModule] = {
-    case lw: LightweightDatasourceModule =>
-      Datasource(DatasourceModule.Lightweight(lw))
-
-    case hw: HeavyweightDatasourceModule =>
-      Datasource(DatasourceModule.Heavyweight(hw))
-
-    case dm: DestinationModule =>
-      Destination(dm)
-
-    case sm: ConcreteSchedulerModule =>
-      Scheduler(sm)
-  }
-
-  final case class ConcreteSchedulerModule(value: SchedulerModule[IO, UUID])
-
-
-  final case class Datasource(mod: DatasourceModule) extends ExternalModule
-  final case class Destination(mod: DestinationModule) extends ExternalModule
-  final case class Scheduler(mod: ConcreteSchedulerModule) extends ExternalModule
+  final case class Datasource[F[_]](mod: DatasourceModule) extends ExternalModule[F]
+  final case class Destination[F[_]](mod: DestinationModule) extends ExternalModule[F]
+  final case class Scheduler[F[_]](mod: SchedulerModule[F, UUID]) extends ExternalModule[F]
 }

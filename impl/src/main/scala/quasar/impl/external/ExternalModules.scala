@@ -50,8 +50,8 @@ object ExternalModules extends Logging {
   def apply[F[_]: ConcurrentEffect: ContextShift](
       config: ExternalConfig,
       blocker: Blocker)(
-      instantiate: PartialFunction[(PluginType, AnyRef), ExternalModule])
-      : Stream[F, ExternalModule] = {
+      instantiate: PartialFunction[(PluginType, AnyRef), ExternalModule[F]])
+      : Stream[F, ExternalModule[F]] = {
 
     val plugins = config match {
       case PluginDirectory(directory) =>
