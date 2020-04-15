@@ -20,30 +20,33 @@ import slamdata.Predef._
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.destination.DestinationType
+import quasar.api.scheduler.SchedulerType
 
 import cats.ApplicativeError
-import scalaz.syntax.either._
-import scalaz.{\/, -\/, \/-}
 
-final case class IncompatibleModuleException(kind: DatasourceType \/ DestinationType) extends java.lang.RuntimeException {
-  override def getMessage = kind match {
-    case -\/(k) => s"Loaded datasource implementation with type $k is incompatible with quasar"
-    case \/-(k) => s"Loaded destination implementation with type $k is incompatible with quasar"
+import IncompatibleModuleException._
+
+sealed trait IncompatibleModuleException extends java.lang.RuntimeException with Product with Serializable { self =>
+  override def getMessage = self match {
+    case Datasource(k) => s"Loaded datasource implementation with type $k is incompatible with quasar"
+    case Destination(k) => s"Loaded destination implementation with type $k is incompatible with quasar"
+    case Scheduler(k) => s"Loaded scheduler implementation with type $k is incompatible with quasar"
   }
 }
 
 object IncompatibleModuleException {
-  def datasource(kind: DatasourceType): IncompatibleModuleException =
-    IncompatibleModuleException(kind.left)
-
-  def destination(kind: DestinationType): IncompatibleModuleException =
-    IncompatibleModuleException(kind.right)
+  final case class Datasource(kind: DatasourceType) extends IncompatibleModuleException
+  final case class Destination(kind: DestinationType) extends IncompatibleModuleException
+  final case class Scheduler(kind: SchedulerType) extends IncompatibleModuleException
 
   def linkDatasource[F[_]: ApplicativeError[?[_], Throwable], A](kind: DatasourceType, fa: => F[A]): F[A] =
-    link(datasource(kind), fa)
+    link(Datasource(kind), fa)
 
   def linkDestination[F[_]: ApplicativeError[?[_], Throwable], A](kind: DestinationType, fa: => F[A]): F[A] =
-    link(destination(kind), fa)
+    link(Destination(kind), fa)
+
+  def linkScheduler[F[_]: ApplicativeError[?[_], Throwable], A](kind: SchedulerType, fa: => F[A]): F[A] =
+    link(Scheduler(kind), fa)
 
   private def link[F[_]: ApplicativeError[?[_], Throwable], A](ex: IncompatibleModuleException, fa: => F[A]): F[A] =
     try {

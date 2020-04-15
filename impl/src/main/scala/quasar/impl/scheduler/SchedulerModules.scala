@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.api.scheduler._
 import quasar.api.scheduler.SchedulerError._
 import quasar.connector.MonadResourceErr
+import quasar.impl.IncompatibleModuleException.linkScheduler
 
 import argonaut.Json
 import argonaut.Argonaut.jEmptyObject
@@ -66,12 +67,6 @@ object SchedulerModules {
       kind: SchedulerType,
       res: => Resource[F, Either[InitializationError[Json], A]])
       : EitherT[Resource[F, ?], CreateError[Json], A] = {
-    // FIXME
-    def linkScheduler(
-        kind: SchedulerType,
-        res: Resource[F, Either[InitializationError[Json], A]])
-        : Resource[F, Either[InitializationError[Json], A]]  =
-      res
     EitherT(linkScheduler(kind, res)).leftMap(ie => ie: CreateError[Json])
   }
 }
