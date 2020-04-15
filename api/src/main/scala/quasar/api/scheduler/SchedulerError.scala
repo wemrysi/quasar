@@ -52,6 +52,14 @@ object SchedulerError {
   final case class IncorrectIntention[C](config: C) extends IntentionError[Nothing, C]
   final case class IntentionNotFound[I](index: I) extends IntentionError[I, Nothing]
 
+  object CreateError {
+    implicit def show[C: Show]: Show[CreateError[C]] = Show.show {
+      case SchedulerUnsupported(kind, set) => s"SchedulerUnsupported(${kind.show}, ${set.show})"
+      case SchedulerNameExists(name) => s"SchedulerNameExists(${name.show})"
+      case e: InitializationError[C] => e.show
+    }
+  }
+
   object InitializationError {
     implicit def show[C: Show]: Show[InitializationError[C]] = Show.show {
       case MalformedConfiguration(kind, config, reason) =>
@@ -67,9 +75,7 @@ object SchedulerError {
 
   object SchedulerError {
     implicit def show[I: Show, C: Show]: Show[SchedulerError[I, C]] = Show.show {
-      case e: InitializationError[C] => e.show
-      case SchedulerUnsupported(kind, set) => s"SchedulerUnsupported(${kind.show}, ${set.show})"
-      case SchedulerNameExists(name) => s"SchedulerNameExists(${name.show})"
+      case e: CreateError[C] => e.show
       case SchedulerNotFound(index) => s"SchedulerNotFound(${index.show})"
       case DeleteError(config) => s"DeleteError(${config.show})"
     }

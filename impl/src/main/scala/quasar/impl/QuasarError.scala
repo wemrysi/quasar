@@ -20,6 +20,7 @@ import slamdata.Predef.{Exception, Product, Serializable, Throwable}
 
 import quasar.api.datasource.DatasourceError.CreateError
 import quasar.api.destination.DestinationError.{CreateError => DestCreateError}
+import quasar.api.scheduler.SchedulerError.{CreateError => SCreateError}
 import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
 import quasar.impl.store.StoreError
@@ -44,6 +45,7 @@ object QuasarError {
   final case class Parsing(error: ParsingError) extends QuasarError
   final case class Planning(error: PlannerError) extends QuasarError
   final case class Storing(error: StoreError) extends QuasarError
+  final case class SchedulingCreation(error: SCreateError[Json]) extends QuasarError
 
   val pushing: Prism[QuasarError, DestCreateError[Json]] =
     Prism.partial[QuasarError, DestCreateError[Json]] {
@@ -80,6 +82,11 @@ object QuasarError {
       case Storing(err) => err
     } (Storing(_))
 
+  val schedulingCreation: Prism[QuasarError, SCreateError[Json]] =
+    Prism.partial[QuasarError, SCreateError[Json]] {
+      case SchedulingCreation(err) => err
+    } (SchedulingCreation(_))
+
   val throwableP: Prism[Throwable, QuasarError] =
     Prism.partial[Throwable, QuasarError] {
       case QuasarException(qe) => qe
@@ -94,6 +101,7 @@ object QuasarError {
       case Planning(e) => e.show
       case Storing(e) => e.show
       case Pushing(e) => e.show
+      case SchedulingCreation(e) => e.show
     }
 
   ////
