@@ -21,13 +21,15 @@ import argonaut.Json
 
 import cats.effect._
 
+import java.util.UUID
+
 import scala.util.Either
 
 import SchedulerError._
 
-trait SchedulerModule[F[_], I] {
+trait SchedulerModule {
   def schedulerType: SchedulerType
   def sanitizeConfig(config: Json): Json
-  def scheduler(config: Json)
-      : Resource[F, Either[InitializationError[Json], Scheduler[F, I, Json]]]
+  def scheduler[F[_]: ContextShift: ConcurrentEffect: Timer](config: Json)
+      : Resource[F, Either[InitializationError[Json], Scheduler[F, UUID, Json]]]
 }

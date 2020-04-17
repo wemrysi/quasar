@@ -24,9 +24,8 @@ import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.ResourceManager
 import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
-import quasar.impl.local.{LocalSchedulerModule, LocalScheduler}
 
-import argonaut.{Json, EncodeJson, DecodeJson, Argonaut}, Argonaut._
+import argonaut.Json
 import argonaut.JsonCats._
 
 import cats.Show
@@ -60,26 +59,29 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
         }
     }
 
-  def module(kind: SchedulerType, err: Option[InitializationError[Json]] = None) = new SchedulerModule[IO, Int] {
+  def module(kind: SchedulerType, err: Option[InitializationError[Json]] = None): SchedulerModule = new SchedulerModule {
     def schedulerType = kind
     def sanitizeConfig(inp: Json) = Json.jString("sanitized")
-    def scheduler(config: Json): Resource[IO, Either[InitializationError[Json], Scheduler[IO, Int, Json]]] =
+    def scheduler[F[_]: ContextShift: ConcurrentEffect: Timer](
+        config: Json)
+        : Resource[F, Either[InitializationError[Json], Scheduler[F, UUID, Json]]] =
       err match {
-        case Some(a) => a.asLeft[Scheduler[IO, Int, Json]].pure[Resource[IO, ?]]
+        case Some(a) =>
+          a.asLeft[Scheduler[F, UUID, Json]].pure[Resource[F, ?]]
         case None =>
-          val scheduler = new Scheduler[IO, Int, Json]  {
-            def intentions: Stream[IO, (Int, Json)] =
+          val scheduler = new Scheduler[F, UUID, Json]  {
+            def intentions: Stream[F, (UUID, Json)] =
               Stream.empty
-            def addIntention(c: Json): IO[Either[IncorrectIntention[Json], Int]] =
-              IO(0.asRight[IncorrectIntention[Json]])
-            def getIntention(i: Int): IO[Either[IntentionNotFound[Int], Json]] =
-              IO(Json.jNull.asRight[IntentionNotFound[Int]])
-            def editIntention(i: Int, config: Json): IO[Condition[IntentionError[Int, Json]]] =
-              IO(Condition.normal[IntentionError[Int, Json]]())
-            def deleteIntention(i: Int): IO[Condition[IntentionNotFound[Int]]] =
-              IO(Condition.normal[IntentionNotFound[Int]]())
+            def addIntention(c: Json): F[Either[IncorrectIntention[Json], UUID]] =
+              Sync[F].delay(UUID.randomUUID.asRight[IncorrectIntention[Json]])
+            def getIntention(i: UUID): F[Either[IntentionNotFound[UUID], Json]] =
+              Sync[F].delay(Json.jNull.asRight[IntentionNotFound[UUID]])
+            def editIntention(i: UUID, config: Json): F[Condition[IntentionError[UUID, Json]]] =
+              Sync[F].delay(Condition.normal[IntentionError[UUID, Json]]())
+            def deleteIntention(i: UUID): F[Condition[IntentionNotFound[UUID]]] =
+              Sync[F].delay(Condition.normal[IntentionNotFound[UUID]]())
           }
-          scheduler.asRight[InitializationError[Json]].pure[Resource[IO, ?]]
+          scheduler.asRight[InitializationError[Json]].pure[Resource[F, ?]]
       }
   }
 
@@ -91,7 +93,7 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
       }
     val rCache = ResourceManager[IO, String, Scheduler[IO, UUID, Json]]
 
-    val modules = SchedulerModules[IO, UUID](List(LocalSchedulerModule.ephemeral[IO, Task]))
+    val modules = SchedulerModules[IO](List(module(testType)))
 
     for {
       refs <- Resource.liftF(fRefs)
@@ -102,8 +104,11 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
 
   def emptySchedulers = mkSchedulers map (_._2)
 
+  val testType =
+    SchedulerType("test", 1L)
+
   val testRef =
-    SchedulerRef(LocalSchedulerModule.ephemeral[IO, Task].schedulerType, "ephemeral", Json.jNull)
+    SchedulerRef(testType, "test", Json.jNull)
 
   val sanitize: SchedulerRef[Json] => SchedulerRef[Json] = (x: SchedulerRef[Json]) => x.copy(config = Json.jString("sanitized"))
 
@@ -129,7 +134,7 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
           _ <- finalize
         } yield {
           original must beRight
-          duplicate must beLeft(SchedulerNameExists("ephemeral"))
+          duplicate must beLeft(SchedulerNameExists("test"))
         }
       }
       "rejects unknown scheduler" >>* {
@@ -140,7 +145,7 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
           result <- ss.addScheduler(unknownRef)
           _ <- finalize
         } yield {
-          result must beLeft(SchedulerUnsupported(unknownType, Set(LocalSchedulerModule.ephemeral[IO, Task].schedulerType)))
+          result must beLeft(SchedulerUnsupported(unknownType, Set(testType)))
         }
       }
     }
@@ -212,7 +217,7 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
           _ <- store.insert("unk", unknownRef)
           s <- ss.schedulerOf("unk")
         } yield {
-          s must beLeft(SchedulerUnsupported(unknownType, Set(LocalSchedulerModule.ephemeral[IO, Task].schedulerType)))
+          s must beLeft(SchedulerUnsupported(unknownType, Set(testType)))
         }
       }
     }
@@ -235,17 +240,4 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
 object DefaultSchedulersSpec {
   final case class CreateErrorException(ce: CreateError[Json])
     extends Exception(Show[SchedulerError[Int, Json]].show(ce))
-  final case class Task(value: Int)
-
-  object Task {
-    implicit val submit: LocalScheduler.Submit[IO, Task] = new LocalScheduler.Submit[IO, Task] {
-      def submit(a: Task): IO[Unit] = IO.unit
-    }
-    implicit val encodeJson: EncodeJson[Task] = EncodeJson { tsk =>
-      tsk.value.asJson
-    }
-    implicit val decodeJson: DecodeJson[Task] = DecodeJson { c =>
-      c.as[Int].map(Task(_))
-    }
-  }
 }

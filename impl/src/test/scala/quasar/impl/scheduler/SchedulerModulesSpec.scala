@@ -32,6 +32,7 @@ import cats.implicits._
 
 import fs2.Stream
 
+import java.util.UUID
 import scala.concurrent.ExecutionContext
 
 import SchedulerModulesSpec._
@@ -52,30 +53,33 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
         }
     }
 
-  def module(kind: SchedulerType, err: Option[InitializationError[Json]] = None) = new SchedulerModule[IO, Int] {
+  def module(kind: SchedulerType, err: Option[InitializationError[Json]] = None) = new SchedulerModule {
     def schedulerType = kind
     def sanitizeConfig(inp: Json) = Json.jString("sanitized")
-    def scheduler(config: Json): Resource[IO, Either[InitializationError[Json], Scheduler[IO, Int, Json]]] =
+    def scheduler[F[_]: ContextShift: ConcurrentEffect: Timer](
+        config: Json)
+        : Resource[F, Either[InitializationError[Json], Scheduler[F, UUID, Json]]] =
       err match {
-        case Some(a) => a.asLeft[Scheduler[IO, Int, Json]].pure[Resource[IO, ?]]
+        case Some(a) =>
+          a.asLeft[Scheduler[F, UUID, Json]].pure[Resource[F, ?]]
         case None =>
-          val scheduler = new Scheduler[IO, Int, Json]  {
-            def intentions: Stream[IO, (Int, Json)] =
+          val scheduler = new Scheduler[F, UUID, Json]  {
+            def intentions: Stream[F, (UUID, Json)] =
               Stream.empty
-            def addIntention(c: Json): IO[Either[IncorrectIntention[Json], Int]] =
-              IO(0.asRight[IncorrectIntention[Json]])
-            def getIntention(i: Int): IO[Either[IntentionNotFound[Int], Json]] =
-              IO(Json.jNull.asRight[IntentionNotFound[Int]])
-            def editIntention(i: Int, config: Json): IO[Condition[IntentionError[Int, Json]]] =
-              IO(Condition.normal[IntentionError[Int, Json]]())
-            def deleteIntention(i: Int): IO[Condition[IntentionNotFound[Int]]] =
-              IO(Condition.normal[IntentionNotFound[Int]]())
+            def addIntention(c: Json): F[Either[IncorrectIntention[Json], UUID]] =
+              Sync[F].delay(UUID.randomUUID.asRight[IncorrectIntention[Json]])
+            def getIntention(i: UUID): F[Either[IntentionNotFound[UUID], Json]] =
+              Sync[F].delay(Json.jNull.asRight[IntentionNotFound[UUID]])
+            def editIntention(i: UUID, config: Json): F[Condition[IntentionError[UUID, Json]]] =
+              Sync[F].delay(Condition.normal[IntentionError[UUID, Json]]())
+            def deleteIntention(i: UUID): F[Condition[IntentionNotFound[UUID]]] =
+              Sync[F].delay(Condition.normal[IntentionNotFound[UUID]]())
           }
-          scheduler.asRight[InitializationError[Json]].pure[Resource[IO, ?]]
+          scheduler.asRight[InitializationError[Json]].pure[Resource[F, ?]]
       }
   }
 
-  def mkModules(lst: List[SchedulerModule[IO, Int]]) = SchedulerModules[IO, Int](lst)
+  def mkModules(lst: List[SchedulerModule]) = SchedulerModules[IO](lst)
 
   val fooKind = SchedulerType("foo", 1L)
   val barKind = SchedulerType("bar", 2L)

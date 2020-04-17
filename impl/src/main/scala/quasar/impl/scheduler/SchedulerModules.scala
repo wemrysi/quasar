@@ -31,28 +31,31 @@ import cats.effect._
 import cats.implicits._
 import cats.MonadError
 
-trait SchedulerModules[F[_], I, C] {
-  def create(ref: SchedulerRef[C]): EitherT[Resource[F, ?], CreateError[C], Scheduler[F, I, Json]]
+import java.util.UUID
+
+trait SchedulerModules[F[_], I, C, CC] {
+  def create(ref: SchedulerRef[C]): EitherT[Resource[F, ?], CreateError[C], Scheduler[F, I, CC]]
   def sanitizeRef(inp: SchedulerRef[C]): SchedulerRef[C]
   def supportedTypes: F[Set[SchedulerType]]
 }
 
 object SchedulerModules {
-  def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr, I](
-      modules: List[SchedulerModule[F, I]])
-      : SchedulerModules[F, I, Json] = {
+  def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr](
+      modules: List[SchedulerModule])
+      : SchedulerModules[F, UUID, Json, Json] = {
     lazy val moduleSet: Set[SchedulerType] =
       Set(modules.map(_.schedulerType):_*)
-    lazy val moduleMap: Map[SchedulerType, SchedulerModule[F, I]] =
+    lazy val moduleMap: Map[SchedulerType, SchedulerModule] =
       Map(modules.map(ss => (ss.schedulerType, ss)):_*)
 
-    new SchedulerModules[F, I, Json] {
-      def create(ref: SchedulerRef[Json]): EitherT[Resource[F, ?], CreateError[Json], Scheduler[F, I, Json]] =
+    new SchedulerModules[F, UUID, Json, Json] {
+      def create(ref: SchedulerRef[Json])
+          : EitherT[Resource[F, ?], CreateError[Json], Scheduler[F, UUID, Json]] =
         moduleMap.get(ref.kind) match {
           case None =>
             EitherT.leftT(SchedulerUnsupported(ref.kind, moduleSet): CreateError[Json])
           case Some(module) =>
-            handleInitErrors(ref.kind, module.scheduler(ref.config))
+            handleInitErrors(ref.kind, module.scheduler[F](ref.config))
         }
       def sanitizeRef(inp: SchedulerRef[Json]): SchedulerRef[Json] = moduleMap.get(inp.kind) match {
         case None => inp.copy(config = jEmptyObject)

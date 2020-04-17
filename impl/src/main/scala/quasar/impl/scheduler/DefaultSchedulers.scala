@@ -39,7 +39,7 @@ private[quasar] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
     refs: IndexedStore[F, I, SchedulerRef[C]],
     cache: ResourceManager[F, I, Scheduler[F, II, Json]],
     getter: CachedGetter[F, I, SchedulerRef[C]],
-    modules: SchedulerModules[F, II, C])
+    modules: SchedulerModules[F, II, C, Json])
     extends Schedulers[F, I, II, C, Json] {
   def addScheduler(ref: SchedulerRef[C]): F[Either[CreateError[C], I]] = for {
     i <- freshId
@@ -189,7 +189,7 @@ object DefaultSchedulers {
       freshId: F[I],
       refs: IndexedStore[F, I, SchedulerRef[C]],
       cache: ResourceManager[F, I, Scheduler[F, II, Json]],
-      modules: SchedulerModules[F, II, C])
+      modules: SchedulerModules[F, II, C, Json])
       : F[DefaultSchedulers[F, I, II, C]] = for {
     semaphore <- IndexedSemaphore[F, I]
     getter <- CachedGetter(refs.lookup(_))

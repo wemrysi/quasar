@@ -21,44 +21,30 @@ import quasar.impl.DatasourceModule
 import quasar.connector.destination.DestinationModule
 import quasar.connector.datasource.{HeavyweightDatasourceModule, LightweightDatasourceModule}
 
-import java.util.UUID
-
 import slamdata.Predef._
 
-import scala.reflect.classTag
-
 // this trait exists mostly because we can't have a sealed algebra that covers *all* modules, so we project one here
-sealed trait ExternalModule[F[_]] extends Product with Serializable
+sealed trait ExternalModule extends Product with Serializable
 
 object ExternalModule {
-  final case class Datasource[F[_]](mod: DatasourceModule) extends ExternalModule[F]
-  final case class Destination[F[_]](mod: DestinationModule) extends ExternalModule[F]
-  final case class Scheduler[F[_]](mod: SchedulerModule[F, UUID]) extends ExternalModule[F]
+  final case class Datasource(mod: DatasourceModule) extends ExternalModule
+  final case class Destination(mod: DestinationModule) extends ExternalModule
+  final case class Scheduler(mod: SchedulerModule) extends ExternalModule
 
-  trait Unapply[F[_]] {
-    def unapply(ar: AnyRef): Option[ExternalModule[F]]
+  def unapply(ar: AnyRef): Option[ExternalModule] =
+    wrap.lift(ar)
+
+  val wrap: PartialFunction[AnyRef, ExternalModule] = {
+    case lw: LightweightDatasourceModule =>
+      Datasource(DatasourceModule.Lightweight(lw))
+
+    case hw: HeavyweightDatasourceModule =>
+      Datasource(DatasourceModule.Heavyweight(hw))
+
+    case dm: DestinationModule =>
+      Destination(dm)
+
+    case sm: SchedulerModule =>
+      Scheduler(sm)
   }
-
-  def unapplier[F[_]]: Unapply[F] = new Unapply[F] {
-    type SchedulerModuleF = SchedulerModule[F, UUID]
-
-    def unapply(ar: AnyRef): Option[ExternalModule[F]] =
-      wrap.lift(ar)
-
-    val wrap: PartialFunction[AnyRef, ExternalModule[F]] = {
-      case lw: LightweightDatasourceModule =>
-        Datasource(DatasourceModule.Lightweight(lw))
-
-      case hw: HeavyweightDatasourceModule =>
-        Datasource(DatasourceModule.Heavyweight(hw))
-
-      case dm: DestinationModule =>
-        Destination(dm)
-
-      case sm if classTag[SchedulerModule[F, UUID]].runtimeClass.isInstance(sm) =>
-        Scheduler(sm.asInstanceOf[SchedulerModule[F, UUID]])
-    }
-  }
-
-
 }

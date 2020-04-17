@@ -97,7 +97,7 @@ object Quasar extends Logging {
       byteStores: ByteStores[F, UUID])(
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
-      schedulerModules: List[SchedulerModule[F, UUID]])(
+      schedulerModules: List[SchedulerModule])(
       implicit
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
@@ -106,7 +106,7 @@ object Quasar extends Logging {
       DestinationModules[F](destinationModules)
 
     val sModules =
-      SchedulerModules[F, UUID](schedulerModules)
+      SchedulerModules[F](schedulerModules)
 
 
     for {
