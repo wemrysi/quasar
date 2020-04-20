@@ -20,7 +20,9 @@ import slamdata.Predef._
 
 import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
 import quasar.api.scheduler._, SchedulerError._
+import quasar.api.intentions.IntentionError, IntentionError._
 import quasar.connector._
+import quasar.connector.scheduler._
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.ResourceManager
 import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
@@ -28,7 +30,6 @@ import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
 import argonaut.Json
 import argonaut.JsonCats._
 
-import cats.Show
 import cats.effect._
 import cats.implicits._
 
@@ -39,8 +40,6 @@ import scala.concurrent.ExecutionContext
 import java.util.concurrent.ConcurrentHashMap
 import java.util.UUID
 
-import DefaultSchedulersSpec._
-
 class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[IO] with ConditionMatchers {
   val blocker: Blocker = quasar.concurrent.Blocker.cached("default-schedulers-spec")
 
@@ -48,16 +47,6 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
 
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
-
-  implicit val ioCreateErrorME: MonadError_[IO, CreateError[Json]] =
-    new MonadError_[IO, CreateError[Json]] {
-      def raiseError[A](e: CreateError[Json]): IO[A] =
-        IO.raiseError(new CreateErrorException(e))
-      def handleError[A](fa: IO[A])(f: CreateError[Json] => IO[A]): IO[A] =
-        fa.recoverWith {
-          case CreateErrorException(e) => f(e)
-        }
-    }
 
   def module(kind: SchedulerType, err: Option[InitializationError[Json]] = None): SchedulerModule = new SchedulerModule {
     def schedulerType = kind
@@ -70,14 +59,14 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
           a.asLeft[Scheduler[F, UUID, Json]].pure[Resource[F, ?]]
         case None =>
           val scheduler = new Scheduler[F, UUID, Json]  {
-            def intentions: Stream[F, (UUID, Json)] =
+            def entries: Stream[F, (UUID, Json)] =
               Stream.empty
             def addIntention(c: Json): F[Either[IncorrectIntention[Json], UUID]] =
               Sync[F].delay(UUID.randomUUID.asRight[IncorrectIntention[Json]])
-            def getIntention(i: UUID): F[Either[IntentionNotFound[UUID], Json]] =
+            def lookupIntention(i: UUID): F[Either[IntentionNotFound[UUID], Json]] =
               Sync[F].delay(Json.jNull.asRight[IntentionNotFound[UUID]])
-            def editIntention(i: UUID, config: Json): F[Condition[IntentionError[UUID, Json]]] =
-              Sync[F].delay(Condition.normal[IntentionError[UUID, Json]]())
+            def editIntention(i: UUID, config: Json): F[Condition[SchedulingError[UUID, Json]]] =
+              Sync[F].delay(Condition.normal[SchedulingError[UUID, Json]]())
             def deleteIntention(i: UUID): F[Condition[IntentionNotFound[UUID]]] =
               Sync[F].delay(Condition.normal[IntentionNotFound[UUID]]())
           }
@@ -235,9 +224,4 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
       }
     }
   }
-}
-
-object DefaultSchedulersSpec {
-  final case class CreateErrorException(ce: CreateError[Json])
-    extends Exception(Show[SchedulerError[Int, Json]].show(ce))
 }

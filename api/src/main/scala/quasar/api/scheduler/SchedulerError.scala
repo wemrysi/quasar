@@ -68,11 +68,9 @@ object SchedulerError {
     }
   }
 
-  object SchedulerError {
-    implicit def show[I: Show, C: Show]: Show[SchedulerError[I, C]] = Show.show {
-      case e: CreateError[C] => e.show
-      case SchedulerNotFound(index) => s"SchedulerNotFound(${index.show})"
-      case DeleteError(config) => s"DeleteError(${config.show})"
-    }
+  implicit def show[I: Show, C: Show]: Show[SchedulerError[I, C]] = Show.show {
+    case e: CreateError[C] => e.show
+    case SchedulerNotFound(index) => s"SchedulerNotFound(${index.show})"
+    case DeleteError(config) => s"DeleteError(${config.show})"
   }
 }

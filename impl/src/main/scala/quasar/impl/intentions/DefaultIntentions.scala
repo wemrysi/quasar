@@ -28,7 +28,7 @@ import cats.implicits._
 
 import fs2.Stream
 
-private [impl] final class DefaultIntentions[
+private[impl] final class DefaultIntentions[
     F[_]: Monad,
     I, II, C] private (
     schedulerIds: Stream[F, I],

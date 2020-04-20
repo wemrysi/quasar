@@ -19,8 +19,10 @@ package quasar.impl.scheduler
 import slamdata.Predef._
 
 import quasar.{Condition, EffectfulQSpec}
+import quasar.api.intentions.IntentionError, IntentionError._
 import quasar.api.scheduler._, SchedulerError._
 import quasar.connector._
+import quasar.connector.scheduler._
 import quasar.contrib.scalaz.MonadError_
 
 import argonaut.Json
@@ -38,8 +40,8 @@ import scala.concurrent.ExecutionContext
 import SchedulerModulesSpec._
 
 final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[IO] {
-
   implicit val timer = IO.timer(ec)
+
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
@@ -64,14 +66,14 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
           a.asLeft[Scheduler[F, UUID, Json]].pure[Resource[F, ?]]
         case None =>
           val scheduler = new Scheduler[F, UUID, Json]  {
-            def intentions: Stream[F, (UUID, Json)] =
+            def entries: Stream[F, (UUID, Json)] =
               Stream.empty
             def addIntention(c: Json): F[Either[IncorrectIntention[Json], UUID]] =
               Sync[F].delay(UUID.randomUUID.asRight[IncorrectIntention[Json]])
-            def getIntention(i: UUID): F[Either[IntentionNotFound[UUID], Json]] =
+            def lookupIntention(i: UUID): F[Either[IntentionNotFound[UUID], Json]] =
               Sync[F].delay(Json.jNull.asRight[IntentionNotFound[UUID]])
-            def editIntention(i: UUID, config: Json): F[Condition[IntentionError[UUID, Json]]] =
-              Sync[F].delay(Condition.normal[IntentionError[UUID, Json]]())
+            def editIntention(i: UUID, config: Json): F[Condition[SchedulingError[UUID, Json]]] =
+              Sync[F].delay(Condition.normal[SchedulingError[UUID, Json]]())
             def deleteIntention(i: UUID): F[Condition[IntentionNotFound[UUID]]] =
               Sync[F].delay(Condition.normal[IntentionNotFound[UUID]]())
           }
