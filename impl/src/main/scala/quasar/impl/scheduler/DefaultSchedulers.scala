@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.scheduler._
 import quasar.api.scheduler.SchedulerError._
-import quasar.connector.scheduler.{Scheduler, SchedulerModule}
+import quasar.connector.scheduler.Scheduler
 import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 
@@ -32,9 +32,7 @@ import cats.effect._
 import cats.implicits._
 import cats.{~>, Eq}
 
-import fs2.Stream
-
-private[quasar] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
+private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
     semaphore: IndexedSemaphore[F, I],
     freshId: F[I],
     refs: IndexedStore[F, I, SchedulerRef[C]],
@@ -73,10 +71,15 @@ private[quasar] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
             error
           case Removed(_) =>
             EitherT.right(cache.shutdown(i)) flatMap (_ => error)
-          case Inserted(ref) => for {
-            allocated <- allocateScheduler[SE](ref)
-            _ <- EitherT.right[SE](cache.manage(i, allocated))
-          } yield allocated._1
+          case Inserted(ref) =>
+            EitherT.right[SE](cache.get(i)) flatMap {
+              case None =>
+                for {
+                  allocated <- allocateScheduler[SE](ref)
+                  _ <- EitherT.right[SE](cache.manage(i, allocated))
+                } yield allocated._1
+              case Some(a) => EitherT.rightT[F, SE](a)
+            }
           case Updated(incoming, old) if SchedulerRef.atMostRenamed(incoming, old) =>
             fromCache
           case Preserved(_) =>
@@ -176,7 +179,7 @@ private[quasar] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
 }
 
 object DefaultSchedulers {
-  def apply[F[_]: Concurrent: ContextShift, I: Eq, II, C: Eq](
+  private[impl] def apply[F[_]: Concurrent: ContextShift, I: Eq, II, C: Eq](
       freshId: F[I],
       refs: IndexedStore[F, I, SchedulerRef[C]],
       cache: ResourceManager[F, I, Scheduler[F, II, Json]],

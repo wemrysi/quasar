@@ -44,6 +44,7 @@ import quasar.impl.destinations._
 import quasar.impl.discovery.DefaultDiscovery
 import quasar.impl.evaluate._
 import quasar.impl.implicits._
+import quasar.impl.intentions.DefaultIntentions
 import quasar.impl.push.DefaultResultPush
 import quasar.impl.scheduler._
 import quasar.impl.storage.IndexedStore
@@ -164,7 +165,10 @@ object Quasar extends Logging {
         jobManager,
         resultRender))
 
-      intentions: Intentions[F, UUID, UUID, Json] = ???
+      intentions: Intentions[F, UUID, UUID, Json] = DefaultIntentions(
+        schedulerRefs.entries.map(_._1),
+        schedulers.schedulerOf(_).map(_.toOption))
+
 
     } yield new Quasar(datasources, destinations, schedulers, tables, sqlEvaluator, discovery, push, intentions)
   }

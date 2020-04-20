@@ -21,14 +21,24 @@ import slamdata.Predef._
 import cats.Show
 import cats.implicits._
 
-sealed trait IntentionError[+I, +C] extends Product with Serializable
+sealed trait IntentionError[+I, +II, +C] extends Product with Serializable
 
 object IntentionError {
-  final case class IncorrectIntention[C](config: C) extends IntentionError[Nothing, C]
-  final case class IntentionNotFound[I](index: I) extends IntentionError[I, Nothing]
+  final case class SchedulerNotFound[I](index: I) extends IntentionError[I, Nothing, Nothing]
 
-  implicit def show[I: Show, C: Show]: Show[IntentionError[I, C]] = Show.show {
-    case IncorrectIntention(config) => s"IncorrectIntention(${config.show})"
-    case IntentionNotFound(index) => s"IntentionNotFound(${index.show})"
+  sealed trait SchedulingError[+I, +C] extends IntentionError[Nothing, I, C]
+  final case class IncorrectIntention[C](config: C) extends SchedulingError[Nothing, C]
+  final case class IntentionNotFound[I](index: I) extends SchedulingError[I, Nothing]
+
+  object SchedulingError {
+    implicit def show[I: Show, C: Show]: Show[SchedulingError[I, C]] = Show.show {
+      case IncorrectIntention(config) => s"IncorrectIntention(${config.show})"
+      case IntentionNotFound(index) => s"IntentionNotFound(${index.show})"
+    }
+  }
+
+  implicit def show[I: Show, II: Show, C: Show]: Show[IntentionError[I, II, C]] = Show.show {
+    case s: SchedulingError[II, C] => s.show
+    case SchedulerNotFound(index) => s"SchedulerNotFound(${index.show})"
   }
 }

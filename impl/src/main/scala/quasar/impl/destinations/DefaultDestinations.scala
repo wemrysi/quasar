@@ -39,7 +39,7 @@ import scalaz.syntax.std.boolean._
 
 import shims.{monadToScalaz, equalToCats}
 
-private[quasar] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
+private[impl] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
     semaphore: IndexedSemaphore[F, I],
     freshId: F[I],
     refs: IndexedStore[F, I, DestinationRef[C]],
@@ -213,7 +213,7 @@ private[quasar] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
 }
 
 object DefaultDestinations {
-  def apply[F[_]: Concurrent: ContextShift, I: Order, C: Equal](
+  private[impl] def apply[F[_]: Concurrent: ContextShift, I: Order, C: Equal](
       freshId: F[I],
       refs: IndexedStore[F, I, DestinationRef[C]],
       cache: ResourceManager[F, I, Destination[F]],

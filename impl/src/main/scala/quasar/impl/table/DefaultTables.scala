@@ -34,7 +34,7 @@ import scalaz.syntax.monad._
 
 import shims.{eqToScalaz, monadToScalaz}
 
-final class DefaultTables[F[_]: Effect, I: Equal, Q](
+private[impl] final class DefaultTables[F[_]: Effect, I: Equal, Q](
     freshId: F[I],
     tableStore: IndexedStore[F, I, TableRef[Q]])
     extends Tables[F, I, Q] {
@@ -85,7 +85,7 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q](
 }
 
 object DefaultTables {
-  def apply[F[_]: Effect, I: Equal, Q](
+  private[impl] def apply[F[_]: Effect, I: Equal, Q](
       freshId: F[I],
       tableStore: IndexedStore[F, I, TableRef[Q]])
       : Tables[F, I, Q] =

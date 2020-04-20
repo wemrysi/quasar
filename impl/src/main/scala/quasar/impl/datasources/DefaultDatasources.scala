@@ -40,7 +40,7 @@ import scalaz.syntax.std.boolean._
 import shims.{monadToScalaz, equalToCats}
 import shims.effect.scalazEitherTSync
 
-private[quasar] final class DefaultDatasources[
+private[impl] final class DefaultDatasources[
     T[_[_]],
     F[_]: Sync: MonadError_[?[_], CreateError[C]],
     G[_], H[_],
@@ -214,7 +214,7 @@ private[quasar] final class DefaultDatasources[
 }
 
 object DefaultDatasources {
-  def apply[
+  private[impl] def apply[
       T[_[_]],
       F[_]: Concurrent: ContextShift: MonadError_[?[_], CreateError[C]],
       G[_], H[_],

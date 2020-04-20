@@ -27,6 +27,6 @@ trait Scheduler[F[_], I, C] {
   def entries: Stream[F, (I, C)]
   def addIntention(config: C): F[Either[IncorrectIntention[C], I]]
   def lookupIntention(i: I): F[Either[IntentionNotFound[I], C]]
-  def editIntention(i: I, config: C): F[Condition[IntentionError[I, C]]]
+  def editIntention(i: I, config: C): F[Condition[SchedulingError[I, C]]]
   def deleteIntention(i: I): F[Condition[IntentionNotFound[I]]]
 }
