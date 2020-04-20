@@ -19,9 +19,8 @@ package quasar.api.scheduler
 import slamdata.Predef._
 
 import quasar.Condition
-import quasar.api.scheduler._, SchedulerError._
 
-import fs2.Stream
+import SchedulerError._
 
 trait Schedulers[F[_], I, II, C, CC] {
   def addScheduler(ref: SchedulerRef[C]): F[Either[CreateError[C], I]]

@@ -76,15 +76,14 @@ import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, show
 final class Quasar[F[_], R, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
-    val schedulers: Schedulers[F, UUID, UUID, Json, Json],
+    val schedulers: Schedulers[F, UUID, Array[Byte], Json, Json],
     val tables: Tables[F, UUID, SqlQuery],
     val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, Stream[F, R]],
     val discovery: Discovery[Resource[F, ?], Stream[F, ?], UUID, C],
     val resultPush: ResultPush[F, UUID, UUID],
-    val intentions: Intentions[F, UUID, UUID, Json])
+    val intentions: Intentions[F, UUID, Array[Byte], Json])
 
 
-@SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 object Quasar extends Logging {
 
   type EvalResult[F[_]] = Either[QueryResult[F], AggregateResult[F, QSMap[Fix, QueryResult[F]]]]
@@ -139,7 +138,7 @@ object Quasar extends Logging {
       destCache <- ResourceManager[F, UUID, Destination[F]]
       destinations <- Resource.liftF(DefaultDestinations(freshUUID, destinationRefs, destCache, destModules))
 
-      sCache <- ResourceManager[F, UUID, Scheduler[F, UUID, Json]]
+      sCache <- ResourceManager[F, UUID, Scheduler[F, Array[Byte], Json]]
       schedulers <- Resource.liftF(DefaultSchedulers(freshUUID, schedulerRefs, sCache, sModules))
 
       lookupRunning =
@@ -165,7 +164,7 @@ object Quasar extends Logging {
         jobManager,
         resultRender))
 
-      intentions: Intentions[F, UUID, UUID, Json] = DefaultIntentions(
+      intentions: Intentions[F, UUID, Array[Byte], Json] = DefaultIntentions(
         schedulerRefs.entries.map(_._1),
         schedulers.schedulerOf(_).map(_.toOption))
 

@@ -32,8 +32,6 @@ import cats.effect._
 import cats.implicits._
 import cats.MonadError
 
-import java.util.UUID
-
 trait SchedulerModules[F[_], I, C, CC] {
   def create(ref: SchedulerRef[C]): EitherT[Resource[F, ?], CreateError[C], Scheduler[F, I, CC]]
   def sanitizeRef(inp: SchedulerRef[C]): SchedulerRef[C]
@@ -43,15 +41,15 @@ trait SchedulerModules[F[_], I, C, CC] {
 object SchedulerModules {
   def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr](
       modules: List[SchedulerModule])
-      : SchedulerModules[F, UUID, Json, Json] = {
+      : SchedulerModules[F, Array[Byte], Json, Json] = {
     lazy val moduleSet: Set[SchedulerType] =
       Set(modules.map(_.schedulerType):_*)
     lazy val moduleMap: Map[SchedulerType, SchedulerModule] =
       Map(modules.map(ss => (ss.schedulerType, ss)):_*)
 
-    new SchedulerModules[F, UUID, Json, Json] {
+    new SchedulerModules[F, Array[Byte], Json, Json] {
       def create(ref: SchedulerRef[Json])
-          : EitherT[Resource[F, ?], CreateError[Json], Scheduler[F, UUID, Json]] =
+          : EitherT[Resource[F, ?], CreateError[Json], Scheduler[F, Array[Byte], Json]] =
         moduleMap.get(ref.kind) match {
           case None =>
             EitherT.leftT(SchedulerUnsupported(ref.kind, moduleSet): CreateError[Json])

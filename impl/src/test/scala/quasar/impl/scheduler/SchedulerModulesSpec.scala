@@ -60,22 +60,22 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
     def sanitizeConfig(inp: Json) = Json.jString("sanitized")
     def scheduler[F[_]: ContextShift: ConcurrentEffect: Timer](
         config: Json)
-        : Resource[F, Either[InitializationError[Json], Scheduler[F, UUID, Json]]] =
+        : Resource[F, Either[InitializationError[Json], Scheduler[F, Array[Byte], Json]]] =
       err match {
         case Some(a) =>
-          a.asLeft[Scheduler[F, UUID, Json]].pure[Resource[F, ?]]
+          a.asLeft[Scheduler[F, Array[Byte], Json]].pure[Resource[F, ?]]
         case None =>
-          val scheduler = new Scheduler[F, UUID, Json]  {
-            def entries: Stream[F, (UUID, Json)] =
+          val scheduler = new Scheduler[F, Array[Byte], Json]  {
+            def entries: Stream[F, (Array[Byte], Json)] =
               Stream.empty
-            def addIntention(c: Json): F[Either[IncorrectIntention[Json], UUID]] =
-              Sync[F].delay(UUID.randomUUID.asRight[IncorrectIntention[Json]])
-            def lookupIntention(i: UUID): F[Either[IntentionNotFound[UUID], Json]] =
-              Sync[F].delay(Json.jNull.asRight[IntentionNotFound[UUID]])
-            def editIntention(i: UUID, config: Json): F[Condition[SchedulingError[UUID, Json]]] =
-              Sync[F].delay(Condition.normal[SchedulingError[UUID, Json]]())
-            def deleteIntention(i: UUID): F[Condition[IntentionNotFound[UUID]]] =
-              Sync[F].delay(Condition.normal[IntentionNotFound[UUID]]())
+            def addIntention(c: Json): F[Either[IncorrectIntention[Json], Array[Byte]]] =
+              Sync[F].delay(UUID.randomUUID.toString.getBytes.asRight[IncorrectIntention[Json]])
+            def lookupIntention(i: Array[Byte]): F[Either[IntentionNotFound[Array[Byte]], Json]] =
+              Sync[F].delay(Json.jNull.asRight[IntentionNotFound[Array[Byte]]])
+            def editIntention(i: Array[Byte], config: Json): F[Condition[SchedulingError[Array[Byte], Json]]] =
+              Sync[F].delay(Condition.normal[SchedulingError[Array[Byte], Json]]())
+            def deleteIntention(i: Array[Byte]): F[Condition[IntentionNotFound[Array[Byte]]]] =
+              Sync[F].delay(Condition.normal[IntentionNotFound[Array[Byte]]]())
           }
           scheduler.asRight[InitializationError[Json]].pure[Resource[F, ?]]
       }
