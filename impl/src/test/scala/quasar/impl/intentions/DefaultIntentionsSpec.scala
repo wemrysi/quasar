@@ -42,18 +42,18 @@ final class DefaultIntentionsSpec(implicit ec: ExecutionContext) extends Effectf
         _ <- mp.update(_.updated(ix, c))
       } yield Right(ix)
       def lookupIntention(i: Int) =
-        mp.get map (_.get(i).toRight(IntentionNotFound(i)))
+        mp.get map (_.get(i).toRight(IntentionNotFound(i, "")))
       def editIntention(i: Int, c: String) = for {
         container <- mp.get
         result <- container.get(i) match {
-          case None => Condition.abnormal(IntentionNotFound(i)).pure[IO]
+          case None => Condition.abnormal(IntentionNotFound(i, "")).pure[IO]
           case Some(_) => mp.update(_.updated(i, c)) as Condition.normal[IntentionNotFound[Int]]()
         }
       } yield result
       def deleteIntention(i: Int) = for {
         container <- mp.get
         result <- container.get(i) match {
-          case None => Condition.abnormal(IntentionNotFound(i)).pure[IO]
+          case None => Condition.abnormal(IntentionNotFound(i, "")).pure[IO]
           case Some(_) => mp.update(_ - i) as Condition.normal[IntentionNotFound[Int]]()
         }
       } yield result
@@ -106,7 +106,7 @@ final class DefaultIntentionsSpec(implicit ec: ExecutionContext) extends Effectf
         _ <- ref.update(_.updated(0, "foo"))
         res1 <- intentions.lookup(0, 0)
       } yield {
-        res0 must beLeft(IntentionNotFound(0))
+        res0 must beLeft(IntentionNotFound(0, ""))
         res1 must beRight("foo")
       }
     }

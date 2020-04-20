@@ -27,13 +27,13 @@ object IntentionError {
   final case class SchedulerNotFound[I](index: I) extends IntentionError[I, Nothing, Nothing]
 
   sealed trait SchedulingError[+I, +C] extends IntentionError[Nothing, I, C]
-  final case class IncorrectIntention[C](config: C) extends SchedulingError[Nothing, C]
-  final case class IntentionNotFound[I](index: I) extends SchedulingError[I, Nothing]
+  final case class IncorrectIntention[C](config: C, reason: String) extends SchedulingError[Nothing, C]
+  final case class IntentionNotFound[I](index: I, reason: String) extends SchedulingError[I, Nothing]
 
   object SchedulingError {
     implicit def show[I: Show, C: Show]: Show[SchedulingError[I, C]] = Show.show {
-      case IncorrectIntention(config) => s"IncorrectIntention(${config.show})"
-      case IntentionNotFound(index) => s"IntentionNotFound(${index.show})"
+      case IncorrectIntention(config, reason) => s"IncorrectIntention(${config.show}, ${reason.show})"
+      case IntentionNotFound(index, reason) => s"IntentionNotFound(${index.show}, ${reason.show})"
     }
   }
 
