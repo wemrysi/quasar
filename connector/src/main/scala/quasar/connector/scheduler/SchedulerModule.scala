@@ -14,19 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.api.scheduler
+package quasar.connector.scheduler
 
-import slamdata.Predef._
-
-import quasar.Condition
 import quasar.api.scheduler._, SchedulerError._
 
-import fs2.Stream
 
-trait Schedulers[F[_], I, II, C, CC] {
-  def addScheduler(ref: SchedulerRef[C]): F[Either[CreateError[C], I]]
-  def schedulerRef(i: I): F[Either[SchedulerNotFound[I], SchedulerRef[C]]]
-  def removeScheduler(i: I): F[Condition[SchedulerError[I, C]]]
-  def replaceScheduler(i: I, ref: SchedulerRef[C]): F[Condition[SchedulerError[I, C]]]
-  def supportedTypes: F[Set[SchedulerType]]
+import argonaut.Json
+import cats.effect._
+
+import java.util.UUID
+import scala.util.Either
+
+trait SchedulerModule {
+  def schedulerType: SchedulerType
+  def sanitizeConfig(config: Json): Json
+  def scheduler[F[_]: ContextShift: ConcurrentEffect: Timer](config: Json)
+      : Resource[F, Either[InitializationError[Json], Scheduler[F, UUID, Json]]]
 }

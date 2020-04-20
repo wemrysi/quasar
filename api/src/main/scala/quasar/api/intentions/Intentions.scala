@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.api.scheduler
+package quasar.api.intentions
 
 import slamdata.Predef._
 
 import quasar.Condition
-import quasar.api.scheduler.SchedulerError._
+import quasar.api.intentions.IntentionError._
 
 import fs2.Stream
 
-trait Scheduler[F[_], I, C] {
-  def intentions: Stream[F, (I, C)]
-  def addIntention(config: C): F[Either[IncorrectIntention[C], I]]
-  def getIntention(i: I): F[Either[IntentionNotFound[I], C]]
-  def editIntention(i: I, config: C): F[Condition[IntentionError[I, C]]]
-  def deleteIntention(i: I): F[Condition[IntentionNotFound[I]]]
+trait Intentions[F[_], I, II, C] {
+  def entries(schedulerId: I): Stream[F, (I, C)]
+  def add(schedulerId: I, config: C): F[Either[IncorrectIntention[C], I]]
+  def lookup(schedulerId: I, intentionId: II): F[Either[IntentionNotFound[I], C]]
+  def edit(schedulerId: I, intentionId: II, config: C): F[Condition[IntentionError[I, C]]]
+  def delete(schedulerId: I, intentionId: II): F[Condition[IntentionNotFound[I]]]
 }

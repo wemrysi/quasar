@@ -14,22 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.api.scheduler
+package quasar.api.intentions
 
+import slamdata.Predef._
 
-import argonaut.Json
+import cats.Show
+import cats.implicits._
 
-import cats.effect._
+sealed trait IntentionError[+I, +C] extends Product with Serializable
 
-import java.util.UUID
+object IntentionError {
+  final case class IncorrectIntention[C](config: C) extends IntentionError[Nothing, C]
+  final case class IntentionNotFound[I](index: I) extends IntentionError[I, Nothing]
 
-import scala.util.Either
-
-import SchedulerError._
-
-trait SchedulerModule {
-  def schedulerType: SchedulerType
-  def sanitizeConfig(config: Json): Json
-  def scheduler[F[_]: ContextShift: ConcurrentEffect: Timer](config: Json)
-      : Resource[F, Either[InitializationError[Json], Scheduler[F, UUID, Json]]]
+  implicit def show[I: Show, C: Show]: Show[IntentionError[I, C]] = Show.show {
+    case IncorrectIntention(config) => s"IncorrectIntention(${config.show})"
+    case IntentionNotFound(index) => s"IntentionNotFound(${index.show})"
+  }
 }

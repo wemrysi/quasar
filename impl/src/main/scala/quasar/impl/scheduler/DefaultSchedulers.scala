@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.scheduler._
 import quasar.api.scheduler.SchedulerError._
+import quasar.connector.scheduler.{Scheduler, SchedulerModule}
 import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 
@@ -51,16 +52,6 @@ private[quasar] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
       .toRight(SchedulerNotFound(i))
       .map(modules.sanitizeRef(_))
       .value
-
-  def intentions: Stream[F, (I, II, Json)] = for {
-    (k, v) <- refs.entries
-    eScheduler <- Stream.eval(schedulerOf(k))
-    scheduler <- eScheduler match {
-      case Left(_) => Stream.empty
-      case Right(a) => Stream.emit(a)
-    }
-    (kk, intention) <- scheduler.intentions
-  } yield (k, kk, intention)
 
   def schedulerOf(i: I): F[Either[SchedulerError[I, C], Scheduler[F, II, Json]]] = {
     type SE = SchedulerError[I, C]

@@ -23,16 +23,18 @@ import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
 import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
 import quasar.api.discovery.{Discovery, SchemaConfig}
+import quasar.api.intentions.Intentions
 import quasar.api.push.ResultPush
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.table.{TableRef, Tables}
-import quasar.api.scheduler.{Scheduler, Schedulers, SchedulerRef, SchedulerModule}
+import quasar.api.scheduler.{Schedulers, SchedulerRef}
 import quasar.common.PhaseResultTell
 import quasar.connector.{QueryResult, ResourceSchema}
 import quasar.connector.datasource.Datasource
 import quasar.connector.destination.{Destination, DestinationModule}
 import quasar.connector.evaluate._
 import quasar.connector.render.ResultRender
+import quasar.connector.scheduler.{Scheduler, SchedulerModule}
 import quasar.contrib.std.uuid._
 import quasar.ejson.implicits._
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
@@ -73,11 +75,13 @@ import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, show
 final class Quasar[F[_], R, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
+    val schedulers: Schedulers[F, UUID, UUID, Json, Json],
     val tables: Tables[F, UUID, SqlQuery],
     val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, Stream[F, R]],
     val discovery: Discovery[Resource[F, ?], Stream[F, ?], UUID, C],
     val resultPush: ResultPush[F, UUID, UUID],
-    val schedulers: Schedulers[F, UUID, UUID, Json, Json])
+    val intentions: Intentions[F, UUID, UUID, Json])
+
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 object Quasar extends Logging {
@@ -160,7 +164,9 @@ object Quasar extends Logging {
         jobManager,
         resultRender))
 
-    } yield new Quasar(datasources, destinations, tables, sqlEvaluator, discovery, push, schedulers)
+      intentions: Intentions[F, UUID, UUID, Json] = ???
+
+    } yield new Quasar(datasources, destinations, schedulers, tables, sqlEvaluator, discovery, push, intentions)
   }
 
   ////

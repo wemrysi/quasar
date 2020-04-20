@@ -16,10 +16,10 @@
 
 package quasar.impl.external
 
-import quasar.api.scheduler.SchedulerModule
 import quasar.impl.DatasourceModule
 import quasar.connector.destination.DestinationModule
 import quasar.connector.datasource.{HeavyweightDatasourceModule, LightweightDatasourceModule}
+import quasar.connector.scheduler.SchedulerModule
 
 import slamdata.Predef._
 
