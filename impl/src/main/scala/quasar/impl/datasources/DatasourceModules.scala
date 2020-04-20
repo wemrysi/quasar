@@ -106,7 +106,7 @@ object DatasourceModules {
   type MDS[T[_[_]], F[_]] =
     QuasarDatasource[T, Resource[F, ?], Stream[F, ?], QueryResult[F], ResourcePathType.Physical]
 
-  def apply[
+  private[impl] def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr: MonadPlannerErr,
       I, A: Hash](

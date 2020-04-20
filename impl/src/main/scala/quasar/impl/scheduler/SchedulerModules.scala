@@ -39,7 +39,7 @@ trait SchedulerModules[F[_], I, C, CC] {
 }
 
 object SchedulerModules {
-  def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr](
+  private[impl] def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr](
       modules: List[SchedulerModule])
       : SchedulerModules[F, Array[Byte], Json, Json] = {
     lazy val moduleSet: Set[SchedulerType] =

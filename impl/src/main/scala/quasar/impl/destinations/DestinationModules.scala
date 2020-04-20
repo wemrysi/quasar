@@ -45,7 +45,7 @@ trait DestinationModules[F[_], C] {
 }
 
 object DestinationModules {
-  def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr](
+  private[impl] def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr](
       modules: List[DestinationModule])
       : DestinationModules[F, Json] = {
 
