@@ -14,17 +14,10 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.connector
 
-import slamdata.Predef._
+import quasar.api.push.{OffsetKey, OffsetPath}
 
-import quasar.contrib.scalaz.MonadError_
+import skolems.∃
 
-package object connector {
-  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
-
-  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
-
-  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
-      : MonadResourceErr[F] = ev
-}
+final case class Offset(path: OffsetPath, value: ∃[OffsetKey.Actual])
