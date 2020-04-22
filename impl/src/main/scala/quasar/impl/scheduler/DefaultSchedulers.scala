@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.scheduler._
 import quasar.api.scheduler.SchedulerError._
-import quasar.connector.scheduler.Scheduler
+import quasar.connector.scheduler.{Scheduler, SchedulerModule}
 import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 
@@ -40,6 +40,14 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
     getter: CachedGetter[F, I, SchedulerRef[C]],
     modules: SchedulerModules[F, II, C, Json])
     extends Schedulers[F, I, II, C, Json] {
+  type Module = SchedulerModule
+  type ModuleType = SchedulerType
+
+  def enableModule(m: SchedulerModule): F[Unit] =
+    modules.enable(m)
+  def disableModule(m: SchedulerType): F[Unit] =
+    modules.disable(m)
+
   def addScheduler(ref: SchedulerRef[C]): F[Either[CreateError[C], I]] = for {
     i <- freshId
     c <- addRef[CreateError[C]](i, ref)
@@ -48,7 +56,7 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
   def schedulerRef(i: I): F[Either[SchedulerNotFound[I], SchedulerRef[C]]] =
     OptionT(refs.lookup(i))
       .toRight(SchedulerNotFound(i))
-      .map(modules.sanitizeRef(_))
+      .semiflatMap(modules.sanitizeRef(_))
       .value
 
   def schedulerOf(i: I): F[Either[SchedulerError[I, C], Scheduler[F, II, Json]]] = {

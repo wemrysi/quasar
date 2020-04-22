@@ -89,7 +89,8 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
   "supported types" >> {
     "empty" >>* {
       for {
-        actual <- mkModules(List()).supportedTypes
+        modules <- mkModules(List())
+        actual <- modules.supportedTypes
       } yield {
         actual must_=== Set()
       }
@@ -98,34 +99,61 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
 
       val expected = Set(fooKind)
       for {
-        actual <- mkModules(List(module(fooKind))).supportedTypes
+        modules <- mkModules(List(module(fooKind)))
+        actual <- modules.supportedTypes
       } yield {
         actual must_=== expected
       }
     }
   }
 
-  "sanitizeRef" >> {
-    val modules = mkModules(List(module(fooKind)))
+  "sanitizeRef" >>* {
     val supported = SchedulerRef(fooKind, "supported", Json.jString("foo"))
     val unsupported = SchedulerRef(barKind, "unsupported", Json.jString("bar"))
 
-    modules.sanitizeRef(supported) must_=== supported.copy(config = Json.jString("sanitized"))
-    modules.sanitizeRef(unsupported) must_=== unsupported.copy(config = Json.jEmptyObject)
+    for {
+      modules <- mkModules(List(module(fooKind)))
+      supportedSanitized <- modules.sanitizeRef(supported)
+      unsupportedSanitized <- modules.sanitizeRef(unsupported)
+    } yield {
+      supportedSanitized must_=== supported.copy(config = Json.jString("sanitized"))
+      unsupportedSanitized must_=== unsupported.copy(config = Json.jEmptyObject)
+    }
   }
 
   "create" >> {
     "work for supported" >>* {
       val ref = SchedulerRef(fooKind, "supported", Json.jString(""))
-      mkModules(List(module(fooKind))).create(ref).value use { res =>
-        IO(res must beRight)
-      }
+      for {
+        modules <- mkModules(List(module(fooKind)))
+        res <- modules.create(ref).value.use { res => IO(res must beRight) }
+      } yield res
     }
     "doesn't work for unsupported" >>* {
       val ref = SchedulerRef(barKind, "unsupported", Json.jString(""))
-      mkModules(List(module(fooKind))).create(ref).value use { res =>
-        IO(res must beLeft(SchedulerUnsupported(barKind, Set(fooKind))))
-      }
+      for {
+        modules <- mkModules(List(module(fooKind)))
+        res <- modules.create(ref).value.use { res => IO(res must beLeft(SchedulerUnsupported(barKind, Set(fooKind)))) }
+      } yield res
+    }
+  }
+
+  "enable/disable" >>* {
+    val ref = SchedulerRef(fooKind, "supported", Json.jString(""))
+    for {
+      modules <- mkModules(List())
+      (m0, finish0) <- modules.create(ref).value.allocated
+      _ <- modules.enable(module(fooKind))
+      (m1, finish1) <- modules.create(ref).value.allocated
+      _ <- modules.disable(fooKind)
+      (m2, finish2) <- modules.create(ref).value.allocated
+      _ <- finish0
+      _ <- finish1
+      _ <- finish2
+    } yield {
+      m0 must beLeft(SchedulerUnsupported(fooKind, Set()))
+      m1 must beRight
+      m2 must beLeft(SchedulerUnsupported(fooKind, Set()))
     }
   }
 
@@ -145,13 +173,14 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
     val connErr = ConnectionFailed(connFailed, Json.jString("c"), new Exception("conn"))
     val accessErr = AccessDenied(accessDenied, Json.jString("d"), "access denied")
 
-    val modules = mkModules(List(
+    val ioModules = mkModules(List(
       module(malformed, Some(malformedErr)),
       module(invalid, Some(invalidErr)),
       module(connFailed, Some(connErr)),
       module(accessDenied, Some(accessErr))))
 
     for {
+      modules <- ioModules
       (malformedS, _) <- modules.create(malformedRef).value.allocated
       (invalidS, _) <- modules.create(invalidRef).value.allocated
       (connFailedS, _) <- modules.create(connFailedRef).value.allocated

@@ -26,6 +26,7 @@ import quasar.api.discovery.{Discovery, SchemaConfig}
 import quasar.api.intentions.Intentions
 import quasar.api.push.ResultPush
 import quasar.api.resource.{ResourcePath, ResourcePathType}
+import quasar.api.scheduler.SchedulerType
 import quasar.api.table.{TableRef, Tables}
 import quasar.api.scheduler.{Schedulers, SchedulerRef}
 import quasar.common.PhaseResultTell
@@ -76,7 +77,7 @@ import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, show
 final class Quasar[F[_], R, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
-    val schedulers: Schedulers[F, UUID, Array[Byte], Json, Json],
+    val schedulers: Schedulers.Aux[F, UUID, Array[Byte], Json, Json, SchedulerModule, SchedulerType],
     val tables: Tables[F, UUID, SqlQuery],
     val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, Stream[F, R]],
     val discovery: Discovery[Resource[F, ?], Stream[F, ?], UUID, C],
@@ -109,10 +110,6 @@ object Quasar extends Logging {
     val destModules =
       DestinationModules[F](destinationModules)
 
-    val sModules =
-      SchedulerModules[F](schedulerModules)
-
-
     for {
       _ <- Resource.liftF(warnDuplicates[F, DatasourceModule, DatasourceType](datasourceModules)(_.kind))
       _ <- Resource.liftF(warnDuplicates[F, DestinationModule, DestinationType](destinationModules)(_.destinationType))
@@ -132,12 +129,14 @@ object Quasar extends Logging {
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(report)(_, _))
 
-      dsCache <- ResourceManager[F, UUID, QuasarDatasource[Fix, Resource[F, ?], Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
+      dsCache <- ResourceManager[
+        F, UUID, QuasarDatasource[Fix, Resource[F, ?], Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
       datasources <- Resource.liftF(DefaultDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, byteStores))
 
       destCache <- ResourceManager[F, UUID, Destination[F]]
       destinations <- Resource.liftF(DefaultDestinations(freshUUID, destinationRefs, destCache, destModules))
 
+      sModules <- Resource.liftF(SchedulerModules[F](schedulerModules))
       sCache <- ResourceManager[F, UUID, Scheduler[F, Array[Byte], Json]]
       schedulers <- Resource.liftF(DefaultSchedulers(freshUUID, schedulerRefs, sCache, sModules))
 

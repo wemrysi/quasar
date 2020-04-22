@@ -23,9 +23,22 @@ import quasar.Condition
 import SchedulerError._
 
 trait Schedulers[F[_], I, II, C, CC] {
+  type Module
+  type ModuleType
+
   def addScheduler(ref: SchedulerRef[C]): F[Either[CreateError[C], I]]
   def schedulerRef(i: I): F[Either[SchedulerNotFound[I], SchedulerRef[C]]]
   def removeScheduler(i: I): F[Condition[SchedulerError[I, C]]]
   def replaceScheduler(i: I, ref: SchedulerRef[C]): F[Condition[SchedulerError[I, C]]]
   def supportedTypes: F[Set[SchedulerType]]
+
+  def enableModule(m: Module): F[Unit]
+  def disableModule(ty: ModuleType): F[Unit]
+}
+
+object Schedulers {
+  type Aux[F[_], I, II, C, CC, M, MT] = Schedulers[F, I, II, C, CC] {
+    type Module = M
+    type ModuleType = MT
+  }
 }

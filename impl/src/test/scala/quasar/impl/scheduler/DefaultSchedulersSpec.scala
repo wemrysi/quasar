@@ -82,11 +82,10 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
       }
     val rCache = ResourceManager[IO, String, Scheduler[IO, Array[Byte], Json]]
 
-    val modules = SchedulerModules[IO](List(module(testType)))
-
     for {
       refs <- Resource.liftF(fRefs)
       cache <- rCache
+      modules <- Resource.liftF(SchedulerModules[IO](List(module(testType))))
       result <- Resource.liftF(DefaultSchedulers(freshId, refs, cache, modules))
     } yield (refs, result, cache)
   }
@@ -102,6 +101,25 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
   val sanitize: SchedulerRef[Json] => SchedulerRef[Json] = (x: SchedulerRef[Json]) => x.copy(config = Json.jString("sanitized"))
 
   "schedulers" >> {
+    "enable/disableModule" >>* {
+      val unknownType = SchedulerType("unknown", 0L)
+      val unknownRef = SchedulerRef(unknownType, "unknown", Json.jNull)
+      for {
+        (ss, finalize) <- emptySchedulers.allocated
+        result0 <- ss.addScheduler(unknownRef)
+        _ <- ss.enableModule(module(unknownType))
+        result1 <- ss.addScheduler(unknownRef)
+        id = result1.toOption.get
+        _ <- ss.removeScheduler(id)
+        _ <- ss.disableModule(unknownType)
+        result2 <- ss.addScheduler(unknownRef)
+        _ <- finalize
+      } yield {
+        result0 must beLeft(SchedulerUnsupported(unknownType, Set(testType)))
+        result1 must beRight
+        result2 must beLeft(SchedulerUnsupported(unknownType, Set(testType)))
+      }
+    }
     "add scheduler" >> {
       "create and saves scheduler" >>* {
         for {

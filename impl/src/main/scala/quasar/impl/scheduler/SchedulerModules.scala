@@ -27,41 +27,50 @@ import quasar.impl.IncompatibleModuleException.linkScheduler
 import argonaut.Json
 import argonaut.Argonaut.jEmptyObject
 
-import cats.data.EitherT
+import cats.data.{EitherT, OptionT}
 import cats.effect._
+import cats.effect.concurrent.Ref
 import cats.implicits._
 import cats.MonadError
 
 trait SchedulerModules[F[_], I, C, CC] {
   def create(ref: SchedulerRef[C]): EitherT[Resource[F, ?], CreateError[C], Scheduler[F, I, CC]]
-  def sanitizeRef(inp: SchedulerRef[C]): SchedulerRef[C]
+  def sanitizeRef(inp: SchedulerRef[C]): F[SchedulerRef[C]]
   def supportedTypes: F[Set[SchedulerType]]
+  def enable(module: SchedulerModule): F[Unit]
+  def disable(mt: SchedulerType): F[Unit]
 }
 
 object SchedulerModules {
   private[impl] def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr](
       modules: List[SchedulerModule])
-      : SchedulerModules[F, Array[Byte], Json, Json] = {
-    lazy val moduleSet: Set[SchedulerType] =
-      Set(modules.map(_.schedulerType):_*)
-    lazy val moduleMap: Map[SchedulerType, SchedulerModule] =
+      : F[SchedulerModules[F, Array[Byte], Json, Json]] = {
+
+    val moduleMap: Map[SchedulerType, SchedulerModule] =
       Map(modules.map(ss => (ss.schedulerType, ss)):_*)
 
-    new SchedulerModules[F, Array[Byte], Json, Json] {
-      def create(ref: SchedulerRef[Json])
-          : EitherT[Resource[F, ?], CreateError[Json], Scheduler[F, Array[Byte], Json]] =
-        moduleMap.get(ref.kind) match {
-          case None =>
-            EitherT.leftT(SchedulerUnsupported(ref.kind, moduleSet): CreateError[Json])
-          case Some(module) =>
-            handleInitErrors(ref.kind, module.scheduler[F](ref.config))
+    Ref.of[F, Map[SchedulerType, SchedulerModule]](moduleMap) map { (ref: Ref[F, Map[SchedulerType, SchedulerModule]]) =>
+      def getModule(i: SchedulerType): F[Option[SchedulerModule]] = ref.get map (_.get(i))
+
+      new SchedulerModules[F, Array[Byte], Json, Json] {
+        def create(ref: SchedulerRef[Json])
+            : EitherT[Resource[F, ?], CreateError[Json], Scheduler[F, Array[Byte], Json]] =
+          for {
+            tys <- EitherT.right(Resource.liftF(supportedTypes))
+            module <- OptionT(Resource.liftF(getModule(ref.kind))).toRight(SchedulerUnsupported(ref.kind, tys))
+            res <- handleInitErrors(ref.kind, module.scheduler[F](ref.config))
+          } yield res
+
+        def sanitizeRef(inp: SchedulerRef[Json]): F[SchedulerRef[Json]] = getModule(inp.kind) map {
+          case None => inp.copy(config = jEmptyObject)
+          case Some(x) => inp.copy(config = x.sanitizeConfig(inp.config))
         }
-      def sanitizeRef(inp: SchedulerRef[Json]): SchedulerRef[Json] = moduleMap.get(inp.kind) match {
-        case None => inp.copy(config = jEmptyObject)
-        case Some(x) => inp.copy(config = x.sanitizeConfig(inp.config))
+        def supportedTypes: F[Set[SchedulerType]] =
+          ref.get map (_.keySet)
+
+        def enable(m: SchedulerModule): F[Unit] = ref.update(_.updated(m.schedulerType, m))
+        def disable(mt: SchedulerType): F[Unit] = ref.update(_ - mt)
       }
-      def supportedTypes: F[Set[SchedulerType]] =
-        moduleSet.pure[F]
     }
   }
 
