@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.impl.store
+package quasar.impl.storage
 
 import slamdata.Predef._
 

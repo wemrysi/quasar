@@ -23,7 +23,7 @@ import quasar.api.destination.DestinationError.{CreateError => DestCreateError}
 import quasar.api.scheduler.SchedulerError.{CreateError => SCreateError}
 import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
-import quasar.impl.store.StoreError
+import quasar.impl.storage.StoreError
 import quasar.qscript.PlannerError
 import quasar.sql.ParsingError
 

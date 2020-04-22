@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.impl.store
+package quasar.impl
 
 import slamdata.Predef._
 
@@ -24,7 +24,6 @@ import cats.syntax.show._
 import cats.instances.string._
 
 import quasar.contrib.scalaz.MonadError_
-import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}, IndexedStore._
 
 import java.nio.file.Path
 import java.util.UUID
@@ -35,7 +34,9 @@ import monocle.Prism
 
 import shims.monadToScalaz
 
-object Store {
+package object storage {
+  import IndexedStore._
+
   val MapDBTableName = "default"
 
   def codecStore[A: Show, F[_]: Sync: ContextShift: MonadError_[?[_], StoreError]](
