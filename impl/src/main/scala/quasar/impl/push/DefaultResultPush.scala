@@ -128,34 +128,34 @@ final class DefaultResultPush[
   import DefaultResultPush.{ActiveState, liftKey}
   import ResultPushError._
 
-  def cancel(destinationId: D, path: ResourcePath): F[Condition[DestinationNotFound[D]]] =
-    ???
-/*
+  def cancel(destinationId: D, path: ResourcePath): F[Condition[DestinationNotFound[D]]] = {
     val doCancel: F[Unit] = for {
-      result <- jobManager.cancel(destinationId :: tableId :: HNil)
+      canceledAt <- instantNow
 
-      now <- instantNow
+      key = destinationId :: path :: HNil
 
-      _ <- Concurrent[F] delay {
-        pushStatus.computeIfPresent(destinationId, (_, mm) => {
-          mm.computeIfPresent(tableId, {
-            case (_, pm @ PushMeta(_, _, _, Status.Running(startedAt))) =>
-              pm.copy(status = Status.Canceled(startedAt, now))
-            case (_, pm) =>
-              pm
-          })
+      result <- jobManager.cancel(key)
 
-          mm
-        })
+      state <- Sync[F].delay(Option(active.remove(liftKey(key))))
+
+      // TODO[logging]: Warn unless result == state.isDefined
+
+      _ <- state traverse_ {
+        case ActiveState.PushRunning(p, runningAt, _, limit, terminal) =>
+          val canceled = Status.Canceled(runningAt, canceledAt, limit)
+          pushes.insert(key, ∃[Push[?, Q]](p.value.copy(status = canceled)))
+            .guarantee(terminal.complete(canceled))
+
+        case accepted =>
+          accepted.terminal.complete(Status.Canceled(accepted.at, canceledAt, accepted.limit))
       }
-    } yield result
+    } yield ()
 
-    ensureBothExist[ExistentialError[T, D]](destinationId, tableId)
+    destination[DestinationNotFound[D]](destinationId)
       .semiflatMap(_ => doCancel)
       .value
       .map(Condition.eitherIso.reverseGet(_))
   }
-*/
 
   def cancelAll: F[Unit] =
     ???
@@ -453,28 +453,35 @@ final class DefaultResultPush[
 }
 
 object DefaultResultPush {
-  private sealed trait ActiveState[F[_], Q] extends Product with Serializable
+  private sealed trait ActiveState[F[_], Q] extends Product with Serializable {
+    def at: Instant
+    def limit: Option[Long]
+    def terminal: Deferred[F, Status.Terminal]
+  }
 
   private object ActiveState {
     final case class StartAccepted[F[_], Q](
         config: ∃[PushConfig[?, Q]],
         at: Instant,
         limit: Option[Long],
-        deferred: Deferred[F, Status.Terminal])
+        terminal: Deferred[F, Status.Terminal])
         extends ActiveState[F, Q]
 
     final case class UpdateAccepted[F[_], Q](
         push: ∃[Push[?, Q]],
         at: Instant,
-        deferred: Deferred[F, Status.Terminal])
-        extends ActiveState[F, Q]
+        terminal: Deferred[F, Status.Terminal])
+        extends ActiveState[F, Q] {
+
+      val limit = None
+    }
 
     final case class PushRunning[F[_], Q](
         push: ∃[Push[?, Q]],
         at: Instant,
         acceptedAt: Instant,
         limit: Option[Long],
-        deferred: Deferred[F, Status.Terminal])
+        terminal: Deferred[F, Status.Terminal])
         extends ActiveState[F, Q]
   }
 
