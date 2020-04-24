@@ -24,20 +24,19 @@ import quasar.api.Label.Syntax._
 import quasar.api.push._
 import quasar.api.push.param._
 import quasar.api.resource.ResourcePath
-import quasar.api.table.TableRef
 import quasar.connector.Offset
 import quasar.connector.destination._
-import quasar.connector.render.{ResultRender, RenderConfig}
+import quasar.connector.render.ResultRender
 import quasar.impl.storage.{IndexedStore, PrefixStore}
 
 import java.time.Instant
-import java.util.{Map => JMap, Comparator}
+import java.util.Comparator
 import java.util.concurrent.{ConcurrentMap, ConcurrentNavigableMap, ConcurrentSkipListMap}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
-import cats.Applicative
+import cats.{Applicative, Order}
 import cats.data.{Const, EitherT, Ior, OptionT, NonEmptyList}
 import cats.effect.{Concurrent, Resource, Sync, Timer}
 import cats.effect.concurrent.Deferred
@@ -48,6 +47,9 @@ import fs2.Stream
 import fs2.job.{JobManager, Job, Event => JobEvent, Timestamp => JobStarted}
 
 import shapeless._
+import shapeless.HList.ListCompat._
+
+import shims.orderToCats
 
 import skolems.∃
 
@@ -113,137 +115,22 @@ import skolems.∃
 // TODO[logging]: Need to log when a push terminates
 // TODO[clustering]: Need to decide how we'll ensure a job is only ever running on a single node.
 final class DefaultResultPush[
-    F[_]: Concurrent: Timer, D, Q, R] private (
+    F[_]: Concurrent: Timer, D <: AnyRef, Q, R] private (
     lookupDestination: D => F[Option[Destination[F]]],
     evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), Stream[F, R]],
     jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing],
     render: ResultRender[F, R],
-    active: ConcurrentNavigableMap[D :: Option[ResourcePath] :: HNil, ActiveState[Q]],
+    active: ConcurrentNavigableMap[D :: Option[ResourcePath] :: HNil, DefaultResultPush.ActiveState[F, Q]],
     pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
     offsets: IndexedStore[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
-    extends ResultPush[F, T, D, Q] {
+    extends ResultPush[F, D, Q] {
 
-  import DefaultResultPush.liftKey
+  import DefaultResultPush.{ActiveState, liftKey}
   import ResultPushError._
 
-  def coerce(destinationId: D, tpe: ColumnType.Scalar)
-      : F[Either[ResultPushError.DestinationNotFound[D], TypeCoercion[CoercedType]]] = {
-
-    val destF = EitherT.fromOptionF[F, ResultPushError.DestinationNotFound[D], Destination[F]](
-      lookupDestination(destinationId),
-      DestinationNotFound(destinationId))
-
-    destF.map(coerceWith(_, tpe)).value
-  }
-
-  def start(
-      tableId: T,
-      destinationId: D,
-      push: ∃[Push[?, Q]],
-      limit: Option[Long])
-      : F[Condition[NonEmptyList[ResultPushError[T, D]]]] = {
-
-    type Errs = NonEmptyList[ResultPushError[T, D]]
-
-    def err(rpe: ResultPushError[T, D]): Errs = NonEmptyList.one(rpe)
-
-    def handleFull(
-        dest: Destination[F])(
-        path: ResourcePath,
-        query: Q,
-        outputColumns: NonEmptyList[Column[(ColumnType.Scalar, dest.Type)]])
-        : EitherT[F, Errs, Stream[F, Unit]] =
-      /*
-
-      evaluated =
-        Stream.resource(evaluator(tableRef.query))
-          .flatten
-          .flatMap(render.render(_, tableRef.columns, sink.config, limit))
-
-      sinked = sink.consume(path, typedColumns, evaluated).map(Right(_))
-
-      for {
-        ResultSink.CreateSink(renderCfg, consume) <-
-          EitherT.fromEither[F] {
-            createSink(dest).toRight[ResultPushError[T, D]](FullNotSupported(destinationId))
-          }
-      }*/
-      ???
-
-    def handleIncremental[A](
-        dest: Destination[F])(
-        path: ResourcePath,
-        query: Q,
-        outputColumns: NonEmptyList[Column[(ColumnType.Scalar, dest.Type)]],
-        resumeConfig: ResumeConfig[A],
-        initialOffset: Option[OffsetKey.Actual[A]])
-        : EitherT[F, Errs, Stream[F, OffsetKey.Actual[A]]] =
-      ???
-
-    val writing = for {
-      dest <- EitherT.fromOptionF[F, Errs, Destination[F]](
-        lookupDestination(destinationId),
-        err(DestinationNotFound(destinationId)))
-
-      tableRef <- EitherT.fromOptionF[F, Errs, TableRef[Q]](
-        lookupTable(tableId),
-        err(TableNotFound(tableId)))
-
-      key = destinationId :: tableId :: HNil
-
-      _ <- EitherT(Sync[F].delay(active.containsKey(liftKey(key))) map {
-        case true => Left(err(PushAlreadyRunning(tableId, destinationId)))
-        case false => Right(())
-      })
-
-      typedOutputColumns <- EitherT.fromEither[F] {
-        push.value.columns
-          .traverse(typedColumn(destinationId, dest, _).toValidatedNel)
-          .toEither
-      }
-
-      sinked <- push.value match {
-        case Push.Full(path, q, _) =>
-          handleFull(dest)(path, q, typedOutputColumns)
-
-        case Push.Incremental(path, q, _, resumeCfg, initOffset) =>
-          handleIncremental(dest)(path, q, typedOutputColumns, resumeCfg, initOffset)
-            .map(_.evalMap(o => offsets.insert(key, ∃(o))))
-      }
-
-      acceptedAt <- EitherT.right[Errs](instantNow)
-      accepted = Status.Accepted(acceptedAt, limit)
-
-      alreadyRunning <- EitherT.right[Errs](Sync[F] delay {
-        Option(active.putIfAbsent(liftKey(key), accepted)).isDefined
-      })
-
-      _ <- if (alreadyRunning)
-        EitherT.leftT[F, Unit](err(PushAlreadyRunning(tableId, destinationId)))
-      else
-        EitherT.right[Errs](pushes.insert(key, push) *> offsets.delete(key))
-
-      setRunning = instantNow.flatMap(ts => Sync[F] delay {
-        active.replace(liftKey(key), accepted, Status.Running(ts, limit))
-      })
-
-      job = Stream.eval_(setRunning) ++ sinked
-
-      submitted <- EitherT.right[Errs](jobManager.submit(Job(key, job.map(Right(_)))))
-
-      _ <- if (submitted)
-        EitherT.rightT[F, Errs](())
-      else
-        // TODO[logging]: this shouldn't happen, so should log if it ever does
-        EitherT.left[Unit](
-          Sync[F].delay(active.remove(liftKey(key), accepted))
-            .as(err(PushAlreadyRunning(tableId, destinationId))))
-    } yield ()
-
-    writing.value.map(Condition.eitherIso.reverseGet(_))
-  }
-
-  def cancel(tableId: T, destinationId: D): F[Condition[ExistentialError[T, D]]] = {
+  def cancel(destinationId: D, path: ResourcePath): F[Condition[DestinationNotFound[D]]] =
+    ???
+/*
     val doCancel: F[Unit] = for {
       result <- jobManager.cancel(destinationId :: tableId :: HNil)
 
@@ -268,21 +155,166 @@ final class DefaultResultPush[
       .value
       .map(Condition.eitherIso.reverseGet(_))
   }
+*/
 
-  def update(destinationId: D, path: ResourcePath)
-      : F[Either[ResultPushError[D], F[Status.Terminal]]] = ???
+  def cancelAll: F[Unit] =
+    ???
+    //jobManager.jobIds.flatMap(_.traverse_(jobManager.cancel(_)))
 
-  def destinationStatus(destinationId: D): F[Either[DestinationNotFound[D], Map[T, PushMeta]]] =
-    ensureDestinationExists[DestinationNotFound[D]](destinationId)
-      .semiflatMap(x => Concurrent[F] delay {
-        val back = Option(pushStatus.get(destinationId))
-        back.fold(Map[T, PushMeta]())(_.asScala.toMap)
-      })
+  def coerce(destinationId: D, scalar: ColumnType.Scalar)
+      : F[Either[DestinationNotFound[D], TypeCoercion[CoercedType]]] =
+    destination[DestinationNotFound[D]](destinationId)
+      .map(coerceWith(_, scalar))
       .value
 
-  // FIXME: rewrite in term of `active`
-  def cancelAll: F[Unit] =
-    jobManager.jobIds.flatMap(_.traverse_(jobManager.cancel(_)))
+  def destinationStatus(destinationId: D)
+      : F[Either[DestinationNotFound[D], Map[ResourcePath, ∃[Push[?, Q]]]]] = {
+
+    def overrideWithActive(m: Map[ResourcePath, ∃[Push[?, Q]]]): F[Map[ResourcePath, ∃[Push[?, Q]]]] =
+      Sync[F] delay {
+        val activeForDest =
+          active
+            .subMap(
+              destinationId :: Some(ResourcePath.root()) :: HNil,
+              destinationId :: None :: HNil)
+            .entrySet.iterator.asScala
+            .map(e => e.getKey -> e.getValue)
+            .collect { case (_ #: Some(path) #: HNil, v) => (path, v) }
+
+        activeForDest.foldLeft(m) {
+          case (m, (path, ActiveState.StartAccepted(cfg, ts, lim, _))) =>
+            m.updated(path, ∃[Push[?, Q]](Push(cfg.value, ts, Status.Accepted(ts, lim))))
+
+          case (m, (path, ActiveState.UpdateAccepted(p, ts, _))) =>
+            m.updated(path, ∃[Push[?, Q]](p.value.copy(status = Status.Accepted(ts, None))))
+
+          case (m, (path, ActiveState.PushRunning(p, ts, _, lim, _))) =>
+            m.updated(path, ∃[Push[?, Q]](p.value.copy(status = Status.Running(ts, lim))))
+        }
+      }
+
+    destination[DestinationNotFound[D]](destinationId)
+      .semiflatMap(_ =>
+        pushes.prefixedEntries(destinationId :: HNil)
+          .map(_.leftMap(_.select[ResourcePath]))
+          .compile.to(Map))
+      .semiflatMap(overrideWithActive)
+      .value
+  }
+
+  def start(destinationId: D, config: ∃[PushConfig[?, Q]], limit: Option[Long])
+      : F[Either[NonEmptyList[ResultPushError[D]], F[Status.Terminal]]] = {
+
+    type Errs = NonEmptyList[ResultPushError[D]]
+
+    def err(rpe: ResultPushError[D]): Errs = NonEmptyList.one(rpe)
+
+    def handleFull(
+        dest: Destination[F])(
+        path: ResourcePath,
+        query: Q,
+        outputColumns: NonEmptyList[Column[(ColumnType.Scalar, dest.Type)]])
+        : EitherT[F, Errs, Stream[F, Unit]] =
+      /*
+
+      evaluated =
+        Stream.resource(evaluator(tableRef.query))
+          .flatten
+          .flatMap(render.render(_, tableRef.columns, sink.config, limit))
+
+      sinked = sink.consume(path, typedColumns, evaluated).map(Right(_))
+
+      for {
+        ResultSink.CreateSink(renderCfg, consume) <-
+          EitherT.fromEither[F] {
+            createSink(dest).toRight[ResultPushError[D]](FullNotSupported(destinationId))
+          }
+      }*/
+      ???
+
+    def handleIncremental[A](
+        dest: Destination[F])(
+        path: ResourcePath,
+        query: Q,
+        outputColumns: NonEmptyList[Column[(ColumnType.Scalar, dest.Type)]],
+        resumeConfig: ResumeConfig[A],
+        initialOffset: Option[OffsetKey.Actual[A]])
+        : EitherT[F, Errs, Stream[F, OffsetKey.Actual[A]]] =
+      ???
+
+    val started = for {
+      dest <- destination(destinationId).leftMap(err)
+
+      cfg = config.value
+
+      key = destinationId :: cfg.path :: HNil
+
+      _ <- EitherT(Sync[F].delay(active.containsKey(liftKey(key))) map {
+        case true => Left(err(PushAlreadyRunning(destinationId, cfg.path)))
+        case false => Right(())
+      })
+
+      typedOutputColumns <- EitherT.fromEither[F] {
+        cfg.columns
+          .traverse(typedColumn(destinationId, dest, _).toValidatedNel)
+          .toEither
+      }
+
+      sinked <- cfg match {
+        case PushConfig.Full(path, q, _) =>
+          handleFull(dest)(path, q, typedOutputColumns)
+
+        case PushConfig.Incremental(path, q, _, resumeCfg, initOffset) =>
+          handleIncremental(dest)(path, q, typedOutputColumns, resumeCfg, initOffset)
+            .map(_.evalMap(o => offsets.insert(key, ∃(o))))
+      }
+
+      terminal <- EitherT.right[Errs](Deferred[F, Status.Terminal])
+      acceptedAt <- EitherT.right[Errs](instantNow)
+      accepted = ActiveState.StartAccepted(config, acceptedAt, limit, terminal)
+
+      alreadyRunning <- EitherT.right[Errs](Sync[F] delay {
+        Option(active.putIfAbsent(liftKey(key), accepted)).isDefined
+      })
+
+      _ <- if (alreadyRunning)
+        EitherT.leftT[F, Unit](err(PushAlreadyRunning(destinationId, cfg.path)))
+      else
+        EitherT.rightT[F, Errs](())
+
+      preamble = for {
+        runningAt <- instantNow
+
+        unknownPush = ∃[Push[?, Q]](Push(cfg, acceptedAt, Status.Unknown(runningAt, limit)))
+        running = ActiveState.PushRunning(unknownPush, runningAt, acceptedAt, limit, terminal)
+
+        _ <- Sync[F].delay(active.replace(liftKey(key), accepted, running))
+        _ <- pushes.insert(key, unknownPush)
+        _ <- offsets.delete(key)
+      } yield ()
+
+      job = Stream.eval_(preamble) ++ sinked
+
+      submitted <- EitherT.right[Errs](jobManager.submit(Job(key, job.map(Right(_)))))
+
+      _ <- if (submitted)
+        EitherT.rightT[F, Errs](())
+      else
+        // TODO[logging]: this shouldn't happen, so should log if it ever does
+        EitherT.left[Unit](for {
+          _ <- Sync[F].delay(active.remove(liftKey(key), accepted))
+          canceledAt <- instantNow
+          _ <- terminal.complete(Status.Canceled(acceptedAt, canceledAt, limit))
+        } yield err(PushAlreadyRunning(destinationId, cfg.path)))
+
+    } yield terminal.get
+
+    started.value
+  }
+
+  def update(destinationId: D, path: ResourcePath)
+      : F[Either[NonEmptyList[ResultPushError[D]], F[Status.Terminal]]] =
+    ???
 
 
   ////
@@ -313,7 +345,7 @@ final class DefaultResultPush[
       column: String,
       scalar: ColumnType.Scalar,
       selected: TypeIndex)
-      : Either[ResultPushError[T, D], Unit] = {
+      : Either[ResultPushError[D], Unit] = {
 
     val isValid = coerceWith(dest, scalar) match {
       case TypeCoercion.Unsatisfied(_, top) =>
@@ -330,7 +362,7 @@ final class DefaultResultPush[
   }
 
   private def constructType(destId: D, dest: Destination[F], name: String, selected: SelectedType)
-      : Either[ResultPushError[T, D], dest.Type] = {
+      : Either[ResultPushError[D], dest.Type] = {
 
     import dest._
     import ParamType._
@@ -393,8 +425,8 @@ final class DefaultResultPush[
     }
   }
 
-  private def typedColumn(destId: D, dest: Destination[F], column: Push.OutputColumn)
-      : Either[ResultPushError[T, D], Column[(ColumnType.Scalar, dest.Type)]] =
+  private def typedColumn(destId: D, dest: Destination[F], column: PushConfig.OutputColumn)
+      : Either[ResultPushError[D], Column[(ColumnType.Scalar, dest.Type)]] =
     column traverse {
       case (scalar, selected) =>
         for {
@@ -413,25 +445,11 @@ final class DefaultResultPush[
       case sink @ ResultSink.UpsertSink(_, _) => sink
     }
 
-  private def ensureBothExist[E >: ExistentialError[T, D] <: ResultPushError[T, D]](
-      destinationId: D,
-      tableId: T)
-      : EitherT[F, E, Unit] =
-    ensureDestinationExists[E](destinationId) *> ensureTableExists[E](tableId)
-
-  private def ensureDestinationExists[E >: DestinationNotFound[D] <: ResultPushError[T, D]](
+  private def destination[E >: DestinationNotFound[D] <: ResultPushError[D]](
       destinationId: D)
-      : EitherT[F, E, Unit] =
+      : EitherT[F, E, Destination[F]] =
     OptionT(lookupDestination(destinationId))
       .toRight[E](DestinationNotFound(destinationId))
-      .void
-
-  private def ensureTableExists[E >: TableNotFound[T] <: ResultPushError[T, D]](
-      tableId: T)
-      : EitherT[F, E, Unit] =
-    OptionT(lookupTable(tableId))
-      .toRight[E](TableNotFound(tableId))
-      .void
 }
 
 object DefaultResultPush {
@@ -460,14 +478,14 @@ object DefaultResultPush {
         extends ActiveState[F, Q]
   }
 
-  def apply[F[_]: Concurrent: Timer, D, Q, R](
+  def apply[F[_]: Concurrent: Timer, D <: AnyRef: Order, Q, R](
+      maxConcurrentPushes: Int,
       lookupDestination: D => F[Option[Destination[F]]],
       evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), Stream[F, R]],
-      jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing],
       render: ResultRender[F, R],
       pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
       offsets: IndexedStore[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
-      : F[DefaultResultPush[F, D, Q, R]] = {
+      : Resource[F, DefaultResultPush[F, D, Q, R]] = {
 
     def epochToInstant(e: FiniteDuration): Instant =
       Instant.ofEpochMilli(e.toMillis)
@@ -530,24 +548,59 @@ object DefaultResultPush {
       }
     }
 
-    // FIXME: define this
+    // A custom comparator with the property that, forall d: D, p: ResourcePath,
+    // d :: Some(p) :: HNil < d :: None :: HNil.
+    //
+    // This gives us a means of selecting all paths for a destination via
+    // range queries where the lower bound is d :: Some(/) :: HNil and the upper
+    // bound is d :: None :: HNil.
     def prefixComparator: Comparator[D :: Option[ResourcePath] :: HNil] =
-      ???
+      new Comparator[D :: Option[ResourcePath] :: HNil] {
+        def compare(
+            x: D :: Option[ResourcePath] :: HNil,
+            y: D :: Option[ResourcePath] :: HNil)
+            : Int = {
 
-    for {
-      active <- Sync[F].delay(new ConcurrentSkipListMap[D :: Option[ResourcePath] :: HNil, ActiveState[F, Q]](prefixComparator))
-      _ <- Concurrent[F].start(jobManager.events.evalMap(handleEvent(active)).compile.drain)
-    } yield {
-      new DefaultResultPush(
-        lookupTable,
-        lookupDestination,
-        evaluator,
-        jobManager,
-        render,
-        active,
-        terminated,
-        pushes,
-        offsets)
+          val d = x.head.compare(y.head)
+
+          if (d == 0)
+            (x.select[Option[ResourcePath]], y.select[Option[ResourcePath]]) match {
+              case (None, None) => 0
+              case (None, _) => 1
+              case (_, None) => -1
+              case (Some(xp), Some(yp)) => xp.compare(yp)
+            }
+          else
+            d
+        }
+      }
+
+    def acquire(jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing])
+        : F[DefaultResultPush[F, D, Q, R]] =
+      for {
+        active <-
+          Sync[F].delay(new ConcurrentSkipListMap[D :: Option[ResourcePath] :: HNil, ActiveState[F, Q]](
+            prefixComparator))
+
+        _ <- Concurrent[F].start(jobManager.events.evalMap(handleEvent(active)).compile.drain)
+      } yield {
+        new DefaultResultPush(
+          lookupDestination,
+          evaluator,
+          jobManager,
+          render,
+          active,
+          pushes,
+          offsets)
+      }
+
+    val jm =
+      JobManager[F, D :: ResourcePath :: HNil, Nothing](
+        jobLimit = maxConcurrentPushes,
+        eventsLimit = maxConcurrentPushes)
+
+    jm flatMap { jobManager =>
+      Resource.make(acquire(jobManager))(_.cancelAll)
     }
   }
 
