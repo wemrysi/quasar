@@ -20,46 +20,45 @@ import slamdata.Predef._
 
 import quasar.api.ColumnType
 import quasar.api.push.param.ParamError
+import quasar.api.resource.ResourcePath
 
 import cats.data.NonEmptyList
 
-sealed trait ResultPushError[+T, +D] extends Product with Serializable
+sealed trait ResultPushError[+D] extends Product with Serializable
 
 object ResultPushError {
-  sealed trait ExistentialError[+T, +D] extends ResultPushError[T, D]
-
   final case class DestinationNotFound[D](destinationId: D)
-      extends ExistentialError[Nothing, D]
+      extends ResultPushError[D]
 
-  final case class TableNotFound[T](tableId: T)
-      extends ExistentialError[T, Nothing]
+  final case class PushNotFound[D](destinationId: D, path: ResourcePath)
+      extends ResultPushError[D]
 
-  final case class PushNotFound[T, D](tableId: T, destinationId: D)
-      extends ResultPushError[T, D]
-
-  final case class PushAlreadyRunning[T, D](tableId: T, destinationId: D)
-      extends ResultPushError[T, D]
+  final case class PushAlreadyRunning[D](destinationId: D, path: ResourcePath)
+      extends ResultPushError[D]
 
   final case class FullNotSupported[D](destinationId: D)
-      extends ResultPushError[Nothing, D]
+      extends ResultPushError[D]
 
   final case class IncrementalNotSupported[D](destinationId: D)
-      extends ResultPushError[Nothing, D]
+      extends ResultPushError[D]
 
   final case class InvalidCoercion[D](
       destinationId: D,
       column: String,
       scalar: ColumnType.Scalar,
       typeIndex: TypeIndex)
-      extends ResultPushError[Nothing, D]
+      extends ResultPushError[D]
 
-  final case class TypeNotFound[D](destinationId: D, column: String, index: TypeIndex)
-      extends ResultPushError[Nothing, D]
+  final case class TypeNotFound[D](
+      destinationId: D,
+      column: String,
+      index: TypeIndex)
+      extends ResultPushError[D]
 
   final case class TypeConstructionFailed[D](
       destinationId: D,
       column: String,
       typeLabel: String,
       errors: NonEmptyList[ParamError])
-      extends ResultPushError[Nothing, D]
+      extends ResultPushError[D]
 }
