@@ -28,6 +28,9 @@ sealed trait Status extends Product with Serializable {
 }
 
 object Status {
+  final case class Unknown(startedAt: Instant, limit: Option[Long])
+      extends Status
+
   sealed trait Active extends Status
 
   final case class Accepted(startedAt: Instant, limit: Option[Long])
@@ -41,7 +44,7 @@ object Status {
       extends Terminal
   final case class Canceled(startedAt: Instant, canceledAt: Instant, limit: Option[Long])
       extends Terminal
-  final case class Failed(startedAt: Instant, failedAt: Instant, limit: Option[Long], cause: Throwable)
+  final case class Failed(startedAt: Instant, failedAt: Instant, limit: Option[Long], reason: String)
       extends Terminal
 
   implicit def statusEq[S <: Status]: Eq[S] =
@@ -49,6 +52,8 @@ object Status {
 
   implicit def statusShow[S <: Status]: Show[S] =
     Show show {
+      case Unknown(startedAt, limit) =>
+        s"Unknown($startedAt, $limit)"
       case Accepted(startedAt, limit) =>
         s"Accepted($startedAt, $limit)"
       case Running(startedAt, limit) =>
@@ -57,7 +62,7 @@ object Status {
         s"Finished($startedAt, $finishedAt, $limit)"
       case Canceled(startedAt, canceledAt, limit) =>
         s"Canceled($startedAt, $canceledAt, $limit)"
-      case Failed(startedAt, finishedAt, limit, cause) =>
-        s"Failed($startedAt, $finishedAt, $limit)\n\n$cause"
+      case Failed(startedAt, finishedAt, limit, reason) =>
+        s"Failed($startedAt, $finishedAt, $limit, $reason)"
     }
 }
