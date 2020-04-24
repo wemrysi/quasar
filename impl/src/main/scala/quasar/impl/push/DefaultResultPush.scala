@@ -40,11 +40,12 @@ import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 import cats.Applicative
 import cats.data.{Const, EitherT, Ior, OptionT, NonEmptyList}
 import cats.effect.{Concurrent, Resource, Sync, Timer}
+import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
 import cats.implicits._
 
 import fs2.Stream
-import fs2.job.{JobManager, Job, Event => JobEvent}
+import fs2.job.{JobManager, Job, Event => JobEvent, Timestamp => JobStarted}
 
 import shapeless._
 
@@ -96,23 +97,30 @@ import skolems.∃
 // start/re
 // modernize? refresh? update?
 //
+// 1. StartAccepted(config, startedAt, limit), nothing persisted yet, but status reflects
+//    acceptance of new config
+// 2. When the run action is actually scheduled, if the current status is start accepted,
+//    a new push is persisted with the status set to `Unknown`
+// 3. If the server crashes or whatnot, the persisted state will actually reflect we
+//    have no idea what state the push is in
+// 4. When the push completes successfully, persist it with the terminal status
+//
 //
 
 // FIXME: Make a pass through `start` with an eye towards cancellation/failure and ensuring
 //        state is correct in their presence.
 
+// TODO[logging]: Need to log when a push terminates
 // TODO[clustering]: Need to decide how we'll ensure a job is only ever running on a single node.
 final class DefaultResultPush[
-    F[_]: Concurrent: Timer, T, D, Q, R] private (
-    lookupTable: T => F[Option[TableRef[Q]]],
+    F[_]: Concurrent: Timer, D, Q, R] private (
     lookupDestination: D => F[Option[Destination[F]]],
     evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), Stream[F, R]],
-    jobManager: JobManager[F, D :: T :: HNil, Nothing],
+    jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing],
     render: ResultRender[F, R],
-    active: ConcurrentNavigableMap[D :: Option[T] :: HNil, Status.Active],
-    terminated: PrefixStore[F, D :: T :: HNil, Status.Terminal],
-    pushes: PrefixStore[F, D :: T :: HNil, ∃[Push[?, Q]]],
-    offsets: IndexedStore[F, D :: T :: HNil, ∃[OffsetKey.Actual]])
+    active: ConcurrentNavigableMap[D :: Option[ResourcePath] :: HNil, ActiveState[Q]],
+    pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
+    offsets: IndexedStore[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
     extends ResultPush[F, T, D, Q] {
 
   import DefaultResultPush.liftKey
@@ -214,7 +222,6 @@ final class DefaultResultPush[
         EitherT.leftT[F, Unit](err(PushAlreadyRunning(tableId, destinationId)))
       else
         EitherT.right[Errs](pushes.insert(key, push) *> offsets.delete(key))
-      })
 
       setRunning = instantNow.flatMap(ts => Sync[F] delay {
         active.replace(liftKey(key), accepted, Status.Running(ts, limit))
@@ -262,12 +269,8 @@ final class DefaultResultPush[
       .map(Condition.eitherIso.reverseGet(_))
   }
 
-  // FIXME
-  def resume(
-      tableId: T,
-      destinationId: D,
-      limit: Option[Long])
-      : F[Condition[ResultPushError[T, D]]] = ???
+  def update(destinationId: D, path: ResourcePath)
+      : F[Either[ResultPushError[D], F[Status.Terminal]]] = ???
 
   def destinationStatus(destinationId: D): F[Either[DestinationNotFound[D], Map[T, PushMeta]]] =
     ensureDestinationExists[DestinationNotFound[D]](destinationId)
@@ -277,6 +280,7 @@ final class DefaultResultPush[
       })
       .value
 
+  // FIXME: rewrite in term of `active`
   def cancelAll: F[Unit] =
     jobManager.jobIds.flatMap(_.traverse_(jobManager.cancel(_)))
 
@@ -431,59 +435,107 @@ final class DefaultResultPush[
 }
 
 object DefaultResultPush {
-  def apply[F[_]: Concurrent: Timer, T, D, Q, R](
-      lookupTable: T => F[Option[TableRef[Q]]],
+  private sealed trait ActiveState[F[_], Q] extends Product with Serializable
+
+  private object ActiveState {
+    final case class StartAccepted[F[_], Q](
+        config: ∃[PushConfig[?, Q]],
+        at: Instant,
+        limit: Option[Long],
+        deferred: Deferred[F, Status.Terminal])
+        extends ActiveState[F, Q]
+
+    final case class UpdateAccepted[F[_], Q](
+        push: ∃[Push[?, Q]],
+        at: Instant,
+        deferred: Deferred[F, Status.Terminal])
+        extends ActiveState[F, Q]
+
+    final case class PushRunning[F[_], Q](
+        push: ∃[Push[?, Q]],
+        at: Instant,
+        acceptedAt: Instant,
+        limit: Option[Long],
+        deferred: Deferred[F, Status.Terminal])
+        extends ActiveState[F, Q]
+  }
+
+  def apply[F[_]: Concurrent: Timer, D, Q, R](
       lookupDestination: D => F[Option[Destination[F]]],
       evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), Stream[F, R]],
-      jobManager: JobManager[F, D :: T :: HNil, Nothing],
+      jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing],
       render: ResultRender[F, R],
-      terminated: PrefixStore[F, D :: T :: HNil, Status.Terminal],
-      pushes: PrefixStore[F, D :: T :: HNil, ∃[Push[?, Q]]],
-      offsets: IndexedStore[F, D :: T :: HNil, ∃[OffsetKey.Actual]])
-      : F[DefaultResultPush[F, T, D, Q, R]] = {
+      pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
+      offsets: IndexedStore[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
+      : F[DefaultResultPush[F, D, Q, R]] = {
 
     def epochToInstant(e: FiniteDuration): Instant =
       Instant.ofEpochMilli(e.toMillis)
 
-    def handleEvent(active: ConcurrentMap[D :: Option[T] :: HNil, Status.Active])
-        : JobEvent[D :: T :: HNil] => F[Unit] = {
+    def acceptedAsOf(acceptedAt: Instant, startedAt: JobStarted): SBoolean =
+      acceptedAt.compareTo(epochToInstant(startedAt.epoch)) <= 0
 
-      case JobEvent.Completed(id, start, duration) =>
-        Sync[F].delay(active.get(liftKey(id))) flatMap {
-          case s @ Status.Running(_, limit) =>
-            val finished = Status.Finished(
-              epochToInstant(start.epoch),
-              epochToInstant(start.epoch + duration),
-              limit)
+    def handleEvent(active: ConcurrentMap[D :: Option[ResourcePath] :: HNil, ActiveState[F, Q]])
+        : JobEvent[D :: ResourcePath :: HNil] => F[Unit] = {
 
-            terminated.insert(id, finished)
-              .guarantee(Sync[F].delay(active.remove(liftKey(id), s)).void)
+      def complete[A](
+          running: ActiveState.PushRunning[F, Q],
+          id: D :: ResourcePath :: HNil,
+          push: Push[A, Q],
+          terminal: Status.Terminal,
+          limit: Option[Long],
+          deferred: Deferred[F, Status.Terminal]): F[Unit] = {
 
-          case _ => Applicative[F].unit
-        }
+        val terminate = for {
+          _ <- Sync[F].delay(active.remove(liftKey(id), running))
+          _ <- deferred.complete(terminal)
+        } yield ()
 
-      case JobEvent.Failed(id, start, duration, ex) =>
-        Sync[F].delay(active.get(liftKey(id))) flatMap {
-          case s @ Status.Running(_, limit) =>
-            val failed = Status.Failed(
-              epochToInstant(start.epoch),
-              epochToInstant(start.epoch + duration),
-              limit,
-              ex)
+        pushes
+          .insert(id, ∃[Push[?, Q]](push.copy(status = terminal)))
+          .guarantee(terminate.uncancelable)
+      }
 
-            terminated.insert(id, failed)
-              .guarantee(Sync[F].delay(active.remove(liftKey(id), s)).void)
+      {
+        case JobEvent.Completed(id, start, duration) =>
+          Sync[F].delay(active.get(liftKey(id))) flatMap {
+            case s @ ActiveState.PushRunning(p, _, acceptedAt, limit, deferred)
+                if acceptedAsOf(acceptedAt, start) =>
 
-          case _ => Applicative[F].unit
-        }
+              val finished = Status.Finished(
+                epochToInstant(start.epoch),
+                epochToInstant(start.epoch + duration),
+                limit)
+
+              complete(s, id, p.value, finished, limit, deferred)
+
+            case _ => Applicative[F].unit
+          }
+
+        case JobEvent.Failed(id, start, duration, ex) =>
+          Sync[F].delay(active.get(liftKey(id))) flatMap {
+            case s @ ActiveState.PushRunning(p, _, acceptedAt, limit, deferred)
+                if acceptedAsOf(acceptedAt, start) =>
+
+              val failed = Status.Failed(
+                epochToInstant(start.epoch),
+                epochToInstant(start.epoch + duration),
+                limit,
+                ex.toString)
+
+              complete(s, id, p.value, failed, limit, deferred)
+
+            case _ => Applicative[F].unit
+          }
+      }
     }
 
     // FIXME: define this
-    def prefixComparator: Comparator[D :: Option[T] :: HNil] =
+    def prefixComparator: Comparator[D :: Option[ResourcePath] :: HNil] =
       ???
 
     for {
-      active <- Sync[F].delay(new ConcurrentSkipListMap[D :: Option[T] :: HNil, Status.Active](prefixComparator))
+      active <- Sync[F].delay(new ConcurrentSkipListMap[D :: Option[ResourcePath] :: HNil, ActiveState[F, Q]](prefixComparator))
       _ <- Concurrent[F].start(jobManager.events.evalMap(handleEvent(active)).compile.drain)
     } yield {
       new DefaultResultPush(
