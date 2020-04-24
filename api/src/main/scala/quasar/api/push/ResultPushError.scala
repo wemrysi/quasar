@@ -18,6 +18,7 @@ package quasar.api.push
 
 import slamdata.Predef._
 
+import quasar.api.ColumnType
 import quasar.api.push.param.ParamError
 
 import cats.data.NonEmptyList
@@ -33,14 +34,24 @@ object ResultPushError {
   final case class TableNotFound[T](tableId: T)
       extends ExistentialError[T, Nothing]
 
-  final case class FormatNotSupported[D](destinationId: D, format: String)
-      extends ResultPushError[Nothing, D]
+  final case class PushNotFound[T, D](tableId: T, destinationId: D)
+      extends ResultPushError[T, D]
 
   final case class PushAlreadyRunning[T, D](tableId: T, destinationId: D)
       extends ResultPushError[T, D]
 
-  final case class PushNotIncremental[T, D](tableId: T, destinationId: D)
-      extends ResultPushError[T, D]
+  final case class FullNotSupported[D](destinationId: D)
+      extends ResultPushError[Nothing, D]
+
+  final case class IncrementalNotSupported[D](destinationId: D)
+      extends ResultPushError[Nothing, D]
+
+  final case class InvalidCoercion[D](
+      destinationId: D,
+      column: String,
+      scalar: ColumnType.Scalar,
+      typeIndex: TypeIndex)
+      extends ResultPushError[Nothing, D]
 
   final case class TypeNotFound[D](destinationId: D, column: String, index: TypeIndex)
       extends ResultPushError[Nothing, D]

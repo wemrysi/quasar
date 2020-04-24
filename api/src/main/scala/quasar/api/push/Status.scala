@@ -22,54 +22,42 @@ import java.time.Instant
 
 import cats.{Eq, Show}
 
-import monocle.Prism
-
 sealed trait Status extends Product with Serializable {
   def startedAt: Instant
   def limit: Option[Long]
 }
 
 object Status {
-  final case class Finished(startedAt: Instant, finishedAt: Instant, limit: Option[Long])
-      extends Status
+  sealed trait Active extends Status
+
+  final case class Accepted(startedAt: Instant, limit: Option[Long])
+      extends Active
   final case class Running(startedAt: Instant, limit: Option[Long])
-      extends Status
+      extends Active
+
+  sealed trait Terminal extends Status
+
+  final case class Finished(startedAt: Instant, finishedAt: Instant, limit: Option[Long])
+      extends Terminal
   final case class Canceled(startedAt: Instant, canceledAt: Instant, limit: Option[Long])
-      extends Status
+      extends Terminal
   final case class Failed(startedAt: Instant, failedAt: Instant, limit: Option[Long], cause: Throwable)
-      extends Status
+      extends Terminal
 
-  val finished: Prism[Status, (Instant, Instant, Option[Long])] =
-    Prism.partial[Status, (Instant, Instant, Option[Long])] {
-      case Finished(st, fn, lm) => (st, fn, lm)
-    } (Finished.tupled)
-
-  val running: Prism[Status, (Instant, Option[Long])] =
-    Prism.partial[Status, (Instant, Option[Long])] {
-      case Running(st, lm) => (st, lm)
-    } (Running.tupled)
-
-  val canceled: Prism[Status, (Instant, Instant, Option[Long])] =
-    Prism.partial[Status, (Instant, Instant, Option[Long])] {
-      case Canceled(st, fn, lm) => (st, fn, lm)
-    } (Canceled.tupled)
-
-  val failed: Prism[Status, (Instant, Instant, Option[Long], Throwable)] =
-    Prism.partial[Status, (Instant, Instant, Option[Long], Throwable)] {
-      case Failed(st, fn, lm, th) => (st, fn, lm, th)
-    } (Failed.tupled)
-
-  implicit val statusEq: Eq[Status] =
+  implicit def statusEq[S <: Status]: Eq[S] =
     Eq.fromUniversalEquals
 
-  implicit val statusShow: Show[Status] = Show show {
-    case Finished(startedAt, finishedAt, limit) =>
-      s"Finished($startedAt, $finishedAt, $limit)"
-    case Running(startedAt, limit) =>
-      s"Running($startedAt, $limit)"
-    case Canceled(startedAt, canceledAt, limit) =>
-      s"Canceled($startedAt, $canceledAt, $limit)"
-    case Failed(startedAt, finishedAt, limit, cause) =>
-      s"Failed($startedAt, $finishedAt, $limit)\n\n$cause"
-  }
+  implicit def statusShow[S <: Status]: Show[S] =
+    Show show {
+      case Accepted(startedAt, limit) =>
+        s"Accepted($startedAt, $limit)"
+      case Running(startedAt, limit) =>
+        s"Running($startedAt, $limit)"
+      case Finished(startedAt, finishedAt, limit) =>
+        s"Finished($startedAt, $finishedAt, $limit)"
+      case Canceled(startedAt, canceledAt, limit) =>
+        s"Canceled($startedAt, $canceledAt, $limit)"
+      case Failed(startedAt, finishedAt, limit, cause) =>
+        s"Failed($startedAt, $finishedAt, $limit)\n\n$cause"
+    }
 }
