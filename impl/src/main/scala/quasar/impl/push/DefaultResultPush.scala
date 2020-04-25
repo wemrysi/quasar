@@ -158,8 +158,13 @@ final class DefaultResultPush[
   }
 
   def cancelAll: F[Unit] =
-    ???
-    //jobManager.jobIds.flatMap(_.traverse_(jobManager.cancel(_)))
+    Stream.eval(Sync[F].delay(active.keySet.iterator.asScala))
+      .flatMap(Stream.fromIterator[F](_))
+      .map(lowerKey)
+      .parEvalMapUnordered(Int.MaxValue) {
+        case d #: p #: HNil => cancel(d, p).attempt.void
+      }
+      .compile.drain
 
   def coerce(destinationId: D, scalar: ColumnType.Scalar)
       : F[Either[DestinationNotFound[D], TypeCoercion[CoercedType]]] =
@@ -170,28 +175,29 @@ final class DefaultResultPush[
   def destinationStatus(destinationId: D)
       : F[Either[DestinationNotFound[D], Map[ResourcePath, ∃[Push[?, Q]]]]] = {
 
-    def overrideWithActive(m: Map[ResourcePath, ∃[Push[?, Q]]]): F[Map[ResourcePath, ∃[Push[?, Q]]]] =
-      Sync[F] delay {
-        val activeForDest =
-          active
-            .subMap(
-              destinationId :: Some(ResourcePath.root()) :: HNil,
-              destinationId :: None :: HNil)
-            .entrySet.iterator.asScala
-            .map(e => e.getKey -> e.getValue)
-            .collect { case (_ #: Some(path) #: HNil, v) => (path, v) }
-
-        activeForDest.foldLeft(m) {
-          case (m, (path, ActiveState.StartAccepted(cfg, ts, lim, _))) =>
-            m.updated(path, ∃[Push[?, Q]](Push(cfg.value, ts, Status.Accepted(ts, lim))))
-
-          case (m, (path, ActiveState.UpdateAccepted(p, ts, _))) =>
-            m.updated(path, ∃[Push[?, Q]](p.value.copy(status = Status.Accepted(ts, None))))
-
-          case (m, (path, ActiveState.PushRunning(p, ts, _, lim, _))) =>
-            m.updated(path, ∃[Push[?, Q]](p.value.copy(status = Status.Running(ts, lim))))
-        }
+    def overrideWithActive(m: Map[ResourcePath, ∃[Push[?, Q]]]): F[Map[ResourcePath, ∃[Push[?, Q]]]] = {
+      val activeForDest = Sync[F] delay {
+        active
+          .subMap(
+            destinationId :: Some(ResourcePath.root()) :: HNil,
+            destinationId :: None :: HNil)
+          .entrySet.iterator.asScala
       }
+
+      Stream.eval(activeForDest)
+        .flatMap(Stream.fromIterator[F](_))
+        .map(e => (lowerKey(e.getKey).select[ResourcePath], e.getValue))
+        .compile.fold(m) {
+          case (acc, (path, ActiveState.StartAccepted(cfg, ts, lim, _))) =>
+            acc.updated(path, ∃[Push[?, Q]](Push(cfg.value, ts, Status.Accepted(ts, lim))))
+
+          case (acc, (path, ActiveState.UpdateAccepted(p, ts, _))) =>
+            acc.updated(path, ∃[Push[?, Q]](p.value.copy(status = Status.Accepted(ts, None))))
+
+          case (acc, (path, ActiveState.PushRunning(p, ts, _, lim, _))) =>
+            acc.updated(path, ∃[Push[?, Q]](p.value.copy(status = Status.Running(ts, lim))))
+        }
+    }
 
     destination[DestinationNotFound[D]](destinationId)
       .semiflatMap(_ =>
@@ -339,6 +345,16 @@ final class DefaultResultPush[
     Timer[F].clock.realTime(MILLISECONDS)
       .map(Instant.ofEpochMilli(_))
 
+  private def typedColumn(destId: D, dest: Destination[F], column: PushConfig.OutputColumn)
+      : Either[ResultPushError[D], Column[(ColumnType.Scalar, dest.Type)]] =
+    column traverse {
+      case (scalar, selected) =>
+        for {
+          _ <- validateCoercion(destId, dest, column.name, scalar, selected.index)
+          t <- constructType(destId, dest, column.name, selected)
+        } yield (scalar, t)
+    }
+
   private def validateCoercion(
       destId: D,
       dest: Destination[F],
@@ -425,16 +441,6 @@ final class DefaultResultPush[
     }
   }
 
-  private def typedColumn(destId: D, dest: Destination[F], column: PushConfig.OutputColumn)
-      : Either[ResultPushError[D], Column[(ColumnType.Scalar, dest.Type)]] =
-    column traverse {
-      case (scalar, selected) =>
-        for {
-          _ <- validateCoercion(destId, dest, column.name, scalar, selected.index)
-          t <- constructType(destId, dest, column.name, selected)
-        } yield (scalar, t)
-    }
-
   private def createSink[A](sinks: NonEmptyList[ResultSink[F, A]]): Option[ResultSink.CreateSink[F, A]] =
     sinks collectFirst {
       case sink @ ResultSink.CreateSink(_, _) => sink
@@ -450,6 +456,9 @@ final class DefaultResultPush[
       : EitherT[F, E, Destination[F]] =
     OptionT(lookupDestination(destinationId))
       .toRight[E](DestinationNotFound(destinationId))
+
+  private def lowerKey(k: D :: Option[ResourcePath] :: HNil): D :: ResourcePath :: HNil =
+    k.updateWith((_: Option[ResourcePath]).get)
 }
 
 object DefaultResultPush {
