@@ -16,7 +16,10 @@
 
 package quasar.impl.storage
 
-import scala.{AnyRef, Array, Unit}
+import scala.{AnyRef, Array, Boolean, Option, Unit}
+
+import cats.Monad
+import cats.implicits._
 
 import fs2.Stream
 
@@ -35,4 +38,39 @@ trait PrefixStore[F[_], K <: HList, V] extends IndexedStore[F, K, V] {
       pfx: IsPrefix[P, K],
       toArray: ToTraversable.Aux[P, Array, AnyRef])
       : F[Unit]
+}
+
+object PrefixStore {
+  def xmapValueF[F[_]: Monad, K <: HList, V1, V2](
+      s: PrefixStore[F, K, V1])(
+      f: V1 => F[V2])(
+      g: V2 => F[V1])
+      : PrefixStore[F, K, V2] =
+    new PrefixStore[F, K, V2] {
+      def prefixedEntries[P <: HList](p: P)(
+          implicit
+          pfx: IsPrefix[P, K],
+          toArray: ToTraversable.Aux[P, Array, AnyRef])
+          : Stream[F, (K, V2)] =
+        s.prefixedEntries(p).evalMap(_.traverse(f))
+
+      def deletePrefixed[P <: HList](p: P)(
+          implicit
+          pfx: IsPrefix[P, K],
+          toArray: ToTraversable.Aux[P, Array, AnyRef])
+          : F[Unit] =
+        s.deletePrefixed(p)
+
+      def entries: Stream[F, (K, V2)] =
+        s.entries.evalMap(_.traverse(f))
+
+      def lookup(k: K): F[Option[V2]] =
+        s.lookup(k).flatMap(_.traverse(f))
+
+      def insert(k: K, v2: V2): F[Unit] =
+        g(v2).flatMap(s.insert(k, _))
+
+      def delete(k: K): F[Boolean] =
+        s.delete(k)
+    }
 }
