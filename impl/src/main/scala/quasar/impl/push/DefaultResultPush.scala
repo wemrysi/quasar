@@ -26,7 +26,7 @@ import quasar.api.push.param._
 import quasar.api.resource.ResourcePath
 import quasar.connector.Offset
 import quasar.connector.destination._
-import quasar.connector.render.ResultRender
+import quasar.connector.render.{RenderInput, ResultRender}
 import quasar.impl.storage.{IndexedStore, PrefixStore}
 
 import java.time.Instant
@@ -36,7 +36,7 @@ import java.util.concurrent.{ConcurrentMap, ConcurrentNavigableMap, ConcurrentSk
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
-import cats.{Applicative, Order}
+import cats.{Applicative, Functor, Order, Traverse}
 import cats.data.{Const, EitherT, Ior, OptionT, NonEmptyList}
 import cats.effect.{Concurrent, Resource, Sync, Timer}
 import cats.effect.concurrent.Deferred
@@ -52,29 +52,6 @@ import shapeless.HList.ListCompat._
 import shims.orderToCats
 
 import skolems.∃
-
-// TODO: do we want to use the upsert sink to perform full loads? or should we fail? I guess we don't have
-//       ids and columns to use, so probably just fail?
-//
-// now that we're persisting, what do we do about tables that
-// are deleted/archived? they'll show up in push output. guess it is up to FE to filter them?
-// can also filter them in sdbe, don't want to bake in the name hacks here
-//
-// pending/running <- ephemeral, used to prevent duplicates
-//
-// when do we persist the push?
-//
-
-// may need an indexed semaphore for safe updates.
-
-// if we store (push, terminal, maybeoffset), we would need to have
-// store (push, terminal) and offset separately
-//
-// hm, or what about (push, maybeterminal, maybeoffset)?
-
-// running status <- overrides terminal
-// partial offset state
-// terminal status
 
 // ideally
 //
@@ -220,33 +197,78 @@ final class DefaultResultPush[
         path: ResourcePath,
         query: Q,
         outputColumns: NonEmptyList[Column[(ColumnType.Scalar, dest.Type)]])
-        : EitherT[F, Errs, Stream[F, Unit]] =
-      /*
+        : EitherT[F, Errs, Stream[F, Unit]] = {
 
-      evaluated =
-        Stream.resource(evaluator(tableRef.query))
-          .flatten
-          .flatMap(render.render(_, tableRef.columns, sink.config, limit))
+      val createSink = dest.sinks collectFirst {
+        case sink @ ResultSink.CreateSink(_, _) => sink
+      }
 
-      sinked = sink.consume(path, typedColumns, evaluated).map(Right(_))
+      EitherT.fromOption[F](createSink, err(FullNotSupported(destinationId))) map { sink =>
+        val (renderColumns, destColumns) =
+          Functor[NonEmptyList].compose[Column].unzip(outputColumns)
 
-      for {
-        ResultSink.CreateSink(renderCfg, consume) <-
-          EitherT.fromEither[F] {
-            createSink(dest).toRight[ResultPushError[D]](FullNotSupported(destinationId))
-          }
-      }*/
-      ???
+        val renderedResults =
+          Stream.resource(evaluator((query, None)))
+            .flatten
+            .flatMap(render.render(_, renderColumns, sink.config, limit))
+
+        sink.consume(path, destColumns, renderedResults)
+      }
+    }
 
     def handleIncremental[A](
         dest: Destination[F])(
         path: ResourcePath,
         query: Q,
-        outputColumns: NonEmptyList[Column[(ColumnType.Scalar, dest.Type)]],
+        nonIdOutputColumns: List[Column[(ColumnType.Scalar, dest.Type)]],
         resumeConfig: ResumeConfig[A],
         initialOffset: Option[OffsetKey.Actual[A]])
-        : EitherT[F, Errs, Stream[F, OffsetKey.Actual[A]]] =
-      ???
+        : EitherT[F, Errs, Stream[F, OffsetKey.Actual[A]]] = {
+
+      val C = Functor[Column]
+
+      val upsertSink = dest.sinks collectFirst {
+        case sink @ ResultSink.UpsertSink(_, _) => sink
+      }
+
+      for {
+        sink <- EitherT.fromOption[F](upsertSink, err(IncrementalNotSupported(destinationId)))
+
+        (idColumn, _) = C.unzip(resumeConfig.resultIdColumn)
+
+        idOutputColumn = resumeConfig.resultIdColumn.map(_.leftMap(IdType.scalarP(_)))
+
+        (idRenderColumn, idDestColumn) <- EitherT.fromEither[F] {
+          typedColumn(destinationId, dest, idOutputColumn)
+            .bimap(err, C.unzip)
+        }
+
+        (nonIdRenderColumns, nonIdDestColumns) =
+          Functor[List].compose[Column].unzip(nonIdOutputColumns)
+
+        offset = initialOffset.map(o => Offset(resumeConfig.sourceOffsetPath, ∃(o)))
+
+        dataEvents =
+          Stream.resource(evaluator((query, offset))).flatten flatMap { results =>
+            render.renderUpserts(
+              RenderInput.Initial(results),
+              idColumn,
+              resumeConfig.resultOffsetColumn,
+              NonEmptyList(idRenderColumn, nonIdRenderColumns),
+              sink.renderConfig,
+              limit)
+          }
+
+        upsertArgs =
+          ResultSink.UpsertSink.Args(
+            path,
+            idDestColumn,
+            nonIdDestColumns,
+            WriteMode.Replace,
+            dataEvents)
+
+      } yield sink.consume[A](upsertArgs)
+    }
 
     val started = for {
       dest <- destination(destinationId).leftMap(err)
@@ -260,18 +282,14 @@ final class DefaultResultPush[
         case false => Right(())
       })
 
-      typedOutputColumns <- EitherT.fromEither[F] {
-        cfg.columns
-          .traverse(typedColumn(destinationId, dest, _).toValidatedNel)
-          .toEither
-      }
-
       sinked <- cfg match {
-        case PushConfig.Full(path, q, _) =>
-          handleFull(dest)(path, q, typedOutputColumns)
+        case PushConfig.Full(path, q, columns) =>
+          EitherT.fromEither[F](typedColumns(destinationId, dest, columns))
+            .flatMap(handleFull(dest)(path, q, _))
 
-        case PushConfig.Incremental(path, q, _, resumeCfg, initOffset) =>
-          handleIncremental(dest)(path, q, typedOutputColumns, resumeCfg, initOffset)
+        case PushConfig.Incremental(path, q, otherCols, resumeCfg, initOffset) =>
+          EitherT.fromEither[F](typedColumns(destinationId, dest, otherCols))
+            .flatMap(handleIncremental(dest)(path, q, _, resumeCfg, initOffset))
             .map(_.evalMap(o => offsets.insert(key, ∃(o))))
       }
 
@@ -344,6 +362,13 @@ final class DefaultResultPush[
   private def instantNow: F[Instant] =
     Timer[F].clock.realTime(MILLISECONDS)
       .map(Instant.ofEpochMilli(_))
+
+  private def typedColumns[G[_]: Traverse](
+      destId: D,
+      dest: Destination[F],
+      columns: G[PushConfig.OutputColumn])
+      : Either[NonEmptyList[ResultPushError[D]], G[Column[(ColumnType.Scalar, dest.Type)]]] =
+    columns.traverse(typedColumn(destId, dest, _).toValidatedNel).toEither
 
   private def typedColumn(destId: D, dest: Destination[F], column: PushConfig.OutputColumn)
       : Either[ResultPushError[D], Column[(ColumnType.Scalar, dest.Type)]] =
@@ -440,16 +465,6 @@ final class DefaultResultPush[
         Left(TypeNotFound(destId, name, selected.index))
     }
   }
-
-  private def createSink[A](sinks: NonEmptyList[ResultSink[F, A]]): Option[ResultSink.CreateSink[F, A]] =
-    sinks collectFirst {
-      case sink @ ResultSink.CreateSink(_, _) => sink
-    }
-
-  private def upsertSink[A](sinks: NonEmptyList[ResultSink[F, A]]): Option[ResultSink.UpsertSink[F, A]] =
-    sinks collectFirst {
-      case sink @ ResultSink.UpsertSink(_, _) => sink
-    }
 
   private def destination[E >: DestinationNotFound[D] <: ResultPushError[D]](
       destinationId: D)
