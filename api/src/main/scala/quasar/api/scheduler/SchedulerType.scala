@@ -14,23 +14,21 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.api.scheduler
 
-import quasar.contrib.scalaz.MonadError_
+import slamdata.Predef._
 
-import java.lang.String
-import java.util.UUID
+import cats.{Order, Show}
+import cats.implicits._
 
-import monocle.Prism
+final case class SchedulerType(name: String, version: Long)
 
-import scala.util.Try
+object SchedulerType {
+  implicit val orderSchedulerType: Order[SchedulerType] = Order.by { t =>
+    (t.name, t.version)
+  }
 
-package object impl {
-  val UuidString: Prism[String, UUID] =
-    Prism[String, UUID](
-      s => Try(UUID.fromString(s)).toOption)(
-      u => u.toString)
-
-  type MonadQuasarErr[F[_]] = MonadError_[F, QuasarError]
-  def MonadQuasarErr[F[_]](implicit ev: MonadQuasarErr[F]): MonadQuasarErr[F] = ev
+  implicit val showSchedulerType: Show[SchedulerType] = Show.show { st =>
+    s"SchedulerType(${st.name.show}, ${st.version.show}"
+  }
 }

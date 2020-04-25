@@ -46,7 +46,7 @@ import shims.showToCats
 
 import skolems.∃
 
-final class DefaultResultPush[
+private[impl] final class DefaultResultPush[
     F[_]: Concurrent: Timer, T, D, Q, R] private (
     lookupTable: T => F[Option[TableRef[Q]]],
     evaluator: QueryEvaluator[Resource[F, ?], Q, Stream[F, R]],
@@ -304,7 +304,7 @@ final class DefaultResultPush[
 }
 
 object DefaultResultPush {
-  def apply[F[_]: Concurrent: Timer, T, D, Q, R](
+  private[impl] def apply[F[_]: Concurrent: Timer, T, D, Q, R](
       lookupTable: T => F[Option[TableRef[Q]]],
       evaluator: QueryEvaluator[Resource[F, ?], Q, Stream[F, R]],
       lookupDestination: D => F[Option[Destination[F]]],

@@ -89,7 +89,6 @@ lazy val root = project.in(file("."))
     foundation, frontend,
     impl,
     qscript, qsu,
-    runp,
     sql)
 
 /** Very general utilities, ostensibly not Quasar-specific, but they just aren’t
@@ -118,6 +117,7 @@ lazy val foundation = project
       "org.typelevel"              %% "spire"                     % spireVersion,
       "io.argonaut"                %% "argonaut"                  % argonautVersion,
       "io.argonaut"                %% "argonaut-scalaz"           % argonautVersion,
+      "io.argonaut"                %% "argonaut-cats"             % argonautVersion,
       "com.slamdata"               %% "matryoshka-core"           % matryoshkaVersion,
       "com.slamdata"               %% "pathy-core"                % pathyVersion,
       "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
@@ -259,10 +259,12 @@ lazy val core = project
 lazy val impl = project
   .settings(name := "quasar-impl")
   .dependsOn(
+    core % BothScopes,
     api % BothScopes,
     common % "test->test",
     connector % BothScopes,
-    frontend % "test->test")
+    frontend % "test->test",
+    qsu)
   .settings(commonSettings)
   .settings(
 
@@ -273,24 +275,14 @@ lazy val impl = project
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
       "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
       "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
+      "io.argonaut"    %% "argonaut-cats"            % argonautVersion,
       "org.typelevel"  %% "jawn-util"                % jawnVersion,
       "io.atomix"      % "atomix"                    % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
       "org.scodec"     %% "scodec-bits"              % scodecBitsVersion,
       "io.netty"       % "netty-all"                 % nettyVersion,
       "org.mapdb"      % "mapdb"                     % mapdbVersion,
+      "eu.timepit"     %% "refined-scalacheck"       % refinedVersion % Test,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
       "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2"))
   .evictToLocal("FS2_JOB_PATH", "core")
-
-lazy val runp = (project in file("run"))
-  .settings(name := "quasar-run")
-  .dependsOn(
-    core % BothScopes,
-    impl,
-    qsu)
-  .settings(commonSettings)
-  .settings(
-    libraryDependencies ++= Seq(
-      "org.mapdb" %  "mapdb"  % mapdbVersion,
-      "eu.timepit" %% "refined-scalacheck" % refinedVersion % Test))

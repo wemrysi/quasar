@@ -81,7 +81,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         ConcurrentMapIndexedStore.unhooked[IO, String, DestinationRef[Json]](mp, blocker)
       }
     val rCache = ResourceManager[IO, String, Destination[IO]]
-    val modules = DestinationModules[IO, String](List(MockDestinationModule))
+    val modules = DestinationModules[IO](List(MockDestinationModule))
     for {
       refs <- Resource.liftF(fRefs)
       cache <- rCache

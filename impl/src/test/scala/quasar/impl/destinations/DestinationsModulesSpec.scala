@@ -87,7 +87,7 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
     }
   }
 
-  def mkModules(lst: List[DestinationModule]) = DestinationModules[IO, String](lst)
+  def mkModules(lst: List[DestinationModule]) = DestinationModules[IO](lst)
 
   "supported types" >> {
     "empty" >>* {

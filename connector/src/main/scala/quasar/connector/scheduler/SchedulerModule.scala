@@ -14,23 +14,20 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.connector.scheduler
 
-import quasar.contrib.scalaz.MonadError_
+import slamdata.Predef._
 
-import java.lang.String
-import java.util.UUID
+import quasar.api.scheduler._, SchedulerError._
 
-import monocle.Prism
+import argonaut.Json
+import cats.effect._
 
-import scala.util.Try
+import scala.util.Either
 
-package object impl {
-  val UuidString: Prism[String, UUID] =
-    Prism[String, UUID](
-      s => Try(UUID.fromString(s)).toOption)(
-      u => u.toString)
-
-  type MonadQuasarErr[F[_]] = MonadError_[F, QuasarError]
-  def MonadQuasarErr[F[_]](implicit ev: MonadQuasarErr[F]): MonadQuasarErr[F] = ev
+trait SchedulerModule {
+  def schedulerType: SchedulerType
+  def sanitizeConfig(config: Json): Json
+  def scheduler[F[_]: ContextShift: ConcurrentEffect: Timer](config: Json)
+      : Resource[F, Either[InitializationError[Json], Scheduler[F, Array[Byte], Json]]]
 }

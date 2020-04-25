@@ -19,21 +19,16 @@ package quasar.impl.external
 import slamdata.Predef._
 
 import cats.{Eq, Show}
+import cats.implicits._
 
-sealed abstract class PluginType(
-    val manifestAttributeName: String,
-    val displayName: DisplayName)
-    extends Product
-    with Serializable
+// NB: this is actually more general, I'm just sticking it here for now
+final case class DisplayName(lowercase: String, uppercase: String, plural: String)
 
-object PluginType {
-  case object Datasource extends PluginType("Datasource-Module", DisplayName("datasource", "Datasource", "datasources"))
-  case object Destination extends PluginType("Destination-Module", DisplayName("destination", "Destination", "destinations"))
-  case object Scheduler extends PluginType("Scheduler-Module", DisplayName("scheduler", "Scheduler", "schedulers"))
+object DisplayName {
 
-  implicit val equal: Eq[PluginType] =
-    Eq.fromUniversalEquals
+  implicit val eq: Eq[DisplayName] =
+    Eq.by(dn => (dn.lowercase, dn.uppercase, dn.plural))
 
-  implicit val show: Show[PluginType] =
-    Show.fromToString
+  implicit val show: Show[DisplayName] =
+    Show.show(dn => s"DisplayName(lowercase = ${dn.lowercase}, uppercase = ${dn.uppercase}, plural = ${dn.plural})")
 }

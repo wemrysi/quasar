@@ -14,23 +14,10 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.impl
 
-import quasar.contrib.scalaz.MonadError_
+import quasar.Variables
+import quasar.contrib.pathy.ADir
+import quasar.sql.Query
 
-import java.lang.String
-import java.util.UUID
-
-import monocle.Prism
-
-import scala.util.Try
-
-package object impl {
-  val UuidString: Prism[String, UUID] =
-    Prism[String, UUID](
-      s => Try(UUID.fromString(s)).toOption)(
-      u => u.toString)
-
-  type MonadQuasarErr[F[_]] = MonadError_[F, QuasarError]
-  def MonadQuasarErr[F[_]](implicit ev: MonadQuasarErr[F]): MonadQuasarErr[F] = ev
-}
+final case class SqlQuery(query: Query, vars: Variables, basePath: ADir)

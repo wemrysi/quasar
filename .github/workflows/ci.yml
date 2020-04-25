@@ -94,12 +94,6 @@ jobs:
           name: target-${{ matrix.os }}-${{ matrix.scala }}-${{ matrix.java }}-sql_target
           path: sql/target
 
-      - name: Upload target directory 'run/target' (${{ matrix.scala }})
-        uses: actions/upload-artifact@v1
-        with:
-          name: target-${{ matrix.os }}-${{ matrix.scala }}-${{ matrix.java }}-run_target
-          path: run/target
-
       - name: Upload target directory 'qsu/target' (${{ matrix.scala }})
         uses: actions/upload-artifact@v1
         with:
@@ -235,12 +229,6 @@ jobs:
         with:
           name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-sql_target
           path: sql/target
-
-      - name: Download target directory 'run/target' (2.12.10)
-        uses: actions/download-artifact@v1
-        with:
-          name: target-${{ matrix.os }}-2.12.10-${{ matrix.java }}-run_target
-          path: run/target
 
       - name: Download target directory 'qsu/target' (2.12.10)
         uses: actions/download-artifact@v1
