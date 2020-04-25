@@ -44,7 +44,7 @@ object ResultSink {
         idColumn: Column[T],
         otherColumns: List[Column[T]],
         writeMode: WriteMode,
-        input: Stream[F, DataEvent[_, OffsetKey.Actual[A]]]) {
+        input: Stream[F, DataEvent[Any, OffsetKey.Actual[A]]]) {
 
       def columns: NonEmptyList[Column[T]] =
         NonEmptyList(idColumn, otherColumns)
