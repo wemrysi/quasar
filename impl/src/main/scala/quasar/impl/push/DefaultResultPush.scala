@@ -29,6 +29,7 @@ import quasar.connector.destination._
 import quasar.connector.render.{RenderInput, ResultRender}
 import quasar.impl.storage.{IndexedStore, PrefixStore}
 
+import java.lang.IllegalStateException
 import java.time.Instant
 import java.util.Comparator
 import java.util.concurrent.{ConcurrentMap, ConcurrentNavigableMap, ConcurrentSkipListMap}
@@ -186,11 +187,76 @@ final class DefaultResultPush[
   }
 
   def start(destinationId: D, config: ∃[PushConfig[?, Q]], limit: Option[Long])
+      : F[Either[NonEmptyList[ResultPushError[D]], F[Status.Terminal]]] =
+    EitherT.right[Errs](instantNow)
+      .flatMap(runPush(destinationId, config.value, limit, _, None))
+      .value
+
+  def update(destinationId: D, path: ResourcePath)
       : F[Either[NonEmptyList[ResultPushError[D]], F[Status.Terminal]]] = {
 
-    type Errs = NonEmptyList[ResultPushError[D]]
+    def resume[A](inc: PushConfig.Incremental[A, Q], createdAt: Instant)
+        : Option[∃[OffsetKey.Actual]] => EitherT[F, Errs, F[Status.Terminal]] = {
 
-    def err(rpe: ResultPushError[D]): Errs = NonEmptyList.one(rpe)
+      case Some(resumeFrom) =>
+        val actualKey: OffsetKey.Actual[_] = resumeFrom.value
+        val expectedKey: OffsetKey.Formal[Unit, A] = inc.resumeConfig.resultOffsetColumn.tpe
+
+        (actualKey, expectedKey) match {
+          case (realKey @ OffsetKey.RealKey(_), OffsetKey.RealKey(_)) =>
+            runPush(destinationId, inc, None, createdAt, Some(realKey))
+
+          case (stringKey @ OffsetKey.StringKey(_), OffsetKey.StringKey(_)) =>
+            runPush(destinationId, inc, None, createdAt, Some(stringKey))
+
+          case (dateTimeKey @ OffsetKey.DateTimeKey(_), OffsetKey.DateTimeKey(_)) =>
+            runPush(destinationId, inc, None, createdAt, Some(dateTimeKey))
+
+          case _ =>
+            // TODO[logging]: Log this error
+            val ex = new IllegalStateException(
+              s"Invalid offset, expected ${expectedKey.show}, found ${actualKey.show}")
+            EitherT(Concurrent[F].raiseError[Either[Errs, F[Status.Terminal]]](ex))
+        }
+
+      case None =>
+        // TODO[logging]: warn that offset wasn't found
+        runPush(destinationId, inc, None, createdAt, None)
+    }
+
+    val key = destinationId :: path :: HNil
+
+    OptionT(pushes.lookup(key))
+      .toRight(err(PushNotFound(destinationId, path)))
+      .flatMap { push0 =>
+        val push = push0.value
+
+        push.config match {
+          case full @ PushConfig.Full(_, _, _) =>
+            runPush(destinationId, full, None, push.createdAt, None)
+
+          case inc @ PushConfig.Incremental(_, _, _, _, _) =>
+            EitherT.right[Errs](offsets.lookup(key))
+              .flatMap(resume(inc, push.createdAt))
+        }
+      }
+      .value
+  }
+
+
+  ////
+
+  private type Errs = NonEmptyList[ResultPushError[D]]
+
+  private def err(rpe: ResultPushError[D]): Errs = NonEmptyList.one(rpe)
+
+  private def runPush[A](
+      destinationId: D,
+      config: PushConfig[A, Q],
+      limit: Option[Long],
+      createdAt: Instant,
+      resumeFrom: Option[OffsetKey.Actual[A]])
+      : EitherT[F, Errs, F[Status.Terminal]] = {
 
     def handleFull(
         dest: Destination[F])(
@@ -222,7 +288,7 @@ final class DefaultResultPush[
         query: Q,
         nonIdOutputColumns: List[Column[(ColumnType.Scalar, dest.Type)]],
         resumeConfig: ResumeConfig[A],
-        initialOffset: Option[OffsetKey.Actual[A]])
+        actualOffset: Either[Option[OffsetKey.Actual[A]], OffsetKey.Actual[A]])
         : EitherT[F, Errs, Stream[F, OffsetKey.Actual[A]]] = {
 
       val C = Functor[Column]
@@ -246,12 +312,23 @@ final class DefaultResultPush[
         (nonIdRenderColumns, nonIdDestColumns) =
           Functor[List].compose[Column].unzip(nonIdOutputColumns)
 
-        offset = initialOffset.map(o => Offset(resumeConfig.sourceOffsetPath, ∃(o)))
+        (offsetValue, isUpdate) = actualOffset match {
+          case Left(initial) => (initial, false)
+          case Right(resume) => (Some(resume), true)
+        }
+
+        offset = offsetValue.map(o => Offset(resumeConfig.sourceOffsetPath, ∃(o)))
 
         dataEvents =
           Stream.resource(evaluator((query, offset))).flatten flatMap { results =>
+            val input =
+              if (isUpdate)
+                RenderInput.Incremental(results)
+              else
+                RenderInput.Initial(results)
+
             render.renderUpserts(
-              RenderInput.Initial(results),
+              input,
               idColumn,
               resumeConfig.resultOffsetColumn,
               NonEmptyList(idRenderColumn, nonIdRenderColumns),
@@ -264,57 +341,62 @@ final class DefaultResultPush[
             path,
             idDestColumn,
             nonIdDestColumns,
-            WriteMode.Replace,
+            if (isUpdate) WriteMode.Append else WriteMode.Replace,
             dataEvents)
 
       } yield sink.consume[A](upsertArgs)
     }
 
-    val started = for {
+    for {
       dest <- destination(destinationId).leftMap(err)
 
-      cfg = config.value
-
-      key = destinationId :: cfg.path :: HNil
+      key = destinationId :: config.path :: HNil
 
       _ <- EitherT(Sync[F].delay(active.containsKey(liftKey(key))) map {
-        case true => Left(err(PushAlreadyRunning(destinationId, cfg.path)))
+        case true => Left(err(PushAlreadyRunning(destinationId, config.path)))
         case false => Right(())
       })
 
-      sinked <- cfg match {
+      sinked <- config match {
         case PushConfig.Full(path, q, columns) =>
           EitherT.fromEither[F](typedColumns(destinationId, dest, columns))
             .flatMap(handleFull(dest)(path, q, _))
 
         case PushConfig.Incremental(path, q, otherCols, resumeCfg, initOffset) =>
+          val offset = resumeFrom match {
+            case Some(key) => Right(key)
+            case None => Left(initOffset)
+          }
+
           EitherT.fromEither[F](typedColumns(destinationId, dest, otherCols))
-            .flatMap(handleIncremental(dest)(path, q, _, resumeCfg, initOffset))
+            .flatMap(handleIncremental(dest)(path, q, _, resumeCfg, offset))
             .map(_.evalMap(o => offsets.insert(key, ∃(o))))
       }
 
       terminal <- EitherT.right[Errs](Deferred[F, Status.Terminal])
       acceptedAt <- EitherT.right[Errs](instantNow)
-      accepted = ActiveState.StartAccepted(config, acceptedAt, limit, terminal)
+      accepted = ActiveState.StartAccepted(∃[PushConfig[?, Q]](config), acceptedAt, limit, terminal)
 
       alreadyRunning <- EitherT.right[Errs](Sync[F] delay {
         Option(active.putIfAbsent(liftKey(key), accepted)).isDefined
       })
 
       _ <- if (alreadyRunning)
-        EitherT.leftT[F, Unit](err(PushAlreadyRunning(destinationId, cfg.path)))
+        EitherT.leftT[F, Unit](err(PushAlreadyRunning(destinationId, config.path)))
       else
         EitherT.rightT[F, Errs](())
 
       preamble = for {
         runningAt <- instantNow
 
-        unknownPush = ∃[Push[?, Q]](Push(cfg, acceptedAt, Status.Unknown(runningAt, limit)))
+        unknownPush = ∃[Push[?, Q]](Push(config, createdAt, Status.Unknown(runningAt, limit)))
         running = ActiveState.PushRunning(unknownPush, runningAt, acceptedAt, limit, terminal)
+
+        isResume = resumeFrom.isDefined
 
         _ <- Sync[F].delay(active.replace(liftKey(key), accepted, running))
         _ <- pushes.insert(key, unknownPush)
-        _ <- offsets.delete(key)
+        _ <- if (isResume) ().pure[F] else offsets.delete(key).void
       } yield ()
 
       job = Stream.eval_(preamble) ++ sinked
@@ -329,19 +411,10 @@ final class DefaultResultPush[
           _ <- Sync[F].delay(active.remove(liftKey(key), accepted))
           canceledAt <- instantNow
           _ <- terminal.complete(Status.Canceled(acceptedAt, canceledAt, limit))
-        } yield err(PushAlreadyRunning(destinationId, cfg.path)))
+        } yield err(PushAlreadyRunning(destinationId, config.path)))
 
     } yield terminal.get
-
-    started.value
   }
-
-  def update(destinationId: D, path: ResourcePath)
-      : F[Either[NonEmptyList[ResultPushError[D]], F[Status.Terminal]]] =
-    ???
-
-
-  ////
 
   private def coerceWith(dest: Destination[F], scalar: ColumnType.Scalar): TypeCoercion[CoercedType] = {
     import dest._
