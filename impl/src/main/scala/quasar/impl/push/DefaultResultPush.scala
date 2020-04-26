@@ -149,7 +149,7 @@ final class DefaultResultPush[
       .map(coerceWith(_, scalar))
       .value
 
-  def destinationStatus(destinationId: D)
+  def pushedTo(destinationId: D)
       : F[Either[DestinationNotFound[D], Map[ResourcePath, ∃[Push[?, Q]]]]] = {
 
     def overrideWithActive(m: Map[ResourcePath, ∃[Push[?, Q]]]): F[Map[ResourcePath, ∃[Push[?, Q]]]] = {

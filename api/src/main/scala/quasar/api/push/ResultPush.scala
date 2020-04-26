@@ -44,7 +44,7 @@ trait ResultPush[F[_], DestinationId, Query] {
       : F[Either[DestinationNotFound[DestinationId], TypeCoercion[CoercedType]]]
 
   /** Returns the latest pushes made to the specified destination. */
-  def destinationStatus(destinationId: DestinationId)
+  def pushedTo(destinationId: DestinationId)
       : F[Either[DestinationNotFound[DestinationId], Map[ResourcePath, ∃[Push[?, Query]]]]]
 
   /** Start a push to the specified destination.
