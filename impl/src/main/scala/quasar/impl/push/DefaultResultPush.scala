@@ -37,7 +37,7 @@ import java.util.concurrent.{ConcurrentMap, ConcurrentNavigableMap, ConcurrentSk
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
-import cats.{Applicative, Functor, Order, Traverse}
+import cats.{Applicative, Functor, Order, Show, Traverse}
 import cats.data.{Const, EitherT, Ior, OptionT, NonEmptyList}
 import cats.effect.{Concurrent, Resource, Sync, Timer}
 import cats.effect.concurrent.Deferred
@@ -47,6 +47,11 @@ import cats.implicits._
 import fs2.Stream
 import fs2.job.{JobManager, Job, Event => JobEvent, Timestamp => JobStarted}
 
+import io.chrisdavenport.log4cats.Logger
+import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+
+import pathy.Path
+
 import shapeless._
 import shapeless.HList.ListCompat._
 
@@ -54,56 +59,20 @@ import shims.orderToCats
 
 import skolems.∃
 
-// ideally
-//
-// semantics, starting a new push invalidates any state of the previous, regardless of whether new finishes.
-//
-// accept the job, inmem: accepted
-// jm runs the stream
-// persist offsets as needed
-// persist terminal state
-//
-// what happens if previous was also incremental and we want to restart
-//
-// maintain an additional id on offsets (d :: t :: uuid :: HNil, and store the UUID in the push store,
-// then we can invalidate the previous (d :: t) when the first offset for the new one is persisted
-//
-// why not have resume also work for full pushes? just do not-incremental for now, if we ever want to enable it,
-// we can.
-//
-// ok, so two stores, d :: t -> PushState[O] and d :: t :: id -> Offset
-// can't really delete old offsets, somehow prune them? sigh
-//
-// start/re
-// modernize? refresh? update?
-//
-// 1. StartAccepted(config, startedAt, limit), nothing persisted yet, but status reflects
-//    acceptance of new config
-// 2. When the run action is actually scheduled, if the current status is start accepted,
-//    a new push is persisted with the status set to `Unknown`
-// 3. If the server crashes or whatnot, the persisted state will actually reflect we
-//    have no idea what state the push is in
-// 4. When the push completes successfully, persist it with the terminal status
-//
-//
-
-// FIXME: Make a pass through `start` with an eye towards cancellation/failure and ensuring
-//        state is correct in their presence.
-
-// TODO[logging]: Need to log when a push terminates
 // TODO[clustering]: Need to decide how we'll ensure a job is only ever running on a single node.
 final class DefaultResultPush[
-    F[_]: Concurrent: Timer, D <: AnyRef, Q, R] private (
+    F[_]: Concurrent: Timer, D <: AnyRef: Show, Q, R] private (
     lookupDestination: D => F[Option[Destination[F]]],
     evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), Stream[F, R]],
     jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing],
     render: ResultRender[F, R],
     active: ConcurrentNavigableMap[D :: Option[ResourcePath] :: HNil, DefaultResultPush.ActiveState[F, Q]],
     pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
-    offsets: IndexedStore[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
+    offsets: IndexedStore[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
+    log: Logger[F])
     extends ResultPush[F, D, Q] {
 
-  import DefaultResultPush.{ActiveState, liftKey}
+  import DefaultResultPush.{ActiveState, debugKey, debugTerminal, liftKey}
   import ResultPushError._
 
   def cancel(destinationId: D, path: ResourcePath): F[Condition[DestinationNotFound[D]]] = {
@@ -112,20 +81,21 @@ final class DefaultResultPush[
 
       key = destinationId :: path :: HNil
 
-      result <- jobManager.cancel(key)
+      _ <- jobManager.cancel(key)
 
       state <- Sync[F].delay(Option(active.remove(liftKey(key))))
-
-      // TODO[logging]: Warn unless result == state.isDefined
 
       _ <- state traverse_ {
         case ActiveState.PushRunning(p, runningAt, _, limit, terminal) =>
           val canceled = Status.Canceled(runningAt, canceledAt, limit)
           pushes.insert(key, ∃[Push[?, Q]](p.value.copy(status = canceled)))
             .guarantee(terminal.complete(canceled))
+            .productR(log.info(debugTerminal("canceled", key, canceled)))
 
         case accepted =>
-          accepted.terminal.complete(Status.Canceled(accepted.at, canceledAt, accepted.limit))
+          val canceled = Status.Canceled(accepted.at, canceledAt, accepted.limit)
+          accepted.terminal.complete(canceled)
+            .productR(log.info(debugTerminal("aborted", key, canceled)))
       }
     } yield ()
 
@@ -187,13 +157,21 @@ final class DefaultResultPush[
   }
 
   def start(destinationId: D, config: ∃[PushConfig[?, Q]], limit: Option[Long])
-      : F[Either[NonEmptyList[ResultPushError[D]], F[Status.Terminal]]] =
+      : F[Either[NonEmptyList[ResultPushError[D]], F[Status.Terminal]]] = {
+
+    val cfg = config.value
+    val key = destinationId :: cfg.path :: HNil
+
     EitherT.right[Errs](instantNow)
-      .flatMap(runPush(destinationId, config.value, limit, _, None))
+      .flatMap(runPush(destinationId, cfg, limit, _, None))
+      .productL(EitherT.right[Errs](log.info(s"${debugKey(key)} Start push accepted")))
       .value
+  }
 
   def update(destinationId: D, path: ResourcePath)
       : F[Either[NonEmptyList[ResultPushError[D]], F[Status.Terminal]]] = {
+
+    val key = destinationId :: path :: HNil
 
     def resume[A](inc: PushConfig.Incremental[A, Q], createdAt: Instant)
         : Option[∃[OffsetKey.Actual]] => EitherT[F, Errs, F[Status.Terminal]] = {
@@ -213,18 +191,19 @@ final class DefaultResultPush[
             runPush(destinationId, inc, None, createdAt, Some(dateTimeKey))
 
           case _ =>
-            // TODO[logging]: Log this error
             val ex = new IllegalStateException(
               s"Invalid offset, expected ${expectedKey.show}, found ${actualKey.show}")
-            EitherT(Concurrent[F].raiseError[Either[Errs, F[Status.Terminal]]](ex))
+
+            EitherT {
+              log.error(ex)(s"${debugKey(key)} Unable to resume incremental push")
+                .productR(Concurrent[F].raiseError[Either[Errs, F[Status.Terminal]]](ex))
+            }
         }
 
       case None =>
-        // TODO[logging]: warn that offset wasn't found
-        runPush(destinationId, inc, None, createdAt, None)
+        EitherT.right[Errs](log.warn(s"${debugKey(key)} Offset not found, updating from initial"))
+          .productR(runPush(destinationId, inc, None, createdAt, None))
     }
-
-    val key = destinationId :: path :: HNil
 
     OptionT(pushes.lookup(key))
       .toRight(err(PushNotFound(destinationId, path)))
@@ -240,6 +219,7 @@ final class DefaultResultPush[
               .flatMap(resume(inc, push.createdAt))
         }
       }
+      .productL(EitherT.right[Errs](log.info(s"${debugKey(key)} Update push accepted")))
       .value
   }
 
@@ -397,6 +377,8 @@ final class DefaultResultPush[
         _ <- Sync[F].delay(active.replace(liftKey(key), accepted, running))
         _ <- pushes.insert(key, unknownPush)
         _ <- if (isResume) ().pure[F] else offsets.delete(key).void
+
+        _ <- log.info(s"${debugKey(key)} Push running")
       } yield ()
 
       job = Stream.eval_(preamble) ++ sinked
@@ -406,11 +388,12 @@ final class DefaultResultPush[
       _ <- if (submitted)
         EitherT.rightT[F, Errs](())
       else
-        // TODO[logging]: this shouldn't happen, so should log if it ever does
+        // This shouldn't happen
         EitherT.left[Unit](for {
           _ <- Sync[F].delay(active.remove(liftKey(key), accepted))
           canceledAt <- instantNow
           _ <- terminal.complete(Status.Canceled(acceptedAt, canceledAt, limit))
+          _ <- log.error(s"${debugKey(key)} Conflict with job manager, already running")
         } yield err(PushAlreadyRunning(destinationId, config.path)))
 
     } yield terminal.get
@@ -582,7 +565,7 @@ object DefaultResultPush {
         extends ActiveState[F, Q]
   }
 
-  def apply[F[_]: Concurrent: Timer, D <: AnyRef: Order, Q, R](
+  def apply[F[_]: Concurrent: Timer, D <: AnyRef: Order: Show, Q, R](
       maxConcurrentPushes: Int,
       lookupDestination: D => F[Option[Destination[F]]],
       evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), Stream[F, R]],
@@ -597,7 +580,9 @@ object DefaultResultPush {
     def acceptedAsOf(acceptedAt: Instant, startedAt: JobStarted): SBoolean =
       acceptedAt.compareTo(epochToInstant(startedAt.epoch)) <= 0
 
-    def handleEvent(active: ConcurrentMap[D :: Option[ResourcePath] :: HNil, ActiveState[F, Q]])
+    def handleEvent(
+        active: ConcurrentMap[D :: Option[ResourcePath] :: HNil, ActiveState[F, Q]],
+        log: Logger[F])
         : JobEvent[D :: ResourcePath :: HNil] => F[Unit] = {
 
       def complete[A](
@@ -630,6 +615,7 @@ object DefaultResultPush {
                 limit)
 
               complete(s, id, p.value, finished, limit, deferred)
+                .productR(log.info(debugTerminal("finished", id, finished)))
 
             case _ => Applicative[F].unit
           }
@@ -646,6 +632,7 @@ object DefaultResultPush {
                 ex.toString)
 
               complete(s, id, p.value, failed, limit, deferred)
+                .productR(log.error(ex)(debugTerminal("failed", id, failed)))
 
             case _ => Applicative[F].unit
           }
@@ -686,7 +673,9 @@ object DefaultResultPush {
           Sync[F].delay(new ConcurrentSkipListMap[D :: Option[ResourcePath] :: HNil, ActiveState[F, Q]](
             prefixComparator))
 
-        _ <- Concurrent[F].start(jobManager.events.evalMap(handleEvent(active)).compile.drain)
+        log <- Slf4jLogger.create[F]
+
+        _ <- Concurrent[F].start(jobManager.events.evalMap(handleEvent(active, log)).compile.drain)
       } yield {
         new DefaultResultPush(
           lookupDestination,
@@ -695,7 +684,8 @@ object DefaultResultPush {
           render,
           active,
           pushes,
-          offsets)
+          offsets,
+          log)
       }
 
     val jm =
@@ -708,6 +698,19 @@ object DefaultResultPush {
     }
   }
 
+
+  ////
+
   private def liftKey[D, T](key: D :: T :: HNil): D :: Option[T] :: HNil =
     key.updateWith(Option(_: T))
+
+  private def debugKey[D: Show](k: D :: ResourcePath :: HNil): String =
+    s"[${k.select[D].show}:${Path.posixCodec.printPath(k.select[ResourcePath].toPath)}]"
+
+  private def debugTerminal[D: Show](
+      desc: String,
+      id: D :: ResourcePath :: HNil,
+      status: Status.Terminal)
+      : String =
+    s"${debugKey(id)} Push $desc (elapsed ${Status.elapsed(status)})"
 }

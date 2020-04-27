@@ -18,7 +18,7 @@ package quasar.api.push
 
 import slamdata.Predef._
 
-import java.time.Instant
+import java.time.{Duration, Instant}
 
 import cats.{Eq, Show}
 
@@ -46,6 +46,12 @@ object Status {
       extends Terminal
   final case class Failed(startedAt: Instant, failedAt: Instant, limit: Option[Long], reason: String)
       extends Terminal
+
+  val elapsed: Terminal => Duration = {
+    case Finished(s, e, _) => Duration.between(s, e)
+    case Canceled(s, e, _) => Duration.between(s, e)
+    case Failed(s, e, _, _) => Duration.between(s, e)
+  }
 
   implicit def statusEq[S <: Status]: Eq[S] =
     Eq.fromUniversalEquals
