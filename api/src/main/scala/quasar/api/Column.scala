@@ -18,31 +18,34 @@ package quasar.api
 
 import slamdata.Predef._
 
-import cats.{Applicative, Eq, Eval, Show, Traverse}
+import cats.{Apply, Eq, Eval, NonEmptyTraverse, Show}
 import cats.implicits._
 
-final case class Column[T](name: String, tpe: T)
+final case class Column[+T](name: String, tpe: T)
 
 object Column {
-  implicit val traverseColumn: Traverse[Column] =
-    new Traverse[Column] {
+  implicit val columnNonEmptyTraverse: NonEmptyTraverse[Column] =
+    new NonEmptyTraverse[Column] {
+      def nonEmptyTraverse[F[_]: Apply, A, B](fa: Column[A])(f: A => F[B]) =
+        f(fa.tpe).map(b => fa.copy(tpe = b))
+
       def foldLeft[A, B](fa: Column[A], b: B)(f: (B, A) => B): B =
         f(b, fa.tpe)
 
       def foldRight[A, B](fa: Column[A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
         f(fa.tpe, lb)
 
-      override def map[A, B](fa: Column[A])(f: A => B): Column[B] =
-        fa.copy(tpe = f(fa.tpe))
+      def reduceLeftTo[A, B](fa: Column[A])(f: A => B)(g: (B, A) => B): B =
+        f(fa.tpe)
 
-      def traverse[G[_]: Applicative, A, B](fa: Column[A])(f: A => G[B]): G[Column[B]] =
-        f(fa.tpe).map(b => fa.copy(tpe = b))
+      def reduceRightTo[A, B](fa: Column[A])(f: A => B)(g: (A, Eval[B]) => Eval[B]): Eval[B] =
+        Eval.now(f(fa.tpe))
     }
 
-  implicit def equalColumn[T: Eq]: Eq[Column[T]] =
+  implicit def columnEq[T: Eq]: Eq[Column[T]] =
     Eq.by(c => (c.name, c.tpe))
 
-  implicit def showColumn[T: Show]: Show[Column[T]] =
+  implicit def columnShow[T: Show]: Show[Column[T]] =
     Show show { tc =>
       "Column(" + tc.name + ", " + tc.tpe.show + ")"
     }

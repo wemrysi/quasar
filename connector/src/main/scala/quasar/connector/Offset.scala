@@ -14,14 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.api.push
+package quasar.connector
 
-import slamdata.Predef._
+import quasar.api.push.{OffsetKey, OffsetPath}
 
-import quasar.api.resource.ResourcePath
+import skolems.∃
 
-final case class PushMeta(
-    path: ResourcePath,
-    resultType: ResultType,
-    limit: Option[Long],
-    status: Status)
+final case class Offset(path: OffsetPath, value: ∃[OffsetKey.Actual])

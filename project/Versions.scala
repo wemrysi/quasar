@@ -8,6 +8,7 @@ object Versions {
   val disciplineVersion   = "0.11.1"
   val jawnVersion         = "1.0.0"
   val jawnfs2Version      = "1.0.0-RC2"
+  val log4CatsVersion     = "1.0.1"
   val matryoshkaVersion   = "0.18.6"
   val monocleVersion      = "1.6.0"
   val pathyVersion        = "0.3.2"
@@ -25,6 +26,6 @@ object Versions {
   val atomixVersion       = "3.0.11" // This is freezed, because atomix changed discovery service somehow
   val mapdbVersion        = "3.0.8"
   val nettyVersion        = "4.1.47.Final"
-  val skolemsVersion      = "0.2.0"
+  val skolemsVersion      = "0.2.1"
   val kittensVersion      = "2.0.0"
 }

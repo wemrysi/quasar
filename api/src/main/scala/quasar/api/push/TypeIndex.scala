@@ -18,4 +18,14 @@ package quasar.api.push
 
 import scala.Int
 
+import cats.{Eq, Show}
+
 final case class TypeIndex(ordinal: Int) extends scala.AnyVal
+
+object TypeIndex {
+  implicit val typeIndexEq: Eq[TypeIndex] =
+    Eq.fromUniversalEquals
+
+  implicit val typeIndexShow: Show[TypeIndex] =
+    Show.fromToString
+}

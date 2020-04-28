@@ -14,17 +14,12 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.api
 
-import slamdata.Predef._
+import slamdata.Predef.{Either, Int, String}
 
-import quasar.contrib.scalaz.MonadError_
+import cats.data.NonEmptyList
 
-package object connector {
-  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
-
-  type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
-
-  def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])
-      : MonadResourceErr[F] = ev
+package object push {
+  type OffsetPath = NonEmptyList[Either[String, Int]]
 }
