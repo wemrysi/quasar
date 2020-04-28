@@ -73,6 +73,15 @@ object ResourcePathSerializer extends GroupSerializer[ResourcePath] {
   def serialize(out: DataOutput2, value: ResourcePath): Unit =
     underlying.serialize(out, toArray(value))
 
+  override def equals(x: ResourcePath, y: ResourcePath): Boolean =
+    if (x == null || y == null)
+      x == y
+    else
+      underlying.equals(toArray(x), toArray(y))
+
+  override def compare(x: ResourcePath, y: ResourcePath): Int =
+    underlying.compare(toArray(x), toArray(y))
+
   ////
 
   private def fromArray(ss: Array[String]): ResourcePath =
