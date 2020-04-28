@@ -25,7 +25,7 @@ import cats.{Apply, Eq, Eval, NonEmptyTraverse, Show}
 import cats.data.NonEmptyList
 import cats.implicits._
 
-import monocle.{PLens, Prism}
+import monocle.{Lens, PLens, Prism}
 
 import shims.{equalToCats, functorToScalaz, showToCats}
 
@@ -73,6 +73,12 @@ object PushConfig {
     PLens[PushConfig[O, Q1], PushConfig[O, Q2], Q1, Q2](_.query)(q2 => {
       case f @ Full(_, _, _) => f.copy(query = q2)
       case i @ Incremental(_, _, _, _, _) => i.copy(query = q2)
+    })
+
+  def path[O, Q]: Lens[PushConfig[O, Q], ResourcePath] =
+    Lens[PushConfig[O, Q], ResourcePath](_.path)(p2 => {
+      case f @ Full(_, _, _) => f.copy(path = p2)
+      case i @ Incremental(_, _, _, _, _) => i.copy(path = p2)
     })
 
   implicit def pushConfigEq[O, Q: Eq]: Eq[PushConfig[O, Q]] =
