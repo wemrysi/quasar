@@ -18,7 +18,7 @@ package quasar.impl.push
 
 import slamdata.Predef.{Boolean => SBoolean, _}
 
-import quasar.Condition
+import quasar.{Condition, Store}
 import quasar.api.{Column, ColumnType, Labeled, QueryEvaluator}
 import quasar.api.Label.Syntax._
 import quasar.api.push._
@@ -27,7 +27,7 @@ import quasar.api.resource.ResourcePath
 import quasar.connector.Offset
 import quasar.connector.destination._
 import quasar.connector.render.{RenderInput, ResultRender}
-import quasar.impl.storage.{IndexedStore, PrefixStore}
+import quasar.impl.storage.PrefixStore
 
 import java.lang.IllegalStateException
 import java.time.Instant
@@ -68,7 +68,7 @@ final class DefaultResultPush[
     render: ResultRender[F, R],
     active: ConcurrentNavigableMap[D :: Option[ResourcePath] :: HNil, DefaultResultPush.ActiveState[F, Q]],
     pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
-    offsets: IndexedStore[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
+    offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
     log: Logger[F])
     extends ResultPush[F, D, Q] {
 
@@ -431,8 +431,8 @@ final class DefaultResultPush[
     column traverse {
       case (scalar, selected) =>
         for {
-          _ <- validateCoercion(destId, dest, column.name, scalar, selected.index)
           t <- constructType(destId, dest, column.name, selected)
+          _ <- validateCoercion(destId, dest, column.name, scalar, selected.index)
         } yield (scalar, t)
     }
 
@@ -571,7 +571,7 @@ object DefaultResultPush {
       evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), Stream[F, R]],
       render: ResultRender[F, R],
       pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
-      offsets: IndexedStore[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
+      offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
       : Resource[F, DefaultResultPush[F, D, Q, R]] = {
 
     def epochToInstant(e: FiniteDuration): Instant =

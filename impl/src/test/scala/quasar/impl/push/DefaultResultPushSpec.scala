@@ -18,18 +18,25 @@ package quasar.impl.push
 
 import slamdata.Predef._
 
+import cats._
 import cats.data.{Ior, NonEmptyList, NonEmptyMap, NonEmptySet}
-import cats.effect.{IO, Resource}
-import cats.effect.concurrent.Deferred
+import cats.derived.auto.order._
+import cats.effect.{Blocker, IO, Resource}
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.implicits._
 
 import eu.timepit.refined.auto._
 
 import fs2.{Stream, text}
 import fs2.concurrent.{Enqueue, Queue}
-import fs2.job.JobManager
+
+import java.lang.Integer
+import java.time.Instant
 
 import monocle.Prism
+
+import org.mapdb.{DBMaker, Serializer}
+import org.mapdb.serializer.GroupSerializer
 
 import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
 import quasar.api.{Column, ColumnType, Label, Labeled, QueryEvaluator}
@@ -38,24 +45,38 @@ import quasar.api.push._
 import quasar.api.push.param._
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
-import quasar.api.table.{TableColumn, TableName, TableRef}
+import quasar.connector.{DataEvent, Offset}
 import quasar.connector.destination._
 import quasar.connector.render._
+import quasar.impl.storage.{PrefixStore, RefIndexedStore}
+import quasar.impl.storage.mapdb._
 
-import shims.{eqToScalaz, orderToCats, showToCats, showToScalaz}
+import shims.{eqToScalaz, orderToCats, orderToScalaz, showToCats, showToScalaz}
 
+import scala.Predef.classOf
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+
+import scalaz.IMap
+
+import shapeless._
 
 import skolems.∃
 
 object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
+  import ResultPushError._
+
   implicit val tmr = IO.timer(global)
 
   val Timeout = 10.seconds
 
-  val TableId = 42
-  val DestinationId = 43
+  implicit val jintegerOrder: Order[Integer] =
+    Order.by(_.intValue)
+
+  implicit val jintegershow: Show[Integer] =
+    Show.fromToString
+
+  val DestinationId: Integer = new Integer(43)
   val QDestinationType = DestinationType("ref", 1L)
 
   type Filesystem = Map[ResourcePath, String]
@@ -136,6 +157,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     def destinationType: DestinationType = QDestinationType
 
+    // TODO: optional incremental sink
     def sinks = NonEmptyList.one(csvSink)
 
     val csvSink: ResultSink[IO, Type] = ResultSink.create[IO, Type](RenderConfig.Csv()) {
@@ -156,15 +178,33 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   final class MockResultRender extends ResultRender[IO, String] {
     def render(
         input: String,
-        columns: List[TableColumn],
+        columns: NonEmptyList[Column[ColumnType.Scalar]],
         config: RenderConfig,
-        limit: Option[Long])
+        rowLimit: Option[Long])
         : Stream[IO, Byte] =
       Stream(input).through(text.utf8Encode)
+
+    def renderUpserts[A](
+        input: RenderInput[String],
+        idColumn: Column[IdType],
+        offsetColumn: Column[OffsetKey.Formal[Unit, A]],
+        renderedColumns: NonEmptyList[Column[ColumnType.Scalar]],
+        config: RenderConfig.Csv,
+        limit: Option[Long])
+        : Stream[IO, DataEvent[Any, OffsetKey.Actual[A]]] =
+      ???
   }
 
-  def mkEvaluator(fn: String => IO[Stream[IO, String]]): QueryEvaluator[Resource[IO, ?], String, Stream[IO, String]] =
-    QueryEvaluator(fn).mapF(Resource.liftF(_))
+  def mkEvaluator(fn: (String, Option[Offset]) => IO[Stream[IO, String]])
+      : QueryEvaluator[Resource[IO, ?], (String, Option[Offset]), Stream[IO, String]] =
+    QueryEvaluator(fn.tupled).mapF(Resource.liftF(_))
+
+  def constEvaluator(s: IO[Stream[IO, String]])
+      : QueryEvaluator[Resource[IO, ?], (String, Option[Offset]), Stream[IO, String]] =
+    mkEvaluator((_, _) => s)
+
+  val emptyEvaluator: QueryEvaluator[Resource[IO, ?], (String, Option[Offset]), Stream[IO, String]] =
+    constEvaluator(IO(Stream()))
 
   trait StreamControl[F[_]] {
     // Cause the stream to emit a value
@@ -194,40 +234,51 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
-  val dataStream: IO[(IO[Unit], Stream[IO, String])] =
-    Deferred[IO, Unit] map { d =>
-      val s =
-        Stream.fixedDelay[IO](100.millis)
-          .zipRight(Stream(W1, W2, W3))
-
-      (d.get, s.onFinalize(d.complete(())))
-    }
+  val dataStream: Stream[IO, String] =
+    Stream.fixedDelay[IO](100.millis).zipRight(Stream(W1, W2, W3))
 
   def mkResultPush(
-      tables: Map[Int, TableRef[String]],
-      destinations: Map[Int, Destination[IO]],
-      manager: JobManager[IO, (Int, Int), Nothing],
-      evaluator: QueryEvaluator[Resource[IO, ?], String, Stream[IO, String]])
-      : IO[ResultPush[IO, Int, Int]] = {
+      destinations: Map[Integer, Destination[IO]],
+      evaluator: QueryEvaluator[Resource[IO, ?], (String, Option[Offset]), Stream[IO, String]])
+      : Resource[IO, ResultPush[IO, Integer, String]] = {
 
-    val lookupTable: Int => IO[Option[TableRef[String]]] =
-      tableId => IO(tables.get(tableId))
-
-    val lookupDestination: Int => IO[Option[Destination[IO]]] =
+    val lookupDestination: Integer => IO[Option[Destination[IO]]] =
       destinationId => IO(destinations.get(destinationId))
 
     val render = new MockResultRender
 
-    DefaultResultPush[IO, Int, Int, String, String](
-      lookupTable,
-      evaluator,
-      lookupDestination,
-      manager,
-      render)
-  }
+    for {
+      db <- Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close()))
 
-  val jobManager =
-    JobManager[IO, (Int, Int), Nothing]()
+      pushes0 <- Resource liftF {
+        MapDbPrefixStore[IO](
+          "default-result-push-spec",
+          db,
+          Serializer.INTEGER :: (ResourcePathSerializer: GroupSerializer[ResourcePath]) :: HNil,
+          Serializer.ELSA.asInstanceOf[GroupSerializer[Push[_, String]]],
+          Blocker.liftExecutionContext(global))
+      }
+
+      // skolems.Exists isn't Serializable
+      pushes = PrefixStore.xmapValueF(pushes0)(
+        p => IO(∃[Push[?, String]](p)))(
+        p => IO(p.value: Push[_, String]))
+
+      ref <- Resource.liftF(Ref[IO].of(IMap.empty[Integer :: ResourcePath :: HNil, ∃[OffsetKey.Actual]]))
+
+      offsets = RefIndexedStore(ref)
+
+      resultPush <-
+        DefaultResultPush[IO, Integer, String, String](
+          10,
+          lookupDestination,
+          evaluator,
+          render,
+          pushes,
+          offsets)
+
+    } yield resultPush
+  }
 
   def awaitFs(fss: Stream[IO, Filesystem], count: Long = -1): IO[Filesystem] = {
     val (s, msg) =
@@ -241,380 +292,229 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       IO.raiseError(new RuntimeException(s"Expected $msg within ${Timeout}.")))
   }
 
-  def await(io: IO[_]): IO[Unit] =
-    io.timeoutTo(Timeout, IO.raiseError(new RuntimeException(s"Expected completion within ${Timeout}."))).void
+  def await[A](io: IO[A]): IO[A] =
+    io.timeoutTo(Timeout, IO.raiseError[A](new RuntimeException(s"Expected completion within ${Timeout}.")))
 
-  def awaitStatusLike(
-      p: ResultPush[IO, Int, Int],
-      tableId: Int,
-      destinationId: Int)(
-      f: PartialFunction[PushMeta, Boolean])
-      : IO[PushMeta] = {
+  def awaitStatusLike(fs: IO[Status.Terminal])(f: PartialFunction[Status.Terminal, _])
+      : IO[Status.Terminal] = {
 
-    val metas =
-      Stream.eval(p.destinationStatus(destinationId))
-        .map(_.toOption.flatMap(_.get(tableId)))
-        .unNone
-        .repeat
-
-    Stream.fixedDelay[IO](100.millis)
-      .zipRight(metas)
-      .filter(f.applyOrElse(_, (_: PushMeta) => false))
-      .take(1)
-      .compile.lastOrError
-      .timeoutTo(Timeout, IO.raiseError(new RuntimeException(s"Expected a matching `PushMeta` $Timeout.")))
+    fs.flatMap(s =>
+        if (f.isDefinedAt(s))
+          IO.pure(s)
+        else
+          IO.raiseError(new RuntimeException(s"Unexpected status: ${s.show}")))
+      .timeoutTo(
+        Timeout,
+        IO.raiseError(new RuntimeException(s"Expected a matching `Status.Terminal` within $Timeout.")))
   }
 
-  val colX = NonEmptyList.one(Column("X", SelectedType(TypeIndex(0), None)))
+  val colX = NonEmptyList.one(Column("X", (ColumnType.Boolean, SelectedType(TypeIndex(0), None))))
+
+  def full(path: ResourcePath, q: String, cols: PushConfig.Columns = colX): ∃[PushConfig[?, String]] =
+    ∃[PushConfig[?, String]](PushConfig.Full(path, q, cols))
 
   "start" >> {
-    "asynchronously pushes a table to a destination" >>* {
+    "asynchronously pushes results to a destination" >>* {
       val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
       val query = "query"
-      val testTable = TableRef(TableName("foo"), query, List())
 
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
+      for {
+        (destination, filesystem) <- QDestination()
 
-          (halted, data) <- dataStream
+        r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
+          for {
+            started <- rp.start(DestinationId, full(pushPath, query), None)
 
-          evaluator = mkEvaluator(_ => IO(data))
+            result <- await(started.sequence)
 
-          push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, evaluator)
-
-          startRes <- push.start(TableId, colX, DestinationId, pushPath, ResultType.Csv, None)
-
-          _ <- await(halted)
-
-          filesystemAfterPush <- awaitFs(filesystem)
-        } yield {
-          filesystemAfterPush.keySet must equal(Set(pushPath))
-          filesystemAfterPush(pushPath) must equal(dataString)
-          startRes must beNormal
+            filesystemAfterPush <- awaitFs(filesystem)
+          } yield {
+            filesystemAfterPush.keySet must equal(Set(pushPath))
+            filesystemAfterPush(pushPath) must equal(dataString)
+            result must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+          }
         }
-      }
+      } yield r
     }
 
-    "rejects an already running push of a table to the same destination" >>* {
+    "rejects an already running push of a path to the same destination" >>* {
       val path = ResourcePath.root()
-      val testTable = TableRef(TableName("baz"), "query", List())
 
-      jobManager use { jm =>
-        for {
-          (destination, _) <- QDestination()
-          (_, data) <- controlledStream
+      for {
+        (destination, _) <- QDestination()
+        (_, data) <- controlledStream
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator(_ => IO(data)))
-
-          firstStartStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
-          secondStartStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
-        } yield {
-          firstStartStatus must beNormal
-          secondStartStatus must beAbnormal(NonEmptyList.one(ResultPushError.PushAlreadyRunning(TableId, DestinationId)))
+        r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(data))) use { rp =>
+          for {
+            firstStartStatus <- rp.start(DestinationId, full(path, "q"), None)
+            secondStartStatus <- rp.start(DestinationId, full(path, "q2"), None)
+          } yield {
+            firstStartStatus must beRight
+            secondStartStatus must beLeft(NonEmptyList.one(PushAlreadyRunning(DestinationId, path)))
+          }
         }
-      }
+      } yield r
     }
 
-    "allows concurrent push of a table to multiple destinations" >>* {
+    "allows concurrent push to a path in multiple destinations" >>* {
       val path = ResourcePath.root()
-      val testTable = TableRef(TableName("baz"), "query", List())
-      val dest2 = DestinationId + 1
+      val dest2 = new Integer(DestinationId.intValue + 1)
 
-      jobManager use { jm =>
-        for {
-          (destination, _) <- QDestination()
+      for {
+        (destination, _) <- QDestination()
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> destination, dest2 -> destination),
-            jm,
-            mkEvaluator(_ => controlledStream.map(_._2)))
+        eval = constEvaluator(controlledStream.map(_._2))
 
-          firstStartStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
-          secondStartStatus <- push.start(TableId, colX, dest2, path, ResultType.Csv, None)
-        } yield {
-          firstStartStatus must beNormal
-          secondStartStatus must beNormal
+        r <- mkResultPush(Map(DestinationId -> destination, dest2 -> destination), eval) use { rp =>
+          for {
+            firstStartStatus <- rp.start(DestinationId, full(path, "q1"), None)
+            secondStartStatus <- rp.start(dest2, full(path, "q2"), None)
+          } yield {
+            firstStartStatus must beRight
+            secondStartStatus must beRight
+          }
         }
-      }
+      } yield r
     }
 
     "fails with 'destination not found' when destination doesn't exist" >>* {
       val path = ResourcePath.root()
-      val testTable = TableRef(TableName("baz"), "query", List())
 
-      jobManager use { jm =>
-        for {
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-          startStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
-        } yield {
-          startStatus must beAbnormal(NonEmptyList.one(ResultPushError.DestinationNotFound(DestinationId)))
-        }
+      mkResultPush(Map(), emptyEvaluator) use { rp =>
+        rp.start(DestinationId, full(path, "q"), None)
+          .map(_ must beLeft(NonEmptyList.one(DestinationNotFound(DestinationId))))
       }
     }
-
-    "fails with 'table not found' when table doesn't exist" >>* {
-      val path = ResourcePath.root()
-      val testTable = TableRef(TableName("baz"), "query", List())
-
-      jobManager use { jm =>
-        for {
-          (dest, _) <- QDestination()
-          push <- mkResultPush(
-            Map(),
-            Map(DestinationId -> dest),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-          startStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
-        } yield {
-          startStatus must beAbnormal(NonEmptyList.one(ResultPushError.TableNotFound(TableId)))
-        }
-      }
-    }
-
-    "fails when destination doesn't support requested format" >> todo
 
     "fails when selected type isn't found" >>* {
       val path = ResourcePath.root()
-      val testTable = TableRef(TableName("baz"), "query", List())
+      val idx = TypeIndex(-1)
+      val cols = NonEmptyList.one(Column("A", (ColumnType.Boolean, SelectedType(idx, None))))
 
-      jobManager use { jm =>
-        for {
-          (dest, _) <- QDestination()
+      for {
+        (dest, _) <- QDestination()
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> dest),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-
-          idx = TypeIndex(-1)
-          cols = NonEmptyList.one(Column("A", SelectedType(idx, None)))
-
-          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
-        } yield {
-          startStatus must beAbnormal(NonEmptyList.one(ResultPushError.TypeNotFound(DestinationId, "A", idx)))
+        startStatus <- mkResultPush(Map(DestinationId -> dest), emptyEvaluator) use { rp =>
+          rp.start(DestinationId, full(path, "q", cols), None)
         }
+      } yield {
+        startStatus must beLeft(NonEmptyList.one(TypeNotFound(DestinationId, "A", idx)))
       }
     }
 
     "fails when a required type argument is missing" >>* {
       val path = ResourcePath.root()
-      val testTable = TableRef(TableName("baz"), "query", List())
+      val idx = TypeIndex(1)
+      val cols = NonEmptyList.one(Column("A", (ColumnType.String, SelectedType(idx, None))))
 
-      jobManager use { jm =>
-        for {
-          (dest, _) <- QDestination()
+      for {
+        (dest, _) <- QDestination()
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> dest),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-
-          idx = TypeIndex(1)
-          cols = NonEmptyList.one(Column("A", SelectedType(idx, None)))
-
-          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
-        } yield {
-          startStatus must beLike {
-            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
-              DestinationId,
-              "A",
-              "VARCHAR",
-              NonEmptyList(ParamError.ParamMissing("Length", _), Nil)), Nil)) => ok
-          }
+        startStatus <-
+          mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
+            .use(_.start(DestinationId, full(path, "q", cols), None))
+      } yield {
+        startStatus must beLeft.like {
+          case NonEmptyList(ResultPushError.TypeConstructionFailed(
+            DestinationId,
+            "A",
+            "VARCHAR",
+            NonEmptyList(ParamError.ParamMissing("Length", _), Nil)), Nil) => ok
         }
       }
     }
 
     "fails when wrong kind of type argument given" >>* {
       val path = ResourcePath.root()
-      val testTable = TableRef(TableName("baz"), "query", List())
+      val idx = TypeIndex(1)
+      val cols = NonEmptyList.one(Column("A", (ColumnType.String, SelectedType(idx, Some(∃(Actual.boolean(false)))))))
 
-      jobManager use { jm =>
-        for {
-          (dest, _) <- QDestination()
+      for {
+        (dest, _) <- QDestination()
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> dest),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-
-          idx = TypeIndex(1)
-          cols = NonEmptyList.one(Column("A", SelectedType(idx, Some(∃(Actual.boolean(false))))))
-
-          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
-        } yield {
-          startStatus must beLike {
-            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
-              DestinationId,
-              "A",
-              "VARCHAR",
-              NonEmptyList(ParamError.ParamMismatch("Length", _, _), Nil)), Nil)) => ok
-          }
+        startStatus <-
+          mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
+            .use(_.start(DestinationId, full(path, "q", cols), None))
+      } yield {
+        startStatus must beLeft.like {
+          case NonEmptyList(ResultPushError.TypeConstructionFailed(
+            DestinationId,
+            "A",
+            "VARCHAR",
+            NonEmptyList(ParamError.ParamMismatch("Length", _, _), Nil)), Nil) => ok
         }
       }
     }
 
     "fails when integer type argument is out of bounds" >>* {
       val path = ResourcePath.root()
-      val testTable = TableRef(TableName("baz"), "query", List())
+      val idx = TypeIndex(1)
+      val colsLow = NonEmptyList.one(Column("A", (ColumnType.String, SelectedType(idx, Some(∃(Actual.integer(0)))))))
+      val colsHigh = NonEmptyList.one(Column("A", (ColumnType.String, SelectedType(idx, Some(∃(Actual.integer(300)))))))
 
-      jobManager use { jm =>
-        for {
-          (dest, _) <- QDestination()
+      for {
+        (dest, _) <- QDestination()
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> dest),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
+        r <- mkResultPush(Map(DestinationId -> dest), emptyEvaluator) use { rp =>
+          for {
+            startLow <- rp.start(DestinationId, full(path, "l", colsLow), None)
+            startHigh <- rp.start(DestinationId, full(path, "h", colsHigh), None)
+          } yield {
+            startLow must beLeft.like {
+              case NonEmptyList(ResultPushError.TypeConstructionFailed(
+                DestinationId,
+                "A",
+                "VARCHAR",
+                NonEmptyList(ParamError.IntOutOfBounds("Length", 0, Ior.Both(1, 256)), Nil)), Nil) => ok
+            }
 
-          idx = TypeIndex(1)
-
-          colsLow = NonEmptyList.one(Column("A", SelectedType(idx, Some(∃(Actual.integer(0))))))
-          startLow <- push.start(TableId, colsLow, DestinationId, path, ResultType.Csv, None)
-
-          colsHigh = NonEmptyList.one(Column("A", SelectedType(idx, Some(∃(Actual.integer(300))))))
-          startHigh <- push.start(TableId, colsHigh, DestinationId, path, ResultType.Csv, None)
-        } yield {
-          startLow must beLike {
-            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
-              DestinationId,
-              "A",
-              "VARCHAR",
-              NonEmptyList(ParamError.IntOutOfBounds("Length", 0, Ior.Both(1, 256)), Nil)), Nil)) => ok
-          }
-
-          startHigh must beLike {
-            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
-              DestinationId,
-              "A",
-              "VARCHAR",
-              NonEmptyList(ParamError.IntOutOfBounds("Length", 300, Ior.Both(1, 256)), Nil)), Nil)) => ok
+            startHigh must beLeft.like {
+              case NonEmptyList(ResultPushError.TypeConstructionFailed(
+                DestinationId,
+                "A",
+                "VARCHAR",
+                NonEmptyList(ParamError.IntOutOfBounds("Length", 300, Ior.Both(1, 256)), Nil)), Nil) => ok
+            }
           }
         }
-      }
+      } yield r
     }
 
     "fails when enum type argument selection is not found" >>* {
       val path = ResourcePath.root()
-      val testTable = TableRef(TableName("baz"), "query", List())
+      val idx = TypeIndex(2)
+      val cols = NonEmptyList.one(Column("B", (ColumnType.Number, SelectedType(idx, Some(∃(Actual.enumSelect("32-bits")))))))
 
-      jobManager use { jm =>
-        for {
-          (dest, _) <- QDestination()
+      for {
+        (dest, _) <- QDestination()
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> dest),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-
-          idx = TypeIndex(2)
-          cols = NonEmptyList.one(Column("B", SelectedType(idx, Some(∃(Actual.enumSelect("32-bits"))))))
-
-          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
-        } yield {
-          startStatus must beLike {
-            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
-              DestinationId,
-              "B",
-              "NUMBER",
-              NonEmptyList(ParamError.ValueNotInEnum("Width", "32-bits", xs), Nil)), Nil)) =>
-                xs must_=== NonEmptySet.of("4-bits", "8-bits", "16-bits")
-          }
+        startStatus <-
+          mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
+            .use(_.start(DestinationId, full(path, "q", cols), None))
+      } yield {
+        startStatus must beLeft.like {
+          case NonEmptyList(ResultPushError.TypeConstructionFailed(
+            DestinationId,
+            "B",
+            "NUMBER",
+            NonEmptyList(ParamError.ValueNotInEnum("Width", "32-bits", xs), Nil)), Nil) =>
+              xs must_=== NonEmptySet.of("4-bits", "8-bits", "16-bits")
         }
       }
     }
 
-    "fails when column not present in table definition" >> ko
-    "fails unless all table columns are specified" >> ko
-    "fails when column type not a valid coercion of corresponding table column type" >> ko
+    "fails when column type not a valid coercion of corresponding scalar type" >> ko
 
     "start an incremental when previous was full" >> ko
     "start an incremental when previous was incremental" >> ko
     "start a full when prevous was incremental" >> ko
   }
-
-  "start these" >> {
-    val path1 = ResourcePath.root() / ResourceName("foo")
-    val testTable1 = TableRef(TableName("foo"), "queryFoo", List())
-
-    val path2 = ResourcePath.root() / ResourceName("bar")
-    val testTable2 = TableRef(TableName("bar"), "queryBar", List())
-
-    "starts a push for each table to the destination" >>* {
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
-
-          (fooHalted, dataFoo) <- dataStream
-          (barHalted, dataBar) <- dataStream
-
-          push <- mkResultPush(
-            Map(1 -> testTable1, 2 -> testTable2),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator {
-              case "queryFoo" => IO(dataFoo)
-              case "queryBar" => IO(dataBar)
-            })
-
-          errors <- push.startThese(DestinationId, NonEmptyMap.of(
-            1 -> ((colX, path1, ResultType.Csv, None)),
-            2 -> ((colX, path2, ResultType.Csv, None))))
-
-          _ <- await(fooHalted)
-          _ <- await(barHalted)
-
-        } yield {
-          errors.isEmpty must beTrue
-        }
-      }
-    }
-
-    "returns the cause of any pushes that failed to start" >>* {
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
-
-          (barHalted, barData) <- dataStream
-
-          push <- mkResultPush(
-            Map(2 -> testTable2),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator {
-              case "queryBar" => IO(barData)
-            })
-
-          errors <- push.startThese(DestinationId, NonEmptyMap.of(
-            1 -> ((colX, path1, ResultType.Csv, None)),
-            2 -> ((colX, path2, ResultType.Csv, None))))
-
-          _ <- await(barHalted)
-        } yield {
-          errors must_=== Map(1 -> NonEmptyList.one(ResultPushError.TableNotFound(1)))
-        }
-      }
-    }
-  }
-
-  "resume" >> {
+/*
+  "update" >> {
+    "restarts previuos full push using saved query" >> ko
     "resumes previous incremental push from saved offset" >> ko
-    "fails if no incremental state" >> ko
     "fails if already running" >> ko
   }
 
@@ -743,120 +643,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
   }
 
-  "cancel these" >> {
-    "cancels running pushes" >>* {
-      val queryA = "queryA"
-      val queryB = "queryB"
-      val queryC = "queryC"
-
-      val testTableA = TableRef(TableName("A"), queryA, List())
-      val testTableB = TableRef(TableName("B"), queryB, List())
-      val testTableC = TableRef(TableName("C"), queryC, List())
-
-      val pushPathA = ResourcePath.root() / ResourceName("foo") / ResourceName("A")
-      val pushPathB = ResourcePath.root() / ResourceName("foo") / ResourceName("B")
-
-      val idA = TableId
-      val idB = idA + 1
-      val idC = idB + 1
-
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
-
-          (ctlA, dataA) <- controlledStream
-          (ctlB, dataB) <- controlledStream
-
-          push <- mkResultPush(
-            Map(
-              idA -> testTableA,
-              idB -> testTableB,
-              idC -> testTableC),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator {
-              case `queryA` => IO(dataA)
-              case `queryB` => IO(dataB)
-            })
-
-          startRes <- push.startThese(
-            DestinationId,
-            NonEmptyMap.of(
-              idA -> ((colX, pushPathA, ResultType.Csv, None)),
-              idB -> ((colX, pushPathB, ResultType.Csv, None))))
-
-          _ <- ctlA.emit(W1)
-          _ <- ctlB.emit(W2)
-
-          filesystemAfterPush <- awaitFs(filesystem, 2)
-
-          cancelRes <- push.cancelThese(
-            DestinationId,
-            NonEmptySet.of(idA, idB, idC))
-
-          // fail the test if push evaluation was not cancelled
-          _ <- await(ctlA.halted)
-          _ <- await(ctlB.halted)
-        } yield {
-          filesystemAfterPush.keySet must equal(Set(pushPathA, pushPathB))
-          // check if a *partial* result was pushed
-          filesystemAfterPush(pushPathA) must equal(W1)
-          filesystemAfterPush(pushPathB) must equal(W2)
-          startRes.isEmpty must beTrue
-          cancelRes.isEmpty must beTrue
-        }
-      }
-    }
-
-    "returns the cause of any push that failed to cancel" >>* {
-      val queryA = "queryA"
-      val testTableA = TableRef(TableName("A"), queryA, List())
-      val pushPathA = ResourcePath.root() / ResourceName("foo") / ResourceName("A")
-
-      val idA = TableId
-      val idB = idA + 1
-
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
-
-          (ctlA, dataA) <- controlledStream
-
-          push <- mkResultPush(
-            Map(idA -> testTableA),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator {
-              case `queryA` => IO(dataA)
-            })
-
-          startRes <- push.start(
-            idA,
-            colX,
-            DestinationId,
-            pushPathA,
-            ResultType.Csv,
-            None)
-
-          _ <- ctlA.emit(W1)
-
-          filesystemAfterPush <- awaitFs(filesystem, 1)
-
-          cancelRes <- push.cancelThese(DestinationId, NonEmptySet.of(idA, idB))
-
-          _ <- await(ctlA.halted)
-        } yield {
-          filesystemAfterPush.keySet must equal(Set(pushPathA))
-          // check if a *partial* result was pushed
-          filesystemAfterPush(pushPathA) must equal(W1)
-          startRes must beNormal
-          cancelRes must_=== Map(idB -> ResultPushError.TableNotFound(idB))
-        }
-      }
-    }
-  }
-
-  "destination status" >> {
+  "pushesTo" >> {
     "empty when nothing has been pushed" >>* {
       val testTable = TableRef(TableName("baz"), "query", List())
 
@@ -1091,4 +878,5 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
   }
+*/
 }
