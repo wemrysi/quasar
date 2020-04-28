@@ -19,7 +19,7 @@ package quasar.impl.push
 import slamdata.Predef._
 
 import cats._
-import cats.data.{Ior, NonEmptyList, NonEmptyMap, NonEmptySet}
+import cats.data.{Ior, NonEmptyList, NonEmptySet}
 import cats.derived.auto.order._
 import cats.effect.{Blocker, IO, Resource}
 import cats.effect.concurrent.{Deferred, Ref}
@@ -31,14 +31,13 @@ import fs2.{Stream, text}
 import fs2.concurrent.{Enqueue, Queue}
 
 import java.lang.Integer
-import java.time.Instant
 
 import monocle.Prism
 
 import org.mapdb.{DBMaker, Serializer}
 import org.mapdb.serializer.GroupSerializer
 
-import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
+import quasar.{ConditionMatchers, EffectfulQSpec}
 import quasar.api.{Column, ColumnType, Label, Labeled, QueryEvaluator}
 import quasar.api.destination._
 import quasar.api.push._
@@ -195,13 +194,13 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       ???
   }
 
-  def mkEvaluator(fn: (String, Option[Offset]) => IO[Stream[IO, String]])
+  def mkEvaluator(f: PartialFunction[(String, Option[Offset]), IO[Stream[IO, String]]])
       : QueryEvaluator[Resource[IO, ?], (String, Option[Offset]), Stream[IO, String]] =
-    QueryEvaluator(fn.tupled).mapF(Resource.liftF(_))
+    QueryEvaluator(f).mapF(Resource.liftF(_))
 
   def constEvaluator(s: IO[Stream[IO, String]])
       : QueryEvaluator[Resource[IO, ?], (String, Option[Offset]), Stream[IO, String]] =
-    mkEvaluator((_, _) => s)
+    QueryEvaluator(_ => Resource.liftF(s))
 
   val emptyEvaluator: QueryEvaluator[Resource[IO, ?], (String, Option[Offset]), Stream[IO, String]] =
     constEvaluator(IO(Stream()))
@@ -505,378 +504,301 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
-    "fails when column type not a valid coercion of corresponding scalar type" >> ko
+    "fails when column type not a valid coercion of corresponding scalar type" >> todo
 
-    "start an incremental when previous was full" >> ko
-    "start an incremental when previous was incremental" >> ko
-    "start a full when prevous was incremental" >> ko
+    "start an incremental when previous was full" >> todo
+    "start an incremental when previous was incremental" >> todo
+    "start a full when prevous was incremental" >> todo
   }
-/*
+
   "update" >> {
-    "restarts previuos full push using saved query" >> ko
-    "resumes previous incremental push from saved offset" >> ko
-    "fails if already running" >> ko
+    "restarts previuos full push using saved query" >> todo
+    "resumes previous incremental push from saved offset" >> todo
+    "fails if already running" >> todo
   }
 
   "cancel" >> {
-    "aborts a running full push" >>* {
+    "halts a running full start" >>* {
       val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
       val query = "query"
-      val testTable = TableRef(TableName("foo"), query, List())
+      val fullCfg = full(pushPath, query)
 
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
+      for {
+        (destination, filesystem) <- QDestination()
 
-          (ctl, data) <- controlledStream
+        (ctl, data) <- controlledStream
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator(_ => IO(data)))
+        r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(data))) use { rp =>
+          for {
+            startRes <- rp.start(DestinationId, fullCfg, None)
 
-          startRes <- push.start(TableId, colX, DestinationId, pushPath, ResultType.Csv, None)
+            _ <- ctl.emit(W1)
 
-          _ <- ctl.emit(W1)
+            filesystemAfterPush <- awaitFs(filesystem, 1)
 
-          filesystemAfterPush <- awaitFs(filesystem, 1)
+            cancelRes <- rp.cancel(DestinationId, pushPath)
 
-          cancelRes <- push.cancel(TableId, DestinationId)
-
-          _ <- await(ctl.halted)
-        } yield {
-          filesystemAfterPush.keySet must equal(Set(pushPath))
-          // check if a *partial* result was pushed
-          filesystemAfterPush(pushPath) must equal(W1)
-          startRes must beNormal
-          cancelRes must beNormal
+            terminal <- await(startRes.sequence)
+          } yield {
+            filesystemAfterPush.keySet must equal(Set(pushPath))
+            // check if a *partial* result was pushed
+            filesystemAfterPush(pushPath) must equal(W1)
+            cancelRes must beNormal
+            terminal must beRight.like {
+              case Status.Canceled(_, _, _) => ok
+            }
+          }
         }
-      }
+      } yield r
     }
 
     // check that state is preserved
-    "aborts a running incremental push" >> ko
+    "halts a running incremental start" >> todo
+
+    "halts a running full update" >> todo
+
+    "halts a running incremental update" >> todo
 
     "no-op when push already completed" >>* {
-      val testTable = TableRef(TableName("foo"), "query", List())
+      for {
+        (destination, filesystem) <- QDestination()
 
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
+        r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
+          for {
+            startRes <- rp.start(DestinationId, full(ResourcePath.root(), "q"), None)
 
-          (halted, data) <- dataStream
+            _ <- awaitFs(filesystem)
+            _ <- await(startRes.sequence)
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator(_ => IO(data)))
-
-          startRes <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
-
-          _ <- awaitFs(filesystem)
-          _ <- await(halted)
-
-          cancelRes <- push.cancel(TableId, DestinationId)
-        } yield {
-          startRes must beNormal
-          cancelRes must beNormal
+            cancelRes <- rp.cancel(DestinationId, ResourcePath.root())
+          } yield cancelRes must beNormal
         }
-      }
+      } yield r
     }
 
-    "no-op when no push for extant table" >>* {
-      val testTable = TableRef(TableName("foo"), "query", List())
+    "no-op when no push to path" >>* {
+      for {
+        (destination, _) <- QDestination()
 
-      jobManager use { jm =>
-        for {
-          (destination, _) <- QDestination()
-
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-
-          cancelRes <- push.cancel(TableId, DestinationId)
-        } yield {
-          cancelRes must beNormal
-        }
+        cancelRes <-
+          mkResultPush(Map(DestinationId -> destination), emptyEvaluator)
+            .use(_.cancel(DestinationId, ResourcePath.root() / ResourceName("out")))
+      } yield {
+        cancelRes must beNormal
       }
     }
 
     "returns 'destination not found' when destination doesn't exist" >>* {
-      val testTable = TableRef(TableName("foo"), "query", List())
-
-      jobManager use { jm =>
-        for {
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-
-          cancelRes <- push.cancel(TableId, DestinationId)
-        } yield {
-          cancelRes must beAbnormal(ResultPushError.DestinationNotFound(DestinationId))
-        }
-      }
-    }
-
-    "returns 'table not found' when table doesn't exist" >>* {
-      jobManager use { jm =>
-        for {
-          (dest, _) <- QDestination()
-
-          push <- mkResultPush(
-            Map(),
-            Map(DestinationId -> dest),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-
-          cancelRes <- push.cancel(TableId, DestinationId)
-        } yield {
-          cancelRes must beAbnormal(ResultPushError.TableNotFound(TableId))
-        }
-      }
+      mkResultPush(Map(), emptyEvaluator)
+        .use(_.cancel(DestinationId, ResourcePath.root()))
+        .map(_ must beAbnormal(DestinationNotFound(DestinationId)))
     }
   }
 
-  "pushesTo" >> {
+  "pushedTo" >> {
+    def lookupPushed(
+        r: Either[DestinationNotFound[Integer], Map[ResourcePath, ∃[Push[?, String]]]],
+        p: ResourcePath)
+        : Option[Push[_, String]] =
+      r.toOption.flatMap(_.get(p)).map(_.value)
+
     "empty when nothing has been pushed" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
+      for {
+        (destination, _) <- QDestination()
 
-      jobManager use { jm =>
-        for {
-          (destination, _) <- QDestination()
-
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-
-          pushStatus <- push.destinationStatus(DestinationId)
-        } yield {
-          pushStatus must beLike {
-            case Right(m) => m.isEmpty must beTrue
-          }
+        pushes <-
+          mkResultPush(Map(DestinationId -> destination), emptyEvaluator)
+            .use(_.pushedTo(DestinationId))
+      } yield {
+        pushes must beLike {
+          case Right(m) => m.isEmpty must beTrue
         }
       }
     }
 
-    "includes running push" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
+    "includes running full push" >>* {
+      val fullCfg = full(ResourcePath.root(), "runq")
 
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
+      for {
+        (destination, filesystem) <- QDestination()
 
-          (ctl, data) <- controlledStream
+        (ctl, data) <- controlledStream
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator(_ => IO(data)))
+        pushed <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(data))) use { rp =>
+          for {
+            _ <- rp.start(DestinationId, fullCfg, None)
 
-          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+            _ <- ctl.emit(W1)
+            _ <- awaitFs(filesystem, 1)
 
-          _ <- ctl.emit(W1)
-          _ <- awaitFs(filesystem, 1)
-
-          _ <- awaitStatusLike(push, TableId, DestinationId) {
-            case PushMeta(_, ResultType.Csv, None, Status.Running(_)) => true
-          }
-        } yield ok
+            ps <- rp.pushedTo(DestinationId)
+          } yield ps
+        }
+      } yield {
+        lookupPushed(pushed, fullCfg.value.path) must beSome.like {
+          case Push(PushConfig.Full(_, "runq", _), _, Status.Running(_, _)) => ok
+        }
       }
     }
 
+    "includes running full push when previous status exists" >> todo
+
     "includes canceled push" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
+      val fullCfg = full(ResourcePath.root(), "cancelq")
 
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
+      for {
+        (destination, filesystem) <- QDestination()
 
-          (ctl, data) <- controlledStream
+        (ctl, data) <- controlledStream
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator(_ => IO(data)))
+        pushed <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(data))) use { rp =>
+          for {
+            startRes <- rp.start(DestinationId, fullCfg, None)
 
-          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+            _ <- ctl.emit(W1)
+            _ <- awaitFs(filesystem, 1)
 
-          _ <- ctl.emit(W1)
-          _ <- awaitFs(filesystem, 1)
+            _ <- rp.cancel(DestinationId, fullCfg.value.path)
 
-          _ <- push.cancel(TableId, DestinationId)
+            _ <- await(startRes.sequence)
 
-          _ <- await(ctl.halted)
-
-          _ <- awaitStatusLike(push, TableId, DestinationId) {
-            case PushMeta(_, ResultType.Csv, None, Status.Canceled(_, _)) => true
-          }
-        } yield ok
+            ps <- rp.pushedTo(DestinationId)
+          } yield ps
+        }
+      } yield {
+        lookupPushed(pushed, fullCfg.value.path) must beSome.like {
+          case Push(PushConfig.Full(_, "cancelq", _), _, Status.Canceled(_, _, _)) => ok
+        }
       }
     }
 
     "includes completed push" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
+      val fullCfg = full(ResourcePath.root(), "finishq")
 
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
+      for {
+        (destination, filesystem) <- QDestination()
 
-          (halted, data) <- dataStream
+        pushed <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
+          for {
+            startRes <- rp.start(DestinationId, fullCfg, None)
+            _ <- await(startRes.sequence)
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator(_ => IO(data)))
-
-          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
-          _ <- await(halted)
-
-          _ <- awaitStatusLike(push, TableId, DestinationId) {
-            case PushMeta(_, ResultType.Csv, None, Status.Finished(_, _)) => true
-          }
-        } yield ok
+            ps <- rp.pushedTo(DestinationId)
+          } yield ps
+        }
+      } yield {
+        lookupPushed(pushed, fullCfg.value.path) must beSome.like {
+          case Push(PushConfig.Full(_, "finishq", _), _, Status.Finished(_, _, _)) => ok
+        }
       }
     }
 
     "includes pushes that failed to initialize along with error that led to failure" >>* {
-      val testTable = TableRef(TableName("foo"), "query", List())
+      val fullCfg = full(ResourcePath.root(), "failq")
 
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
+      for {
+        (destination, filesystem) <- QDestination()
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator(_ => IO.raiseError[Stream[IO, String]](new Exception("boom"))))
+        eval = constEvaluator(IO.raiseError[Stream[IO, String]](new Exception("boom")))
 
-          pushStatus <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
-
-          status <- awaitStatusLike(push, TableId, DestinationId) {
-            case PushMeta(_, _, _, Status.Failed(_, _, _)) => true
-          }
-        } yield {
-          status must beLike {
-            case PushMeta(_, ResultType.Csv, None, Status.Failed(ex, _, _)) =>
-              ex.getMessage must equal("boom")
-          }
+        pushed <- mkResultPush(Map(DestinationId -> destination), eval) use { rp =>
+          for {
+            startRes <- rp.start(DestinationId, fullCfg, None)
+            _ <- await(startRes.sequence)
+            ps <- rp.pushedTo(DestinationId)
+          } yield ps
+        }
+      } yield {
+        lookupPushed(pushed, fullCfg.value.path) must beSome.like {
+          case Push(PushConfig.Full(_, "failq", _), _, Status.Failed(_, _, _, msg)) =>
+            msg must contain("boom")
         }
       }
     }
 
     "includes pushes that failed during streaming along with the error that led to falure" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
-      val ex = new Exception("boom")
+      val fullCfg = full(ResourcePath.root(), "errorq")
+      val ex = new Exception("errored!")
 
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
+      for {
+        (destination, filesystem) <- QDestination()
 
-          (halted, data) <- dataStream
+        eval = constEvaluator(IO(dataStream ++ Stream.raiseError[IO](ex)))
 
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator(_ => IO(data ++ Stream.raiseError[IO](ex))))
-
-          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
-          _ <- await(halted)
-
-          status <- awaitStatusLike(push, TableId, DestinationId) {
-            case PushMeta(_, _, _, Status.Failed(_, _, _)) => true
-          }
-        } yield {
-          status must beLike {
-            case PushMeta(_, ResultType.Csv, None, Status.Failed(ex, _, _)) =>
-              ex.getMessage must equal("boom")
-          }
+        pushed <- mkResultPush(Map(DestinationId -> destination), eval) use { rp =>
+          for {
+            startRes <- rp.start(DestinationId, fullCfg, None)
+            _ <- await(startRes.sequence)
+            ps <- rp.pushedTo(DestinationId)
+          } yield ps
+        }
+      } yield {
+        lookupPushed(pushed, fullCfg.value.path) must beSome.like {
+          case Push(PushConfig.Full(_, "errorq", _), _, Status.Failed(_, _, _, msg)) =>
+            msg must contain("errored!")
         }
       }
     }
 
-    "returns 'destination not found' when destination doesn't exist" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
+    "results in previous terminal status if canceled before started" >> todo
 
-      jobManager use { jm =>
-        for {
-          push <- mkResultPush(
-            Map(TableId -> testTable),
-            Map(),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-          pushStatus <- push.destinationStatus(DestinationId)
-        } yield {
-          pushStatus must beLeft(ResultPushError.DestinationNotFound(DestinationId))
-        }
-      }
+    "results in unknown status if interrupted/crash while running" >> todo
+
+    "returns 'destination not found' when destination doesn't exist" >>* {
+      mkResultPush(Map(), emptyEvaluator)
+        .use(_.pushedTo(DestinationId))
+        .map(_ must beLeft(DestinationNotFound(DestinationId)))
     }
   }
 
   "cancel all" >> {
     "aborts all running pushes" >>* {
       val path1 = ResourcePath.root() / ResourceName("foo")
-      val testTable1 = TableRef(TableName("foo"), "queryFoo", List())
+      val full1 = full(path1, "queryFoo")
 
       val path2 = ResourcePath.root() / ResourceName("bar")
-      val testTable2 = TableRef(TableName("bar"), "queryBar", List())
+      val full2 = full(path2, "queryBar")
 
-      jobManager use { jm =>
-        for {
-          (destination, filesystem) <- QDestination()
+      for {
+        (destination, filesystem) <- QDestination()
 
-          (ctlA, dataA) <- controlledStream
-          (ctlB, dataB) <- controlledStream
+        (ctlA, dataA) <- controlledStream
+        (ctlB, dataB) <- controlledStream
 
-          push <- mkResultPush(
-            Map(1 -> testTable1, 2 -> testTable2),
-            Map(DestinationId -> destination),
-            jm,
-            mkEvaluator {
-              case "queryFoo" => IO(dataA)
-              case "queryBar" => IO(dataB)
-            })
+        eval = mkEvaluator {
+          case ("queryFoo", _) => IO(dataA)
+          case ("queryBar", _) => IO(dataB)
+        }
 
-          _ <- push.start(1, colX, DestinationId, path1, ResultType.Csv, None)
-          _ <- push.start(2, colX, DestinationId, path2, ResultType.Csv, None)
+        r <- mkResultPush(Map(DestinationId -> destination), eval) use { rp =>
+          for {
+            s1 <- rp.start(DestinationId, full1, None)
+            s2 <- rp.start(DestinationId, full2, None)
 
-          _ <- ctlA.emit(W1)
-          _ <- ctlB.emit(W2)
+            _ <- ctlA.emit(W1)
+            _ <- ctlB.emit(W2)
 
-          _ <- awaitFs(filesystem, 2)
+            _ <- awaitFs(filesystem, 2)
 
-          _ <- push.cancelAll
+            _ <- rp.cancelAll
 
-          _ <- await(ctlA.halted)
-          _ <- await(ctlB.halted)
-        } yield ok
-      }
+            r1 <- await(s1.sequence)
+            r2 <- await(s2.sequence)
+          } yield {
+            r1 must beRight.like {
+              case Status.Canceled(_, _, _) => ok
+            }
+
+            r2 must beRight.like {
+              case Status.Canceled(_, _, _) => ok
+            }
+          }
+        }
+      } yield r
     }
 
     "no-op when no running pushes" >>* {
-      jobManager use { jm =>
-        for {
-          push <- mkResultPush(
-            Map(),
-            Map(),
-            jm,
-            mkEvaluator(_ => IO(Stream())))
-          _ <- push.cancelAll
-        } yield ok
-      }
+      mkResultPush(Map(), emptyEvaluator).use(_.cancelAll).as(ok)
     }
   }
-*/
 }
