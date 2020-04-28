@@ -16,7 +16,7 @@
 
 package quasar.impl.datasources
 
-import quasar.impl.storage.MapDbPrefixStore
+import quasar.impl.storage.mapdb.MapDbPrefixStore
 
 import scala.Predef.classOf
 

@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.impl.storage
+package quasar.impl.storage.mapdb
 
 import slamdata.Predef._
+
+import quasar.impl.storage.{IsPrefix, PrefixStore}
 
 import scala.collection.JavaConverters._
 import java.util.{Map => JMap}

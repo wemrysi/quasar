@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.impl.storage
+package quasar.impl.storage.mapdb
 
 import slamdata.Predef.{Eq => _, _}
+
+import quasar.impl.storage._
 
 import java.util.UUID
 import java.{lang => jl}
