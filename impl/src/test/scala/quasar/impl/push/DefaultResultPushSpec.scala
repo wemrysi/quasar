@@ -22,7 +22,7 @@ import cats._
 import cats.data.{Ior, NonEmptyList, NonEmptySet}
 import cats.derived.auto.order._
 import cats.effect.{Blocker, IO, Resource}
-import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.concurrent.Ref
 import cats.implicits._
 
 import eu.timepit.refined.auto._
@@ -213,22 +213,22 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     object All extends Support
 
     def apply(supports: Support = All): IO[(QDestination, Stream[IO, Filesystem])] =
-      Queue.noneTerminated[IO, Filesystem] map { q =>
-        (new QDestination(q, supports), q.dequeue.scanMonoid)
+      Queue.unbounded[IO, Option[Filesystem]] map { q =>
+        (new QDestination(q, supports), q.dequeue.unNoneTerminate.scanMonoid)
       }
   }
 
-  final class MockResultRender extends ResultRender[IO, String] {
+  final class MockResultRender extends ResultRender[IO, Stream[IO, String]] {
     def render(
-        input: String,
+        input: Stream[IO, String],
         columns: NonEmptyList[Column[ColumnType.Scalar]],
         config: RenderConfig,
         rowLimit: Option[Long])
         : Stream[IO, Byte] =
-      Stream(input).through(text.utf8Encode)
+      rowLimit.fold(input)(input.take(_)).through(text.utf8Encode)
 
     def renderUpserts[A](
-        input: RenderInput[String],
+        input: RenderInput[Stream[IO, String]],
         idColumn: Column[IdType],
         offsetColumn: Column[OffsetKey.Formal[Unit, A]],
         renderedColumns: NonEmptyList[Column[ColumnType.Scalar]],
@@ -236,14 +236,22 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         limit: Option[Long])
         : Stream[IO, DataEvent[Any, OffsetKey.Actual[A]]] = {
       val creates =
-        Stream(input.value)
+        limit.fold(input.value)(input.value.take(_))
           .through(text.utf8Encode)
           .chunks
           .map(DataEvent.Create(_))
 
       offsetColumn.tpe match {
         case OffsetKey.RealKey(_) =>
-          creates ++ Stream.emit(DataEvent.Commit(OffsetKey.Actual.real(100)))
+          // emits offsets equal to the number of bytes emitted
+          creates
+            .scan((0, Stream.empty: Stream[IO, DataEvent[Any, OffsetKey.Actual[A]]])) {
+              case ((acc, _), c) =>
+                val total = acc + c.records.size
+                val out = Stream(c, DataEvent.Commit(OffsetKey.Actual.real(total)))
+                (total, out)
+            }
+            .flatMap(_._2)
 
         case OffsetKey.StringKey(_) =>
           creates ++ Stream.emit(DataEvent.Commit(OffsetKey.Actual.string("id-100")))
@@ -272,26 +280,18 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     // Forcibly halts the stream
     def halt: F[Unit]
-
-    // Completes when the stream has halted for any reason
-    def halted: F[Unit]
   }
 
   val controlledStream: IO[(StreamControl[IO], Stream[IO, String])] =
-    Queue.noneTerminated[IO, String] flatMap { q =>
-      Deferred[IO, Unit] map { d =>
-        val toutErr = new RuntimeException(s"Expected data stream to terminate within ${Timeout} millis.")
+    Queue.unbounded[IO, Option[String]] map { q =>
+      val s = q.dequeue.unNoneTerminate
 
-        val s = q.dequeue.onFinalize(d.complete(()))
-
-        val ctl = new StreamControl[IO] {
-          def emit(v: String) = q.enqueue1(Some(v))
-          val halt = q.enqueue1(None)
-          val halted = d.get.timeoutTo(Timeout, IO.raiseError(toutErr))
-        }
-
-        (ctl, s)
+      val ctl = new StreamControl[IO] {
+        def emit(v: String) = q.enqueue1(Some(v))
+        val halt = q.enqueue1(None)
       }
+
+      (ctl, s)
     }
 
   val dataStream: Stream[IO, String] =
@@ -299,7 +299,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
   def mkResultPush(
       destinations: Map[Integer, Destination[IO]],
-      evaluator: QueryEvaluator[Resource[IO, ?], (String, Option[Offset]), Stream[IO, String]])
+      evaluator: QueryEvaluator[Resource[IO, ?], (String, Option[Offset]), Stream[IO, String]],
+      maxConcurrentPushes: Int = 10)
       : Resource[IO, ResultPush[IO, Integer, String]] = {
 
     val lookupDestination: Integer => IO[Option[Destination[IO]]] =
@@ -315,7 +316,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           "default-result-push-spec",
           db,
           Serializer.INTEGER :: (ResourcePathSerializer: GroupSerializer[ResourcePath]) :: HNil,
-          Serializer.ELSA.asInstanceOf[GroupSerializer[∃[Push[?, String]]]],
+          Serializer.JAVA.asInstanceOf[GroupSerializer[∃[Push[?, String]]]],
           Blocker.liftExecutionContext(global))
       }
 
@@ -324,8 +325,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       offsets = RefIndexedStore(ref)
 
       resultPush <-
-        DefaultResultPush[IO, Integer, String, String](
-          10,
+        DefaultResultPush[IO, Integer, String, Stream[IO, String]](
+          maxConcurrentPushes,
           lookupDestination,
           evaluator,
           render,
@@ -512,7 +513,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             .use(_.start(DestinationId, cfg, None))
       } yield {
         startStatus must beLeft.like {
-          case NonEmptyList(ResultPushError.TypeConstructionFailed(
+          case NonEmptyList(TypeConstructionFailed(
             DestinationId,
             "A",
             "VARCHAR",
@@ -534,7 +535,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             .use(_.start(DestinationId, cfg, None))
       } yield {
         startStatus must beLeft.like {
-          case NonEmptyList(ResultPushError.TypeConstructionFailed(
+          case NonEmptyList(TypeConstructionFailed(
             DestinationId,
             "A",
             "VARCHAR",
@@ -560,7 +561,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             startHigh <- rp.start(DestinationId, cfgH, None)
           } yield {
             startLow must beLeft.like {
-              case NonEmptyList(ResultPushError.TypeConstructionFailed(
+              case NonEmptyList(TypeConstructionFailed(
                 DestinationId,
                 "A",
                 "VARCHAR",
@@ -568,7 +569,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             }
 
             startHigh must beLeft.like {
-              case NonEmptyList(ResultPushError.TypeConstructionFailed(
+              case NonEmptyList(TypeConstructionFailed(
                 DestinationId,
                 "A",
                 "VARCHAR",
@@ -592,7 +593,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             .use(_.start(DestinationId, cfg, None))
       } yield {
         startStatus must beLeft.like {
-          case NonEmptyList(ResultPushError.TypeConstructionFailed(
+          case NonEmptyList(TypeConstructionFailed(
             DestinationId,
             "B",
             "NUMBER",
@@ -602,22 +603,523 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
-    "fails when column type not a valid coercion of corresponding scalar type" >> todo
+    "fails when column type not a valid coercion of corresponding scalar type" >> forallConfigs { config =>
+      val idx = TypeIndex(0) // Boolean
+      val bad = Column("B", (ColumnType.Number, SelectedType(idx, None)))
+      val cfg = outputColumns.set(bad)(config)
 
-    "fails when destination doesn't support full push" >> todo
+      for {
+        (dest, _) <- QDestination()
 
-    "fails when destination doesn't support incremental push" >> todo
+        startStatus <-
+          mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
+            .use(_.start(DestinationId, cfg, None))
+      } yield {
+        startStatus must beLeft.like {
+          case NonEmptyList(InvalidCoercion(
+            DestinationId,
+            "B",
+            ColumnType.Number,
+            idx), Nil) => ok
+        }
+      }
+    }
 
-    "replaces a previous full push to path" >> todo
+    "replaces a previous full push to path" >> forallConfigs { config =>
+      for {
+        (dest, filesystem) <- QDestination()
 
-    "replaces a previous incremental push to path" >> todo
+        prev = full(config.value.path, "prevQ")
+
+        eval = mkEvaluator {
+          case ("prevQ", _) => IO(dataStream.take(1))
+          case _ => IO(dataStream)
+        }
+
+        r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>
+          for {
+            prv <- rp.start(DestinationId, prev, None)
+            _ <- await(prv.sequence)
+            fs0 <- awaitFs(filesystem)
+
+            res <- rp.start(DestinationId, config, None)
+            terminal <- await(res.sequence)
+
+            fs1 <- awaitFs(filesystem)
+          } yield {
+            terminal must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs0.get(config.value.path) must beSome(W1)
+            fs1.get(config.value.path) must beSome(dataString)
+          }
+        }
+      } yield r
+    }
+
+    "replaces a previous incremental push to path" >> forallConfigs { config =>
+      for {
+        (dest, filesystem) <- QDestination()
+
+        prev = incremental(config.value.path, "prevQ")
+
+        eval = mkEvaluator {
+          case ("prevQ", _) => IO(dataStream.take(1))
+          case _ => IO(dataStream)
+        }
+
+        r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>
+          for {
+            prv <- rp.start(DestinationId, prev, None)
+            _ <- await(prv.sequence)
+            fs0 <- awaitFs(filesystem)
+
+            res <- rp.start(DestinationId, config, None)
+            terminal <- await(res.sequence)
+
+            fs1 <- awaitFs(filesystem)
+          } yield {
+            terminal must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs0.get(config.value.path) must beSome(W1)
+            fs1.get(config.value.path) must beSome(dataString)
+          }
+        }
+      } yield r
+    }
+
+    "limit restricts the number of rows pushed" >> forallConfigs { config =>
+      for {
+        (destination, filesystem) <- QDestination()
+
+        r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
+          for {
+            started <- rp.start(DestinationId, config, Some(2L))
+
+            result <- await(started.sequence)
+
+            filesystemAfterPush <- awaitFs(filesystem)
+          } yield {
+            filesystemAfterPush.keySet must equal(Set(config.value.path))
+            filesystemAfterPush(config.value.path) must equal(W1+W2)
+            result must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+          }
+        }
+      } yield r
+    }
+
+    "full fails when destination doesn't support full push" >>* {
+      for {
+        (dest, _) <- QDestination(supports = QDestination.Upsert)
+
+        startStatus <-
+          mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
+            .use(_.start(DestinationId, full(ResourcePath.root(), "nope"), None))
+      } yield {
+        startStatus must beLeft.like {
+          case NonEmptyList(FullNotSupported(DestinationId), Nil) => ok
+        }
+      }
+    }
+
+    "incremental fails when destination doesn't support incremental push" >>* {
+      for {
+        (dest, _) <- QDestination(supports = QDestination.Create)
+
+        startStatus <-
+          mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
+            .use(_.start(DestinationId, incremental(ResourcePath.root(), "nope"), None))
+      } yield {
+        startStatus must beLeft.like {
+          case NonEmptyList(IncrementalNotSupported(DestinationId), Nil) => ok
+        }
+      }
+    }
+
+    "starts incremental push from initial offset" >>* {
+      for {
+        (destination, filesystem) <- QDestination()
+
+        incCfg = incremental(
+          path = ResourcePath.root() / ResourceName("initial"),
+          q = "initial-offset",
+          initial = Some(OffsetKey.Actual.real(99)))
+
+        eval = mkEvaluator {
+          case ("initial-offset", Some(Offset(NonEmptyList(Left("pos"), Nil), ∃(k)))) =>
+            val key: OffsetKey.Actual[_] = k
+
+            key match {
+              case OffsetKey.RealKey(r) if r.toInt == 99 => IO(dataStream)
+              case _ => IO.never
+            }
+        }
+
+        r <- mkResultPush(Map(DestinationId -> destination), eval) use { rp =>
+          for {
+            started <- rp.start(DestinationId, incCfg, None)
+
+            result <- await(started.sequence)
+
+            filesystemAfterPush <- awaitFs(filesystem)
+          } yield {
+            filesystemAfterPush.keySet must equal(Set(incCfg.value.path))
+            filesystemAfterPush(incCfg.value.path) must equal(dataString)
+            result must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+          }
+        }
+      } yield r
+    }
   }
 
   "update" >> {
-    "restarts previous full push using saved query" >> todo
-    "resumes previous incremental push from saved offset" >> todo
-    "resumes previous incremental push from beginning when no offset" >> todo
-    "fails if already running" >> todo
+    "restarts previous full push using saved query" >>* {
+      for {
+        (dest, filesystem) <- QDestination()
+
+        (ctl, data) <- controlledStream
+
+        path = ResourcePath.root() / ResourceName("updatefull")
+        config = full(path, "updatefull")
+
+        eval = mkEvaluator {
+          case ("updatefull", None) => IO(data)
+        }
+
+        r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>
+          for {
+            started <- rp.start(DestinationId, config, None)
+
+            _ <- ctl.emit(W1)
+            _ <- ctl.emit(W2)
+            _ <- ctl.halt
+
+            startRes <- await(started.sequence)
+            fs1 <- awaitFs(filesystem)
+
+            updated <- rp.update(DestinationId, config.value.path)
+
+            _ <- ctl.emit(W1)
+            _ <- ctl.emit(W2)
+            _ <- ctl.emit(W2)
+            _ <- ctl.emit(W3)
+            _ <- ctl.halt
+
+            updateRes <- await(updated.sequence)
+            fs2 <- awaitFs(filesystem)
+          } yield {
+            startRes must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs1.get(path) must beSome(W1+W2)
+
+            updateRes must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs2.get(path) must beSome(W1+W2+W2+W3)
+          }
+        }
+      } yield r
+    }
+
+    "resumes previous incremental push from saved offset" >>* {
+      for {
+        (dest, filesystem) <- QDestination()
+
+        path = ResourcePath.root() / ResourceName("resume")
+        config = incremental(path, "resume")
+
+        eval = mkEvaluator {
+          case ("resume", None) =>
+            IO(Stream(W1, W1, W1).covary[IO])
+
+          case ("resume", Some(Offset(_, ∃(k)))) =>
+            (k: OffsetKey.Actual[_]) match {
+              case OffsetKey.RealKey(r) if r.toInt == 15 =>
+                IO(Stream(W2, W2, W2).covary[IO])
+              case _ => IO.never
+            }
+        }
+
+        r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>
+          for {
+            started <- rp.start(DestinationId, config, None)
+
+            // offset = 15 since 3 emits
+            startRes <- await(started.sequence)
+            fs1 <- awaitFs(filesystem)
+
+            // resume from offset = 15
+            updated <- rp.update(DestinationId, config.value.path)
+
+            updateRes <- await(updated.sequence)
+            fs2 <- awaitFs(filesystem)
+          } yield {
+            startRes must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs1.get(path) must beSome(W1+W1+W1)
+
+            updateRes must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs2.get(path) must beSome(W2+W2+W2)
+          }
+        }
+      } yield r
+    }
+
+    "resumes previous incremental push from beginning when no offset" >>* {
+      for {
+        (dest, filesystem) <- QDestination()
+
+        (ctl, data) <- controlledStream
+
+        failOn1 = data flatMap {
+          case W1 => Stream.raiseError[IO](new RuntimeException("W1!"))
+          case s => Stream.emit(s)
+        }
+
+        path = ResourcePath.root() / ResourceName("qrs")
+        config = incremental(path, "qrs")
+
+        eval = mkEvaluator {
+          case ("qrs", None) => IO(failOn1)
+          case ("qrs", Some(_)) => IO(dataStream)
+        }
+
+        r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>
+          for {
+            started <- rp.start(DestinationId, config, None)
+
+            _ <- ctl.emit(W1) // boom
+
+            // no offset since nothing emitted
+            startRes <- await(started.sequence)
+            fs1 <- awaitFs(filesystem)
+
+            // resume from beginning
+            update1 <- rp.update(DestinationId, config.value.path)
+
+            _ <- ctl.emit(W2)
+            _ <- ctl.emit(W1) // boom
+
+            // offset = 5 since emitted a value before boom
+            update1Res <- await(update1.sequence)
+            fs2 <- awaitFs(filesystem)
+
+            // resume from offset = 5
+            update2 <- rp.update(DestinationId, config.value.path)
+
+            update2Res <- await(update2.sequence)
+            fs3 <- awaitFs(filesystem)
+          } yield {
+            startRes must beRight.like {
+              case Status.Failed(_, _, _, _) => ok
+            }
+            fs1.get(path) must beNone
+
+            update1Res must beRight.like {
+              case Status.Failed(_, _, _, _) => ok
+            }
+            fs2.get(path) must beSome(W2)
+
+            update2Res must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs3.get(path) must beSome(dataString)
+          }
+        }
+      } yield r
+    }
+
+    "resumes previous incremental that failed prior to commit from initial" >>* {
+      for {
+        (dest, filesystem) <- QDestination()
+
+        (ctl, data) <- controlledStream
+
+        failOn2 = data flatMap {
+          case W2 => Stream.raiseError[IO](new RuntimeException("W2!"))
+          case s => Stream.emit(s)
+        }
+
+        path = ResourcePath.root() / ResourceName("abc")
+        // initial offset = 17
+        config = incremental(path, "abc", initial = Some(OffsetKey.Actual.real(17)))
+
+        // only emits for offset = 17
+        eval = mkEvaluator {
+          case ("abc", Some(Offset(_, ∃(k)))) =>
+            (k: OffsetKey.Actual[_]) match {
+              case OffsetKey.RealKey(r) if r.toInt == 17 => IO(failOn2)
+              case _ => IO.never
+            }
+        }
+
+        r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>
+          for {
+            started <- rp.start(DestinationId, config, None)
+
+            _ <- ctl.emit(W2) // boom
+
+            // offset still = 17 since nothing emitted
+            startRes <- await(started.sequence)
+            fs1 <- awaitFs(filesystem)
+
+            // resume from 17
+            update1 <- rp.update(DestinationId, config.value.path)
+
+            _ <- ctl.emit(W1)
+            _ <- ctl.emit(W3)
+            _ <- ctl.halt
+
+            // offset = 10 since emitted two values before halt
+            update1Res <- await(update1.sequence)
+            fs2 <- awaitFs(filesystem)
+          } yield {
+            startRes must beRight.like {
+              case Status.Failed(_, _, _, _) => ok
+            }
+            fs1.get(path) must beNone
+
+            update1Res must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs2.get(path) must beSome(W1+W3)
+          }
+        }
+      } yield r
+    }
+
+    "retains committed incremental offset on failure" >>* {
+      for {
+        (dest, filesystem) <- QDestination()
+
+        (ctl, data) <- controlledStream
+
+        fail3rd = data.zipWithIndex flatMap {
+          case (_, 2) => Stream.raiseError[IO](new RuntimeException("3RD!"))
+          case (s, _) => Stream.emit(s)
+        }
+
+        path = ResourcePath.root() / ResourceName("xyz")
+        config = incremental(path, "xyz")
+
+        eval = mkEvaluator {
+          case ("xyz", None) => IO(data)
+          case ("xyz", Some(Offset(_, ∃(k)))) =>
+            (k: OffsetKey.Actual[_]) match {
+              case OffsetKey.RealKey(r) if r.toInt == 5 => IO(fail3rd)
+              case OffsetKey.RealKey(r) if r.toInt == 10 => IO(data)
+              case _ => IO.never
+            }
+        }
+
+        r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>
+          for {
+            started <- rp.start(DestinationId, config, None)
+
+            _ <- ctl.emit(W1)
+            _ <- ctl.halt
+
+            // offset = 5
+            startRes <- await(started.sequence)
+            fs1 <- awaitFs(filesystem)
+
+            // resume from 5
+            update1 <- rp.update(DestinationId, config.value.path)
+
+            _ <- ctl.emit(W2)
+            _ <- ctl.emit(W2) // offset = 10
+            _ <- ctl.emit(W2) // boom!
+
+            // offset = 10 since emitted two values before boom
+            update1Res <- await(update1.sequence)
+            fs2 <- awaitFs(filesystem)
+
+            // resume from 10
+            update2 <- rp.update(DestinationId, config.value.path)
+
+            _ <- ctl.emit(W3)
+            _ <- ctl.emit(W3)
+            _ <- ctl.emit(W3)
+            _ <- ctl.halt
+
+            // offset = 15
+            update2Res <- await(update2.sequence)
+            fs3 <- awaitFs(filesystem)
+          } yield {
+            startRes must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs1.get(path) must beSome(W1)
+
+            update1Res must beRight.like {
+              case Status.Failed(_, _, _, _) => ok
+            }
+            fs2.get(path) must beSome(W2+W2)
+
+            update2Res must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs3.get(path) must beSome(W3+W3+W3)
+          }
+        }
+      } yield r
+    }
+
+    "fails if never started" >>* {
+      for {
+        (dest, _) <- QDestination()
+
+        path = ResourcePath.root() / ResourceName("nope")
+
+        updated <-
+          mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
+            .use(_.update(DestinationId, path))
+      } yield {
+        updated must beLeft.like {
+          case NonEmptyList(PushNotFound(DestinationId, p), Nil) => p must equal(path)
+        }
+      }
+    }
+
+    "fails if already running" >> forallConfigs { config =>
+      for {
+        (dest, _) <- QDestination()
+
+        (ctl, data) <- controlledStream
+
+        r <- mkResultPush(Map(DestinationId -> dest), constEvaluator(IO(data))) use { rp =>
+          for {
+            started <- rp.start(DestinationId, config, None)
+
+            _ <- ctl.emit(W1)
+            _ <- ctl.halt
+
+            startRes <- await(started.sequence)
+
+            update1 <- rp.update(DestinationId, config.value.path)
+            update2 <- rp.update(DestinationId, config.value.path)
+          } yield {
+            startRes must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            update1 must beRight
+            update2 must beLeft.like {
+              case NonEmptyList(PushAlreadyRunning(DestinationId, p), Nil) =>
+                p must equal(config.value.path)
+            }
+          }
+        }
+      } yield r
+    }
   }
 
   "cancel" >> {
@@ -652,8 +1154,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         }
       } yield r
     }
-
-    "halts a running update push" >> todo
 
     "no-op when push already completed" >> forallConfigs { config =>
       for {
@@ -698,20 +1198,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         : Option[Push[_, String]] =
       r.toOption.flatMap(_.get(p)).map(_.value)
 
-    "empty when nothing has been pushed" >>* {
-      for {
-        (destination, _) <- QDestination()
-
-        pushes <-
-          mkResultPush(Map(DestinationId -> destination), emptyEvaluator)
-            .use(_.pushedTo(DestinationId))
-      } yield {
-        pushes must beLike {
-          case Right(m) => m.isEmpty must beTrue
-        }
-      }
-    }
-
     "includes running push" >> forallConfigs { config =>
       for {
         (destination, filesystem) <- QDestination()
@@ -737,7 +1223,50 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
-    "includes running full push when previous status exists" >> todo
+    "includes running push when previous terminal exists" >> forallConfigs { config =>
+      for {
+        (destination, filesystem) <- QDestination()
+
+        cfg0 = config.value
+        cfgQ = cfg0.query
+        initialQ = cfgQ + "-initial"
+
+        initialCfg = ∃[PushConfig[?, String]](PushConfig.query.set(initialQ)(cfg0))
+
+        (ctl, data) <- controlledStream
+
+        eval = mkEvaluator {
+          case (`initialQ`, None) => IO(dataStream)
+          case (`cfgQ`, None) => IO(data)
+        }
+
+        r <- mkResultPush(Map(DestinationId -> destination), eval) use { rp =>
+          for {
+            initRes <- rp.start(DestinationId, initialCfg, None)
+            _ <- await(initRes.sequence)
+
+            initPushed <- rp.pushedTo(DestinationId)
+
+            _ <- rp.start(DestinationId, config, None)
+
+            _ <- ctl.emit(W1)
+            _ <- awaitFs(filesystem, 4)
+
+            nextPushed <- rp.pushedTo(DestinationId)
+          } yield {
+            lookupPushed(initPushed, config.value.path) must beSome.like {
+              case Push(c, _, Status.Finished(_, _, _)) =>
+                c.query must_=== initialQ
+            }
+
+            lookupPushed(nextPushed, config.value.path) must beSome.like {
+              case Push(c, _, Status.Running(_, _)) =>
+                c.query must_=== cfgQ
+            }
+          }
+        }
+      } yield r
+    }
 
     "includes canceled push" >> forallConfigs { config =>
       for {
@@ -837,9 +1366,85 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
-    "results in previous terminal status if canceled before started" >> todo
+    "results in previous terminal status if canceled before started" >> forallConfigs { config =>
+      for {
+        (destination, filesystem) <- QDestination()
 
-    "results in unknown status if interrupted/crash while running" >> todo
+        cfg0 = config.value
+        origQ = cfg0.query
+
+        initialQ = origQ + "-initial"
+        againQ = origQ + "-again"
+        otherQ = origQ + "-other"
+
+        initialCfg = ∃[PushConfig[?, String]](PushConfig.query.set(initialQ)(cfg0))
+        againCfg = ∃[PushConfig[?, String]](PushConfig.query.set(againQ)(cfg0))
+
+        otherCfg = ∃[PushConfig[?, String]](
+          PushConfig.path.modify(_ / ResourceName("other"))(
+            PushConfig.query.set(otherQ)(cfg0)))
+
+        (ctl1, data1) <- controlledStream
+        (ctl2, data2) <- controlledStream
+
+        eval = mkEvaluator {
+          case (`initialQ`, None) => IO(dataStream)
+          case (`againQ`, None) => IO(data1)
+          case (`otherQ`, None) => IO(data2)
+        }
+
+        r <- mkResultPush(Map(DestinationId -> destination), eval, 1) use { rp =>
+          for {
+            init <- rp.start(DestinationId, initialCfg, None)
+            initRes <- await(init.sequence)
+
+            initPushes <- rp.pushedTo(DestinationId)
+
+            _ <- rp.start(DestinationId, otherCfg, None)
+            _ <- rp.start(DestinationId, againCfg, None)
+
+            _ <- ctl2.emit(W1)
+            _ <- awaitFs(filesystem, 4)
+
+            otherPushes <- rp.pushedTo(DestinationId)
+
+            _ <- rp.cancel(DestinationId, againCfg.value.path)
+
+            canceledPushes <- rp.pushedTo(DestinationId)
+          } yield {
+            lookupPushed(initPushes, initialCfg.value.path) must beSome.like {
+              case Push(c, _, Status.Finished(_, _, _)) => c.query must_=== initialQ
+            }
+
+            lookupPushed(otherPushes, otherCfg.value.path) must beSome.like {
+              case Push(c, _, Status.Running(_, _)) => c.query must_=== otherQ
+            }
+
+            lookupPushed(otherPushes, againCfg.value.path) must beSome.like {
+              case Push(c, _, Status.Accepted(_, _)) => c.query must_=== againQ
+            }
+
+            lookupPushed(canceledPushes, againCfg.value.path) must beSome.like {
+              case Push(c, _, Status.Finished(_, _, _)) => c.query must_=== initialQ
+            }
+          }
+        }
+      } yield r
+    }
+
+    "empty when nothing has been pushed" >>* {
+      for {
+        (destination, _) <- QDestination()
+
+        pushes <-
+          mkResultPush(Map(DestinationId -> destination), emptyEvaluator)
+            .use(_.pushedTo(DestinationId))
+      } yield {
+        pushes must beLike {
+          case Right(m) => m.isEmpty must beTrue
+        }
+      }
+    }
 
     "returns 'destination not found' when destination doesn't exist" >>* {
       mkResultPush(Map(), emptyEvaluator)

@@ -63,7 +63,7 @@ import skolems.∃
 final class DefaultResultPush[
     F[_]: Concurrent: Timer, D <: AnyRef: Show, Q, R] private (
     lookupDestination: D => F[Option[Destination[F]]],
-    evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), Stream[F, R]],
+    evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), R],
     jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing],
     render: ResultRender[F, R],
     active: ConcurrentNavigableMap[D :: Option[ResourcePath] :: HNil, DefaultResultPush.ActiveState[F, Q]],
@@ -255,7 +255,6 @@ final class DefaultResultPush[
 
         val renderedResults =
           Stream.resource(evaluator((query, None)))
-            .flatten
             .flatMap(render.render(_, renderColumns, sink.config, limit))
 
         sink.consume(path, destColumns, renderedResults)
@@ -300,7 +299,7 @@ final class DefaultResultPush[
         offset = offsetValue.map(o => Offset(resumeConfig.sourceOffsetPath, ∃(o)))
 
         dataEvents =
-          Stream.resource(evaluator((query, offset))).flatten flatMap { results =>
+          Stream.resource(evaluator((query, offset))) flatMap { results =>
             val input =
               if (isUpdate)
                 RenderInput.Incremental(results)
@@ -568,7 +567,7 @@ object DefaultResultPush {
   def apply[F[_]: Concurrent: Timer, D <: AnyRef: Order: Show, Q, R](
       maxConcurrentPushes: Int,
       lookupDestination: D => F[Option[Destination[F]]],
-      evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), Stream[F, R]],
+      evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), R],
       render: ResultRender[F, R],
       pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
       offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
