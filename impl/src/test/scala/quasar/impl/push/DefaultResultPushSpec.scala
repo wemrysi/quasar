@@ -1243,6 +1243,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         r <- mkResultPush(Map(DestinationId -> destination), eval) use { rp =>
           for {
             initRes <- rp.start(DestinationId, initialCfg, None)
+            _ <- awaitFs(filesystem) // consume fs updates
             _ <- await(initRes.sequence)
 
             initPushed <- rp.pushedTo(DestinationId)
@@ -1250,7 +1251,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             _ <- rp.start(DestinationId, config, None)
 
             _ <- ctl.emit(W1)
-            _ <- awaitFs(filesystem, 4)
+            _ <- awaitFs(filesystem, 1)
 
             nextPushed <- rp.pushedTo(DestinationId)
           } yield {
@@ -1396,19 +1397,22 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         r <- mkResultPush(Map(DestinationId -> destination), eval, 1) use { rp =>
           for {
             init <- rp.start(DestinationId, initialCfg, None)
+            _ <- awaitFs(filesystem) // consume fs updates
             initRes <- await(init.sequence)
 
             initPushes <- rp.pushedTo(DestinationId)
 
+            // simulate another push running, blocks 'again' due to concurrency limit
             _ <- rp.start(DestinationId, otherCfg, None)
-            _ <- rp.start(DestinationId, againCfg, None)
+            again <- rp.start(DestinationId, againCfg, None)
 
             _ <- ctl2.emit(W1)
-            _ <- awaitFs(filesystem, 4)
+            _ <- awaitFs(filesystem, 1)
 
             otherPushes <- rp.pushedTo(DestinationId)
 
             _ <- rp.cancel(DestinationId, againCfg.value.path)
+            _ <- await(again.sequence)
 
             canceledPushes <- rp.pushedTo(DestinationId)
           } yield {
