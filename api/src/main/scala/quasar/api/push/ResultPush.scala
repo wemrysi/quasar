@@ -18,11 +18,15 @@ package quasar.api.push
 
 import slamdata.Predef._
 
-import quasar.Condition
+import quasar.{Condition, Exhaustive}
 import quasar.api.ColumnType
 import quasar.api.resource.ResourcePath
 
-import cats.data.NonEmptyList
+import cats.Monad
+import cats.data.{EitherT, NonEmptyList, NonEmptyMap}
+import cats.syntax.functor._
+
+import shapeless._
 
 import skolems.∃
 
@@ -71,4 +75,34 @@ trait ResultPush[F[_], DestinationId, Query] {
     */
   def update(destinationId: DestinationId, path: ResourcePath)
       : F[Either[NonEmptyList[ResultPushError[DestinationId]], F[Status.Terminal]]]
+
+  /** Returns a map enumerating how every scalar type may be represented in the
+    * specified destination.
+    */
+  def coercions(destinationId: DestinationId)
+      (implicit F: Monad[F])
+      : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, TypeCoercion[CoercedType]]]] = {
+
+    // Ensures the map contains an entry for every ColumType.Scalar
+    def coercions0[H <: HList](l: H)(implicit E: Exhaustive[ColumnType.Scalar, H])
+        : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, TypeCoercion[CoercedType]]]] =
+      E.toNel(l)
+        .traverse(t => EitherT(coerce(destinationId, t)).tupleLeft(t))
+        .map(n => NonEmptyMap.of(n.head, n.tail: _*))
+        .value
+
+    coercions0(
+      ColumnType.Null ::
+      ColumnType.Boolean ::
+      ColumnType.LocalTime ::
+      ColumnType.OffsetTime ::
+      ColumnType.LocalDate ::
+      ColumnType.OffsetDate ::
+      ColumnType.LocalDateTime ::
+      ColumnType.OffsetDateTime ::
+      ColumnType.Interval ::
+      ColumnType.Number ::
+      ColumnType.String ::
+      HNil)
+  }
 }
