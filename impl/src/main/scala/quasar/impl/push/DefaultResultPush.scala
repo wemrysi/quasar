@@ -571,7 +571,7 @@ object DefaultResultPush {
       render: ResultRender[F, R],
       pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
       offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
-      : Resource[F, DefaultResultPush[F, D, Q, R]] = {
+      : Resource[F, ResultPush[F, D, Q]] = {
 
     def epochToInstant(e: FiniteDuration): Instant =
       Instant.ofEpochMilli(e.toMillis)
@@ -666,7 +666,7 @@ object DefaultResultPush {
       }
 
     def acquire(jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing])
-        : F[DefaultResultPush[F, D, Q, R]] =
+        : F[ResultPush[F, D, Q]] =
       for {
         active <-
           Sync[F].delay(new ConcurrentSkipListMap[D :: Option[ResourcePath] :: HNil, ActiveState[F, Q]](
