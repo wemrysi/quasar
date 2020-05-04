@@ -18,18 +18,14 @@ package quasar
 
 import slamdata.Predef._
 
-import java.nio.{ByteBuffer, CharBuffer}
-import java.nio.charset.CodingErrorAction
+import java.nio.charset.{CharsetEncoder, CodingErrorAction}
 
 object byte {
   // https://en.wikipedia.org/wiki/Byte_order_mark#UTF-8
   val Utf8Bom: Array[Byte] = Array[Byte](0xEF.toByte, 0xBB.toByte, 0xBF.toByte)
 
-  def charBufferToByteBuffer[F[_]](cb: CharBuffer, cs: Charset): ByteBuffer = {
-    val encoder = cs.newEncoder
+  def charsetEncoder(cs: Charset): CharsetEncoder =
+    cs.newEncoder
       .onMalformedInput(CodingErrorAction.REPLACE)
       .onUnmappableCharacter(CodingErrorAction.REPLACE)
-
-    encoder.encode(cb)
-  }
 }

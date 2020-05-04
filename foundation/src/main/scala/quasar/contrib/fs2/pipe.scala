@@ -41,8 +41,10 @@ object pipe {
 
   def charBufferToByte[F[_]](cs: Charset): Pipe[F, CharBuffer, Byte] = { str =>
     Stream suspend {
+      val encoder = byte.charsetEncoder(cs)
+
       str.flatMap(cb =>
-        Stream.chunk(Chunk.ByteBuffer(byte.charBufferToByteBuffer[F](cb, cs))))
+        Stream.chunk(Chunk.ByteBuffer(encoder.encode(cb))))
     }
   }
 }
