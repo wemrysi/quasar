@@ -18,15 +18,15 @@ package quasar.contrib.fs2
 
 import slamdata.Predef._
 
+import quasar.byte
+
 import java.nio.CharBuffer
-import java.nio.charset.{CodingErrorAction, StandardCharsets}
+import java.nio.charset.StandardCharsets
 
 import fs2.{Chunk, Pipe, Stream}
 
 object pipe {
-  // https://en.wikipedia.org/wiki/Byte_order_mark#UTF-8
-  private val Utf8Bom = Chunk.bytes(Array[Byte](0xEF.toByte, 0xBB.toByte, 0xBF.toByte))
-
+  private val Utf8Bom = Chunk.bytes(byte.Utf8Bom)
   private val Utf8 = StandardCharsets.UTF_8
 
   /**
@@ -41,11 +41,10 @@ object pipe {
 
   def charBufferToByte[F[_]](cs: Charset): Pipe[F, CharBuffer, Byte] = { str =>
     Stream suspend {
-      val encoder = cs.newEncoder
-        .onMalformedInput(CodingErrorAction.REPLACE)
-        .onUnmappableCharacter(CodingErrorAction.REPLACE)
+      val encoder = byte.charsetEncoder(cs)
 
-      str.flatMap(cb => Stream.chunk(Chunk.ByteBuffer(encoder.encode(cb))))
+      str.flatMap(cb =>
+        Stream.chunk(Chunk.ByteBuffer(encoder.encode(cb))))
     }
   }
 }
