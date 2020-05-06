@@ -30,7 +30,7 @@ import MapDbByteStoresSpec._
 final class MapDbByteStoresSpec extends ByteStoresSpec[IO, Integer] {
   val byteStores =
     Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close()))
-      .evalMap(db => MapDbByteStores("mapdb-bytestores-spec", db, Serializer.INTEGER))
+      .evalMap(db => MapDbByteStores[IO, Integer]("mapdb-bytestores-spec", db, Serializer.INTEGER))
 
   val k1 = new Integer(3)
   val k2 = new Integer(7)

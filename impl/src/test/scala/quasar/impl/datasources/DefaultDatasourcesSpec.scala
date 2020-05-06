@@ -132,7 +132,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
                 ScalarStages.Id))
           }
 
-        Resource.pure(mp.get(config) match {
+        Resource.pure[F, R[F, InterpretedRead[ResourcePath]]](mp.get(config) match {
           case None => ds
           case Some(e) => Left(e): R[F, InterpretedRead[ResourcePath]]
         })
