@@ -28,6 +28,13 @@ object stateT {
       def put(s: S) = StateT.set[F, S](s)
     }
 
+  implicit def catsMonadStateWithinState[F[_]: Monad, S1, S2](implicit F: MonadState_[F, S1])
+      : MonadState_[StateT[F, S2, ?], S1] =
+    new MonadState_[StateT[F, S2, ?], S1] {
+      def get = StateT.liftF(F.get)
+      def put(s: S1) = StateT.liftF(F.put(s))
+    }
+
   implicit def catsStateTMonadTell_[F[_]: Applicative, S, W](implicit F: MonadTell_[F, W])
       : MonadTell_[StateT[F, S, ?], W] =
     new MonadTell_[StateT[F, S, ?], W] {

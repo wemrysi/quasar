@@ -16,14 +16,21 @@
 
 package quasar.qsu
 
-import quasar.ejson
-import quasar.common.effect.NameGenerator
-import quasar.qscript.{SrcHole, LeftSide, MapFuncsCore, MFC, RightSide}
-import quasar.qsu.{QScriptUniform => QSU}
 import slamdata.Predef._
 
+import quasar.ejson
+import quasar.common.effect.NameGenerator
+import quasar.contrib.cats.stateT._
+import quasar.qscript.{SrcHole, LeftSide, MapFuncsCore, MFC, RightSide}
+import quasar.qsu.{QScriptUniform => QSU}
+
+import cats.data.StateT
+
 import matryoshka.{BirecursiveT, ShowT}
-import scalaz.{Monad, Scalaz, StateT}, Scalaz._
+
+import scalaz.{Monad, Scalaz}, Scalaz._
+
+import shims.{monadToCats, monadToScalaz}
 
 final class RewriteGroupByArrays[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
@@ -48,7 +55,7 @@ final class RewriteGroupByArrays[T[_[_]]: BirecursiveT: ShowT] private () extend
         nestedM.map(nested => qgraph.overwriteAtRoot(nested.unfold.map(_.root)) :++ nested)
     }
 
-    back.eval(qgraph.generateRevIndex)
+    back.runA(qgraph.generateRevIndex)
   }
 
   object NAryArray {

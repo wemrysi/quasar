@@ -18,9 +18,11 @@ package quasar.qsu
 
 import slamdata.Predef.{Eq => _, Int => SInt, _}
 
+import quasar.contrib.cats.stateT._
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.implicits._
 
+import cats.data.State
 import cats.instances.symbol._
 import cats.instances.tuple._
 import cats.syntax.eq._
@@ -28,14 +30,14 @@ import cats.syntax.bifunctor._
 
 import matryoshka.{BirecursiveT, EqualT}
 
-import scalaz.{@@, ==>>, Id, IMap, State, Monad}
+import scalaz.{@@, ==>>, Id, IMap, Monad}
 import scalaz.Tags.MaxVal
 import scalaz.std.anyVal._
 import scalaz.std.option._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 
-import shims.{applicativeToCats, equalToCats, monoidToCats}
+import shims.{applicativeToCats, equalToCats, monadToScalaz, monoidToCats}
 
 final class Bucketing[T[_[_]]: BirecursiveT: EqualT, P] private (
     qprov: QProvAux[T, P])
@@ -103,6 +105,7 @@ final class Bucketing[T[_[_]]: BirecursiveT: EqualT, P] private (
   private def bucketedP(src: Symbol, p: P): (IdAccess ==>> SInt, P) =
     bucketedIds[State[BucketsState[IdAccess], ?]](src, p)
       .run(BucketsState(0, IMap.empty))
+      .value
       .leftMap(_.buckets)
 }
 

@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef.{Map => SMap, _}
 import quasar.IdStatus
 import quasar.common.effect.NameGenerator
+import quasar.contrib.cats.stateT._
 import quasar.contrib.iota._
 import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
@@ -26,12 +27,18 @@ import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript.{JoinFunc, OnUndefined, RecFreeMap}
 
+import cats.data.{State, StateT}
+
 import monocle.macros.Lenses
+
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns.EnvT
-import scalaz.{\/-, -\/, Cofree, DList, Id, Monad, Monoid, MonadState, Scalaz, Show, State, StateT}, Scalaz._
+
+import scalaz.{\/-, -\/, Cofree, DList, Id, Monad, Monoid, Scalaz, Show}, Scalaz._
+
+import shims.{monadToCats, monadToScalaz}
 
 @Lenses
 final case class QSUGraph[T[_[_]]](
@@ -50,9 +57,8 @@ final case class QSUGraph[T[_[_]]](
 
   /** A bottom up (leaves first) monoidal fold of the graph. */
   def foldMapUpM[F[_]: Monad, A: Monoid](f: QSUGraph[T] => F[A]): F[A] = {
-    type VisitedT[X[_], A] = StateT[X, Set[Symbol], A]
-    type G[A] = VisitedT[F, A]
-    val MS = MonadState[G, Set[Symbol]]
+    type G[A] = StateT[F, Set[Symbol], A]
+    val MS = MonadState_[G, Set[Symbol]]
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(g: QSUGraph[T]): G[A] =
@@ -65,17 +71,16 @@ final case class QSUGraph[T[_[_]]](
           for {
             _ <- MS.put(visited + g.root)
             aSub <- g.unfold.foldMapM(inner)
-            aG <- f(g).liftM[VisitedT]
+            aG <- StateT.liftF(f(g))
           } yield aSub |+| aG
       } yield a
 
-    inner(this).eval(Set())
+    inner(this).runA(Set())
   }
 
   def foldMapDownM[F[_]: Monad, A: Monoid](f: QSUGraph[T] => F[A]): F[A] = {
-    type VisitedT[X[_], A] = StateT[X, Set[Symbol], A]
-    type G[A] = VisitedT[F, A]
-    val MS = MonadState[G, Set[Symbol]]
+    type G[A] = StateT[F, Set[Symbol], A]
+    val MS = MonadState_[G, Set[Symbol]]
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(g: QSUGraph[T]): G[A] =
@@ -87,12 +92,12 @@ final case class QSUGraph[T[_[_]]](
         else
           for {
             _ <- MS.put(visited + g.root)
-            aG <- f(g).liftM[VisitedT]
+            aG <- StateT.liftF(f(g))
             aSub <- g.unfold.foldMapM(inner)
           } yield aG |+| aSub
       } yield a
 
-    inner(this).eval(Set())
+    inner(this).runA(Set())
   }
 
   def foldMapUp[A: Monoid](f: QSUGraph[T] => A): A =
@@ -163,7 +168,7 @@ final case class QSUGraph[T[_[_]]](
 
   def corewriteM[F[_]: Monad](pf: PartialFunction[QSUGraph[T], F[QSUGraph[T]]]): F[QSUGraph[T]] = {
     type ModifiedT[G[_], A] = StateT[G, QSUVerts[T], A]
-    val MS = MonadState[ModifiedT[F, ?], QSUVerts[T]]
+    val MS = MonadState_[ModifiedT[F, ?], QSUVerts[T]]
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(g: QSUGraph[T]): F[QSUGraph[T]] =
@@ -172,10 +177,10 @@ final case class QSUGraph[T[_[_]]](
         transformed.unfold.traverse[ModifiedT[F, ?], QSUGraph[T]] { g0 =>
           for {
             prevVertices <- MS.get
-            newGraph     <- inner(g0.copy(vertices = g0.vertices ++ prevVertices)).liftM[ModifiedT]
+            newGraph     <- StateT.liftF(inner(g0.copy(vertices = g0.vertices ++ prevVertices)))
             _            <- MS.modify(_ ++ newGraph.vertices)
           } yield newGraph
-        }.map(qsu => QSUGraph.refold(g.root, qsu)).eval(changed)
+        }.map(qsu => QSUGraph.refold(g.root, qsu)).runA(changed)
       }
 
     inner(this)
@@ -199,9 +204,8 @@ final case class QSUGraph[T[_[_]]](
    */
   def rewriteM[F[_]: Monad](pf: PartialFunction[QSUGraph[T], F[QSUGraph[T]]]): F[QSUGraph[T]] = {
     type RewriteS = SMap[Symbol, QSUGraph[T]]
-    type VisitedT[X[_], A] = StateT[X, RewriteS, A]
-    type G[A] = VisitedT[F, A]
-    val MS = MonadState[G, RewriteS]
+    type G[A] = StateT[F, RewriteS, A]
+    val MS = MonadState_[G, RewriteS]
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(g: QSUGraph[T]): G[QSUGraph[T]] = {
@@ -253,7 +257,7 @@ final case class QSUGraph[T[_[_]]](
               self2 = rewritten.copy(vertices = collapsed)
 
               applied <- if (pf.isDefinedAt(self2))
-                pf(self2).liftM[VisitedT]
+                StateT.liftF(pf(self2)): G[QSUGraph[T]]
               else
                 self2.point[G]
 
@@ -266,7 +270,7 @@ final case class QSUGraph[T[_[_]]](
       } yield back
     }
 
-    inner(this).eval(SMap())
+    inner(this).runA(SMap())
   }
 
   def rewrite(pf: PartialFunction[QSUGraph[T], QSUGraph[T]]): QSUGraph[T] =
@@ -365,7 +369,7 @@ object QSUGraph extends QSUGraphInstances {
 
     qsu.cataM(fromTreeƒ[T, F]).run((SMap(), SMap())).map {
       case ((_, s), r) => (s, r)
-    }.eval(0)
+    }.runA(0).value
   }
 
   /** Construct a QSUGraph from a tree of `QScriptUniform` by compacting
