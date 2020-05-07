@@ -20,6 +20,7 @@ import slamdata.Predef.{Map => SMap, _}
 
 import quasar.RenderTreeT
 import quasar.common.effect.NameGenerator
+import quasar.contrib.cats.stateT._
 import quasar.contrib.iota.copkTraverse
 import quasar.fp.symbolOrder
 import quasar.frontend.logicalplan.JoinDir
@@ -27,9 +28,14 @@ import quasar.qscript.{construction, JoinSide, LeftSide, MonadPlannerErr, RightS
 import quasar.qscript.PlannerError.InternalError
 import quasar.qscript.RecFreeS._
 
+import cats.data.StateT
+
 import matryoshka.{BirecursiveT, ShowT}
+
 import scalaz.Tags.Disjunction
-import scalaz.{Monad, NonEmptyList, IList, Scalaz, StateT, Tag, \/, \/-, -\/, Free, OptionT}, Scalaz._
+import scalaz.{Monad, NonEmptyList, IList, Scalaz, Tag, \/, \/-, -\/, Free, OptionT}, Scalaz._
+
+import shims.{monadToCats, monadToScalaz}
 
 /** Extracts `MapFunc` expressions from operations by requiring an argument
   * to be a function of one or more sibling arguments and creating an
@@ -42,7 +48,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
   def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](graph: QSUGraph)
       : F[QSUGraph] = {
     type G[A] = StateT[F, RevIdx, A]
-    graph.rewriteM[G](extract[G]).eval(graph.generateRevIndex)
+    graph.rewriteM[G](extract[G]).runA(graph.generateRevIndex)
   }
 
   ////

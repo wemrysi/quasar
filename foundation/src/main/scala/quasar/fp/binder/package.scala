@@ -72,13 +72,6 @@ package object binder {
     loop(t.project, B.initial)
   }
 
-  def boundParaS[T, F[_]: Traverse, S, A]
-    (t: T)
-    (f: F[(T, A)] => State[S, A])
-    (implicit T: Recursive.Aux[T, F], B: Binder[F])
-      : State[S, A] =
-    boundParaM[T, State[S, ?], F, A](t)(f)
-
   def boundPara[T, F[_]: Functor, A]
     (t: T)
     (f: F[(T, A)] => A)

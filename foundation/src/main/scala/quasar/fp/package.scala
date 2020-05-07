@@ -23,7 +23,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import monocle.{Lens, PLens}
+import monocle.PLens
 import scalaz.{Lens => _, PLens => _, _}, BijectionT._, Kleisli._, Liskov._, Scalaz._
 import shapeless.{Fin, Nat, Sized, Succ}
 
@@ -165,8 +165,6 @@ package object fp
   /** `point` as a natural transformation */
   def pointNT[F[_]: Applicative] = λ[Id ~> F](Applicative[F] point _)
 
-  def evalNT[F[_]: Monad, S](initial: S) = λ[StateT[F, S, ?] ~> F](_ eval initial)
-
   def liftFG[F[_], G[a] <: ACopK[a], A](orig: F[A] => G[A])(implicit F: F :<<: G):
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig)
@@ -292,26 +290,6 @@ package object fp
 }
 
 package fp {
-  /** Lift a `State` computation to operate over a "larger" state given a `Lens`.
-    *
-    * NB: Uses partial application of `F[_]` for better type inference, usage:
-    *
-    *   `zoomNT[F](lens)`
-    */
-  object zoomNT {
-    def apply[F[_]]: Aux[F] =
-      new Aux[F]
-
-    final class Aux[F[_]] {
-      type ST[S, A] = StateT[F, S, A]
-      def apply[A, B](lens: Lens[A, B])(implicit M: Monad[F]): ST[B, ?] ~> ST[A, ?] =
-        new (ST[B, ?] ~> ST[A, ?]) {
-          def apply[C](s: ST[B, C]) =
-            StateT((a: A) => s.run(lens.get(a)).map(_.leftMap(lens.set(_)(a))))
-        }
-    }
-  }
-
   // type Delay[F[_], G[_]] = F ~> λ[A => F[G[A]]]
   trait DelayedA[A] {
     /** The B is discarded in each case; the type was fixed by A. */

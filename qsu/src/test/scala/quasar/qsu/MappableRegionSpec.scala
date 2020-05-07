@@ -19,10 +19,11 @@ package quasar.qsu
 import slamdata.Predef.{Boolean, String, Symbol}
 import quasar.{Qspec, TreeMatchers}
 import quasar.IdStatus.ExcludeId
+import quasar.contrib.iota._
+import quasar.contrib.matryoshka.implicits._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
-import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.qscript.{construction, Hole, MapFuncsCore, SrcHole}
 

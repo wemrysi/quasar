@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.common.effect.NameGenerator
+import quasar.contrib.cats.stateT._
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
@@ -39,11 +40,17 @@ import quasar.qsu.{QScriptUniform => QSU}
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
 import quasar.qsu.mra.JoinKey
 
+import cats.data.StateT
+
 import matryoshka.{BirecursiveT, ShowT}
+
 import monocle.{Lens, Optional}
 import monocle.syntax.fields._1
-import scalaz.{Foldable, Free, Functor, IList, IMap, ISet, Monad, NonEmptyList, Show, StateT, Traverse}
+
+import scalaz.{Foldable, Free, Functor, IList, IMap, ISet, Monad, NonEmptyList, Show, Traverse}
 import scalaz.Scalaz._
+
+import shims.{monadToCats, monadToScalaz}
 
 /** TODO
   * With smarter structural MapFunc simplification, we could just
@@ -150,8 +157,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
     import QSUGraph.{Extractors => E}
 
-    type ReifyT[X[_], A] = StateT[X, ReifyState, A]
-    type G[A] = ReifyT[F, A]
+    type G[A] = StateT[F, ReifyState, A]
     val G = MonadState_[G, ReifyState]
 
     // if the root of the graph contains reified identities
@@ -190,7 +196,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
     /** Returns a new graph that applies `func` to the result of `g`. */
     def mapResultOf(g: QSUGraph, func: FreeMap): G[(Symbol, QSUGraph)] =
       for {
-        nestedRoot <- freshName.liftM[ReifyT]
+        nestedRoot <- StateT.liftF(freshName): G[Symbol]
 
         QSUGraph(origRoot, origVerts) = g
 

@@ -23,6 +23,7 @@ import quasar.connector.ResourceError
 import quasar.contrib.scalaz.MonadError_
 import quasar.qscript.PlannerError
 import quasar.impl.storage.StoreError
+import quasar.sql.ParsingError
 
 import argonaut.Json
 
@@ -35,6 +36,9 @@ object implicits {
 
   implicit def evaluatingMonadError[F[_]: MonadQuasarErr]: MonadError_[F, ResourceError] =
     MonadError_.facet[F](QuasarError.evaluating)
+
+  implicit def parsingMonadError[F[_]: MonadQuasarErr]: MonadError_[F, ParsingError] =
+    MonadError_.facet[F](QuasarError.parsing)
 
   implicit def planningMonadError[F[_]: MonadQuasarErr]: MonadError_[F, PlannerError] =
     MonadError_.facet[F](QuasarError.planning)

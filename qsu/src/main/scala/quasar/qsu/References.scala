@@ -21,9 +21,10 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
+import quasar.contrib.matryoshka.implicits._
 import quasar.qscript.{FreeMap, FreeMapA}
 
-import matryoshka.{delayShow, delayEqual, BirecursiveT, ShowT, EqualT}
+import matryoshka.{delayShow, BirecursiveT, ShowT, EqualT}
 import matryoshka.data._
 import scalaz.{\/, Equal, IMap, ISet, Monoid, Show}
 import scalaz.std.list._

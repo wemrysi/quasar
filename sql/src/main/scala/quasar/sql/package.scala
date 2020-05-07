@@ -22,6 +22,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.common.CIName
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.MonadError_
 
 import contextual._
 import matryoshka._
@@ -33,6 +34,9 @@ import scalaz._, Scalaz._
 import scalaz.Liskov._
 
 package object sql {
+
+  type MonadParsingErr[F[_]] = MonadError_[F, ParsingError]
+  def MonadParsingErr[F[_]](implicit ev: MonadParsingErr[F]): MonadParsingErr[F] = ev
 
   def select[A] = Prism.partial[Sql[A], (IsDistinct, List[Proj[A]], Option[SqlRelation[A]], Option[A], Option[GroupBy[A]], Option[OrderBy[A]])] {
     case Select(d, p, r, f, g, o) => (d, p, r, f, g, o)

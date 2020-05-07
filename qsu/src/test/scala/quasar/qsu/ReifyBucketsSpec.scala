@@ -20,7 +20,8 @@ import slamdata.Predef.{List, Long, Nil}
 
 import quasar.{Qspec, TreeMatchers}
 import quasar.IdStatus.ExcludeId
-import quasar.contrib.iota.{copkEqual, copkTraverse}
+import quasar.contrib.iota._
+import quasar.contrib.matryoshka.implicits._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.qscript.{construction, Hole, MapFuncsCore, PlannerError, ReduceFuncs}

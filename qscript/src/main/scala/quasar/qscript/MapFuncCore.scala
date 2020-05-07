@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar._
 import quasar.RenderTree.ops._
 import quasar.contrib.matryoshka._
+import quasar.contrib.matryoshka.implicits._
 import quasar.ejson._
 import quasar.ejson.implicits._
 import quasar.fp._
@@ -468,20 +469,20 @@ object MapFuncCore {
       }
   }
 
-  implicit def equal[T[_[_]]: BirecursiveT: EqualT, A]: Delay[Equal, MapFuncCore[T, ?]] =
-    new Delay[Equal, MapFuncCore[T, ?]] {
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT, A]: Delay[LazyEqual, MapFuncCore[T, ?]] =
+    new Delay[LazyEqual, MapFuncCore[T, ?]] {
       @SuppressWarnings(Array("org.wartremover.warts.Equals"))
-      def apply[A](in: Equal[A]): Equal[MapFuncCore[T, A]] = Equal.equal {
+      def apply[A](in: LazyEqual[A]): LazyEqual[MapFuncCore[T, A]] = LazyEqual.lazyEqual {
         // nullary
         case (Constant(v1), Constant(v2)) =>
           // FIXME: Ensure we’re using _structural_ equality here.
-          v1 ≟ v2
-        case (JoinSideName(n1), JoinSideName(n2)) => n1 ≟ n2
-        case (Undefined(), Undefined()) => true
-        case (Now(), Now()) => true
-        case (NowTime(), NowTime()) => true
-        case (NowDate(), NowDate()) => true
-        case (CurrentTimeZone(), CurrentTimeZone()) => true
+          Need(v1 ≟ v2)
+        case (JoinSideName(n1), JoinSideName(n2)) => Need(n1 ≟ n2)
+        case (Undefined(), Undefined()) => Need(true)
+        case (Now(), Now()) => Need(true)
+        case (NowTime(), NowTime()) => Need(true)
+        case (NowDate(), NowDate()) => Need(true)
+        case (CurrentTimeZone(), CurrentTimeZone()) => Need(true)
         // unary
         case (ExtractCentury(a1), ExtractCentury(a2)) => in.equal(a1, a2)
         case (ExtractDayOfMonth(a1), ExtractDayOfMonth(a2)) => in.equal(a1, a2)
@@ -512,7 +513,7 @@ object MapFuncCore {
         case (LocalDate(a1), LocalDate(b1)) => in.equal(a1, b1)
         case (Interval(a1), Interval(b1)) => in.equal(a1, b1)
         case (StartOfDay(a1), StartOfDay(b1)) => in.equal(a1, b1)
-        case (TemporalTrunc(a1, a2), TemporalTrunc(b1, b2)) => a1 ≟ b1 && in.equal(a2, b2)
+        case (TemporalTrunc(a1, a2), TemporalTrunc(b1, b2)) => Need(a1 ≟ b1) && in.equal(a2, b2)
         case (TimeOfDay(a1), TimeOfDay(b1)) => in.equal(a1, b1)
         case (ToTimestamp(a1), ToTimestamp(b1)) => in.equal(a1, b1)
         case (TypeOf(a1), TypeOf(b1)) => in.equal(a1, b1)
@@ -569,9 +570,9 @@ object MapFuncCore {
         case (Search(a1, a2, a3), Search(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Like(a1, a2, a3), Like(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Substring(a1, a2, a3), Substring(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
-        case (Guard(a1, atpe, a2, a3), Guard(b1, btpe, b2, b3)) => atpe ≟ btpe && in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
+        case (Guard(a1, atpe, a2, a3), Guard(b1, btpe, b2, b3)) => Need(atpe ≟ btpe) && in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
 
-        case (_, _) => false
+        case (_, _) => Need(false)
       }
     }
 

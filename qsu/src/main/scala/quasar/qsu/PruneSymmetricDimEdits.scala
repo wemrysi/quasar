@@ -19,13 +19,18 @@ package quasar.qsu
 import slamdata.Predef._
 
 import quasar.common.effect.NameGenerator
+import quasar.contrib.cats.stateT._
 import quasar.contrib.scalaz.MonadState_
 import quasar.qscript.MonadPlannerErr
 import quasar.qsu.{QScriptUniform => QSU}
 
-import scalaz.{Monad, Scalaz, StateT}, Scalaz._
+import cats.data.StateT
+
+import scalaz.{Monad, Scalaz}, Scalaz._
 
 import scala.collection.immutable.{Map => SMap}
+
+import shims.{monadToCats, monadToScalaz}
 
 final class PruneSymmetricDimEdits[T[_[_]]] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
@@ -72,7 +77,7 @@ final class PruneSymmetricDimEdits[T[_[_]]] private () extends QSUTTypes[T] {
         }
     }
 
-    backM.eval(g.generateRevIndex).eval(SMap())
+    backM.runA(g.generateRevIndex).runA(SMap())
   }
 
   // does not return Unreferenced()
