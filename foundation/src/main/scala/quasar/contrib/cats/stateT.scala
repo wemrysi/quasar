@@ -16,9 +16,9 @@
 
 package quasar.contrib.cats
 
-import quasar.contrib.scalaz.{MonadState_, MonadTell_}
+import quasar.contrib.scalaz.{MonadError_, MonadState_, MonadTell_}
 
-import cats.Applicative
+import cats.{Applicative, Monad}
 import cats.data.StateT
 
 object stateT {
@@ -32,5 +32,15 @@ object stateT {
       : MonadTell_[StateT[F, S, ?], W] =
     new MonadTell_[StateT[F, S, ?], W] {
       def writer[A](w: W, a: A) = StateT.liftF(F.writer(w, a))
+    }
+
+  implicit def catsStateTMonadError_[F[_]: Monad, S, E](implicit F: MonadError_[F, E])
+      : MonadError_[StateT[F, S, ?], E] =
+    new MonadError_[StateT[F, S, ?], E] {
+      def raiseError[A](e: E): StateT[F, S, A] =
+        StateT.liftF(F.raiseError(e))
+
+      def handleError[A](fa: StateT[F, S, A])(f: E => StateT[F, S, A]): StateT[F, S, A] =
+        StateT(s => F.handleError(fa.run(s))(e => f(e).run(s)))
     }
 }
