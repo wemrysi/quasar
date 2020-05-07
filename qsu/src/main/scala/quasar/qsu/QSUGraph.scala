@@ -27,6 +27,7 @@ import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript.{JoinFunc, OnUndefined, RecFreeMap}
 
+import cats.Eval
 import cats.data.{State, StateT}
 
 import monocle.macros.Lenses
@@ -274,7 +275,7 @@ final case class QSUGraph[T[_[_]]](
   }
 
   def rewrite(pf: PartialFunction[QSUGraph[T], QSUGraph[T]]): QSUGraph[T] =
-    rewriteM[Id](pf)
+    rewriteM[Eval](pf.andThen(Eval.now(_))).value
 
   // projects the root of the graph (which we assume exists)
   def unfold: QScriptUniform[T, QSUGraph[T]] =
