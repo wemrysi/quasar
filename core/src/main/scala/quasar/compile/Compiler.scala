@@ -49,7 +49,7 @@ import matryoshka.patterns._
 
 import pathy.Path._
 
-import scalaz.{\/, -\/, \/-, Cofree, Equal, Functor, Free => ZFree, Monad, Scalaz, Show}, Scalaz._
+import scalaz.{\/, -\/, \/-, Cofree, Equal, Functor, Free => ZFree, Monad, Need, Scalaz, Show}, Scalaz._
 
 import shapeless.{Annotations => _, Data => _, :: => _, _}
 
@@ -823,7 +823,7 @@ object Compiler {
     val KS = MonadState_[State[KeyState, ?], KeyState]
 
     def makeKey(tree: T, flp: ZFree[LP, Unit]): T =
-      flp.cata(interpret[LP, Unit, T](_ => tree, _.embed))
+      flp.cataM(interpretM[Need, LP, Unit, T](_ => Need(tree), fa => Need(fa.embed))).value
 
     // Step 1: annotate nodes containing the keys.
     val ann: State[KeyState, Cofree[LP, Boolean]] = tree.transAnaM {

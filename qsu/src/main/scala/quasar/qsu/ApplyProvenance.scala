@@ -20,7 +20,6 @@ import slamdata.Predef._
 
 import quasar.IdStatus, IdStatus.IncludeId
 import quasar.contrib.cats.stateT._
-import quasar.contrib.matryoshka.ginterpret
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
 import quasar.ejson.EJson
@@ -49,12 +48,13 @@ import cats.data.{NonEmptyList, StateT}
 import matryoshka._
 import matryoshka.data.free._
 import matryoshka.implicits._
+import matryoshka.patterns.ginterpretM
 
 import monocle.macros.Lenses
 
 import pathy.Path
 
-import scalaz.{Applicative, Equal, Free, Functor, IList, Monad, Show, ValidationNel}
+import scalaz.{Applicative, Equal, Free, Functor, IList, Monad, Need, Show, ValidationNel}
 import scalaz.Scalaz._
 
 import shims.{eqToScalaz, equalToCats, monadToCats, monadToScalaz}
@@ -345,7 +345,7 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
     }
 
   private def computeFuncProvenance[A](fm: FreeMapA[A])(f: A => P): P =
-    fm.para(ginterpret(f, computeFuncProvenanceƒ[A]))
+    fm.paraM(ginterpretM(f.andThen(Need(_)), computeFuncProvenanceƒ[A].andThen(Need(_)))).value
 
   private def computeJoin2[F[_]: Monad: MonadPlannerErr: QAuthS](
       g: QSUGraph,
