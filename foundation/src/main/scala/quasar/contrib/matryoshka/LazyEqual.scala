@@ -21,6 +21,7 @@ import scala.Boolean
 import matryoshka.{Delay, Recursive}
 
 import scalaz.{Functor, Need}
+import scalaz.syntax.bind._
 
 trait LazyEqual[A] {
   def equal(x: A, y: A): Need[Boolean]
@@ -35,5 +36,5 @@ object LazyEqual {
     }
 
   def recursive[T, F[_]: Functor](implicit T: Recursive.Aux[T, F], F: Delay[LazyEqual, F]): LazyEqual[T] =
-    lazyEqual((x, y) => F(recursive[T, F]).equal(T.project(x), T.project(y)))
+    lazyEqual((x, y) => Need(F(recursive[T, F])).flatMap(_.equal(T.project(x), T.project(y))))
 }
