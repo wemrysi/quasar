@@ -22,6 +22,7 @@ import slamdata.Predef._
 import quasar.{NonTerminal, RenderTree, RenderTreeT, Terminal}
 import quasar.RenderTree.ops._
 import quasar.contrib.iota._
+import quasar.contrib.matryoshka.implicits._
 import quasar.fp._
 import quasar.qscript.{FreeMap, FreeMapA}
 
