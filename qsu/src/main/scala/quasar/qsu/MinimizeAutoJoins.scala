@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef.{Map => SMap, _}
 import quasar.common.effect.NameGenerator
 import quasar.RenderTreeT
+import quasar.contrib.cats.stateT._
 import quasar.contrib.std.errorImpossible
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.{EJson, Fixed}
@@ -43,11 +44,13 @@ import quasar.qsu.{QScriptUniform => QSU}
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
 import quasar.qsu.minimizers.Minimizer
 
+import cats.data.StateT
+
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 
-import scalaz.{Bind, Equal, Monad, OptionT, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
+import scalaz.{Bind, Equal, Monad, OptionT, Scalaz}, Scalaz._   // sigh, monad/traverse conflict
 
-import shims.equalToCats
+import shims.{equalToCats, monadToCats, monadToScalaz}
 
 sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends MraPhase[T] {
   import MinimizeAutoJoins._
@@ -89,11 +92,11 @@ sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: Re
         OptionT(coalesceToMap[G](qgraph, List(left, center, right), combiner2)).getOrElseF(qgraph.point[G])
     }
 
-    val lifted = back(MinimizationState[T, P](agraph.auth)) map {
+    val lifted = back.run(MinimizationState[T, P](agraph.auth)) map {
       case (MinimizationState(auth), graph) => AuthenticatedQSU[T, P](graph, auth)
     }
 
-    lifted.eval(agraph.graph.generateRevIndex)
+    lifted.runA(agraph.graph.generateRevIndex)
   }
 
   // the Ints are indices into branches
@@ -340,7 +343,7 @@ object MinimizeAutoJoins {
 
       computed <-
         ApplyProvenance.computeDims[T, StateT[G, QAuth[T, qp.P], ?]](qp, qgraph)
-          .exec(state.auth)
+          .runS(state.auth)
 
       _ <- MinStateM[T, qp.P, G].put(state.copy(auth = computed))
     } yield ()

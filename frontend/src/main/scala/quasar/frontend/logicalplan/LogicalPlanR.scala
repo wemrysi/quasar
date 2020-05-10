@@ -20,16 +20,23 @@ import slamdata.Predef._
 import quasar._
 import quasar.common.{CIName, JoinType, SortDir}
 import quasar.common.data.Data
+import quasar.contrib.cats.stateT._
 import quasar.contrib.pathy._
 import quasar.fp.ski._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 
 import scala.Symbol
 
+import cats.data.State
+
 import matryoshka._
 import matryoshka.implicits._
-import scalaz._, Scalaz._
+
+import scalaz.{State => _, _}, Scalaz._
+
 import shapeless.{nat, Nat, Sized}
+
+import shims.monadToScalaz
 
 final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) {
   import quasar.std.StdLib, StdLib._
@@ -105,8 +112,8 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
   def rename[M[_]: Monad](f: Symbol => M[Symbol])(t: T): M[T] =
     (Map[Symbol, Symbol](), t).anaM[T](renameƒ(f))
 
-  def normalizeTempNames(t: T) =
-    rename(κ(freshSym[State[Long, ?]]("tmp")))(t).evalZero[Long]
+  def normalizeTempNames(t: T): T =
+    rename(κ(freshSym[State[Long, ?]]("tmp")))(t).runA(0).value
 
   def bindFree(vars: Map[CIName, T])(t: T): T =
     t.cata[T] {

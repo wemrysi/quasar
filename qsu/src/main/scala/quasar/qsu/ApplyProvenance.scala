@@ -19,7 +19,7 @@ package quasar.qsu
 import slamdata.Predef._
 
 import quasar.IdStatus, IdStatus.IncludeId
-import quasar.contrib.matryoshka.ginterpret
+import quasar.contrib.cats.stateT._
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
 import quasar.ejson.EJson
@@ -43,20 +43,21 @@ import quasar.qscript.{
   RightSide3
 }
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, StateT}
 
 import matryoshka._
 import matryoshka.data.free._
 import matryoshka.implicits._
+import matryoshka.patterns.ginterpretM
 
 import monocle.macros.Lenses
 
 import pathy.Path
 
-import scalaz.{Applicative, Equal, Free, Functor, IList, Monad, Show, StateT, ValidationNel}
+import scalaz.{Applicative, Equal, Free, Functor, IList, Monad, Need, Show, ValidationNel}
 import scalaz.Scalaz._
 
-import shims.{eqToScalaz, equalToCats}
+import shims.{eqToScalaz, equalToCats, monadToCats, monadToScalaz}
 
 sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] extends MraPhase[T] {
   import ApplyProvenance._
@@ -324,7 +325,7 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
       (f: P => P)
       : F[P] =
     handleMissingDims(dimsFor[F](src) map f) flatMap { ds =>
-      QAuthS.modify(_.addDims(g.root, ds)) as ds
+      QAuthS[F].modify(_.addDims(g.root, ds)) as ds
     }
 
   private def compute2[F[_]: Monad: MonadPlannerErr: QAuthS]
@@ -332,7 +333,7 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
       (f: (P, P) => P)
       : F[P] =
     handleMissingDims((dimsFor[F](l) |@| dimsFor(r))(f)) flatMap { ds =>
-      QAuthS.modify(_.addDims(g.root, ds)) as ds
+      QAuthS[F].modify(_.addDims(g.root, ds)) as ds
     }
 
   private def compute3[F[_]: Monad: MonadPlannerErr: QAuthS]
@@ -340,11 +341,11 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
       (f: (P, P, P) => P)
       : F[P] =
     handleMissingDims((dimsFor[F](l) |@| dimsFor[F](c) |@| dimsFor[F](r))(f)) flatMap { ds =>
-      QAuthS.modify(_.addDims(g.root, ds)) as ds
+      QAuthS[F].modify(_.addDims(g.root, ds)) as ds
     }
 
   private def computeFuncProvenance[A](fm: FreeMapA[A])(f: A => P): P =
-    fm.para(ginterpret(f, computeFuncProvenanceƒ[A]))
+    fm.paraM(ginterpretM(f.andThen(Need(_)), computeFuncProvenanceƒ[A].andThen(Need(_)))).value
 
   private def computeJoin2[F[_]: Monad: MonadPlannerErr: QAuthS](
       g: QSUGraph,

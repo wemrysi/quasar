@@ -26,6 +26,7 @@ import quasar.{
   UnaryFunc,
   VarName
 }
+import quasar.contrib.cats.stateT._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
@@ -39,13 +40,20 @@ import quasar.sql._
 import quasar.std.StdLib, StdLib._
 import quasar.time.TemporalPart
 
+import cats.data.{EitherT, State, StateT}
+
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
+
 import pathy.Path._
-import scalaz.{Plus => _, Tree => _, Free => ZFree, Select => _, _}, Scalaz._
+
+import scalaz.{\/, -\/, \/-, Cofree, Equal, Functor, Free => ZFree, Monad, Need, Scalaz, Show}, Scalaz._
+
 import shapeless.{Annotations => _, Data => _, :: => _, _}
+
+import shims.monadToScalaz
 
 final case class TableContext[T]
   (root: Option[T], full: () => T, subtables: Map[String, T])
@@ -91,10 +99,10 @@ private object CompilerState {
   /** Runs a computation inside a binding/table context, which contains
     * compilation data for the bindings/tables in scope.
     */
-  def contextual[M[_], T, A]
+  def contextual[M[_]: Monad, T, A]
     (bc: BindingContext[T], tc: TableContext[T])
     (compM: M[A])
-    (implicit m: MonadState[M, CompilerState[T]])
+    (implicit m: MonadState_[M, CompilerState[T]])
       : M[A] = {
 
     def preMod: CompilerState[T] => CompilerState[T] =
@@ -106,36 +114,36 @@ private object CompilerState {
     m.modify(preMod) *> compM <* m.modify(postMod)
   }
 
-  def addFields[M[_], T, A]
-    (add: List[String])(f: M[A])(implicit m: MonadState[M, CompilerState[T]])
+  def addFields[M[_]: Monad, T, A]
+    (add: List[String])(f: M[A])(implicit m: MonadState_[M, CompilerState[T]])
       : M[A] =
     for {
-      curr <- fields
+      curr <- fields[M, T]
       _    <- m.modify((s: CompilerState[T]) => s.copy(fields = curr ++ add))
       a    <- f
     } yield a
 
-  def fields[M[_], T](implicit m: MonadState[M, CompilerState[T]])
+  def fields[M[_]: Functor, T](implicit m: MonadState_[M, CompilerState[T]])
       : M[List[String]] =
     m.get ∘ (_.fields)
 
-  def rootTable[M[_], T](implicit m: MonadState[M, CompilerState[T]])
+  def rootTable[M[_]: Functor, T](implicit m: MonadState_[M, CompilerState[T]])
       : M[Option[T]] =
     m.get ∘ (_.context.tableContext.headOption.flatMap(_.root))
 
-  def rootTableReq[M[_], T]
+  def rootTableReq[M[_]: Monad, T]
     (implicit
       MErr: MonadError_[M, SemanticError],
-      MState: MonadState[M, CompilerState[T]])
+      MState: MonadState_[M, CompilerState[T]])
       : M[T] =
-    rootTable >>=
+    rootTable[M, T] >>=
       (_.fold(MErr.raiseError[T](CompiledTableMissing))(_.point[M]))
 
   // prioritize binding context - when we want to prioritize a table,
   // we will have the table reference already in the binding context
-  def subtable[M[_], T]
+  def subtable[M[_]: Functor, T]
     (name: String)
-    (implicit m: MonadState[M, CompilerState[T]])
+    (implicit m: MonadState_[M, CompilerState[T]])
       : M[Option[T]] =
     m.get ∘ { state =>
       state.context.bindingContext.headOption.flatMap { bc =>
@@ -147,23 +155,23 @@ private object CompilerState {
       }
     }
 
-  def subtableReq[M[_], T]
+  def subtableReq[M[_]: Monad, T]
     (name: String)
     (implicit
       MErr: MonadError_[M, SemanticError],
-      MState: MonadState[M, CompilerState[T]])
+      MState: MonadState_[M, CompilerState[T]])
       : M[T] =
-    subtable(name) >>=
+    subtable[M, T](name) >>=
       (_.fold(
         MErr.raiseError[T](CompiledSubtableMissing(name)))(
         _.point[M]))
 
-  def fullTable[M[_], T](implicit m: MonadState[M, CompilerState[T]])
+  def fullTable[M[_]: Functor, T](implicit m: MonadState_[M, CompilerState[T]])
       : M[Option[T]] =
     m.get ∘ (_.context.tableContext.headOption.map(_.full()))
 
   /** Generates a fresh name for use as an identifier, e.g. tmp321. */
-  def freshName[M[_], T](prefix: String)(implicit m: MonadState[M, CompilerState[T]]): M[scala.Symbol] =
+  def freshName[M[_]: Monad, T](prefix: String)(implicit m: MonadState_[M, CompilerState[T]]): M[scala.Symbol] =
     m.get ∘ (s => scala.Symbol(prefix + s.nameGen.toString)) <*
       m.modify((s: CompilerState[T]) => s.copy(nameGen = s.nameGen + 1))
 }
@@ -197,8 +205,9 @@ final class Compiler[M[_], T: Equal]
   private def compile0
     (node: CoExpr)
     (implicit
+      MMonad: Monad[M],
       MErr: MonadError_[M, SemanticError],
-      MState: MonadState[M, CompilerState[T]])
+      MState: MonadState_[M, CompilerState[T]])
       : M[T] = {
     // NB: When there are multiple names for the same function, we may mark one
     //     with an `*` to indicate that it’s the “preferred” name, and others
@@ -281,7 +290,7 @@ final class Compiler[M[_], T: Equal]
       CIName("meta")                      -> structural.Meta)
 
     def compileDistinct(t: T) =
-      CompilerState.freshName("distinct") ∘ (name =>
+      CompilerState.freshName[M, T]("distinct") ∘ (name =>
         lpr.let(name, t, agg.Arbitrary(set.GroupBy(lpr.free(name), lpr.free(name)).embed).embed))
 
     def compileCases
@@ -337,7 +346,7 @@ final class Compiler[M[_], T: Equal]
       (next: M[T]) =>
       current.map { current =>
         for {
-          stepName <- CompilerState.freshName("tmp")
+          stepName <- CompilerState.freshName[M, T]("tmp")
           current  <- current
           bc        = relations match {
             case ExprRelationAST(_, Some(name))  => BindingContext(Map(name -> lpr.free(stepName)))
@@ -398,7 +407,7 @@ final class Compiler[M[_], T: Equal]
         case ExprRelationAST(expr, _) => compile0(expr)
 
         case JoinRelation(left, right, tpe, clause) =>
-          (CompilerState.freshName("left") ⊛ CompilerState.freshName("right"))((leftName, rightName) => {
+          (CompilerState.freshName[M, T]("left") ⊛ CompilerState.freshName[M, T]("right"))((leftName, rightName) => {
             val leftFree: T = lpr.joinSideName(leftName)
             val rightFree: T = lpr.joinSideName(rightName)
 
@@ -574,7 +583,7 @@ final class Compiler[M[_], T: Equal]
 
                             val distincted = isDistinct match {
                               case SelectDistinct =>
-                                ((CompilerState.rootTableReq[M, T] ⊛ CompilerState.freshName("distinct"))((t, name) =>
+                                ((CompilerState.rootTableReq[M, T] ⊛ CompilerState.freshName[M, T]("distinct"))((t, name) =>
                                   orderBy.fold(
                                     distinct(name, agg.Arbitrary, t).point[M])(
                                     sort(_, distinct(name, agg.First, t)))).join).some
@@ -617,7 +626,7 @@ final class Compiler[M[_], T: Equal]
 
       case Splice(expr) =>
         expr.fold(
-          CompilerState.fullTable.flatMap(_.map(emit _).getOrElse(fail(GenericError("Not within a table context so could not find table expression for wildcard")))))(
+          CompilerState.fullTable[M, T].flatMap(_.map(emit _).getOrElse(fail(GenericError("Not within a table context so could not find table expression for wildcard")))))(
           compile0)
 
       case Binop(left, right, op) =>
@@ -677,7 +686,7 @@ final class Compiler[M[_], T: Equal]
           .valueOr(compileFunction[nat._1](_, Func.Input1(expr)))
 
       case Ident(name) =>
-        CompilerState.fields.flatMap(fields =>
+        CompilerState.fields[M, T].flatMap(fields =>
           if (fields.any(_ ≟ name))
             CompilerState.rootTableReq[M, T] ∘
             (structural.MapProject(_, lpr.constant(Data.Str(name))).embed)
@@ -702,7 +711,7 @@ final class Compiler[M[_], T: Equal]
       case InvokeFunction(name, args) if name ≟ CIName("coalesce") =>
         args match {
           case List(a1, a2) =>
-            (CompilerState.freshName("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
+            (CompilerState.freshName[M, T]("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
               lpr.let(name, c1,
                 relations.Cond(
                   // TODO: Ideally this would use `is null`, but that doesn’t makes it
@@ -753,8 +762,9 @@ final class Compiler[M[_], T: Equal]
   def compile
     (tree: Cofree[Sql, SA.Annotations])
     (implicit
+      MMonad: Monad[M],
       MErr: MonadError_[M, SemanticError],
-      MState: MonadState[M, CompilerState[T]],
+      MState: MonadState_[M, CompilerState[T]],
       S: Show[T],
       R: RenderTree[T])
       : M[T] =
@@ -766,10 +776,6 @@ object Compiler {
     (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
     new Compiler[M, T]
 
-  def trampoline[T: Equal]
-    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
-    apply[StateT[EitherT[scalaz.Free.Trampoline, SemanticError, ?], CompilerState[T], ?], T]
-
   def compile[T: Equal: RenderTree]
     (tree: Cofree[Sql, SA.Annotations])
     (implicit
@@ -777,7 +783,10 @@ object Compiler {
      TC: Corecursive.Aux[T, LP],
      S: Show[T])
      : SemanticError \/ T =
-    trampoline[T].compile(tree).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.run
+    apply[StateT[EitherT[cats.Eval, SemanticError, ?], CompilerState[T], ?], T]
+      .compile(tree)
+      .runA(CompilerState(Nil, Context(Nil, Nil), 0))
+      .value.value.disjunction
 
   /** Emulate SQL semantics by reducing any projection which trivially
     * matches a key in the "group by".
@@ -814,7 +823,7 @@ object Compiler {
     val KS = MonadState_[State[KeyState, ?], KeyState]
 
     def makeKey(tree: T, flp: ZFree[LP, Unit]): T =
-      flp.cata(interpret[LP, Unit, T](_ => tree, _.embed))
+      flp.cataM(interpretM[Need, LP, Unit, T](_ => Need(tree), fa => Need(fa.embed))).value
 
     // Step 1: annotate nodes containing the keys.
     val ann: State[KeyState, Cofree[LP, Boolean]] = tree.transAnaM {
@@ -851,8 +860,7 @@ object Compiler {
       }
     }
 
-    ann.eval((sources, sources.map { case (t, flp) => makeKey(t,flp) })).ana[T](rewriteƒ)
-
+    ann.runA((sources, sources.map { case (t, flp) => makeKey(t,flp) })).value.ana[T](rewriteƒ)
   }
 
 }

@@ -19,14 +19,20 @@ package quasar.qsu
 import slamdata.Predef._
 
 import quasar.common.effect.NameGenerator
+import quasar.contrib.cats.stateT._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp.symbolOrder
 import quasar.fp.ski.ι
 import quasar.qscript.{construction, Hole, HoleF, MonadPlannerErr, ReduceFunc, ReduceIndexF, SrcHole}
 import ApplyProvenance.AuthenticatedQSU
 
+import cats.data.StateT
+
 import matryoshka._
-import scalaz.{Equal, ISet, Monad, NonEmptyList, Scalaz, StateT}, Scalaz._
+
+import scalaz.{Equal, ISet, Monad, NonEmptyList, Scalaz}, Scalaz._
+
+import shims.{monadToCats, monadToScalaz}
 
 sealed abstract class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] extends MraPhase[T] {
   import QSUGraph.Extractors._
@@ -79,7 +85,7 @@ sealed abstract class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
         }
     }
 
-    bucketsReified.run(aqsu.auth).eval(aqsu.graph.generateRevIndex) map {
+    bucketsReified.run(aqsu.auth).runA(aqsu.graph.generateRevIndex) map {
       case (auth, graph) => ApplyProvenance.AuthenticatedQSU(graph, auth)
     }
   }

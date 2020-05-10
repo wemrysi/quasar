@@ -28,6 +28,7 @@ import quasar.{
 }
 import quasar.common.data.Data
 import quasar.common.effect.NameGenerator
+import quasar.contrib.cats.stateT._
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
@@ -57,6 +58,8 @@ import quasar.qscript.{
 import quasar.qscript.PlannerError.NonRepresentableData
 import quasar.qsu.{QScriptUniform => QSU}
 
+import cats.data.StateT
+
 import iotaz.CopK
 
 import matryoshka.{AlgebraM, BirecursiveT}
@@ -65,9 +68,11 @@ import matryoshka.patterns.{interpretM, CoEnv}
 
 import pathy.Path.{rootDir, Sandboxed}
 
-import scalaz.{\/, Free, Monad, StateT, Scalaz}, Scalaz._   // monad/traverse conflict
+import scalaz.{\/, Free, Monad, Scalaz}, Scalaz._   // monad/traverse conflict
 
 import shapeless.Sized
+
+import shims.{monadToCats, monadToScalaz}
 
 final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 
@@ -82,7 +87,7 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       plan: T[lp.LogicalPlan]): F[QSUGraph] =
     cataWithLetM[StateT[StateT[F, RevIdx, ?], LetS, ?]](
       plan,
-      readLPƒ[StateT[StateT[F, RevIdx, ?], LetS, ?]]).eval(SMap()).eval(SMap())
+      readLPƒ[StateT[StateT[F, RevIdx, ?], LetS, ?]]).runA(SMap()).runA(SMap())
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def cataWithLetM[G[_]: Monad](

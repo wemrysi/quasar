@@ -32,6 +32,7 @@ import quasar.RenderTreeT
 //import quasar.RenderTree.ops._
 import quasar.common.effect.NameGenerator
 import quasar.contrib.iota._
+import quasar.contrib.matryoshka.implicits._
 import quasar.contrib.scalaz.free._
 import quasar.contrib.std.errorImpossible
 import quasar.fp.ski.κ2

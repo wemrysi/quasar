@@ -22,6 +22,7 @@ import quasar.{Qspec, TreeMatchers}
 import quasar.IdStatus.ExcludeId
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
+import quasar.contrib.matryoshka.implicits._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._

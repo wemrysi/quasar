@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.{IdStatus, Qspec, TreeMatchers}
 import quasar.common.{SortDir, JoinType}
 import quasar.contrib.matryoshka._
+import quasar.contrib.matryoshka.implicits._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.implicits._
 import quasar.ejson.{EJson, Fixed}
