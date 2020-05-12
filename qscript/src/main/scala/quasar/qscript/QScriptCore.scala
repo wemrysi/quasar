@@ -20,6 +20,7 @@ import slamdata.Predef.{Map => ScalaMap, _}
 import quasar.{IdStatus, NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
+import quasar.contrib.matryoshka.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 

@@ -19,15 +19,14 @@ package quasar.qscript.rewrites
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
 import quasar.contrib.iota._
+import quasar.contrib.scalaz.free._
 import quasar.fp.PrismNT
 import quasar.qscript._
 
 import iotaz.CopK
 import matryoshka.{Hole => _, _}
-import matryoshka.data._
 import matryoshka.implicits._
 import scalaz.{~>, Functor}
-import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 
 private class NormalizeQScript[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
@@ -44,7 +43,7 @@ private class NormalizeQScript[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT
     ftg => FToNorm(ftg) match {
       case Some(QSC(value)) => value match {
         // no-op Map
-        case Map(src, mf) if mf === HoleR => src.project
+        case Map(src, FreeA(SrcHole)) => src.project
 
         case Map(outerSrc, outerMF) =>
           prismGF.unapply(outerSrc.project) match {

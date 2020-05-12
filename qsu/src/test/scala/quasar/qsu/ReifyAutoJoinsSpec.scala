@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import quasar.{IdStatus, Qspec, TreeMatchers}
 import quasar.contrib.iota._
+import quasar.contrib.matryoshka.implicits._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._

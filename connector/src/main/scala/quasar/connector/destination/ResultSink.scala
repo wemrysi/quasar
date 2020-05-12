@@ -19,12 +19,12 @@ package quasar.connector.destination
 import slamdata.Predef._
 
 import quasar.api.Column
+import quasar.api.push.OffsetKey
 import quasar.api.resource.ResourcePath
 import quasar.connector._
 import quasar.connector.render.RenderConfig
 
 import cats.data.NonEmptyList
-import cats.syntax.functor._
 
 import fs2.Stream
 
@@ -34,37 +34,37 @@ sealed trait ResultSink[F[_], T] extends Product with Serializable
 
 object ResultSink {
   final case class CreateSink[F[_], T](
-      config: RenderConfig,
+      renderConfig: RenderConfig,
       consume: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
       extends ResultSink[F, T]
 
   object UpsertSink {
     final case class Args[F[_], T, A](
         path: ResourcePath,
-        idColumn: Column[TypedKey[T, A]],
-        otherColumns: NonEmptyList[Column[T]],
+        idColumn: Column[T],
+        otherColumns: List[Column[T]],
         writeMode: WriteMode,
-        input: Stream[F, DataEvent.Primitive[A, Offset]]) {
+        input: Stream[F, DataEvent[OffsetKey.Actual[A]]]) {
 
-      def columns =
-        idColumn.map(_.value.getConst) :: otherColumns
+      def columns: NonEmptyList[Column[T]] =
+        NonEmptyList(idColumn, otherColumns)
     }
   }
 
   final case class UpsertSink[F[_], T](
-      renderConfig: RenderConfig,
-      consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, Offset]]])
+      renderConfig: RenderConfig.Csv,
+      consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, OffsetKey.Actual[α]]]])
       extends ResultSink[F, T]
 
   def create[F[_], T](
-      config: RenderConfig)(
+      renderConfig: RenderConfig)(
       consume: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
       : ResultSink[F, T] =
-    CreateSink(config, consume)
+    CreateSink(renderConfig, consume)
 
   def upsert[F[_], T](
-      config: RenderConfig)(
-      consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, Offset]]])
+      renderConfig: RenderConfig.Csv)(
+      consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, OffsetKey.Actual[α]]]])
       : ResultSink[F, T] =
-    UpsertSink(config, consume)
+    UpsertSink(renderConfig, consume)
 }

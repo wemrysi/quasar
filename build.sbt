@@ -106,8 +106,7 @@ lazy val foundation = project
       "com.slamdata"               %% "slamdata-predef"           % "0.1.2",
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
       "com.codecommit"             %% "shims"                     % "2.1.0",
-      "com.codecommit"             %% "shims-effect"              % "2.1.0",
-      "com.codecommit"             %% "skolems"                   % "0.1.2",
+      "com.codecommit"             %% "skolems"                   % skolemsVersion,
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
       "org.typelevel"              %% "cats-effect-laws"          % catsEffectVersion % Test,
       "co.fs2"                     %% "fs2-core"                  % fs2Version,
@@ -124,13 +123,13 @@ lazy val foundation = project
       "com.precog"                 %% "qdata-time"                % qdataVersion.value,
       "eu.timepit"                 %% "refined"                   % refinedVersion,
       "com.chuusai"                %% "shapeless"                 % shapelessVersion,
-      "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
       "com.propensive"             %% "contextual"                % "1.2.1",
       "io.frees"                   %% "iotaz-core"                % "0.3.10",
       "com.github.markusbernhardt"  % "proxy-vole"                % "1.0.5",
       "org.typelevel"              %% "simulacrum"                % "1.0.0",
       "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
       "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
+      "org.scalacheck"             %% "scalacheck"                % scalacheckVersion                    % Test,
       "org.typelevel"              %% "spire-laws"                % spireVersion                         % Test,
       "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
       "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
@@ -149,7 +148,7 @@ lazy val api = project
 
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro"      % monocleVersion,
-      "com.codecommit"             %% "skolems"            % "0.2.0",
+      "com.codecommit"             %% "skolems"            % skolemsVersion,
       "eu.timepit"                 %% "refined-scalaz"     % refinedVersion,
       "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test))
   .settings(commonSettings)
@@ -276,6 +275,7 @@ lazy val impl = project
       "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
       "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
       "io.argonaut"    %% "argonaut-cats"            % argonautVersion,
+      "io.chrisdavenport" %% "log4cats-slf4j"        % log4CatsVersion,
       "org.typelevel"  %% "jawn-util"                % jawnVersion,
       "io.atomix"      % "atomix"                    % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
       "org.scodec"     %% "scodec-bits"              % scodecBitsVersion,
@@ -284,5 +284,7 @@ lazy val impl = project
       "eu.timepit"     %% "refined-scalacheck"       % refinedVersion % Test,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
-      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2"))
+      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2",
+
+      "org.typelevel" %% "kittens" % kittensVersion % Test))
   .evictToLocal("FS2_JOB_PATH", "core")

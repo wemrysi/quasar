@@ -28,7 +28,7 @@ import scala.collection.mutable.ArrayBuffer
 import cats.effect.Sync
 import cats.implicits._
 
-import fs2.{compress, Chunk, Stream, Pipe}
+import fs2.{compression, Chunk, Stream, Pipe}
 
 import qdata.{QData, QDataEncode}
 import qdata.tectonic.QDataPlate
@@ -74,7 +74,10 @@ object ResultParser {
           bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
 
       case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
-        compress.gunzip[F](DefaultDecompressionBufferSize) andThen typed[F, A](pt)
+        compression
+          .gunzip[F](DefaultDecompressionBufferSize)
+          .andThen(_.flatMap(_.content))
+          .andThen(typed[F, A](pt))
     }
   }
 
@@ -124,8 +127,10 @@ object ResultParser {
       : Pipe[F, Byte, A] =
     format match {
       case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
-        compress.gunzip[F](DefaultDecompressionBufferSize) andThen
-          stateful(pt, plate, state, data)
+        compression
+          .gunzip[F](DefaultDecompressionBufferSize)
+          .andThen(_.flatMap(_.content))
+          .andThen(stateful(pt, plate, state, data))
 
       case DataFormat.Json(vnt, isPrecise) =>
         val mode: json.Parser.Mode = vnt match {

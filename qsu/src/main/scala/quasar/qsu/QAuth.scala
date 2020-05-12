@@ -18,7 +18,8 @@ package quasar.qsu
 
 import slamdata.Predef._
 import quasar.ejson.implicits._
-import quasar.contrib.iota.{copkEqual, copkShow, copkTraverse}
+import quasar.contrib.iota.{copkLazyEqual, copkShow, copkTraverse}
+import quasar.contrib.matryoshka.implicits._
 import quasar.fp.{symbolOrder, symbolShow}
 import quasar.qscript.{FreeMap, MonadPlannerErr, PlannerError}, PlannerError.InternalError
 

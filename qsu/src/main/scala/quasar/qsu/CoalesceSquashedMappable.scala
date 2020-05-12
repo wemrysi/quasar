@@ -43,7 +43,7 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 
-import scalaz.{State => _, _}, Scalaz._
+import scalaz.{\/, Foldable, Scalaz}, Scalaz._
 
 import shims.{monadToCats, monadToScalaz}
 

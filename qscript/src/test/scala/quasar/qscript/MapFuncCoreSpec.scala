@@ -20,9 +20,10 @@ import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers, Type}
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
-import quasar.contrib.iota.{copkEqual, copkTraverse, copkShow}
+import quasar.contrib.iota.{copkLazyEqual, copkTraverse, copkShow}
+import quasar.contrib.matryoshka.implicits._
 
-import matryoshka.{delayEqual, delayShow}
+import matryoshka.delayShow
 import matryoshka.data.Fix
 import matryoshka.data.free._
 import matryoshka.implicits._

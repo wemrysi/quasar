@@ -19,6 +19,8 @@ package quasar.qscript
 import slamdata.Predef._
 
 import quasar._
+import quasar.contrib.matryoshka.LazyEqual
+import quasar.contrib.matryoshka.implicits._
 
 import matryoshka._
 import monocle.macros.Lenses
@@ -67,23 +69,23 @@ object MapFuncDerived {
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Equals"))
-  implicit def equal[T[_[_]]: EqualT, A]: Delay[Equal, MapFuncDerived[T, ?]] =
-    new Delay[Equal, MapFuncDerived[T, ?]] {
-      def apply[A](in: Equal[A]): Equal[MapFuncDerived[T, A]] = Equal.equal {
+  implicit def equal[T[_[_]]: EqualT, A]: Delay[LazyEqual, MapFuncDerived[T, ?]] =
+    new Delay[LazyEqual, MapFuncDerived[T, ?]] {
+      def apply[A](in: LazyEqual[A]): LazyEqual[MapFuncDerived[T, A]] = LazyEqual.lazyEqual {
         // unary
         case (Abs(a1), Abs(a2)) => in.equal(a1, a2)
         case (Ceil(a1), Ceil(a2)) => in.equal(a1, a2)
         case (Floor(a1), Floor(a2)) => in.equal(a1, a2)
         case (Trunc(a1), Trunc(a2)) => in.equal(a1, a2)
         case (Round(a1), Round(a2)) => in.equal(a1, a2)
-        case (Typecheck(a1, typ1), Typecheck(a2, typ2)) => in.equal(a1, a2) && typ1 === typ2
+        case (Typecheck(a1, typ1), Typecheck(a2, typ2)) => Need(typ1 === typ2) && in.equal(a1, a2)
 
         // binary
         case (FloorScale(a11, a12), FloorScale(a21, a22)) => in.equal(a11, a21) && in.equal(a12, a22)
         case (CeilScale(a11, a12), CeilScale(a21, a22))   => in.equal(a11, a21) && in.equal(a12, a22)
         case (RoundScale(a11, a12), RoundScale(a21, a22)) => in.equal(a11, a21) && in.equal(a12, a22)
 
-        case (_, _) => false
+        case (_, _) => Need(false)
       }
     }
 

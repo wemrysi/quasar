@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers, Type}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.contrib.iota._
+import quasar.contrib.matryoshka.implicits._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
@@ -87,7 +88,7 @@ object MinimizeAutoJoinsSpec
     RecFreeS.equal[MapFunc, A]
 
   implicit def freeMapEqual[A: scalaz.Equal]: scalaz.Equal[FreeMapA[A]] =
-    matryoshka.data.free.freeEqual[MapFunc].apply(scalaz.Equal[A])
+    quasar.contrib.matryoshka.implicits.lazyEqualEqual[FreeMapA[A]]
 
   type J = Fix[EJson]
   val J = Fixed[Fix[EJson]]

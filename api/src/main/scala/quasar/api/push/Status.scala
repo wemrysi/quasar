@@ -18,41 +18,57 @@ package quasar.api.push
 
 import slamdata.Predef._
 
-import java.time.Instant
+import java.time.{Duration, Instant}
 
-import scalaz.{Equal, Show}
+import cats.{Eq, Show}
 
-sealed trait Status extends Product with Serializable
+sealed trait Status extends Product with Serializable {
+  def startedAt: Instant
+  def limit: Option[Long]
+}
 
 object Status {
-  final case class Finished(startedAt: Instant, finishedAt: Instant) extends Status
-  final case class Running(startedAt: Instant) extends Status
-  final case class Canceled(startedAt: Instant, canceledAt: Instant) extends Status
-  final case class Failed(th: Throwable, startedAt: Instant, failedAt: Instant) extends Status
+  final case class Unknown(startedAt: Instant, limit: Option[Long])
+      extends Status
 
-  implicit val equal: Equal[Status] =
-    Equal.equalA
+  sealed trait Active extends Status
 
-  implicit val show: Show[Status] = Show.shows {
-    case Finished(startedAt, finishedAt) =>
-      s"Finished($startedAt, $finishedAt)"
-    case Running(startedAt) =>
-      s"Running($startedAt)"
-    case Canceled(startedAt, canceledAt) =>
-      s"Canceled($startedAt, $canceledAt)"
-    case Failed(ex, startedAt, finishedAt) =>
-      s"Failed(${ex.getMessage}, $startedAt, $finishedAt)" + "\n\n" + s"$ex"
+  final case class Accepted(startedAt: Instant, limit: Option[Long])
+      extends Active
+  final case class Running(startedAt: Instant, limit: Option[Long])
+      extends Active
+
+  sealed trait Terminal extends Status
+
+  final case class Finished(startedAt: Instant, finishedAt: Instant, limit: Option[Long])
+      extends Terminal
+  final case class Canceled(startedAt: Instant, canceledAt: Instant, limit: Option[Long])
+      extends Terminal
+  final case class Failed(startedAt: Instant, failedAt: Instant, limit: Option[Long], reason: String)
+      extends Terminal
+
+  val elapsed: Terminal => Duration = {
+    case Finished(s, e, _) => Duration.between(s, e)
+    case Canceled(s, e, _) => Duration.between(s, e)
+    case Failed(s, e, _, _) => Duration.between(s, e)
   }
 
-  def finished(startedAt: Instant, finishedAt: Instant): Status =
-    Finished(startedAt, finishedAt)
+  implicit def statusEq[S <: Status]: Eq[S] =
+    Eq.fromUniversalEquals
 
-  def running(startedAt: Instant): Status =
-    Running(startedAt)
-
-  def canceled(startedAt: Instant, canceledAt: Instant): Status =
-    Canceled(startedAt, canceledAt)
-
-  def failed(ex: Throwable, startedAt: Instant, failedAt: Instant): Status =
-    Failed(ex, startedAt, failedAt)
+  implicit def statusShow[S <: Status]: Show[S] =
+    Show show {
+      case Unknown(startedAt, limit) =>
+        s"Unknown($startedAt, $limit)"
+      case Accepted(startedAt, limit) =>
+        s"Accepted($startedAt, $limit)"
+      case Running(startedAt, limit) =>
+        s"Running($startedAt, $limit)"
+      case Finished(startedAt, finishedAt, limit) =>
+        s"Finished($startedAt, $finishedAt, $limit)"
+      case Canceled(startedAt, canceledAt, limit) =>
+        s"Canceled($startedAt, $canceledAt, $limit)"
+      case Failed(startedAt, finishedAt, limit, reason) =>
+        s"Failed($startedAt, $finishedAt, $limit, $reason)"
+    }
 }

@@ -22,9 +22,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.{IO, Resource}
 import cats.effect.concurrent.Ref
+import cats.implicits._
+
 import scalaz.IMap
 import scalaz.std.anyVal._
-import scalaz.std.string._
 
 object RefIndexedStoreSpec extends RefSpec(Ref.unsafe[IO, Int](0))
 

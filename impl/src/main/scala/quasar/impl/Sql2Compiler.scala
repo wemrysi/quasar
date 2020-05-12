@@ -17,19 +17,24 @@
 package quasar.impl
 
 import slamdata.Predef.{Long, None, StringContext}
+
 import quasar.RenderTreeT
 import quasar.common.{phaseM, PhaseResultTell}
-import quasar.compile.queryPlan
+import quasar.compile.{queryPlan, MonadSemanticErrs}
+import quasar.contrib.cats.stateT._
 import quasar.contrib.iota._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.impl.implicits._
-import quasar.qscript.QScriptEducated
+import quasar.qscript.{MonadPlannerErr, QScriptEducated}
 import quasar.qsu.LPtoQS
-import quasar.sql.parser
+import quasar.sql.{parser, MonadParsingErr}
 
-import cats.data.Kleisli
+import cats.Monad
+import cats.data.{Kleisli, StateT}
+import cats.syntax.flatMap._
+import cats.syntax.functor._
 
 import eu.timepit.refined.auto._
 
@@ -39,8 +44,7 @@ import org.slf4s.Logging
 
 import pathy.Path.posixCodec
 
-import scalaz.{Monad, StateT}
-import scalaz.syntax.bind._
+import shims.monadToScalaz
 
 object Sql2Compiler extends Logging {
   def apply[
@@ -54,15 +58,14 @@ object Sql2Compiler extends Logging {
 
   def sql2ToQScript[
       T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
-      F[_]: Monad: MonadQuasarErr: PhaseResultTell](
+      F[_]: Monad: MonadParsingErr: MonadPlannerErr: MonadSemanticErrs: PhaseResultTell](
       sqlQuery: SqlQuery)
       : F[T[QScriptEducated[T, ?]]] =
     for {
-      sql <- MonadQuasarErr[F].unattempt_(
-        parser[T].parseExpr(sqlQuery.query.value).leftMap(QuasarError.parsing(_)))
+      sql <- MonadParsingErr[F].unattempt_(parser[T].parseExpr(sqlQuery.query.value))
 
       lp  <- queryPlan[F, T, T[LP]](sql, sqlQuery.vars, sqlQuery.basePath, 0L, None)
 
-      qs  <- phaseM[F]("QScript (Educated)", LPtoQS[T].apply[StateT[F, Long, ?]](lp).eval(0))
+      qs  <- phaseM[F]("QScript (Educated)", LPtoQS[T].apply[StateT[F, Long, ?]](lp).runA(0))
     } yield qs
 }

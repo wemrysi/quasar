@@ -14,22 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.api.push
+package quasar.api
 
-import slamdata.Predef._
+import slamdata.Predef.{Either, Int, String}
 
-import scalaz.{Equal, Show}
+import cats.data.NonEmptyList
 
-sealed trait ResultType extends Product with Serializable
-
-object ResultType {
-  case object Csv extends ResultType
-
-  implicit def equal: Equal[ResultType] =
-    Equal.equalA[ResultType]
-
-  implicit def show: Show[ResultType] =
-    Show.shows[ResultType] {
-      case ResultType.Csv => "csv"
-    }
+package object push {
+  type OffsetPath = NonEmptyList[Either[String, Int]]
 }

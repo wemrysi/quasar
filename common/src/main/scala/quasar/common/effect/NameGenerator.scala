@@ -21,9 +21,14 @@ import slamdata.Predef._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp.ski.κ
 
+import cats.data.StateT
+
 import simulacrum.typeclass
-import scalaz._
+
+import scalaz.{StateT => _, _}
 import scalaz.syntax.bind._
+
+import shims.monadToCats
 
 /** A source of strings unique within `F[_]`, an implementation must have the
   * property that, if Applicative[F], then (freshName |@| freshName)(_ != _).
@@ -59,7 +64,7 @@ sealed abstract class NameGeneratorInstances0 {
       def freshName = ReaderT(κ(NameGenerator[F].freshName))
     }
 
-  implicit def stateTNameGenerator[F[_]: NameGenerator : Monad, S]: NameGenerator[StateT[F, S, ?]] =
+  implicit def catsStateTNameGenerator[F[_]: NameGenerator : Monad, S]: NameGenerator[StateT[F, S, ?]] =
     new NameGenerator[StateT[F, S, ?]] {
       def freshName = StateT(s => NameGenerator[F].freshName strengthL s)
     }

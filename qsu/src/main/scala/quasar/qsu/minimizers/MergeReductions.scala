@@ -18,10 +18,11 @@ package quasar.qsu
 package minimizers
 
 import quasar.common.effect.NameGenerator
+import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
+import quasar.contrib.matryoshka.implicits._
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,

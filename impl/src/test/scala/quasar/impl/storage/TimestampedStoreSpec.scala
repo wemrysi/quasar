@@ -23,8 +23,7 @@ import quasar.impl.cluster.Timestamped
 
 import cats.effect.{IO, Resource, Timer}
 import cats.effect.concurrent.{Ref, Deferred}
-
-import scalaz.std.string._
+import cats.instances.string._
 
 import java.util.concurrent.ConcurrentHashMap
 

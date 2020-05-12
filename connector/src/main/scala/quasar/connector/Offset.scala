@@ -14,22 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.contrib.scalaz
+package quasar.connector
 
-import slamdata.Predef.{Int, Unit}
+import quasar.api.push.{OffsetKey, OffsetPath}
 
-import org.specs2.mutable.Specification
-import scalaz.concurrent.Task
+import skolems.∃
 
-class MoreBindOpsSpec extends Specification {
-  import bind._
-
-  "MoreBindOps" >> {
-    "<<" >> {
-      var state = true
-      val t1: Task[Int] = Task.delay{state = true; 7}
-      val t2: Task[Unit]  = Task.delay{state = false}
-      ((t1 << t2).unsafePerformSync must_=== 7) and (state must_=== false)
-    }
-  }
-}
+final case class Offset(path: OffsetPath, value: ∃[OffsetKey.Actual])

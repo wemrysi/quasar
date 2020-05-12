@@ -14,24 +14,32 @@
  * limitations under the License.
  */
 
-package quasar.contrib.pathy
+package quasar.api.push
 
 import slamdata.Predef._
 
-import java.io.{File => JFile}
+import java.time.Instant
 
-import _root_.pathy.Path, Path._
-import _root_.scalaz.concurrent.Task
+import cats.{Eq, Show}
+import cats.implicits._
 
-object Helpers {
-  /** Returns the contents of the file as a `String`. */
-  def textContents(file: RFile): Task[String] =
-    jtextContents(jFile(file))
+import monocle.macros.Lenses
 
-  /** Returns the contents of the file as a `String`. */
-  def jtextContents(file: JFile): Task[String] =
-    Task.delay(scala.io.Source.fromInputStream(new FileInputStream(file)).mkString)
+import shims.{equalToCats, showToCats}
 
-  def jFile(path: Path[_, _, Sandboxed]): JFile =
-    new JFile(posixCodec.printPath(path))
+@Lenses
+final case class Push[O, Q](
+    config: PushConfig[O, Q],
+    createdAt: Instant,
+    status: Status)
+
+object Push {
+  implicit def pushEq[O, Q: Eq]: Eq[Push[O, Q]] = {
+    implicit val instantEq = Eq.fromUniversalEquals[Instant]
+    Eq.by(p => (p.config, p.createdAt, p.status))
+  }
+
+  implicit def pushShow[O, Q: Show]: Show[Push[O, Q]] =
+    Show.show(p =>
+      s"Push(${p.config.show}, ${p.createdAt}, ${p.status.show})")
 }

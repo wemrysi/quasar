@@ -23,6 +23,7 @@ import quasar.{RenderTreeT, Type}
 import quasar.common.effect.NameGenerator
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
+import quasar.contrib.matryoshka.implicits._
 import quasar.ejson.{CommonEJson, Str}
 import quasar.ejson.implicits._
 import quasar.fp._
