@@ -90,12 +90,12 @@ private[impl] final class DefaultResultPush[
           val canceled = Status.Canceled(runningAt, canceledAt, limit)
           pushes.insert(key, ∃[Push[?, Q]](p.value.copy(status = canceled)))
             .guarantee(terminal.complete(canceled))
-            .productR(log.info(debugTerminal("canceled", key, canceled)))
+            .productR(log.debug(debugTerminal("canceled", key, canceled)))
 
         case accepted =>
           val canceled = Status.Canceled(accepted.at, canceledAt, accepted.limit)
           accepted.terminal.complete(canceled)
-            .productR(log.info(debugTerminal("aborted", key, canceled)))
+            .productR(log.debug(debugTerminal("aborted", key, canceled)))
       }
     } yield ()
 
@@ -164,7 +164,7 @@ private[impl] final class DefaultResultPush[
 
     EitherT.right[Errs](instantNow)
       .flatMap(runPush(destinationId, cfg, limit, _, None))
-      .productL(EitherT.right[Errs](log.info(s"${debugKey(key)} Start push accepted")))
+      .productL(EitherT.right[Errs](log.debug(s"${debugKey(key)} Start push accepted")))
       .value
   }
 
@@ -219,7 +219,7 @@ private[impl] final class DefaultResultPush[
               .flatMap(resume(inc, push.createdAt))
         }
       }
-      .productL(EitherT.right[Errs](log.info(s"${debugKey(key)} Update push accepted")))
+      .productL(EitherT.right[Errs](log.debug(s"${debugKey(key)} Update push accepted")))
       .value
   }
 
@@ -377,7 +377,7 @@ private[impl] final class DefaultResultPush[
         _ <- pushes.insert(key, unknownPush)
         _ <- if (isResume) ().pure[F] else offsets.delete(key).void
 
-        _ <- log.info(s"${debugKey(key)} Push running")
+        _ <- log.debug(s"${debugKey(key)} Push running")
       } yield ()
 
       job = Stream.eval_(preamble) ++ sinked
@@ -614,7 +614,7 @@ private[impl] object DefaultResultPush {
                 limit)
 
               complete(s, id, p.value, finished, limit, deferred)
-                .productR(log.info(debugTerminal("finished", id, finished)))
+                .productR(log.debug(debugTerminal("finished", id, finished)))
 
             case _ => Applicative[F].unit
           }
