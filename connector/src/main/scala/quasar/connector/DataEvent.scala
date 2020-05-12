@@ -16,81 +16,60 @@
 
 package quasar.connector
 
-import slamdata.Predef._
+import slamdata.Predef.{Eq => _, _}
 
-import cats.{Applicative, Bitraverse, Eq, Eval, Show}
-import cats.data.NonEmptyList
-import cats.instances.byte._
-import cats.syntax.eq._
-import cats.syntax.functor._
-import cats.syntax.show._
+import cats._
+import cats.implicits._
 
 import fs2.Chunk
 
-sealed trait DataEvent[+I, +O] extends Product with Serializable
+sealed trait DataEvent[+O] extends Product with Serializable
 
 object DataEvent {
-  final case class Replace[I](id: I, newRecord: Chunk[Byte]) extends DataEvent[I, Nothing]
-
-  sealed trait Primitive[+I, +O] extends DataEvent[I, O]
-  final case class Create(records: Chunk[Byte]) extends Primitive[Nothing, Nothing]
-  final case class Delete[I](recordIds: NonEmptyList[I]) extends Primitive[I, Nothing]
+  final case class Create(records: Chunk[Byte]) extends DataEvent[Nothing]
+  final case class Delete(recordIds: IdBatch) extends DataEvent[Nothing]
 
   /** A transaction boundary, consumers should treat all events since the
     * previous `Commit` (or the start of the stream) as part of a single
     * transaction, if possible.
     */
-  final case class Commit[O](offset: O) extends Primitive[Nothing, O]
+  final case class Commit[O](offset: O) extends DataEvent[O]
 
-  implicit val dataEventBitraverse: Bitraverse[DataEvent] =
-    new Bitraverse[DataEvent] {
-      def bifoldLeft[A, B, C](fab: DataEvent[A, B], c: C)(f: (C, A) => C, g: (C, B) => C): C =
-        fab match {
-          case Replace(a, _) => f(c, a)
-          case Create(_) => c
-          case Delete(as) => as.foldLeft(c)(f)
-          case Commit(b) => g(c, b)
+  implicit val dataEventTraverse: Traverse[DataEvent] =
+    new Traverse[DataEvent] {
+      def foldLeft[A, B](fa: DataEvent[A], b: B)(f: (B, A) => B): B =
+        fa match {
+          case Create(_) => b
+          case Delete(_) => b
+          case Commit(a) => f(b, a)
         }
 
-      def bifoldRight[A, B, C](fab: DataEvent[A, B], c: Eval[C])(f: (A, Eval[C]) => Eval[C], g: (B, Eval[C]) => Eval[C]): Eval[C] =
-        fab match {
-          case Replace(a, _) => f(a, c)
-          case Create(_) => c
-          case Delete(as) => as.foldRight(c)(f)
-          case Commit(b) => g(b, c)
+      def foldRight[A, B](fa: DataEvent[A], b: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
+        fa match {
+          case Create(_) => b
+          case Delete(_) => b
+          case Commit(a) => f(a, b)
         }
 
-      def bitraverse[G[_]: Applicative, A, B, C, D](fab: DataEvent[A, B])(f: A => G[C], g: B => G[D]): G[DataEvent[C, D]] =
-        fab match {
-          case Replace(a, r) => f(a).map(Replace(_, r): DataEvent[C, D])
-          case Create(r) => Applicative[G].pure[DataEvent[C, D]](Create(r))
-          case Delete(as) => as.traverse(f).map(Delete(_): DataEvent[C, D])
-          case Commit(b) => g(b).map(Commit(_): DataEvent[C, D])
-        }
-
-      override def bimap[A, B, C, D](fab: DataEvent[A, B])(f: A => C, g: B => D): DataEvent[C, D] =
-        fab match {
-          case Replace(a, r) => Replace(f(a), r)
-          case Create(rs) => Create(rs)
-          case Delete(as) => Delete(as map f)
-          case Commit(b) => Commit(g(b))
+      def traverse[F[_]: Applicative, A, B](fa: DataEvent[A])(f: A => F[B]): F[DataEvent[B]] =
+        fa match {
+          case c @ Create(_) => (c: DataEvent[B]).pure[F]
+          case d @ Delete(_) => (d: DataEvent[B]).pure[F]
+          case Commit(a) => f(a).map(Commit(_))
         }
     }
 
-  implicit def dataEventEq[I: Eq, O: Eq, E <: DataEvent[I, O]]: Eq[E] =
-    Eq instance {
-      case (Replace(idx, rx), Replace(idy, ry)) => idx === idy && rx === ry
-      case (Create(rx), Create(ry)) => rx === ry
-      case (Delete(idsx), Delete(idsy)) => idsx === idsy
-      case (Commit(ox), Commit(oy)) => ox === oy
-      case _ => false
+  implicit def dataEventEq[O: Eq]: Eq[DataEvent[O]] =
+    Eq by {
+      case Create(bs) => (Some(bs), None, None)
+      case Delete(ids) => (None, Some(ids), None)
+      case Commit(o) => (None, None, Some(o))
     }
 
-  implicit def dataEventShow[I: Show, O: Show, E <: DataEvent[I, O]]: Show[E] =
+  implicit def dataEventShow[O: Show]: Show[DataEvent[O]] =
     Show show {
-      case Replace(i, r) => s"Replace(${i.show}, ${r.size} bytes)"
       case Create(rs) => s"Create(${rs.size} bytes)"
-      case Delete(ids) => ids.map(_.show).toList.mkString("Delete(", ", ", ")")
+      case Delete(ids) => s"Delete(${ids.show})"
       case Commit(o) => s"Commit(${o.show})"
     }
 }

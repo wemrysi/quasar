@@ -16,26 +16,21 @@
 
 package quasar.impl.storage
 
-import slamdata.Predef.{Int, String}
+import scala.annotation.implicitNotFound
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import shapeless._
 
-import cats.effect.{IO, Resource}
-import cats.effect.concurrent.Ref
-import cats.implicits._
+@implicitNotFound("Could not prove that ${L} is a prefix of ${M}.")
+sealed trait IsPrefix[L <: HList, M <: HList]
 
-import scalaz.IMap
-import scalaz.std.anyVal._
+object IsPrefix {
+  def apply[L <: HList, M <: HList](implicit isp: IsPrefix[L, M]): IsPrefix[L, M] = isp
 
-object RefIndexedStoreSpec extends RefSpec(Ref.unsafe[IO, Int](0))
+  implicit def singletonIsPrefix[H, M <: HList]: IsPrefix[H :: HNil, H :: M] =
+    new IsPrefix[H :: HNil, H :: M] {}
 
-abstract class RefSpec(idxRef: Ref[IO, Int]) extends IndexedStoreSpec[IO, Int, String] {
-  val emptyStore =
-    Resource.liftF(Ref.of[IO, IMap[Int, String]](IMap.empty).map(RefIndexedStore(_)))
-
-  val freshIndex = idxRef.modify(i => (i + 1, i + 1))
-
-  val valueA = "A"
-
-  val valueB = "B"
+  implicit def prefixIsPrefix[H, L <: HList, M <: HList](
+      implicit tailIsPrefix: IsPrefix[L, M])
+      : IsPrefix[H :: L, H :: M] =
+    new IsPrefix[H :: L, H :: M] {}
 }

@@ -14,28 +14,30 @@
  * limitations under the License.
  */
 
-package quasar.impl.storage
+package quasar.connector.render
 
-import slamdata.Predef.{Int, String}
+import slamdata.Predef.{Eq => _, _}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-import cats.effect.{IO, Resource}
-import cats.effect.concurrent.Ref
+import cats._
 import cats.implicits._
 
-import scalaz.IMap
-import scalaz.std.anyVal._
+sealed trait RenderInput[+A] {
+  def value: A
+}
 
-object RefIndexedStoreSpec extends RefSpec(Ref.unsafe[IO, Int](0))
+object RenderInput {
+  final case class Initial[A](value: A) extends RenderInput[A]
+  final case class Incremental[A](value: A) extends RenderInput[A]
 
-abstract class RefSpec(idxRef: Ref[IO, Int]) extends IndexedStoreSpec[IO, Int, String] {
-  val emptyStore =
-    Resource.liftF(Ref.of[IO, IMap[Int, String]](IMap.empty).map(RefIndexedStore(_)))
+  implicit def inputEq[A: Eq]: Eq[RenderInput[A]] =
+    Eq.by {
+      case Initial(a) => Left(a)
+      case Incremental(a) => Right(a)
+    }
 
-  val freshIndex = idxRef.modify(i => (i + 1, i + 1))
-
-  val valueA = "A"
-
-  val valueB = "B"
+  implicit def inputShow[A: Show]: Show[RenderInput[A]] =
+    Show show {
+      case Initial(value) => s"Initial(${value.show})"
+      case Incremental(value) => s"Incremental(${value.show})"
+    }
 }

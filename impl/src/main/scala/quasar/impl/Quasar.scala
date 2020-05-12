@@ -18,25 +18,24 @@ package quasar.impl
 
 import slamdata.Predef._
 
-import quasar.{Condition, RateLimiting}
+import quasar.{Condition, RateLimiting, Store}
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
 import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
 import quasar.api.discovery.{Discovery, SchemaConfig}
 import quasar.api.intentions.Intentions
-import quasar.api.push.ResultPush
+import quasar.api.push.{OffsetKey, Push, ResultPush}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.scheduler.SchedulerType
 import quasar.api.table.{TableRef, Tables}
 import quasar.api.scheduler.{Schedulers, SchedulerRef}
 import quasar.common.PhaseResultTell
-import quasar.connector.{QueryResult, ResourceSchema}
+import quasar.connector.{Offset, QueryResult, ResourceSchema}
 import quasar.connector.datasource.Datasource
 import quasar.connector.destination.{Destination, DestinationModule}
 import quasar.connector.evaluate._
 import quasar.connector.render.ResultRender
 import quasar.connector.scheduler.{Scheduler, SchedulerModule}
-import quasar.contrib.std.uuid._
 import quasar.ejson.implicits._
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources._
@@ -48,7 +47,7 @@ import quasar.impl.implicits._
 import quasar.impl.intentions.DefaultIntentions
 import quasar.impl.push.DefaultResultPush
 import quasar.impl.scheduler._
-import quasar.impl.storage.IndexedStore
+import quasar.impl.storage.{IndexedStore, PrefixStore}
 import quasar.impl.table.DefaultTables
 import quasar.qscript.{construction, Map => QSMap}
 
@@ -60,30 +59,33 @@ import argonaut.JsonScalaz._
 
 import cats.{~>, Functor, Show}
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
+import cats.instances.uuid._
 import cats.kernel.Hash
 import cats.syntax.applicative._
 import cats.syntax.functor._
 import cats.syntax.show._
 
 import fs2.Stream
-import fs2.job.JobManager
 
 import matryoshka.data.Fix
 
 import org.slf4s.Logging
 
+import shapeless._
+
 import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, showToCats, equalToCats}
+
+import skolems.∃
 
 final class Quasar[F[_], R, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
     val schedulers: Schedulers.Aux[F, UUID, Array[Byte], Json, Json, SchedulerModule, SchedulerType],
     val tables: Tables[F, UUID, SqlQuery],
-    val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, Stream[F, R]],
+    val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, R],
     val discovery: Discovery[Resource[F, ?], Stream[F, ?], UUID, C],
-    val resultPush: ResultPush[F, UUID, UUID],
+    val resultPush: ResultPush[F, UUID, SqlQuery],
     val intentions: Intentions[F, UUID, Array[Byte], Json])
-
 
 object Quasar extends Logging {
 
@@ -95,11 +97,14 @@ object Quasar extends Logging {
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       schedulerRefs: IndexedStore[F, UUID, SchedulerRef[Json]],
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
-      queryFederation: QueryFederation[Fix, Resource[F, ?], QueryAssociate[Fix, Resource[F, ?], EvalResult[F]], Stream[F, R]],
+      pushes: PrefixStore[F, UUID :: ResourcePath :: HNil, ∃[Push[?, SqlQuery]]],
+      offsets: Store[F, UUID :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
+      queryFederation: QueryFederation[Fix, Resource[F, ?], QueryAssociate[Fix, Resource[F, ?], EvalResult[F]], R],
       resultRender: ResultRender[F, R],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
       rateLimiting: RateLimiting[F, A],
       byteStores: ByteStores[F, UUID])(
+      maxConcurrentPushes: Int,
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
       schedulerModules: List[SchedulerModule])(
@@ -145,7 +150,7 @@ object Quasar extends Logging {
 
       sqlEvaluator =
         Sql2Compiler[Fix, F]
-          .map((_, None))
+          .first[Option[Offset]]
           .andThen(QueryFederator(ResourceRouter(UuidString, lookupRunning)))
           .mapF(Resource.liftF(_))
           .andThen(queryFederation)
@@ -154,21 +159,30 @@ object Quasar extends Logging {
 
       discovery = DefaultDiscovery(datasources.quasarDatasourceOf, resourceSchema)
 
-      jobManager <- JobManager[F, (UUID, UUID), Nothing]()
+      resultPush <-
+        DefaultResultPush[F, UUID, SqlQuery, R](
+          maxConcurrentPushes,
+          destinations.destinationOf(_).map(_.toOption),
+          sqlEvaluator,
+          resultRender,
+          pushes,
+          offsets)
 
-      push <- Resource.liftF(DefaultResultPush[F, UUID, UUID, SqlQuery, R](
-        tableRefs.lookup,
-        sqlEvaluator,
-        destinations.destinationOf(_).map(_.toOption),
-        jobManager,
-        resultRender))
-
-      intentions: Intentions[F, UUID, Array[Byte], Json] = DefaultIntentions(
+      intentions = DefaultIntentions(
         schedulerRefs.entries.map(_._1),
-        schedulers.schedulerOf(_).map(_.toOption))
+        schedulers.schedulerOf(_: UUID).map(_.toOption))
 
-
-    } yield new Quasar(datasources, destinations, schedulers, tables, sqlEvaluator, discovery, push, intentions)
+    } yield {
+      new Quasar(
+        datasources,
+        destinations,
+        schedulers,
+        tables,
+        sqlEvaluator.local((_, None)),
+        discovery,
+        resultPush,
+        intentions)
+    }
   }
 
   ////

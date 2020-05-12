@@ -19,96 +19,66 @@ package quasar.api.push
 import slamdata.Predef._
 
 import quasar.{Condition, Exhaustive}
-import quasar.api.{Column, ColumnType}
+import quasar.api.ColumnType
 import quasar.api.resource.ResourcePath
 
-import scala.collection.immutable.SortedMap
-
-import cats.{Applicative, Monad}
-import cats.data.{EitherT, NonEmptyList, NonEmptyMap, NonEmptySet}
-import cats.implicits._
+import cats.Monad
+import cats.data.{EitherT, NonEmptyList, NonEmptyMap}
+import cats.syntax.functor._
 
 import shapeless._
 
-/** @tparam F effects
-  * @tparam T Table Id
-  * @tparam D Destination Id
-  */
-trait ResultPush[F[_], TableId, DestinationId] {
+import skolems.∃
+
+/** Provides the ability to push the scalar results of queries into destinations. */
+trait ResultPush[F[_], DestinationId, Query] {
   import ResultPushError._
 
-  def coerce(
-      destinationId: DestinationId,
-      tpe: ColumnType.Scalar)
-      : F[Either[DestinationNotFound[DestinationId], TypeCoercion[CoercedType]]]
+  /** Cancel execution of an active push. */
+  def cancel(destinationId: DestinationId, path: ResourcePath)
+      : F[Condition[DestinationNotFound[DestinationId]]]
 
-  def cancel(
-      tableId: TableId,
-      destinationId: DestinationId)
-      : F[Condition[ExistentialError[TableId, DestinationId]]]
-
+  /** Cancel execution of all active pushes. */
   def cancelAll: F[Unit]
 
-  def destinationStatus(destinationId: DestinationId)
-      : F[Either[DestinationNotFound[DestinationId], Map[TableId, PushMeta]]]
+  /** Returns a specification of how the given scalar type may be represented in
+    * the specified destination.
+    */
+  def coerce(destinationId: DestinationId, scalar: ColumnType.Scalar)
+      : F[Either[DestinationNotFound[DestinationId], TypeCoercion[CoercedType]]]
 
+  /** Returns the latest pushes made to the specified destination. */
+  def pushedTo(destinationId: DestinationId)
+      : F[Either[DestinationNotFound[DestinationId], Map[ResourcePath, ∃[Push[?, Query]]]]]
+
+  /** Start a push to the specified destination.
+    *
+    * On success, this function returns immediately and provides an effect that
+    * may be used to await termination of the push.
+    *
+    * @param limit restrict the number of rows pushed to this amount, does not
+    *              affect subsequent `update`s of this push.
+    */
   def start(
-      tableId: TableId,
-      columns: NonEmptyList[Column[SelectedType]],
       destinationId: DestinationId,
-      path: ResourcePath,
-      format: ResultType,
+      config: ∃[PushConfig[?, Query]],
       limit: Option[Long])
-      : F[Condition[NonEmptyList[ResultPushError[TableId, DestinationId]]]]
+      : F[Either[NonEmptyList[ResultPushError[DestinationId]], F[Status.Terminal]]]
 
-  /** Attempts to cancel the push to `destinationId` for each entry `tables`.
+  /** Update the specified push to reflect the latest data from its source(s).
     *
-    * The resulting `Map` will contain an entry for any push that failed to
-    * cancel. An empty `Map` indicates no errors were encountered.
-    */
-  def cancelThese(
-      destinationId: DestinationId,
-      tables: NonEmptySet[TableId])(
-      implicit F: Applicative[F])
-      : F[Map[TableId, ExistentialError[TableId, DestinationId]]] = {
-
-    val failed: Map[TableId, ExistentialError[TableId, DestinationId]] =
-      SortedMap.empty(tables.toSortedSet.ordering)
-
-    tables.foldLeft(failed.pure[F]) {
-      case (f, tid) =>
-        (f, cancel(tid, destinationId)) mapN {
-          case (m, Condition.Abnormal(err)) => m.updated(tid, err)
-          case (m, Condition.Normal()) => m
-        }
-    }
-  }
-
-  /** Attempts to start a push to `destinationId` for each entry `tables`.
+    * For `Full` pushes, this will result in a full scan of all sources, replacing
+    * the results in the destination.
     *
-    * The resulting `Map` will contain an entry for any push that failed to
-    * start. An empty `Map` indicates all pushes were started successfully.
+    * For `Incremental` pushes, this will result in updating the results in the
+    * destination with the changes since the previous execution of the push.
     */
-  def startThese(
-      destinationId: DestinationId,
-      tables: NonEmptyMap[TableId, (NonEmptyList[Column[SelectedType]], ResourcePath, ResultType, Option[Long])])(
-      implicit F: Applicative[F])
-      : F[Map[TableId, NonEmptyList[ResultPushError[TableId, DestinationId]]]] = {
+  def update(destinationId: DestinationId, path: ResourcePath)
+      : F[Either[NonEmptyList[ResultPushError[DestinationId]], F[Status.Terminal]]]
 
-    val tablesM = tables.toSortedMap
-
-    val failed: Map[TableId, NonEmptyList[ResultPushError[TableId, DestinationId]]] =
-      SortedMap.empty(tablesM.ordering)
-
-    tablesM.foldLeft(failed.pure[F]) {
-      case (f, (tid, (cols, path, tpe, limit))) =>
-        (f, start(tid, cols, destinationId, path, tpe, limit)) mapN {
-          case (m, Condition.Abnormal(errs)) => m.updated(tid, errs)
-          case (m, Condition.Normal()) => m
-        }
-    }
-  }
-
+  /** Returns a map enumerating how every scalar type may be represented in the
+    * specified destination.
+    */
   def coercions(destinationId: DestinationId)
       (implicit F: Monad[F])
       : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, TypeCoercion[CoercedType]]]] = {

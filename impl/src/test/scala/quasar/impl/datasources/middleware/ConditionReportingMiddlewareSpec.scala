@@ -54,11 +54,11 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
     }))
 
     def pathIsResource(path: ResourcePath): Resource[IO, Boolean] =
-      Resource.pure(false)
+      Resource.pure[IO, Boolean](false)
 
     def prefixedChildPaths(path: ResourcePath)
         : Resource[IO, Option[List[(ResourceName, ResourcePathType)]]] =
-      Resource.pure(None)
+      Resource.pure[IO, Option[List[(ResourceName, ResourcePathType)]]](None)
   }
 
   val managedTester = QuasarDatasource.lightweight[T](TestDs)
