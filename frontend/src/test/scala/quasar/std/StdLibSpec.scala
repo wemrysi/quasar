@@ -98,35 +98,23 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbZoneOffset: Arbitrary[ZoneOffset] = Arbitrary[ZoneOffset](runner.timezoneDomain)
 
     implicit val arbLocalDate: Arbitrary[JLocalDate] = Arbitrary[JLocalDate](runner.dateDomain)
-    implicit val arbDataLocalDate: Arbitrary[Data.LocalDate] = arbLocalDate ^^ Data.LocalDate
 
     implicit val arbLocalTime: Arbitrary[JLocalTime] = Arbitrary[JLocalTime](runner.timeDomain)
-    implicit val arbDataLocalTime: Arbitrary[Data.LocalTime] = arbLocalTime ^^ Data.LocalTime
 
     implicit val arbLocalDateTime: Arbitrary[JLocalDateTime] =
       Arbitrary[JLocalDateTime]((runner.dateDomain, runner.timeDomain) >> JLocalDateTime.of)
-    implicit val arbDataLocalDateTime: Arbitrary[Data.LocalDateTime] =
-      arbLocalDateTime ^^ Data.LocalDateTime
 
     implicit val arbOffsetDate: Arbitrary[QOffsetDate] =
       Arbitrary[QOffsetDate]((runner.dateDomain, runner.timezoneDomain) >> (QOffsetDate(_, _)))
-    implicit val arbDataOffsetDate: Arbitrary[Data.OffsetDate] =
-      arbOffsetDate ^^ Data.OffsetDate
 
     implicit val arbOffsetTime: Arbitrary[JOffsetTime] =
       Arbitrary[JOffsetTime]((runner.timeDomain, runner.timezoneDomain) >> JOffsetTime.of)
-    implicit val arbDataOffsetTime: Arbitrary[Data.OffsetTime] =
-      arbOffsetTime ^^ Data.OffsetTime
 
     implicit val arbOffsetDateTime: Arbitrary[JOffsetDateTime] =
       Arbitrary[JOffsetDateTime]((arbLocalDateTime.gen, runner.timezoneDomain) >> JOffsetDateTime.of)
-    implicit val arbDataOffsetDateTime: Arbitrary[Data.OffsetDateTime] =
-      arbOffsetDateTime ^^ Data.OffsetDateTime
 
     implicit val arbInterval: Arbitrary[DateTimeInterval] =
       Arbitrary[DateTimeInterval](runner.intervalDomain)
-    implicit val arbDataInterval: Arbitrary[Data.Interval] =
-      arbInterval ^^ Data.Interval
 
     implicit val arbDuration: Arbitrary[Duration] = TimeGenerators.arbDuration
     implicit val arbPeriod: Arbitrary[Period] = TimeGenerators.arbPeriod
@@ -1774,21 +1762,551 @@ abstract class StdLibSpec extends Qspec {
         unary(OffsetDate(_).embed, Data.Str(v.toString), Data.OffsetDate(v))
       }
 
-      "OffsetDateTime" >> prop { (v: JOffsetDateTime) =>
-        unary(OffsetDateTime(_).embed, Data.Str(v.toString), Data.OffsetDateTime(v))
+      "OffsetDateTime" >> {
+        "pre-Gregorian format" >> {
+          val expected = Data.OffsetDateTime(JOffsetDateTime.of(JLocalDateTime.of(JLocalDate.of(53, 4, 2), JLocalTime.of(7, 47, 18)), ZoneOffset.of("+02:30")))
+
+          unary(OffsetDateTime(_).embed, Data.Str("0053-04-02T07:47:18+02:30"), expected)
+          unary(OffsetDateTime(_).embed, Data.Str("0053-04-0207:47:18+02:30"), expected)
+          unary(OffsetDateTime(_).embed, Data.Str("00530402T074718+0230"), expected)
+          unary(OffsetDateTime(_).embed, Data.Str("00530402074718+0230"), Data.NA) // FIXME this should parse
+        }
+
+        "Gregorian format" >> {
+          val expected = Data.OffsetDateTime(JOffsetDateTime.of(JLocalDateTime.of(JLocalDate.of(2020, 5, 14), JLocalTime.of(7, 47, 18)), ZoneOffset.of("+02:30")))
+
+          unary(OffsetDateTime(_).embed, Data.Str("2020-05-14T07:47:18+02:30"), expected)
+          unary(OffsetDateTime(_).embed, Data.Str("2020-05-1407:47:18+02:30"), expected)
+          unary(OffsetDateTime(_).embed, Data.Str("20200514T074718+0230"), expected)
+          unary(OffsetDateTime(_).embed, Data.Str("20200514074718+0230"), Data.NA) // FIXME this should parse
+        }
+
+        "format basic and extended mixed is undefined" >> {
+          unary(OffsetDateTime(_).embed, Data.Str("0053-04-02T074718+02:30"), Data.NA) // e b e
+          unary(OffsetDateTime(_).embed, Data.Str("0053-04-02074718+02:30"), Data.NA)
+          unary(OffsetDateTime(_).embed, Data.Str("00530402T07:47:18+0230"), Data.NA) // b e b
+          unary(OffsetDateTime(_).embed, Data.Str("0053040207:47:18+0230"), Data.NA)
+          unary(OffsetDateTime(_).embed, Data.Str("0053-04-02T074718+0230"), Data.NA) // e b b
+          unary(OffsetDateTime(_).embed, Data.Str("0053-04-02074718+0230"), Data.NA)
+          unary(OffsetDateTime(_).embed, Data.Str("0053-04-02T07:47:18+0230"), Data.NA) // e e b
+          unary(OffsetDateTime(_).embed, Data.Str("0053-04-0207:47:18+0230"), Data.NA)
+          unary(OffsetDateTime(_).embed, Data.Str("00530402T074718+02:30"), Data.NA) // b b e
+          unary(OffsetDateTime(_).embed, Data.Str("00530402074718+02:30"), Data.NA)
+          unary(OffsetDateTime(_).embed, Data.Str("00530402T07:47:18+02:30"), Data.NA) // b e e
+          unary(OffsetDateTime(_).embed, Data.Str("0053040207:47:18+02:30"), Data.NA)
+        }
+
+        "arbitrary string" >> prop { (v: JOffsetDateTime) =>
+          unary(OffsetDateTime(_).embed, Data.Str(v.toString), Data.OffsetDateTime(v))
+        }
       }
 
-      "OffsetTime" >> prop { (v: JOffsetTime) =>
-        unary(OffsetTime(_).embed, Data.Str(v.toString), Data.OffsetTime(v))
+      "OffsetTime" >> {
+        "UTC" >> {
+          "hour minute" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 0, 0, ZoneOffset.UTC))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47Z"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("0747Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T0747Z"), Data.NA)
+          }
+
+          "hour minute second" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 18, 0, ZoneOffset.UTC))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:18Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18Z"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718Z"), Data.NA)
+          }
+
+          "hour minute second nanosecond with full stop [.]" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 18, 41593000, ZoneOffset.UTC))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:18.041593Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18.041593Z"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718.041593Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718.041593Z"), Data.NA)
+          }
+
+          "hour minute second nanosecond with comma [,]" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 18, 41593000, ZoneOffset.UTC))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:18,041593Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18,041593Z"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718,041593Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718,041593Z"), Data.NA)
+          }
+
+          "midnight" >> { // FIXME the ISO 8601 spec also accepts 24:00 as midnight
+            val expected = Data.OffsetTime(JOffsetTime.of(0, 0, 0, 0, ZoneOffset.UTC))
+
+            unary(OffsetTime(_).embed, Data.Str("00:00:00Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00Z"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000Z"), Data.NA)
+
+            unary(OffsetTime(_).embed, Data.Str("00:00:00.0Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00.0Z"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000.0Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000.0Z"), Data.NA)
+
+            unary(OffsetTime(_).embed, Data.Str("00:00:00,0Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00,0Z"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000,0Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000,0Z"), Data.NA)
+          }
+
+          "impossible time (99 hour)" >> {
+            val expected = Data.NA
+
+            unary(OffsetTime(_).embed, Data.Str("99:47:18Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T99:47:18Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("994718Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T994718Z"), expected)
+          }
+
+          "impossible time (99 minute)" >> {
+            val expected = Data.NA
+
+            unary(OffsetTime(_).embed, Data.Str("07:99:18Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:99:18Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("079918Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T079918Z"), expected)
+          }
+
+          "impossible time (99 second)" >> {
+            val expected = Data.NA
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:99Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:99Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("074799Z"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074799Z"), expected)
+          }
+        }
+
+        "minus 5" >> {
+          "hour minute" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 0, 0, ZoneOffset.ofHours(-5)))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47-05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("07:47-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47-05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("0747-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T0747-0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("0747-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T0747-05"), Data.NA)
+          }
+
+          "hour minute second" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 18, 0, ZoneOffset.ofHours(-5)))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:18-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18-05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("07:47:18-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18-05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718-0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718-05"), Data.NA)
+          }
+
+          "hour minute second nanosecond with full stop [.]" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 18, 41593000, ZoneOffset.ofHours(-5)))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:18.041593-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18.041593-05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("07:47:18.041593-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18.041593-05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718.041593-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718.041593-0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718.041593-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718.041593-05"), Data.NA)
+          }
+
+          "hour minute second nanosecond with comma [,]" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 18, 41593000, ZoneOffset.ofHours(-5)))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:18,041593-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18,041593-05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("07:47:18,041593-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18,041593-05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718,041593-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718,041593-0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718,041593-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718,041593-05"), Data.NA)
+          }
+
+          "midnight" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(0, 0, 0, 0, ZoneOffset.ofHours(-5)))
+
+            unary(OffsetTime(_).embed, Data.Str("00:00:00-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00-05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("00:00:00-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00-05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000-0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000-05"), Data.NA)
+
+            unary(OffsetTime(_).embed, Data.Str("00:00:00.0-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00.0-05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("00:00:00.0-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00.0-05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000.0-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000.0-0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000.0-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000.0-05"), Data.NA)
+
+            unary(OffsetTime(_).embed, Data.Str("00:00:00,0-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00,0-05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("00:00:00,0-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00,0-05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000,0-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000,0-0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000,0-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000,0-05"), Data.NA)
+          }
+
+          "impossible time (99 hour)" >> {
+            val expected = Data.NA
+
+            unary(OffsetTime(_).embed, Data.Str("99:47:18-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T99:47:18-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("99:47:18-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T99:47:18-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("994718-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T994718-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("994718-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T994718-05"), expected)
+          }
+
+          "impossible time (99 minute)" >> {
+            val expected = Data.NA
+
+            unary(OffsetTime(_).embed, Data.Str("07:99:18-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:99:18-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("07:99:18-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:99:18-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("079918-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T079918-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("079918-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T079918-05"), expected)
+          }
+
+          "impossible time (99 second)" >> {
+            val expected = Data.NA
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:99-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:99-05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("07:47:99-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:99-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("074799-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074799-0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("074799-05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074799-05"), expected)
+          }
+        }
+
+        "plus 5" >> {
+          "hour minute" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 0, 0, ZoneOffset.ofHours(5)))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47+05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("07:47+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47+05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("0747+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T0747+0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("0747+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T0747+05"), Data.NA)
+          }
+
+          "hour minute second" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 18, 0, ZoneOffset.ofHours(5)))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:18+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18+05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("07:47:18+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18+05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718+0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718+05"), Data.NA)
+          }
+
+          "hour minute second nanosecond with full stop [.]" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 18, 41593000, ZoneOffset.ofHours(5)))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:18.041593+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18.041593+05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("07:47:18.041593+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18.041593+05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718.041593+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718.041593+0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718.041593+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718.041593+05"), Data.NA)
+          }
+
+          "hour minute second nanosecond with comma [,]" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(7, 47, 18, 41593000, ZoneOffset.ofHours(5)))
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:18,041593+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18,041593+05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("07:47:18,041593+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:18,041593+05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718,041593+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718,041593+0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("074718,041593+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074718,041593+05"), Data.NA)
+          }
+
+          "midnight" >> {
+            val expected = Data.OffsetTime(JOffsetTime.of(0, 0, 0, 0, ZoneOffset.ofHours(5)))
+
+            unary(OffsetTime(_).embed, Data.Str("00:00:00+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00+05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("00:00:00+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00+05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000+0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000+05"), Data.NA)
+
+            unary(OffsetTime(_).embed, Data.Str("00:00:00.0+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00.0+05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("00:00:00.0+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00.0+05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000.0+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000.0+0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000.0+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000.0+05"), Data.NA)
+
+            unary(OffsetTime(_).embed, Data.Str("00:00:00,0+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00,0+05:00"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("00:00:00,0+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T00:00:00,0+05"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000,0+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000,0+0500"), Data.NA)
+            unary(OffsetTime(_).embed, Data.Str("000000,0+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T000000,0+05"), Data.NA)
+          }
+
+          "impossible time (99 hour)" >> {
+            val expected = Data.NA
+
+            unary(OffsetTime(_).embed, Data.Str("99:47:18+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T99:47:18+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("99:47:18+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T99:47:18+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("994718+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T994718+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("994718+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T994718+05"), expected)
+          }
+
+          "impossible time (99 minute)" >> {
+            val expected = Data.NA
+
+            unary(OffsetTime(_).embed, Data.Str("07:99:18+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:99:18+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("07:99:18+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:99:18+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("079918+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T079918+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("079918+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T079918+05"), expected)
+          }
+
+          "impossible time (99 second)" >> {
+            val expected = Data.NA
+
+            unary(OffsetTime(_).embed, Data.Str("07:47:99+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:99+05:00"), expected)
+            unary(OffsetTime(_).embed, Data.Str("07:47:99+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T07:47:99+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("074799+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074799+0500"), expected)
+            unary(OffsetTime(_).embed, Data.Str("074799+05"), expected)
+            unary(OffsetTime(_).embed, Data.Str("T074799+05"), expected)
+          }
+        }
+
+        "undefined when basic and extended formats are mixed" >> {
+          unary(OffsetTime(_).embed, Data.Str("07:47:18,041593-0500"), Data.NA)
+          unary(OffsetTime(_).embed, Data.Str("074718,041593-05:00"), Data.NA)
+        }
+
+        "undefined when offset sign is missing" >> {
+          unary(OffsetTime(_).embed, Data.Str("07:47:18,04159305:00"), Data.NA)
+          unary(OffsetTime(_).embed, Data.Str("07:47:18,04159305"), Data.NA)
+          unary(OffsetTime(_).embed, Data.Str("074718,0415930500"), Data.NA)
+          unary(OffsetTime(_).embed, Data.Str("074718,04159305"), Data.NA)
+        }
+
+        "arbitrary" >> prop { (v: JOffsetTime) =>
+          unary(OffsetTime(_).embed, Data.Str(v.toString), Data.OffsetTime(v))
+        }
       }
 
       "LocalDate" >> {
-        "0053-04-02" >> {
-          unary(LocalDate(_).embed, Data.Str("0053-04-02"), Data.LocalDate(JLocalDate.of(53, 4, 2)))
+        "pre-Gregorian format" >> {
+          val expected = Data.LocalDate(JLocalDate.of(53, 4, 2))
+
+          unary(LocalDate(_).embed, Data.Str("0053-04-02"), expected)
+          unary(LocalDate(_).embed, Data.Str("00530402"), expected)
         }
 
-        "arbitrary string" >> prop { (v: JLocalDate) =>
+        "Gregorian format" >> {
+          val expected = Data.LocalDate(JLocalDate.of(2020, 5, 14))
+
+          unary(LocalDate(_).embed, Data.Str("2020-05-14"), expected)
+          unary(LocalDate(_).embed, Data.Str("20200514"), expected)
+        }
+
+        "four-digit year with + undefined" >> {
+          val expected = Data.NA
+
+          unary(LocalDate(_).embed, Data.Str("+2020-05-14"), expected)
+          unary(LocalDate(_).embed, Data.Str("+20200514"), expected)
+        }
+
+        "four-digit year with -" >> {
+          val expected = Data.LocalDate(JLocalDate.of(-2020, 5, 14))
+
+          unary(LocalDate(_).embed, Data.Str("-2020-05-14"), expected)
+          unary(LocalDate(_).embed, Data.Str("-20200514"), expected)
+        }
+
+        "minimum year supported by java.time.LocalDate format" >> {
+          val expected = Data.LocalDate(JLocalDate.of(-999999999, 1, 1))
+
+          unary(LocalDate(_).embed, Data.Str("-999999999-01-01"), expected)
+          unary(LocalDate(_).embed, Data.Str("-9999999990101"), expected)
+        }
+
+        "maximum year supported by java.time.LocalDate format" >> {
+          val expected = Data.LocalDate(JLocalDate.of(999999999, 12, 31))
+
+          unary(LocalDate(_).embed, Data.Str("+999999999-12-31"), expected)
+          unary(LocalDate(_).embed, Data.Str("+9999999991231"), expected)
+        }
+
+        "impossible date (February 31) undefined" >> {
+          val expected = Data.NA
+
+          unary(LocalDate(_).embed, Data.Str("2020-02-31"), expected)
+          unary(LocalDate(_).embed, Data.Str("20200231"), expected)
+        }
+
+        "impossible date (77 day) undefined" >> {
+          val expected = Data.NA
+
+          unary(LocalDate(_).embed, Data.Str("2020-01-77"), expected)
+          unary(LocalDate(_).embed, Data.Str("20200177"), expected)
+        }
+
+        "impossible date (77 month) undefined" >> {
+          val expected = Data.NA
+
+          unary(LocalDate(_).embed, Data.Str("2020-77-01"), expected)
+          unary(LocalDate(_).embed, Data.Str("20207701"), expected)
+        }
+
+        // only testing one format
+        "arbitrary date" >> prop { (v: JLocalDate) =>
           unary(LocalDate(_).embed, Data.Str(v.toString), Data.LocalDate(v))
+        }
+      }
+
+      "LocalTime" >> {
+        "hour minute" >> {
+          val expected = Data.LocalTime(JLocalTime.of(7, 47))
+
+          unary(LocalTime(_).embed, Data.Str("07:47"), expected)
+          unary(LocalTime(_).embed, Data.Str("T07:47"), expected)
+          unary(LocalTime(_).embed, Data.Str("0747"), expected)
+          unary(LocalTime(_).embed, Data.Str("T0747"), expected)
+        }
+
+        "hour minute second" >> {
+          val expected = Data.LocalTime(JLocalTime.of(7, 47, 18))
+
+          unary(LocalTime(_).embed, Data.Str("07:47:18"), expected)
+          unary(LocalTime(_).embed, Data.Str("T07:47:18"), expected)
+          unary(LocalTime(_).embed, Data.Str("074718"), expected)
+          unary(LocalTime(_).embed, Data.Str("T074718"), expected)
+        }
+
+        "hour minute second nanosecond with full stop [.]" >> {
+          val expected = Data.LocalTime(JLocalTime.of(7, 47, 18, 41593000))
+
+          unary(LocalTime(_).embed, Data.Str("07:47:18.041593"), expected)
+          unary(LocalTime(_).embed, Data.Str("T07:47:18.041593"), expected)
+          unary(LocalTime(_).embed, Data.Str("074718.041593"), expected)
+          unary(LocalTime(_).embed, Data.Str("T074718.041593"), expected)
+        }
+
+        "hour minute second nanosecond with comma [,]" >> {
+          val expected = Data.LocalTime(JLocalTime.of(7, 47, 18, 41593000))
+
+          unary(LocalTime(_).embed, Data.Str("07:47:18,041593"), expected)
+          unary(LocalTime(_).embed, Data.Str("T07:47:18,041593"), expected)
+          unary(LocalTime(_).embed, Data.Str("074718,041593"), expected)
+          unary(LocalTime(_).embed, Data.Str("T074718,041593"), expected)
+        }
+
+        "midnight" >> { // the ISO 8601 spec also accepts 24:00 as midnight
+          val expected = Data.LocalTime(JLocalTime.of(0, 0, 0))
+
+          unary(LocalTime(_).embed, Data.Str("00:00:00"), expected)
+          unary(LocalTime(_).embed, Data.Str("T00:00:00"), expected)
+          unary(LocalTime(_).embed, Data.Str("000000"), expected)
+          unary(LocalTime(_).embed, Data.Str("T000000"), expected)
+
+          unary(LocalTime(_).embed, Data.Str("00:00:00.0"), expected)
+          unary(LocalTime(_).embed, Data.Str("T00:00:00.0"), expected)
+          unary(LocalTime(_).embed, Data.Str("000000.0"), expected)
+          unary(LocalTime(_).embed, Data.Str("T000000.0"), expected)
+
+          unary(LocalTime(_).embed, Data.Str("00:00:00,0"), expected)
+          unary(LocalTime(_).embed, Data.Str("T00:00:00,0"), expected)
+          unary(LocalTime(_).embed, Data.Str("000000,0"), expected)
+          unary(LocalTime(_).embed, Data.Str("T000000,0"), expected)
+        }
+
+        "impossible time (99 hour)" >> {
+          val expected = Data.NA
+
+          unary(LocalTime(_).embed, Data.Str("99:47:18"), expected)
+          unary(LocalTime(_).embed, Data.Str("T99:47:18"), expected)
+          unary(LocalTime(_).embed, Data.Str("994718"), expected)
+          unary(LocalTime(_).embed, Data.Str("T994718"), expected)
+        }
+
+        "impossible time (99 minute)" >> {
+          val expected = Data.NA
+
+          unary(LocalTime(_).embed, Data.Str("07:99:18"), expected)
+          unary(LocalTime(_).embed, Data.Str("T07:99:18"), expected)
+          unary(LocalTime(_).embed, Data.Str("079918"), expected)
+          unary(LocalTime(_).embed, Data.Str("T079918"), expected)
+        }
+
+        "impossible time (99 second)" >> {
+          val expected = Data.NA
+
+          unary(LocalTime(_).embed, Data.Str("07:47:99"), expected)
+          unary(LocalTime(_).embed, Data.Str("T07:47:99"), expected)
+          unary(LocalTime(_).embed, Data.Str("074799"), expected)
+          unary(LocalTime(_).embed, Data.Str("T074799"), expected)
+        }
+
+        // only testing one format
+        "arbitrary time" >> prop { (v: JLocalTime) =>
+          unary(LocalTime(_).embed, Data.Str(v.toString), Data.LocalTime(v))
         }
       }
 
@@ -1807,19 +2325,37 @@ abstract class StdLibSpec extends Qspec {
         "precision micros" >> prop { (v: JLocalDateTime) => test(v.truncatedTo(ChronoUnit.MICROS)) }
 
         "full precision" >> prop (test(_: JLocalDateTime))
-      }
 
-      "LocalTime" >> {
-        "07:47:18" >> {
-          unary(LocalTime(_).embed, Data.Str("07:47:18"), Data.LocalTime(JLocalTime.parse("07:47:18")))
+        "pre-Gregorian format" >> {
+          val expected = Data.LocalDateTime(JLocalDateTime.of(JLocalDate.of(53, 4, 2), JLocalTime.of(7, 47, 18)))
+
+          unary(LocalDateTime(_).embed, Data.Str("0053-04-02T07:47:18"), expected)
+          unary(LocalDateTime(_).embed, Data.Str("0053-04-0207:47:18"), expected)
+          unary(LocalDateTime(_).embed, Data.Str("00530402T074718"), expected)
+          unary(LocalDateTime(_).embed, Data.Str("00530402074718"), Data.NA) // FIXME this should parse
         }
 
-        "07:47:18.041593" >> {
-          unary(LocalTime(_).embed, Data.Str("07:47:18.041593"), Data.LocalTime(JLocalTime.parse("07:47:18.041593")))
+        "pre-Gregorian format basic and extended mixed is undefined" >> {
+          unary(LocalDateTime(_).embed, Data.Str("0053-04-02T074718"), Data.NA)
+          unary(LocalDateTime(_).embed, Data.Str("0053-04-02074718"), Data.NA)
+          unary(LocalDateTime(_).embed, Data.Str("00530402T07:47:18"), Data.NA)
+          unary(LocalDateTime(_).embed, Data.Str("0053040207:47:18"), Data.NA)
         }
 
-        "arbitrary string" >> prop { (v: JLocalTime) =>
-          unary(LocalTime(_).embed, Data.Str(v.toString), Data.LocalTime(v))
+        "Gregorian format" >> {
+          val expected = Data.LocalDateTime(JLocalDateTime.of(JLocalDate.of(2020, 5, 14), JLocalTime.of(7, 47, 18)))
+
+          unary(LocalDateTime(_).embed, Data.Str("2020-05-14T07:47:18"), expected)
+          unary(LocalDateTime(_).embed, Data.Str("2020-05-1407:47:18"), expected)
+          unary(LocalDateTime(_).embed, Data.Str("20200514T074718"), expected)
+          unary(LocalDateTime(_).embed, Data.Str("20200514074718"), Data.NA) // FIXME this should parse
+        }
+
+        "Gregorian format basic and extended mixed is undefined" >> {
+          unary(LocalDateTime(_).embed, Data.Str("2020-05-14T074718"), Data.NA)
+          unary(LocalDateTime(_).embed, Data.Str("2020-05-14074718"), Data.NA)
+          unary(LocalDateTime(_).embed, Data.Str("20200514T07:47:18"), Data.NA)
+          unary(LocalDateTime(_).embed, Data.Str("2020051407:47:18"), Data.NA)
         }
       }
 
