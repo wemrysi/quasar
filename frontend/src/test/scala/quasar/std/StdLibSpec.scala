@@ -2180,6 +2180,41 @@ abstract class StdLibSpec extends Qspec {
           unary(LocalDate(_).embed, Data.Str("-20200514"), expected)
         }
 
+        "six-digit year with + and 0 prefix" >> {
+          val expected = Data.LocalDate(JLocalDate.of(2020, 5, 14))
+
+          unary(LocalDate(_).embed, Data.Str("+002020-05-14"), expected)
+          unary(LocalDate(_).embed, Data.Str("+0020200514"), expected)
+        }
+
+        "six-digit year with - and 0 prefix" >> {
+          val expected = Data.LocalDate(JLocalDate.of(-2020, 5, 14))
+
+          unary(LocalDate(_).embed, Data.Str("-002020-05-14"), expected)
+          unary(LocalDate(_).embed, Data.Str("-0020200514"), expected)
+        }
+
+        // this is against ISO 8601 specification 4.1.2.3 and 4.1.2.4
+        "year and month" >> {
+          unary(LocalDate(_).embed, Data.Str("2020-05"), Data.NA)
+          unary(LocalDate(_).embed, Data.Str("+002020-05"), Data.NA)
+          unary(LocalDate(_).embed, Data.Str("-002020-05"), Data.NA)
+        }
+
+        // this is against ISO 8601 specification 4.1.2.3 and 4.1.2.4
+        "year" >> {
+          unary(LocalDate(_).embed, Data.Str("2020"), Data.NA)
+          unary(LocalDate(_).embed, Data.Str("+002020"), Data.NA)
+          unary(LocalDate(_).embed, Data.Str("-002020"), Data.NA)
+        }
+
+        // this is against ISO 8601 specification 4.1.2.3 and 4.1.2.4
+        "century" >> {
+          unary(LocalDate(_).embed, Data.Str("20"), Data.NA)
+          unary(LocalDate(_).embed, Data.Str("+0020"), Data.NA)
+          unary(LocalDate(_).embed, Data.Str("-0020"), Data.NA)
+        }
+
         "minimum year supported by java.time.LocalDate format" >> {
           val expected = Data.LocalDate(JLocalDate.of(-999999999, 1, 1))
 
