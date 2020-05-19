@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.impl.storage
 
 import slamdata.Predef._
 
 import cats.Applicative
 
 import fs2.Stream
-
-import quasar.impl.storage.{IsPrefix, PrefixStore}
 
 import shapeless._
 import shapeless.ops.hlist._
