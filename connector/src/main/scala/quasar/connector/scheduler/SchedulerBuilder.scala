@@ -16,9 +16,18 @@
 
 package quasar.connector.scheduler
 
+import slamdata.Predef._
+
+import quasar.api.scheduler._, SchedulerError._
+
+import argonaut.Json
 import cats.effect._
 
-trait SchedulerModule {
-  def builder[F[_]: ContextShift: ConcurrentEffect: Timer]
-      : Resource[F, SchedulerBuilder[F]]
+import scala.util.Either
+
+trait SchedulerBuilder[F[_]] {
+  def schedulerType: SchedulerType
+  def sanitizeConfig(config: Json): Json
+  def scheduler(config: Json)
+      : Resource[F, Either[InitializationError[Json], Scheduler[F, Array[Byte], Json]]]
 }

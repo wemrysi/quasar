@@ -48,29 +48,28 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
-  def module(kind: SchedulerType, err: Option[InitializationError[Json]] = None): SchedulerModule = new SchedulerModule {
+  def builder(kind: SchedulerType, err: Option[InitializationError[Json]] = None): SchedulerBuilder[IO] = new SchedulerBuilder[IO] {
     def schedulerType = kind
     def sanitizeConfig(inp: Json) = Json.jString("sanitized")
-    def scheduler[F[_]: ContextShift: ConcurrentEffect: Timer](
-        config: Json)
-        : Resource[F, Either[InitializationError[Json], Scheduler[F, Array[Byte], Json]]] =
+    def scheduler(config: Json)
+        : Resource[IO, Either[InitializationError[Json], Scheduler[IO, Array[Byte], Json]]] =
       err match {
         case Some(a) =>
-          a.asLeft[Scheduler[F, Array[Byte], Json]].pure[Resource[F, ?]]
+          a.asLeft[Scheduler[IO, Array[Byte], Json]].pure[Resource[IO, ?]]
         case None =>
-          val scheduler = new Scheduler[F, Array[Byte], Json]  {
-            def entries: Stream[F, (Array[Byte], Json)] =
+          val scheduler = new Scheduler[IO, Array[Byte], Json]  {
+            def entries: Stream[IO, (Array[Byte], Json)] =
               Stream.empty
-            def addIntention(c: Json): F[Either[IncorrectIntention[Json], Array[Byte]]] =
-              Sync[F].delay(UUID.randomUUID.toString.getBytes.asRight[IncorrectIntention[Json]])
-            def lookupIntention(i: Array[Byte]): F[Either[IntentionNotFound[Array[Byte]], Json]] =
-              Sync[F].delay(Json.jNull.asRight[IntentionNotFound[Array[Byte]]])
-            def editIntention(i: Array[Byte], config: Json): F[Condition[SchedulingError[Array[Byte], Json]]] =
-              Sync[F].delay(Condition.normal[SchedulingError[Array[Byte], Json]]())
-            def deleteIntention(i: Array[Byte]): F[Condition[IntentionNotFound[Array[Byte]]]] =
-              Sync[F].delay(Condition.normal[IntentionNotFound[Array[Byte]]]())
+            def addIntention(c: Json): IO[Either[IncorrectIntention[Json], Array[Byte]]] =
+              IO(UUID.randomUUID.toString.getBytes.asRight[IncorrectIntention[Json]])
+            def lookupIntention(i: Array[Byte]): IO[Either[IntentionNotFound[Array[Byte]], Json]] =
+              IO(Json.jNull.asRight[IntentionNotFound[Array[Byte]]])
+            def editIntention(i: Array[Byte], config: Json): IO[Condition[SchedulingError[Array[Byte], Json]]] =
+              IO(Condition.normal[SchedulingError[Array[Byte], Json]]())
+            def deleteIntention(i: Array[Byte]): IO[Condition[IntentionNotFound[Array[Byte]]]] =
+              IO(Condition.normal[IntentionNotFound[Array[Byte]]]())
           }
-          scheduler.asRight[InitializationError[Json]].pure[Resource[F, ?]]
+          scheduler.asRight[InitializationError[Json]].pure[Resource[IO, ?]]
       }
   }
 
@@ -85,8 +84,8 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
     for {
       refs <- Resource.liftF(fRefs)
       cache <- rCache
-      modules <- Resource.liftF(SchedulerModules[IO](List(module(testType))))
-      result <- Resource.liftF(DefaultSchedulers(freshId, refs, cache, modules))
+      builders <- Resource.liftF(SchedulerBuilders[IO](List(builder(testType))))
+      result <- Resource.liftF(DefaultSchedulers(freshId, refs, cache, builders))
     } yield (refs, result, cache)
   }
 
@@ -107,7 +106,7 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
       for {
         (ss, finalize) <- emptySchedulers.allocated
         result0 <- ss.addScheduler(unknownRef)
-        _ <- ss.enableModule(module(unknownType))
+        _ <- ss.enableModule(builder(unknownType))
         result1 <- ss.addScheduler(unknownRef)
         id = result1.toOption.get
         _ <- ss.removeScheduler(id)

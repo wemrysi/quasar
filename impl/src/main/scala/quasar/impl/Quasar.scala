@@ -34,7 +34,7 @@ import quasar.connector.datasource.Datasource
 import quasar.connector.destination.{Destination, DestinationModule}
 import quasar.connector.evaluate._
 import quasar.connector.render.ResultRender
-import quasar.connector.scheduler.{Scheduler, SchedulerModule}
+import quasar.connector.scheduler.{Scheduler, SchedulerBuilder}
 import quasar.ejson.implicits._
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources._
@@ -78,7 +78,7 @@ import skolems.∃
 final class Quasar[F[_], R, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
-    val schedulers: Schedulers.Aux[F, UUID, Array[Byte], Json, Json, SchedulerModule, SchedulerType],
+    val schedulers: Schedulers.Aux[F, Stream[F, ?], UUID, Json, SchedulerBuilder[F], SchedulerType],
     val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, R],
     val discovery: Discovery[Resource[F, ?], Stream[F, ?], UUID, C],
     val resultPush: ResultPush[F, UUID, SqlQuery],
@@ -103,7 +103,7 @@ object Quasar extends Logging {
       maxConcurrentPushes: Int,
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
-      schedulerModules: List[SchedulerModule])(
+      schedulerBuilders: List[SchedulerBuilder[F]])(
       implicit
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
@@ -137,9 +137,9 @@ object Quasar extends Logging {
       destCache <- ResourceManager[F, UUID, Destination[F]]
       destinations <- Resource.liftF(DefaultDestinations(freshUUID, destinationRefs, destCache, destModules))
 
-      sModules <- Resource.liftF(SchedulerModules[F](schedulerModules))
+      sBuilders <- Resource.liftF(SchedulerBuilders[F](schedulerBuilders))
       sCache <- ResourceManager[F, UUID, Scheduler[F, Array[Byte], Json]]
-      schedulers <- Resource.liftF(DefaultSchedulers(freshUUID, schedulerRefs, sCache, sModules))
+      schedulers <- Resource.liftF(DefaultSchedulers(freshUUID, schedulerRefs, sCache, sBuilders))
 
       lookupRunning =
         (id: UUID) => datasources.quasarDatasourceOf(id).map(_.map(_.modify(reifiedAggregateDs)))
@@ -167,7 +167,7 @@ object Quasar extends Logging {
         schedulers.schedulerOf(_: UUID).map(_.toOption))
 
     } yield {
-      new Quasar(
+      new Quasar[F, R, C](
         datasources,
         destinations,
         schedulers,
