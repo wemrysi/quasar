@@ -33,7 +33,7 @@ private[impl] final class DefaultIntentions[
     I, II, C] private (
     schedulerIds: Stream[F, I],
     scheduler: I => F[Option[Scheduler[F, II, C]]])
-    extends Intentions[F, I, II, C] {
+    extends Intentions[F, Stream[F, ?], I, II, C] {
 
   def allIntentions: Stream[F, (I, II, C)] = for {
     schedulerId <- schedulerIds
@@ -87,6 +87,6 @@ object DefaultIntentions {
       I, II, C](
       schedulerIds: Stream[F, I],
       scheduler: I => F[Option[Scheduler[F, II, C]]])
-      : Intentions[F, I, II, C] =
+      : Intentions[F, Stream[F, ?], I, II, C] =
     new DefaultIntentions(schedulerIds, scheduler)
 }

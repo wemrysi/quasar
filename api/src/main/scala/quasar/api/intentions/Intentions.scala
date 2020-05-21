@@ -21,11 +21,9 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.intentions.IntentionError._
 
-import fs2.Stream
-
-trait Intentions[F[_], I, II, C] {
-  def allIntentions: Stream[F, (I, II, C)]
-  def schedulerIntentions(schedulerId: I): F[Either[SchedulerNotFound[I], Stream[F, (II, C)]]]
+trait Intentions[F[_], G[_], I, II, C] {
+  def allIntentions: G[(I, II, C)]
+  def schedulerIntentions(schedulerId: I): F[Either[SchedulerNotFound[I], G[(II, C)]]]
   def add(schedulerId: I, config: C): F[Either[IntentionError[I, II, C], II]]
   def lookup(schedulerId: I, intentionId: II): F[Either[IntentionError[I, II, C], C]]
   def edit(schedulerId: I, intentionId: II, config: C): F[Condition[IntentionError[I, II, C]]]

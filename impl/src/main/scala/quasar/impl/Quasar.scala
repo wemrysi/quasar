@@ -82,7 +82,7 @@ final class Quasar[F[_], R, C <: SchemaConfig](
     val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, R],
     val discovery: Discovery[Resource[F, ?], Stream[F, ?], UUID, C],
     val resultPush: ResultPush[F, UUID, SqlQuery],
-    val intentions: Intentions[F, UUID, Array[Byte], Json])
+    val intentions: Intentions[F, Stream[F, ?], UUID, Array[Byte], Json])
 
 object Quasar extends Logging {
 
