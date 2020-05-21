@@ -110,6 +110,31 @@ trait StructuralLib extends Library {
     "Ensures the value is an OffsetDateTime",
     noSimplification)
 
+  val EnsureOffsetDate: UnaryFunc = UnaryFunc(
+    Mapping,
+    "Ensures the value is an OffsetDate",
+    noSimplification)
+
+  val EnsureOffsetTime: UnaryFunc = UnaryFunc(
+    Mapping,
+    "Ensures the value is an OffsetTime",
+    noSimplification)
+
+  val EnsureLocalDateTime: UnaryFunc = UnaryFunc(
+    Mapping,
+    "Ensures the value is an LocalDateTime",
+    noSimplification)
+
+  val EnsureLocalDate: UnaryFunc = UnaryFunc(
+    Mapping,
+    "Ensures the value is an LocalDate",
+    noSimplification)
+
+  val EnsureLocalTime: UnaryFunc = UnaryFunc(
+    Mapping,
+    "Ensures the value is an LocalTime",
+    noSimplification)
+
   val EnsureNull: UnaryFunc = UnaryFunc(
     Mapping,
     "Ensures the value is null",
