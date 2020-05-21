@@ -27,7 +27,6 @@ import quasar.api.intentions.Intentions
 import quasar.api.push.{OffsetKey, Push, ResultPush}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.scheduler.SchedulerType
-import quasar.api.table.{TableRef, Tables}
 import quasar.api.scheduler.{Schedulers, SchedulerRef}
 import quasar.common.PhaseResultTell
 import quasar.connector.{Offset, QueryResult, ResourceSchema}
@@ -48,7 +47,6 @@ import quasar.impl.intentions.DefaultIntentions
 import quasar.impl.push.DefaultResultPush
 import quasar.impl.scheduler._
 import quasar.impl.storage.{IndexedStore, PrefixStore}
-import quasar.impl.table.DefaultTables
 import quasar.qscript.{construction, Map => QSMap}
 
 import java.util.UUID
@@ -81,7 +79,6 @@ final class Quasar[F[_], R, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
     val schedulers: Schedulers.Aux[F, UUID, Array[Byte], Json, Json, SchedulerModule, SchedulerType],
-    val tables: Tables[F, UUID, SqlQuery],
     val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, R],
     val discovery: Discovery[Resource[F, ?], Stream[F, ?], UUID, C],
     val resultPush: ResultPush[F, UUID, SqlQuery],
@@ -96,7 +93,6 @@ object Quasar extends Logging {
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       schedulerRefs: IndexedStore[F, UUID, SchedulerRef[Json]],
-      tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
       pushes: PrefixStore[F, UUID :: ResourcePath :: HNil, ∃[Push[?, SqlQuery]]],
       offsets: Store[F, UUID :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
       queryFederation: QueryFederation[Fix, Resource[F, ?], QueryAssociate[Fix, Resource[F, ?], EvalResult[F]], R],
@@ -155,8 +151,6 @@ object Quasar extends Logging {
           .mapF(Resource.liftF(_))
           .andThen(queryFederation)
 
-      tables = DefaultTables(freshUUID, tableRefs)
-
       discovery = DefaultDiscovery(datasources.quasarDatasourceOf, resourceSchema)
 
       resultPush <-
@@ -177,7 +171,6 @@ object Quasar extends Logging {
         datasources,
         destinations,
         schedulers,
-        tables,
         sqlEvaluator.local((_, None)),
         discovery,
         resultPush,
