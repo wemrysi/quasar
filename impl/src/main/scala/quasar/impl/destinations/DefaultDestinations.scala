@@ -69,47 +69,39 @@ private[impl] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
 
   def destinationOf(i: I): F[DestinationError[I, C] \/ Destination[F]] = {
     type DE = DestinationError[I, C]
-    type L[M[_], A] = EitherT[M, DE, A]
 
-    lazy val error: EitherT[F, DestinationError[I, C], Destination[F]] =
-      EitherT.pureLeft(destinationNotFound[I, DE](i))
+    lazy val error: F[DE \/ Destination[F]] =
+      destinationNotFound[I, DE](i).left[Destination[F]].pure[F]
 
-    lazy val fromCache: EitherT[F, DE, Destination[F]] =
-      cache.get(i).liftM[L] flatMap {
-        case None => error
-        case Some(a) => EitherT.pure(a)
-      }
+    def create(ref: DestinationRef[C]): F[DE \/ Destination[F]] = {
+      val created = for {
+        allocated <- allocateDestination[DE](ref)
+        _ <- cache.manage(i, allocated).liftM[EitherT[?[_], DE, ?]]
+      } yield allocated._1
+
+      created.run
+    }
+
+    def fromCacheOrCreate(ref: DestinationRef[C]): F[DE \/ Destination[F]] =
+      OptionT(cache.get(i))
+        .toRight(destinationNotFound[I, DE](i))
+        .orElse(EitherT(create(ref)))
+        .run
 
     throughSemaphore(i) {
-      val action = for {
-        signal <- EitherT.rightT(getter(i))
-        res <- signal match {
-          case Empty =>
-            error
-          case Removed(_) =>
-            cache.shutdown(i).liftM[L] >> error
-          case Inserted(ref) =>
-            cache.get(i).liftM[L] flatMap {
-              case None =>
-                for {
-                  allocated <- allocateDestination[DE](ref)
-                  _ <- cache.manage(i, allocated).liftM[L]
-                } yield allocated._1
-              case Some(a) => EitherT.pure(a)
-            }
-          case Updated(incoming, old) if DestinationRef.atMostRenamed(incoming, old) =>
-            fromCache
-          case Preserved(_) =>
-            fromCache
-          case Updated(incoming, _) => for {
-            _ <- EitherT.rightT(cache.shutdown(i))
-            allocated <- allocateDestination[DE](incoming)
-            _ <- cache.manage(i, allocated).liftM[L]
-          } yield allocated._1
-        }
-      } yield res
+      getter(i) flatMap {
+        case Empty =>
+          error
 
-      action.run
+        case Removed(_) =>
+          cache.shutdown(i) >> error
+
+        case Updated(incoming, old) if !DestinationRef.atMostRenamed(incoming, old) =>
+          cache.shutdown(i) >> create(incoming)
+
+        case exists: Exists[DestinationRef[C]] =>
+          fromCacheOrCreate(exists.value)
+      }
     }
   }
 
@@ -129,30 +121,27 @@ private[impl] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
     lazy val notFound =
       Condition.abnormal(destinationNotFound[I, DestinationError[I, C]](i))
 
+    def doReplace(prev: DestinationRef[C]): F[Condition[DestinationError[I, C]]] =
+      if (ref === prev)
+        Condition.normal[DestinationError[I, C]]().point[F]
+      else if (DestinationRef.atMostRenamed(ref, prev))
+        setRef(i, ref)
+      else
+        addRef[DestinationError[I, C]](i, ref)
+
     throughSemaphore(i) {
       getter(i) flatMap {
         case Empty =>
           notFound.point[F]
+
         case Removed(_) =>
           cache.shutdown(i) as notFound
-        case existed => for {
-          _ <- refs.insert(i, ref)
-          signal <- getter(i)
-          res <- signal match {
-            case Empty =>
-              notFound.point[F]
-            case Removed(_) =>
-              cache.shutdown(i) as notFound
-            case Inserted(_) =>
-              addRef[DestinationError[I, C]](i, ref)
-            case Preserved(_) =>
-              Condition.normal[DestinationError[I, C]]().point[F]
-            case Updated(incoming, old) if DestinationRef.atMostRenamed(incoming, old) =>
-              setRef(i, incoming)
-            case Updated(_, _) =>
-              cache.shutdown(i) >> addRef[DestinationError[I, C]](i, ref)
-          }
-        } yield res
+
+        case Updated(_, old) =>
+          doReplace(old)
+
+        case exists: Exists[DestinationRef[C]] =>
+          doReplace(exists.value)
       }
     }
   }
@@ -166,12 +155,13 @@ private[impl] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
   private def errorsOf(i: I): F[Option[Exception]] =
     errors.map(_.lookup(i))
 
-  private def addRef[E >: CreateError[C] <: DestinationError[I, C]](i: I, ref: DestinationRef[C]): F[Condition[E]] = {
+  private def addRef[E >: CreateError[C] <: DestinationError[I, C]](i: I, ref: DestinationRef[C])
+      : F[Condition[E]] = {
     val action = for {
       _ <- verifyNameUnique[E](ref.name, i)
 
       mbCurrent <- EitherT.rightT(cache.get(i))
-      _ <- EitherT.rightT(mbCurrent.fold(().point[F])(x => cache.shutdown(i)))
+      _ <- EitherT.rightT(mbCurrent.fold(().point[F])(_ => cache.shutdown(i)))
 
       allocated <- allocateDestination[E](ref)
 
@@ -202,14 +192,13 @@ private[impl] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
   private def allocateDestination[E >: CreateError[C] <: DestinationError[I, C]](
       ref: DestinationRef[C])
       : EitherT[F, E, (Destination[F], F[Unit])] =
-    EitherT(modules.create(ref).run.allocated map {
-      case (-\/(e), _) => -\/(e: E)
-      case (\/-(a), finalize) => \/-((a, finalize))
+    EitherT(modules.create(ref).run.allocated flatMap {
+      case (-\/(e), finalize) => finalize.as((e: E).left[(Destination[F], F[Unit])])
+      case (\/-(a), finalize) => (a, finalize).right[E].pure[F]
     })
 
-  private def throughSemaphore(i: I): F ~> F = λ[F ~> F]{ fa =>
-    semaphore.get(i).use(_ => fa)
-  }
+  private def throughSemaphore(i: I): F ~> F =
+    λ[F ~> F](fa => semaphore.get(i).use(_ => fa))
 }
 
 object DefaultDestinations {
