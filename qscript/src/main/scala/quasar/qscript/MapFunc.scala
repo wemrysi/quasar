@@ -92,6 +92,7 @@ object MapFunc {
     case structural.EnsureLocalDateTime => a => MFD(D.Typecheck(a, Type.LocalDateTime))
     case structural.EnsureLocalDate => a => MFD(D.Typecheck(a, Type.LocalDate))
     case structural.EnsureLocalTime => a => MFD(D.Typecheck(a, Type.LocalTime))
+    case structural.EnsureInterval => a => MFD(D.Typecheck(a, Type.Interval))
     case structural.EnsureNull => a => MFD(D.Typecheck(a, Type.Null))
     case structural.MakeArray => a => MFC(C.MakeArray(a))
     case structural.Meta => a => MFC(C.Meta(a))

@@ -117,6 +117,7 @@ package object compile {
       "_sd_ensure_localdatetime".ci,
       "_sd_ensure_localdate".ci,
       "_sd_ensure_localtime".ci,
+      "_sd_ensure_interval".ci,
       "_sd_ensure_null".ci)
 
     val loop: T => (Option[String] \/ (Option[String] \/ T)) =
