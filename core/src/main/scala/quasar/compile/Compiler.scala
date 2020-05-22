@@ -287,6 +287,7 @@ final class Compiler[M[_], T: Equal]
       CIName("_sd_ensure_localdatetime")  -> structural.EnsureLocalDateTime,
       CIName("_sd_ensure_localdate")      -> structural.EnsureLocalDate,
       CIName("_sd_ensure_localtime")      -> structural.EnsureLocalTime,
+      CIName("_sd_ensure_interval")       -> structural.EnsureInterval,
       CIName("_sd_ensure_null")           -> structural.EnsureNull,
       CIName("flatten_map")               -> structural.FlattenMap,
       CIName("flatten_array")             -> structural.FlattenArray,

@@ -135,6 +135,11 @@ trait StructuralLib extends Library {
     "Ensures the value is an LocalTime",
     noSimplification)
 
+  val EnsureInterval: UnaryFunc = UnaryFunc(
+    Mapping,
+    "Ensures the value is an Interval",
+    noSimplification)
+
   val EnsureNull: UnaryFunc = UnaryFunc(
     Mapping,
     "Ensures the value is null",
