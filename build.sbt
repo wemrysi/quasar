@@ -282,9 +282,9 @@ lazy val impl = project
       "io.netty"       % "netty-all"                 % nettyVersion,
       "org.mapdb"      % "mapdb"                     % mapdbVersion,
       "eu.timepit"     %% "refined-scalacheck"       % refinedVersion % Test,
-      // woodstox is added here as a quick and dirty way to get azure working
-      // see ch3385 for details
-      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2",
-
+      // The azure-core-http-netty dep is added here as a quick and dirty way to get azure working.
+      // Azure relies on service provider mechanism to load an implementation of its HttpClientProvider.
+      // If it is not added then no HttpClientProvider implementation can be found.
+      "com.azure" % "azure-core-http-netty" % "1.5.1",
       "org.typelevel" %% "kittens" % kittensVersion % Test))
   .evictToLocal("FS2_JOB_PATH", "core")
