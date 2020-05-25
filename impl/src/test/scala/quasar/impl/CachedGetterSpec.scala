@@ -49,13 +49,13 @@ class CachedGetterSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[IO]
       r7 <- getter(())
     } yield {
       r0 === Empty
-      r1 === Inserted(1)
+      r1 === Present(1)
       r2 === Updated(2, 1)
-      r3 === Preserved(2)
+      r3 === Present(2)
       r4 === Removed(2)
       r5 === Empty
-      r6 === Inserted(3)
-      r7 === Preserved(3)
+      r6 === Present(3)
+      r7 === Present(3)
     }
   }
 }

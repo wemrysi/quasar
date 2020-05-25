@@ -310,6 +310,32 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           mbB must beSome(b)
         }
       }
+
+      "doesn't replace when config invalid" >>* {
+        val err3: InitializationError[Json] =
+          MalformedConfiguration(supportedType, jString("three"), "3 isn't a config!")
+
+        for {
+          ((dses, refs, starts, shuts), finalize) <- prepare(Map(jString("invalid") -> err3)).allocated
+          a <- refA
+          a2 = DatasourceRef.config.set(jString("invalid"))(a)
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          c <- dses.replaceDatasource(i, a2)
+          r2 <- refs.lookup(i)
+          d <- dses.quasarDatasourceOf(i)
+          started <- starts.get
+          ended <- shuts.get
+          _ <- finalize
+        } yield {
+          // once for initial and another for restart after failed replace
+          started === List(i, i)
+          ended === List(i)
+          c must beAbnormal(err3)
+          r2 must beSome(a)
+          d must beSome
+        }
+      }
     }
     "sanitize config" >> {
       "ref is sanitized" >>* {

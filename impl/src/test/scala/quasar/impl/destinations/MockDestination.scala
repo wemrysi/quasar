@@ -23,7 +23,6 @@ import argonaut.Json
 import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
-import cats.implicits._
 
 import eu.timepit.refined.auto._
 
@@ -35,22 +34,37 @@ import quasar.connector.MonadResourceErr
 import quasar.connector.destination._
 import quasar.connector.render.RenderConfig
 
-object MockDestinationModule extends DestinationModule {
-  def destinationType = DestinationType("mock", 1L)
+final class MockDestinationModule private (initErrs: Map[Json, InitializationError[Json]])
+    extends DestinationModule {
+
+  val destinationType = MockDestinationModule.MockType
+
   def sanitizeDestinationConfig(config: Json) =
     Json.jString("sanitized")
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](config: Json)
       : Resource[F, Either[InitializationError[Json], Destination[F]]] =
-    (new MockDestination[F]: Destination[F])
-      .asRight[InitializationError[Json]]
-      .pure[Resource[F, ?]]
+    Resource.pure[F, Either[InitializationError[Json], Destination[F]]](
+      initErrs.get(config) match {
+        case Some(e) =>
+          Left(e)
+
+        case None =>
+          Right(new MockDestination[F]: Destination[F])
+      })
+}
+
+object MockDestinationModule {
+  val MockType: DestinationType = DestinationType("mock", 1L)
+
+  def apply(m: Map[Json, InitializationError[Json]]): DestinationModule =
+    new MockDestinationModule(m)
 }
 
 class MockDestination[F[_]: Applicative] extends UntypedDestination[F] {
 
   def destinationType: DestinationType =
-    MockDestinationModule.destinationType
+    MockDestinationModule.MockType
 
   def sinks = NonEmptyList.one(mockCsvSink)
 

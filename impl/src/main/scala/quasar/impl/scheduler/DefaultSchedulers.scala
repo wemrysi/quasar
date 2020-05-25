@@ -40,11 +40,13 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
     getter: CachedGetter[F, I, SchedulerRef[C]],
     modules: SchedulerModules[F, II, C, Json])
     extends Schedulers[F, I, II, C, Json] {
+
   type Module = SchedulerModule
   type ModuleType = SchedulerType
 
   def enableModule(m: SchedulerModule): F[Unit] =
     modules.enable(m)
+
   def disableModule(m: SchedulerType): F[Unit] =
     modules.disable(m)
 
@@ -62,44 +64,41 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
   def schedulerOf(i: I): F[Either[SchedulerError[I, C], Scheduler[F, II, Json]]] = {
     type SE = SchedulerError[I, C]
 
-    lazy val error: EitherT[F, SE, Scheduler[F, II, Json]] =
-      EitherT.leftT(SchedulerNotFound(i): SchedulerError[I, C])
+    lazy val error: F[Either[SE, Scheduler[F, II, Json]]] =
+      (SchedulerNotFound(i): SE).asLeft[Scheduler[F, II, Json]].pure[F]
 
-    lazy val fromCache: EitherT[F, SE, Scheduler[F, II, Json]] =
-      EitherT.right(cache.get(i)) flatMap {
-        case None => error
-        case Some(a) => EitherT.pure(a)
-      }
+    def create(ref: SchedulerRef[C]): F[Either[SE, Scheduler[F, II, Json]]] = {
+      val created = for {
+        allocated <- allocateScheduler[SE](ref)
+        _ <- EitherT.right[SE](cache.manage(i, allocated))
+      } yield allocated._1
+
+      created.value
+    }
+
+    def fromCacheOrCreate(ref: SchedulerRef[C]): F[Either[SE, Scheduler[F, II, Json]]] =
+      OptionT(cache.get(i))
+        .toRight[SE](SchedulerNotFound(i))
+        .orElse(EitherT(create(ref)))
+        .value
 
     throughSemaphore(i) {
-      val action = for {
-        signal <- EitherT.right(getter(i))
-        res <- signal match {
-          case Empty =>
-            error
-          case Removed(_) =>
-            EitherT.right(cache.shutdown(i)) flatMap (_ => error)
-          case Inserted(ref) =>
-            EitherT.right[SE](cache.get(i)) flatMap {
-              case None =>
-                for {
-                  allocated <- allocateScheduler[SE](ref)
-                  _ <- EitherT.right[SE](cache.manage(i, allocated))
-                } yield allocated._1
-              case Some(a) => EitherT.rightT[F, SE](a)
-            }
-          case Updated(incoming, old) if SchedulerRef.atMostRenamed(incoming, old) =>
-            fromCache
-          case Preserved(_) =>
-            fromCache
-          case Updated(incoming, _) => for {
-            _ <- EitherT.right[SE](cache.shutdown(i))
-            allocated <- allocateScheduler[SE](incoming)
-            _ <- EitherT.right[SE](cache.manage(i, allocated))
-          } yield allocated._1
-        }
-      } yield res
-      action.value
+      getter(i) flatMap {
+        case Empty =>
+          error
+
+        case Removed(_) =>
+          cache.shutdown(i) >> error
+
+        case Updated(incoming, old) if SchedulerRef.atMostRenamed(incoming, old) =>
+          fromCacheOrCreate(incoming)
+
+        case Updated(incoming, old) =>
+          cache.shutdown(i) >> create(incoming)
+
+        case Present(value) =>
+          fromCacheOrCreate(value)
+      }
     }
   }
 
@@ -112,30 +111,27 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
     lazy val notFound =
       Condition.abnormal(SchedulerNotFound(i): SchedulerError[I, C])
 
+    def doReplace(prev: SchedulerRef[C]): F[Condition[SchedulerError[I, C]]] =
+      if (ref === prev)
+        Condition.normal[SchedulerError[I, C]]().pure[F]
+      else if (SchedulerRef.atMostRenamed(ref, prev))
+        setRef(i, ref)
+      else
+        addRef[SchedulerError[I, C]](i, ref)
+
     throughSemaphore(i) {
       getter(i) flatMap {
         case Empty =>
           notFound.pure[F]
+
         case Removed(_) =>
           cache.shutdown(i) as notFound
-        case existed => for {
-          _ <- refs.insert(i, ref)
-          signal <- getter(i)
-          res <- signal match {
-            case Empty =>
-              notFound.pure[F]
-            case Removed(_) =>
-              cache.shutdown(i) as notFound
-            case Inserted(_) =>
-              addRef[SchedulerError[I, C]](i, ref)
-            case Preserved(_) =>
-              Condition.normal[SchedulerError[I, C]]().pure[F]
-            case Updated(incoming, old) if SchedulerRef.atMostRenamed(incoming, old) =>
-              setRef(i, incoming)
-            case Updated(_, _) =>
-              cache.shutdown(i) >> addRef[SchedulerError[I, C]](i, ref)
-          }
-        } yield res
+
+        case Updated(_, old) =>
+          doReplace(old)
+
+        case Present(value) =>
+          doReplace(value)
       }
     }
   }
@@ -147,7 +143,7 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
     val action = for {
       _ <- verifyNameUnique[E](ref.name, i)
       mbCurrent <- EitherT.right[E](cache.get(i))
-      _ <- EitherT.right[E](mbCurrent.fold(().pure[F])(x => cache.shutdown(i)))
+      _ <- EitherT.right[E](mbCurrent.fold(().pure[F])(_ => cache.shutdown(i)))
       allocated <- allocateScheduler[E](ref)
       _ <- EitherT.right[E](refs.insert(i, ref))
       _ <- EitherT.right[E](cache.manage(i, allocated))
@@ -172,18 +168,16 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
         .map(x => if (x) Left(SchedulerNameExists(name): E) else Right(()))
     }
 
-  private def throughSemaphore(i: I): F ~> F = λ[F ~> F]{ fa =>
-    semaphore.get(i).use(_ => fa)
-  }
+  private def throughSemaphore(i: I): F ~> F =
+    λ[F ~> F](fa => semaphore.get(i).use(_ => fa))
 
   private def allocateScheduler[E >: CreateError[C] <: SchedulerError[I, C]](
       ref: SchedulerRef[C])
       : EitherT[F, E, (Scheduler[F, II, Json], F[Unit])] =
-    EitherT(modules.create(ref).value.allocated map {
-      case (Left(e), _) => Left(e: E)
-      case (Right(a), finalize) => Right((a, finalize))
+    EitherT(modules.create(ref).value.allocated flatMap {
+      case (Left(e), finalize) => finalize.as((e: E).asLeft[(Scheduler[F, II, Json], F[Unit])])
+      case (Right(a), finalize) => (a, finalize).asRight[E].pure[F]
     })
-
 }
 
 object DefaultSchedulers {
