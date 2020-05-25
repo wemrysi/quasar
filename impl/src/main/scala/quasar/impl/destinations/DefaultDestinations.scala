@@ -96,11 +96,14 @@ private[impl] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
         case Removed(_) =>
           cache.shutdown(i) >> error
 
-        case Updated(incoming, old) if !DestinationRef.atMostRenamed(incoming, old) =>
+        case Updated(incoming, old) if DestinationRef.atMostRenamed(incoming, old) =>
+          fromCacheOrCreate(incoming)
+
+        case Updated(incoming, old) =>
           cache.shutdown(i) >> create(incoming)
 
-        case exists: Exists[DestinationRef[C]] =>
-          fromCacheOrCreate(exists.value)
+        case Present(value) =>
+          fromCacheOrCreate(value)
       }
     }
   }
@@ -140,8 +143,8 @@ private[impl] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
         case Updated(_, old) =>
           doReplace(old)
 
-        case exists: Exists[DestinationRef[C]] =>
-          doReplace(exists.value)
+        case Present(value) =>
+          doReplace(value)
       }
     }
   }

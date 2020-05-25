@@ -90,11 +90,14 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
         case Removed(_) =>
           cache.shutdown(i) >> error
 
-        case Updated(incoming, old) if !SchedulerRef.atMostRenamed(incoming, old) =>
+        case Updated(incoming, old) if SchedulerRef.atMostRenamed(incoming, old) =>
+          fromCacheOrCreate(incoming)
+
+        case Updated(incoming, old) =>
           cache.shutdown(i) >> create(incoming)
 
-        case exists: Exists[SchedulerRef[C]] =>
-          fromCacheOrCreate(exists.value)
+        case Present(value) =>
+          fromCacheOrCreate(value)
       }
     }
   }
@@ -127,8 +130,8 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
         case Updated(_, old) =>
           doReplace(old)
 
-        case exists: Exists[SchedulerRef[C]] =>
-          doReplace(exists.value)
+        case Present(value) =>
+          doReplace(value)
       }
     }
   }

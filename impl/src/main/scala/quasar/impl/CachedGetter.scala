@@ -33,25 +33,21 @@ trait CachedGetter[F[_], I, A] extends (I => F[Signal[A]]) {
 
 object CachedGetter {
   sealed trait Signal[+A] extends Product with Serializable
+
   object Signal {
     final case object Empty extends Signal[Nothing]
     final case class Removed[A](value: A) extends Signal[A]
-    sealed trait Exists[+A] extends Signal[A] {
-      def value: A
-    }
-    final case class Inserted[A](value: A) extends Exists[A]
-    final case class Updated[A](value: A, previous: A) extends Exists[A]
-    final case class Preserved[A](value: A) extends Exists[A]
+    final case class Updated[A](value: A, previous: A) extends Signal[A]
+    final case class Present[A](value: A) extends Signal[A]
 
-    def fromOptions[A: Eq](incoming: Option[A], persisted: Option[A]): Signal[A] = (incoming, persisted) match {
-      case (None, None) => Empty
-      case (Some(a), None) => Inserted(a)
-      case (None, Some(a)) => Removed(a)
-      case (Some(a), Some(b)) if a === b => Preserved(a)
-      case (Some(a), Some(b)) => Updated(a, b)
-    }
+    def fromOptions[A: Eq](incoming: Option[A], persisted: Option[A]): Signal[A] =
+      (incoming, persisted) match {
+        case (None, None) => Empty
+        case (None, Some(a)) => Removed(a)
+        case (Some(a), Some(b)) if a =!= b => Updated(a, b)
+        case (Some(a), _) => Present(a)
+      }
   }
-  import Signal._
 
   def apply[F[_]: Sync, I, A: Eq](getter: I => F[Option[A]]): F[CachedGetter[F, I, A]] =
     Ref.of[F, Map[I, A]](Map.empty) map { (cache: Ref[F, Map[I, A]]) =>
@@ -63,7 +59,7 @@ object CachedGetter {
             case Some(a) => cache.update(_.updated(i, a))
             case None => cache.update(_ - i)
           }
-        } yield fromOptions[A](incoming, persisted)
+        } yield Signal.fromOptions[A](incoming, persisted)
       }
     }
 }

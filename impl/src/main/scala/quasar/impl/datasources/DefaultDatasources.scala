@@ -112,8 +112,8 @@ private[impl] final class DefaultDatasources[
         case Updated(_, old) =>
           doReplace(old)
 
-        case exists: Exists[DatasourceRef[C]] =>
-          doReplace(exists.value)
+        case Present(value) =>
+          doReplace(value)
       }
     }
   }
@@ -141,11 +141,14 @@ private[impl] final class DefaultDatasources[
         case Removed(_) =>
           dispose(i).as(None: Option[QDS])
 
-        case Updated(incoming, old) if !DatasourceRef.atMostRenamed(incoming, old) =>
+        case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
+          fromCacheOrCreate(incoming).map(_.some)
+
+        case Updated(incoming, old) =>
           dispose(i) >> create(incoming).map(_.some)
 
-        case exists: Exists[DatasourceRef[C]] =>
-          fromCacheOrCreate(exists.value).map(_.some)
+        case Present(value) =>
+          fromCacheOrCreate(value).map(_.some)
       }
     }
   }
