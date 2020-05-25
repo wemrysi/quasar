@@ -25,7 +25,7 @@ object Versions {
   val slf4sVersion        = "1.7.25"
   val atomixVersion       = "3.0.11" // This is freezed, because atomix changed discovery service somehow
   val mapdbVersion        = "3.0.8"
-  val nettyVersion        = "4.1.47.Final"
+  val nettyVersion        = "4.1.49.Final"
   val skolemsVersion      = "0.2.1"
   val kittensVersion      = "2.0.0"
 }
