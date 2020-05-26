@@ -74,14 +74,14 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
 
   val blocker: Blocker = qc.Blocker.cached("rdestinations-spec")
 
-  def mkDestinations = {
+  def mkDestinations(initErrors: Map[Json, InitializationError[Json]] = Map.empty) = {
     val freshId = IO(java.util.UUID.randomUUID().toString())
     val fRefs: IO[IndexedStore[IO, String, DestinationRef[Json]]] =
       IO(new ConcurrentHashMap[String, DestinationRef[Json]]()).map { (mp: ConcurrentHashMap[String, DestinationRef[Json]]) =>
         ConcurrentMapIndexedStore.unhooked[IO, String, DestinationRef[Json]](mp, blocker)
       }
     val rCache = ResourceManager[IO, String, Destination[IO]]
-    val modules = DestinationModules[IO](List(MockDestinationModule))
+    val modules = DestinationModules[IO](List(MockDestinationModule(initErrors)))
     for {
       refs <- Resource.liftF(fRefs)
       cache <- rCache
@@ -89,9 +89,9 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
     } yield (refs, result, cache)
   }
 
-  def emptyDestinations = mkDestinations map (_._2)
+  def emptyDestinations = mkDestinations() map (_._2)
 
-  val MockDestinationType = MockDestinationModule.destinationType
+  val MockDestinationType = MockDestinationModule.MockType
 
   val testRef =
     DestinationRef(MockDestinationType, DestinationName("foo-mock"), Json.jEmptyString)
@@ -112,7 +112,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         }
       }
       "returns created destinations" >>* {
-        mkDestinations use { case (store, dests, cache) =>
+        mkDestinations() use { case (store, dests, cache) =>
           for {
             md0 <- dests.allDestinationMetadata.flatMap(_.compile.toList)
             addStatus <- dests.addDestination(testRef)
@@ -157,7 +157,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
       "replaces a destination" >>* {
         val newRef = DestinationRef.name.set(DestinationName("foo-mock-2"))(testRef)
         for {
-          ((store, dests, _), finalize) <- mkDestinations.allocated
+          ((store, dests, _), finalize) <- mkDestinations().allocated
           _ <- store.insert("1", testRef)
           beforeReplace <- dests.destinationRef("1")
           replaceResult <- dests.replaceDestination("1", newRef)
@@ -207,7 +207,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
           DestinationRef.config.set(Json.jString("modified"))(testRef)
 
         for {
-          ((store, dests, cache), finalize) <- mkDestinations.allocated
+          ((store, dests, cache), finalize) <- mkDestinations().allocated
           addStatus <- dests.addDestination(testRef)
           i0 = addStatus.fold(x => "", x => x)
           disposes <- Ref.of[IO, Option[String]](None)
@@ -224,7 +224,30 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
           result must beSome(i0)
         }
       }
+
+      "doesn't replace when config invalid" >>* {
+        val err3: InitializationError[Json] =
+          MalformedConfiguration(MockDestinationType, Json.jString("three"), "3 isn't a config!")
+
+        val invalidRef =
+          DestinationRef.config.set(Json.jString("invalid"))(testRef)
+
+        for {
+          ((store, dests, cache), finalize) <- mkDestinations(Map(Json.jString("invalid") -> err3)).allocated
+          c1 <- dests.addDestination(testRef)
+          i = c1.toOption.get
+          r1 <- store.lookup(i)
+          c2 <- dests.replaceDestination(i, invalidRef)
+          r2 <- store.lookup(i)
+          _ <- finalize
+        } yield {
+          r1 must beSome(testRef)
+          c2 must beAbnormal(err3)
+          r2 must beSome(testRef)
+        }
+      }
     }
+
     "destination status" >> {
       "returns an error for an unknown destination" >>* {
         for {
@@ -277,7 +300,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
   "clustering" >> {
     "new ref appeared" >>* {
       for {
-        ((store, dests, cache), finalize) <- mkDestinations.allocated
+        ((store, dests, cache), finalize) <- mkDestinations().allocated
         _ <- store.insert("foo", testRef)
         d <- dests.destinationOf("foo")
         _ <- finalize
@@ -290,7 +313,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
       val unknownType = DestinationType("unknown", 2L)
       val unknownRef = DestinationRef.kind.set(unknownType)(testRef)
 
-      mkDestinations use { case (store, dests, cache) =>
+      mkDestinations() use { case (store, dests, cache) =>
         for {
           _ <- store.insert("unk", unknownRef)
           d <- dests.destinationOf("unk")
@@ -302,7 +325,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
 
     "ref disappered" >>* {
       for {
-        ((store, dests, cache), finalize) <- mkDestinations.allocated
+        ((store, dests, cache), finalize) <- mkDestinations().allocated
         _ <- store.insert("foo", testRef)
         d0 <- dests.destinationOf("foo")
         _ <- store.delete("foo")
@@ -321,7 +344,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         DestinationRef.config.set(Json.jString("modified"))(testRef)
 
       for {
-        ((store, dests, cache), finalize) <- mkDestinations.allocated
+        ((store, dests, cache), finalize) <- mkDestinations().allocated
         _ <- store.insert("foo", testRef)
         _ <- dests.destinationOf("foo")
         trackingRef <- Ref.of[IO, Option[String]](None)

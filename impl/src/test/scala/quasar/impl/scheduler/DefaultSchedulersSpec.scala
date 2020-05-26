@@ -48,32 +48,34 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
-  def builder(kind: SchedulerType, err: Option[InitializationError[Json]] = None): SchedulerBuilder[IO] = new SchedulerBuilder[IO] {
-    def schedulerType = kind
-    def sanitizeConfig(inp: Json) = Json.jString("sanitized")
-    def scheduler(config: Json)
-        : Resource[IO, Either[InitializationError[Json], Scheduler[IO, Array[Byte], Json]]] =
-      err match {
-        case Some(a) =>
-          a.asLeft[Scheduler[IO, Array[Byte], Json]].pure[Resource[IO, ?]]
-        case None =>
-          val scheduler = new Scheduler[IO, Array[Byte], Json]  {
-            def entries: Stream[IO, (Array[Byte], Json)] =
-              Stream.empty
-            def addIntention(c: Json): IO[Either[IncorrectIntention[Json], Array[Byte]]] =
-              IO(UUID.randomUUID.toString.getBytes.asRight[IncorrectIntention[Json]])
-            def lookupIntention(i: Array[Byte]): IO[Either[IntentionNotFound[Array[Byte]], Json]] =
-              IO(Json.jNull.asRight[IntentionNotFound[Array[Byte]]])
-            def editIntention(i: Array[Byte], config: Json): IO[Condition[SchedulingError[Array[Byte], Json]]] =
-              IO(Condition.normal[SchedulingError[Array[Byte], Json]]())
-            def deleteIntention(i: Array[Byte]): IO[Condition[IntentionNotFound[Array[Byte]]]] =
-              IO(Condition.normal[IntentionNotFound[Array[Byte]]]())
-          }
-          scheduler.asRight[InitializationError[Json]].pure[Resource[IO, ?]]
-      }
-  }
+  def builder(kind: SchedulerType, err: Map[Json, InitializationError[Json]])
+      : SchedulerBuilder[IO] =
+    new SchedulerBuilder[IO] {
+      def schedulerType = kind
+      def sanitizeConfig(inp: Json) = Json.jString("sanitized")
+      def scheduler(config: Json)
+          : Resource[IO, Either[InitializationError[Json], Scheduler[IO, Array[Byte], Json]]] =
+        err.get(config) match {
+          case Some(e) =>
+            e.asLeft[Scheduler[IO, Array[Byte], Json]].pure[Resource[IO, ?]]
+          case None =>
+            val scheduler = new Scheduler[IO, Array[Byte], Json]  {
+              def entries: Stream[IO, (Array[Byte], Json)] =
+                Stream.empty
+              def addIntention(c: Json): IO[Either[IncorrectIntention[Json], Array[Byte]]] =
+                IO(UUID.randomUUID.toString.getBytes.asRight[IncorrectIntention[Json]])
+              def lookupIntention(i: Array[Byte]): IO[Either[IntentionNotFound[Array[Byte]], Json]] =
+                IO(Json.jNull.asRight[IntentionNotFound[Array[Byte]]])
+              def editIntention(i: Array[Byte], config: Json): IO[Condition[SchedulingError[Array[Byte], Json]]] =
+                IO(Condition.normal[SchedulingError[Array[Byte], Json]]())
+              def deleteIntention(i: Array[Byte]): IO[Condition[IntentionNotFound[Array[Byte]]]] =
+                IO(Condition.normal[IntentionNotFound[Array[Byte]]]())
+            }
+            scheduler.asRight[InitializationError[Json]].pure[Resource[IO, ?]]
+        }
+    }
 
-  def mkSchedulers = {
+  def mkSchedulers(errors: Map[Json, InitializationError[Json]] = Map.empty) = {
     val freshId = IO(UUID.randomUUID.toString)
     val fRefs: IO[IndexedStore[IO, String, SchedulerRef[Json]]] =
       IO(new ConcurrentHashMap[String, SchedulerRef[Json]]()) map { (mp: ConcurrentHashMap[String, SchedulerRef[Json]]) =>
@@ -84,12 +86,12 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
     for {
       refs <- Resource.liftF(fRefs)
       cache <- rCache
-      builders <- Resource.liftF(SchedulerBuilders[IO](List(builder(testType))))
+      builders <- Resource.liftF(SchedulerBuilders[IO](List(builder(testType, errors))))
       result <- Resource.liftF(DefaultSchedulers(freshId, refs, cache, builders))
     } yield (refs, result, cache)
   }
 
-  def emptySchedulers = mkSchedulers map (_._2)
+  def emptySchedulers = mkSchedulers() map (_._2)
 
   val testType =
     SchedulerType("test", 1L)
@@ -106,7 +108,7 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
       for {
         (ss, finalize) <- emptySchedulers.allocated
         result0 <- ss.addScheduler(unknownRef)
-        _ <- ss.enableModule(builder(unknownType))
+        _ <- ss.enableModule(builder(unknownType, Map.empty))
         result1 <- ss.addScheduler(unknownRef)
         id = result1.toOption.get
         _ <- ss.removeScheduler(id)
@@ -155,11 +157,11 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
         }
       }
     }
-    "replace destination" >> {
-      "replaces a destination" >>* {
+    "replace scheduler" >> {
+      "replaces a scheduler" >>* {
         val newRef = testRef.copy(name = "new-name")
         for {
-          ((store, ss, _), finalize) <- mkSchedulers.allocated
+          ((store, ss, _), finalize) <- mkSchedulers().allocated
           _ <- store.insert("1", testRef)
           beforeReplace <- ss.schedulerRef("1")
           replaceResult <- ss.replaceScheduler("1", newRef)
@@ -202,12 +204,34 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
           replaceStatus must beNormal
         }
       }
+
+      "doesn't replace when config invalid" >>* {
+        val err3: InitializationError[Json] =
+          MalformedConfiguration(testType, Json.jString("three"), "3 isn't a config!")
+
+        val invalidRef =
+          testRef.copy(config = Json.jString("invalid"))
+
+        for {
+          ((store, ss, _), finalize) <- mkSchedulers(Map(Json.jString("invalid") -> err3)).allocated
+          c1 <- ss.addScheduler(testRef)
+          i = c1.toOption.get
+          r1 <- store.lookup(i)
+          c2 <- ss.replaceScheduler(i, invalidRef)
+          r2 <- store.lookup(i)
+          _ <- finalize
+        } yield {
+          r1 must beSome(testRef)
+          c2 must beAbnormal(err3)
+          r2 must beSome(testRef)
+        }
+      }
     }
   }
   "clustering" >> {
     "new ref appeared" >>* {
       for {
-        ((store, ss, cache), finalize) <- mkSchedulers.allocated
+        ((store, ss, cache), finalize) <- mkSchedulers().allocated
         _ <- store.insert("foo", testRef)
         s <- ss.schedulerOf("foo")
         _ <- finalize
@@ -218,7 +242,7 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
     "new unknown ref appeared" >>* {
       val unknownType = SchedulerType("unknown", 2L)
       val unknownRef = SchedulerRef(unknownType, "unknown", Json.jNull)
-      mkSchedulers use { case (store, ss, cache) =>
+      mkSchedulers() use { case (store, ss, cache) =>
         for {
           _ <- store.insert("unk", unknownRef)
           s <- ss.schedulerOf("unk")
@@ -229,7 +253,7 @@ class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpe
     }
     "ref disappered" >>* {
       for {
-        ((store, ss, cache), finalize) <- mkSchedulers.allocated
+        ((store, ss, cache), finalize) <- mkSchedulers().allocated
         _ <- store.insert("foo", testRef)
         s0 <- ss.schedulerRef("foo")
         _ <- store.delete("foo")
