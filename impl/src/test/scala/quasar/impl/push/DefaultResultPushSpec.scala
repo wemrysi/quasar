@@ -422,12 +422,17 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val fullCfg = full(path, "conflictq")
 
       for {
-        (destination, _) <- QDestination()
-        (_, data) <- controlledStream
+        (destination, filesystem) <- QDestination()
+        (ctl, data) <- controlledStream
 
         r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(data))) use { rp =>
           for {
             firstStartStatus <- rp.start(DestinationId, fullCfg, None)
+
+            // ensure first start is running to avoid race conditions
+            _ <- ctl.emit(W1)
+            _ <- awaitFs(filesystem, 1)
+
             secondStartStatus <- rp.start(DestinationId, config, None)
           } yield {
             firstStartStatus must beRight
@@ -442,12 +447,17 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val incCfg = incremental(path, "conflictq")
 
       for {
-        (destination, _) <- QDestination()
-        (_, data) <- controlledStream
+        (destination, filesystem) <- QDestination()
+        (ctl, data) <- controlledStream
 
         r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(data))) use { rp =>
           for {
             firstStartStatus <- rp.start(DestinationId, incCfg, None)
+
+            // ensure first start is running to avoid race conditions
+            _ <- ctl.emit(W1)
+            _ <- awaitFs(filesystem, 1)
+
             secondStartStatus <- rp.start(DestinationId, config, None)
           } yield {
             firstStartStatus must beRight
@@ -1092,7 +1102,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "fails if already running" >> forallConfigs { config =>
       for {
-        (dest, _) <- QDestination()
+        (dest, filesystem) <- QDestination()
 
         (ctl, data) <- controlledStream
 
@@ -1106,6 +1116,11 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             startRes <- await(started.sequence)
 
             update1 <- rp.update(DestinationId, config.value.path)
+
+            // ensure update1 is running to avoid race conditions
+            _ <- ctl.emit(W1)
+            _ <- awaitFs(filesystem, 1)
+
             update2 <- rp.update(DestinationId, config.value.path)
           } yield {
             startRes must beRight.like {
