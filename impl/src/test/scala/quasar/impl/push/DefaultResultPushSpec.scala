@@ -1112,13 +1112,15 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             _ <- ctl.emit(W1)
             _ <- ctl.halt
+            // consume fs events from started
+            _ <- awaitFs(filesystem)
 
             startRes <- await(started.sequence)
 
             update1 <- rp.update(DestinationId, config.value.path)
 
             // ensure update1 is running to avoid race conditions
-            _ <- ctl.emit(W1)
+            _ <- ctl.emit(W2)
             _ <- awaitFs(filesystem, 1)
 
             update2 <- rp.update(DestinationId, config.value.path)
