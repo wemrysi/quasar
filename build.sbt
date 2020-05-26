@@ -284,7 +284,10 @@ lazy val impl = project
       "eu.timepit"     %% "refined-scalacheck"       % refinedVersion % Test,
       // The azure-core-http-netty dep is added here as a quick and dirty way to get azure working.
       // Azure relies on service provider mechanism to load an implementation of its HttpClientProvider.
-      // If it is not added then no HttpClientProvider implementation can be found.
+      // The implementation class is available in the azure plugins, but
+      // somehow the wrong class loader is trying to load the implementation and
+      // if it is not added here then no HttpClientProvider implementation can be found.
+      // See ch11286.
       "com.azure" % "azure-core-http-netty" % "1.5.1",
       "org.typelevel" %% "kittens" % kittensVersion % Test))
   .evictToLocal("FS2_JOB_PATH", "core")
