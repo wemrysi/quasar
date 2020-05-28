@@ -55,9 +55,7 @@ object ResultParser {
           case JsonVariant.LineDelimited => json.Parser.ValueStream
         }
 
-        StreamParser(json.Parser(QDataPlate[F, A, ArrayBuffer[A]](isPrecise), mode))(
-          Chunk.buffer,
-          bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+        StreamParser(json.Parser(QDataPlate[F, A, ArrayBuffer[A]](isPrecise), mode))(Chunk.buffer)
 
       case sv: DataFormat.SeparatedValues =>
         val config = csv.Parser.Config(
@@ -69,9 +67,7 @@ object ResultParser {
           closeQuote = sv.closeQuote.toByte,
           escape = sv.escape.toByte)
 
-        StreamParser(csv.Parser(QDataPlate[F, A, ArrayBuffer[A]](false), config))(
-          Chunk.buffer,
-          bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+        StreamParser(csv.Parser(QDataPlate[F, A, ArrayBuffer[A]](false), config))(Chunk.buffer)
 
       case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
         compression
@@ -142,9 +138,7 @@ object ResultParser {
           QDataPlate[F, A, ArrayBuffer[A]](isPrecise).map(
             MultiplexingPlate(_, plate))
 
-        StreamParser(json.Parser(parserPlate, mode))(
-          Chunk.buffer,
-          bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+        StreamParser(json.Parser(parserPlate, mode))(Chunk.buffer)
 
       case sv: DataFormat.SeparatedValues =>
         val cfg = csv.Parser.Config(
@@ -160,8 +154,6 @@ object ResultParser {
           QDataPlate[F, A, ArrayBuffer[A]](false).map(
             MultiplexingPlate(_, plate))
 
-        StreamParser(csv.Parser(parserPlate, cfg))(
-          Chunk.buffer,
-          bufs => Chunk.buffer(concatArrayBufs[A](bufs)))
+        StreamParser(csv.Parser(parserPlate, cfg))(Chunk.buffer)
     }
 }
