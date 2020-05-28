@@ -1,5 +1,5 @@
 {
-  "precog-tectonic": "12.0.0-236ebd7",
-  "precog-qdata": "14.0.44",
+  "precog-tectonic": "12.0.0",
+  "precog-qdata": "15.0.0",
   "precog-fs2-job": "1.0.23"
 }
