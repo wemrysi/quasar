@@ -666,35 +666,39 @@ private[impl] object DefaultResultPush {
       }
 
     def acquire(jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing])
-        : F[ResultPush[F, D, Q]] =
+        : Resource[F, ResultPush[F, D, Q]] =
       for {
         active <-
-          Sync[F].delay(new ConcurrentSkipListMap[D :: Option[ResourcePath] :: HNil, ActiveState[F, Q]](
-            prefixComparator))
+          Resource liftF {
+            Sync[F].delay(new ConcurrentSkipListMap[D :: Option[ResourcePath] :: HNil, ActiveState[F, Q]](
+              prefixComparator))
+          }
 
-        log <- Slf4jLogger.create[F]
+        log <- Resource.liftF(Slf4jLogger.create[F])
 
-        _ <- Concurrent[F].start(jobManager.events.evalMap(handleEvent(active, log)).compile.drain)
-      } yield {
-        new DefaultResultPush(
-          lookupDestination,
-          evaluator,
-          jobManager,
-          render,
-          active,
-          pushes,
-          offsets,
-          log)
-      }
+        _ <- Concurrent[F].background(jobManager.events.evalMap(handleEvent(active, log)).compile.drain)
+
+        maker = Sync[F] delay {
+          new DefaultResultPush(
+            lookupDestination,
+            evaluator,
+            jobManager,
+            render,
+            active,
+            pushes,
+            offsets,
+            log)
+        }
+
+        back <- Resource.make(maker)(_.cancelAll)
+      } yield back
 
     val jm =
       JobManager[F, D :: ResourcePath :: HNil, Nothing](
         jobLimit = maxConcurrentPushes,
         eventsLimit = maxConcurrentPushes)
 
-    jm flatMap { jobManager =>
-      Resource.make(acquire(jobManager))(_.cancelAll)
-    }
+    jm.flatMap(acquire)
   }
 
 
