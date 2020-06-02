@@ -18,7 +18,7 @@ package quasar.connector.datasource
 
 import quasar.RenderTreeT
 import quasar.api.datasource.DatasourceType
-import quasar.api.datasource.DatasourceError.InitializationError
+import quasar.api.datasource.DatasourceError.{InitializationError, PatchingError}
 import quasar.api.resource.ResourcePathType
 import quasar.connector.{ByteStore, QueryResult}
 import quasar.qscript.{MonadPlannerErr, QScriptEducated}
@@ -30,11 +30,14 @@ import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Timer, Resource}
 import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
+import scalaz.\/
 
 trait HeavyweightDatasourceModule {
   def kind: DatasourceType
 
   def sanitizeConfig(config: Json): Json
+
+  def patchConfigs(original: Json, patch: Json): PatchingError[Json] \/ Json
 
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,

@@ -41,14 +41,20 @@ import fs2.Stream
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 
-import scalaz.{ISet, EitherT, -\/, \/-}
+import scalaz.{ISet, EitherT, \/, -\/, \/-}
 
 import shims.{monadToScalaz, monadToCats}
 
 trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathType] { self =>
-  def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, G, H, R, P]]
+  def create(i: I, ref: DatasourceRef[C])
+      : EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, G, H, R, P]]
+
   def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C]
+
   def supportedTypes: F[ISet[DatasourceType]]
+
+  def patchRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
+      : PatchingError[C] \/ DatasourceRef[C]
 
   def withMiddleware[HH[_], S, Q <: ResourcePathType](
       f: (I, QuasarDatasource[T, G, H, R, P]) => F[QuasarDatasource[T, G, HH, S, Q]])(
@@ -56,7 +62,8 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
       AF: Monad[F])
       : DatasourceModules[T, F, G, HH, I, C, S, Q] =
     new DatasourceModules[T, F, G, HH, I, C, S, Q] {
-      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, G, HH, S, Q]] =
+      def create(i: I, ref: DatasourceRef[C])
+          : EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, G, HH, S, Q]] =
         self.create(i, ref) flatMap { (mds: QuasarDatasource[T, G, H, R, P]) =>
           EitherT.rightT(Resource.liftF(f(i, mds)))
         }
@@ -66,6 +73,10 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
 
       def supportedTypes: F[ISet[DatasourceType]] =
         self.supportedTypes
+
+      def patchRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
+          : PatchingError[C] \/ DatasourceRef[C] =
+        self.patchRefs(original, patch)
     }
 
   def withFinalizer(
@@ -73,7 +84,8 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
       implicit F: Monad[F])
       : DatasourceModules[T, F, G, H, I, C, R, P] =
     new DatasourceModules[T, F, G, H, I, C, R, P] {
-      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, G, H, R, P]] =
+      def create(i: I, ref: DatasourceRef[C])
+          : EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, G, H, R, P]] =
         self.create(i, ref) flatMap { (mds: QuasarDatasource[T, G, H, R, P]) =>
           EitherT.rightT(Resource.make(mds.pure[F])(x => f(i, x)))
         }
@@ -83,12 +95,17 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
 
       def supportedTypes: F[ISet[DatasourceType]] =
         self.supportedTypes
+
+      def patchRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
+          : PatchingError[C] \/ DatasourceRef[C] =
+        self.patchRefs(original, patch)
     }
 
   def widenPathType[PP >: P <: ResourcePathType](implicit AF: Monad[F])
       : DatasourceModules[T, F, G, H, I, C, R, PP] =
     new DatasourceModules[T, F, G, H, I, C, R, PP] {
-      def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, G, H, R, PP]] =
+      def create(i: I, ref: DatasourceRef[C])
+          : EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, G, H, R, PP]] =
         self.create(i, ref) map { QuasarDatasource.widenPathType[T, G, H, R, P, PP](_) }
 
       def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
@@ -96,6 +113,10 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
 
       def supportedTypes: F[ISet[DatasourceType]] =
         self.supportedTypes
+
+      def patchRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
+          : PatchingError[C] \/ DatasourceRef[C] =
+        self.patchRefs(original, patch)
     }
 }
 
@@ -124,31 +145,45 @@ object DatasourceModules {
       Map(modules.map(ds => (ds.kind, ds)): _*)
 
     new DatasourceModules[T, F, Resource[F, ?], Stream[F, ?], I, Json, QueryResult[F], ResourcePathType.Physical] {
-      def create(i: I, ref: DatasourceRef[Json]): EitherT[Resource[F, ?], CreateError[Json], MDS[T, F]] = moduleMap.get(ref.kind) match {
-        case None =>
-          EitherT.pureLeft(DatasourceUnsupported(ref.kind, moduleSet))
+      def create(i: I, ref: DatasourceRef[Json])
+          : EitherT[Resource[F, ?], CreateError[Json], MDS[T, F]] =
+        moduleMap.get(ref.kind) match {
+          case None =>
+            EitherT.pureLeft(DatasourceUnsupported(ref.kind, moduleSet))
 
-        case Some(module) =>
-          EitherT.rightU[CreateError[Json]](Resource.liftF(byteStores.get(i))) flatMap { store =>
-            module match {
-              case DatasourceModule.Lightweight(lw) =>
-                handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting, store))
-                  .map(QuasarDatasource.lightweight[T](_))
+          case Some(module) =>
+            EitherT.rightU[CreateError[Json]](Resource.liftF(byteStores.get(i))) flatMap { store =>
+              module match {
+                case DatasourceModule.Lightweight(lw) =>
+                  handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting, store))
+                    .map(QuasarDatasource.lightweight[T](_))
 
-              case DatasourceModule.Heavyweight(hw) =>
-                handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config, store))
-                  .map(QuasarDatasource.heavyweight(_))
+                case DatasourceModule.Heavyweight(hw) =>
+                  handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config, store))
+                    .map(QuasarDatasource.heavyweight(_))
+              }
             }
-          }
-      }
+        }
 
-      def sanitizeRef(inp: DatasourceRef[Json]): DatasourceRef[Json] = moduleMap.get(inp.kind) match {
-        case None => inp.copy(config = jEmptyObject)
-        case Some(x) => inp.copy(config = x.sanitizeConfig(inp.config))
-      }
+      def sanitizeRef(inp: DatasourceRef[Json]): DatasourceRef[Json] =
+        moduleMap.get(inp.kind) match {
+          case None => inp.copy(config = jEmptyObject)
+          case Some(x) => inp.copy(config = x.sanitizeConfig(inp.config))
+        }
 
       def supportedTypes: F[ISet[DatasourceType]] =
         moduleSet.pure[F]
+
+      def patchRefs(original: DatasourceRef[Json], patch: DatasourceRef[Json])
+          : PatchingError[Json] \/ DatasourceRef[Json] =
+        moduleMap.get(original.kind) match {
+          case None =>
+            \/-(original.copy(config = jEmptyObject))
+
+          case Some(ds) =>
+            ds.patchConfigs(original.config, patch.config)
+              .map(c => original.copy(config = c))
+        }
     }
   }
 

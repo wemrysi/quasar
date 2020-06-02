@@ -92,6 +92,12 @@ final class MockDatasources[
         Condition.abnormal(datasourceNotFound[Int, DatasourceError[Int, C]](id)).point[F]
     }
 
+  /* Replaces the datasource ref entirely with the patch.
+   */
+  def patchDatasource(id: Int, patch: DatasourceRef[C])
+      : F[Condition[DatasourceError[Int, C]]] =
+    replaceDatasource(id, patch)
+
   def removeDatasource(id: Int): F[Condition[ExistentialError[Int]]] =
     mockState.get flatMap { s =>
       if (s.dss member id)

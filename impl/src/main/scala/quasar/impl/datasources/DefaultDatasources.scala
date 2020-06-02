@@ -118,6 +118,17 @@ private[impl] final class DefaultDatasources[
     }
   }
 
+  /** Patches the reference to the specified datasource. */
+  def patchDatasource(datasourceId: I, patch: DatasourceRef[C])
+      : F[Condition[DatasourceError[I, C]]] =
+    datasourceRef(datasourceId) flatMap {
+      case -\/(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
+      case \/-(ref) => modules.patchRefs(ref, patch) match {
+        case -\/(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
+        case \/-(patched) => replaceDatasource(datasourceId, patched)
+      }
+    }
+
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     modules.supportedTypes
 

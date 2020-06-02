@@ -20,6 +20,7 @@ import quasar.RateLimiting
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
   InitializationError,
+  PatchingError,
   malformedConfiguration
 }
 import quasar.common.data.RValue
@@ -31,8 +32,11 @@ import scala.concurrent.ExecutionContext
 import scala.util.Either
 
 import argonaut.Json
+
 import cats.effect._
 import cats.kernel.Hash
+
+import scalaz.{\/, \/-}
 
 object LocalParsedDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
@@ -42,6 +46,9 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
   val kind: DatasourceType = LocalParsedType
 
   def sanitizeConfig(config: Json): Json = config
+
+  // there are no sensitive components, so we use the entire patch
+  def patchConfigs(original: Json, patch: Json): PatchingError[Json] \/ Json = \/-(patch)
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,
