@@ -14,24 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.connector.scheduler
 
-import quasar.Condition
+import slamdata.Predef._
 
-import fs2.Stream
-import scalaz.\/
+import quasar.api.scheduler._, SchedulerError._
 
-/** @tparam I identity
-  * @tparam Q query type
-  */
-trait Tables[F[_], I, Q] {
-  import TableError.{CreateError, ExistenceError, ModificationError}
+import argonaut.Json
+import cats.effect._
 
-  def allTables: Stream[F, (I, TableRef[Q])]
+import scala.util.Either
 
-  def table(tableId: I): F[ExistenceError[I] \/ TableRef[Q]]
-
-  def createTable(table: TableRef[Q]): F[CreateError[I] \/ I]
-
-  def replaceTable(tableId: I, table: TableRef[Q]): F[Condition[ModificationError[I]]]
+trait SchedulerBuilder[F[_]] {
+  def schedulerType: SchedulerType
+  def sanitizeConfig(config: Json): Json
+  def scheduler(config: Json)
+      : Resource[F, Either[InitializationError[Json], Scheduler[F, Array[Byte], Json]]]
 }

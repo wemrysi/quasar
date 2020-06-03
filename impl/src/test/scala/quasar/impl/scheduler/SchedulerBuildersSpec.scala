@@ -37,9 +37,9 @@ import fs2.Stream
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 
-import SchedulerModulesSpec._
+import SchedulerBuildersSpec._
 
-final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[IO] {
+final class SchedulerBuildersSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[IO] {
   implicit val timer = IO.timer(ec)
 
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
@@ -55,33 +55,32 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
         }
     }
 
-  def module(kind: SchedulerType, err: Option[InitializationError[Json]] = None) = new SchedulerModule {
+  def builder(kind: SchedulerType, err: Option[InitializationError[Json]] = None) = new SchedulerBuilder[IO] {
     def schedulerType = kind
     def sanitizeConfig(inp: Json) = Json.jString("sanitized")
-    def scheduler[F[_]: ContextShift: ConcurrentEffect: Timer](
-        config: Json)
-        : Resource[F, Either[InitializationError[Json], Scheduler[F, Array[Byte], Json]]] =
+    def scheduler(config: Json)
+        : Resource[IO, Either[InitializationError[Json], Scheduler[IO, Array[Byte], Json]]] =
       err match {
         case Some(a) =>
-          a.asLeft[Scheduler[F, Array[Byte], Json]].pure[Resource[F, ?]]
+          a.asLeft[Scheduler[IO, Array[Byte], Json]].pure[Resource[IO, ?]]
         case None =>
-          val scheduler = new Scheduler[F, Array[Byte], Json]  {
-            def entries: Stream[F, (Array[Byte], Json)] =
+          val scheduler = new Scheduler[IO, Array[Byte], Json]  {
+            def entries: Stream[IO, (Array[Byte], Json)] =
               Stream.empty
-            def addIntention(c: Json): F[Either[IncorrectIntention[Json], Array[Byte]]] =
-              Sync[F].delay(UUID.randomUUID.toString.getBytes.asRight[IncorrectIntention[Json]])
-            def lookupIntention(i: Array[Byte]): F[Either[IntentionNotFound[Array[Byte]], Json]] =
-              Sync[F].delay(Json.jNull.asRight[IntentionNotFound[Array[Byte]]])
-            def editIntention(i: Array[Byte], config: Json): F[Condition[SchedulingError[Array[Byte], Json]]] =
-              Sync[F].delay(Condition.normal[SchedulingError[Array[Byte], Json]]())
-            def deleteIntention(i: Array[Byte]): F[Condition[IntentionNotFound[Array[Byte]]]] =
-              Sync[F].delay(Condition.normal[IntentionNotFound[Array[Byte]]]())
+            def addIntention(c: Json): IO[Either[IncorrectIntention[Json], Array[Byte]]] =
+              IO(UUID.randomUUID.toString.getBytes.asRight[IncorrectIntention[Json]])
+            def lookupIntention(i: Array[Byte]): IO[Either[IntentionNotFound[Array[Byte]], Json]] =
+              IO(Json.jNull.asRight[IntentionNotFound[Array[Byte]]])
+            def editIntention(i: Array[Byte], config: Json): IO[Condition[SchedulingError[Array[Byte], Json]]] =
+              IO(Condition.normal[SchedulingError[Array[Byte], Json]]())
+            def deleteIntention(i: Array[Byte]): IO[Condition[IntentionNotFound[Array[Byte]]]] =
+              IO(Condition.normal[IntentionNotFound[Array[Byte]]]())
           }
-          scheduler.asRight[InitializationError[Json]].pure[Resource[F, ?]]
+          scheduler.asRight[InitializationError[Json]].pure[Resource[IO, ?]]
       }
   }
 
-  def mkModules(lst: List[SchedulerModule]) = SchedulerModules[IO](lst)
+  def mkBuilders(lst: List[SchedulerBuilder[IO]]) = SchedulerBuilders[IO](lst)
 
   val fooKind = SchedulerType("foo", 1L)
   val barKind = SchedulerType("bar", 2L)
@@ -89,8 +88,8 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
   "supported types" >> {
     "empty" >>* {
       for {
-        modules <- mkModules(List())
-        actual <- modules.supportedTypes
+        builders <- mkBuilders(List())
+        actual <- builders.supportedTypes
       } yield {
         actual must_=== Set()
       }
@@ -99,8 +98,8 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
 
       val expected = Set(fooKind)
       for {
-        modules <- mkModules(List(module(fooKind)))
-        actual <- modules.supportedTypes
+        builders <- mkBuilders(List(builder(fooKind)))
+        actual <- builders.supportedTypes
       } yield {
         actual must_=== expected
       }
@@ -112,9 +111,9 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
     val unsupported = SchedulerRef(barKind, "unsupported", Json.jString("bar"))
 
     for {
-      modules <- mkModules(List(module(fooKind)))
-      supportedSanitized <- modules.sanitizeRef(supported)
-      unsupportedSanitized <- modules.sanitizeRef(unsupported)
+      builders <- mkBuilders(List(builder(fooKind)))
+      supportedSanitized <- builders.sanitizeRef(supported)
+      unsupportedSanitized <- builders.sanitizeRef(unsupported)
     } yield {
       supportedSanitized must_=== supported.copy(config = Json.jString("sanitized"))
       unsupportedSanitized must_=== unsupported.copy(config = Json.jEmptyObject)
@@ -125,15 +124,15 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
     "work for supported" >>* {
       val ref = SchedulerRef(fooKind, "supported", Json.jString(""))
       for {
-        modules <- mkModules(List(module(fooKind)))
-        res <- modules.create(ref).value.use { res => IO(res must beRight) }
+        builders <- mkBuilders(List(builder(fooKind)))
+        res <- builders.create(ref).value.use { res => IO(res must beRight) }
       } yield res
     }
     "doesn't work for unsupported" >>* {
       val ref = SchedulerRef(barKind, "unsupported", Json.jString(""))
       for {
-        modules <- mkModules(List(module(fooKind)))
-        res <- modules.create(ref).value.use { res => IO(res must beLeft(SchedulerUnsupported(barKind, Set(fooKind)))) }
+        builders <- mkBuilders(List(builder(fooKind)))
+        res <- builders.create(ref).value.use { res => IO(res must beLeft(SchedulerUnsupported(barKind, Set(fooKind)))) }
       } yield res
     }
   }
@@ -141,12 +140,12 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
   "enable/disable" >>* {
     val ref = SchedulerRef(fooKind, "supported", Json.jString(""))
     for {
-      modules <- mkModules(List())
-      (m0, finish0) <- modules.create(ref).value.allocated
-      _ <- modules.enable(module(fooKind))
-      (m1, finish1) <- modules.create(ref).value.allocated
-      _ <- modules.disable(fooKind)
-      (m2, finish2) <- modules.create(ref).value.allocated
+      builders <- mkBuilders(List())
+      (m0, finish0) <- builders.create(ref).value.allocated
+      _ <- builders.enable(builder(fooKind))
+      (m1, finish1) <- builders.create(ref).value.allocated
+      _ <- builders.disable(fooKind)
+      (m2, finish2) <- builders.create(ref).value.allocated
       _ <- finish0
       _ <- finish1
       _ <- finish2
@@ -173,18 +172,18 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
     val connErr = ConnectionFailed(connFailed, Json.jString("c"), new Exception("conn"))
     val accessErr = AccessDenied(accessDenied, Json.jString("d"), "access denied")
 
-    val ioModules = mkModules(List(
-      module(malformed, Some(malformedErr)),
-      module(invalid, Some(invalidErr)),
-      module(connFailed, Some(connErr)),
-      module(accessDenied, Some(accessErr))))
+    val ioBuilders = mkBuilders(List(
+      builder(malformed, Some(malformedErr)),
+      builder(invalid, Some(invalidErr)),
+      builder(connFailed, Some(connErr)),
+      builder(accessDenied, Some(accessErr))))
 
     for {
-      modules <- ioModules
-      (malformedS, _) <- modules.create(malformedRef).value.allocated
-      (invalidS, _) <- modules.create(invalidRef).value.allocated
-      (connFailedS, _) <- modules.create(connFailedRef).value.allocated
-      (accessDeniedS, _) <- modules.create(accessDeniedRef).value.allocated
+      builders <- ioBuilders
+      (malformedS, _) <- builders.create(malformedRef).value.allocated
+      (invalidS, _) <- builders.create(invalidRef).value.allocated
+      (connFailedS, _) <- builders.create(connFailedRef).value.allocated
+      (accessDeniedS, _) <- builders.create(accessDeniedRef).value.allocated
     } yield {
       malformedS must beLeft(malformedErr)
       invalidS must beLeft(invalidErr)
@@ -194,7 +193,7 @@ final class SchedulerModulesSpec(implicit ec: ExecutionContext) extends Effectfu
   }
 }
 
-object SchedulerModulesSpec {
+object SchedulerBuildersSpec {
   final case class CreateErrorException(ce: CreateError[Json])
     extends Exception(Show[SchedulerError[Int, Json]].show(ce))
 }

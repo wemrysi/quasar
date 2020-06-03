@@ -14,28 +14,33 @@
  * limitations under the License.
  */
 
-package quasar.api.table
+package quasar.api.scheduler
 
+import quasar.Condition
 import slamdata.Predef._
 
-import cats.{Eq, Order, Show}
+import cats.Show
 import cats.implicits._
 
-final case class TableName(name: String)
+import shims.{showToCats, showToScalaz}
 
-object TableName {
-  implicit val orderTableName: Order[TableName] = Order.by(_.name)
-  implicit val showTableName: Show[TableName] = Show.fromToString
-}
+final case class SchedulerMeta(
+    kind: SchedulerType,
+    name: String,
+    status: Condition[Exception])
 
-final case class TableRef[Q](name: TableName, query: Q, columns: List[TableColumn])
+object SchedulerMeta {
+  def fromOption(
+      kind: SchedulerType,
+      name: String,
+      optErr: Option[Exception]) =
+    SchedulerMeta(kind, name, Condition.optionIso.reverseGet(optErr))
 
-object TableRef {
-  implicit def equalTableRef[Q: Eq]: Eq[TableRef[Q]] =
-    Eq.by(t => (t.name, t.query, t.columns))
+  implicit val show: Show[SchedulerMeta] = Show.show { m =>
+    implicit val exShow: Show[Exception] =
+      Show.show(_.getMessage)
 
-  implicit def showTableRef[Q: Show]: Show[TableRef[Q]] =
-    Show show { t =>
-      "TableRef(" + t.name.show + ", " + t.query.show + ", " + t.columns.show + ")"
-    }
+    s"SchedulerMeta(${m.kind.show}, ${m.name.show}, ${m.status.show})"
+  }
+
 }

@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.intentions.IntentionError, IntentionError._
 
-import cats.{Applicative, Show}
+import cats.{Applicative, Show, ~>}
 import cats.implicits._
 
 import fs2.Stream
@@ -32,6 +32,19 @@ trait Scheduler[F[_], I, C] { scheduler =>
   def lookupIntention(i: I): F[Either[IntentionNotFound[I], C]]
   def editIntention(i: I, config: C): F[Condition[SchedulingError[I, C]]]
   def deleteIntention(i: I): F[Condition[IntentionNotFound[I]]]
+
+  def mapK[G[_]](f: F ~> G): Scheduler[G, I, C] = new Scheduler[G, I, C] {
+    def entries: Stream[G, (I, C)] =
+      scheduler.entries.translate(f)
+    def addIntention(config: C): G[Either[IncorrectIntention[C], I]] =
+      f(scheduler.addIntention(config))
+    def lookupIntention(i: I): G[Either[IntentionNotFound[I], C]] =
+      f(scheduler.lookupIntention(i))
+    def editIntention(i: I, config: C): G[Condition[SchedulingError[I, C]]] =
+      f(scheduler.editIntention(i, config))
+    def deleteIntention(i: I): G[Condition[IntentionNotFound[I]]] =
+      f(scheduler.deleteIntention(i))
+  }
 
   // Scheduler[F, UUID, C] ==> Scheduler[F, Array[Byte], C]
   // UUID => Array[Byte] but Array[Byte] => Either[String, UUID]
