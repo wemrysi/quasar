@@ -214,7 +214,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     def apply(supports: Support = All): IO[(QDestination, Stream[IO, Filesystem])] =
       Queue.unbounded[IO, Option[Filesystem]] map { q =>
-        (new QDestination(q, supports), q.dequeue.unNoneTerminate.scanMonoid)
+        (new QDestination(q, supports), q.dequeue.unNoneTerminate.scan1(_ |+| _))
       }
   }
 
@@ -280,6 +280,10 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     // Forcibly halts the stream
     def halt: F[Unit]
+
+    // Emits the given values and halts.
+    def emits(ss: String*)(implicit F: Monad[F]): F[Unit] =
+      ss.toList.traverse_(emit) >> halt
   }
 
   val controlledStream: IO[(StreamControl[IO], Stream[IO, String])] =
@@ -336,20 +340,18 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     } yield resultPush
   }
 
+  def await[A](io: IO[A], msg: String = "completion"): IO[A] =
+    io.timeoutTo(Timeout, IO.raiseError[A](new RuntimeException(s"Expected $msg within ${Timeout}.")))
+
   def awaitFs(fss: Stream[IO, Filesystem], count: Long = -1): IO[Filesystem] = {
     val (s, msg) =
       if (count <= 0)
         (fss, "final filesystem")
       else
-        (fss.take(count + 1), s"${count} filesystem updates")
+        (fss.take(count), s"${count} filesystem updates")
 
-    s.compile.lastOrError.timeoutTo(
-      Timeout,
-      IO.raiseError(new RuntimeException(s"Expected $msg within ${Timeout}.")))
+    await(s.compile.last, msg).map(_ getOrElse Map.empty)
   }
-
-  def await[A](io: IO[A]): IO[A] =
-    io.timeoutTo(Timeout, IO.raiseError[A](new RuntimeException(s"Expected completion within ${Timeout}.")))
 
   val outputColumns: Traversal[∃[PushConfig[?, String]], PushConfig.OutputColumn] =
     new Traversal[∃[PushConfig[?, String]], PushConfig.OutputColumn] {
@@ -805,20 +807,14 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           for {
             started <- rp.start(DestinationId, config, None)
 
-            _ <- ctl.emit(W1)
-            _ <- ctl.emit(W2)
-            _ <- ctl.halt
+            _ <- ctl.emits(W1, W2)
 
             startRes <- await(started.sequence)
             fs1 <- awaitFs(filesystem)
 
             updated <- rp.update(DestinationId, config.value.path)
 
-            _ <- ctl.emit(W1)
-            _ <- ctl.emit(W2)
-            _ <- ctl.emit(W2)
-            _ <- ctl.emit(W3)
-            _ <- ctl.halt
+            _ <- ctl.emits(W1, W2, W2, W3)
 
             updateRes <- await(updated.sequence)
             fs2 <- awaitFs(filesystem)
@@ -916,7 +912,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             // resume from beginning
             update1 <- rp.update(DestinationId, config.value.path)
 
-            _ <- ctl.emit(W2)
+            _ <- ctl.emit(W2) // offset = 5
             _ <- ctl.emit(W1) // boom
 
             // offset = 5 since emitted a value before boom
@@ -985,9 +981,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             // resume from 17
             update1 <- rp.update(DestinationId, config.value.path)
 
-            _ <- ctl.emit(W1)
-            _ <- ctl.emit(W3)
-            _ <- ctl.halt
+            _ <- ctl.emits(W1, W3)
 
             // offset = 10 since emitted two values before halt
             update1Res <- await(update1.sequence)
@@ -1035,8 +1029,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           for {
             started <- rp.start(DestinationId, config, None)
 
-            _ <- ctl.emit(W1)
-            _ <- ctl.halt
+            _ <- ctl.emits(W1)
 
             // offset = 5
             startRes <- await(started.sequence)
@@ -1046,7 +1039,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             update1 <- rp.update(DestinationId, config.value.path)
 
             _ <- ctl.emit(W2)
-            _ <- ctl.emit(W2) // offset = 10
+            _ <- ctl.emit(W2)
             _ <- ctl.emit(W2) // boom!
 
             // offset = 10 since emitted two values before boom
@@ -1056,10 +1049,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             // resume from 10
             update2 <- rp.update(DestinationId, config.value.path)
 
-            _ <- ctl.emit(W3)
-            _ <- ctl.emit(W3)
-            _ <- ctl.emit(W3)
-            _ <- ctl.halt
+            _ <- ctl.emits(W3, W3, W3)
 
             // offset = 15
             update2Res <- await(update2.sequence)
@@ -1110,8 +1100,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           for {
             started <- rp.start(DestinationId, config, None)
 
-            _ <- ctl.emit(W1)
-            _ <- ctl.halt
+            _ <- ctl.emits(W1)
             // consume fs events from started
             _ <- awaitFs(filesystem)
 
