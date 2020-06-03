@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Condition
 import quasar.api.scheduler._
 import quasar.api.scheduler.SchedulerError._
-import quasar.connector.scheduler.{Scheduler, SchedulerModule}
+import quasar.connector.scheduler.{Scheduler, SchedulerBuilder}
 import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 
@@ -32,23 +32,28 @@ import cats.effect._
 import cats.implicits._
 import cats.{~>, Eq}
 
+import fs2.Stream
+
 private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
     semaphore: IndexedSemaphore[F, I],
     freshId: F[I],
     refs: IndexedStore[F, I, SchedulerRef[C]],
     cache: ResourceManager[F, I, Scheduler[F, II, Json]],
     getter: CachedGetter[F, I, SchedulerRef[C]],
-    modules: SchedulerModules[F, II, C, Json])
-    extends Schedulers[F, I, II, C, Json] {
+    builders: SchedulerBuilders[F, II, C, Json])
+    extends Schedulers[F, Stream[F, ?], I, C] {
 
-  type Module = SchedulerModule
+  type Module = SchedulerBuilder[F]
   type ModuleType = SchedulerType
 
-  def enableModule(m: SchedulerModule): F[Unit] =
-    modules.enable(m)
+  def allMetadata: F[Stream[F, (I, SchedulerMeta)]] =
+    refs.entries.map(_.map(ref => SchedulerMeta.fromOption(ref.kind, ref.name, None))).pure[F]
 
-  def disableModule(m: SchedulerType): F[Unit] =
-    modules.disable(m)
+  def enableModule(m: Module): F[Unit] =
+    builders.enable(m)
+
+  def disableModule(m: ModuleType): F[Unit] =
+    builders.disable(m)
 
   def addScheduler(ref: SchedulerRef[C]): F[Either[CreateError[C], I]] = for {
     i <- freshId
@@ -58,7 +63,7 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
   def schedulerRef(i: I): F[Either[SchedulerNotFound[I], SchedulerRef[C]]] =
     OptionT(refs.lookup(i))
       .toRight(SchedulerNotFound(i))
-      .semiflatMap(modules.sanitizeRef(_))
+      .semiflatMap(builders.sanitizeRef(_))
       .value
 
   def schedulerOf(i: I): F[Either[SchedulerError[I, C], Scheduler[F, II, Json]]] = {
@@ -102,10 +107,10 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
     }
   }
 
-  def removeScheduler(i: I): F[Condition[SchedulerError[I, C]]] =
+  def removeScheduler(i: I): F[Condition[SchedulerNotFound[I]]] =
     refs.delete(i).ifM(
-      cache.shutdown(i).as(Condition.normal[SchedulerError[I, C]]()),
-      Condition.abnormal(SchedulerNotFound(i): SchedulerError[I, C]).pure[F])
+      cache.shutdown(i).as(Condition.normal[SchedulerNotFound[I]]()),
+      Condition.abnormal(SchedulerNotFound(i): SchedulerNotFound[I]).pure[F])
 
   def replaceScheduler(i: I, ref: SchedulerRef[C]): F[Condition[SchedulerError[I, C]]] = {
     lazy val notFound =
@@ -137,7 +142,7 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
   }
 
   def supportedTypes: F[Set[SchedulerType]] =
-    modules.supportedTypes
+    builders.supportedTypes
 
   private def addRef[E >: CreateError[C] <: SchedulerError[I, C]](i: I, ref: SchedulerRef[C]): F[Condition[E]] = {
     val action = for {
@@ -174,7 +179,7 @@ private[impl] final class DefaultSchedulers[F[_]: Sync, I: Eq, II, C: Eq](
   private def allocateScheduler[E >: CreateError[C] <: SchedulerError[I, C]](
       ref: SchedulerRef[C])
       : EitherT[F, E, (Scheduler[F, II, Json], F[Unit])] =
-    EitherT(modules.create(ref).value.allocated flatMap {
+    EitherT(builders.create(ref).value.allocated flatMap {
       case (Left(e), finalize) => finalize.as((e: E).asLeft[(Scheduler[F, II, Json], F[Unit])])
       case (Right(a), finalize) => (a, finalize).asRight[E].pure[F]
     })
@@ -185,9 +190,9 @@ object DefaultSchedulers {
       freshId: F[I],
       refs: IndexedStore[F, I, SchedulerRef[C]],
       cache: ResourceManager[F, I, Scheduler[F, II, Json]],
-      modules: SchedulerModules[F, II, C, Json])
+      builders: SchedulerBuilders[F, II, C, Json])
       : F[DefaultSchedulers[F, I, II, C]] = for {
     semaphore <- IndexedSemaphore[F, I]
     getter <- CachedGetter(refs.lookup(_))
-  } yield new DefaultSchedulers(semaphore, freshId, refs, cache, getter, modules)
+  } yield new DefaultSchedulers(semaphore, freshId, refs, cache, getter, builders)
 }

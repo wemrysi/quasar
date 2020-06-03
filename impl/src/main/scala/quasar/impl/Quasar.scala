@@ -27,7 +27,6 @@ import quasar.api.intentions.Intentions
 import quasar.api.push.{OffsetKey, Push, ResultPush}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.scheduler.SchedulerType
-import quasar.api.table.{TableRef, Tables}
 import quasar.api.scheduler.{Schedulers, SchedulerRef}
 import quasar.common.PhaseResultTell
 import quasar.connector.{Offset, QueryResult, ResourceSchema}
@@ -35,7 +34,7 @@ import quasar.connector.datasource.Datasource
 import quasar.connector.destination.{Destination, DestinationModule}
 import quasar.connector.evaluate._
 import quasar.connector.render.ResultRender
-import quasar.connector.scheduler.{Scheduler, SchedulerModule}
+import quasar.connector.scheduler.{Scheduler, SchedulerBuilder}
 import quasar.ejson.implicits._
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources._
@@ -48,7 +47,6 @@ import quasar.impl.intentions.DefaultIntentions
 import quasar.impl.push.DefaultResultPush
 import quasar.impl.scheduler._
 import quasar.impl.storage.{IndexedStore, PrefixStore}
-import quasar.impl.table.DefaultTables
 import quasar.qscript.{construction, Map => QSMap}
 
 import java.util.UUID
@@ -80,12 +78,11 @@ import skolems.∃
 final class Quasar[F[_], R, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
-    val schedulers: Schedulers.Aux[F, UUID, Array[Byte], Json, Json, SchedulerModule, SchedulerType],
-    val tables: Tables[F, UUID, SqlQuery],
+    val schedulers: Schedulers.Aux[F, Stream[F, ?], UUID, Json, SchedulerBuilder[F], SchedulerType],
     val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, R],
     val discovery: Discovery[Resource[F, ?], Stream[F, ?], UUID, C],
     val resultPush: ResultPush[F, UUID, SqlQuery],
-    val intentions: Intentions[F, UUID, Array[Byte], Json])
+    val intentions: Intentions[F, Stream[F, ?], UUID, Array[Byte], Json])
 
 object Quasar extends Logging {
 
@@ -96,7 +93,6 @@ object Quasar extends Logging {
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       schedulerRefs: IndexedStore[F, UUID, SchedulerRef[Json]],
-      tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
       pushes: PrefixStore[F, UUID :: ResourcePath :: HNil, ∃[Push[?, SqlQuery]]],
       offsets: Store[F, UUID :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
       queryFederation: QueryFederation[Fix, Resource[F, ?], QueryAssociate[Fix, Resource[F, ?], EvalResult[F]], R],
@@ -107,7 +103,7 @@ object Quasar extends Logging {
       maxConcurrentPushes: Int,
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
-      schedulerModules: List[SchedulerModule])(
+      schedulerBuilders: List[SchedulerBuilder[F]])(
       implicit
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
@@ -141,9 +137,9 @@ object Quasar extends Logging {
       destCache <- ResourceManager[F, UUID, Destination[F]]
       destinations <- Resource.liftF(DefaultDestinations(freshUUID, destinationRefs, destCache, destModules))
 
-      sModules <- Resource.liftF(SchedulerModules[F](schedulerModules))
+      sBuilders <- Resource.liftF(SchedulerBuilders[F](schedulerBuilders))
       sCache <- ResourceManager[F, UUID, Scheduler[F, Array[Byte], Json]]
-      schedulers <- Resource.liftF(DefaultSchedulers(freshUUID, schedulerRefs, sCache, sModules))
+      schedulers <- Resource.liftF(DefaultSchedulers(freshUUID, schedulerRefs, sCache, sBuilders))
 
       lookupRunning =
         (id: UUID) => datasources.quasarDatasourceOf(id).map(_.map(_.modify(reifiedAggregateDs)))
@@ -154,8 +150,6 @@ object Quasar extends Logging {
           .andThen(QueryFederator(ResourceRouter(UuidString, lookupRunning)))
           .mapF(Resource.liftF(_))
           .andThen(queryFederation)
-
-      tables = DefaultTables(freshUUID, tableRefs)
 
       discovery = DefaultDiscovery(datasources.quasarDatasourceOf, resourceSchema)
 
@@ -173,11 +167,10 @@ object Quasar extends Logging {
         schedulers.schedulerOf(_: UUID).map(_.toOption))
 
     } yield {
-      new Quasar(
+      new Quasar[F, R, C](
         datasources,
         destinations,
         schedulers,
-        tables,
         sqlEvaluator.local((_, None)),
         discovery,
         resultPush,
