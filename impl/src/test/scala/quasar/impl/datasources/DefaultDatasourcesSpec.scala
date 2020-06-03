@@ -395,7 +395,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           _ <- finalize
         } yield {
           p must beAbnormal(error)
-          l must be_\/-(a.copy(config = a.config))
+          l must be_\/-(a)
         }
       }
     }
