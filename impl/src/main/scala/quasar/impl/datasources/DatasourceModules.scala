@@ -53,7 +53,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
 
   def supportedTypes: F[ISet[DatasourceType]]
 
-  def patchRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
+  def reconfigureRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
       : PatchingError[C] \/ DatasourceRef[C]
 
   def withMiddleware[HH[_], S, Q <: ResourcePathType](
@@ -74,9 +74,9 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
       def supportedTypes: F[ISet[DatasourceType]] =
         self.supportedTypes
 
-      def patchRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
+      def reconfigureRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
           : PatchingError[C] \/ DatasourceRef[C] =
-        self.patchRefs(original, patch)
+        self.reconfigureRefs(original, patch)
     }
 
   def withFinalizer(
@@ -96,9 +96,9 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
       def supportedTypes: F[ISet[DatasourceType]] =
         self.supportedTypes
 
-      def patchRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
+      def reconfigureRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
           : PatchingError[C] \/ DatasourceRef[C] =
-        self.patchRefs(original, patch)
+        self.reconfigureRefs(original, patch)
     }
 
   def widenPathType[PP >: P <: ResourcePathType](implicit AF: Monad[F])
@@ -114,9 +114,9 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
       def supportedTypes: F[ISet[DatasourceType]] =
         self.supportedTypes
 
-      def patchRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
+      def reconfigureRefs(original: DatasourceRef[C], patch: DatasourceRef[C])
           : PatchingError[C] \/ DatasourceRef[C] =
-        self.patchRefs(original, patch)
+        self.reconfigureRefs(original, patch)
     }
 }
 
@@ -174,14 +174,14 @@ object DatasourceModules {
       def supportedTypes: F[ISet[DatasourceType]] =
         moduleSet.pure[F]
 
-      def patchRefs(original: DatasourceRef[Json], patch: DatasourceRef[Json])
+      def reconfigureRefs(original: DatasourceRef[Json], patch: DatasourceRef[Json])
           : PatchingError[Json] \/ DatasourceRef[Json] =
         moduleMap.get(original.kind) match {
           case None =>
             \/-(original.copy(config = jEmptyObject))
 
           case Some(ds) =>
-            ds.patchConfigs(original.config, patch.config)
+            ds.reconfigure(original.config, patch.config)
               .map(c => original.copy(config = c))
         }
     }

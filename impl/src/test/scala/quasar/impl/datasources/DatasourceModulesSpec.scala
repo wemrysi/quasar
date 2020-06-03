@@ -106,7 +106,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def patchConfigs(original: Json, patch: Json): PatchingError[Json] \/ Json =
+      def reconfigure(original: Json, patch: Json): PatchingError[Json] \/ Json =
         \/-(jArray(List(original, patch)))
 
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
@@ -129,7 +129,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def patchConfigs(original: Json, patch: Json): PatchingError[Json] \/ Json =
+      def reconfigure(original: Json, patch: Json): PatchingError[Json] \/ Json =
         \/-(jArray(List(original, patch)))
 
       def heavyweightDatasource[
@@ -194,7 +194,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     }
   }
 
-  "patch refs" >>* {
+  "reconfigure refs" >>* {
     val aType = DatasourceType("a", 1L)
     val bType = DatasourceType("b", 2L)
     val cType = DatasourceType("c", 3L)
@@ -213,9 +213,9 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
     RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]) map { (rl: RateLimiting[IO, UUID]) =>
       val modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(aType), heavyMod(bType)), rl, ByteStores.void[IO, Int])
-      modules.patchRefs(aRef, aPatch) must be_\/-(aExpected)
-      modules.patchRefs(bRef, bPatch) must be_\/-(bExpected)
-      modules.patchRefs(cRef, cPatch) must be_\/-(cExpected)
+      modules.reconfigureRefs(aRef, aPatch) must be_\/-(aExpected)
+      modules.reconfigureRefs(bRef, bPatch) must be_\/-(bExpected)
+      modules.reconfigureRefs(cRef, cPatch) must be_\/-(cExpected)
     }
   }
 

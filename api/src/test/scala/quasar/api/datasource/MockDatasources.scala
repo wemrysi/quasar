@@ -94,7 +94,7 @@ final class MockDatasources[
 
   /* Replaces the datasource ref entirely with the patch.
    */
-  def patchDatasource(id: Int, patch: DatasourceRef[C])
+  def reconfigureDatasource(id: Int, patch: DatasourceRef[C])
       : F[Condition[DatasourceError[Int, C]]] =
     replaceDatasource(id, patch)
 

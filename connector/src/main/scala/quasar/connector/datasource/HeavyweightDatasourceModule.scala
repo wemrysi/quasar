@@ -37,7 +37,7 @@ trait HeavyweightDatasourceModule {
 
   def sanitizeConfig(config: Json): Json
 
-  def patchConfigs(original: Json, patch: Json): PatchingError[Json] \/ Json
+  def reconfigure(original: Json, patch: Json): PatchingError[Json] \/ Json
 
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,

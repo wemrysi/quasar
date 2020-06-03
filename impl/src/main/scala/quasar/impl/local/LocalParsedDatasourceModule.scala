@@ -48,7 +48,7 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
   def sanitizeConfig(config: Json): Json = config
 
   // there are no sensitive components, so we use the entire patch
-  def patchConfigs(original: Json, patch: Json): PatchingError[Json] \/ Json = \/-(patch)
+  def reconfigure(original: Json, patch: Json): PatchingError[Json] \/ Json = \/-(patch)
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,

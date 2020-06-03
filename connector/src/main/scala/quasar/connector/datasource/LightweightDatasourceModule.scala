@@ -37,7 +37,7 @@ trait LightweightDatasourceModule {
 
   def sanitizeConfig(config: Json): Json
 
-  def patchConfigs(original: Json, patch: Json): PatchingError[Json] \/ Json
+  def reconfigure(original: Json, patch: Json): PatchingError[Json] \/ Json
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,
