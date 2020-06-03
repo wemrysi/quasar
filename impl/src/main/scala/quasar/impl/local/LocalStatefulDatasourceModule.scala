@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.RateLimiting
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
+  ConfigurationError,
   InitializationError,
   malformedConfiguration
 }
@@ -45,7 +46,7 @@ object LocalStatefulDatasourceModule extends LightweightDatasourceModule with Lo
   def sanitizeConfig(config: Json): Json = config
 
   // there are no sensitive components, so we use the entire patch
-  def reconfigure(original: Json, patch: Json): Either[InitializationError[Json], Json] = Right(patch)
+  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] = Right(patch)
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,
