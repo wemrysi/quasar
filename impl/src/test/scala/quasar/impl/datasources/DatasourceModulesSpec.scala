@@ -106,7 +106,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def reconfigure(original: Json, patch: Json): Either[PatchingError[Json], Json] =
+      def reconfigure(original: Json, patch: Json): Either[InitializationError[Json], Json] =
         Right(jArray(List(original, patch)))
 
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
@@ -129,7 +129,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def reconfigure(original: Json, patch: Json): Either[PatchingError[Json], Json] =
+      def reconfigure(original: Json, patch: Json): Either[InitializationError[Json], Json] =
         Right(jArray(List(original, patch)))
 
       def heavyweightDatasource[

@@ -22,7 +22,6 @@ import quasar.RateLimiting
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
   InitializationError,
-  PatchingError,
   malformedConfiguration
 }
 import quasar.common.data.RValue
@@ -47,7 +46,7 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
   def sanitizeConfig(config: Json): Json = config
 
   // there are no sensitive components, so we use the entire patch
-  def reconfigure(original: Json, patch: Json): Either[PatchingError[Json], Json] = Right(patch)
+  def reconfigure(original: Json, patch: Json): Either[InitializationError[Json], Json] = Right(patch)
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,

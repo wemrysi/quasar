@@ -52,7 +52,7 @@ import fs2.Stream
 
 import matryoshka.data.Fix
 
-import scalaz.{IMap, \/-, -\/}
+import scalaz.{IMap, NonEmptyList, \/-, -\/}
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -106,7 +106,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
   def lightMod(
       mp: Map[Json, InitializationError[Json]],
       sanitize: Option[Json => Json] = None,
-      reconfig: Option[(Json, Json) => Either[PatchingError[Json], Json]] = None)
+      reconfig: Option[(Json, Json) => Either[InitializationError[Json], Json]] = None)
       : DatasourceModule = DatasourceModule.Lightweight {
     new LightweightDatasourceModule {
       val kind = supportedType
@@ -117,7 +117,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           case Some(f) => f(config)
         }
 
-      def reconfigure(orig: Json, patch: Json): Either[PatchingError[Json], Json] =
+      def reconfigure(orig: Json, patch: Json): Either[InitializationError[Json], Json] =
         reconfig match {
           case None => Right(orig)
           case Some(f) => f(orig, patch)
@@ -157,7 +157,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       mp: Map[Json, InitializationError[Json]],
       errorMap: Option[Ref[IO, IMap[String, Exception]]] = None,
       sanitize: Option[Json => Json] = None,
-      reconfigure: Option[(Json, Json) => Either[PatchingError[Json], Json]] = None) = {
+      reconfigure: Option[(Json, Json) => Either[InitializationError[Json], Json]] = None) = {
 
     val freshId = IO(java.util.UUID.randomUUID.toString())
 
@@ -363,7 +363,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
     }
     "reconfigure config" >> {
       "ref is reconfigured" >>* {
-        val reconfigure: (Json, Json) => Either[PatchingError[Json], Json] = {
+        val reconfigure: (Json, Json) => Either[InitializationError[Json], Json] = {
           case (j1, j2) => Right(jArray(List(j1, j2)))
         }
         val patchConfig = jString("patchconfig")
@@ -381,8 +381,8 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       }
       "ref is not reconfigured when reconfigure function errors" >>* {
         val patchConfig = jString("sensitive")
-        val error = DatasourceError.PatchContainsSensitiveInfo(patchConfig, "oops")
-        val reconfigure: (Json, Json) => Either[PatchingError[Json], Json] = {
+        val error = DatasourceError.InvalidConfiguration(supportedType, patchConfig, NonEmptyList("oops"))
+        val reconfigure: (Json, Json) => Either[InitializationError[Json], Json] = {
           case (j1, j2) => Left(error)
         }
         for {

@@ -54,7 +54,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
   def supportedTypes: F[ISet[DatasourceType]]
 
   def reconfigureRef(original: DatasourceRef[C], patch: C)
-      : Either[PatchingError[C], DatasourceRef[C]]
+      : Either[InitializationError[C], DatasourceRef[C]]
 
   def withMiddleware[HH[_], S, Q <: ResourcePathType](
       f: (I, QuasarDatasource[T, G, H, R, P]) => F[QuasarDatasource[T, G, HH, S, Q]])(
@@ -75,7 +75,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : Either[PatchingError[C], DatasourceRef[C]] =
+          : Either[InitializationError[C], DatasourceRef[C]] =
         self.reconfigureRef(original, patch)
     }
 
@@ -97,7 +97,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : Either[PatchingError[C], DatasourceRef[C]] =
+          : Either[InitializationError[C], DatasourceRef[C]] =
         self.reconfigureRef(original, patch)
     }
 
@@ -115,7 +115,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : Either[PatchingError[C], DatasourceRef[C]] =
+          : Either[InitializationError[C], DatasourceRef[C]] =
         self.reconfigureRef(original, patch)
     }
 }
@@ -175,7 +175,7 @@ object DatasourceModules {
         moduleSet.pure[F]
 
       def reconfigureRef(original: DatasourceRef[Json], patch: Json)
-          : Either[PatchingError[Json], DatasourceRef[Json]] =
+          : Either[InitializationError[Json], DatasourceRef[Json]] =
         moduleMap.get(original.kind) match {
           case None =>
             Right(original.copy(config = jEmptyObject))

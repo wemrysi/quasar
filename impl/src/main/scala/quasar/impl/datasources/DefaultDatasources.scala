@@ -118,7 +118,6 @@ private[impl] final class DefaultDatasources[
     }
   }
 
-  /** Patches the reference to the specified datasource. */
   def reconfigureDatasource(datasourceId: I, patch: C)
       : F[Condition[DatasourceError[I, C]]] =
     datasourceRef(datasourceId) flatMap {

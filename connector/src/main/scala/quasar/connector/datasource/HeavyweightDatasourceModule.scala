@@ -18,7 +18,7 @@ package quasar.connector.datasource
 
 import quasar.RenderTreeT
 import quasar.api.datasource.DatasourceType
-import quasar.api.datasource.DatasourceError.{InitializationError, PatchingError}
+import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource.ResourcePathType
 import quasar.connector.{ByteStore, QueryResult}
 import quasar.qscript.{MonadPlannerErr, QScriptEducated}
@@ -36,7 +36,7 @@ trait HeavyweightDatasourceModule {
 
   def sanitizeConfig(config: Json): Json
 
-  def reconfigure(original: Json, patch: Json): Either[PatchingError[Json], Json]
+  def reconfigure(original: Json, patch: Json): Either[InitializationError[Json], Json]
 
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,

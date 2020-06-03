@@ -56,14 +56,6 @@ object DatasourceError extends DatasourceErrorInstances {
   final case class AccessDenied[C](kind: DatasourceType, config: C, reason: String)
     extends InitializationError[C]
 
-  sealed trait PatchingError[+C] extends DatasourceError[Nothing, C]
-
-  final case class PatchContainsSensitiveInfo[+C](config: C, reason: String)
-      extends PatchingError[C]
-
-  final case class MalformedPatch[+C](config: C, reason: String)
-      extends PatchingError[C]
-
   sealed trait ExistentialError[+I] extends DatasourceError[I, Nothing]
 
   final case class DatasourceNotFound[I](datasourceId: I)
@@ -110,18 +102,6 @@ object DatasourceError extends DatasourceErrorInstances {
     Prism.partial[E, (DatasourceType, C, String)] {
       case MalformedConfiguration(t, c, r) => (t, c, r)
     } ((MalformedConfiguration[C](_, _, _)).tupled)
-
-  def patchContainsSensitiveInfo[C, E >: PatchingError[C] <: DatasourceError[_, C]]
-      : Prism[E, (C, String)] =
-    Prism.partial[E, (C, String)] {
-      case PatchContainsSensitiveInfo(c, r) => (c, r)
-    } ((PatchContainsSensitiveInfo[C](_, _)).tupled)
-
-  def malformedPatch[C, E >: PatchingError[C] <: DatasourceError[_, C]]
-      : Prism[E, (C, String)] =
-    Prism.partial[E, (C, String)] {
-      case MalformedPatch(c, r) => (c, r)
-    } ((MalformedPatch[C](_, _)).tupled)
 }
 
 sealed abstract class DatasourceErrorInstances {
@@ -137,9 +117,7 @@ sealed abstract class DatasourceErrorInstances {
       datasourceNotFound[I, DatasourceError[I, C]].getOption(de),
       datasourceUnsupported[DatasourceError[I, C]].getOption(de),
       invalidConfiguration[C, DatasourceError[I, C]].getOption(de),
-      malformedConfiguration[C, DatasourceError[I, C]].getOption(de),
-      patchContainsSensitiveInfo[C, DatasourceError[I, C]].getOption(de),
-      malformedPatch[C, DatasourceError[I, C]].getOption(de)
+      malformedConfiguration[C, DatasourceError[I, C]].getOption(de)
     )}
   }
 
@@ -147,21 +125,12 @@ sealed abstract class DatasourceErrorInstances {
     Show show {
       case e: CreateError[C] => showCreateError[C].show(e)
       case e: ExistentialError[I] => showExistentialError[I].show(e)
-      case e: PatchingError[C] => showPatchingError[C].show(e)
     }
 
   implicit def showExistentialError[I: Show]: Show[ExistentialError[I]] =
     Show show {
       case DatasourceNotFound(i) =>
         "DatasourceNotFound(" + i.show + ")"
-    }
-
-  implicit def showPatchingError[C: Show]: Show[PatchingError[C]] =
-    Show show {
-      case PatchContainsSensitiveInfo(c, r) =>
-        "PatchContainsSensitiveInfo(" + c.show + ", " + r + ")"
-      case MalformedPatch(c, r) =>
-        "MalformedPatch(" + c.show + ", " + r + ")"
     }
 
   implicit def showCreateError[C: Show]: Show[CreateError[C]] =
