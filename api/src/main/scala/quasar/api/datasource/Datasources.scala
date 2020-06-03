@@ -59,7 +59,7 @@ trait Datasources[F[_], G[_], I, C] {
   /** Replaces the reference to the specified datasource, applying the patch
     * to the existing configuration.
     */
-  def reconfigureDatasource(datasourceId: I, patch: DatasourceRef[C])
+  def reconfigureDatasource(datasourceId: I, patch: C)
       : F[Condition[DatasourceError[I, C]]]
 
   /** The set of supported datasource types. */

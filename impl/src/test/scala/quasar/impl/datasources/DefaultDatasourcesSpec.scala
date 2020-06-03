@@ -372,7 +372,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           ((dses, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
           r <- dses.addDatasource(a)
           i = r.toOption.get
-          _ <- dses.reconfigureDatasource(i, DatasourceRef(a.kind, a.name, patchConfig))
+          _ <- dses.reconfigureDatasource(i, patchConfig)
           l <- dses.datasourceRef(i)
           _ <- finalize
         } yield {
@@ -390,7 +390,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           ((dses, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
           r <- dses.addDatasource(a)
           i = r.toOption.get
-          p <- dses.reconfigureDatasource(i, DatasourceRef(a.kind, a.name, patchConfig))
+          p <- dses.reconfigureDatasource(i, patchConfig)
           l <- dses.datasourceRef(i)
           _ <- finalize
         } yield {

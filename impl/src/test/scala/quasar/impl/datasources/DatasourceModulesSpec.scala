@@ -203,9 +203,9 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     val bRef = DatasourceRef(bType, DatasourceName("b-name"), jString("b-config"))
     val cRef = DatasourceRef(cType, DatasourceName("c-name"), jString("c-config"))
 
-    val aPatch = DatasourceRef(aType, DatasourceName("a-name"), jString("a-patch"))
-    val bPatch = DatasourceRef(bType, DatasourceName("b-name"), jString("b-patch"))
-    val cPatch = DatasourceRef(cType, DatasourceName("c-name"), jString("c-patch"))
+    val aPatch = jString("a-patch")
+    val bPatch = jString("b-patch")
+    val cPatch = jString("c-patch")
 
     val aExpected = aRef.copy(config = jArray(List(jString("a-config"), jString("a-patch"))))
     val bExpected = bRef.copy(config = jArray(List(jString("b-config"), jString("b-patch"))))
@@ -213,9 +213,9 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
     RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]) map { (rl: RateLimiting[IO, UUID]) =>
       val modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(aType), heavyMod(bType)), rl, ByteStores.void[IO, Int])
-      modules.reconfigureRefs(aRef, aPatch) must be_\/-(aExpected)
-      modules.reconfigureRefs(bRef, bPatch) must be_\/-(bExpected)
-      modules.reconfigureRefs(cRef, cPatch) must be_\/-(cExpected)
+      modules.reconfigureRef(aRef, aPatch) must be_\/-(aExpected)
+      modules.reconfigureRef(bRef, bPatch) must be_\/-(bExpected)
+      modules.reconfigureRef(cRef, cPatch) must be_\/-(cExpected)
     }
   }
 

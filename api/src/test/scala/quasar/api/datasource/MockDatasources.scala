@@ -22,7 +22,7 @@ import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource._
 import quasar.contrib.scalaz.MonadState_
 
-import scalaz.{\/, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags}
+import scalaz.{\/, -\/, \/-, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags}
 import scalaz.std.anyVal._
 import scalaz.syntax.either._
 import scalaz.syntax.foldable._
@@ -94,9 +94,12 @@ final class MockDatasources[
 
   /* Replaces the datasource ref entirely with the patch.
    */
-  def reconfigureDatasource(id: Int, patch: DatasourceRef[C])
+  def reconfigureDatasource(id: Int, patch: C)
       : F[Condition[DatasourceError[Int, C]]] =
-    replaceDatasource(id, patch)
+    datasourceRef(id) flatMap {
+      case -\/(err) => Condition.abnormal(err: DatasourceError[Int, C]).point[F]
+      case \/-(ref) => replaceDatasource(id, ref.copy(config = patch))
+    }
 
   def removeDatasource(id: Int): F[Condition[ExistentialError[Int]]] =
     mockState.get flatMap { s =>
