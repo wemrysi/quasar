@@ -41,7 +41,7 @@ import fs2.Stream
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 
-import scalaz.{ISet, EitherT, \/, -\/, \/-}
+import scalaz.{ISet, EitherT, -\/, \/-}
 
 import shims.{monadToScalaz, monadToCats}
 
@@ -54,7 +54,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
   def supportedTypes: F[ISet[DatasourceType]]
 
   def reconfigureRef(original: DatasourceRef[C], patch: C)
-      : PatchingError[C] \/ DatasourceRef[C]
+      : Either[PatchingError[C], DatasourceRef[C]]
 
   def withMiddleware[HH[_], S, Q <: ResourcePathType](
       f: (I, QuasarDatasource[T, G, H, R, P]) => F[QuasarDatasource[T, G, HH, S, Q]])(
@@ -75,7 +75,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : PatchingError[C] \/ DatasourceRef[C] =
+          : Either[PatchingError[C], DatasourceRef[C]] =
         self.reconfigureRef(original, patch)
     }
 
@@ -97,7 +97,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : PatchingError[C] \/ DatasourceRef[C] =
+          : Either[PatchingError[C], DatasourceRef[C]] =
         self.reconfigureRef(original, patch)
     }
 
@@ -115,7 +115,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : PatchingError[C] \/ DatasourceRef[C] =
+          : Either[PatchingError[C], DatasourceRef[C]] =
         self.reconfigureRef(original, patch)
     }
 }
@@ -175,10 +175,10 @@ object DatasourceModules {
         moduleSet.pure[F]
 
       def reconfigureRef(original: DatasourceRef[Json], patch: Json)
-          : PatchingError[Json] \/ DatasourceRef[Json] =
+          : Either[PatchingError[Json], DatasourceRef[Json]] =
         moduleMap.get(original.kind) match {
           case None =>
-            \/-(original.copy(config = jEmptyObject))
+            Right(original.copy(config = jEmptyObject))
 
           case Some(ds) =>
             ds.reconfigure(original.config, patch)

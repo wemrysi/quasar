@@ -20,14 +20,14 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.PatchingError
 import quasar.connector.datasource.{HeavyweightDatasourceModule, LightweightDatasourceModule}
 
-import argonaut.Json
+import scala.util.Either
 
-import scalaz.\/
+import argonaut.Json
 
 sealed trait DatasourceModule {
   def kind: DatasourceType
   def sanitizeConfig(config: Json): Json
-  def reconfigure(original: Json, patch: Json): PatchingError[Json] \/ Json
+  def reconfigure(original: Json, patch: Json): Either[PatchingError[Json], Json]
 }
 
 object DatasourceModule {
@@ -35,7 +35,7 @@ object DatasourceModule {
     def kind = lw.kind
     def sanitizeConfig(config: Json): Json = lw.sanitizeConfig(config)
 
-    def reconfigure(original: Json, patch: Json): PatchingError[Json] \/ Json =
+    def reconfigure(original: Json, patch: Json): Either[PatchingError[Json], Json] =
       lw.reconfigure(original, patch)
   }
 
@@ -43,7 +43,7 @@ object DatasourceModule {
     def kind = hw.kind
     def sanitizeConfig(config: Json): Json = hw.sanitizeConfig(config)
 
-    def reconfigure(original: Json, patch: Json): PatchingError[Json] \/ Json =
+    def reconfigure(original: Json, patch: Json): Either[PatchingError[Json], Json] =
       hw.reconfigure(original, patch)
   }
 }

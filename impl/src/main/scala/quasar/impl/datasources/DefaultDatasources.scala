@@ -124,8 +124,8 @@ private[impl] final class DefaultDatasources[
     datasourceRef(datasourceId) flatMap {
       case -\/(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
       case \/-(ref) => modules.reconfigureRef(ref, patch) match {
-        case -\/(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
-        case \/-(patched) => replaceDatasource(datasourceId, patched)
+        case Left(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
+        case Right(patched) => replaceDatasource(datasourceId, patched)
       }
     }
 

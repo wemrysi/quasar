@@ -30,14 +30,13 @@ import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Timer, Resource}
 import cats.kernel.Hash
 import fs2.Stream
-import scalaz.\/
 
 trait LightweightDatasourceModule {
   def kind: DatasourceType
 
   def sanitizeConfig(config: Json): Json
 
-  def reconfigure(original: Json, patch: Json): PatchingError[Json] \/ Json
+  def reconfigure(original: Json, patch: Json): Either[PatchingError[Json], Json]
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,

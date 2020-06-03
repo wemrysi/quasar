@@ -30,14 +30,11 @@ import quasar.connector._
 import quasar.connector.datasource.LightweightDatasourceModule
 
 import scala.concurrent.ExecutionContext
-import scala.util.Either
 
 import argonaut.Json
 
 import cats.effect._
 import cats.kernel.Hash
-
-import scalaz.{\/, \/-}
 
 object LocalStatefulDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
@@ -49,7 +46,7 @@ object LocalStatefulDatasourceModule extends LightweightDatasourceModule with Lo
   def sanitizeConfig(config: Json): Json = config
 
   // there are no sensitive components, so we use the entire patch
-  def reconfigure(original: Json, patch: Json): PatchingError[Json] \/ Json = \/-(patch)
+  def reconfigure(original: Json, patch: Json): Either[PatchingError[Json], Json] = Right(patch)
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,

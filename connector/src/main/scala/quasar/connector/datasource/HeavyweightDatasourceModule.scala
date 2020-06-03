@@ -30,14 +30,13 @@ import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Timer, Resource}
 import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.\/
 
 trait HeavyweightDatasourceModule {
   def kind: DatasourceType
 
   def sanitizeConfig(config: Json): Json
 
-  def reconfigure(original: Json, patch: Json): PatchingError[Json] \/ Json
+  def reconfigure(original: Json, patch: Json): Either[PatchingError[Json], Json]
 
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
