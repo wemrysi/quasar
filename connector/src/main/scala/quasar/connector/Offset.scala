@@ -18,6 +18,19 @@ package quasar.connector
 
 import quasar.api.push.{OffsetKey, OffsetPath}
 
+import scala.StringContext
+
+import cats.Show
+import cats.syntax.show._
+
 import skolems.∃
 
 final case class Offset(path: OffsetPath, value: ∃[OffsetKey.Actual])
+
+object Offset {
+  implicit val offsetShow: Show[Offset] =
+    Show show { o =>
+      val ps = o.path.map(_.fold(f => s".${f}", i => s"[$i]"))
+      s"Offset(${ps.toList.mkString}, ${o.value.value.show})"
+    }
+}
