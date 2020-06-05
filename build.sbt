@@ -135,7 +135,27 @@ lazy val foundation = project
       "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
       "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
       "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.14") % Test,
-      "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.3"                              % Test))
+      "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.3"                              % Test),
+
+      // add literally every netty artifact so that things evict uniformly
+      libraryDependencies ++=
+        Seq(
+          "bom",
+          "buffer",
+          "codec",
+          "codec-dns",
+          "codec-http",
+          "codec-http2",
+          "codec-socks",
+          "common",
+          "handler",
+          "handler-proxy",
+          "resolver",
+          "resolver-dns",
+          "transport",
+          "transport-native-epoll",
+          "transport-native-kqueue",
+          "transport-native-unix-common").map(n => "io.netty" % s"netty-$n" % "4.1.50.Final"))
   .enablePlugins(BuildInfoPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
@@ -277,9 +297,8 @@ lazy val impl = project
       "io.argonaut"    %% "argonaut-cats"            % argonautVersion,
       "io.chrisdavenport" %% "log4cats-slf4j"        % log4CatsVersion,
       "org.typelevel"  %% "jawn-util"                % jawnVersion,
-      "io.atomix"      % "atomix"                    % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
+      "io.atomix"      % "atomix"                    % atomixVersion,
       "org.scodec"     %% "scodec-bits"              % scodecBitsVersion,
-      "io.netty"       % "netty-all"                 % nettyVersion,
       "org.mapdb"      % "mapdb"                     % mapdbVersion,
       "eu.timepit"     %% "refined-scalacheck"       % refinedVersion % Test,
       // The azure-core-http-netty dep is added here as a quick and dirty way to get azure working.
