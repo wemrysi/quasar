@@ -140,7 +140,6 @@ lazy val foundation = project
       // add literally every netty artifact so that things evict uniformly
       libraryDependencies ++=
         Seq(
-          "bom",
           "buffer",
           "codec",
           "codec-dns",
