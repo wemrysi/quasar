@@ -25,7 +25,6 @@ import quasar.contrib.scalaz.MonadState_
 import scalaz.{\/, -\/, \/-, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags}
 import scalaz.std.anyVal._
 import scalaz.syntax.either._
-import scalaz.syntax.foldable._
 import scalaz.syntax.monad._
 import scalaz.syntax.order._
 import scalaz.syntax.plusEmpty._
@@ -121,7 +120,7 @@ final class MockDatasources[
       : F[Condition[E]] =
     if (supportedTypes contains ref.kind)
       mockState.get flatMap { case MockState(nextId, dss) =>
-        if (dss.any(_._1.name === ref.name))
+        if (dss.toList.exists(entry => entry._2._1.name === ref.name && entry._1 =/= id))
           Condition.abnormal(datasourceNameExists[E](ref.name)).point[F]
         else
           errorCondition(ref) match {
