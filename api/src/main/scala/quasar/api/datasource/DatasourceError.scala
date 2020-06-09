@@ -44,17 +44,19 @@ object DatasourceError extends DatasourceErrorInstances {
 
   sealed trait InitializationError[+C] extends CreateError[C]
 
-  final case class MalformedConfiguration[C](kind: DatasourceType, config: C, reason: String)
-      extends InitializationError[C]
-
-  final case class InvalidConfiguration[C](kind: DatasourceType, config: C, reasons: NonEmptyList[String])
-      extends InitializationError[C]
-
   final case class ConnectionFailed[C](kind: DatasourceType, config: C, cause: Exception)
     extends InitializationError[C]
 
   final case class AccessDenied[C](kind: DatasourceType, config: C, reason: String)
     extends InitializationError[C]
+
+  sealed trait ConfigurationError[C] extends InitializationError[C]
+
+  final case class MalformedConfiguration[C](kind: DatasourceType, config: C, reason: String)
+      extends ConfigurationError[C]
+
+  final case class InvalidConfiguration[C](kind: DatasourceType, config: C, reasons: NonEmptyList[String])
+      extends ConfigurationError[C]
 
   sealed trait ExistentialError[+I] extends DatasourceError[I, Nothing]
 
@@ -85,12 +87,6 @@ object DatasourceError extends DatasourceErrorInstances {
       case DatasourceUnsupported(k, s) => (k, s)
     } (DatasourceUnsupported.tupled)
 
-  def invalidConfiguration[C, E >: InitializationError[C] <: DatasourceError[_, C]]
-      : Prism[E, (DatasourceType, C, NonEmptyList[String])] =
-    Prism.partial[E, (DatasourceType, C, NonEmptyList[String])] {
-      case InvalidConfiguration(t, c, rs) => (t, c, rs)
-    } ((InvalidConfiguration[C](_, _, _)).tupled)
-
   def accessDenied[C, E >: InitializationError[C] <: DatasourceError[_, C]]
       : Prism[E, (DatasourceType, C, String)] =
     Prism.partial[E, (DatasourceType, C, String)] {
@@ -102,6 +98,12 @@ object DatasourceError extends DatasourceErrorInstances {
     Prism.partial[E, (DatasourceType, C, String)] {
       case MalformedConfiguration(t, c, r) => (t, c, r)
     } ((MalformedConfiguration[C](_, _, _)).tupled)
+
+  def invalidConfiguration[C, E >: InitializationError[C] <: DatasourceError[_, C]]
+      : Prism[E, (DatasourceType, C, NonEmptyList[String])] =
+    Prism.partial[E, (DatasourceType, C, NonEmptyList[String])] {
+      case InvalidConfiguration(t, c, rs) => (t, c, rs)
+    } ((InvalidConfiguration[C](_, _, _)).tupled)
 }
 
 sealed abstract class DatasourceErrorInstances {
@@ -123,7 +125,7 @@ sealed abstract class DatasourceErrorInstances {
 
   implicit def show[I: Show, C: Show]: Show[DatasourceError[I, C]] =
     Show show {
-      case e: CreateError[C]    => showCreateError[C].show(e)
+      case e: CreateError[C] => showCreateError[C].show(e)
       case e: ExistentialError[I] => showExistentialError[I].show(e)
     }
 

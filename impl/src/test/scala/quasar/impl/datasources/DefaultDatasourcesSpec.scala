@@ -32,7 +32,7 @@ import quasar.qscript.{PlannerError, InterpretedRead}
 
 import argonaut.Json
 import argonaut.JsonScalaz._
-import argonaut.Argonaut.jString
+import argonaut.Argonaut.{jArray, jString}
 
 import cats.Show
 import cats.effect.{Blocker, ConcurrentEffect, ContextShift, IO, Resource, Timer}
@@ -52,7 +52,7 @@ import fs2.Stream
 
 import matryoshka.data.Fix
 
-import scalaz.{IMap, \/-, -\/}
+import scalaz.{IMap, NonEmptyList, \/-, -\/}
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -105,15 +105,23 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
 
   def lightMod(
       mp: Map[Json, InitializationError[Json]],
-      sanitize: Option[Json => Json] = None)
+      sanitize: Option[Json => Json] = None,
+      reconfig: Option[(Json, Json) => Either[ConfigurationError[Json], Json]] = None)
       : DatasourceModule = DatasourceModule.Lightweight {
     new LightweightDatasourceModule {
       val kind = supportedType
 
-      def sanitizeConfig(config: Json): Json = sanitize match {
-        case None => config
-        case Some(f) => f(config)
-      }
+      def sanitizeConfig(config: Json): Json =
+        sanitize match {
+          case None => config
+          case Some(f) => f(config)
+        }
+
+      def reconfigure(orig: Json, patch: Json): Either[ConfigurationError[Json], Json] =
+        reconfig match {
+          case None => Right(orig)
+          case Some(f) => f(orig, patch)
+        }
 
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
           config: Json,
@@ -148,7 +156,8 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
   def prepare(
       mp: Map[Json, InitializationError[Json]],
       errorMap: Option[Ref[IO, IMap[String, Exception]]] = None,
-      sanitize: Option[Json => Json] = None) = {
+      sanitize: Option[Json => Json] = None,
+      reconfigure: Option[(Json, Json) => Either[ConfigurationError[Json], Json]] = None) = {
 
     val freshId = IO(java.util.UUID.randomUUID.toString())
 
@@ -174,7 +183,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       byteStores = ByteStores.void[IO, String]
 
       modules =
-        DatasourceModules[Fix, IO, String, UUID](List(lightMod(mp, sanitize)), rateLimiting, byteStores)
+        DatasourceModules[Fix, IO, String, UUID](List(lightMod(mp, sanitize, reconfigure)), rateLimiting, byteStores)
           .widenPathType[PathType]
           .withMiddleware((i: String, mds: QDS) => starts.update(i :: _) as mds)
           .withFinalizer((i: String, mds: QDS) => shuts.update(i :: _))
@@ -342,7 +351,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
         val sanitize: Json => Json = x => jString("sanitized")
         for {
           a <- refA
-          ((dses, _, _, _), finalize) <- prepare(Map(), None, Some(sanitize)).allocated
+          ((dses, _, _, _), finalize) <- prepare(Map(), None, Some(sanitize), None).allocated
           r <- dses.addDatasource(a)
           i = r.toOption.get
           l <- dses.datasourceRef(i)
@@ -352,11 +361,49 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
         }
       }
     }
+    "reconfigure config" >> {
+      "ref is reconfigured" >>* {
+        val reconfigure: (Json, Json) => Either[ConfigurationError[Json], Json] = {
+          case (j1, j2) => Right(jArray(List(j1, j2)))
+        }
+        val patchConfig = jString("patchconfig")
+        for {
+          a <- refA
+          ((dses, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          _ <- dses.reconfigureDatasource(i, patchConfig)
+          l <- dses.datasourceRef(i)
+          _ <- finalize
+        } yield {
+          l must be_\/-(a.copy(config = jArray(List(a.config, patchConfig))))
+        }
+      }
+      "ref is not reconfigured when reconfigure function errors" >>* {
+        val patchConfig = jString("sensitive")
+        val error = DatasourceError.InvalidConfiguration(supportedType, patchConfig, NonEmptyList("oops"))
+        val reconfigure: (Json, Json) => Either[ConfigurationError[Json], Json] = {
+          case (j1, j2) => Left(error)
+        }
+        for {
+          a <- refA
+          ((dses, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          p <- dses.reconfigureDatasource(i, patchConfig)
+          l <- dses.datasourceRef(i)
+          _ <- finalize
+        } yield {
+          p must beAbnormal(error)
+          l must be_\/-(a)
+        }
+      }
+    }
     "lookup status" >> {
       "include errors" >>* {
         for {
           ref <- Ref.of[IO, IMap[String, Exception]](IMap.empty)
-          ((dses, _, _, _), finalize) <- prepare(Map(), Some(ref), None).allocated
+          ((dses, _, _, _), finalize) <- prepare(Map(), Some(ref), None, None).allocated
           a <- refA
           r <- dses.addDatasource(a)
           i = r.toOption.get

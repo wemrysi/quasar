@@ -17,22 +17,33 @@
 package quasar.impl
 
 import quasar.api.datasource.DatasourceType
+import quasar.api.datasource.DatasourceError.ConfigurationError
 import quasar.connector.datasource.{HeavyweightDatasourceModule, LightweightDatasourceModule}
+
+import scala.util.Either
+
 import argonaut.Json
 
 sealed trait DatasourceModule {
   def kind: DatasourceType
   def sanitizeConfig(config: Json): Json
+  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json]
 }
 
 object DatasourceModule {
   final case class Lightweight(lw: LightweightDatasourceModule) extends DatasourceModule {
     def kind = lw.kind
     def sanitizeConfig(config: Json): Json = lw.sanitizeConfig(config)
+
+    def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] =
+      lw.reconfigure(original, patch)
   }
 
   final case class Heavyweight(hw: HeavyweightDatasourceModule) extends DatasourceModule {
     def kind = hw.kind
     def sanitizeConfig(config: Json): Json = hw.sanitizeConfig(config)
+
+    def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] =
+      hw.reconfigure(original, patch)
   }
 }

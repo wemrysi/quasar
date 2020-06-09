@@ -18,7 +18,7 @@ package quasar.connector.datasource
 
 import quasar.RateLimiting
 import quasar.api.datasource.DatasourceType
-import quasar.api.datasource.DatasourceError.InitializationError
+import quasar.api.datasource.DatasourceError.{ConfigurationError, InitializationError}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.connector.{ByteStore, MonadResourceErr, QueryResult}
 import quasar.qscript.InterpretedRead
@@ -35,6 +35,8 @@ trait LightweightDatasourceModule {
   def kind: DatasourceType
 
   def sanitizeConfig(config: Json): Json
+
+  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json]
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,

@@ -22,10 +22,9 @@ import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource._
 import quasar.contrib.scalaz.MonadState_
 
-import scalaz.{\/, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags}
+import scalaz.{\/, -\/, \/-, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags}
 import scalaz.std.anyVal._
 import scalaz.syntax.either._
-import scalaz.syntax.foldable._
 import scalaz.syntax.monad._
 import scalaz.syntax.order._
 import scalaz.syntax.plusEmpty._
@@ -92,6 +91,15 @@ final class MockDatasources[
         Condition.abnormal(datasourceNotFound[Int, DatasourceError[Int, C]](id)).point[F]
     }
 
+  /* Replaces the datasource ref entirely with the patch.
+   */
+  def reconfigureDatasource(id: Int, patch: C)
+      : F[Condition[DatasourceError[Int, C]]] =
+    datasourceRef(id) flatMap {
+      case -\/(err) => Condition.abnormal(err: DatasourceError[Int, C]).point[F]
+      case \/-(ref) => replaceDatasource(id, ref.copy(config = patch))
+    }
+
   def removeDatasource(id: Int): F[Condition[ExistentialError[Int]]] =
     mockState.get flatMap { s =>
       if (s.dss member id)
@@ -112,7 +120,7 @@ final class MockDatasources[
       : F[Condition[E]] =
     if (supportedTypes contains ref.kind)
       mockState.get flatMap { case MockState(nextId, dss) =>
-        if (dss.any(_._1.name === ref.name))
+        if (dss.toList.exists(entry => entry._2._1.name === ref.name && entry._1 =/= id))
           Condition.abnormal(datasourceNameExists[E](ref.name)).point[F]
         else
           errorCondition(ref) match {

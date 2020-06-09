@@ -118,6 +118,16 @@ private[impl] final class DefaultDatasources[
     }
   }
 
+  def reconfigureDatasource(datasourceId: I, patch: C)
+      : F[Condition[DatasourceError[I, C]]] =
+    datasourceRef(datasourceId) flatMap {
+      case -\/(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
+      case \/-(ref) => modules.reconfigureRef(ref, patch) match {
+        case Left(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
+        case Right(patched) => replaceDatasource(datasourceId, patched)
+      }
+    }
+
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     modules.supportedTypes
 
