@@ -32,7 +32,7 @@ import fs2.Stream
 
 import argonaut.Json
 import argonaut.JsonScalaz._
-import argonaut.Argonaut.{jEmptyObject, jString}
+import argonaut.Argonaut.{jArray, jEmptyObject, jString}
 
 import cats.{Monad, Show}
 import cats.effect.{IO, ContextShift, ConcurrentEffect, Timer, Resource}
@@ -103,7 +103,12 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
   def lightMod(k: DatasourceType, err: Option[InitializationError[Json]] = None): DatasourceModule =
     DatasourceModule.Lightweight(new LightweightDatasourceModule {
       val kind = k
+
       def sanitizeConfig(config: Json): Json = jString("sanitized")
+
+      def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] =
+        Right(jArray(List(original, patch)))
+
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
           config: Json,
           rateLimiting: RateLimiting[F, A],
@@ -121,7 +126,12 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
   def heavyMod(k: DatasourceType, err: Option[InitializationError[Json]] = None): DatasourceModule =
     DatasourceModule.Heavyweight(new HeavyweightDatasourceModule {
       val kind = k
+
       def sanitizeConfig(config: Json): Json = jString("sanitized")
+
+      def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] =
+        Right(jArray(List(original, patch)))
+
       def heavyweightDatasource[
           T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
           F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
@@ -162,6 +172,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       }
     }
   }
+
   "sanitizing refs" >>* {
     val aType = DatasourceType("a", 1L)
     val bType = DatasourceType("b", 2L)
@@ -180,6 +191,31 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       modules.sanitizeRef(aRef) === aExpected
       modules.sanitizeRef(bRef) === bExpected
       modules.sanitizeRef(cRef) === cExpected
+    }
+  }
+
+  "reconfigure refs" >>* {
+    val aType = DatasourceType("a", 1L)
+    val bType = DatasourceType("b", 2L)
+    val cType = DatasourceType("c", 3L)
+
+    val aRef = DatasourceRef(aType, DatasourceName("a-name"), jString("a-config"))
+    val bRef = DatasourceRef(bType, DatasourceName("b-name"), jString("b-config"))
+    val cRef = DatasourceRef(cType, DatasourceName("c-name"), jString("c-config"))
+
+    val aPatch = jString("a-patch")
+    val bPatch = jString("b-patch")
+    val cPatch = jString("c-patch")
+
+    val aExpected = aRef.copy(config = jArray(List(jString("a-config"), jString("a-patch"))))
+    val bExpected = bRef.copy(config = jArray(List(jString("b-config"), jString("b-patch"))))
+    val cExpected = cRef.copy(config = jEmptyObject)
+
+    RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]) map { (rl: RateLimiting[IO, UUID]) =>
+      val modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(aType), heavyMod(bType)), rl, ByteStores.void[IO, Int])
+      modules.reconfigureRef(aRef, aPatch) must beRight(aExpected)
+      modules.reconfigureRef(bRef, bPatch) must beRight(bExpected)
+      modules.reconfigureRef(cRef, cPatch) must beRight(cExpected)
     }
   }
 

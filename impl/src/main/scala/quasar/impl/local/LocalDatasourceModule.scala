@@ -16,9 +16,12 @@
 
 package quasar.impl.local
 
+import slamdata.Predef._
+
 import quasar.RateLimiting
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
+  ConfigurationError,
   InitializationError,
   malformedConfiguration
 }
@@ -28,9 +31,8 @@ import quasar.connector.datasource.LightweightDatasourceModule
 
 import scala.concurrent.ExecutionContext
 
-import scala.util.Either
-
 import argonaut.Json
+
 import cats.effect._
 import cats.kernel.Hash
 
@@ -42,6 +44,9 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
   val kind: DatasourceType = LocalType
 
   def sanitizeConfig(config: Json): Json = config
+
+  // there are no sensitive components, so we use the entire patch
+  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] = Right(patch)
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,
