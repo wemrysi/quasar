@@ -110,6 +110,13 @@ final class MockDatasources[
         Condition.abnormal(datasourceNotFound[Int, ExistentialError[Int]](id)).point[F]
     }
 
+  def renameDatasource(id: Int, name: DatasourceName)
+      : F[Condition[DatasourceError[Int, C]]] =
+    datasourceRef(id) flatMap {
+      case -\/(err) => Condition.abnormal(err: DatasourceError[Int, C]).point[F]
+      case \/-(ref) => replaceDatasource(id, ref.copy(name = name))
+    }
+
   val supportedDatasourceTypes: F[ISet[DatasourceType]] = supportedTypes.point[F]
 
   ////
