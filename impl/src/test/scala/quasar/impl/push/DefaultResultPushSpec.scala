@@ -73,6 +73,8 @@ import spire.math.Real
 object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   import ResultPushError._
 
+  skipAllIf(true)
+
   addSections
 
   implicit val tmr = IO.timer(global)
