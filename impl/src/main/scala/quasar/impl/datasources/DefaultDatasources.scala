@@ -128,6 +128,13 @@ private[impl] final class DefaultDatasources[
       }
     }
 
+  def renameDatasource(datasourceId: I, name: DatasourceName)
+      : F[Condition[DatasourceError[I, C]]] =
+    datasourceRef(datasourceId) flatMap {
+      case -\/(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
+      case \/-(ref) => replaceDatasource(datasourceId, ref.copy(name = name))
+    }
+
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     modules.supportedTypes
 

@@ -62,6 +62,11 @@ trait Datasources[F[_], G[_], I, C] {
   def reconfigureDatasource(datasourceId: I, patch: C)
       : F[Condition[DatasourceError[I, C]]]
 
+  /** Renames the reference to the specified datasource.
+    */
+  def renameDatasource(datasourceId: I, name: DatasourceName)
+      : F[Condition[DatasourceError[I, C]]]
+
   /** The set of supported datasource types. */
   def supportedDatasourceTypes: F[ISet[DatasourceType]]
 }

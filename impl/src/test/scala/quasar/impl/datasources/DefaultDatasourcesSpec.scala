@@ -379,6 +379,21 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           l must be_\/-(a.copy(config = jArray(List(a.config, patchConfig))))
         }
       }
+      "reconfiguration errors given a nonexisting datasource id" >>* {
+        val reconfigure: (Json, Json) => Either[ConfigurationError[Json], Json] = {
+          case (j1, j2) => Right(jArray(List(j1, j2)))
+        }
+        val patchConfig = jString("patchconfig")
+        for {
+          ((dses, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
+          reconf <- dses.reconfigureDatasource("not a datasource", patchConfig)
+          _ <- finalize
+        } yield {
+          reconf must beLike {
+            case Condition.Abnormal(ex) => ex must_=== DatasourceNotFound("not a datasource")
+          }
+        }
+      }
       "ref is not reconfigured when reconfigure function errors" >>* {
         val patchConfig = jString("sensitive")
         val error = DatasourceError.InvalidConfiguration(supportedType, patchConfig, NonEmptyList("oops"))
