@@ -220,6 +220,48 @@ abstract class DatasourcesSpec[
     }}
   }
 
+  "rename datasource" >> {
+    "datasource is renamed when given a new name" >>* datasources.use { dses =>
+      for {
+        a <- refA
+        i <- createRef(dses)(a)
+        _ <- dses.renameDatasource(i, DatasourceName("new renamed datasource name"))
+        l <- dses.datasourceRef(i)
+      } yield {
+        l must be_\/-(a.copy(name = DatasourceName("new renamed datasource name")))
+      }
+    }
+
+    "renaming errors given a name that another datasource has" >>* datasources.use { dses =>
+      for {
+        a <- refA
+        b <- refB
+        i <- createRef(dses)(a)
+        _ <- createRef(dses)(b)
+        rename <- dses.renameDatasource(i, b.name)
+        l <- dses.datasourceRef(i)
+      } yield {
+        rename must beLike {
+          case Condition.Abnormal(ex) => ex must_=== DatasourceNameExists(b.name)
+        }
+        l must be_\/-(a) // datasource was not renamed
+      }
+    }
+
+    "renaming errors given a nonexisting datasource id" >>* datasources.use { dses =>
+      for {
+        a <- refA
+        i <- createRef(dses)(a)
+        _ <- dses.removeDatasource(i)
+        rename <- dses.renameDatasource(i, DatasourceName("new renamed datasource name"))
+      } yield {
+        rename must beLike {
+          case Condition.Abnormal(DatasourceNotFound(_)) => ok
+        }
+      }
+    }
+  }
+
   ////
 
   type Err = DatasourceError[I, C]

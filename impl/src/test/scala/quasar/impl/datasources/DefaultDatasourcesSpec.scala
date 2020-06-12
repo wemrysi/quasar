@@ -361,50 +361,6 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
         }
       }
     }
-    "rename datasource" >> {
-      "datasource is renamed when given a new name" >>* {
-        for {
-          a <- refA
-          ((dses, _, _, _), finalize) <- prepare(Map(), None, None, None).allocated
-          r <- dses.addDatasource(a)
-          i = r.toOption.get
-          _ <- dses.renameDatasource(i, DatasourceName("new renamed datasource name"))
-          l <- dses.datasourceRef(i)
-          _ <- finalize
-        } yield {
-          l must be_\/-(a.copy(name = DatasourceName("new renamed datasource name")))
-        }
-      }
-      "renaming errors given a name that another datasource has" >>* {
-        for {
-          a <- refA
-          b <- refB
-          ((dses, _, _, _), finalize) <- prepare(Map(), None, None, None).allocated
-          _ <- dses.addDatasource(b)
-          r <- dses.addDatasource(a)
-          i = r.toOption.get
-          rename <- dses.renameDatasource(i, b.name)
-          l <- dses.datasourceRef(i)
-          _ <- finalize
-        } yield {
-          rename must beLike {
-            case Condition.Abnormal(ex) => ex must_=== DatasourceNameExists(b.name)
-          }
-          l must be_\/-(a) // datasource was not renamed
-        }
-      }
-      "renaming errors given a nonexisting datasource id" >>* {
-        for {
-          ((dses, _, _, _), finalize) <- prepare(Map(), None, None, None).allocated
-          rename <- dses.renameDatasource("not a datasource", DatasourceName("new renamed datasource name"))
-          _ <- finalize
-        } yield {
-          rename must beLike {
-            case Condition.Abnormal(ex) => ex must_=== DatasourceNotFound("not a datasource")
-          }
-        }
-      }
-    }
     "reconfigure config" >> {
       "ref is reconfigured" >>* {
         val reconfigure: (Json, Json) => Either[ConfigurationError[Json], Json] = {
