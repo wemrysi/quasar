@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.connector.MonadResourceErr
-import quasar.connector.destination.{Destination, DestinationModule}
+import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 import quasar.impl.IncompatibleModuleException.linkDestination
 
 import argonaut.Json
@@ -46,7 +46,8 @@ trait DestinationModules[F[_], C] {
 
 object DestinationModules {
   private[impl] def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr](
-      modules: List[DestinationModule])
+      modules: List[DestinationModule],
+      pushPull: PushmiPullyu[F])
       : DestinationModules[F, Json] = {
 
     lazy val moduleSet: ISet[DestinationType] =
@@ -63,7 +64,7 @@ object DestinationModules {
               DestinationUnsupported(ref.kind, moduleSet))
 
           case Some(module) =>
-            handleInitErrors(ref.kind, module.destination[F](ref.config))
+            handleInitErrors(ref.kind, module.destination[F](ref.config, pushPull))
         }
 
       def sanitizeRef(inp: DestinationRef[Json]): DestinationRef[Json] = moduleMap.get(inp.kind) match {

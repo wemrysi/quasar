@@ -23,7 +23,7 @@ import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.{concurrent => qc}
 import quasar.connector.ResourceError
-import quasar.connector.destination.Destination
+import quasar.connector.destination.{Destination, PushmiPullyu}
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.ResourceManager
 import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
@@ -42,6 +42,8 @@ import cats.syntax.applicativeError._
 import cats.syntax.traverse._
 
 import eu.timepit.refined.auto._
+
+import fs2.Stream
 
 import scalaz.{\/-, -\/, ISet}
 
@@ -74,6 +76,8 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
 
   val blocker: Blocker = qc.Blocker.cached("rdestinations-spec")
 
+  val pushPull: PushmiPullyu[IO] = _ => _ => Stream.empty[IO]
+
   def mkDestinations(initErrors: Map[Json, InitializationError[Json]] = Map.empty) = {
     val freshId = IO(java.util.UUID.randomUUID().toString())
     val fRefs: IO[IndexedStore[IO, String, DestinationRef[Json]]] =
@@ -81,7 +85,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         ConcurrentMapIndexedStore.unhooked[IO, String, DestinationRef[Json]](mp, blocker)
       }
     val rCache = ResourceManager[IO, String, Destination[IO]]
-    val modules = DestinationModules[IO](List(MockDestinationModule(initErrors)))
+    val modules = DestinationModules[IO](List(MockDestinationModule(initErrors)), pushPull)
     for {
       refs <- Resource.liftF(fRefs)
       cache <- rCache

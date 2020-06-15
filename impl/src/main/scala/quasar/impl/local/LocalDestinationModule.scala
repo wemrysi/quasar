@@ -21,7 +21,7 @@ import quasar.api.destination.DestinationError.{
   malformedConfiguration
 }
 import quasar.connector.MonadResourceErr
-import quasar.connector.destination.{Destination, DestinationModule}
+import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 
 import scala.util.Either
 
@@ -36,7 +36,8 @@ trait LocalDestinationModule extends DestinationModule {
   def sanitizeDestinationConfig(config: Json): Json = config
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-      config: Json)
+      config: Json,
+      pushPull: PushmiPullyu[F])
       : Resource[F, Either[InitializationError[Json], Destination[F]]] = {
     val dest = for {
       ld <- attemptConfig[F, LocalDestinationConfig, InitializationError[Json]](
