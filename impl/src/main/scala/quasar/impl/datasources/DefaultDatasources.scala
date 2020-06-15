@@ -120,7 +120,7 @@ private[impl] final class DefaultDatasources[
 
   def reconfigureDatasource(datasourceId: I, patch: C)
       : F[Condition[DatasourceError[I, C]]] =
-    datasourceRef(datasourceId) flatMap {
+    lookupRef[DatasourceError[I, C]](datasourceId) flatMap {
       case -\/(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
       case \/-(ref) => modules.reconfigureRef(ref, patch) match {
         case Left(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
@@ -130,7 +130,7 @@ private[impl] final class DefaultDatasources[
 
   def renameDatasource(datasourceId: I, name: DatasourceName)
       : F[Condition[DatasourceError[I, C]]] =
-    datasourceRef(datasourceId) flatMap {
+    lookupRef[DatasourceError[I, C]](datasourceId) flatMap {
       case -\/(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
       case \/-(ref) => replaceDatasource(datasourceId, ref.copy(name = name))
     }
