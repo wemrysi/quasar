@@ -25,6 +25,7 @@ import quasar.api.resource._
 import quasar.impl.{DatasourceModule, QuasarDatasource}
 import quasar.impl.IncompatibleModuleException.linkDatasource
 import quasar.connector.{MonadResourceErr, QueryResult}
+import quasar.connector.datasource.Reconfiguration
 import quasar.qscript.MonadPlannerErr
 
 import scala.concurrent.ExecutionContext
@@ -34,8 +35,8 @@ import argonaut.Argonaut.jEmptyObject
 
 import cats.{Monad, MonadError}
 import cats.effect.{Resource, ConcurrentEffect, ContextShift, Timer, Bracket}
+import cats.implicits._
 import cats.kernel.Hash
-import cats.syntax.applicative._
 
 import fs2.Stream
 
@@ -54,7 +55,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
   def supportedTypes: F[ISet[DatasourceType]]
 
   def reconfigureRef(original: DatasourceRef[C], patch: C)
-      : Either[ConfigurationError[C], DatasourceRef[C]]
+      : Either[ConfigurationError[C], (Reconfiguration, DatasourceRef[C])]
 
   def withMiddleware[HH[_], S, Q <: ResourcePathType](
       f: (I, QuasarDatasource[T, G, H, R, P]) => F[QuasarDatasource[T, G, HH, S, Q]])(
@@ -75,7 +76,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : Either[ConfigurationError[C], DatasourceRef[C]] =
+          : Either[ConfigurationError[C], (Reconfiguration, DatasourceRef[C])] =
         self.reconfigureRef(original, patch)
     }
 
@@ -97,7 +98,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : Either[ConfigurationError[C], DatasourceRef[C]] =
+          : Either[ConfigurationError[C], (Reconfiguration, DatasourceRef[C])] =
         self.reconfigureRef(original, patch)
     }
 
@@ -115,7 +116,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : Either[ConfigurationError[C], DatasourceRef[C]] =
+          : Either[ConfigurationError[C], (Reconfiguration, DatasourceRef[C])] =
         self.reconfigureRef(original, patch)
     }
 }
@@ -175,14 +176,14 @@ object DatasourceModules {
         moduleSet.pure[F]
 
       def reconfigureRef(original: DatasourceRef[Json], patch: Json)
-          : Either[ConfigurationError[Json], DatasourceRef[Json]] =
+          : Either[ConfigurationError[Json], (Reconfiguration, DatasourceRef[Json])] =
         moduleMap.get(original.kind) match {
           case None =>
-            Right(original.copy(config = jEmptyObject))
+            Right((Reconfiguration.Preserve, original.copy(config = jEmptyObject)))
 
           case Some(ds) =>
             ds.reconfigure(original.config, patch)
-              .map(c => original.copy(config = c))
+              .map(_.map(c => original.copy(config = c)))
         }
     }
   }

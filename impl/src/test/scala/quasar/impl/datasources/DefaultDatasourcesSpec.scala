@@ -117,10 +117,10 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           case Some(f) => f(config)
         }
 
-      def reconfigure(orig: Json, patch: Json): Either[ConfigurationError[Json], Json] =
+      def reconfigure(orig: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
         reconfig match {
-          case None => Right(orig)
-          case Some(f) => f(orig, patch)
+          case None => Right((Reconfiguration.Reset, orig))
+          case Some(f) => f(orig, patch).map((Reconfiguration.Reset, _))
         }
 
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](

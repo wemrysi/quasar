@@ -28,7 +28,7 @@ import quasar.api.datasource.DatasourceError.{
 import quasar.common.data.RValue
 import quasar.{concurrent => qc}
 import quasar.connector._
-import quasar.connector.datasource.LightweightDatasourceModule
+import quasar.connector.datasource.{LightweightDatasourceModule, Reconfiguration}
 
 import scala.concurrent.ExecutionContext
 
@@ -47,7 +47,8 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
   def sanitizeConfig(config: Json): Json = config
 
   // there are no sensitive components, so we use the entire patch
-  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] = Right(patch)
+  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
+    Right((Reconfiguration.Preserve, patch))
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,

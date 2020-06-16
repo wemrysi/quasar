@@ -22,11 +22,12 @@ import quasar.Condition
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
+import quasar.connector.datasource.Reconfiguration
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.{CachedGetter, IndexedSemaphore, QuasarDatasource, ResourceManager}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 
-import cats.~>
+import cats.{~>, Applicative}
 import cats.effect.{Concurrent, ContextShift, Sync, Resource}
 
 import fs2.Stream
@@ -57,7 +58,7 @@ private[impl] final class DefaultDatasources[
 
   def addDatasource(ref: DatasourceRef[C]): F[CreateError[C] \/ I] = for {
     i <- freshId
-    c <- addRef[CreateError[C]](i, ref)
+    c <- addRef[CreateError[C]](i, Reconfiguration.Preserve, ref)
   } yield Condition.disjunctionIso.get(c).as(i)
 
   def allDatasourceMetadata: F[Stream[F, (I, DatasourceMeta)]] =
@@ -81,10 +82,13 @@ private[impl] final class DefaultDatasources[
 
   def removeDatasource(i: I): F[Condition[ExistentialError[I]]] =
     refs.delete(i).ifM(
-      dispose(i).as(Condition.normal[ExistentialError[I]]()),
+      dispose(i, true).as(Condition.normal[ExistentialError[I]]()),
       Condition.abnormal(datasourceNotFound[I, ExistentialError[I]](i)).point[F])
 
-  def replaceDatasource(i: I, ref: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] = {
+  def replaceDatasource(i: I, ref: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] =
+    replaceDatasourceImpl(i, Reconfiguration.Reset, ref)
+
+  private def replaceDatasourceImpl(i: I, reconf: Reconfiguration, ref: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] = {
     lazy val notFound =
       Condition.abnormal(datasourceNotFound[I, DatasourceError[I, C]](i))
 
@@ -94,7 +98,7 @@ private[impl] final class DefaultDatasources[
       else if (DatasourceRef.atMostRenamed(ref, prev))
         setRef(i, ref)
       else
-        addRef[DatasourceError[I, C]](i, ref)
+        addRef[DatasourceError[I, C]](i, reconf, ref)
 
     throughSemaphore(i) {
       getter(i).flatMap {
@@ -104,7 +108,7 @@ private[impl] final class DefaultDatasources[
 
         // it's removed, but resource hasn't been finalized
         case Removed(_) =>
-          dispose(i).as(notFound)
+          dispose(i, true).as(notFound)
 
         // The last value we knew about has since been externally updated,
         // but our update replaces it, so we ignore the new value and
@@ -123,8 +127,11 @@ private[impl] final class DefaultDatasources[
     lookupRef[DatasourceError[I, C]](datasourceId) flatMap {
       case -\/(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
       case \/-(ref) => modules.reconfigureRef(ref, patch) match {
-        case Left(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
-        case Right(patched) => replaceDatasource(datasourceId, patched)
+        case Left(err) =>
+          Condition.abnormal(err: DatasourceError[I, C]).point[F]
+
+        case Right((reconf, patched)) =>
+          replaceDatasource(datasourceId, patched)
       }
     }
 
@@ -156,13 +163,13 @@ private[impl] final class DefaultDatasources[
           (None: Option[QDS]).pure[F]
 
         case Removed(_) =>
-          dispose(i).as(None: Option[QDS])
+          dispose(i, true).as(None: Option[QDS])
 
         case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
           fromCacheOrCreate(incoming).map(_.some)
 
         case Updated(incoming, old) =>
-          dispose(i) >> create(incoming).map(_.some)
+          dispose(i, true) >> create(incoming).map(_.some)
 
         case Present(value) =>
           fromCacheOrCreate(value).map(_.some)
@@ -170,12 +177,17 @@ private[impl] final class DefaultDatasources[
     }
   }
 
-  private def addRef[E >: CreateError[C] <: DatasourceError[I, C]](i: I, ref: DatasourceRef[C]): F[Condition[E]] = {
+  private def addRef[E >: CreateError[C] <: DatasourceError[I, C]](i: I, reconf: Reconfiguration, ref: DatasourceRef[C]): F[Condition[E]] = {
+    val clearBS = reconf match {
+      case Reconfiguration.Reset => true
+      case Reconfiguration.Preserve => false
+    }
+
     val action = for {
       _ <- verifyNameUnique[E](ref.name, i)
       // Grab managed ds and if it's presented shut it down
       mbCurrent <- EitherT.rightT(cache.get(i))
-      _ <- EitherT.rightT(mbCurrent.fold(().point[F])(_ => dispose(i)))
+      _ <- EitherT.rightT(mbCurrent.fold(().point[F])(_ => dispose(i, clearBS)))
       allocated <- EitherT(modules.create(i, ref).run.allocated map {
         case (-\/(e), _) => -\/(e: E)
         case (\/-(a), finalize) => \/-((a, finalize))
@@ -211,8 +223,8 @@ private[impl] final class DefaultDatasources[
         .map(_ ? datasourceNameExists[E](name).left[Unit] | ().right)
     }
 
-  private def dispose(i: I): F[Unit] =
-    cache.shutdown(i) >> byteStores.clear(i)
+  private def dispose(i: I, clear: Boolean): F[Unit] =
+    cache.shutdown(i) >> (if (clear) byteStores.clear(i) else Applicative[F].unit)
 
   private val createErrorHandling: EitherT[Resource[F, ?], CreateError[C], ?] ~> Resource[F, ?] =
     λ[EitherT[Resource[F, ?], CreateError[C], ?] ~> Resource[F, ?]]( inp =>
