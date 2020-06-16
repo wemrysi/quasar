@@ -16,12 +16,14 @@
 
 package quasar.impl.datasources
 
+import quasar.Store
 import quasar.connector.ByteStore
 
 import cats.Applicative
+import cats.effect.Concurrent
 import cats.implicits._
 
-import scala.Unit
+import scala.{None, Some, Unit}
 
 trait ByteStores[F[_], K] {
   /** Returns the `ByteStore` for the specified key. */
@@ -36,5 +38,27 @@ object ByteStores {
     new ByteStores[F, I] {
       def get(key: I) = ByteStore.void[F].pure[F]
       def clear(key: I) = ().pure[F]
+    }
+
+  /** Returns a `ByteStores` that returns the same shared `ByteStore` for
+    * every key. (this comment is a lie)
+    */
+  def ephemeral[F[_]: Concurrent, I]: F[ByteStores[F, I]] =
+    Store.ephemeral[F, I, ByteStore[F]] map { bss =>
+      new ByteStores[F, I] {
+        def get(k: I) =
+          bss.lookup(k) flatMap {
+            case None =>
+              for {
+                s0 <- ByteStore.ephemeral[F]
+                _ <- bss.insert(k, s0)
+              } yield s0
+
+            case Some(s) => s.pure[F]
+          }
+
+        def clear(k: I) =
+          bss.delete(k).void
+      }
     }
 }

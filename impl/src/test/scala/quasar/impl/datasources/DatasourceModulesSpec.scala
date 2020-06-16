@@ -106,8 +106,8 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] =
-        Right(jArray(List(original, patch)))
+      def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
+        Right((Reconfiguration.Reset, jArray(List(original, patch))))
 
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
           config: Json,
@@ -129,8 +129,8 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] =
-        Right(jArray(List(original, patch)))
+      def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
+        Right((Reconfiguration.Reset, jArray(List(original, patch))))
 
       def heavyweightDatasource[
           T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
@@ -213,9 +213,13 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
     RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]) map { (rl: RateLimiting[IO, UUID]) =>
       val modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(aType), heavyMod(bType)), rl, ByteStores.void[IO, Int])
-      modules.reconfigureRef(aRef, aPatch) must beRight(aExpected)
-      modules.reconfigureRef(bRef, bPatch) must beRight(bExpected)
-      modules.reconfigureRef(cRef, cPatch) must beRight(cExpected)
+      modules.reconfigureRef(aRef, aPatch) must beRight((Reconfiguration.Reset, aExpected))
+      modules.reconfigureRef(bRef, bPatch) must beRight((Reconfiguration.Reset, bExpected))
+
+      modules.reconfigureRef(cRef, cPatch) must beLike {
+        case Left(DatasourceError.DatasourceUnsupported(kind, _)) =>
+          kind mustEqual cRef.kind
+      }
     }
   }
 
