@@ -119,8 +119,8 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
 
       def reconfigure(orig: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
         reconfig match {
-          case None => Right((Reconfiguration.Reset, orig))
-          case Some(f) => f(orig, patch).map((Reconfiguration.Reset, _))
+          case None => Right((Reconfiguration.Preserve, orig))
+          case Some(f) => f(orig, patch).map((Reconfiguration.Preserve, _))
         }
 
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
@@ -180,6 +180,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       starts <- Resource.liftF(Ref.of[IO, List[String]](List()))
       shuts <- Resource.liftF(Ref.of[IO, List[String]](List()))
 
+      // TODO make not stupid
       byteStores = ByteStores.void[IO, String]
 
       modules =
@@ -193,7 +194,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       result <- Resource.liftF {
         DefaultDatasources[Fix, IO, Resource[IO, ?], Stream[IO, ?], String, Json, QueryResult[IO]](freshId, refs, modules, cache, errors, byteStores)
       }
-    } yield (result, refs, starts, shuts)
+    } yield (result, /*byteStores,*/ refs, starts, shuts)
   }
 
   def supportedType = DatasourceType("test-type", 3L)
