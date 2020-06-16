@@ -97,7 +97,7 @@ private[impl] final class DefaultDatasources[
         addRef[DatasourceError[I, C]](i, ref)
 
     throughSemaphore(i) {
-      getter(i) flatMap {
+      getter(i).flatMap {
         // We're replacing, emit abnormal condition if there was no ref
         case Empty =>
           notFound.point[F]
@@ -114,7 +114,7 @@ private[impl] final class DefaultDatasources[
 
         case Present(value) =>
           doReplace(value)
-      }
+      } <* getter(i)
     }
   }
 
