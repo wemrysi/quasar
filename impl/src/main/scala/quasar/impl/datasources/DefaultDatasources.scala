@@ -131,7 +131,7 @@ private[impl] final class DefaultDatasources[
           Condition.abnormal(err: DatasourceError[I, C]).point[F]
 
         case Right((reconf, patched)) =>
-          replaceDatasource(datasourceId, patched)
+          replaceDatasourceImpl(datasourceId, reconf, patched)
       }
     }
 

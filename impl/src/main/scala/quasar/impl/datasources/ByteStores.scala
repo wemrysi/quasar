@@ -41,7 +41,7 @@ object ByteStores {
     }
 
   /** Returns a `ByteStores` that returns the same shared `ByteStore` for
-    * every key.
+    * every key. (this comment is a lie)
     */
   def ephemeral[F[_]: Concurrent, I]: F[ByteStores[F, I]] =
     Store.ephemeral[F, I, ByteStore[F]] map { bss =>

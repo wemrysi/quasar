@@ -106,7 +106,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
   def lightMod(
       mp: Map[Json, InitializationError[Json]],
       sanitize: Option[Json => Json] = None,
-      reconfig: Option[(Json, Json) => Either[ConfigurationError[Json], Json]] = None)
+      reconfig: Option[(Json, Json) => Either[ConfigurationError[Json], (Reconfiguration, Json)]] = None)
       : DatasourceModule = DatasourceModule.Lightweight {
     new LightweightDatasourceModule {
       val kind = supportedType
@@ -120,7 +120,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       def reconfigure(orig: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
         reconfig match {
           case None => Right((Reconfiguration.Preserve, orig))
-          case Some(f) => f(orig, patch).map((Reconfiguration.Preserve, _))
+          case Some(f) => f(orig, patch)
         }
 
       def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
@@ -157,7 +157,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       mp: Map[Json, InitializationError[Json]],
       errorMap: Option[Ref[IO, IMap[String, Exception]]] = None,
       sanitize: Option[Json => Json] = None,
-      reconfigure: Option[(Json, Json) => Either[ConfigurationError[Json], Json]] = None) = {
+      reconfigure: Option[(Json, Json) => Either[ConfigurationError[Json], (Reconfiguration, Json)]] = None) = {
 
     val freshId = IO(java.util.UUID.randomUUID.toString())
 
@@ -180,8 +180,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       starts <- Resource.liftF(Ref.of[IO, List[String]](List()))
       shuts <- Resource.liftF(Ref.of[IO, List[String]](List()))
 
-      // TODO make not stupid
-      byteStores = ByteStores.void[IO, String]
+      byteStores <- Resource.liftF(ByteStores.ephemeral[IO, String])
 
       modules =
         DatasourceModules[Fix, IO, String, UUID](List(lightMod(mp, sanitize, reconfigure)), rateLimiting, byteStores)
@@ -194,7 +193,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       result <- Resource.liftF {
         DefaultDatasources[Fix, IO, Resource[IO, ?], Stream[IO, ?], String, Json, QueryResult[IO]](freshId, refs, modules, cache, errors, byteStores)
       }
-    } yield (result, /*byteStores,*/ refs, starts, shuts)
+    } yield (result, byteStores, refs, starts, shuts)
   }
 
   def supportedType = DatasourceType("test-type", 3L)
@@ -205,7 +204,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
     "add datasource" >> {
       "initializes datasource" >>* {
         for {
-          ((dses, _, starts, _), finalize) <- prepare(Map()).allocated
+          ((dses, _, _, starts, _), finalize) <- prepare(Map()).allocated
           b <- refB
           i0 <- dses.addDatasource(b)
           _ <- finalize
@@ -219,7 +218,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       }
       "returns created datasources" >>* {
         for {
-          ((dses, _, starts, shuts), finalize) <- prepare(Map()).allocated
+          ((dses, _, _, starts, shuts), finalize) <- prepare(Map()).allocated
           md0 <- dses.allDatasourceMetadata.flatMap(_.compile.toList)
           b <- refB
           addStatus <- dses.addDatasource(b)
@@ -248,7 +247,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
         val err3: InitializationError[Json] =
           MalformedConfiguration(supportedType, jString("three"), "3 isn't a config!")
         for {
-          ((dses, refs, _, _), finalize) <- prepare(Map(jString("three") -> err3)).allocated
+          ((dses, _, refs, _, _), finalize) <- prepare(Map(jString("three") -> err3)).allocated
           a <- refA
           _ <- dses.addDatasource(DatasourceRef.config.set(jString("three"))(a)).attempt
           _ <- finalize
@@ -261,7 +260,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
     "remove datasource" >> {
       "shutdown existing" >>* {
         for {
-          ((dses, _, starts, shuts), finalize) <- prepare(Map()).allocated
+          ((dses, _, _, starts, shuts), finalize) <- prepare(Map()).allocated
           a <- refA
           added <- dses.addDatasource(a)
           mbi = added.toOption
@@ -287,7 +286,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
         for {
           a <- refA
           b <- refB
-          ((dses, _, starts, shuts), finalize) <- prepare(Map()).allocated
+          ((dses, _, _, starts, shuts), finalize) <- prepare(Map()).allocated
           r <- dses.addDatasource(a)
           i = r.toOption.get
           c <- dses.replaceDatasource(i, b)
@@ -305,7 +304,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           a <- refA
           n <- randomName
           b = DatasourceRef.name.set(n)(a)
-          ((dses, refs, starts, shuts), finalize) <- prepare(Map()).allocated
+          ((dses, _, refs, starts, shuts), finalize) <- prepare(Map()).allocated
           r <- dses.addDatasource(a)
           i = r.toOption.get
           c <- dses.replaceDatasource(i, b)
@@ -326,7 +325,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           MalformedConfiguration(supportedType, jString("three"), "3 isn't a config!")
 
         for {
-          ((dses, refs, starts, shuts), finalize) <- prepare(Map(jString("invalid") -> err3)).allocated
+          ((dses, _, refs, starts, shuts), finalize) <- prepare(Map(jString("invalid") -> err3)).allocated
           a <- refA
           a2 = DatasourceRef.config.set(jString("invalid"))(a)
           r <- dses.addDatasource(a)
@@ -352,7 +351,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
         val sanitize: Json => Json = x => jString("sanitized")
         for {
           a <- refA
-          ((dses, _, _, _), finalize) <- prepare(Map(), None, Some(sanitize), None).allocated
+          ((dses, _, _, _, _), finalize) <- prepare(Map(), None, Some(sanitize), None).allocated
           r <- dses.addDatasource(a)
           i = r.toOption.get
           l <- dses.datasourceRef(i)
@@ -363,30 +362,55 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       }
     }
     "reconfigure config" >> {
-      "ref is reconfigured" >>* {
-        val reconfigure: (Json, Json) => Either[ConfigurationError[Json], Json] = {
-          case (j1, j2) => Right(jArray(List(j1, j2)))
+      "ref is reconfigured resetting state" >>* {
+        val reconfigure: (Json, Json) => Either[ConfigurationError[Json], (Reconfiguration, Json)] = {
+          case (j1, j2) => Right((Reconfiguration.Reset, jArray(List(j1, j2))))
         }
         val patchConfig = jString("patchconfig")
         for {
           a <- refA
-          ((dses, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
+          ((dses, bs, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
           r <- dses.addDatasource(a)
           i = r.toOption.get
+          s <- bs.get(i)
+          _ <- s.insert("this-is-a-string", Array(24))
           _ <- dses.reconfigureDatasource(i, patchConfig)
+          bsLookup <- bs.get(i).flatMap(_.lookup("this-is-a-string"))
           l <- dses.datasourceRef(i)
           _ <- finalize
         } yield {
+          bsLookup must beNone
+          l must be_\/-(a.copy(config = jArray(List(a.config, patchConfig))))
+        }
+      }
+      "ref is reconfigured preserving state" >>* {
+        val reconfigure: (Json, Json) => Either[ConfigurationError[Json], (Reconfiguration, Json)] = {
+          case (j1, j2) => Right((Reconfiguration.Preserve, jArray(List(j1, j2))))
+        }
+        val patchConfig = jString("patchconfig")
+        for {
+          a <- refA
+          ((dses, bs, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          s <- bs.get(i)
+          _ <- s.insert("this-is-a-string", Array(24))
+          _ <- dses.reconfigureDatasource(i, patchConfig)
+          bsLookup <- bs.get(i).flatMap(_.lookup("this-is-a-string"))
+          l <- dses.datasourceRef(i)
+          _ <- finalize
+        } yield {
+          bsLookup must beSome(Array(24))
           l must be_\/-(a.copy(config = jArray(List(a.config, patchConfig))))
         }
       }
       "reconfiguration errors given a nonexisting datasource id" >>* {
-        val reconfigure: (Json, Json) => Either[ConfigurationError[Json], Json] = {
-          case (j1, j2) => Right(jArray(List(j1, j2)))
+        val reconfigure: (Json, Json) => Either[ConfigurationError[Json], (Reconfiguration, Json)] = {
+          case (j1, j2) => Right((Reconfiguration.Reset, jArray(List(j1, j2))))
         }
         val patchConfig = jString("patchconfig")
         for {
-          ((dses, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
+          ((dses, _, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
           reconf <- dses.reconfigureDatasource("not a datasource", patchConfig)
           _ <- finalize
         } yield {
@@ -398,12 +422,12 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       "ref is not reconfigured when reconfigure function errors" >>* {
         val patchConfig = jString("sensitive")
         val error = DatasourceError.InvalidConfiguration(supportedType, patchConfig, NonEmptyList("oops"))
-        val reconfigure: (Json, Json) => Either[ConfigurationError[Json], Json] = {
+        val reconfigure: (Json, Json) => Either[ConfigurationError[Json], (Reconfiguration, Json)] = {
           case (j1, j2) => Left(error)
         }
         for {
           a <- refA
-          ((dses, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
+          ((dses, _, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
           r <- dses.addDatasource(a)
           i = r.toOption.get
           p <- dses.reconfigureDatasource(i, patchConfig)
@@ -419,7 +443,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       "include errors" >>* {
         for {
           ref <- Ref.of[IO, IMap[String, Exception]](IMap.empty)
-          ((dses, _, _, _), finalize) <- prepare(Map(), Some(ref), None, None).allocated
+          ((dses, _, _, _, _), finalize) <- prepare(Map(), Some(ref), None, None).allocated
           a <- refA
           r <- dses.addDatasource(a)
           i = r.toOption.get
@@ -437,7 +461,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
     "clustering" >> {
       "new ref appeared" >>* {
         for {
-          ((dses, refs, starts, _), finalize) <- prepare(Map()).allocated
+          ((dses, _, refs, starts, _), finalize) <- prepare(Map()).allocated
           a <- refA
           _ <- refs.insert("foo", a)
           res <- dses.quasarDatasourceOf("foo")
@@ -450,7 +474,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       }
       "ref disappeared" >>* {
         for {
-          ((dses, refs, starts, shuts), finalize) <- prepare(Map()).allocated
+          ((dses, _, refs, starts, shuts), finalize) <- prepare(Map()).allocated
           a <- refA
           r <- dses.addDatasource(a)
           i = r.toOption.get
@@ -471,7 +495,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       }
       "ref updated" >>* {
         for {
-          ((dses, refs, starts, shuts), finalize) <- prepare(Map()).allocated
+          ((dses, _, refs, starts, shuts), finalize) <- prepare(Map()).allocated
           a <- refA
           _ <- refs.insert("foo", a)
           res0 <- dses.quasarDatasourceOf("foo")
