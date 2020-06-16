@@ -55,7 +55,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
   def supportedTypes: F[ISet[DatasourceType]]
 
   def reconfigureRef(original: DatasourceRef[C], patch: C)
-      : Either[ConfigurationError[C], (Reconfiguration, DatasourceRef[C])]
+      : Either[CreateError[C], (Reconfiguration, DatasourceRef[C])]
 
   def withMiddleware[HH[_], S, Q <: ResourcePathType](
       f: (I, QuasarDatasource[T, G, H, R, P]) => F[QuasarDatasource[T, G, HH, S, Q]])(
@@ -76,7 +76,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : Either[ConfigurationError[C], (Reconfiguration, DatasourceRef[C])] =
+          : Either[CreateError[C], (Reconfiguration, DatasourceRef[C])] =
         self.reconfigureRef(original, patch)
     }
 
@@ -98,7 +98,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : Either[ConfigurationError[C], (Reconfiguration, DatasourceRef[C])] =
+          : Either[CreateError[C], (Reconfiguration, DatasourceRef[C])] =
         self.reconfigureRef(original, patch)
     }
 
@@ -116,7 +116,7 @@ trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathTyp
         self.supportedTypes
 
       def reconfigureRef(original: DatasourceRef[C], patch: C)
-          : Either[ConfigurationError[C], (Reconfiguration, DatasourceRef[C])] =
+          : Either[CreateError[C], (Reconfiguration, DatasourceRef[C])] =
         self.reconfigureRef(original, patch)
     }
 }
@@ -176,10 +176,10 @@ object DatasourceModules {
         moduleSet.pure[F]
 
       def reconfigureRef(original: DatasourceRef[Json], patch: Json)
-          : Either[ConfigurationError[Json], (Reconfiguration, DatasourceRef[Json])] =
+          : Either[CreateError[Json], (Reconfiguration, DatasourceRef[Json])] =
         moduleMap.get(original.kind) match {
           case None =>
-            Right((Reconfiguration.Preserve, original.copy(config = jEmptyObject)))
+            Left(datasourceUnsupported[CreateError[Json]]((original.kind, moduleSet)))
 
           case Some(ds) =>
             ds.reconfigure(original.config, patch)
