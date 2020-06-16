@@ -27,7 +27,7 @@ import quasar.api.datasource.DatasourceError.{
 }
 import quasar.{concurrent => qc}
 import quasar.connector._
-import quasar.connector.datasource.LightweightDatasourceModule
+import quasar.connector.datasource.{ByteStoreRetention, LightweightDatasourceModule}
 
 import scala.concurrent.ExecutionContext
 
@@ -46,7 +46,8 @@ object LocalStatefulDatasourceModule extends LightweightDatasourceModule with Lo
   def sanitizeConfig(config: Json): Json = config
 
   // there are no sensitive components, so we use the entire patch
-  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] = Right(patch)
+  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (ByteStoreRetention, Json)] =
+    Right((ByteStoreRetention.Reset, patch))
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
       config: Json,

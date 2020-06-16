@@ -18,7 +18,11 @@ package quasar.impl
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.ConfigurationError
-import quasar.connector.datasource.{HeavyweightDatasourceModule, LightweightDatasourceModule}
+import quasar.connector.datasource.{
+  ByteStoreRetention,
+  HeavyweightDatasourceModule,
+  LightweightDatasourceModule
+}
 
 import scala.util.Either
 
@@ -27,7 +31,7 @@ import argonaut.Json
 sealed trait DatasourceModule {
   def kind: DatasourceType
   def sanitizeConfig(config: Json): Json
-  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json]
+  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (ByteStoreRetention, Json)]
 }
 
 object DatasourceModule {
@@ -35,7 +39,7 @@ object DatasourceModule {
     def kind = lw.kind
     def sanitizeConfig(config: Json): Json = lw.sanitizeConfig(config)
 
-    def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] =
+    def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (ByteStoreRetention, Json)] =
       lw.reconfigure(original, patch)
   }
 
@@ -43,7 +47,7 @@ object DatasourceModule {
     def kind = hw.kind
     def sanitizeConfig(config: Json): Json = hw.sanitizeConfig(config)
 
-    def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], Json] =
+    def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (ByteStoreRetention, Json)] =
       hw.reconfigure(original, patch)
   }
 }
