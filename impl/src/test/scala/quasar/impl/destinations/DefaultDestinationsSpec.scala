@@ -41,8 +41,6 @@ import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 import cats.syntax.traverse._
 
-import eu.timepit.refined.auto._
-
 import scalaz.{\/-, -\/, ISet}
 
 import java.util.concurrent.ConcurrentHashMap
@@ -143,7 +141,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         }
       }
       "rejects unknown destination" >>* {
-        val unknownType = DestinationType("unknown", 1L)
+        val unknownType = DestinationType("unknown", 1)
         val unknownRef = DestinationRef.kind.set(unknownType)(testRef)
         for {
           (dests, finalize) <- emptyDestinations.allocated
@@ -310,7 +308,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
     }
 
     "new unknown ref appeared" >>* {
-      val unknownType = DestinationType("unknown", 2L)
+      val unknownType = DestinationType("unknown", 2)
       val unknownRef = DestinationRef.kind.set(unknownType)(testRef)
 
       mkDestinations() use { case (store, dests, cache) =>

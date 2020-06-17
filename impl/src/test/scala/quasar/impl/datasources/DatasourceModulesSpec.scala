@@ -41,8 +41,6 @@ import cats.kernel.Hash
 import cats.kernel.instances.uuid._
 import cats.syntax.applicativeError._
 
-import eu.timepit.refined.auto._
-
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
 
@@ -161,22 +159,22 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       for {
         rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
         modules = DatasourceModules[Fix, IO, Int, UUID](List(
-          lightMod(DatasourceType("a", 1L)),
-          lightMod(DatasourceType("b", 2L)),
-          heavyMod(DatasourceType("c", 3L))),
+          lightMod(DatasourceType("a", 1)),
+          lightMod(DatasourceType("b", 2)),
+          heavyMod(DatasourceType("c", 3))),
           rl,
           ByteStores.void[IO, Int])
         tys <- modules.supportedTypes
       } yield {
-        tys === ISet.fromList(List(DatasourceType("a", 1L), DatasourceType("b", 2L), DatasourceType("c", 3L)))
+        tys === ISet.fromList(List(DatasourceType("a", 1), DatasourceType("b", 2), DatasourceType("c", 3)))
       }
     }
   }
 
   "sanitizing refs" >>* {
-    val aType = DatasourceType("a", 1L)
-    val bType = DatasourceType("b", 2L)
-    val cType = DatasourceType("c", 3L)
+    val aType = DatasourceType("a", 1)
+    val bType = DatasourceType("b", 2)
+    val cType = DatasourceType("c", 3)
 
     val aRef = DatasourceRef(aType, DatasourceName("a-name"), jString("a-config"))
     val bRef = DatasourceRef(bType, DatasourceName("b-name"), jString("b-config"))
@@ -195,9 +193,9 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
   }
 
   "reconfigure refs" >>* {
-    val aType = DatasourceType("a", 1L)
-    val bType = DatasourceType("b", 2L)
-    val cType = DatasourceType("c", 3L)
+    val aType = DatasourceType("a", 1)
+    val bType = DatasourceType("b", 2)
+    val cType = DatasourceType("c", 3)
 
     val aRef = DatasourceRef(aType, DatasourceName("a-name"), jString("a-config"))
     val bRef = DatasourceRef(bType, DatasourceName("b-name"), jString("b-config"))
@@ -224,9 +222,9 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
   }
 
   "create" >> {
-    val lightType = DatasourceType("light", 1L)
-    val heavyType = DatasourceType("heavy", 2L)
-    val incompatType = DatasourceType("incompat", 3L)
+    val lightType = DatasourceType("light", 1)
+    val heavyType = DatasourceType("heavy", 2)
+    val incompatType = DatasourceType("incompat", 3)
 
     val lightRef = DatasourceRef(lightType, DatasourceName("light-name"), jString("light-config"))
     val heavyRef = DatasourceRef(heavyType, DatasourceName("heavy-name"), jString("heavy-config"))
@@ -256,19 +254,19 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     }
     "errors with initialization error" >>* {
       val malformed =
-        DatasourceType("malformed", 1L)
+        DatasourceType("malformed", 1)
       val malformedRef =
         DatasourceRef(malformed, DatasourceName("doesn't matter"), jString("malformed-config"))
       val invalid =
-        DatasourceType("invalid", 1L)
+        DatasourceType("invalid", 1)
       val invalidRef =
         DatasourceRef(invalid, DatasourceName("doesn't matter"), jString("invalid-config"))
       val connFailed =
-        DatasourceType("conn-failed", 1L)
+        DatasourceType("conn-failed", 1)
       val connFailedRef =
         DatasourceRef(connFailed, DatasourceName("doesn't matter"), jString("conn-failed-config"))
       val accessDenied =
-        DatasourceType("access-denied", 1L)
+        DatasourceType("access-denied", 1)
       val accessDeniedRef =
         DatasourceRef(accessDenied, DatasourceName("doesn't matter"), jString("access-denied-config"))
 

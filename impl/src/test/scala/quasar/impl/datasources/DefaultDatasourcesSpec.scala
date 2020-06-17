@@ -46,8 +46,6 @@ import cats.syntax.applicativeError._
 import cats.syntax.functor._
 import cats.syntax.traverse._
 
-import eu.timepit.refined.auto._
-
 import fs2.Stream
 
 import matryoshka.data.Fix
@@ -196,7 +194,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
     } yield (result, byteStores, refs, starts, shuts)
   }
 
-  def supportedType = DatasourceType("test-type", 3L)
+  def supportedType = DatasourceType("test-type", 3)
   def validConfigs = (jString("one"), jString("two"))
   def gatherMultiple[A](as: Stream[IO, A]) = as.compile.toList
 

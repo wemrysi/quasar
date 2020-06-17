@@ -33,8 +33,6 @@ import cats.data.NonEmptyList
 import cats.effect.{IO, Resource}
 import cats.effect.concurrent.Ref
 
-import eu.timepit.refined.auto._
-
 object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with ConditionMatchers {
 
   type T[_[_]] = Unit
@@ -42,7 +40,7 @@ object ConditionReportingMiddlewareSpec extends quasar.EffectfulQSpec[IO] with C
   val thatsRoot = new IllegalArgumentException("THAT'S ROOT!")
 
   object TestDs extends Datasource[Resource[IO, ?], List, InterpretedRead[ResourcePath], Unit, ResourcePathType] {
-    val kind: DatasourceType = DatasourceType("tester", 7L)
+    val kind: DatasourceType = DatasourceType("tester", 7)
 
     val loaders = NonEmptyList.of(Loader.Batch(BatchLoader.Full { (ir: InterpretedRead[ResourcePath]) =>
       Resource liftF {

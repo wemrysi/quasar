@@ -28,7 +28,6 @@ import quasar.api.destination.{
 }
 import quasar.contrib.scalaz.MonadState_
 
-import eu.timepit.refined.auto._
 import monocle.Lens
 import monocle.macros.Lenses
 import scalaz.std.anyVal._
@@ -46,8 +45,8 @@ final class MockDestinationsSpec extends Qspec with ConditionMatchers {
   implicit def monadIndex: MonadState_[M, Int] =
     MonadState_.zoom[M][RunState[Int, String], Int](RunState.currentIndex)
 
-  val mockType = DestinationType("mock", 1L)
-  val unsupportedType = DestinationType("unsupported", 1337L)
+  val mockType = DestinationType("mock", 1)
+  val unsupportedType = DestinationType("unsupported", 1337)
 
   def freshId: M[Int] =
     MonadState_[M, Int].modify(_ + 1) >> MonadState_[M, Int].get

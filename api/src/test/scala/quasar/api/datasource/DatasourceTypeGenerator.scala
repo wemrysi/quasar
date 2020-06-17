@@ -16,29 +16,15 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef._
-import quasar.pkg.tests._
-
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.{Positive => RPositive}
-import eu.timepit.refined.scalacheck.numeric._
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 
 trait DatasourceTypeGenerator {
   implicit val datasourceTypeArbitrary: Arbitrary[DatasourceType] =
     Arbitrary(for {
-      name <- genName
-      ver  <- chooseRefinedNum[Refined, Long, RPositive](1L, 100L)
+      strLength  <- Gen.choose(1, 100)
+      name <- Gen.listOfN(strLength, Gen.alphaNumChar).map(_.mkString)
+      ver  <- Gen.choose(1, 100)
     } yield DatasourceType(name, ver))
-
-  private def genName: Gen[DatasourceType.Name] =
-    for {
-      cs <- Gen.listOf(Gen.frequency(
-        100 -> Gen.alphaNumChar,
-        3   -> Gen.const('-')))
-      c <- Gen.alphaNumChar
-    } yield Refined.unsafeApply[String, DatasourceType.NameP]((c :: cs).mkString)
 }
 
 object DatasourceTypeGenerator extends DatasourceTypeGenerator

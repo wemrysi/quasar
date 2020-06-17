@@ -18,9 +18,7 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import eu.timepit.refined.auto._
 import quasar.api.destination.{DestinationName, DestinationRef, DestinationType}
-import quasar.fp.numeric.Positive
 
 import argonaut.{HCursor, CodecJson, DecodeJson, DecodeResult, EncodeJson, Json}
 
@@ -34,21 +32,15 @@ object StoreCodec {
     def encode(destRef: DestinationRef[C]): Json =
       Json(
         RefNameField -> Json.jString(destRef.name.value),
-        RefTypeNameField -> Json.jString(destRef.kind.name.value),
+        RefTypeNameField -> Json.jString(destRef.kind.name),
         RefTypeVersionField -> Json.jNumber(destRef.kind.version),
         RefConfigField -> EncodeJson.of[C].encode(destRef.config))
 
     def decode(c: HCursor): DecodeResult[DestinationRef[C]] =
       for {
         name <- c.get[String](RefNameField).map(DestinationName(_))
-        kindTypeName <- c.get[String](RefTypeNameField).flatMap(kn =>
-          DestinationType.stringName.getOption(kn).fold(
-            DecodeResult.fail[DestinationType.Name](s"$RefTypeNameField does not match DestinationType.NameP", c.history))(
-            DecodeResult.ok[DestinationType.Name](_)))
-        kindVersion <- c.get[Long](RefTypeVersionField).flatMap(kv =>
-          Positive(kv).fold(
-            DecodeResult.fail[Positive](s"$RefTypeVersionField field is not Positive", c.history))(
-            DecodeResult.ok[Positive](_)))
+        kindTypeName <- c.get[String](RefTypeNameField)
+        kindVersion <- c.get[Int](RefTypeVersionField)
         configDoc <- c.get[C](RefConfigField)
       } yield DestinationRef[C](DestinationType(kindTypeName, kindVersion), name, configDoc)
 

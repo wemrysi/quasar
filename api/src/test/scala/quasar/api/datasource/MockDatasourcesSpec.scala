@@ -26,7 +26,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import cats.effect.{IO, Resource}
 import cats.data.StateT
 import cats.syntax.applicative._
-import eu.timepit.refined.auto._
 import scalaz.ISet
 import scalaz.std.anyVal._
 import scalaz.std.list._
@@ -37,9 +36,9 @@ import MockDatasourcesSpec._
 final class MockDatasourcesSpec
   extends DatasourcesSpec[MockM, List, Int, String] {
 
-  val s3: DatasourceType = DatasourceType("s3", 1L)
-  val azure: DatasourceType = DatasourceType("azure", 1L)
-  val mongo: DatasourceType = DatasourceType("mongodb", 1L)
+  val s3: DatasourceType = DatasourceType("s3", 1)
+  val azure: DatasourceType = DatasourceType("azure", 1)
+  val mongo: DatasourceType = DatasourceType("mongodb", 1)
   val acceptedSet: ISet[DatasourceType] = ISet.fromList(List(s3, azure, mongo))
 
   def datasources: Resource[MockM, Datasources[MockM, List, Int, String]] =
@@ -47,7 +46,7 @@ final class MockDatasourcesSpec
       MockDatasources[String, MockM, List](acceptedSet, _ => Condition.normal())
     }
 
-  def supportedType = DatasourceType("s3", 1L)
+  def supportedType = DatasourceType("s3", 1)
 
   def validConfigs = ("bucket1", "bucket2")
 
