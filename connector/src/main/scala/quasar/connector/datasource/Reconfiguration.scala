@@ -16,11 +16,29 @@
 
 package quasar.connector.datasource
 
+import cats.{Hash, Order, Show}
+
 import scala.{Product, Serializable}
 
 sealed trait Reconfiguration extends Product with Serializable
 
 object Reconfiguration {
+
+  implicit val orderHash: Order[Reconfiguration] with Hash[Reconfiguration] =
+    new Order[Reconfiguration] with Hash[Reconfiguration] {
+
+      def hash(r: Reconfiguration) = r match {
+        case Reset => 0
+        case Preserve => 1
+      }
+
+      def compare(r1: Reconfiguration, r2: Reconfiguration) =
+        hash(r1) - hash(r2)
+    }
+
+  implicit val show: Show[Reconfiguration] =
+    Show.fromToString[Reconfiguration]
+
   case object Reset extends Reconfiguration
   case object Preserve extends Reconfiguration
 }
