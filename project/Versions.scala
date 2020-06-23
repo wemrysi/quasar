@@ -26,4 +26,6 @@ object Versions {
   val mapdbVersion        = "3.0.8"
   val skolemsVersion      = "0.2.1"
   val kittensVersion      = "2.0.0"
+  val iotaVersion         = "0.3.10"
+  val drosteVersion       = "0.8.0"
 }

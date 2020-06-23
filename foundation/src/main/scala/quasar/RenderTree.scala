@@ -199,7 +199,7 @@ sealed abstract class RenderTreeInstances0 extends RenderTreeInstances1 {
     RenderTree.recursive
 }
 
-sealed abstract class RenderTreeInstances1 {
+sealed abstract class RenderTreeInstances1 extends RenderTreeInstances2 {
   import RenderTree.make
 
   implicit def tuple2RenderTree[A, B](
@@ -209,4 +209,26 @@ sealed abstract class RenderTreeInstances1 {
       RA.render(t._1) ::
       RB.render(t._2) ::
       Nil))
+}
+
+sealed abstract class RenderTreeInstances2 {
+  import cats.{~>, Functor}
+  import cats.data.Const
+  import iota.{CopK, TListK}
+  import higherkindness.droste.{Algebra, Basis, Delay, scheme}
+  import RenderTree.ops._
+
+  implicit def catsConst[A: RenderTree]: Delay[RenderTree, Const[A, ?]] =
+    λ[RenderTree ~> λ[α => RenderTree[Const[A, α]]]](_ =>
+      RenderTree.make(_.getConst.render))
+
+  implicit def catsDelay[F[_], A: RenderTree](implicit F: Delay[RenderTree, F]): RenderTree[F[A]] =
+    F(RenderTree[A])
+
+  implicit def catsCopKRenderTree[LL <: TListK](
+      implicit M: DelayRenderTreeMaterlializer[LL])
+      : Delay[RenderTree, CopK[LL, ?]] = M.materialize(offset = 0)
+
+  implicit def basisRenderTree[F[_], U: Basis[F, ?]](implicit FD: Delay[RenderTree, F], FF: Functor[F]): RenderTree[U] =
+    RenderTree.make(scheme.cata(Algebra(FD(RenderTree[RenderedTree]).render)))
 }
