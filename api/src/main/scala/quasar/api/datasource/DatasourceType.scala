@@ -26,7 +26,7 @@ import scalaz.std.tuple._
 import scalaz.syntax.show._
 
 @Lenses
-final case class DatasourceType(name: String, version: Int)
+final case class DatasourceType(name: String, version: Long)
 
 object DatasourceType extends DatasourceTypeInstances
 

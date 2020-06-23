@@ -26,7 +26,7 @@ import scalaz.syntax.show._
 import scalaz.{Equal, Order, Show}
 
 @Lenses
-final case class DestinationType(name: String, version: Int)
+final case class DestinationType(name: String, version: Long)
 
 object DestinationType extends DestinationTypeInstances
 

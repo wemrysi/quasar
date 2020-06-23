@@ -23,7 +23,7 @@ trait DatasourceTypeGenerator {
     Arbitrary(for {
       strLength  <- Gen.choose(1, 100)
       name <- Gen.listOfN(strLength, Gen.alphaNumChar).map(_.mkString)
-      ver  <- Gen.choose(1, 100)
+      ver  <- Gen.choose(1L, 100L)
     } yield DatasourceType(name, ver))
 }
 

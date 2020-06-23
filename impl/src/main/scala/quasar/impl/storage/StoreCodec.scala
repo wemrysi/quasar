@@ -40,7 +40,7 @@ object StoreCodec {
       for {
         name <- c.get[String](RefNameField).map(DestinationName(_))
         kindTypeName <- c.get[String](RefTypeNameField)
-        kindVersion <- c.get[Int](RefTypeVersionField)
+        kindVersion <- c.get[Long](RefTypeVersionField)
         configDoc <- c.get[C](RefConfigField)
       } yield DestinationRef[C](DestinationType(kindTypeName, kindVersion), name, configDoc)
 

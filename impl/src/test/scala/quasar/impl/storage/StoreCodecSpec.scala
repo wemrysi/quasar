@@ -30,7 +30,7 @@ final class StoreCodecSpec extends SpecificationLike with Discipline {
   val destinationTypeGen: Gen[DestinationType] =
     for {
       ident <- Gen.identifier
-      version <- Gen.choose(1, 100)
+      version <- Gen.choose(1L, 100L)
     } yield DestinationType(ident, version)
 
   val destinationNameGen: Gen[DestinationName] =
