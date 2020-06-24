@@ -25,8 +25,6 @@ import cats.effect.{Blocker, IO, Resource}
 import cats.effect.concurrent.Ref
 import cats.implicits._
 
-import eu.timepit.refined.auto._
-
 import fs2.{Stream, text}
 import fs2.concurrent.{Enqueue, Queue}
 
@@ -88,7 +86,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     Show.fromToString
 
   val DestinationId: Integer = new Integer(43)
-  val QDestinationType = DestinationType("ref", 1L)
+  val QDestinationType = DestinationType("ref", 1)
 
   type Filesystem = Map[ResourcePath, String]
 

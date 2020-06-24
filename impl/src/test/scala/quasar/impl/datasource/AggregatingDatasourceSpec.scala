@@ -29,8 +29,6 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.{IO, Resource}
 
-import eu.timepit.refined.auto._
-
 import fs2.Stream
 
 import monocle.Lens
@@ -56,7 +54,7 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
 
   val underlying =
     MapBasedDatasource.pure[Resource[IO, ?], Stream[IO, ?]](
-      DatasourceType("pure-test", 1L),
+      DatasourceType("pure-test", 1),
       IMap(
         ResourcePath.root() / ResourceName("a") / ResourceName("b") -> 1,
         ResourcePath.root() / ResourceName("a") / ResourceName("c") -> 2,
@@ -87,7 +85,7 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
 
       val uds =
         new PhysicalDatasource[Resource[IO, ?], Stream[IO, ?], ResourcePath, Int] {
-          val kind = DatasourceType("prefixed", 6L)
+          val kind = DatasourceType("prefixed", 6)
 
           val loaders = NonEmptyList.of(Loader.Batch(BatchLoader.Full { (rp: ResourcePath) =>
             Resource.pure[IO, Int](paths.lookup(rp) getOrElse -1)

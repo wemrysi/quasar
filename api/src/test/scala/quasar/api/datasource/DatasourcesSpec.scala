@@ -28,7 +28,6 @@ import cats.effect.{Resource, Effect}
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import eu.timepit.refined.auto._
 import org.specs2.matcher.Matcher
 import scalaz.{Equal, IMap, Order, Show, \/}
 import scalaz.syntax.equal._
@@ -93,7 +92,7 @@ abstract class DatasourcesSpec[
     }}
 
     "error when type not supported" >>* {
-      val unsup = DatasourceType("--unsupported--", 17L)
+      val unsup = DatasourceType("--unsupported--", 17)
 
       datasources.use { dses => for {
         n <- randomName

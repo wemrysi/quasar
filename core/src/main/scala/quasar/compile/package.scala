@@ -23,7 +23,6 @@ import quasar.common.data.Data
 import quasar.contrib.pathy.ADir
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp._
-import quasar.fp.numeric.{Natural, Positive}
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{constant, preparePlan, ArgumentErrors, LogicalPlan => LP}
 import quasar.sql._
@@ -50,13 +49,13 @@ package object compile {
   type SemanticErrsT[F[_], A] = EitherT[F, SemanticErrors, A]
 
   def addOffsetLimit[T]
-      (lp: T, off: Natural, lim: Option[Positive])
+      (lp: T, off: Int, lim: Option[Int])
       (implicit T: Corecursive.Aux[T, LP])
       : T = {
-    val skipped = Drop(lp, constant[T](Data.Int(off.value)).embed).embed
+    val skipped = Drop(lp, constant[T](Data.Int(off)).embed).embed
     lim.fold(
       skipped)(
-      l => Take(skipped, constant[T](Data.Int(l.value)).embed).embed)
+      l => Take(skipped, constant[T](Data.Int(l)).embed).embed)
   }
 
   def allVariables: Algebra[Sql, List[VarName]] = {
@@ -196,7 +195,7 @@ package object compile {
       F[_]: Monad: PhaseResultTell: MonadSemanticErrs,
       U[_[_]]: BirecursiveT: EqualT: RenderTreeT,
       T: Equal: RenderTree: Show](
-      expr: U[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive])(
+      expr: U[Sql], vars: Variables, basePath: ADir, off: Int, lim: Option[Int])(
       implicit TC: Corecursive.Aux[T, LP], TR: Recursive.Aux[T, LP])
       : F[T] =
     precompile[F, U, T](expr, vars, basePath) flatMap { lp =>

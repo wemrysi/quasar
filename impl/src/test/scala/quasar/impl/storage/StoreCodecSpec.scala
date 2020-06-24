@@ -21,10 +21,7 @@ import slamdata.Predef._
 import quasar.api.destination.{DestinationName, DestinationRef, DestinationType}
 
 import argonaut.{CodecJson, Json}
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
-import eu.timepit.refined.scalacheck.numeric.chooseRefinedNum
+
 import org.scalacheck._
 import org.specs2.mutable.SpecificationLike
 import org.typelevel.discipline.specs2.mutable.Discipline
@@ -32,9 +29,8 @@ import org.typelevel.discipline.specs2.mutable.Discipline
 final class StoreCodecSpec extends SpecificationLike with Discipline {
   val destinationTypeGen: Gen[DestinationType] =
     for {
-      ident0 <- Gen.identifier
-      ident = Refined.unsafeApply[String, DestinationType.NameP](ident0)
-      version <- chooseRefinedNum[Refined, Long, Positive](1L, 100L)
+      ident <- Gen.identifier
+      version <- Gen.choose(1L, 100L)
     } yield DestinationType(ident, version)
 
   val destinationNameGen: Gen[DestinationName] =
