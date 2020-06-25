@@ -36,8 +36,6 @@ import cats.{Order, Show}
 import cats.data.NonEmptyList
 import cats.implicits._
 
-import eu.timepit.refined.auto._
-
 import fs2.Stream
 
 import matryoshka._
@@ -63,7 +61,7 @@ final class QueryFederatorSpec extends Qspec with TreeMatchers {
   type M[A] = Either[ResourceError, A]
   type Q = InterpretedRead[ResourcePath]
 
-  val fedType = DatasourceType("federator", 37L)
+  val fedType = DatasourceType("federator", 37)
 
   val abs = ResourcePath.root() / ResourceName("resource") / ResourceName("abs")
   val xys = ResourcePath.root() / ResourceName("resource") / ResourceName("xys")

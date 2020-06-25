@@ -39,8 +39,6 @@ import cats.effect.{ConcurrentEffect, ContextShift, IO, Resource, Timer}
 import argonaut.Json
 import argonaut.JsonScalaz._
 
-import eu.timepit.refined.auto._
-
 import fs2.Stream
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -102,9 +100,9 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
     }
 
     "non-empty" >>* {
-      val expected = ISet.fromList(List(DestinationType("foo", 1L), DestinationType("bar", 2L)))
+      val expected = ISet.fromList(List(DestinationType("foo", 1), DestinationType("bar", 2)))
       for {
-        actual <- mkModules(List(module(DestinationType("foo", 1L)), module(DestinationType("bar", 2L)))).supportedTypes
+        actual <- mkModules(List(module(DestinationType("foo", 1)), module(DestinationType("bar", 2)))).supportedTypes
       } yield {
         actual === expected
       }
@@ -112,10 +110,10 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
   }
 
   "sanitizeRef" >> {
-    val kind = DestinationType("foo", 1L)
+    val kind = DestinationType("foo", 1)
     val modules = mkModules(List(module(kind)))
     val supported = DestinationRef(kind, DestinationName("supported"), Json.jString("foo"))
-    val unsupported = DestinationRef(DestinationType("bar", 2L), DestinationName("unsupported"), Json.jString("bar"))
+    val unsupported = DestinationRef(DestinationType("bar", 2), DestinationName("unsupported"), Json.jString("bar"))
 
     modules.sanitizeRef(supported) === supported.copy(config = Json.jString("sanitized"))
     modules.sanitizeRef(unsupported) === unsupported.copy(config = Json.jEmptyObject)
@@ -123,7 +121,7 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
 
   "create" >> {
     "work for supported" >>* {
-      val kind = DestinationType("foo", 1L)
+      val kind = DestinationType("foo", 1)
       val ref = DestinationRef(kind, DestinationName("supported"), Json.jString(""))
 
       mkModules(List(module(kind))).create(ref).run use { res =>
@@ -132,32 +130,32 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
     }
 
     "doesn't work for unsupported" >>* {
-      val kind = DestinationType("foo", 1L)
-      val ref = DestinationRef(DestinationType("bar", 2L), DestinationName("unsupported"), Json.jString(""))
+      val kind = DestinationType("foo", 1)
+      val ref = DestinationRef(DestinationType("bar", 2), DestinationName("unsupported"), Json.jString(""))
 
       mkModules(List(module(kind))).create(ref).run use { res =>
         IO.pure(res must beLike {
           case -\/(ce) =>
-            ce === DestinationUnsupported(DestinationType("bar", 2L), ISet.singleton(DestinationType("foo", 1L)))
+            ce === DestinationUnsupported(DestinationType("bar", 2), ISet.singleton(DestinationType("foo", 1)))
         })
       }
     }
 
     "errors with initialization error" >>* {
       val malformed =
-        DestinationType("malformed", 1L)
+        DestinationType("malformed", 1)
       val malformedRef =
         DestinationRef(malformed, DestinationName("doesn't matter"), Json.jString("malformed-config"))
       val invalid =
-        DestinationType("invalid", 1L)
+        DestinationType("invalid", 1)
       val invalidRef =
         DestinationRef(invalid, DestinationName("doesn't matter"), Json.jString("invalid-config"))
       val connFailed =
-        DestinationType("conn-failed", 1L)
+        DestinationType("conn-failed", 1)
       val connFailedRef =
         DestinationRef(connFailed, DestinationName("doesn't matter"), Json.jString("conn-failed-config"))
       val accessDenied =
-        DestinationType("access-denied", 1L)
+        DestinationType("access-denied", 1)
       val accessDeniedRef =
         DestinationRef(accessDenied, DestinationName("doesn't matter"), Json.jString("access-denied-config"))
       val modules = mkModules(List(

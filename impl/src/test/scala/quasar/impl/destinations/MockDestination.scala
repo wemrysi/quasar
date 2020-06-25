@@ -24,8 +24,6 @@ import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
 
-import eu.timepit.refined.auto._
-
 import fs2.Stream
 
 import quasar.api.destination.DestinationType
@@ -57,7 +55,7 @@ final class MockDestinationModule private (initErrs: Map[Json, InitializationErr
 }
 
 object MockDestinationModule {
-  val MockType: DestinationType = DestinationType("mock", 1L)
+  val MockType: DestinationType = DestinationType("mock", 1)
 
   def apply(m: Map[Json, InitializationError[Json]]): DestinationModule =
     new MockDestinationModule(m)

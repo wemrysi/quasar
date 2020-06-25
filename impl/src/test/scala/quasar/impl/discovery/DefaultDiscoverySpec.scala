@@ -32,8 +32,6 @@ import java.lang.String
 import cats.effect.{IO, Resource}
 import cats.implicits._
 
-import eu.timepit.refined.auto._
-
 import matryoshka.data.Fix
 
 import shims.{eqToScalaz, showToScalaz}
@@ -44,7 +42,7 @@ object DefaultDiscoverySpec extends EffectfulQSpec[IO] {
 
   val lookup: String => IO[Option[QuasarDatasource[Fix, Resource[IO, ?], List, Int, ResourcePathType]]] = {
     case "extant" =>
-      IO.pure(Some(QuasarDatasource.lightweight[Fix](EmptyDatasource(DatasourceType("testing", 1L), 0))))
+      IO.pure(Some(QuasarDatasource.lightweight[Fix](EmptyDatasource(DatasourceType("testing", 1), 0))))
 
     case _ =>
       IO.pure(None)

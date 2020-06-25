@@ -36,8 +36,6 @@ import cats.data.{Kleisli, StateT}
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 
-import eu.timepit.refined.auto._
-
 import matryoshka._
 
 import org.slf4s.Logging
@@ -64,7 +62,7 @@ object Sql2Compiler extends Logging {
     for {
       sql <- MonadParsingErr[F].unattempt_(parser[T].parseExpr(sqlQuery.query.value))
 
-      lp  <- queryPlan[F, T, T[LP]](sql, sqlQuery.vars, sqlQuery.basePath, 0L, None)
+      lp  <- queryPlan[F, T, T[LP]](sql, sqlQuery.vars, sqlQuery.basePath, 0, None)
 
       qs  <- phaseM[F]("QScript (Educated)", LPtoQS[T].apply[StateT[F, Long, ?]](lp).runA(0))
     } yield qs

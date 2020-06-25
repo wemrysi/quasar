@@ -28,8 +28,6 @@ import cats.data.OptionT
 import cats.effect.{IO, Resource}
 import cats.instances.list._
 
-import eu.timepit.refined.auto._
-
 import scalaz.IMap
 
 object MapBasedDatasourceSpec extends DatasourceSpec[IO, List, ResourcePathType.Physical] {
@@ -39,7 +37,7 @@ object MapBasedDatasourceSpec extends DatasourceSpec[IO, List, ResourcePathType.
 
   val mapDatasource =
     MapBasedDatasource.pure[Resource[IO, ?], List](
-      DatasourceType("pure-test", 1L),
+      DatasourceType("pure-test", 1),
       IMap(
         ResourcePath.root() / ResourceName("a") -> 0,
         ResourcePath.root() / ResourceName("a") / ResourceName("b") -> 1,

@@ -12,7 +12,6 @@ object Versions {
   val matryoshkaVersion   = "0.18.6"
   val monocleVersion      = "1.6.0"
   val pathyVersion        = "0.3.2"
-  val refinedVersion      = "0.9.10"
   val scodecBitsVersion   = "1.1.12"
   val scalacheckVersion   = "1.14.3"
   val scalazVersion       = "7.2.30"
@@ -27,4 +26,6 @@ object Versions {
   val mapdbVersion        = "3.0.8"
   val skolemsVersion      = "0.2.1"
   val kittensVersion      = "2.0.0"
+  val iotaVersion         = "0.3.10"
+  val drosteVersion       = "0.8.0"
 }

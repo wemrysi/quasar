@@ -121,12 +121,13 @@ lazy val foundation = project
       "com.slamdata"               %% "pathy-core"                % pathyVersion,
       "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
       "com.precog"                 %% "qdata-time"                % qdataVersion.value,
-      "eu.timepit"                 %% "refined"                   % refinedVersion,
       "com.chuusai"                %% "shapeless"                 % shapelessVersion,
       "com.propensive"             %% "contextual"                % "1.2.1",
-      "io.frees"                   %% "iotaz-core"                % "0.3.10",
+      "io.frees"                   %% "iotaz-core"                % iotaVersion,
+      "io.frees"                   %% "iota-core"                 % iotaVersion,
       "com.github.markusbernhardt"  % "proxy-vole"                % "1.0.5",
       "org.typelevel"              %% "simulacrum"                % "1.0.0",
+      "io.higherkindness"          %% "droste-core"               % drosteVersion,
       "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
       "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
       "org.scalacheck"             %% "scalacheck"                % scalacheckVersion                    % Test,
@@ -166,10 +167,8 @@ lazy val api = project
     scalacOptions -= "-Ywarn-dead-code",
 
     libraryDependencies ++= Seq(
-      "com.github.julien-truffaut" %% "monocle-macro"      % monocleVersion,
-      "com.codecommit"             %% "skolems"            % skolemsVersion,
-      "eu.timepit"                 %% "refined-scalaz"     % refinedVersion,
-      "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test))
+      "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
+      "com.codecommit"             %% "skolems"       % skolemsVersion))
   .settings(commonSettings)
 
 /** A fixed-point implementation of the EJson spec. This should probably become
@@ -299,7 +298,6 @@ lazy val impl = project
       "io.atomix"      % "atomix"                    % atomixVersion,
       "org.scodec"     %% "scodec-bits"              % scodecBitsVersion,
       "org.mapdb"      % "mapdb"                     % mapdbVersion,
-      "eu.timepit"     %% "refined-scalacheck"       % refinedVersion % Test,
       // The azure-core-http-netty dep is added here as a quick and dirty way to get azure working.
       // Azure relies on service provider mechanism to load an implementation of its HttpClientProvider.
       // The implementation class is available in the azure plugins, but
