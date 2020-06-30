@@ -32,6 +32,7 @@ trait DestinationModule {
   def sanitizeDestinationConfig(config: Json): Json
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-      config: Json)
+      config: Json,
+      pushPull: PushmiPullyu[F])
       : Resource[F, Either[InitializationError[Json], Destination[F]]]
 }

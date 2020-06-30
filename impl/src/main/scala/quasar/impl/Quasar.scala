@@ -31,7 +31,7 @@ import quasar.api.scheduler.{Schedulers, SchedulerRef}
 import quasar.common.PhaseResultTell
 import quasar.connector.{Offset, QueryResult, ResourceSchema}
 import quasar.connector.datasource.Datasource
-import quasar.connector.destination.{Destination, DestinationModule}
+import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 import quasar.connector.evaluate._
 import quasar.connector.render.ResultRender
 import quasar.connector.scheduler.{Scheduler, SchedulerBuilder}
@@ -99,7 +99,8 @@ object Quasar extends Logging {
       resultRender: ResultRender[F, R],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
       rateLimiting: RateLimiting[F, A],
-      byteStores: ByteStores[F, UUID])(
+      byteStores: ByteStores[F, UUID],
+      pushPull: PushmiPullyu[F])(
       maxConcurrentPushes: Int,
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
@@ -109,7 +110,7 @@ object Quasar extends Logging {
       : Resource[F, Quasar[F, R, C]] = {
 
     val destModules =
-      DestinationModules[F](destinationModules)
+      DestinationModules[F](destinationModules, pushPull)
 
     for {
       _ <- Resource.liftF(warnDuplicates[F, DatasourceModule, DatasourceType](datasourceModules)(_.kind))

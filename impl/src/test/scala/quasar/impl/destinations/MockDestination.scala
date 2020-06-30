@@ -40,7 +40,9 @@ final class MockDestinationModule private (initErrs: Map[Json, InitializationErr
   def sanitizeDestinationConfig(config: Json) =
     Json.jString("sanitized")
 
-  def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](config: Json)
+  def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
+      config: Json,
+      pushPull: PushmiPullyu[F])
       : Resource[F, Either[InitializationError[Json], Destination[F]]] =
     Resource.pure[F, Either[InitializationError[Json], Destination[F]]](
       initErrs.get(config) match {
