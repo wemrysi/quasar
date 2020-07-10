@@ -20,29 +20,18 @@ import cats.data.NonEmptyList
 
 import monocle.Prism
 
-import quasar.api.{ColumnType, Label, Labeled}
+import quasar.api.{ColumnType, Label}
 import quasar.api.destination.DestinationType
 import quasar.api.push.TypeCoercion
-import quasar.api.push.param._
 
-import java.lang.String
 import scala.Int
 import scala.util.Either
-
-import skolems.∃
 
 /**
  * @see quasar.api.destination.UntypedDestination
  */
 trait Destination[F[_]] {
   type Type
-
-  type Constructor[P] <: ConstructorLike[P]
-
-  trait ConstructorLike[P] { self: Constructor[P] =>
-    def apply(actual: P): Type
-  }
-
   type TypeId
 
   val typeIdOrdinal: Prism[Int, TypeId]
@@ -51,14 +40,9 @@ trait Destination[F[_]] {
 
   def coerce(tpe: ColumnType.Scalar): TypeCoercion[TypeId]
 
-  def construct(id: TypeId): Either[Type, ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]]
+  def construct(id: TypeId): Either[Type, Constructor[Type]]
 
   def destinationType: DestinationType
 
   def sinks: NonEmptyList[ResultSink[F, Type]]
-
-  // Convenience function to consolidate all the type ascriptions
-  protected def formalConstructor[A](ctor: Constructor[A], paramLabel: String, param: Formal[A])
-      : ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]] =
-    ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]((ctor, Labeled(paramLabel, param)))
 }

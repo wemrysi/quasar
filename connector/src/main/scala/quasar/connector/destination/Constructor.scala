@@ -14,13 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.api.push
+package quasar.connector.destination
 
 import quasar.api.Labeled
-import quasar.api.push.param.Formal
+import quasar.api.push.param._
 
-import scala.collection.immutable.List
+import scala.{Product, Serializable}
 
-import skolems.∃
+sealed trait Constructor[T] extends Product with Serializable
 
-final case class CoercedType(index: Labeled[TypeIndex], args: List[Labeled[∃[Formal]]])
+object Constructor {
+  final case class Unary[A, T](
+      param1: Labeled[Formal[A]],
+      apply: A => T)
+      extends Constructor[T]
+
+  final case class Binary[A, B, T](
+      param1: Labeled[Formal[A]],
+      param2: Labeled[Formal[B]],
+      apply: (A, B) => T)
+      extends Constructor[T]
+}

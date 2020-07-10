@@ -104,68 +104,62 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     import QDestination._
 
-    sealed trait Constructor[P] extends ConstructorLike[P] with Product with Serializable
-
     sealed trait Type extends Product with Serializable
+    sealed trait TypeId extends Product with Serializable
 
-    case object Bool extends Type
+    case object Bool extends Type with TypeId
 
     case class Varchar(length: Int) extends Type
-    case object Varchar extends Constructor[Int]
+    case object Varchar extends TypeId
 
     case class Num(width: Int) extends Type
-    case object Num extends Constructor[Int]
-
-    sealed trait TypeId extends Product with Serializable
-    case object BoolId extends TypeId
-    case object VarcharId extends TypeId
-    case object NumId extends TypeId
+    case object Num extends TypeId
 
     val typeIdOrdinal =
       Prism.partial[Int, TypeId] {
-        case 0 => BoolId
-        case 1 => VarcharId
-        case 2 => NumId
+        case 0 => Bool
+        case 1 => Varchar
+        case 2 => Num
       } {
-        case BoolId => 0
-        case VarcharId => 1
-        case NumId => 2
+        case Bool => 0
+        case Varchar => 1
+        case Num => 2
       }
 
     val typeIdLabel =
       Label label {
-        case BoolId => "BOOLEAN"
-        case VarcharId => "VARCHAR"
-        case NumId => "NUMBER"
+        case Bool => "BOOLEAN"
+        case Varchar => "VARCHAR"
+        case Num => "NUMBER"
       }
 
     def coerce(s: ColumnType.Scalar): TypeCoercion[TypeId] =
       s match {
-        case ColumnType.Boolean => TypeCoercion.Satisfied(NonEmptyList.one(BoolId))
-        case ColumnType.String => TypeCoercion.Satisfied(NonEmptyList.one(VarcharId))
-        case ColumnType.Number => TypeCoercion.Satisfied(NonEmptyList.one(NumId))
+        case ColumnType.Boolean => TypeCoercion.Satisfied(NonEmptyList.one(Bool))
+        case ColumnType.String => TypeCoercion.Satisfied(NonEmptyList.one(Varchar))
+        case ColumnType.Number => TypeCoercion.Satisfied(NonEmptyList.one(Num))
         case other => TypeCoercion.Unsatisfied(Nil, None)
       }
 
-    def construct(id: TypeId): Either[Type, ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]] =
+    def construct(id: TypeId): Either[Type, Constructor[Type]] =
       id match {
-        case BoolId =>
+        case Bool =>
           Left(Bool)
 
-        case VarcharId =>
-          Right(formalConstructor(
-            Varchar,
-            "Length",
-            Formal.integer(Some(Ior.both(1, 256)), None)))
+        case Varchar =>
+          Right(Constructor.Unary(
+            Labeled("Length", Formal.integer(Some(Ior.both(1, 256)), None)),
+            Varchar(_)))
 
-        case NumId =>
-          Right(formalConstructor(
-            Num,
-            "Width",
-            Formal.enum[Int](
-              "4-bits" -> 4,
-              "8-bits" -> 8,
-              "16-bits" -> 16)))
+        case Num =>
+          Right(Constructor.Unary(
+            Labeled(
+              "Width",
+              Formal.enum[Int](
+                "4-bits" -> 4,
+                "8-bits" -> 8,
+                "16-bits" -> 16)),
+            Num(_)))
       }
 
     def destinationType: DestinationType = QDestinationType
@@ -369,11 +363,11 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
-  val colX = NonEmptyList.one(Column("X", (ColumnType.Boolean, SelectedType(TypeIndex(0), None))))
+  val colX = NonEmptyList.one(Column("X", (ColumnType.Boolean, SelectedType(TypeIndex(0), Nil))))
 
   val resumePos =
     ResumeConfig(
-      Column("id", (IdType.StringId, SelectedType(TypeIndex(1), Some(∃(Actual.integer(10)))))),
+      Column("id", (IdType.StringId, SelectedType(TypeIndex(1), List(∃(Actual.integer(10)))))),
       Column("pos", OffsetKey.Formal.real(())),
       NonEmptyList.one(Left("pos")))
 
@@ -496,7 +490,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "fails when selected type isn't found" >> forallConfigs { config =>
       val idx = TypeIndex(-1)
-      val bad = Column("A", (ColumnType.Boolean, SelectedType(idx, None)))
+      val bad = Column("A", (ColumnType.Boolean, SelectedType(idx, Nil)))
       val cfg = outputColumns.set(bad)(config)
 
       for {
@@ -512,7 +506,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "fails when a required type argument is missing" >> forallConfigs { config =>
       val idx = TypeIndex(1)
-      val bad = Column("A", (ColumnType.String, SelectedType(idx, None)))
+      val bad = Column("A", (ColumnType.String, SelectedType(idx, Nil)))
       val cfg = outputColumns.set(bad)(config)
 
       for {
@@ -534,7 +528,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "fails when wrong kind of type argument given" >> forallConfigs { config =>
       val idx = TypeIndex(1)
-      val bad = Column("A", (ColumnType.String, SelectedType(idx, Some(∃(Actual.boolean(false))))))
+      val bad = Column("A", (ColumnType.String, SelectedType(idx, List(∃(Actual.boolean(false))))))
       val cfg = outputColumns.set(bad)(config)
 
       for {
@@ -556,8 +550,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "fails when integer type argument is out of bounds" >> forallConfigs { config =>
       val idx = TypeIndex(1)
-      val low = Column("A", (ColumnType.String, SelectedType(idx, Some(∃(Actual.integer(0))))))
-      val high = Column("A", (ColumnType.String, SelectedType(idx, Some(∃(Actual.integer(300))))))
+      val low = Column("A", (ColumnType.String, SelectedType(idx, List(∃(Actual.integer(0))))))
+      val high = Column("A", (ColumnType.String, SelectedType(idx, List(∃(Actual.integer(300))))))
 
       val cfgL = outputColumns.set(low)(config)
       val cfgH = outputColumns.set(high)(config)
@@ -592,7 +586,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "fails when enum type argument selection is not found" >> forallConfigs { config =>
       val idx = TypeIndex(2)
-      val bad = Column("B", (ColumnType.Number, SelectedType(idx, Some(∃(Actual.enumSelect("32-bits"))))))
+      val bad = Column("B", (ColumnType.Number, SelectedType(idx, List(∃(Actual.enumSelect("32-bits"))))))
       val cfg = outputColumns.set(bad)(config)
 
       for {
@@ -615,7 +609,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "fails when column type not a valid coercion of corresponding scalar type" >> forallConfigs { config =>
       val idx = TypeIndex(0) // Boolean
-      val bad = Column("B", (ColumnType.Number, SelectedType(idx, None)))
+      val bad = Column("B", (ColumnType.Number, SelectedType(idx, Nil)))
       val cfg = outputColumns.set(bad)(config)
 
       for {

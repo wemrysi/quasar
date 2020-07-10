@@ -19,16 +19,19 @@ package quasar.api.push
 import quasar.api.push.param.{Actual, ParamType => P}
 
 import scala.{None, Option, Some, StringContext}
+import scala.collection.immutable.List
 
 import cats.{Eq, Show}
 import cats.implicits._
 
 import skolems.∃
 
-final case class SelectedType(index: TypeIndex, arg: Option[∃[Actual]])
+final case class SelectedType(index: TypeIndex, args: List[∃[Actual]])
 
 object SelectedType {
   implicit val selectedTypeEq: Eq[SelectedType] =
+    Eq.fromUniversalEquals
+    /* TODO
     Eq.instance {
       case (SelectedType(i1, None), SelectedType(i2, None)) =>
         i1 === i2
@@ -44,8 +47,11 @@ object SelectedType {
 
       case _ => false
     }
+  */
 
   implicit val selectedTypeShow: Show[SelectedType] =
+    Show.fromToString
+    /* TODO
     Show show {
       case SelectedType(i, a) =>
         val astr = a map {
@@ -57,4 +63,5 @@ object SelectedType {
 
         s"SelectedType(${i.show}, $astr)"
     }
+    */
 }
