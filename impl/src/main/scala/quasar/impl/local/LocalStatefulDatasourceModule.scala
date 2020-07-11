@@ -23,6 +23,7 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
   ConfigurationError,
   InitializationError,
+  MalformedConfiguration,
   malformedConfiguration
 }
 import quasar.{concurrent => qc}
@@ -32,9 +33,11 @@ import quasar.connector.datasource.{LightweightDatasourceModule, Reconfiguration
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
+import argonaut.Argonaut._
 
 import cats.effect._
 import cats.kernel.Hash
+import cats.implicits._
 
 object LocalStatefulDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
@@ -45,11 +48,23 @@ object LocalStatefulDatasourceModule extends LightweightDatasourceModule with Lo
 
   def sanitizeConfig(config: Json): Json = config
 
+  def migrateConfig[F[_]: Sync](config: Json)
+      : F[Either[ConfigurationError[Json], Json]] = {
+    val back = config.as[LocalConfig].toOption match {
+      case None => Left(MalformedConfiguration(kind, config, s"Failed to migrate config: $config"): ConfigurationError[Json])
+      case Some(c) => Right(c.asJson)
+    }
+    back.pure[F]
+  }
+
   // there are no sensitive components, so we use the entire patch
-  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
+  def reconfigure(original: Json, patch: Json)
+      : Either[ConfigurationError[Json], (Reconfiguration, Json)] =
     Right((Reconfiguration.Preserve, patch))
 
-  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
+  def lightweightDatasource[
+      F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer,
+      A: Hash](
       config: Json,
       rateLimiting: RateLimiting[F, A],
       stateStore: ByteStore[F])(
@@ -59,10 +74,10 @@ object LocalStatefulDatasourceModule extends LightweightDatasourceModule with Lo
       lc <- attemptConfig[F, LocalConfig, InitializationError[Json]](
         config,
         "Failed to decode LocalDatasource config: ")(
-        (c, d) => malformedConfiguration((LocalStatefulType, c, d)))
+        (c, d) => malformedConfiguration((kind, c, d)))
 
       root <- validatedPath(lc.rootDir, "Invalid path: ") { d =>
-        malformedConfiguration((LocalStatefulType, config, d))
+        malformedConfiguration((kind, config, d))
       }
     } yield {
       LocalStatefulDatasource[F](

@@ -27,7 +27,7 @@ import scala.concurrent.ExecutionContext
 import scala.util.Either
 
 import argonaut.Json
-import cats.effect.{ConcurrentEffect, ContextShift, Timer, Resource}
+import cats.effect.{ConcurrentEffect, ContextShift, Timer, Resource, Sync}
 import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 
@@ -36,7 +36,11 @@ trait HeavyweightDatasourceModule {
 
   def sanitizeConfig(config: Json): Json
 
-  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)]
+  def migrateConfig[F[_]: Sync](config: Json)
+      : F[Either[ConfigurationError[Json], Json]]
+
+  def reconfigure(original: Json, patch: Json)
+      : Either[ConfigurationError[Json], (Reconfiguration, Json)]
 
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
