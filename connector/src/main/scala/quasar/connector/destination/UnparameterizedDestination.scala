@@ -16,13 +16,7 @@
 
 package quasar.connector.destination
 
-import quasar.api.Labeled
-import quasar.api.push.param._
-
-import scala.Nothing
 import scala.util.{Either, Left}
-
-import skolems.∃
 
 trait UnparameterizedDestination[F[_]] extends Destination[F] {
   type Type = TypeId

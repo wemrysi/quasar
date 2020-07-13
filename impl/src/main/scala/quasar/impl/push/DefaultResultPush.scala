@@ -513,16 +513,19 @@ private[impl] final class DefaultResultPush[
           val back = ctor match {
             case Constructor.Unary(Labeled(l1, p1), f) =>
               selected.args match {
-                case List(a1, _*) =>
+                case List(a1) =>
                   validatedParam(l1, p1, a1).map(f)
 
                 case Nil =>
                   Left(ParamError.ParamMissing(l1, p1))
+
+                case List(_, rs @ _*) =>
+                  Left(ParamError.RedundantParams(l1, rs.toList))
               }
 
             case Constructor.Binary(Labeled(l1, p1), Labeled(l2, p2), f) =>
               selected.args match {
-                case List(a1, a2, _*) =>
+                case List(a1, a2) =>
                   (validatedParam(l1, p1, a1), validatedParam(l2, p2, a2)).mapN(f)
 
                 case List(a1) =>
@@ -530,6 +533,9 @@ private[impl] final class DefaultResultPush[
 
                 case Nil =>
                   Left(ParamError.ParamMissing(l1, p1))
+
+                case List(_, _, rs @ _*) =>
+                  Left(ParamError.RedundantParams(l1, rs.toList))
               }
           }
 
