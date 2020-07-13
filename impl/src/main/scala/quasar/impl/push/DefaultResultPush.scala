@@ -402,15 +402,17 @@ private[impl] final class DefaultResultPush[
     import dest._
 
     dest.coerce(scalar) map { id =>
-      val param = construct(id) match {
-        case Right(e) =>
-          val (_, p) = e.value
-          Some(p.map(∃(_)))
+      val params = construct(id) match {
+        case Right(Constructor.Unary(p1, _)) =>
+          List(p1.map(∃(_)))
 
-        case Left(_) => None
+        case Right(Constructor.Binary(p1, p2, _)) =>
+          List(p1, p2).map(_.map(∃(_)))
+
+        case Left(_) => List()
       }
 
-      CoercedType(Labeled(id.label, TypeIndex(typeIdOrdinal(id))), param)
+      CoercedType(Labeled(id.label, TypeIndex(typeIdOrdinal(id))), params)
     }
   }
 
@@ -466,51 +468,76 @@ private[impl] final class DefaultResultPush[
     def checkBounds(b: Int Ior Int, i: Int): SBoolean =
       b.fold(_ <= i, _ >= i, (min, max) => min <= i && i <= max)
 
+    def validatedParam[A](label: String, formal: Formal[A], actual: ∃[Actual])
+        : Either[ParamError, A] =
+      (formal, actual) match {
+        case (Boolean(_), ∃(Boolean(Const(b)))) =>
+          Right(b)
+
+        case (Integer(Integer.Args(None, None)), ∃(Integer(Const(i)))) =>
+          Right(i)
+
+        case (Integer(Integer.Args(Some(bounds), None)), ∃(Integer(Const(i)))) =>
+          if (checkBounds(bounds, i))
+            Right(i)
+          else
+            Left(ParamError.IntOutOfBounds(label, i, bounds))
+
+        case (Integer(Integer.Args(None, Some(step))), ∃(Integer(Const(i)))) =>
+          if (step(i))
+            Right(i)
+          else
+            Left(ParamError.IntOutOfStep(label, i, step))
+
+        case (Integer(Integer.Args(Some(bounds), Some(step))), ∃(Integer(Const(i)))) =>
+          if (!checkBounds(bounds, i))
+            Left(ParamError.IntOutOfBounds(label, i, bounds))
+          else if (!step(i))
+            Left(ParamError.IntOutOfStep(label, i, step))
+          else
+            Right(i)
+
+        case (Enum(possiblities), ∃(EnumSelect(Const(key)))) =>
+          possiblities.lookup(key)
+            .toRight(ParamError.ValueNotInEnum(label, key, possiblities.keys))
+
+        case _ => Left(ParamError.ParamMismatch(label, ∃(formal), actual))
+      }
+
+    // TODO: error for too many args
     typeIdOrdinal.getOption(selected.index.ordinal) match {
       case Some(id) => construct(id) match {
         case Left(t) => Right(t)
 
-        case Right(e) =>
-          val (c, Labeled(label, formal)) = e.value
+        case Right(ctor) =>
+          val back = ctor match {
+            case Constructor.Unary(Labeled(l1, p1), f) =>
+              selected.args match {
+                case List(a1) =>
+                  validatedParam(l1, p1, a1).map(f)
 
-          val back = for {
-            actual <- selected.arg.toRight(ParamError.ParamMissing(label, formal))
+                case Nil =>
+                  Left(ParamError.ParamMissing(l1, p1))
 
-            t <- (formal: Formal[A] forSome { type A }, actual) match {
-              case (Boolean(_), ∃(Boolean(Const(b)))) =>
-                Right(c(b.asInstanceOf[e.A]))
+                case List(_, rs @ _*) =>
+                  Left(ParamError.RedundantParams(l1, rs.toList))
+              }
 
-              case (Integer(Integer.Args(None, None)), ∃(Integer(Const(i)))) =>
-                Right(c(i.asInstanceOf[e.A]))
+            case Constructor.Binary(Labeled(l1, p1), Labeled(l2, p2), f) =>
+              selected.args match {
+                case List(a1, a2) =>
+                  (validatedParam(l1, p1, a1), validatedParam(l2, p2, a2)).mapN(f)
 
-              case (Integer(Integer.Args(Some(bounds), None)), ∃(Integer(Const(i)))) =>
-                if (checkBounds(bounds, i))
-                  Right(c(i.asInstanceOf[e.A]))
-                else
-                  Left(ParamError.IntOutOfBounds(label, i, bounds))
+                case List(a1) =>
+                  Left(ParamError.ParamMissing(l2, p2))
 
-              case (Integer(Integer.Args(None, Some(step))), ∃(Integer(Const(i)))) =>
-                if (step(i))
-                  Right(c(i.asInstanceOf[e.A]))
-                else
-                  Left(ParamError.IntOutOfStep(label, i, step))
+                case Nil =>
+                  Left(ParamError.ParamMissing(l1, p1))
 
-              case (Integer(Integer.Args(Some(bounds), Some(step))), ∃(Integer(Const(i)))) =>
-                if (!checkBounds(bounds, i))
-                  Left(ParamError.IntOutOfBounds(label, i, bounds))
-                else if (!step(i))
-                  Left(ParamError.IntOutOfStep(label, i, step))
-                else
-                  Right(c(i.asInstanceOf[e.A]))
-
-              case (Enum(possiblities), ∃(EnumSelect(Const(key)))) =>
-                possiblities.lookup(key)
-                  .map(a => c(a.asInstanceOf[e.A]))
-                  .toRight(ParamError.ValueNotInEnum(label, key, possiblities.keys))
-
-              case _ => Left(ParamError.ParamMismatch(label, formal, actual))
-            }
-          } yield t
+                case List(_, _, rs @ _*) =>
+                  Left(ParamError.RedundantParams(l1, rs.toList))
+              }
+          }
 
           back.leftMap(err =>
             TypeConstructionFailed(destId, name, id.label, NonEmptyList.one(err)))

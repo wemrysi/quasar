@@ -18,43 +18,45 @@ package quasar.api.push
 
 import quasar.api.push.param.{Actual, ParamType => P}
 
-import scala.{None, Option, Some, StringContext}
+import java.lang.String
+import scala._
+import scala.collection.immutable.List
 
 import cats.{Eq, Show}
 import cats.implicits._
 
 import skolems.∃
 
-final case class SelectedType(index: TypeIndex, arg: Option[∃[Actual]])
+final case class SelectedType(index: TypeIndex, args: List[∃[Actual]])
 
 object SelectedType {
+  private def exEq(pair: (∃[Actual], ∃[Actual])): Boolean = pair match {
+    case (∃(P.Boolean(b1)), ∃(P.Boolean(b2))) =>
+      b1 === b2
+    case (∃(P.Integer(i1)), ∃(P.Integer(i2))) =>
+      i1 === i2
+    case (∃(P.EnumSelect(s1)), ∃(P.EnumSelect(s2))) =>
+      s1 === s2
+    case _ =>
+      false
+  }
+
+  private val exToString: ∃[Actual] => String = {
+    case ∃(P.Boolean(b)) => s"$b"
+    case ∃(P.Integer(i)) => s"$i"
+    case ∃(P.EnumSelect(s)) => s"EnumSelect($s)"
+    case ∃(P.Enum(_)) => s"Enum(?)"
+  }
+
   implicit val selectedTypeEq: Eq[SelectedType] =
     Eq.instance {
-      case (SelectedType(i1, None), SelectedType(i2, None)) =>
-        i1 === i2
-
-      case (SelectedType(i1, Some(∃(P.Boolean(b1)))), SelectedType(i2, Some(∃(P.Boolean(b2))))) =>
-        i1 === i2 && b1 === b2
-
-      case (SelectedType(i1, Some(∃(P.Integer(n1)))), SelectedType(i2, Some(∃(P.Integer(n2))))) =>
-        i1 === i2 && n1 === n2
-
-      case (SelectedType(i1, Some(∃(P.EnumSelect(s1)))), SelectedType(i2, Some(∃(P.EnumSelect(s2))))) =>
-        i1 === i2 && s1 === s2
-
-      case _ => false
+      case (SelectedType(i1, as1), SelectedType(i2, as2)) =>
+        i1 === i2 && as1.length === as2.length && as1.zip(as2).forall(exEq)
     }
 
   implicit val selectedTypeShow: Show[SelectedType] =
     Show show {
-      case SelectedType(i, a) =>
-        val astr = a map {
-          case ∃(P.Boolean(b)) => s"$b"
-          case ∃(P.Integer(i)) => s"$i"
-          case ∃(P.EnumSelect(s)) => s"EnumSelect($s)"
-          case ∃(P.Enum(_)) => s"Enum(?)"
-        }
-
-        s"SelectedType(${i.show}, $astr)"
+      case SelectedType(i, as) =>
+        s"SelectedType(${i.show}, List(${as.map(exToString).intercalate(", ")}))"
     }
 }

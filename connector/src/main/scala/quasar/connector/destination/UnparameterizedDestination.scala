@@ -16,18 +16,11 @@
 
 package quasar.connector.destination
 
-import quasar.api.Labeled
-import quasar.api.push.param._
-
-import scala.Nothing
 import scala.util.{Either, Left}
-
-import skolems.∃
 
 trait UnparameterizedDestination[F[_]] extends Destination[F] {
   type Type = TypeId
-  type Constructor[P] = Nothing
 
-  def construct(id: TypeId): Either[Type, ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]] =
+  def construct(id: TypeId): Either[Type, Constructor[Type]] =
     Left(id)
 }
