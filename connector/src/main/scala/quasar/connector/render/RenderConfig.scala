@@ -32,6 +32,7 @@ object RenderConfig {
       includeHeader: Boolean = true,
       nullSentinel: Option[String] = None,
       includeBom: Boolean = true,
+      booleanFormat: Boolean => String = if (_) "true" else "false",
       offsetDateTimeFormat: DateTimeFormatter = ISO_DATE_TIME,
       offsetDateFormat: DateTimeFormatter = ISO_OFFSET_DATE,
       offsetTimeFormat: DateTimeFormatter = ISO_OFFSET_TIME,
