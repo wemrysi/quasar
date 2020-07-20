@@ -35,10 +35,11 @@ import argonaut.JsonScalaz._
 import argonaut.Argonaut.{jArray, jEmptyObject, jString}
 
 import cats.{Monad, Show}
-import cats.effect.{IO, ContextShift, ConcurrentEffect, Timer, Resource}
+import cats.effect.{ContextShift, ConcurrentEffect, IO, Resource, Sync, Timer}
 import cats.instances.int._
 import cats.kernel.Hash
 import cats.kernel.instances.uuid._
+import cats.syntax.applicative._
 import cats.syntax.applicativeError._
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
@@ -98,16 +99,26 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
         ScalarStages.Id))
   }
 
-  def lightMod(k: DatasourceType, err: Option[InitializationError[Json]] = None): DatasourceModule =
+  def lightMod(k: DatasourceType, err: Option[InitializationError[Json]] = None)
+      : DatasourceModule =
     DatasourceModule.Lightweight(new LightweightDatasourceModule {
       val kind = k
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
+      def migrateConfig[F[_]: Sync](config: Json)
+          : F[Either[ConfigurationError[Json], Json]] = {
+        val back: Either[ConfigurationError[Json], Json] = Right(jString("migrated"))
+        back.pure[F]
+      }
+
+      def reconfigure(original: Json, patch: Json)
+          : Either[ConfigurationError[Json], (Reconfiguration, Json)] =
         Right((Reconfiguration.Reset, jArray(List(original, patch))))
 
-      def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
+      def lightweightDatasource[
+          F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer,
+          A: Hash](
           config: Json,
           rateLimiting: RateLimiting[F, A],
           byteStore: ByteStore[F])(
@@ -121,13 +132,21 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       }
     })
 
-  def heavyMod(k: DatasourceType, err: Option[InitializationError[Json]] = None): DatasourceModule =
+  def heavyMod(k: DatasourceType, err: Option[InitializationError[Json]] = None)
+      : DatasourceModule =
     DatasourceModule.Heavyweight(new HeavyweightDatasourceModule {
       val kind = k
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
+      def migrateConfig[F[_]: Sync](config: Json)
+          : F[Either[ConfigurationError[Json], Json]] = {
+        val back: Either[ConfigurationError[Json], Json] = Right(jString("migrated"))
+        back.pure[F]
+      }
+
+      def reconfigure(original: Json, patch: Json)
+          : Either[ConfigurationError[Json], (Reconfiguration, Json)] =
         Right((Reconfiguration.Reset, jArray(List(original, patch))))
 
       def heavyweightDatasource[

@@ -35,7 +35,7 @@ import argonaut.JsonScalaz._
 import argonaut.Argonaut.{jArray, jString}
 
 import cats.Show
-import cats.effect.{Blocker, ConcurrentEffect, ContextShift, IO, Resource, Timer}
+import cats.effect.{Blocker, ConcurrentEffect, ContextShift, IO, Resource, Sync, Timer}
 import cats.effect.concurrent.Ref
 import cats.instances.string._
 import cats.instances.option._
@@ -115,13 +115,22 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           case Some(f) => f(config)
         }
 
-      def reconfigure(orig: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
+      def migrateConfig[F[_]: Sync](config: Json)
+          : F[Either[ConfigurationError[Json], Json]] = {
+        val back: Either[ConfigurationError[Json], Json] = Right(config)
+        back.pure[F]
+      }
+
+      def reconfigure(orig: Json, patch: Json)
+          : Either[ConfigurationError[Json], (Reconfiguration, Json)] =
         reconfig match {
           case None => Right((Reconfiguration.Preserve, orig))
           case Some(f) => f(orig, patch)
         }
 
-      def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
+      def lightweightDatasource[
+          F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer,
+          A: Hash](
           config: Json,
           rateLimiting: RateLimiting[F, A],
           byteStore: ByteStore[F])(
