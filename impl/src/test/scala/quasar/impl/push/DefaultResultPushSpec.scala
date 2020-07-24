@@ -148,7 +148,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
         case Varchar =>
           Right(Constructor.Unary(
-            Labeled("Length", Formal.integer(Some(Ior.both(1, 256)), None)),
+            Labeled("Length", Formal.integer(Some(Ior.both(1, 256)), None, None)),
             Varchar(_)))
 
         case Num =>
