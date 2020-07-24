@@ -22,7 +22,7 @@ import cats.implicits._
 
 import java.lang.String
 
-import scala.{Boolean => SBoolean, Int, Nothing, Option, Product, Serializable, Unit}
+import scala.{Boolean => SBoolean, Int, Nothing, Option, None, Product, Serializable, Unit}
 
 sealed trait ParamType[F[_], A] extends Product with Serializable
 
@@ -38,7 +38,7 @@ object ParamType {
     type Max = Int
     type Default = Int
 
-    final case class Args(bounds: Option[Min Ior Max], step: Option[IntegerStep], defaultValue: Option[Default])
+    final case class Args(bounds: Option[Min Ior Max], step: Option[IntegerStep], defaultValue: Option[Default] = None)
 
     object Args {
       implicit val argsEq: Eq[Args] =
