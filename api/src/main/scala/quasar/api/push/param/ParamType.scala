@@ -36,12 +36,13 @@ object ParamType {
   object Integer {
     type Min = Int
     type Max = Int
+    type Default = Int
 
-    final case class Args(bounds: Option[Min Ior Max], step: Option[IntegerStep])
+    final case class Args(bounds: Option[Min Ior Max], step: Option[IntegerStep], defaultValue: Option[Default])
 
     object Args {
       implicit val argsEq: Eq[Args] =
-        Eq.by(a => (a.bounds, a.step))
+        Eq.by(a => (a.bounds, a.step, a.defaultValue))
 
       implicit val argsShow: Show[Args] =
         Show.fromToString

@@ -31,8 +31,8 @@ package object param {
     val boolean: Formal[Boolean] =
       ParamType.Boolean[Id](())
 
-    def integer(bounds: Option[Int Ior Int], step: Option[IntegerStep]): Formal[Int] =
-      ParamType.Integer[Id](ParamType.Integer.Args(bounds, step))
+    def integer(bounds: Option[Int Ior Int], step: Option[IntegerStep], defaultValue: Option[Int]): Formal[Int] =
+      ParamType.Integer[Id](ParamType.Integer.Args(bounds, step, defaultValue))
 
     def enum[A](x: (String, A), xs: (String, A)*): Formal[A] =
       ParamType.Enum[Id, A](NonEmptyMap.of(x, xs: _*))
