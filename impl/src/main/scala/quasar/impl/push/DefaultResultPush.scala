@@ -477,22 +477,22 @@ private[impl] final class DefaultResultPush[
         case (Boolean(_), ∃(Boolean(Const(b)))) =>
           b.validNel
 
-        case (Integer(Integer.Args(None, None, None)), ∃(Integer(Const(i)))) =>
+        case (Integer(Integer.Args(None, None, _)), ∃(Integer(Const(i)))) =>
           i.validNel
 
-        case (Integer(Integer.Args(Some(bounds), None, None)), ∃(Integer(Const(i)))) =>
+        case (Integer(Integer.Args(Some(bounds), None, _)), ∃(Integer(Const(i)))) =>
           if (checkBounds(bounds, i))
             i.validNel
           else
             ParamError.IntOutOfBounds(label, i, bounds).invalidNel
 
-        case (Integer(Integer.Args(None, Some(step), None)), ∃(Integer(Const(i)))) =>
+        case (Integer(Integer.Args(None, Some(step), _)), ∃(Integer(Const(i)))) =>
           if (step(i))
             i.validNel
           else
             ParamError.IntOutOfStep(label, i, step).invalidNel
 
-        case (Integer(Integer.Args(Some(bounds), Some(step), None)), ∃(Integer(Const(i)))) =>
+        case (Integer(Integer.Args(Some(bounds), Some(step), _)), ∃(Integer(Const(i)))) =>
           if (!checkBounds(bounds, i))
             ParamError.IntOutOfBounds(label, i, bounds).invalidNel
           else if (!step(i))
