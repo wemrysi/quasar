@@ -19,6 +19,7 @@ package quasar.impl.datasources
 import slamdata.Predef._
 
 import quasar.{RateLimiting, RenderTreeT}
+import quasar.api.auth.ExternalCredentials
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
@@ -45,6 +46,8 @@ import matryoshka.{BirecursiveT, EqualT, ShowT}
 import scalaz.{ISet, EitherT, -\/, \/-}
 
 import shims.{monadToScalaz, monadToCats}
+
+import java.util.UUID
 
 trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathType] { self =>
   def create(i: I, ref: DatasourceRef[C])
@@ -134,7 +137,8 @@ object DatasourceModules {
       I, A: Hash](
       modules: List[DatasourceModule],
       rateLimiting: RateLimiting[F, A],
-      byteStores: ByteStores[F, I])(
+      byteStores: ByteStores[F, I],
+      getAuth: UUID => F[Option[ExternalCredentials[F]]])(
       implicit
       ec: ExecutionContext)
       : Modules[T, F, I] = {
@@ -156,9 +160,8 @@ object DatasourceModules {
             EitherT.rightU[CreateError[Json]](Resource.liftF(byteStores.get(i))) flatMap { store =>
               module match {
                 case DatasourceModule.Lightweight(lw) =>
-                  handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting, store))
+                  handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting, store, getAuth))
                     .map(QuasarDatasource.lightweight[T](_))
-
                 case DatasourceModule.Heavyweight(hw) =>
                   handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config, store))
                     .map(QuasarDatasource.heavyweight(_))
