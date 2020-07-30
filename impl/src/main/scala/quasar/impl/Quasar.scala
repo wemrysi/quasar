@@ -20,7 +20,6 @@ import slamdata.Predef._
 
 import quasar.{Condition, RateLimiting, Store}
 import quasar.api.QueryEvaluator
-import quasar.api.auth.ExternalCredentials
 import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
 import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
 import quasar.api.discovery.{Discovery, SchemaConfig}
@@ -30,7 +29,7 @@ import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.scheduler.SchedulerType
 import quasar.api.scheduler.{Schedulers, SchedulerRef}
 import quasar.common.PhaseResultTell
-import quasar.connector.{Offset, QueryResult, ResourceSchema}
+import quasar.connector.{ExternalCredentials, Offset, QueryResult, ResourceSchema}
 import quasar.connector.datasource.Datasource
 import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 import quasar.connector.evaluate._

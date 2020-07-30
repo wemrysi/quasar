@@ -19,13 +19,12 @@ package quasar.impl.datasources
 import slamdata.Predef._
 
 import quasar.{RateLimiting, RenderTreeT}
-import quasar.api.auth.ExternalCredentials
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.impl.{DatasourceModule, QuasarDatasource}
 import quasar.impl.IncompatibleModuleException.linkDatasource
-import quasar.connector.{MonadResourceErr, QueryResult}
+import quasar.connector.{ExternalCredentials, MonadResourceErr, QueryResult}
 import quasar.connector.datasource.Reconfiguration
 import quasar.qscript.MonadPlannerErr
 

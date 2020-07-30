@@ -14,9 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.api.auth
+package quasar.connector
 
-import scala.{Throwable, Option}
-import java.lang.String
+import scala._
 
-final case class AuthError(message: String, cause: Option[Throwable])
+trait ExternalCredentials[F[_]] extends Product with Serializable
+
+object ExternalCredentials {
+  final case class Perpetual[F[_]](accessToken: Array[Byte]) extends ExternalCredentials[F]
+  final case class Temporary[F[_]](accessToken: F[Array[Byte]], renew: F[Unit]) extends ExternalCredentials[F]
+}

@@ -17,11 +17,11 @@
 package quasar.connector.datasource
 
 import quasar.RateLimiting
-import quasar.api.auth.ExternalCredentials
+
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{ConfigurationError, InitializationError}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
-import quasar.connector.{ByteStore, MonadResourceErr, QueryResult}
+import quasar.connector.{ByteStore, ExternalCredentials, MonadResourceErr, QueryResult}
 import quasar.qscript.InterpretedRead
 
 import scala.Option

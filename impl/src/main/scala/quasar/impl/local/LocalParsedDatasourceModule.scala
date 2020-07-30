@@ -19,7 +19,6 @@ package quasar.impl.local
 import slamdata.Predef._
 
 import quasar.RateLimiting
-import quasar.api.auth.ExternalCredentials
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
   ConfigurationError,
