@@ -19,7 +19,6 @@ package quasar.impl.datasources
 import slamdata.Predef._
 
 import quasar.{RateLimiter, RateLimiting, ScalarStages, ConditionMatchers, Condition, NoopRateLimitUpdater}
-import quasar.api.auth.ExternalCredentials
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._

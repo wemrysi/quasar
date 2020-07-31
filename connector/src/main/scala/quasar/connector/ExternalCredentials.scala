@@ -21,6 +21,6 @@ import scala._
 trait ExternalCredentials[F[_]] extends Product with Serializable
 
 object ExternalCredentials {
-  final case class Perpetual[F[_]](accessToken: Array[Byte]) extends ExternalCredentials[F]
-  final case class Temporary[F[_]](accessToken: F[Array[Byte]], renew: F[Unit]) extends ExternalCredentials[F]
+  final case class Perpetual[F[_]](get: Array[Byte]) extends ExternalCredentials[F]
+  final case class Temporary[F[_]](get: F[Array[Byte]], renew: F[Unit]) extends ExternalCredentials[F]
 }
