@@ -133,7 +133,8 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           A: Hash](
           config: Json,
           rateLimiting: RateLimiting[F, A],
-          byteStore: ByteStore[F])(
+          byteStore: ByteStore[F],
+          auth: UUID => F[Option[ExternalCredentials[F]]])(
           implicit ec: ExecutionContext)
           : Resource[F, R[F, InterpretedRead[ResourcePath]]] = {
 
@@ -190,7 +191,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
       byteStores <- Resource.liftF(ByteStores.ephemeral[IO, String])
 
       modules =
-        DatasourceModules[Fix, IO, String, UUID](List(lightMod(mp, sanitize, reconfigure)), rateLimiting, byteStores)
+        DatasourceModules[Fix, IO, String, UUID](List(lightMod(mp, sanitize, reconfigure)), rateLimiting, byteStores, x => IO(None))
           .widenPathType[PathType]
           .withMiddleware((i: String, mds: QDS) => starts.update(i :: _) as mds)
           .withFinalizer((i: String, mds: QDS) => shuts.update(i :: _))

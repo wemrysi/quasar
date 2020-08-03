@@ -29,7 +29,7 @@ import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.scheduler.SchedulerType
 import quasar.api.scheduler.{Schedulers, SchedulerRef}
 import quasar.common.PhaseResultTell
-import quasar.connector.{Offset, QueryResult, ResourceSchema}
+import quasar.connector.{ExternalCredentials, Offset, QueryResult, ResourceSchema}
 import quasar.connector.datasource.Datasource
 import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 import quasar.connector.evaluate._
@@ -100,7 +100,8 @@ object Quasar extends Logging {
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
       rateLimiting: RateLimiting[F, A],
       byteStores: ByteStores[F, UUID],
-      pushPull: PushmiPullyu[F])(
+      pushPull: PushmiPullyu[F],
+      getAuth: UUID => F[Option[ExternalCredentials[F]]])(
       maxConcurrentPushes: Int,
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
@@ -127,7 +128,7 @@ object Quasar extends Logging {
       }
 
       dsModules =
-        DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiting, byteStores)
+        DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiting, byteStores, getAuth)
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(report)(_, _))
 

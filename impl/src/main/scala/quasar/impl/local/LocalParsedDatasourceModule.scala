@@ -40,6 +40,8 @@ import cats.effect._
 import cats.kernel.Hash
 import cats.implicits._
 
+import java.util.UUID
+
 object LocalParsedDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
   override lazy val blocker: Blocker =
@@ -68,7 +70,8 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
       A: Hash](
       config: Json,
       rateLimiting: RateLimiting[F, A],
-      stateStore: ByteStore[F])(
+      stateStore: ByteStore[F],
+      auth: UUID => F[Option[ExternalCredentials[F]]])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]] = {
     val ds = for {
