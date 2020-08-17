@@ -305,14 +305,13 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     for {
       db <- Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close()))
 
-      pushes <- Resource liftF {
+      pushes <-
         MapDbPrefixStore[IO](
           "default-result-push-spec",
           db,
           Serializer.INTEGER :: (ResourcePathSerializer: GroupSerializer[ResourcePath]) :: HNil,
           Serializer.JAVA.asInstanceOf[GroupSerializer[∃[Push[?, String]]]],
           Blocker.liftExecutionContext(global))
-      }
 
       ref <- Resource.liftF(Ref[IO].of(IMap.empty[Integer :: ResourcePath :: HNil, ∃[OffsetKey.Actual]]))
 

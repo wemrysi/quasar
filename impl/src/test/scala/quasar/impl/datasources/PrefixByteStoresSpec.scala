@@ -35,18 +35,18 @@ import shapeless._
 import PrefixByteStoresSpec._
 
 final class PrefixByteStoresSpec extends ByteStoresSpec[IO, Integer] {
-  val byteStores =
-    Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close())) evalMap { db =>
-      val prefixStore =
-        MapDbPrefixStore[IO](
-          "prefix-bytestores-spec",
-          db,
-          Serializer.INTEGER :: Serializer.STRING :: HNil,
-          Serializer.BYTE_ARRAY,
-          Blocker.liftExecutionContext(global))
+  val byteStores = for {
+    db <- Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close()))
 
-      prefixStore.map(PrefixByteStores(_))
-    }
+    prefixStore <-
+      MapDbPrefixStore[IO](
+        "prefix-bytestores-spec",
+        db,
+        Serializer.INTEGER :: Serializer.STRING :: HNil,
+        Serializer.BYTE_ARRAY,
+        Blocker.liftExecutionContext(global))
+
+  } yield PrefixByteStores(prefixStore)
 
   val k1 = new Integer(3)
   val k2 = new Integer(7)

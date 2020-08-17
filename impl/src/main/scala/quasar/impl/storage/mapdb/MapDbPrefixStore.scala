@@ -23,7 +23,7 @@ import quasar.impl.storage.{IsPrefix, PrefixStore}
 import scala.collection.JavaConverters._
 import java.util.{Map => JMap}
 
-import cats.effect.{Blocker, ContextShift, Sync}
+import cats.effect.{Blocker, ContextShift, Resource, Sync}
 import cats.syntax.functor._
 
 import fs2.Stream
@@ -115,15 +115,17 @@ object MapDbPrefixStore {
         ssToList: ToTraversable.Aux[SS, List, S[_]],
         kToArray: ToTraversable.Aux[K, Array, AnyRef],
         kFromTraversable: FromTraversable[K])
-        : F[PrefixStore[F, K, V]] =
-      blocker.delay[F, PrefixStore[F, K, V]] {
-        val store =
-          db.treeMap(name)
-            .keySerializer(new SerializerArrayTuple(ssToList(keySerializer): _*))
-            .valueSerializer(valueSerializer)
-            .createOrOpen()
+        : Resource[F, PrefixStore[F, K, V]] = {
 
-        new MapDbPrefixStore[F, K, V](db, store, blocker)
+      val alloc = sync.delay {
+        db.treeMap(name)
+          .keySerializer(new SerializerArrayTuple(ssToList(keySerializer): _*))
+          .valueSerializer(valueSerializer)
+          .createOrOpen()
       }
+
+      Resource.make(blocker.blockOn(alloc))(m => blocker.delay(m.close))
+        .map(new MapDbPrefixStore[F, K, V](db, _, blocker))
+    }
   }
 }
