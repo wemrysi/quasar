@@ -41,7 +41,7 @@ lazy val buildSettings = Seq(
   // NB: -Xlint triggers issues that need to be fixed
   scalacOptions --= Seq("-Xlint"),
 
-  testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive", "showtimes")),
+  testOptions in Test := Seq(Tests.Argument(Specs2, "ex", "resumes previous incremental push from beginning when no offset", /*"exclude", "exclusive",*/ "showtimes")),
 
   logBuffered in Test := githubIsWorkflowBuild.value,
 

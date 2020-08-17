@@ -934,13 +934,21 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // offset = 5 since emitted a value before boom
             update1Res <- await(update1.sequence)
+            _ <- IO(println(s"UPDATE 1 RESULT: $update1Res"))
             fs2 <- awaitFs(filesystem)
+            _ <- IO(println(s"FS2: $fs2"))
 
             // resume from offset = 5
             update2 <- rp.update(DestinationId, config.value.path)
 
             update2Res <- await(update2.sequence)
-            fs3 <- awaitFs(filesystem)
+            _ <- IO(println(s"UPDATE 2 RESULT: $update2Res"))
+            fs3 <- awaitFs(filesystem) // FIXME: This times out non-deterministically
+            // something else consumed the fs event?
+            // it really was never emitted?
+            // the fs stream never halted?
+            // is some other process pushing a `None` into the fs queue async, causing a race
+            // with 937 and 943?
           } yield {
             startRes must beRight.like {
               case Status.Failed(_, _, _, _) => ok
