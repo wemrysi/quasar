@@ -76,8 +76,8 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
       val dest: Destination[F] = new LegacyDestination[F] {
         def destinationType = kind
         def sinks = NonEmptyList.of(mock)
-        val mock = ResultSink.create[F, ColumnType.Scalar](RenderConfig.Csv()) {
-          case _ => Stream(())
+        val mock = ResultSink.create[F, ColumnType.Scalar, Byte] { (_, _) =>
+          (RenderConfig.Csv(), _ => Stream(()))
         }
       }
       err match {

@@ -16,12 +16,12 @@
 
 package quasar.connector.render
 
-import scala.{Boolean, Option, None, Product, Serializable}
+import scala.{Boolean, Byte, Option, None, Product, Serializable}
 
 import java.lang.String
 import java.time.format.DateTimeFormatter
 
-sealed trait RenderConfig extends Product with Serializable
+sealed trait RenderConfig[A] extends Product with Serializable
 
 object RenderConfig {
   import DateTimeFormatter._
@@ -39,11 +39,16 @@ object RenderConfig {
       localDateTimeFormat: DateTimeFormatter = ISO_LOCAL_DATE_TIME,
       localDateFormat: DateTimeFormatter = ISO_LOCAL_DATE,
       localTimeFormat: DateTimeFormatter = ISO_LOCAL_TIME)
-      extends RenderConfig
+      extends RenderConfig[Byte]
 
   final case class Json(
       prefix: String,
       delimiter: String,
       suffix: String)
-      extends RenderConfig
+      extends RenderConfig[Byte]
+
+  final case class Separated(
+      separator: String,
+      columnRender: ColumnRender[String])
+      extends RenderConfig[String]
 }

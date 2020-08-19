@@ -245,31 +245,19 @@ private[impl] final class DefaultResultPush[
         outputColumns: NonEmptyList[Column[(ColumnType.Scalar, dest.Type)]])
         : EitherT[F, Errs, Stream[F, Unit]] = {
 
-      val fullSink = dest.sinks collectFirst {
-        case create @ ResultSink.CreateSink(_, _) => Left(create)
-        case sql @ ResultSink.SqlSink(_) => Right(sql)
+      val createSink = dest.sinks collectFirst {
+        case sink @ ResultSink.CreateSink(_) => sink
       }
 
-      EitherT.fromOption[F](fullSink, err(FullNotSupported(destinationId))) map {
-        case Left(createSink) =>
-          val (renderColumns, destColumns) =
-            Functor[NonEmptyList].compose[Column].unzip(outputColumns)
+      EitherT.fromOption[F](createSink, err(FullNotSupported(destinationId))) map { sink =>
+        val (renderColumns, destColumns) =
+          Functor[NonEmptyList].compose[Column].unzip(outputColumns)
 
-          val renderedResults =
-            Stream.resource(evaluator((query, None)))
-              .flatMap(render.render(_, renderColumns, createSink.renderConfig, limit))
+        val (renderConfig, pipe) = sink.consume(path, destColumns)
 
-          createSink.consume(path, destColumns, renderedResults)
-
-        case Right(sqlSink) =>
-          val (renderColumns, destColumns) =
-            Functor[NonEmptyList].compose[Column].unzip(outputColumns)
-
-          val (renderConfig, pipe) = sqlSink.consume(path, destColumns)
-
-          Stream.resource(evaluator((query, None)))
-            .flatMap(render.renderSql(_, renderColumns, renderConfig, limit))
-            .through(pipe)
+        Stream.resource(evaluator((query, None)))
+          .flatMap(render.render(_, renderColumns, renderConfig, limit))
+          .through(pipe)
       }
     }
 

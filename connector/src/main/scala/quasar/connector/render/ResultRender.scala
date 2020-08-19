@@ -26,14 +26,13 @@ import cats.data.NonEmptyList
 
 import fs2.Stream
 
-// TODO: Unify render/renderSql
 trait ResultRender[F[_], I] {
-  def render(
+  def render[A](
       input: I,
       columns: NonEmptyList[Column[ColumnType.Scalar]],
-      config: RenderConfig,
+      config: RenderConfig[A],
       rowLimit: Option[Long])
-      : Stream[F, Byte]
+      : Stream[F, A]
 
   def renderUpserts[A](
       input: RenderInput[I],
@@ -43,11 +42,4 @@ trait ResultRender[F[_], I] {
       config: RenderConfig.Csv,
       rowLimit: Option[Long])
       : Stream[F, DataEvent[OffsetKey.Actual[A]]]
-
-  def renderSql(
-      input: I,
-      columns: NonEmptyList[Column[ColumnType.Scalar]],
-      config: SqlRenderConfig,
-      rowLimit: Option[Long])
-      : Stream[F, String]
 }

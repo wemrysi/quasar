@@ -170,11 +170,13 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       case All => NonEmptyList.of(createSink, upsertSink)
     }
 
-    val createSink: ResultSink[IO, Type] = ResultSink.create[IO, Type](RenderConfig.Csv()) {
-      case (dst, _, bytes) =>
-        bytes.through(text.utf8Decode)
+    val createSink: ResultSink[IO, Type] = ResultSink.create { (dst, _) =>
+      val pipe =
+        (_: Stream[IO, Byte]).through(text.utf8Decode)
           .evalMap(s => q.enqueue1(Some(Map(dst -> s))))
           .onFinalize(q.enqueue1(None))
+
+      (RenderConfig.Csv(), pipe)
     }
 
     val upsertSink: ResultSink[IO, Type] = {
@@ -213,13 +215,21 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   }
 
   final class MockResultRender extends ResultRender[IO, Stream[IO, String]] {
-    def render(
+    def render[A](
         input: Stream[IO, String],
         columns: NonEmptyList[Column[ColumnType.Scalar]],
-        config: RenderConfig,
+        config: RenderConfig[A],
         rowLimit: Option[Long])
-        : Stream[IO, Byte] =
-      rowLimit.fold(input)(input.take(_)).through(text.utf8Encode)
+        : Stream[IO, A] = {
+
+      val limited = rowLimit.fold(input)(input.take(_))
+
+      config match {
+        case _: RenderConfig.Csv => limited.through(text.utf8Encode)
+        case _: RenderConfig.Json => limited.through(text.utf8Encode)
+        case _: RenderConfig.Separated => limited
+      }
+    }
 
     def renderUpserts[A](
         input: RenderInput[Stream[IO, String]],
@@ -255,14 +265,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           creates ++ Stream.emit(DataEvent.Commit(OffsetKey.Actual.dateTime(epoch)))
       }
     }
-
-    def renderSql(
-        input: Stream[IO, String],
-        columns: NonEmptyList[Column[ColumnType.Scalar]],
-        config: SqlRenderConfig,
-        rowLimit: Option[Long])
-        : Stream[IO, String] =
-      Stream.empty
   }
 
   def mkEvaluator(f: PartialFunction[(String, Option[Offset]), IO[Stream[IO, String]]])
