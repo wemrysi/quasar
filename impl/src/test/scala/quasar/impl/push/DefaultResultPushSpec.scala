@@ -255,6 +255,14 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           creates ++ Stream.emit(DataEvent.Commit(OffsetKey.Actual.dateTime(epoch)))
       }
     }
+
+    def renderSql(
+        input: Stream[IO, String],
+        columns: NonEmptyList[Column[ColumnType.Scalar]],
+        config: SqlRenderConfig,
+        rowLimit: Option[Long])
+        : Stream[IO, String] =
+      Stream.empty
   }
 
   def mkEvaluator(f: PartialFunction[(String, Option[Offset]), IO[Stream[IO, String]]])
