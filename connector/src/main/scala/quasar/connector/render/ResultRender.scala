@@ -26,6 +26,7 @@ import cats.data.NonEmptyList
 
 import fs2.Stream
 
+// TODO: Unify render/renderSql
 trait ResultRender[F[_], I] {
   def render(
       input: I,
@@ -42,4 +43,11 @@ trait ResultRender[F[_], I] {
       config: RenderConfig.Csv,
       rowLimit: Option[Long])
       : Stream[F, DataEvent[OffsetKey.Actual[A]]]
+
+  def renderSql(
+      input: I,
+      columns: NonEmptyList[Column[ColumnType.Scalar]],
+      config: SqlRenderConfig,
+      rowLimit: Option[Long])
+      : Stream[F, String]
 }

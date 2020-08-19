@@ -22,11 +22,11 @@ import quasar.api.Column
 import quasar.api.push.OffsetKey
 import quasar.api.resource.ResourcePath
 import quasar.connector._
-import quasar.connector.render.RenderConfig
+import quasar.connector.render.{SqlRenderConfig, RenderConfig}
 
 import cats.data.NonEmptyList
 
-import fs2.Stream
+import fs2.{Pipe, Stream}
 
 import skolems.∀
 
@@ -56,6 +56,10 @@ object ResultSink {
       consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, OffsetKey.Actual[α]]]])
       extends ResultSink[F, T]
 
+  final case class SqlSink[F[_], T](
+      consume: (ResourcePath, NonEmptyList[Column[T]]) => (SqlRenderConfig, Pipe[F, String, Unit]))
+      extends ResultSink[F, T]
+
   def create[F[_], T](
       renderConfig: RenderConfig)(
       consume: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
@@ -67,4 +71,9 @@ object ResultSink {
       consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, OffsetKey.Actual[α]]]])
       : ResultSink[F, T] =
     UpsertSink(renderConfig, consume)
+
+  def sql[F[_], T](
+      consume: (ResourcePath, NonEmptyList[Column[T]]) => (SqlRenderConfig, Pipe[F, String, Unit]))
+      : ResultSink[F, T] =
+    SqlSink(consume)
 }
