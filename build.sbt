@@ -21,7 +21,7 @@ ThisBuild / scmInfo := Some(
   )
 )
 
-ThisBuild / githubWorkflowBuild := Seq(WorkflowStep.Sbt(List("testOnly", "quasar.impl.push.DefaultResultPushSpec")))
+ThisBuild / githubWorkflowBuild := Seq(WorkflowStep.Sbt(List("testOnly quasar.impl.push.DefaultResultPushSpec")))
 
 lazy val qdataVersion = Def.setting[String](
   managedVersions.value("precog-qdata"))
