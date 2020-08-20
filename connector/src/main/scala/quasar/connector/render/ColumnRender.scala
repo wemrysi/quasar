@@ -24,7 +24,7 @@ import cats.Applicative
 
 import qdata.time.{DateTimeInterval, OffsetDate}
 
-trait ColumnRender[A] {
+trait ColumnRender[+A] {
   def renderUndefined(columnName: String): A
 
   def renderBoolean(columnName: String, value: Boolean): A

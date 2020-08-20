@@ -18,7 +18,7 @@ package quasar.connector.render
 
 import scala.{Boolean, Byte, Option, None, Product, Serializable}
 
-import java.lang.String
+import java.lang.{CharSequence, String}
 import java.time.format.DateTimeFormatter
 
 sealed trait RenderConfig[A] extends Product with Serializable
@@ -48,7 +48,7 @@ object RenderConfig {
       extends RenderConfig[Byte]
 
   final case class Separated(
-      separator: String,
-      columnRender: ColumnRender[String])
-      extends RenderConfig[String]
+      separator: CharSequence,
+      columnRender: ColumnRender[CharSequence])
+      extends RenderConfig[CharSequence]
 }
