@@ -87,7 +87,7 @@ jobs:
       - name: Check that workflows are up to date
         run: $SBT ++${{ matrix.scala }} githubWorkflowCheck
 
-      - run: $SBT ++${{ matrix.scala }} ci
+      - run: $SBT ++${{ matrix.scala }} testOnly quasar.impl.push.DefaultResultPushSpec
 
       - name: Upload target directory 'sql/target' (${{ matrix.scala }})
         uses: actions/upload-artifact@v1
