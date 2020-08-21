@@ -256,6 +256,7 @@ private[impl] final class DefaultResultPush[
         val renderedResults =
           Stream.resource(evaluator((query, None)))
             .flatMap(render.render(_, renderColumns, sink.renderConfig, limit))
+            .prefetch
 
         sink.consume(path, destColumns, renderedResults)
       }
@@ -321,7 +322,7 @@ private[impl] final class DefaultResultPush[
             idDestColumn,
             nonIdDestColumns,
             if (isUpdate) WriteMode.Append else WriteMode.Replace,
-            dataEvents)
+            dataEvents.prefetch)
 
       } yield sink.consume[A](upsertArgs)
     }
