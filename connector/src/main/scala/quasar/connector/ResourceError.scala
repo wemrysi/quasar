@@ -151,6 +151,7 @@ sealed abstract class ResourceErrorInstances {
       ResourceError.notAResource.getOption(e),
       ResourceError.pathNotFound.getOption(e),
       ResourceError.seekUnsupported.getOption(e),
+      ResourceError.seekFailed.getOption(e),
       ResourceError.tooManyResources.getOption(e)))
   }
 
