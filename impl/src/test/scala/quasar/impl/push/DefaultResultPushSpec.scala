@@ -943,12 +943,14 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             update2Res <- await(update2.sequence)
             _ <- IO(println(s"UPDATE 2 RESULT: $update2Res"))
-            fs3 <- awaitFs(filesystem) // FIXME: This times out non-deterministically
+            fsObs = filesystem.evalTap(x => IO(println(s"UPDATE 2 FS: $x")))
+            fs3 <- awaitFs(fsObs) // FIXME: This times out non-deterministically
             // something else consumed the fs event?
             // it really was never emitted?
             // the fs stream never halted?
             // is some other process pushing a `None` into the fs queue async, causing a race
             // with 937 and 943?
+            // or maybe _not_ pushing None so the stream never terminates?
           } yield {
             startRes must beRight.like {
               case Status.Failed(_, _, _, _) => ok
