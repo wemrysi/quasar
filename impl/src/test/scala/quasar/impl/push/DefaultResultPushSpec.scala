@@ -668,7 +668,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             res <- rp.start(DestinationId, config, None)
             terminal <- await(res.sequence)
 
-            fs1 <- awaitFs(filesystem)
+            fs1 <- awaitFs(filesystem) // TODO: This also timed out once on GH actions
           } yield {
             terminal must beRight.like {
               case Status.Finished(_, _, _) => ok
