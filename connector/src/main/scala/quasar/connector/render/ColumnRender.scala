@@ -27,6 +27,12 @@ import qdata.time.{DateTimeInterval, OffsetDate}
 trait ColumnRender[+A] {
   def renderUndefined(columnName: String): A
 
+  def renderNull(columnName: String): A
+
+  def renderEmptyArray(columnName: String): A
+
+  def renderEmptyObject(columnName: String): A
+
   def renderBoolean(columnName: String, value: Boolean): A
 
   def renderLong(columnName: String, value: Long): A
@@ -58,6 +64,9 @@ object ColumnRender {
       def pure[A](a: A): ColumnRender[A] =
         new ColumnRender[A] {
           def renderUndefined(columnName: String) = a
+          def renderNull(columnName: String) = a
+          def renderEmptyArray(columnName: String) = a
+          def renderEmptyObject(columnName: String) = a
           def renderBoolean(columnName: String, value: Boolean) = a
           def renderLong(columnName: String, value: Long) = a
           def renderDouble(columnName: String, value: Double) = a
@@ -76,6 +85,15 @@ object ColumnRender {
         new ColumnRender[B] {
           def renderUndefined(columnName: String) =
             ff.renderUndefined(columnName)(fa.renderUndefined(columnName))
+
+          def renderNull(columnName: String) =
+            ff.renderNull(columnName)(fa.renderNull(columnName))
+
+          def renderEmptyArray(columnName: String) =
+            ff.renderEmptyArray(columnName)(fa.renderEmptyArray(columnName))
+
+          def renderEmptyObject(columnName: String) =
+            ff.renderEmptyObject(columnName)(fa.renderEmptyObject(columnName))
 
           def renderBoolean(columnName: String, value: Boolean) =
             ff.renderBoolean(columnName, value)(fa.renderBoolean(columnName, value))
