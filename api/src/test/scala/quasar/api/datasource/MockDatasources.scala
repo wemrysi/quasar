@@ -22,7 +22,7 @@ import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource._
 import quasar.contrib.scalaz.MonadState_
 
-import scalaz.{\/, -\/, \/-, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags}
+import scalaz.{\/, -\/, \/-, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags, EitherT}
 import scalaz.std.anyVal._
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
@@ -116,6 +116,15 @@ final class MockDatasources[
       case -\/(err) => Condition.abnormal(err: DatasourceError[Int, C]).point[F]
       case \/-(ref) => replaceDatasource(id, ref.copy(name = name))
     }
+
+  def copyDatasource(id: Int, modifyName: DatasourceName => DatasourceName): F[DatasourceError[Int, C] \/ Int] = {
+    val action = for {
+      ref <- EitherT(datasourceRef(id)).leftMap(x => x: DatasourceError[Int, C])
+      ref0 = ref.copy(name = modifyName(ref.name))
+      id <- EitherT(addDatasource(ref0)).leftMap(x => x: DatasourceError[Int, C])
+    } yield id
+    action.run
+  }
 
   val supportedDatasourceTypes: F[ISet[DatasourceType]] = supportedTypes.point[F]
 

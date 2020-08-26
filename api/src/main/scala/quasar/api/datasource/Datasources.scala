@@ -67,6 +67,10 @@ trait Datasources[F[_], G[_], I, C] {
   def renameDatasource(datasourceId: I, name: DatasourceName)
       : F[Condition[DatasourceError[I, C]]]
 
+  /** creates temporary cop of the datasource specified by id
+    */
+  def copyDatasource(datasourceId: I, modifyName: DatasourceName => DatasourceName): F[DatasourceError[I, C] \/ I]
+
   /** The set of supported datasource types. */
   def supportedDatasourceTypes: F[ISet[DatasourceType]]
 }

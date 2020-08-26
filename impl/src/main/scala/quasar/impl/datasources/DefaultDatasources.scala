@@ -142,6 +142,15 @@ private[impl] final class DefaultDatasources[
       case \/-(ref) => replaceDatasource(datasourceId, ref.copy(name = name))
     }
 
+  def copyDatasource(datasourceId: I, modifyName: DatasourceName => DatasourceName): F[DatasourceError[I, C] \/ I] = {
+    val action = for {
+      ref <- EitherT(lookupRef[DatasourceError[I, C]](datasourceId))
+      ref0 = ref.copy(name = modifyName(ref.name))
+      id <- EitherT(addDatasource(ref0)).leftMap(x => x: DatasourceError[I, C])
+    } yield id
+    action.run
+  }
+
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
     modules.supportedTypes
 

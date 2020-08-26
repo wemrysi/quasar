@@ -29,7 +29,7 @@ import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import org.specs2.matcher.Matcher
-import scalaz.{Equal, IMap, Order, Show, \/}
+import scalaz.{Equal, IMap, Order, Show, \/, \/-, -\/}
 import scalaz.syntax.equal._
 import scalaz.syntax.foldable._
 import scalaz.std.list._
@@ -260,8 +260,40 @@ abstract class DatasourcesSpec[
       }
     }
   }
+  "copy datasource" >> {
+    "copies at most renamed datasource located at specified id" >>* datasources.use { dses =>
+      for {
+        a <- refA
+        i0 <- createRef(dses)(prepareForCopy(a))
+        i1 <- dses.copyDatasource(i0, _ => DatasourceName("copied"))
+        res <- dses.datasourceRef(i1.toOption.get)
+      } yield {
+        res must beLike {
+          case \/-(resDs) =>
+            resDs.name must_=== DatasourceName("copied")
+            isCopy(a, resDs) must beTrue
+        }
+      }
+    }
+    "errors when there is no datasource at specified id" >>* datasources.use { dses =>
+      for {
+        a <- refA
+        i0 <- createRef(dses)(prepareForCopy(a))
+        _ <- dses.removeDatasource(i0)
+        i1 <- dses.copyDatasource(i0, _ => DatasourceName("copied"))
+      } yield {
+        i1 must beLike {
+          case -\/(DatasourceNotFound(_)) => ok
+        }
+      }
+    }
+  }
 
   ////
+
+  def prepareForCopy(inp: DatasourceRef[C]): DatasourceRef[C] = inp
+  def isCopy(source: DatasourceRef[C], copy: DatasourceRef[C]): Boolean =
+    DatasourceRef.atMostRenamed(source, copy)
 
   type Err = DatasourceError[I, C]
 
