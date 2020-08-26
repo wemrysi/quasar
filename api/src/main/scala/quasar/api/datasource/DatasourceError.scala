@@ -63,6 +63,9 @@ object DatasourceError extends DatasourceErrorInstances {
   final case class DatasourceNotFound[I](datasourceId: I)
       extends ExistentialError[I]
 
+  final case class CopyError[I](datasourceId: I)
+      extends DatasourceError[I, Nothing]
+
   def connectionFailed[C, E >: InitializationError[C] <: DatasourceError[_, C]]
       : Prism[E, (DatasourceType, C, Exception)] =
     Prism.partial[E, (DatasourceType, C, Exception)] {
@@ -80,6 +83,12 @@ object DatasourceError extends DatasourceErrorInstances {
     Prism.partial[E, I] {
       case DatasourceNotFound(id) => id
     } (DatasourceNotFound(_))
+
+  def copyError[I, E >: CopyError[I] <: DatasourceError[I, _]]
+      : Prism[E, I] =
+  Prism.partial[E, I] {
+    case CopyError(id) => id
+  } (CopyError(_))
 
   def datasourceUnsupported[E >: CreateError[Nothing] <: DatasourceError[_, _]]
       : Prism[E, (DatasourceType, ISet[DatasourceType])] =

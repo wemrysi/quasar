@@ -18,12 +18,18 @@ package quasar.api.datasource
 
 import slamdata.Predef.String
 
+import cats.effect.Sync
 import scalaz.{Order, Show}
 import scalaz.std.string._
 
+import java.util.UUID
+
 final case class DatasourceName(value: String)
 
-object DatasourceName extends DatasourceNameInstances
+object DatasourceName extends DatasourceNameInstances {
+  def freshName[F[_]: Sync]: F[DatasourceName] =
+    Sync[F].delay(DatasourceName(UUID.randomUUID.toString))
+}
 
 sealed abstract class DatasourceNameInstances {
   implicit val order: Order[DatasourceName] =
