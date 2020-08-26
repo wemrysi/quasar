@@ -117,10 +117,10 @@ final class MockDatasources[
       case \/-(ref) => replaceDatasource(id, ref.copy(name = name))
     }
 
-  def copyDatasource(id: Int): F[DatasourceError[Int, C] \/ Int] = {
+  def copyDatasource(id: Int, modifyName: DatasourceName => DatasourceName): F[DatasourceError[Int, C] \/ Int] = {
     val action = for {
       ref <- EitherT(datasourceRef(id)).leftMap(x => x: DatasourceError[Int, C])
-      ref0 = ref.copy(name = DatasourceName(s"copied:${ref.name.value}"))
+      ref0 = ref.copy(name = modifyName(ref.name))
       id <- EitherT(addDatasource(ref0)).leftMap(x => x: DatasourceError[Int, C])
     } yield id
     action.run

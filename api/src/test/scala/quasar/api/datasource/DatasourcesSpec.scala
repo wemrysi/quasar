@@ -265,11 +265,12 @@ abstract class DatasourcesSpec[
       for {
         a <- refA
         i0 <- createRef(dses)(prepareForCopy(a))
-        i1 <- dses.copyDatasource(i0)
+        i1 <- dses.copyDatasource(i0, _ => DatasourceName("copied"))
         res <- dses.datasourceRef(i1.toOption.get)
       } yield {
         res must beLike {
           case \/-(resDs) =>
+            resDs.name must_=== DatasourceName("copied")
             isCopy(a, resDs) must beTrue
         }
       }
@@ -279,7 +280,7 @@ abstract class DatasourcesSpec[
         a <- refA
         i0 <- createRef(dses)(prepareForCopy(a))
         _ <- dses.removeDatasource(i0)
-        i1 <- dses.copyDatasource(i0)
+        i1 <- dses.copyDatasource(i0, _ => DatasourceName("copied"))
       } yield {
         i1 must beLike {
           case -\/(DatasourceNotFound(_)) => ok

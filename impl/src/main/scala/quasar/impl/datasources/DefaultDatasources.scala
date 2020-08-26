@@ -142,14 +142,11 @@ private[impl] final class DefaultDatasources[
       case \/-(ref) => replaceDatasource(datasourceId, ref.copy(name = name))
     }
 
-  def copyDatasource(datasourceId: I): F[DatasourceError[I, C] \/ I] = {
+  def copyDatasource(datasourceId: I, modifyName: DatasourceName => DatasourceName): F[DatasourceError[I, C] \/ I] = {
     val action = for {
       ref <- EitherT(lookupRef[DatasourceError[I, C]](datasourceId))
-      id <- EitherT.rightT(freshId)
-      freshName <- EitherT.rightT(DatasourceName.freshName)
-      ref0 = ref.copy(name = freshName)
-      _ <- EitherT(addRef[DatasourceError[I, C]](id, Reconfiguration.Preserve, ref0).map(
-        Condition.disjunctionIso.get(_)))
+      ref0 = ref.copy(name = modifyName(ref.name))
+      id <- EitherT(addDatasource(ref0)).leftMap(x => x: DatasourceError[I, C])
     } yield id
     action.run
   }
