@@ -136,6 +136,7 @@ sealed abstract class DatasourceErrorInstances {
     Show show {
       case e: CreateError[C] => showCreateError[C].show(e)
       case e: ExistentialError[I] => showExistentialError[I].show(e)
+      case CopyError(i) => s"CopyError($i)"
     }
 
   implicit def showExistentialError[I: Show]: Show[ExistentialError[I]] =
