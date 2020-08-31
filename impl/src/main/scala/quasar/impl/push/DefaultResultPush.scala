@@ -246,18 +246,18 @@ private[impl] final class DefaultResultPush[
         : EitherT[F, Errs, Stream[F, Unit]] = {
 
       val createSink = dest.sinks collectFirst {
-        case sink @ ResultSink.CreateSink(_, _) => sink
+        case sink @ ResultSink.CreateSink(_) => sink
       }
 
       EitherT.fromOption[F](createSink, err(FullNotSupported(destinationId))) map { sink =>
         val (renderColumns, destColumns) =
           Functor[NonEmptyList].compose[Column].unzip(outputColumns)
 
-        val renderedResults =
-          Stream.resource(evaluator((query, None)))
-            .flatMap(render.render(_, renderColumns, sink.renderConfig, limit))
+        val (renderConfig, pipe) = sink.consume(path, destColumns)
 
-        sink.consume(path, destColumns, renderedResults)
+        Stream.resource(evaluator((query, None)))
+          .flatMap(render.render(_, renderColumns, renderConfig, limit))
+          .through(pipe)
       }
     }
 

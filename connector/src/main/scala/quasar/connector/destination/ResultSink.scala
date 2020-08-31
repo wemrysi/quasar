@@ -26,16 +26,15 @@ import quasar.connector.render.RenderConfig
 
 import cats.data.NonEmptyList
 
-import fs2.Stream
+import fs2.{Pipe, Stream}
 
 import skolems.∀
 
 sealed trait ResultSink[F[_], T] extends Product with Serializable
 
 object ResultSink {
-  final case class CreateSink[F[_], T](
-      renderConfig: RenderConfig,
-      consume: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
+  final case class CreateSink[F[_], T, A](
+      consume: (ResourcePath, NonEmptyList[Column[T]]) => (RenderConfig[A], Pipe[F, A, Unit]))
       extends ResultSink[F, T]
 
   object UpsertSink {
@@ -56,11 +55,10 @@ object ResultSink {
       consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, OffsetKey.Actual[α]]]])
       extends ResultSink[F, T]
 
-  def create[F[_], T](
-      renderConfig: RenderConfig)(
-      consume: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
+  def create[F[_], T, A](
+      consume: (ResourcePath, NonEmptyList[Column[T]]) => (RenderConfig[A], Pipe[F, A, Unit]))
       : ResultSink[F, T] =
-    CreateSink(renderConfig, consume)
+    CreateSink(consume)
 
   def upsert[F[_], T](
       renderConfig: RenderConfig.Csv)(

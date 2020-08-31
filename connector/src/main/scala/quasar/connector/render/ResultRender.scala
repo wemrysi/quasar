@@ -27,12 +27,12 @@ import cats.data.NonEmptyList
 import fs2.Stream
 
 trait ResultRender[F[_], I] {
-  def render(
+  def render[A](
       input: I,
       columns: NonEmptyList[Column[ColumnType.Scalar]],
-      config: RenderConfig,
+      config: RenderConfig[A],
       rowLimit: Option[Long])
-      : Stream[F, Byte]
+      : Stream[F, A]
 
   def renderUpserts[A](
       input: RenderInput[I],
