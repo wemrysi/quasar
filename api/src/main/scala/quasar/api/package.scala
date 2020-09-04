@@ -16,9 +16,13 @@
 
 package quasar
 
+import scala.List
+
 import cats.data.Kleisli
 
 package object api {
+  type DataPath = List[DataPathSegment]
+
   type QueryEvaluator[F[_], -Q, R] = Kleisli[F, Q, R]
 
   object QueryEvaluator {
