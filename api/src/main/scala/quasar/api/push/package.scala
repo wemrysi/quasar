@@ -16,10 +16,10 @@
 
 package quasar.api
 
-import slamdata.Predef.{Either, Int, String}
-
 import cats.data.NonEmptyList
 
 package object push {
-  type OffsetPath = NonEmptyList[Either[String, Int]]
+  type OffsetPath = NonEmptyList[DataPathSegment]
+  def OffsetPath(head: DataPathSegment, tail: DataPathSegment*): OffsetPath =
+    NonEmptyList.of(head, tail: _*)
 }

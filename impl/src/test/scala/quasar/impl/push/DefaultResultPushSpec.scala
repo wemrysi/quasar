@@ -42,7 +42,7 @@ import org.specs2.execute.AsResult
 import org.specs2.specification.core.Fragment
 
 import quasar.{ConditionMatchers, EffectfulQSpec}
-import quasar.api.{Column, ColumnType, Label, Labeled, QueryEvaluator}
+import quasar.api.{Column, ColumnType, DataPathSegment, Label, Labeled, QueryEvaluator}
 import quasar.api.destination._
 import quasar.api.push._
 import quasar.api.push.param._
@@ -379,7 +379,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     ResumeConfig(
       Column("id", (IdType.StringId, SelectedType(TypeIndex(1), List(∃(Actual.integer(10)))))),
       Column("pos", OffsetKey.Formal.real(())),
-      NonEmptyList.one(Left("pos")))
+      OffsetPath(DataPathSegment.Field("pos")))
 
   def full(path: ResourcePath, q: String, cols: PushConfig.Columns = colX): ∃[PushConfig[?, String]] =
     ∃[PushConfig[?, String]](PushConfig.Full(path, q, cols))
@@ -785,7 +785,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           initial = Some(OffsetKey.Actual.real(99)))
 
         eval = mkEvaluator {
-          case ("initial-offset", Some(Offset(NonEmptyList(Left("pos"), Nil), ∃(k)))) =>
+          case ("initial-offset", Some(Offset(NonEmptyList(DataPathSegment.Field("pos"), Nil), ∃(k)))) =>
             val key: OffsetKey.Actual[_] = k
 
             key match {
