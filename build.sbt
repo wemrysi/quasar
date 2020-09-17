@@ -69,7 +69,8 @@ concurrentRestrictions in Global := {
 
 lazy val publishSettings = Seq(
   performMavenCentralSync := false,   // publishes quasar to bintray only, skipping sonatype and maven central
-  publishArtifact in (Test, packageBin) := true
+  publishArtifact in (Test, packageBin) := true,
+  publishArtifact in (Test, packageSrc) := true
 )
 
 // Build and publish a project, excluding its tests.
