@@ -24,7 +24,7 @@ import quasar.contrib.iota.{:<<:, ACopK}
   *
   * It _may_ be unprincipled (otherwise, why not allow [[scalaz.Inject]] to work
   * this way directly?) But it is temporarily necessary in order to “inject” our
-  * more constrained versions of QScript into [[QScriptTotal]].
+  * more constrained versions of QScript into `QScriptTotal`.
   */
 trait Injectable[IN[_], OUT[_]] {
   def inject: IN ~> OUT

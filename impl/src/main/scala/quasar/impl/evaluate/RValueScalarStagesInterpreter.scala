@@ -306,63 +306,6 @@ object RValueScalarStagesInterpreter {
       fields: Map[String, RValue])
       : Stream[F, RValue] = {
 
-    /**
-      * @param from1 the index within the first component to begin from
-      * @param count the number of values to emit
-      */
-    @SuppressWarnings(Array(
-      "org.wartremover.warts.Equals",
-      "org.wartremover.warts.Var",
-      "org.wartremover.warts.While"))
-    def cross(fieldNames: Array[String], components: Array[Array[RValue]], from1: Int, count: Int)
-        : Stream[F, RValue] =
-      Stream.evalUnChunk(Concurrent[F] delay {
-        val size = components.length
-        val rvalues = new Array[RValue](count)
-        val cursors = Array.fill(size)(0)
-        var fields = Map.empty[String, RValue]
-
-        var i = size - 1
-
-        cursors(0) = from1
-
-        while (i >= 0) {
-          fields += (fieldNames(i) -> components(i)(cursors(i)))
-          i -= 1
-        }
-
-        rvalues(0) = RObject(fields)
-
-        var total = 1
-        val first1 = components.indexWhere(_.length == 1)
-        val init = if (first1 > 0) first1 - 1 else components.length - 1
-
-        while (total < count) {
-          i = init
-
-          while (i >= 0) {
-            val c = components(i)
-            val j = cursors(i)
-
-            if (j == (c.length - 1)) {
-              fields += (fieldNames(i) -> c(0))
-              cursors(i) = 0
-              i -= 1
-            } else {
-              fields += (fieldNames(i) -> c(j + 1))
-              cursors(i) = j + 1
-              i = -1
-            }
-          }
-
-          rvalues(total) = RObject(fields)
-
-          total += 1
-        }
-
-        Chunk.array(rvalues)
-      })
-
     def ranges1(totalSize: Int, chunkSize: Int, size1: Int): Stream[F, (Int, Int)] = {
       val resultsPerTick = totalSize / size1
       val ticksPerChunk = math.max(1, chunkSize / resultsPerTick)
@@ -429,4 +372,61 @@ object RValueScalarStagesInterpreter {
       }
     }
   }
+
+  /**
+   * @param from1 the index within the first component to begin from
+   * @param count the number of values to emit
+   */
+  @SuppressWarnings(Array(
+    "org.wartremover.warts.Equals",
+    "org.wartremover.warts.Var",
+    "org.wartremover.warts.While"))
+  private def cross[F[_]: Concurrent](fieldNames: Array[String], components: Array[Array[RValue]], from1: Int, count: Int)
+      : Stream[F, RValue] =
+    Stream.evalUnChunk(Concurrent[F] delay {
+      val size = components.length
+      val rvalues = new Array[RValue](count)
+      val cursors = Array.fill(size)(0)
+      var fields = Map.empty[String, RValue]
+
+      var i = size - 1
+
+      cursors(0) = from1
+
+      while (i >= 0) {
+        fields += (fieldNames(i) -> components(i)(cursors(i)))
+        i -= 1
+      }
+
+      rvalues(0) = RObject(fields)
+
+      var total = 1
+      val first1 = components.indexWhere(_.length == 1)
+      val init = if (first1 > 0) first1 - 1 else components.length - 1
+
+      while (total < count) {
+        i = init
+
+        while (i >= 0) {
+          val c = components(i)
+          val j = cursors(i)
+
+          if (j == (c.length - 1)) {
+            fields += (fieldNames(i) -> c(0))
+            cursors(i) = 0
+            i -= 1
+          } else {
+            fields += (fieldNames(i) -> c(j + 1))
+            cursors(i) = j + 1
+            i = -1
+          }
+        }
+
+        rvalues(total) = RObject(fields)
+
+        total += 1
+      }
+
+      Chunk.array(rvalues)
+    })
 }
