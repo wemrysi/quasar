@@ -25,9 +25,12 @@ import scala.{AnyRef, Array, Boolean, Byte, Option, Unit}
 import cats.Applicative
 
 import shapeless._
+import shapeless.ops.hlist._
 
-final class PrefixByteStores[F[_]: Applicative, K <: AnyRef] private (
-    store: PrefixStore[F, K :: String :: HNil, Array[Byte]])
+import scodec._
+
+final class PrefixByteStores[F[_]: Applicative, K: Codec] private (
+    store: PrefixStore.SStore[F, K :: String :: HNil, Array[Byte]])
     extends ByteStores[F, K] {
 
   private class PrefixByteStore(prefix: K) extends ByteStore[F] {
@@ -49,8 +52,8 @@ final class PrefixByteStores[F[_]: Applicative, K <: AnyRef] private (
 }
 
 object PrefixByteStores {
-  def apply[F[_]: Applicative, K <: AnyRef](
-      store: PrefixStore[F, K :: String :: HNil, Array[Byte]])
+  def apply[F[_]: Applicative, K: Codec](
+      store: PrefixStore.SStore[F, K :: String :: HNil, Array[Byte]])
       : ByteStores[F, K] =
     new PrefixByteStores(store)
 }

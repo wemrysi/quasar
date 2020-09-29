@@ -16,8 +16,11 @@
 
 package quasar.impl.datasources
 
-import quasar.impl.storage.mapdb.MapDbPrefixStore
+import quasar.impl.storage
+import quasar.impl.storage.mvstore.MVStorePrefixStore
+//import quasar.impl.storage.mapdb.MapDbPrefixStore
 
+import slamdata.Predef._
 import scala.Predef.classOf
 
 import cats.Eq
@@ -32,27 +35,43 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import shapeless._
 
+import scodec.Codec
+import scodec.bits.ByteVector
+import scodec.codecs.{int32, bytes, utf8_32, variableSizeBytes}
+
 import PrefixByteStoresSpec._
 
-final class PrefixByteStoresSpec extends ByteStoresSpec[IO, Integer] {
+final class PrefixByteStoresSpec extends ByteStoresSpec[IO, Int] {
+  implicit val intCodec: Codec[Int] = int32
+
+  implicit val strCodec: Codec[String] = utf8_32
+
+  implicit val arrayByteCodec: Codec[Array[Byte]] =
+    variableSizeBytes(int32, bytes).xmapc(_.toArray)(ByteVector(_))
+
   val byteStores =
-    Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close())) evalMap { db =>
+    storage.offheapMVStore[IO] evalMap { db =>
+//    Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close())) evalMap { db =>
       val prefixStore =
-        MapDbPrefixStore[IO](
-          "prefix-bytestores-spec",
+        MVStorePrefixStore[IO, Int :: String :: HNil, Array[Byte]](
           db,
-          Serializer.INTEGER :: Serializer.STRING :: HNil,
-          Serializer.BYTE_ARRAY,
+          "prefix-bytestores-spec",
           Blocker.liftExecutionContext(global))
+//        MapDbPrefixStore[IO](
+//          "prefix-bytestores-spec",
+//          db,
+//          Serializer.INTEGER :: Serializer.STRING :: HNil,
+//          Serializer.BYTE_ARRAY,
+//          Blocker.liftExecutionContext(global))
 
       prefixStore.map(PrefixByteStores(_))
     }
 
-  val k1 = new Integer(3)
-  val k2 = new Integer(7)
+  val k1 = 3
+  val k2 = 7
 }
 
 object PrefixByteStoresSpec {
-  implicit val jIntegerEq: Eq[Integer] =
-    Eq.by(_.intValue)
+//  implicit val jIntegerEq: Eq[Integer] =
+//    Eq.by(_.intValue)
 }

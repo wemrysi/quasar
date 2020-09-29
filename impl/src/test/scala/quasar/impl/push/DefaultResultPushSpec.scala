@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+/*
 package quasar.impl.push
 
 import slamdata.Predef._
@@ -51,6 +52,7 @@ import quasar.api.resource.{ResourcePath, ResourceName}
 import quasar.connector.{DataEvent, Offset}
 import quasar.connector.destination._
 import quasar.connector.render._
+import quasar.impl.storage
 import quasar.impl.storage.RefIndexedStore
 import quasar.impl.storage.mapdb._
 
@@ -313,14 +315,16 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     val render = new MockResultRender
 
     for {
-      db <- Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close()))
+      db <- storage.offheapMVStore
+//      db <- Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close()))
 
       pushes <- Resource liftF {
-        MapDbPrefixStore[IO](
-          "default-result-push-spec",
+        MVStorePrefixStore[IO, Int :: ResourcePath :: HNil, ∃[Push[?, String]]](
           db,
-          Serializer.INTEGER :: (ResourcePathSerializer: GroupSerializer[ResourcePath]) :: HNil,
-          Serializer.JAVA.asInstanceOf[GroupSerializer[∃[Push[?, String]]]],
+          "default-result-push-spec",
+//          db,
+//          Serializer.INTEGER :: (ResourcePathSerializer: GroupSerializer[ResourcePath]) :: HNil,
+//          Serializer.JAVA.asInstanceOf[GroupSerializer[∃[Push[?, String]]]],
           Blocker.liftExecutionContext(global))
       }
 
@@ -1551,3 +1555,4 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
   }
 }
+ */

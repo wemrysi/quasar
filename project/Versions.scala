@@ -28,4 +28,5 @@ object Versions {
   val kittensVersion      = "2.0.0"
   val iotaVersion         = "0.3.10"
   val drosteVersion       = "0.8.0"
+  val h2Version           = "1.4.200"
 }

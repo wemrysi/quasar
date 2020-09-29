@@ -44,6 +44,8 @@ final class MapDbPrefixStore[F[_]: Sync: ContextShift, K <: HList, V] private (
     kFromTraversable: FromTraversable[K])
     extends PrefixStore[F, K, V] {
 
+  type Constraint[P <: HList] = ToTraversable.Aux[P, Array, AnyRef]
+
   def prefixedEntries[P <: HList](p: P)(
       implicit
       pfx: IsPrefix[P, K],
@@ -115,8 +117,8 @@ object MapDbPrefixStore {
         ssToList: ToTraversable.Aux[SS, List, S[_]],
         kToArray: ToTraversable.Aux[K, Array, AnyRef],
         kFromTraversable: FromTraversable[K])
-        : F[PrefixStore[F, K, V]] =
-      blocker.delay[F, PrefixStore[F, K, V]] {
+        : F[PrefixStore.TStore[F, K, V]] =
+      blocker.delay[F, PrefixStore.TStore[F, K, V]] {
         val store =
           db.treeMap(name)
             .keySerializer(new SerializerArrayTuple(ssToList(keySerializer): _*))

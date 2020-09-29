@@ -28,6 +28,7 @@ import quasar.contrib.scalaz.MonadError_
 import java.nio.file.Path
 import java.util.UUID
 import org.mapdb._
+import org.h2.mvstore._
 
 import argonaut.{CodecJson, Parse}
 import monocle.Prism
@@ -37,25 +38,7 @@ import shims.monadToScalaz
 package object storage {
   import IndexedStore._
 
-  val MapDBTableName = "default"
-
-  def codecStore[A: Show, F[_]: Sync: ContextShift: MonadError_[?[_], StoreError]](
-    path: Path,
-    codec: CodecJson[A],
-    blocker: Blocker)
-    : Resource[F, IndexedStore[F, UUID, A]] =
-    for {
-      db <- mapDB[F](path)
-      table <- Resource.liftF(uuidTable[F](db))
-    } yield {
-      val prismaticCodec: Prism[String, A] =
-        Prism[String, A](str =>
-          Parse.parseOption(str).flatMap(codec.Decoder.decodeJson(_).toOption))(
-          codec.Encoder.encode(_).nospaces)
-
-      transformValue(errorFromShow[String]("CodecJson"))(
-        ConcurrentMapIndexedStore(table, Sync[F].delay { db.commit() }, blocker), prismaticCodec)
-    }
+  val DefaultTableName = "default"
 
   def errorFromShow[A: Show](desc: String)(a: A): StoreError =
     StoreError.corrupt(s"Failed to decode '$desc' from '${a.show}'")
@@ -86,19 +69,15 @@ package object storage {
       (db, Sync[F].delay(db.close))
     })
 
-  def stringTable[F[_]: Sync](db: DB): F[BTreeMap[String, String]] =
-    Sync[F].delay {
-      db.treeMap(MapDBTableName)
-        .keySerializer(Serializer.STRING)
-        .valueSerializer(Serializer.STRING)
-        .createOrOpen
-    }
+  def mvStore[F[_]: Sync](path: Path): Resource[F, MVStore] =
+    Resource[F, MVStore](Sync[F].delay {
+      val store = (new MVStore.Builder()).fileName(path.toString).open()
+      (store, Sync[F].delay(store.close))
+    })
 
-  def uuidTable[F[_]: Sync](db: DB): F[BTreeMap[UUID, String]] =
-    Sync[F].delay {
-      db.treeMap(MapDBTableName)
-        .keySerializer(Serializer.UUID)
-        .valueSerializer(Serializer.STRING)
-        .createOrOpen
-    }
+  def offheapMVStore[F[_]: Sync]: Resource[F, MVStore] =
+    Resource[F, MVStore](Sync[F].delay {
+      val store = (new MVStore.Builder()).fileStore(new OffHeapStore()).open()
+      (store, Sync[F].delay(store.close))
+    })
 }

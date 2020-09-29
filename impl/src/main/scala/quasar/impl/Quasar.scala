@@ -72,6 +72,8 @@ import org.slf4s.Logging
 import shapeless._
 
 import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, showToCats, equalToCats}
+import scodec.Codec
+import scodec.codecs.uuid
 
 import skolems.∃
 
@@ -86,6 +88,8 @@ final class Quasar[F[_], R, C <: SchemaConfig](
 
 object Quasar extends Logging {
 
+  implicit val uuidCodec: Codec[java.util.UUID] = uuid
+
   type EvalResult[F[_]] = Either[QueryResult[F], AggregateResult[F, QSMap[Fix, QueryResult[F]]]]
 
   /** What it says on the tin. */
@@ -93,7 +97,7 @@ object Quasar extends Logging {
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       schedulerRefs: IndexedStore[F, UUID, SchedulerRef[Json]],
-      pushes: PrefixStore[F, UUID :: ResourcePath :: HNil, ∃[Push[?, SqlQuery]]],
+      pushes: PrefixStore.SStore[F, UUID :: ResourcePath :: HNil, ∃[Push[?, SqlQuery]]],
       offsets: Store[F, UUID :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
       queryFederation: QueryFederation[Fix, Resource[F, ?], QueryAssociate[Fix, Resource[F, ?], EvalResult[F]], R],
       resultRender: ResultRender[F, R],
