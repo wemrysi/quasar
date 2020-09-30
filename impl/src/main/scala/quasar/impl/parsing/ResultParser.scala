@@ -85,7 +85,7 @@ object ResultParser {
     }
   }
 
-  def apply[F[_]: Sync: ConcurrentEffect: ContextShift, A: QDataEncode](queryResult: QueryResult[F]): Stream[F, A] = {
+  def apply[F[_]: ConcurrentEffect: ContextShift, A: QDataEncode](queryResult: QueryResult[F]): Stream[F, A] = {
     def parsedStream(qr: QueryResult[F]): Stream[F, A] =
       qr match {
         case QueryResult.Parsed(qdd, data, _) =>
@@ -123,7 +123,7 @@ object ResultParser {
         Stream.empty
     }
 
-  private def stateful[F[_]: Sync: ConcurrentEffect: ContextShift, P <: Plate[Unit], S, A: QDataEncode](
+  private def stateful[F[_]: ConcurrentEffect: ContextShift, P <: Plate[Unit], S, A: QDataEncode](
       format: DataFormat,
       plate: P,
       state: P => F[Option[S]],
