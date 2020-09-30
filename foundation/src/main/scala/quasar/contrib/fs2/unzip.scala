@@ -38,7 +38,8 @@ object compression {
 
     def entry(zis: ZipInputStream): OptionT[F, (String, Stream[F, Byte])] =
       OptionT(Sync[F].delay(Option(zis.getNextEntry()))).map { ze =>
-        (ze.getName, io.readInputStream[F](F.pure(zis), chunkSize, bec, closeAfterUse = false))
+        (ze.getName, io.readInputStream[F](F.pure(zis), chunkSize, bec, closeAfterUse = false)
+          .onFinalize(bec.delay(zis.closeEntry())))
       }
 
     def unzipEntries(zis: ZipInputStream): Stream[F, (String, Stream[F, Byte])] =

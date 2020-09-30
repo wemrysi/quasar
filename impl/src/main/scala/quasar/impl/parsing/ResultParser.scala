@@ -24,18 +24,14 @@ import quasar.connector.{CompressionScheme, QueryResult, DataFormat}, DataFormat
 import quasar.contrib.fs2.{compression => qcomp}
 
 import java.lang.IllegalArgumentException
-import java.util.zip.ZipInputStream
 
 import scala.collection.mutable.ArrayBuffer
 
-import cats.data.OptionT
 import cats.effect.{Sync, ConcurrentEffect, ContextShift}
-import cats.effect.Blocker
 import cats.implicits._
 
 import fs2.{Chunk, Stream, Pipe}
 import fs2.compression
-import fs2.io
 
 import qdata.{QData, QDataEncode}
 import qdata.tectonic.QDataPlate
