@@ -157,38 +157,108 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       .use(r => IO.pure(r must_=== Some(100)))
   }
 
-  "decompresses gzipped resources" >>* {
-    val ds =
-      LocalParsedDatasource[IO, RValue](
-        Paths.get("./impl/src/test/resources"),
-        1024,
-        DataFormat.gzipped(DataFormat.precise(DataFormat.json)),
-        blocker)
+  "decompression scenarios" >> {
+    "decompresses gzipped resources" >>* {
+      val ds =
+        LocalParsedDatasource[IO, RValue](
+          Paths.get("./impl/src/test/resources"),
+          1024,
+          DataFormat.gzipped(DataFormat.precise(DataFormat.json)),
+          blocker)
 
-    val iread =
-      InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.gz"), ScalarStages.Id)
+      val iread =
+        InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.gz"), ScalarStages.Id)
 
-    ds.loadFull(iread)
-      .semiflatMap(qr => Resource.liftF(compileData(qr)))
-      .value
-      .use(r => IO.pure(r must_=== Some(100)))
-  }
+      ds.loadFull(iread)
+        .semiflatMap(qr => Resource.liftF(compileData(qr)))
+        .value
+        .use(r => IO.pure(r must_=== Some(100)))
+    }
+    
+    "decompresses zipped single ldjson array file" >>* {
+      val ds =
+        LocalParsedDatasource[IO, RValue](
+          Paths.get("./impl/src/test/resources"),
+          1024,
+          DataFormat.zipped(DataFormat.precise(DataFormat.json)),
+          blocker)
 
-  "decompresses zipped resources" >>* {
-    val ds =
-      LocalParsedDatasource[IO, RValue](
-        Paths.get("./impl/src/test/resources"),
-        1024,
-        DataFormat.zipped(DataFormat.precise(DataFormat.json)),
-        blocker)
+      val iread =
+        InterpretedRead(ResourcePath.root() / ResourceName("arrayLdjsonSmallZips.json.zip"), ScalarStages.Id)
 
-    val iread =
-      InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.zip"), ScalarStages.Id)
+      ds.loadFull(iread)
+        .semiflatMap(qr => Resource.liftF(compileData(qr)))
+        .value
+        .use(r => IO.pure(r must_=== Some(100)))
+    }
 
-    ds.loadFull(iread)
-      .semiflatMap(qr => Resource.liftF(compileData(qr)))
-      .value
-      .use(r => IO.pure(r must_=== Some(100)))
+    "decompresses zipped multiple ldjson array files" >>* {
+      val ds =
+        LocalParsedDatasource[IO, RValue](
+          Paths.get("./impl/src/test/resources"),
+          1024,
+          DataFormat.zipped(DataFormat.precise(DataFormat.ldjson)),
+          blocker)
+
+      val iread =
+        InterpretedRead(ResourcePath.root() / ResourceName("multiArrayLdjsonSmallZipsInDir.zip"), ScalarStages.Id)
+
+      ds.loadFull(iread)
+        .semiflatMap(qr => Resource.liftF(compileData(qr)))
+        .value
+        .use(r => IO.pure(r must_=== Some(3)))
+    }
+
+    "decompresses zipped multiple array ldjson files in directory" >>* {
+      val ds =
+        LocalParsedDatasource[IO, RValue](
+          Paths.get("./impl/src/test/resources"),
+          1024,
+          DataFormat.zipped(DataFormat.precise(DataFormat.ldjson)),
+          blocker)
+
+      val iread =
+        InterpretedRead(ResourcePath.root() / ResourceName("multiArrayLdjsonSmallZips.zip"), ScalarStages.Id)
+
+      ds.loadFull(iread)
+        .semiflatMap(qr => Resource.liftF(compileData(qr)))
+        .value
+        .use(r => IO.pure(r must_=== Some(3)))
+    }
+
+    "decompresses zipped multiple ldjson files" >>* {
+      val ds =
+        LocalParsedDatasource[IO, RValue](
+          Paths.get("./impl/src/test/resources"),
+          1024,
+          DataFormat.zipped(DataFormat.precise(DataFormat.ldjson)),
+          blocker)
+
+      val iread =
+        InterpretedRead(ResourcePath.root() / ResourceName("multiLdjsonSmallZips.zip"), ScalarStages.Id)
+
+      ds.loadFull(iread)
+        .semiflatMap(qr => Resource.liftF(compileData(qr)))
+        .value
+        .use(r => IO.pure(r must_=== Some(30)))
+    }
+
+    "decompresses zipped multiple ldjson files in directory" >>* {
+      val ds =
+        LocalParsedDatasource[IO, RValue](
+          Paths.get("./impl/src/test/resources"),
+          1024,
+          DataFormat.zipped(DataFormat.precise(DataFormat.ldjson)),
+          blocker)
+
+      val iread =
+        InterpretedRead(ResourcePath.root() / ResourceName("multiLdjsonSmallZipsInDir.zip"), ScalarStages.Id)
+
+      ds.loadFull(iread)
+        .semiflatMap(qr => Resource.liftF(compileData(qr)))
+        .value
+        .use(r => IO.pure(r must_=== Some(30)))
+    }
   }
 
   "parses csv" >>* {

@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.ScalarStages
 import quasar.{concurrent => qc}
 import quasar.connector.{CompressionScheme, QueryResult, DataFormat}, DataFormat.JsonVariant
+import quasar.contrib.fs2.{compression => qcomp}
 
 import java.lang.IllegalArgumentException
 import java.util.zip.ZipInputStream
@@ -54,7 +55,7 @@ object ResultParser {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def typed[F[_]: Sync: ConcurrentEffect: ContextShift, A: QDataEncode](format: DataFormat): Pipe[F, Byte, A] = {
+  def typed[F[_]: ConcurrentEffect: ContextShift, A: QDataEncode](format: DataFormat): Pipe[F, Byte, A] = {
     format match {
       case DataFormat.Json(vnt, isPrecise) =>
         val mode: json.Parser.Mode = vnt match {
@@ -83,8 +84,7 @@ object ResultParser {
           .andThen(typed[F, A](pt))
 
       case DataFormat.Compressed(CompressionScheme.Zip, pt) =>
-        unzipP[F](blocker)
-          .andThen(g => g.flatMap(t => t._2) )
+        qcomp.unzip[F](blocker, DefaultDecompressionBufferSize)
           .andThen(typed[F, A](pt))
     }
   }
@@ -141,9 +141,7 @@ object ResultParser {
           .andThen(stateful(pt, plate, state, data))
 
       case DataFormat.Compressed(CompressionScheme.Zip, pt) =>
-        println("using that inflate")
-        unzipP[F](blocker)
-          .andThen(g => g.flatMap(t => t._2) )
+        qcomp.unzip[F](blocker, DefaultDecompressionBufferSize)
           .andThen(stateful(pt, plate, state, data))
 
       case DataFormat.Json(vnt, isPrecise) =>
@@ -174,33 +172,4 @@ object ResultParser {
 
         StreamParser(csv.Parser(parserPlate, cfg))(Chunk.buffer)
     }
-
-  // unzipP comes from
-  // https://gist.github.com/nmehitabel/a7c976ef8f0a41dfef88e981b9141075#file-fs2zip-scala-L18
-  private def unzipP[F[_]](
-      bec: Blocker,
-      chunkSize: Int = DefaultDecompressionBufferSize)(
-      implicit F: ConcurrentEffect[F], 
-      cs: ContextShift[F])
-      : Pipe[F, Byte, (String, Stream[F, Byte])] = {
-
-    def entry(zis: ZipInputStream): OptionT[F, (String, Stream[F, Byte])] =
-      OptionT(Sync[F].delay(Option(zis.getNextEntry()))).map { ze =>
-        (ze.getName, io.readInputStream[F](F.delay(zis), DefaultDecompressionBufferSize, bec, closeAfterUse = false))
-      }
-
-    def unzipEntries(zis: ZipInputStream): Stream[F, (String, Stream[F, Byte])] =
-      Stream.unfoldEval(zis) { zis0 =>
-        entry(zis0).map((_, zis0)).value
-      }
-
-    value: Stream[F, Byte] =>
-      value.through(io.toInputStream).flatMap { is: InputStream =>
-        val zis: F[ZipInputStream]          = Sync[F].delay(new ZipInputStream(is))
-        val zres: Stream[F, ZipInputStream] = Stream.bracket(zis)(zis => Sync[F].delay(zis.close()))
-        zres.flatMap { z =>
-          unzipEntries(z)
-        }
-      }
-   }
 }
