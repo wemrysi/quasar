@@ -174,6 +174,23 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       .use(r => IO.pure(r must_=== Some(100)))
   }
 
+  "decompresses zipped resources" >>* {
+    val ds =
+      LocalParsedDatasource[IO, RValue](
+        Paths.get("./impl/src/test/resources"),
+        1024,
+        DataFormat.zipped(DataFormat.precise(DataFormat.json)),
+        blocker)
+
+    val iread =
+      InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.zip"), ScalarStages.Id)
+
+    ds.loadFull(iread)
+      .semiflatMap(qr => Resource.liftF(compileData(qr)))
+      .value
+      .use(r => IO.pure(r must_=== Some(100)))
+  }
+
   "parses csv" >>* {
     val ds = LocalParsedDatasource[IO, RValue](
       Paths.get("./impl/src/test/resources"),

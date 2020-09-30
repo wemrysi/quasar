@@ -136,7 +136,7 @@ object LocalConfigSpec extends quasar.Qspec {
 
       Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
     }
-    "can handle compressed" >> {
+    "can handle gzip compressed" >> {
       val js = """
         {
           "rootDir": "/data",
@@ -150,11 +150,21 @@ object LocalConfigSpec extends quasar.Qspec {
           LocalConfig.DefaultReadChunkSizeBytes,
           DataFormat.gzipped(DataFormat.json))
 
-      val exp1 =
+      Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
+    }
+    "can handle zip compressed" >> {
+      val js = """
+        {
+          "rootDir": "/data",
+          "format": { "type": "json", "variant": "array-wrapped", "precise": false },
+          "compressionScheme": "zip"
+        }
+      """.stripMargin
+      val exp =
         LocalConfig(
           "/data",
           LocalConfig.DefaultReadChunkSizeBytes,
-          DataFormat.gzipped(DataFormat.json))
+          DataFormat.zipped(DataFormat.json))
 
       Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
     }

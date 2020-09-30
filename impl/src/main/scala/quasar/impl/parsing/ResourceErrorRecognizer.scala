@@ -49,6 +49,8 @@ object ResourceErrorRecognizer {
   val typeSummary: DataFormat => String = {
     case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
       "gzipped " + typeSummary(pt: DataFormat)
+    case DataFormat.Compressed(CompressionScheme.Zip, pt) =>
+      "zipped " + typeSummary(pt: DataFormat)
     case v: DataFormat.SeparatedValues =>
       "separated values"
     case DataFormat.Json(vnt, isPrecise) =>
