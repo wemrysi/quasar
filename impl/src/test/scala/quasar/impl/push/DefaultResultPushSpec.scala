@@ -21,11 +21,11 @@ import slamdata.Predef._
 import cats.data.{Ior, NonEmptyList, NonEmptySet}
 import cats.derived.auto.order._
 import cats.effect.{Blocker, IO, Resource}
-import cats.effect.concurrent.Ref
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.implicits._
 
 import fs2.{Pipe, Stream, text}
-import fs2.concurrent.{Enqueue, Queue}
+import fs2.concurrent.Queue
 
 import java.time.{Instant, ZoneOffset}
 
@@ -67,16 +67,12 @@ import skolems.{∃, ∀}
 import spire.math.Real
 
 object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
-
   import ResultPushError._
+
+  addSections
 
   implicit val intCodec: Codec[Int] = int32
   implicit val resourcePathCodec: Codec[ResourcePath] = SerializableStore.codec[ResourcePath]
-
-
-  skipAllIf(true)
-
-  addSections
 
   implicit val ioMonadStoreError: MonadError_[IO, StoreError] =
     MonadError_.facet[IO](StoreError.throwableP)
@@ -99,7 +95,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   // The string formed by concatentating Ws
   val dataString = W1 + W2 + W3
 
-  final class QDestination(q: Enqueue[IO, Option[Filesystem]], support: QDestination.Support)
+  final class QDestination(fs: Ref[IO, Filesystem], support: QDestination.Support)
       extends Destination[IO] {
 
     import QDestination._
@@ -170,24 +166,33 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       case All => NonEmptyList.of(createSink, upsertSink)
     }
 
-    val createSink: ResultSink[IO, Type] = ResultSink.create { (dst, _) =>
-      val pipe =
-        (_: Stream[IO, Byte]).through(text.utf8Decode)
-          .evalMap(s => q.enqueue1(Some(Map(dst -> s))))
-          .onFinalize(q.enqueue1(None))
+    val createSink: ResultSink[IO, Type] =
+      ResultSink.create { (dst, _) =>
+        val pipe = (in: Stream[IO, Byte]) =>
+          (Stream.eval_(fs.update(_.updated(dst, ""))) ++ in)
+            .through(text.utf8Decode)
+            .evalMap(s => fs.update(_ |+| Map(dst -> s)))
 
-      (RenderConfig.Csv(), pipe)
-    }
+        (RenderConfig.Csv(), pipe)
+      }
 
-    val upsertSink: ResultSink[IO, Type] = {
-      ResultSink.upsert[IO, Type, Byte](args => {
+    val upsertSink: ResultSink[IO, Type] =
+      ResultSink.upsert[IO, Type, Byte] { args =>
+        val init = args.writeMode match {
+          case WriteMode.Replace =>
+            Stream.eval_(fs.update(_.updated(args.path, "")))
+
+          case WriteMode.Append =>
+            Stream.empty
+        }
+
         def pipe[A](dataEvents: Stream[IO, DataEvent[Byte, OffsetKey.Actual[A]]])
             : Stream[IO, OffsetKey.Actual[A]] =
-          dataEvents.flatMap {
+          (init ++ dataEvents) flatMap {
             case DataEvent.Create(c) =>
               Stream.chunk(c)
                 .through(text.utf8Decode)
-                .evalMap(s => q.enqueue1(Some(Map(args.path -> s))))
+                .evalMap(s => fs.update(_ |+| Map(args.path -> s)))
                 .drain
 
             case DataEvent.Commit(k) =>
@@ -196,12 +201,10 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             case _ =>
               Stream.empty
           }
-          .onFinalize(q.enqueue1(None))
 
         (RenderConfig.Csv(),
           ∀[λ[α => Pipe[IO, DataEvent[Byte, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]](pipe))
-      })
-    }
+      }
   }
 
   object QDestination {
@@ -210,9 +213,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     object Upsert extends Support
     object All extends Support
 
-    def apply(supports: Support = All): IO[(QDestination, Stream[IO, Filesystem])] =
-      Queue.unbounded[IO, Option[Filesystem]] map { q =>
-        (new QDestination(q, supports), q.dequeue.unNoneTerminate.scanMonoid)
+    def apply(supports: Support = All): IO[(QDestination, IO[Filesystem])] =
+      Ref.of[IO, Filesystem](Map()) map { fs =>
+        (new QDestination(fs, supports), fs.get)
       }
   }
 
@@ -315,6 +318,25 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   val dataStream: Stream[IO, String] =
     Stream.fixedDelay[IO](100.millis).zipRight(Stream(W1, W2, W3))
 
+  def startLatch[A](s: Stream[IO, A], count: Int = 0): IO[(Stream[IO, A], IO[Unit])] =
+    Deferred[IO, Unit] map { latch =>
+      val latchIdx = count - 1
+
+      val latched =
+        if (count <= 0)
+          Stream.eval_(latch.complete(())) ++ s
+        else
+          s.zipWithIndex flatMap {
+            case (a, i) if i == latchIdx =>
+              Stream.emit(a) ++ Stream.eval_(latch.complete(()))
+
+            case (a, _) =>
+              Stream.emit(a)
+          }
+
+      (latched, latch.get)
+    }
+
   def mkResultPush(
       destinations: Map[Int, Destination[IO]],
       evaluator: QueryEvaluator[Resource[IO, ?], (String, Option[Offset]), Stream[IO, String]],
@@ -351,18 +373,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           offsets)
 
     } yield resultPush
-  }
-
-  def awaitFs(fss: Stream[IO, Filesystem], count: Long = -1): IO[Filesystem] = {
-    val (s, msg) =
-      if (count <= 0)
-        (fss, "final filesystem")
-      else
-        (fss.take(count + 1), s"${count} filesystem updates")
-
-    s.compile.lastOrError.timeoutTo(
-      Timeout,
-      IO.raiseError(new RuntimeException(s"Expected $msg within ${Timeout}.")))
   }
 
   def await[A](io: IO[A]): IO[A] =
@@ -422,7 +432,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             result <- await(started.sequence)
 
-            filesystemAfterPush <- awaitFs(filesystem)
+            filesystemAfterPush <- filesystem
           } yield {
             filesystemAfterPush.keySet must equal(Set(config.value.path))
             filesystemAfterPush(config.value.path) must equal(dataString)
@@ -440,7 +450,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
       for {
         (destination, filesystem) <- QDestination()
-        (ctl, data) <- controlledStream
+        (ctl, data0) <- controlledStream
+        (data, awaitStart) <- startLatch(data0)
 
         r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(data))) use { rp =>
           for {
@@ -448,7 +459,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // ensure first start is running to avoid race conditions
             _ <- ctl.emit(W1)
-            _ <- awaitFs(filesystem, 1)
+            _ <- awaitStart
 
             secondStartStatus <- rp.start(DestinationId, config, None)
           } yield {
@@ -465,7 +476,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
       for {
         (destination, filesystem) <- QDestination()
-        (ctl, data) <- controlledStream
+        (ctl, data0) <- controlledStream
+        (data, awaitStart) <- startLatch(data0)
 
         r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(data))) use { rp =>
           for {
@@ -473,7 +485,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // ensure first start is running to avoid race conditions
             _ <- ctl.emit(W1)
-            _ <- awaitFs(filesystem, 1)
+            _ <- awaitStart
 
             secondStartStatus <- rp.start(DestinationId, config, None)
           } yield {
@@ -689,12 +701,12 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           for {
             prv <- rp.start(DestinationId, prev, None)
             _ <- await(prv.sequence)
-            fs0 <- awaitFs(filesystem)
+            fs0 <- filesystem
 
             res <- rp.start(DestinationId, config, None)
             terminal <- await(res.sequence)
 
-            fs1 <- awaitFs(filesystem)
+            fs1 <- filesystem
           } yield {
             terminal must beRight.like {
               case Status.Finished(_, _, _) => ok
@@ -721,12 +733,12 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           for {
             prv <- rp.start(DestinationId, prev, None)
             _ <- await(prv.sequence)
-            fs0 <- awaitFs(filesystem)
+            fs0 <- filesystem
 
             res <- rp.start(DestinationId, config, None)
             terminal <- await(res.sequence)
 
-            fs1 <- awaitFs(filesystem)
+            fs1 <- filesystem
           } yield {
             terminal must beRight.like {
               case Status.Finished(_, _, _) => ok
@@ -748,7 +760,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             result <- await(started.sequence)
 
-            filesystemAfterPush <- awaitFs(filesystem)
+            filesystemAfterPush <- filesystem
           } yield {
             filesystemAfterPush.keySet must equal(Set(config.value.path))
             filesystemAfterPush(config.value.path) must equal(W1+W2)
@@ -813,7 +825,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             result <- await(started.sequence)
 
-            filesystemAfterPush <- awaitFs(filesystem)
+            filesystemAfterPush <- filesystem
           } yield {
             filesystemAfterPush.keySet must equal(Set(incCfg.value.path))
             filesystemAfterPush(incCfg.value.path) must equal(dataString)
@@ -849,7 +861,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             _ <- ctl.halt
 
             startRes <- await(started.sequence)
-            fs1 <- awaitFs(filesystem)
+            fs1 <- filesystem
 
             updated <- rp.update(DestinationId, config.value.path)
 
@@ -860,7 +872,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             _ <- ctl.halt
 
             updateRes <- await(updated.sequence)
-            fs2 <- awaitFs(filesystem)
+            fs2 <- filesystem
           } yield {
             startRes must beRight.like {
               case Status.Finished(_, _, _) => ok
@@ -901,13 +913,13 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // offset = 15 since 3 emits
             startRes <- await(started.sequence)
-            fs1 <- awaitFs(filesystem)
+            fs1 <- filesystem
 
             // resume from offset = 15
             updated <- rp.update(DestinationId, config.value.path)
 
             updateRes <- await(updated.sequence)
-            fs2 <- awaitFs(filesystem)
+            fs2 <- filesystem
           } yield {
             startRes must beRight.like {
               case Status.Finished(_, _, _) => ok
@@ -917,7 +929,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             updateRes must beRight.like {
               case Status.Finished(_, _, _) => ok
             }
-            fs2.get(path) must beSome(W2+W2+W2)
+            fs2.get(path) must beSome(W1+W1+W1+W2+W2+W2)
           }
         }
       } yield r
@@ -950,7 +962,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // no offset since nothing emitted
             startRes <- await(started.sequence)
-            fs1 <- awaitFs(filesystem)
+            fs1 <- filesystem
 
             // resume from beginning
             update1 <- rp.update(DestinationId, config.value.path)
@@ -960,18 +972,18 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // offset = 5 since emitted a value before boom
             update1Res <- await(update1.sequence)
-            fs2 <- awaitFs(filesystem)
+            fs2 <- filesystem
 
             // resume from offset = 5
             update2 <- rp.update(DestinationId, config.value.path)
 
             update2Res <- await(update2.sequence)
-            fs3 <- awaitFs(filesystem)
+            fs3 <- filesystem
           } yield {
             startRes must beRight.like {
               case Status.Failed(_, _, _, _) => ok
             }
-            fs1.get(path) must beNone
+            fs1.get(path) must beSome("")
 
             update1Res must beRight.like {
               case Status.Failed(_, _, _, _) => ok
@@ -981,7 +993,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             update2Res must beRight.like {
               case Status.Finished(_, _, _) => ok
             }
-            fs3.get(path) must beSome(dataString)
+            fs3.get(path) must beSome(W2+dataString)
           }
         }
       } yield r
@@ -1019,7 +1031,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // offset still = 17 since nothing emitted
             startRes <- await(started.sequence)
-            fs1 <- awaitFs(filesystem)
+            fs1 <- filesystem
 
             // resume from 17
             update1 <- rp.update(DestinationId, config.value.path)
@@ -1030,12 +1042,12 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // offset = 10 since emitted two values before halt
             update1Res <- await(update1.sequence)
-            fs2 <- awaitFs(filesystem)
+            fs2 <- filesystem
           } yield {
             startRes must beRight.like {
               case Status.Failed(_, _, _, _) => ok
             }
-            fs1.get(path) must beNone
+            fs1.get(path) must beSome("")
 
             update1Res must beRight.like {
               case Status.Finished(_, _, _) => ok
@@ -1079,7 +1091,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // offset = 5
             startRes <- await(started.sequence)
-            fs1 <- awaitFs(filesystem)
+            fs1 <- filesystem
 
             // resume from 5
             update1 <- rp.update(DestinationId, config.value.path)
@@ -1090,7 +1102,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // offset = 10 since emitted two values before boom
             update1Res <- await(update1.sequence)
-            fs2 <- awaitFs(filesystem)
+            fs2 <- filesystem
 
             // resume from 10
             update2 <- rp.update(DestinationId, config.value.path)
@@ -1102,7 +1114,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // offset = 15
             update2Res <- await(update2.sequence)
-            fs3 <- awaitFs(filesystem)
+            fs3 <- filesystem
           } yield {
             startRes must beRight.like {
               case Status.Finished(_, _, _) => ok
@@ -1112,12 +1124,12 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             update1Res must beRight.like {
               case Status.Failed(_, _, _, _) => ok
             }
-            fs2.get(path) must beSome(W2+W2)
+            fs2.get(path) must beSome(W1+W2+W2)
 
             update2Res must beRight.like {
               case Status.Finished(_, _, _) => ok
             }
-            fs3.get(path) must beSome(W3+W3+W3)
+            fs3.get(path) must beSome(W1+W2+W2+W3+W3+W3)
           }
         }
       } yield r
@@ -1143,7 +1155,14 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       for {
         (dest, filesystem) <- QDestination()
 
-        (ctl, data) <- controlledStream
+        latch <- Deferred[IO, Unit]
+
+        (ctl, data0) <- controlledStream
+
+        data = data0 flatMap {
+          case W2 => Stream.eval(latch.complete(())).as(W2)
+          case other => Stream.emit(other)
+        }
 
         r <- mkResultPush(Map(DestinationId -> dest), constEvaluator(IO(data))) use { rp =>
           for {
@@ -1151,8 +1170,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             _ <- ctl.emit(W1)
             _ <- ctl.halt
-            // consume fs events from started
-            _ <- awaitFs(filesystem)
 
             startRes <- await(started.sequence)
 
@@ -1160,7 +1177,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
             // ensure update1 is running to avoid race conditions
             _ <- ctl.emit(W2)
-            _ <- awaitFs(filesystem, 1)
+            _ <- latch.get
 
             update2 <- rp.update(DestinationId, config.value.path)
           } yield {
@@ -1185,15 +1202,17 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       for {
         (destination, filesystem) <- QDestination()
 
-        (ctl, data) <- controlledStream
+        (ctl, data0) <- controlledStream
+        (data, awaitStart) <- startLatch(data0, 1)
 
         r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(data))) use { rp =>
           for {
             startRes <- rp.start(DestinationId, config, None)
 
             _ <- ctl.emit(W1)
+            _ <- awaitStart
 
-            filesystemAfterPush <- awaitFs(filesystem, 1)
+            filesystemAfterPush <- filesystem
 
             cancelRes <- rp.cancel(DestinationId, path)
 
@@ -1213,13 +1232,12 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "no-op when push already completed" >> forallConfigs { config =>
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, _) <- QDestination()
 
         r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
           for {
             startRes <- rp.start(DestinationId, config, None)
 
-            _ <- awaitFs(filesystem)
             _ <- await(startRes.sequence)
 
             cancelRes <- rp.cancel(DestinationId, config.value.path)
@@ -1256,16 +1274,17 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "includes running push" >> forallConfigs { config =>
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, _) <- QDestination()
 
-        (ctl, data) <- controlledStream
+        (ctl, data0) <- controlledStream
+        (data, awaitStart) <- startLatch(data0)
 
         pushed <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(data))) use { rp =>
           for {
             _ <- rp.start(DestinationId, config, None)
 
             _ <- ctl.emit(W1)
-            _ <- awaitFs(filesystem, 1)
+            _ <- awaitStart
 
             ps <- rp.pushedTo(DestinationId)
           } yield ps
@@ -1281,7 +1300,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "includes running push when previous terminal exists" >> forallConfigs { config =>
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, _) <- QDestination()
 
         cfg0 = config.value
         cfgQ = cfg0.query
@@ -1289,7 +1308,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
         initialCfg = ∃[PushConfig[?, String]](PushConfig.query.set(initialQ)(cfg0))
 
-        (ctl, data) <- controlledStream
+        (ctl, data0) <- controlledStream
+        (data, awaitStart) <- startLatch(data0)
 
         eval = mkEvaluator {
           case (`initialQ`, None) => IO(dataStream)
@@ -1299,7 +1319,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         r <- mkResultPush(Map(DestinationId -> destination), eval) use { rp =>
           for {
             initRes <- rp.start(DestinationId, initialCfg, None)
-            _ <- awaitFs(filesystem) // consume fs updates
             _ <- await(initRes.sequence)
 
             initPushed <- rp.pushedTo(DestinationId)
@@ -1307,7 +1326,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             _ <- rp.start(DestinationId, config, None)
 
             _ <- ctl.emit(W1)
-            _ <- awaitFs(filesystem, 1)
+            _ <- awaitStart
 
             nextPushed <- rp.pushedTo(DestinationId)
           } yield {
@@ -1327,16 +1346,17 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "includes canceled push" >> forallConfigs { config =>
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, _) <- QDestination()
 
-        (ctl, data) <- controlledStream
+        (ctl, data0) <- controlledStream
+        (data, awaitStarted) <- startLatch(data0)
 
         pushed <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(data))) use { rp =>
           for {
             startRes <- rp.start(DestinationId, config, None)
 
             _ <- ctl.emit(W1)
-            _ <- awaitFs(filesystem, 1)
+            _ <- awaitStarted
 
             _ <- rp.cancel(DestinationId, config.value.path)
 
@@ -1356,7 +1376,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "includes completed push" >> forallConfigs { config =>
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, _) <- QDestination()
 
         pushed <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
           for {
@@ -1377,7 +1397,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "includes pushes that failed to initialize along with error that led to failure" >> forallConfigs { config =>
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, _) <- QDestination()
 
         eval = constEvaluator(IO.raiseError[Stream[IO, String]](new Exception("boom")))
 
@@ -1402,7 +1422,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val ex = new Exception("errored!")
 
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, _) <- QDestination()
 
         eval = constEvaluator(IO(dataStream ++ Stream.raiseError[IO](ex)))
 
@@ -1425,7 +1445,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "results in previous terminal status if canceled before started" >> forallConfigs { config =>
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, _) <- QDestination()
 
         cfg0 = config.value
         origQ = cfg0.query
@@ -1442,7 +1462,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             PushConfig.query.set(otherQ)(cfg0)))
 
         (ctl1, data1) <- controlledStream
-        (ctl2, data2) <- controlledStream
+        (ctl2, data20) <- controlledStream
+        (data2, started2) <- startLatch(data20)
 
         eval = mkEvaluator {
           case (`initialQ`, None) => IO(dataStream)
@@ -1453,7 +1474,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         r <- mkResultPush(Map(DestinationId -> destination), eval, 1) use { rp =>
           for {
             init <- rp.start(DestinationId, initialCfg, None)
-            _ <- awaitFs(filesystem) // consume fs updates
             initRes <- await(init.sequence)
 
             initPushes <- rp.pushedTo(DestinationId)
@@ -1463,7 +1483,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             again <- rp.start(DestinationId, againCfg, None)
 
             _ <- ctl2.emit(W1)
-            _ <- awaitFs(filesystem, 1)
+            _ <- started2
 
             otherPushes <- rp.pushedTo(DestinationId)
 
@@ -1522,10 +1542,12 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val incCfg = incremental(path2, "queryBar")
 
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, _) <- QDestination()
 
-        (ctlA, dataA) <- controlledStream
-        (ctlB, dataB) <- controlledStream
+        (ctlA, dataA0) <- controlledStream
+        (dataA, startedA) <- startLatch(dataA0)
+        (ctlB, dataB0) <- controlledStream
+        (dataB, startedB) <- startLatch(dataB0)
 
         eval = mkEvaluator {
           case ("queryFoo", _) => IO(dataA)
@@ -1540,7 +1562,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             _ <- ctlA.emit(W1)
             _ <- ctlB.emit(W2)
 
-            _ <- awaitFs(filesystem, 2)
+            _ <- startedA *> startedB
 
             _ <- rp.cancelAll
 
