@@ -82,9 +82,10 @@ object ResultParser {
           .andThen(_.flatMap(_.content))
           .andThen(typed[F, A](pt))
 
-      case DataFormat.Compressed(CompressionScheme.Zip, pt) => {
-        unzip[F](_, blocker, DefaultDecompressionBufferSize).flatMap(t => t._2)
-      }
+      case DataFormat.Compressed(CompressionScheme.Zip, pt) =>
+        unzipP[F](blocker)
+          .andThen(g => g.flatMap(t => t._2) )
+          .andThen(typed[F, A](pt))
     }
   }
 
@@ -126,7 +127,7 @@ object ResultParser {
         Stream.empty
     }
 
-  private def stateful[F[_]: Sync, P <: Plate[Unit], S, A: QDataEncode](
+  private def stateful[F[_]: Sync: ConcurrentEffect: ContextShift, P <: Plate[Unit], S, A: QDataEncode](
       format: DataFormat,
       plate: P,
       state: P => F[Option[S]],
@@ -139,13 +140,11 @@ object ResultParser {
           .andThen(_.flatMap(_.content))
           .andThen(stateful(pt, plate, state, data))
 
-      case DataFormat.Compressed(CompressionScheme.Zip, pt) => {
+      case DataFormat.Compressed(CompressionScheme.Zip, pt) =>
         println("using that inflate")
-        compression
-          .inflate[F](false, DefaultDecompressionBufferSize)
-          //.andThen(_.flatMap(_.content))
+        unzipP[F](blocker)
+          .andThen(g => g.flatMap(t => t._2) )
           .andThen(stateful(pt, plate, state, data))
-      }
 
       case DataFormat.Json(vnt, isPrecise) =>
         val mode: json.Parser.Mode = vnt match {
@@ -176,6 +175,8 @@ object ResultParser {
         StreamParser(csv.Parser(parserPlate, cfg))(Chunk.buffer)
     }
 
+  // unzipP comes from
+  // https://gist.github.com/nmehitabel/a7c976ef8f0a41dfef88e981b9141075#file-fs2zip-scala-L18
   private def unzipP[F[_]](
       bec: Blocker,
       chunkSize: Int = DefaultDecompressionBufferSize)(
@@ -202,11 +203,4 @@ object ResultParser {
         }
       }
    }
-
-  private def unzip[F[_]](zipped: Stream[F, Byte], bec: Blocker, chunkSize: Int = DefaultDecompressionBufferSize)(
-      implicit F: ConcurrentEffect[F],
-      cs: ContextShift[F])
-      : Stream[F, (String, Stream[F, Byte])] =
-    zipped.through(unzipP(bec, chunkSize))
-
 }

@@ -24,7 +24,7 @@ import quasar.impl.parsing.ResultParser
 
 import java.nio.file.{Path => JPath}
 
-import cats.effect.{Blocker, ContextShift, Effect, Timer}
+import cats.effect.{Blocker, ConcurrentEffect, ContextShift, Effect, Timer}
 import fs2.io
 import qdata.{QDataDecode, QDataEncode}
 
@@ -34,7 +34,7 @@ object LocalParsedDatasource {
 
   /* @param readChunkSizeBytes the number of bytes per chunk to use when reading files.
   */
-  def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer, A: QDataDecode: QDataEncode](
+  def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer: ConcurrentEffect, A: QDataDecode: QDataEncode](
       root: JPath,
       readChunkSizeBytes: Int,
       format: DataFormat,
