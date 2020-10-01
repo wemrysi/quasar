@@ -28,11 +28,12 @@ import fs2.{Stream, Pipe}
 import fs2.io
 
 object compression {
-  // unzipP comes from https://gist.github.com/nmehitabel/a7c976ef8f0a41dfef88e981b9141075#file-fs2zip-scala-L18
-  private def unzipP[F[_]](
+
+  // unzipEach comes from https://gist.github.com/nmehitabel/a7c976ef8f0a41dfef88e981b9141075#file-fs2zip-scala-L18
+  def unzipEach[F[_]](
       bec: Blocker,
       chunkSize: Int)(
-      implicit F: ConcurrentEffect[F], 
+      implicit F: ConcurrentEffect[F],
       cs: ContextShift[F])
       : Pipe[F, Byte, (String, Stream[F, Byte])] = {
 
@@ -58,8 +59,8 @@ object compression {
    }
 
    def unzip[F[_]](bec: Blocker, chunkSize: Int)(
-       implicit F: ConcurrentEffect[F], 
-        cs: ContextShift[F])
-        : Pipe[F, Byte, Byte] = 
-      unzipP[F](bec, chunkSize).andThen(_.flatMap(_._2))
+       implicit F: ConcurrentEffect[F],
+       cs: ContextShift[F])
+       : Pipe[F, Byte, Byte] =
+     unzipEach[F](bec, chunkSize).andThen(_.flatMap(_._2))
 }
