@@ -69,6 +69,12 @@ package object storage {
       (db, Sync[F].delay(db.close))
     })
 
+  def inMemoryMapDb[F[_]: Sync]: Resource[F, DB] =
+    Resource[F, DB](Sync[F].delay {
+      val db = DBMaker.memoryDB().make()
+      (db, Sync[F].delay(db.close))
+    })
+
   def mvStore[F[_]: Sync](path: Path): Resource[F, MVStore] =
     Resource[F, MVStore](Sync[F].delay {
       val store = (new MVStore.Builder()).fileName(path.toString).open()

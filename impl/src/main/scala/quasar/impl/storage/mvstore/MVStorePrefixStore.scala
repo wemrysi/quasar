@@ -143,8 +143,8 @@ object MVStorePrefixStore {
       db: MVStore,
       name: String,
       blocker: Blocker)
-      : F[PrefixStore.SStore[F, K, V]] =
-    blocker.delay[F, PrefixStore.SStore[F, K, V]] {
+      : F[PrefixStore.SCodec[F, K, V]] =
+    blocker.delay[F, PrefixStore.SCodec[F, K, V]] {
       val store: MVMap[Array[Byte], Array[Byte]] = db.openMap(name)
       new MVStorePrefixStore[F, K, V](store, blocker)
     }

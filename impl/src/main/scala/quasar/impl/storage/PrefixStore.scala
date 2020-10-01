@@ -45,15 +45,14 @@ trait PrefixStore[F[_], K <: HList, V] extends IndexedStore[F, K, V] {
 }
 
 object PrefixStore {
+  type ToArray[L <: HList] = ToTraversable.Aux[L, Array, AnyRef]
+
   type Aux[F[_], K <: HList, V, C[P <: HList]] = PrefixStore[F, K, V] {
     type Constraint[P <: HList] = C[P]
   }
 
-  type ToArray[L <: HList] = ToTraversable.Aux[L, Array, AnyRef]
-
-  type TStore[F[_], K <: HList, V] = Aux[F, K, V, ToArray]
-
-  type SStore[F[_], K <: HList, V] = Aux[F, K, V, Codec]
+  type Legacy[F[_], K <: HList, V] = Aux[F, K, V, ToArray]
+  type SCodec[F[_], K <: HList, V] = Aux[F, K, V, Codec]
 
   def xmapValueF[F[_]: Monad, K <: HList, V1, V2](
       s: PrefixStore[F, K, V1])(

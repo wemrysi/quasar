@@ -99,6 +99,18 @@ object ResourcePath extends ResourcePathInstances {
       case ICons(h, t) => h /: resourceNamesIso(t)
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  val resourceNameListIso: Iso[ResourcePath, List[ResourceName]] =
+    Iso[ResourcePath, List[ResourceName]] {
+      _.uncons match {
+        case None => List()
+        case Some((name, path)) => name :: resourceNameListIso.get(path)
+      }
+    } {
+      case List() => Root
+      case h :: t => h /: resourceNameListIso(t)
+    }
+
   val leaf: Prism[ResourcePath, AFile] =
     Prism.partial[ResourcePath, AFile] {
       case Leaf(f) => f

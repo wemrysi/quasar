@@ -30,7 +30,7 @@ import shapeless.ops.hlist._
 import scodec._
 
 final class PrefixByteStores[F[_]: Applicative, K: Codec] private (
-    store: PrefixStore.SStore[F, K :: String :: HNil, Array[Byte]])
+    store: PrefixStore.SCodec[F, K :: String :: HNil, Array[Byte]])
     extends ByteStores[F, K] {
 
   private class PrefixByteStore(prefix: K) extends ByteStore[F] {
@@ -53,7 +53,7 @@ final class PrefixByteStores[F[_]: Applicative, K: Codec] private (
 
 object PrefixByteStores {
   def apply[F[_]: Applicative, K: Codec](
-      store: PrefixStore.SStore[F, K :: String :: HNil, Array[Byte]])
+      store: PrefixStore.SCodec[F, K :: String :: HNil, Array[Byte]])
       : ByteStores[F, K] =
     new PrefixByteStores(store)
 }
