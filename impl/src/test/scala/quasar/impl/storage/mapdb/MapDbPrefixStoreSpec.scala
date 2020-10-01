@@ -44,7 +44,7 @@ final class MapDbPrefixStoreSpec extends IndexedStoreSpec[IO, UUID :: jl.String 
     def jlong: jl.Long = jl.Long.valueOf(i.toLong)
   }
 
-  val emptyStore: Resource[IO, PrefixStore.TStore[IO, UUID :: jl.String :: jl.Integer :: HNil, jl.Long]] =
+  val emptyStore: Resource[IO, PrefixStore.Legacy[IO, UUID :: jl.String :: jl.Integer :: HNil, jl.Long]] =
     Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close())) evalMap { db =>
       MapDbPrefixStore[IO](
         "mapdb-prefix-store-spec",

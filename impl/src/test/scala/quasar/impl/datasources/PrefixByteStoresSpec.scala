@@ -16,20 +16,15 @@
 
 package quasar.impl.datasources
 
+import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage
-import quasar.impl.storage.mvstore.MVStorePrefixStore
-//import quasar.impl.storage.mapdb.MapDbPrefixStore
+import quasar.impl.storage.StoreError
+import quasar.impl.storage.mvstore.MVPrefixStore
 
 import slamdata.Predef._
-import scala.Predef.classOf
 
-import cats.Eq
-import cats.effect.{Blocker, IO, Resource}
+import cats.effect.{Blocker, IO}
 import cats.implicits._
-
-import org.mapdb.{DBMaker, Serializer}
-
-import java.lang.Integer
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -39,9 +34,10 @@ import scodec.Codec
 import scodec.bits.ByteVector
 import scodec.codecs.{int32, bytes, utf8_32, variableSizeBytes}
 
-import PrefixByteStoresSpec._
-
 final class PrefixByteStoresSpec extends ByteStoresSpec[IO, Int] {
+  implicit val ioStoreError: MonadError_[IO, StoreError] =
+    MonadError_.facet[IO](StoreError.throwableP)
+
   implicit val intCodec: Codec[Int] = int32
 
   implicit val strCodec: Codec[String] = utf8_32
@@ -51,27 +47,14 @@ final class PrefixByteStoresSpec extends ByteStoresSpec[IO, Int] {
 
   val byteStores =
     storage.offheapMVStore[IO] evalMap { db =>
-//    Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close())) evalMap { db =>
       val prefixStore =
-        MVStorePrefixStore[IO, Int :: String :: HNil, Array[Byte]](
+        MVPrefixStore[IO, Int :: String :: HNil, Array[Byte]](
           db,
           "prefix-bytestores-spec",
           Blocker.liftExecutionContext(global))
-//        MapDbPrefixStore[IO](
-//          "prefix-bytestores-spec",
-//          db,
-//          Serializer.INTEGER :: Serializer.STRING :: HNil,
-//          Serializer.BYTE_ARRAY,
-//          Blocker.liftExecutionContext(global))
-
       prefixStore.map(PrefixByteStores(_))
     }
 
   val k1 = 3
   val k2 = 7
-}
-
-object PrefixByteStoresSpec {
-//  implicit val jIntegerEq: Eq[Integer] =
-//    Eq.by(_.intValue)
 }
