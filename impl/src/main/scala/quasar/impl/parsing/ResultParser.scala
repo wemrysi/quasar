@@ -43,7 +43,7 @@ import tectonic.fs2.StreamParser
 
 object ResultParser {
   val DefaultDecompressionBufferSize: Int = 32768
-  val blocker = qc.Blocker.cached("sdbe-runner")
+  val blocker = qc.Blocker.cached("qusar-result-parser")
 
   private def concatArrayBufs[A](bufs: List[ArrayBuffer[A]]): ArrayBuffer[A] = {
     val totalSize = bufs.foldLeft(0)(_ + _.length)
@@ -51,7 +51,8 @@ object ResultParser {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def typed[F[_]: ConcurrentEffect: ContextShift, A: QDataEncode](format: DataFormat): Pipe[F, Byte, A] = {
+  def typed[F[_]: ConcurrentEffect: ContextShift, A: QDataEncode](format: DataFormat)
+      : Pipe[F, Byte, A] = {
     format match {
       case DataFormat.Json(vnt, isPrecise) =>
         val mode: json.Parser.Mode = vnt match {
@@ -85,7 +86,8 @@ object ResultParser {
     }
   }
 
-  def apply[F[_]: ConcurrentEffect: ContextShift, A: QDataEncode](queryResult: QueryResult[F]): Stream[F, A] = {
+  def apply[F[_]: ConcurrentEffect: ContextShift, A: QDataEncode](queryResult: QueryResult[F])
+      : Stream[F, A] = {
     def parsedStream(qr: QueryResult[F]): Stream[F, A] =
       qr match {
         case QueryResult.Parsed(qdd, data, _) =>
