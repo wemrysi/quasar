@@ -21,7 +21,7 @@ import slamdata.Predef._
 import java.util.zip.ZipInputStream
 
 import cats.data.OptionT
-import cats.effect.{Sync, ConcurrentEffect, ContextShift}
+import cats.effect.{ConcurrentEffect, ContextShift}
 import cats.effect.Blocker
 
 import fs2.{Stream, Pipe}
@@ -31,36 +31,41 @@ object compression {
 
   // unzipEach comes from https://gist.github.com/nmehitabel/a7c976ef8f0a41dfef88e981b9141075#file-fs2zip-scala-L18
   def unzipEach[F[_]](
-      bec: Blocker,
+      blocker: Blocker,
       chunkSize: Int)(
       implicit F: ConcurrentEffect[F],
       cs: ContextShift[F])
       : Pipe[F, Byte, (String, Stream[F, Byte])] = {
 
-    def entry(zis: ZipInputStream): OptionT[F, (String, Stream[F, Byte])] =
-      OptionT(Sync[F].delay(Option(zis.getNextEntry()))).map { ze =>
-        (ze.getName, io.readInputStream[F](F.pure(zis), chunkSize, bec, closeAfterUse = false)
-          .onFinalize(bec.delay(zis.closeEntry())))
+    def unzipEntry(zis: ZipInputStream): OptionT[F, (String, Stream[F, Byte])] = {
+      val next = OptionT(blocker.delay(Option(zis.getNextEntry())))
+
+      next map { entry =>
+        val str = io.readInputStream[F](F.pure(zis), chunkSize, blocker, closeAfterUse = false)
+        (entry.getName, str.onFinalize(blocker.delay(zis.closeEntry())))
       }
+    }
 
     def unzipEntries(zis: ZipInputStream): Stream[F, (String, Stream[F, Byte])] =
       Stream.unfoldEval(zis) { zis0 =>
-        entry(zis0).map((_, zis0)).value
+        unzipEntry(zis0).map((_, zis0)).value
       }
 
     value: Stream[F, Byte] =>
-      value.through(io.toInputStream).flatMap { is: InputStream =>
-        val zis: F[ZipInputStream]          = bec.delay(new ZipInputStream(is))
-        val zres: Stream[F, ZipInputStream] = Stream.bracket(zis)(zis => bec.delay(zis.close()))
-        zres.flatMap { z =>
-          unzipEntries(z)
-        }
+      value.through(io.toInputStream) flatMap { is: InputStream =>
+        val zis: F[ZipInputStream] =
+          blocker.delay(new ZipInputStream(is))
+
+        val zres: Stream[F, ZipInputStream] =
+          Stream.bracket(zis)(zis => blocker.delay(zis.close()))
+
+        zres.flatMap(unzipEntries)
       }
    }
 
-   def unzip[F[_]](bec: Blocker, chunkSize: Int)(
+   def unzip[F[_]](blocker: Blocker, chunkSize: Int)(
        implicit F: ConcurrentEffect[F],
        cs: ContextShift[F])
        : Pipe[F, Byte, Byte] =
-     unzipEach[F](bec, chunkSize).andThen(_.flatMap(_._2))
+     unzipEach[F](blocker, chunkSize).andThen(_.flatMap(_._2))
 }
