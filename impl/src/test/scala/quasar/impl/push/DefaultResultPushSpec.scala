@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-/*
 package quasar.impl.push
 
 import slamdata.Predef._
@@ -34,7 +33,7 @@ import java.time.{Instant, ZoneOffset}
 
 import monocle.Prism
 
-import org.mapdb.{DBMaker, Serializer}
+import org.mapdb.Serializer
 import org.mapdb.serializer.GroupSerializer
 
 import monocle.Traversal
@@ -315,16 +314,14 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     val render = new MockResultRender
 
     for {
-      db <- storage.offheapMVStore
-//      db <- Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close()))
+      db <- storage.inMemoryMapDb[IO]
 
       pushes <- Resource liftF {
-        MVStorePrefixStore[IO, Int :: ResourcePath :: HNil, ∃[Push[?, String]]](
-          db,
+        MapDbPrefixStore[IO](
           "default-result-push-spec",
-//          db,
-//          Serializer.INTEGER :: (ResourcePathSerializer: GroupSerializer[ResourcePath]) :: HNil,
-//          Serializer.JAVA.asInstanceOf[GroupSerializer[∃[Push[?, String]]]],
+          db,
+          Serializer.INTEGER :: (ResourcePathSerializer: GroupSerializer[ResourcePath]) :: HNil,
+          Serializer.JAVA.asInstanceOf[GroupSerializer[∃[Push[?, String]]]],
           Blocker.liftExecutionContext(global))
       }
 
@@ -1555,4 +1552,3 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
   }
 }
- */
