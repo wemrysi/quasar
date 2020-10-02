@@ -174,7 +174,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
         .value
         .use(r => IO.pure(r must_=== Some(100)))
     }
-    
+
     "decompresses zipped single ldjson array file" >>* {
       val ds =
         LocalParsedDatasource[IO, RValue](
@@ -192,7 +192,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
         .use(r => IO.pure(r must_=== Some(100)))
     }
 
-    "decompresses zipped multiple ldjson array files" >>* {
+    "decompresses zipped multiple array ldjson files in directory" >>* {
       val ds =
         LocalParsedDatasource[IO, RValue](
           Paths.get("./impl/src/test/resources"),
@@ -209,7 +209,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
         .use(r => IO.pure(r must_=== Some(3)))
     }
 
-    "decompresses zipped multiple array ldjson files in directory" >>* {
+    "decompresses zipped multiple ldjson array files" >>* {
       val ds =
         LocalParsedDatasource[IO, RValue](
           Paths.get("./impl/src/test/resources"),
