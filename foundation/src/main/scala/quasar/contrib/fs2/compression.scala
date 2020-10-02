@@ -29,8 +29,20 @@ import fs2.io
 
 object compression {
 
-  // unzipEach comes from https://gist.github.com/nmehitabel/a7c976ef8f0a41dfef88e981b9141075#file-fs2zip-scala-L18
-  def unzipEach[F[_]](
+   def unzip[F[_]](blocker: Blocker, chunkSize: Int)(
+       implicit F: ConcurrentEffect[F],
+       cs: ContextShift[F])
+       : Pipe[F, Byte, Byte] =
+     unzipEach[F](blocker, chunkSize).andThen(_.flatMap(_._2))
+
+  ////
+
+  /* unzipEach comes from https://gist.github.com/nmehitabel/a7c976ef8f0a41dfef88e981b9141075#file-fs2zip-scala-L18
+   *
+   * Danger Will Robinson! Do not use without flattening inner stream!
+   * https://github.com/precog/quasar/pull/4690#discussion_r499025426
+   */
+  private def unzipEach[F[_]](
       blocker: Blocker,
       chunkSize: Int)(
       implicit F: ConcurrentEffect[F],
@@ -62,10 +74,4 @@ object compression {
         zres.flatMap(unzipEntries)
       }
    }
-
-   def unzip[F[_]](blocker: Blocker, chunkSize: Int)(
-       implicit F: ConcurrentEffect[F],
-       cs: ContextShift[F])
-       : Pipe[F, Byte, Byte] =
-     unzipEach[F](blocker, chunkSize).andThen(_.flatMap(_._2))
 }
