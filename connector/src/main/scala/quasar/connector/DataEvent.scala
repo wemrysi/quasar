@@ -68,9 +68,16 @@ object DataEvent {
         }
     }
 
+  implicit def dataEventEq[O: Eq, P: Eq]: Eq[DataEvent[O, P]] =
+    Eq by {
+      case Create(cs) => (Some(cs), None, None)
+      case Delete(ids) => (None, Some(ids), None)
+      case Commit(o) => (None, None, Some(o))
+    }
+
   implicit def dataEventShow[O: Show, P: Show]: Show[DataEvent[O, P]] =
     Show show {
-      case Create(rs) => s"Create(${rs.size} things)"
+      case Create(rs) => s"Create(${rs.size} elements)"
       case Delete(ids) => s"Delete(${ids.show})"
       case Commit(o) => s"Commit(${o.show})"
     }
