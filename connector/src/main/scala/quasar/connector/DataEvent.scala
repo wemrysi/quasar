@@ -23,52 +23,54 @@ import cats.implicits._
 
 import fs2.Chunk
 
-sealed trait DataEvent[+O] extends Product with Serializable
+sealed trait DataEvent[+O, +P] extends Product with Serializable
 
 object DataEvent {
-  final case class Create(records: Chunk[Byte]) extends DataEvent[Nothing]
-  final case class Delete(recordIds: IdBatch) extends DataEvent[Nothing]
+  final case class Create[P](records: Chunk[P]) extends DataEvent[Nothing, P]
+  final case class Delete(recordIds: IdBatch) extends DataEvent[Nothing, Nothing]
 
   /** A transaction boundary, consumers should treat all events since the
     * previous `Commit` (or the start of the stream) as part of a single
     * transaction, if possible.
     */
-  final case class Commit[O](offset: O) extends DataEvent[O]
+  final case class Commit[O](offset: O) extends DataEvent[O, Nothing]
 
-  implicit val dataEventTraverse: Traverse[DataEvent] =
-    new Traverse[DataEvent] {
-      def foldLeft[A, B](fa: DataEvent[A], b: B)(f: (B, A) => B): B =
+  def create[O, P](records: Chunk[P]): DataEvent[O, P] =
+    Create(records)
+
+  def delete[O, P](recordIds: IdBatch): DataEvent[O, P] =
+    Delete(recordIds)
+
+  def commit[O, P](offset: O): DataEvent[O, P] =
+    Commit(offset)
+
+  implicit def dataEventTraverse[P]: Traverse[DataEvent[?, P]] =
+    new Traverse[DataEvent[?, P]] {
+      def foldLeft[A, B](fa: DataEvent[A, P], b: B)(f: (B, A) => B): B =
         fa match {
           case Create(_) => b
           case Delete(_) => b
           case Commit(a) => f(b, a)
         }
 
-      def foldRight[A, B](fa: DataEvent[A], b: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
+      def foldRight[A, B](fa: DataEvent[A, P], b: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
         fa match {
           case Create(_) => b
           case Delete(_) => b
           case Commit(a) => f(a, b)
         }
 
-      def traverse[F[_]: Applicative, A, B](fa: DataEvent[A])(f: A => F[B]): F[DataEvent[B]] =
+      def traverse[F[_]: Applicative, A, B](fa: DataEvent[A, P])(f: A => F[B]): F[DataEvent[B, P]] =
         fa match {
-          case c @ Create(_) => (c: DataEvent[B]).pure[F]
-          case d @ Delete(_) => (d: DataEvent[B]).pure[F]
+          case c @ Create(_) => (c: DataEvent[B, P]).pure[F]
+          case d @ Delete(_) => (d: DataEvent[B, P]).pure[F]
           case Commit(a) => f(a).map(Commit(_))
         }
     }
 
-  implicit def dataEventEq[O: Eq]: Eq[DataEvent[O]] =
-    Eq by {
-      case Create(bs) => (Some(bs), None, None)
-      case Delete(ids) => (None, Some(ids), None)
-      case Commit(o) => (None, None, Some(o))
-    }
-
-  implicit def dataEventShow[O: Show]: Show[DataEvent[O]] =
+  implicit def dataEventShow[O: Show, P: Show]: Show[DataEvent[O, P]] =
     Show show {
-      case Create(rs) => s"Create(${rs.size} bytes)"
+      case Create(rs) => s"Create(${rs.size} things)"
       case Delete(ids) => s"Delete(${ids.show})"
       case Commit(o) => s"Commit(${o.show})"
     }

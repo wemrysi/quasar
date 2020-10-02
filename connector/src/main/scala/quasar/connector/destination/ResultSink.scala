@@ -38,21 +38,21 @@ object ResultSink {
       extends ResultSink[F, T]
 
   object UpsertSink {
-    final case class Args[F[_], T, A](
+    final case class Args[F[_], T, A, P](
         path: ResourcePath,
         idColumn: Column[T],
         otherColumns: List[Column[T]],
         writeMode: WriteMode,
-        input: Stream[F, DataEvent[OffsetKey.Actual[A]]]) {
+        input: Stream[F, DataEvent[OffsetKey.Actual[A], P]]) {
 
       def columns: NonEmptyList[Column[T]] =
         NonEmptyList(idColumn, otherColumns)
     }
   }
 
-  final case class UpsertSink[F[_], T](
-      renderConfig: RenderConfig.Csv,
-      consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, OffsetKey.Actual[α]]]])
+  final case class UpsertSink[F[_], T, P](
+      renderConfig: RenderConfig[P],
+      consume: ∀[λ[α => UpsertSink.Args[F, T, α, P] => Stream[F, OffsetKey.Actual[α]]]])
       extends ResultSink[F, T]
 
   def create[F[_], T, A](
@@ -60,9 +60,9 @@ object ResultSink {
       : ResultSink[F, T] =
     CreateSink(consume)
 
-  def upsert[F[_], T](
-      renderConfig: RenderConfig.Csv)(
-      consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, OffsetKey.Actual[α]]]])
+  def upsert[F[_], T, P](
+      renderConfig: RenderConfig[P])(
+      consume: ∀[λ[α => UpsertSink.Args[F, T, α, P] => Stream[F, OffsetKey.Actual[α]]]])
       : ResultSink[F, T] =
     UpsertSink(renderConfig, consume)
 }

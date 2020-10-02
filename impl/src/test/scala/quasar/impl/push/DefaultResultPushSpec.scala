@@ -180,7 +180,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
 
     val upsertSink: ResultSink[IO, Type] = {
-      val consume = Forall[λ[α => ResultSink.UpsertSink.Args[IO, Type, α] => Stream[IO, OffsetKey.Actual[α]]]] { args =>
+      val consume = Forall[λ[α => ResultSink.UpsertSink.Args[IO, Type, α, Byte] => Stream[IO, OffsetKey.Actual[α]]]] { args =>
         args.input
           .flatMap {
             case DataEvent.Create(c) =>
@@ -198,7 +198,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           .onFinalize(q.enqueue1(None))
       }
 
-      ResultSink.upsert[IO, Type](RenderConfig.Csv())(consume)
+      ResultSink.upsert[IO, Type, Byte](RenderConfig.Csv())(consume)
     }
   }
 
@@ -231,28 +231,40 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
-    def renderUpserts[A](
+    def renderUpserts[A, P](
         input: RenderInput[Stream[IO, String]],
         idColumn: Column[IdType],
         offsetColumn: Column[OffsetKey.Formal[Unit, A]],
         renderedColumns: NonEmptyList[Column[ColumnType.Scalar]],
-        config: RenderConfig.Csv,
+        config: RenderConfig[P],
         limit: Option[Long])
-        : Stream[IO, DataEvent[OffsetKey.Actual[A]]] = {
-      val creates =
-        limit.fold(input.value)(input.value.take(_))
-          .through(text.utf8Encode)
-          .chunks
-          .map(DataEvent.Create(_))
+        : Stream[IO, DataEvent[OffsetKey.Actual[A], P]] = {
+      val creates: Stream[IO, DataEvent.Create[P]] =
+        config match {
+          case (r: RenderConfig.Csv) =>
+            limit.fold(input.value)(input.value.take(_))
+              .through(text.utf8Encode)
+              .chunks
+              .map(DataEvent.Create(_))
+
+          case (r: RenderConfig.Separated) =>
+            limit.fold(input.value)(input.value.take(_))
+              .chunks
+              .map(DataEvent.Create(_))
+
+          case _ =>
+            Stream.raiseError[IO](new RuntimeException("renderJson not implemented"))
+        }
 
       offsetColumn.tpe match {
         case OffsetKey.RealKey(_) =>
           // emits offsets equal to the number of bytes emitted
           creates
-            .scan((0, Stream.empty: Stream[IO, DataEvent[OffsetKey.Actual[A]]])) {
+            .scan((0, Stream.empty: Stream[IO, DataEvent[OffsetKey.Actual[A], P]])) {
               case ((acc, _), c) =>
                 val total = acc + c.records.size
                 val out = Stream(c, DataEvent.Commit(OffsetKey.Actual.real(total)))
+
                 (total, out)
             }
             .flatMap(_._2)
