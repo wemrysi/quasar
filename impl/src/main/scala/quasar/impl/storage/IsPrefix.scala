@@ -19,8 +19,7 @@ package quasar.impl.storage
 import scala.annotation.implicitNotFound
 
 import shapeless._
-import scodec._
-import shapeless.ops.hlist._
+
 @implicitNotFound("Could not prove that ${L} is a prefix of ${M}.")
 sealed trait IsPrefix[L <: HList, M <: HList]
 

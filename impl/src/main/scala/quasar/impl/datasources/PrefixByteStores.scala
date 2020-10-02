@@ -20,12 +20,11 @@ import quasar.connector.ByteStore
 import quasar.impl.storage.PrefixStore
 
 import java.lang.String
-import scala.{AnyRef, Array, Boolean, Byte, Option, Unit}
+import scala.{Array, Boolean, Byte, Option, Unit}
 
 import cats.Applicative
 
 import shapeless._
-import shapeless.ops.hlist._
 
 import scodec._
 

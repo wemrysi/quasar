@@ -18,7 +18,7 @@ package quasar.impl
 
 import slamdata.Predef._
 
-import cats.effect.{Bracket, Concurrent, Resource}
+import cats.effect.{Concurrent, Resource}
 import cats.effect.concurrent.{Ref, Semaphore}
 import cats.effect.syntax.bracket._
 import cats.syntax.applicative._

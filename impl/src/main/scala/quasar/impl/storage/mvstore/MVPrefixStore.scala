@@ -21,23 +21,14 @@ import slamdata.Predef._
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage.{CodecPrefixStore, PrefixStore, StoreError}
 
-import scala.collection.JavaConverters._
-import java.util.{Map => JMap}
-
 import cats.effect.{Blocker, ContextShift, Sync}
 import cats.implicits._
-
-import fs2.Stream
 
 import org.h2.mvstore._
 
 import shapeless._
-import shapeless.ops.hlist._
-import shapeless.ops.traversable._
 
-import scodec.codecs._
-import scodec.bits.BitVector
-import scodec._
+import scodec.Codec
 
 object MVPrefixStore {
   def apply[F[_]: MonadError_[?[_], StoreError]: Sync: ContextShift, K <: HList: Codec, V: Codec](

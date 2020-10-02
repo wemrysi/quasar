@@ -14,56 +14,47 @@
  * limitations under the License.
  */
 
-package quasar.impl.storage.mapdb
+package quasar.impl.storage.mvstore
 
-import slamdata.Predef.{Eq => _, _}
+import slamdata.Predef.{Eq => _, uuid => _, _}
 
+import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage
 import quasar.impl.storage._
 
 import java.util.UUID
-import java.{lang => jl}
 
-import scala.Predef.classOf
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.Random
 
 import cats._
 import cats.derived.auto.eq._
 import cats.effect.{Blocker, IO, Resource}
 import cats.implicits._
 
-import org.mapdb.Serializer
+import scala.util.Random
+import java.util.UUID
+
+import scodec._
 
 import shapeless._
 
-import MapDbPrefixStoreSpec._
+import MVPrefixStoreSpec._
 
-final class MapDbPrefixStoreSpec extends IndexedStoreSpec[IO, UUID :: jl.String :: jl.Integer :: HNil, jl.Long] {
-  implicit class ExtraIntOps(val i: Int) {
-    def jint: jl.Integer = jl.Integer.valueOf(i)
-    def jlong: jl.Long = jl.Long.valueOf(i.toLong)
-  }
-
-  val emptyStore: Resource[IO, PrefixStore.Legacy[IO, UUID :: jl.String :: jl.Integer :: HNil, jl.Long]] =
-    storage.inMemoryMapDb[IO] evalMap { db =>
-      MapDbPrefixStore[IO](
-        "mapdb-prefix-store-spec",
-        db,
-        Serializer.UUID :: Serializer.STRING :: Serializer.INTEGER :: HNil,
-        Serializer.LONG,
-        Blocker.liftExecutionContext(global))
+final class MVPrefixStoreSpec extends IndexedStoreSpec[IO, UUID :: String :: Int :: HNil, Long] {
+  val emptyStore: Resource[IO, PrefixStore.SCodec[IO, UUID :: String :: Int :: HNil, Long]] =
+    storage.offheapMVStore[IO] evalMap { db =>
+      MVPrefixStore[IO, UUID :: String :: Int :: HNil, Long](db, "testing", Blocker.liftExecutionContext(global))
     }
 
-  val freshIndex: IO[UUID :: jl.String :: jl.Integer :: HNil] =
+  val freshIndex: IO[UUID :: String :: Int :: HNil] =
     for {
       uuid <- IO(UUID.randomUUID)
       str <- IO(Random.alphanumeric.take(6).mkString)
-      int <- IO(Random.nextInt(100000).jint)
+      int <- IO(Random.nextInt(10000))
     } yield uuid :: str :: int :: HNil
 
-  val valueA = 24.jlong
-  val valueB = 42.jlong
+  val valueA = 24L
+  val valueB = 42L
 
   "prefix store" >> {
     "prefixed entries" >> {
@@ -74,9 +65,9 @@ final class MapDbPrefixStoreSpec extends IndexedStoreSpec[IO, UUID :: jl.String 
             k2 <- freshIndex
             k3 <- freshIndex
 
-            _ <- store.insert(k1, 1.jlong)
-            _ <- store.insert(k2, 2.jlong)
-            _ <- store.insert(k3, 3.jlong)
+            _ <- store.insert(k1, 1L)
+            _ <- store.insert(k2, 2L)
+            _ <- store.insert(k3, 3L)
 
             vs <- store.prefixedEntries(k2).compile.toList
 
@@ -92,17 +83,17 @@ final class MapDbPrefixStoreSpec extends IndexedStoreSpec[IO, UUID :: jl.String 
           for {
             uuid <- IO(UUID.randomUUID)
 
-            k1 = uuid :: "foo" :: 1.jint :: HNil
-            k2 = uuid :: "foo" :: 2.jint :: HNil
-            k3 = uuid :: "bar" :: 3.jint :: HNil
+            k1 = uuid :: "foo" :: 1 :: HNil
+            k2 = uuid :: "foo" :: 2 :: HNil
+            k3 = uuid :: "bar" :: 3 :: HNil
 
-            _ <- store.insert(k1, 1.jlong)
-            _ <- store.insert(k2, 2.jlong)
-            _ <- store.insert(k3, 3.jlong)
+            _ <- store.insert(k1, 1L)
+            _ <- store.insert(k2, 2L)
+            _ <- store.insert(k3, 3L)
 
             vs <- store.prefixedEntries(uuid :: HNil).compile.toList
           } yield {
-            vs.map(_._2) must contain(exactly(1.jlong, 2.jlong, 3.jlong))
+            vs.map(_._2) must contain(exactly(1L, 2L, 3L))
           }
         }
       }
@@ -112,17 +103,17 @@ final class MapDbPrefixStoreSpec extends IndexedStoreSpec[IO, UUID :: jl.String 
           for {
             uuid <- IO(UUID.randomUUID)
 
-            k1 = uuid :: "foo" :: 1.jint :: HNil
-            k2 = uuid :: "foo" :: 2.jint :: HNil
-            k3 = uuid :: "bar" :: 3.jint :: HNil
+            k1 = uuid :: "foo" :: 1 :: HNil
+            k2 = uuid :: "foo" :: 2 :: HNil
+            k3 = uuid :: "bar" :: 3 :: HNil
 
-            _ <- store.insert(k1, 1.jlong)
-            _ <- store.insert(k2, 2.jlong)
-            _ <- store.insert(k3, 3.jlong)
+            _ <- store.insert(k1, 1L)
+            _ <- store.insert(k2, 2L)
+            _ <- store.insert(k3, 3L)
 
             vs <- store.prefixedEntries(uuid :: "foo" :: HNil).compile.toList
           } yield {
-            vs.map(_._2) must contain(exactly(1.jlong, 2.jlong))
+            vs.map(_._2) must contain(exactly(1L, 2L))
           }
         }
       }
@@ -133,13 +124,13 @@ final class MapDbPrefixStoreSpec extends IndexedStoreSpec[IO, UUID :: jl.String 
             uuid <- IO(UUID.randomUUID)
             otherUuid <- IO(UUID.randomUUID)
 
-            k1 = uuid :: "foo" :: 1.jint :: HNil
-            k2 = uuid :: "foo" :: 2.jint :: HNil
-            k3 = uuid :: "bar" :: 3.jint :: HNil
+            k1 = uuid :: "foo" :: 1 :: HNil
+            k2 = uuid :: "foo" :: 2 :: HNil
+            k3 = uuid :: "bar" :: 3 :: HNil
 
-            _ <- store.insert(k1, 1.jlong)
-            _ <- store.insert(k2, 2.jlong)
-            _ <- store.insert(k3, 3.jlong)
+            _ <- store.insert(k1, 1L)
+            _ <- store.insert(k2, 2L)
+            _ <- store.insert(k3, 3L)
 
             vs <- store.prefixedEntries(otherUuid :: "foo" :: HNil).compile.toList
           } yield {
@@ -155,18 +146,18 @@ final class MapDbPrefixStoreSpec extends IndexedStoreSpec[IO, UUID :: jl.String 
           for {
             uuid <- IO(UUID.randomUUID)
 
-            k1 = uuid :: "foo" :: 1.jint :: HNil
-            k2 = uuid :: "foo" :: 2.jint :: HNil
-            k3 = uuid :: "bar" :: 3.jint :: HNil
+            k1 = uuid :: "foo" :: 1 :: HNil
+            k2 = uuid :: "foo" :: 2 :: HNil
+            k3 = uuid :: "bar" :: 3 :: HNil
 
-            _ <- store.insert(k1, 1.jlong)
-            _ <- store.insert(k2, 2.jlong)
-            _ <- store.insert(k3, 3.jlong)
+            _ <- store.insert(k1, 1L)
+            _ <- store.insert(k2, 2L)
+            _ <- store.insert(k3, 3L)
 
             _ <- store.deletePrefixed(uuid :: "foo" :: HNil)
             vs <- store.entries.compile.toList
           } yield {
-            vs must contain(exactly(k3 -> 3.jlong))
+            vs must contain(exactly(k3 -> 3L))
           }
         }
       }
@@ -177,13 +168,13 @@ final class MapDbPrefixStoreSpec extends IndexedStoreSpec[IO, UUID :: jl.String 
             uuid <- IO(UUID.randomUUID)
             otherUuid <- IO(UUID.randomUUID)
 
-            k1 = uuid :: "foo" :: 1.jint :: HNil
-            k2 = uuid :: "foo" :: 2.jint :: HNil
-            k3 = uuid :: "bar" :: 3.jint :: HNil
+            k1 = uuid :: "foo" :: 1 :: HNil
+            k2 = uuid :: "foo" :: 2 :: HNil
+            k3 = uuid :: "bar" :: 3 :: HNil
 
-            _ <- store.insert(k1, 1.jlong)
-            _ <- store.insert(k2, 2.jlong)
-            _ <- store.insert(k3, 3.jlong)
+            _ <- store.insert(k1, 1L)
+            _ <- store.insert(k2, 2L)
+            _ <- store.insert(k3, 3L)
 
             preDelete <- store.entries.compile.toList
             _ <- store.deletePrefixed(otherUuid :: "foo" :: HNil)
@@ -197,16 +188,19 @@ final class MapDbPrefixStoreSpec extends IndexedStoreSpec[IO, UUID :: jl.String 
   }
 }
 
-object MapDbPrefixStoreSpec {
-  implicit val jIntegerEq: Eq[jl.Integer] =
-    Eq.by(_.intValue)
+object MVPrefixStoreSpec {
+  import scodec.codecs._
 
-  implicit def testHListSHow[L <: HList]: Show[L] =
-    Show.fromToString
+  implicit def testHListShow[L <: HList]: Show[L] = Show.fromToString
 
-  implicit val jlLongEq: Eq[jl.Long] =
-    Eq.by(_.longValue)
+  implicit val ioStoreError: MonadError_[IO, StoreError] =
+    MonadError_.facet[IO](StoreError.throwableP)
 
-  implicit val jlLongShow: Show[jl.Long] =
-    Show.fromToString
+  implicit val uuidCodec: Codec[UUID] = uuid
+
+  implicit val strCodec: Codec[String] = utf8_32
+
+  implicit val intCodec: Codec[Int] = int32
+
+  implicit val longCodec: Codec[Long] = int64
 }

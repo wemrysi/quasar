@@ -19,25 +19,14 @@ package quasar.impl
 import slamdata.Predef._
 
 import cats.Show
-import cats.effect.{Blocker, ContextShift, Resource, Sync}
+import cats.effect.{Resource, Sync}
 import cats.syntax.show._
-import cats.instances.string._
-
-import quasar.contrib.scalaz.MonadError_
 
 import java.nio.file.Path
-import java.util.UUID
 import org.mapdb._
 import org.h2.mvstore._
 
-import argonaut.{CodecJson, Parse}
-import monocle.Prism
-
-import shims.monadToScalaz
-
 package object storage {
-  import IndexedStore._
-
   val DefaultTableName = "default"
 
   def errorFromShow[A: Show](desc: String)(a: A): StoreError =

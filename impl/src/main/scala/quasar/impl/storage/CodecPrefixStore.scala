@@ -27,11 +27,11 @@ import fs2.Stream
 
 import shapeless._
 
-import scodec.bits.BitVector
 import scodec._
+import scodec.bits.BitVector
 
 final class CodecPrefixStore[F[_]: Monad: MonadError_[?[_], StoreError], K <: HList: Codec, V: Codec] private (
-    underlying: PrefixableStore[F, Array[Byte], Array[Byte]])
+    val underlying: PrefixableStore[F, Array[Byte], Array[Byte]])
     extends PrefixStore[F, K, V] {
   type Constraint[P <: HList] = Codec[P]
 

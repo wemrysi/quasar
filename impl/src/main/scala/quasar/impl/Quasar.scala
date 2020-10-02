@@ -72,8 +72,6 @@ import org.slf4s.Logging
 import shapeless._
 
 import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, showToCats, equalToCats}
-import scodec.Codec
-import scodec.codecs.uuid
 
 import skolems.∃
 
