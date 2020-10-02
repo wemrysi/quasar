@@ -24,7 +24,7 @@ import quasar.connector.datasource._
 
 import scala.util.{Left, Right}
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, OptionT}
 import cats.effect.{Resource, Sync}
 import cats.implicits._
 
@@ -61,61 +61,52 @@ final class AggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
         })
     }
 
-  def pathIsResource(path: ResourcePath): Resource[F, Boolean] =
-    underlying.pathIsResource(path)
-      .ifM(true.pure[Resource[F, ?]], aggPathExists(path))
+  def pathIsResource(path: ResourcePath): Resource[F, Boolean] = {
+    // `p / **` exists iff `p` is prefix/prefixresource
+    def aggPathExists: Resource[F, Boolean] = {
+      // whether the provided stream emits any values
+      // warning: runs the stream to completion
+      def isNonEmpty[A](s: Stream[F, A]): F[Boolean] =
+        s.pull.unconsNonEmpty
+          .flatMap(_.fold(Pull.output1(false))(_ => Pull.output1(true)))
+          .stream
+          .compile
+          .fold(false)(_ || _)
+
+      OptionT.fromOption[Resource[F, ?]](aggPath(path))
+        .flatMap(p => OptionT(underlying.prefixedChildPaths(p).evalMap(_.traverse(isNonEmpty))))
+        .getOrElse(false)
+    }
+
+    underlying.pathIsResource(path).ifM(
+      ifTrue = true.pure[Resource[F, ?]],
+      ifFalse = aggPathExists)
+  }
 
   def prefixedChildPaths(prefixPath: ResourcePath)
-      : Resource[F, Option[Stream[F, (ResourceName, ResourcePathType)]]] = {
-
-    def loop[A](s: Stream[F, A]): Pull[F, A, Unit] =
-      s.pull.uncons flatMap {
-        case Some((hd, tl)) => Pull.output(hd) >> loop[A](tl)
-        case None => Pull.done
-      }
-
-    aggPath(prefixPath) match {
-      case None =>
-        underlying.prefixedChildPaths(prefixPath)
-          .map(_ map { s =>
-            val back = s.pull.unconsNonEmpty flatMap {
-              case Some((hd, tl)) =>
-                Pull.output1((AggName, ResourcePathType.AggregateResource)) >>
-                  Pull.output(hd) >>
-                  loop(tl)
-              case None => Pull.done
-            }
-            back.stream
-          })
-      case Some(_) =>
-        pathIsResource(prefixPath).ifM(
-          Stream.empty.covary[F].covaryOutput[(ResourceName, ResourcePathType)].some.pure[Resource[F, ?]],
-          none.pure[Resource[F, ?]])
-    }
-  }
+      : Resource[F, Option[Stream[F, (ResourceName, ResourcePathType)]]] =
+    if (aggPath(prefixPath).isDefined)
+      pathIsResource(prefixPath).ifM(
+        ifTrue = Stream.empty.covary[F].covaryOutput[(ResourceName, ResourcePathType)].some.pure[Resource[F, ?]],
+        ifFalse = none.pure[Resource[F, ?]])
+    else
+      underlying.prefixedChildPaths(prefixPath).map(_.map(
+        _.pull.peek1.flatMap {
+          case Some((_, s)) => Pull.output1(AggEntry) >> s.pull.echo
+          case None => Pull.done
+        }.stream))
 
   ////
 
   private val AggName: ResourceName = ResourceName("**")
 
+  private val AggEntry: (ResourceName, ResourcePathType) =
+    (AggName, ResourcePathType.AggregateResource)
+
   private def aggPath(path: ResourcePath): Option[ResourcePath] =
     path.unsnoc.flatMap {
       case (p, n) => if (n === AggName) Some(p) else None
     }
-
-  // `p / *` exists iff underlying `p` is prefix/prefixresource
-  private def aggPathExists(path: ResourcePath): Resource[F, Boolean] =
-    aggPath(path)
-      .map(p => underlying.prefixedChildPaths(p).flatMap(ofPrefix))
-      .getOrElse(false.pure[Resource[F, ?]])
-
-  // checks whether the provided stream is that of a prefix/prefixresource
-  // warning: runs the stream to completion
-  private def ofPrefix[A](os: Option[Stream[F, A]]): Resource[F, Boolean] =
-    Resource.liftF(os.traverse(_.pull.peek1.flatMap {
-      case None => Pull.output1(false)
-      case _ => Pull.output1(true)
-    }.stream.compile.last).map(_.flatten getOrElse false))
 
   private def aggregateFull(full: Q => Resource[F, R])(q: Q): Resource[F, CompositeResult[F, R]] = {
     def aggregate(p: ResourcePath): Resource[F, AggregateResult[F, R]] =
