@@ -66,18 +66,33 @@ final class AggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
       .ifM(true.pure[Resource[F, ?]], aggPathExists(path))
 
   def prefixedChildPaths(prefixPath: ResourcePath)
-      : Resource[F, Option[Stream[F, (ResourceName, ResourcePathType)]]] =
+      : Resource[F, Option[Stream[F, (ResourceName, ResourcePathType)]]] = {
+
+    def loop[A](s: Stream[F, A]): Pull[F, A, Unit] =
+      s.pull.uncons flatMap {
+        case Some((hd, tl)) => Pull.output(hd) >> loop[A](tl)
+        case None => Pull.done
+      }
+
     aggPath(prefixPath) match {
       case None =>
         underlying.prefixedChildPaths(prefixPath)
-          .flatMap(os => ofPrefix(os).ifM(
-            os.map(s => Stream.emit((AggName, ResourcePathType.AggregateResource)) ++ s).pure[Resource[F, ?]],
-            os.map(_.covaryOutput[(ResourceName, ResourcePathType)]).pure[Resource[F, ?]]))
+          .map(_ map { s =>
+            val back = s.pull.unconsNonEmpty flatMap {
+              case Some((hd, tl)) =>
+                Pull.output1((AggName, ResourcePathType.AggregateResource)) >>
+                  Pull.output(hd) >>
+                  loop(tl)
+              case None => Pull.done
+            }
+            back.stream
+          })
       case Some(_) =>
         pathIsResource(prefixPath).ifM(
           Stream.empty.covary[F].covaryOutput[(ResourceName, ResourcePathType)].some.pure[Resource[F, ?]],
           none.pure[Resource[F, ?]])
     }
+  }
 
   ////
 
@@ -95,6 +110,7 @@ final class AggregatingDatasource[F[_]: MonadResourceErr: Sync, Q, R] private(
       .getOrElse(false.pure[Resource[F, ?]])
 
   // checks whether the provided stream is that of a prefix/prefixresource
+  // warning: runs the stream to completion
   private def ofPrefix[A](os: Option[Stream[F, A]]): Resource[F, Boolean] =
     Resource.liftF(os.traverse(_.pull.peek1.flatMap {
       case None => Pull.output1(false)
