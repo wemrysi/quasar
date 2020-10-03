@@ -107,6 +107,7 @@ lazy val foundation = project
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
       "com.codecommit"             %% "shims"                     % "2.1.0",
       "com.codecommit"             %% "skolems"                   % skolemsVersion,
+      "com.codecommit"             %% "cats-effect-testing-specs2" % "0.4.0" % Test,
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
       "org.typelevel"              %% "cats-effect-laws"          % catsEffectVersion % Test,
       "co.fs2"                     %% "fs2-core"                  % fs2Version,
