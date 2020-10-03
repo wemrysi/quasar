@@ -25,7 +25,7 @@ import cats.effect.{Blocker, IO, Resource}
 import cats.effect.concurrent.Ref
 import cats.implicits._
 
-import fs2.{Stream, text}
+import fs2.{Pipe, Stream, text}
 import fs2.concurrent.{Enqueue, Queue}
 
 import java.lang.Integer
@@ -64,7 +64,7 @@ import scalaz.IMap
 
 import shapeless._
 
-import skolems.{∃, Forall}
+import skolems.{∃, ∀}
 
 import spire.math.Real
 
@@ -180,9 +180,10 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
 
     val upsertSink: ResultSink[IO, Type] = {
-      val consume = Forall[λ[α => ResultSink.UpsertSink.Args[IO, Type, α, Byte] => Stream[IO, OffsetKey.Actual[α]]]] { args =>
-        args.input
-          .flatMap {
+      ResultSink.upsert[IO, Type, Byte](args => {
+        def pipe[A](dataEvents: Stream[IO, DataEvent[OffsetKey.Actual[A], Byte]])
+            : Stream[IO, OffsetKey.Actual[A]] =
+          dataEvents.flatMap {
             case DataEvent.Create(c) =>
               Stream.chunk(c)
                 .through(text.utf8Decode)
@@ -196,9 +197,10 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
               Stream.empty
           }
           .onFinalize(q.enqueue1(None))
-      }
 
-      ResultSink.upsert[IO, Type, Byte](RenderConfig.Csv())(consume)
+        (RenderConfig.Csv(),
+          ∀[λ[α => Pipe[IO, DataEvent[OffsetKey.Actual[α], Byte], OffsetKey.Actual[α]]]](pipe))
+      })
     }
   }
 
