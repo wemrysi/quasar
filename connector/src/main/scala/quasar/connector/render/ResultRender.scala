@@ -41,5 +41,5 @@ trait ResultRender[F[_], I] {
       renderedColumns: NonEmptyList[Column[ColumnType.Scalar]],
       config: RenderConfig[P],
       rowLimit: Option[Long])
-      : Stream[F, DataEvent[OffsetKey.Actual[A], P]]
+      : Stream[F, DataEvent[P, OffsetKey.Actual[A]]]
 }

@@ -50,7 +50,7 @@ object ResultSink {
   }
 
   final case class UpsertSink[F[_], T, A](
-      consume: UpsertSink.Args[T] => (RenderConfig[A], ∀[λ[α => Pipe[F, DataEvent[OffsetKey.Actual[α], A], OffsetKey.Actual[α]]]]))
+      consume: UpsertSink.Args[T] => (RenderConfig[A], ∀[λ[α => Pipe[F, DataEvent[A, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]]))
       extends ResultSink[F, T]
 
   def create[F[_], T, A](
@@ -59,7 +59,7 @@ object ResultSink {
     CreateSink(consume)
 
   def upsert[F[_], T, A](
-      consume: UpsertSink.Args[T] => (RenderConfig[A], ∀[λ[α => Pipe[F, DataEvent[OffsetKey.Actual[α], A], OffsetKey.Actual[α]]]]))
+      consume: UpsertSink.Args[T] => (RenderConfig[A], ∀[λ[α => Pipe[F, DataEvent[A, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]]))
       : ResultSink[F, T] =
     UpsertSink(consume)
 }

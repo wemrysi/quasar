@@ -181,7 +181,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     val upsertSink: ResultSink[IO, Type] = {
       ResultSink.upsert[IO, Type, Byte](args => {
-        def pipe[A](dataEvents: Stream[IO, DataEvent[OffsetKey.Actual[A], Byte]])
+        def pipe[A](dataEvents: Stream[IO, DataEvent[Byte, OffsetKey.Actual[A]]])
             : Stream[IO, OffsetKey.Actual[A]] =
           dataEvents.flatMap {
             case DataEvent.Create(c) =>
@@ -199,7 +199,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           .onFinalize(q.enqueue1(None))
 
         (RenderConfig.Csv(),
-          ∀[λ[α => Pipe[IO, DataEvent[OffsetKey.Actual[α], Byte], OffsetKey.Actual[α]]]](pipe))
+          ∀[λ[α => Pipe[IO, DataEvent[Byte, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]](pipe))
       })
     }
   }
@@ -240,7 +240,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         renderedColumns: NonEmptyList[Column[ColumnType.Scalar]],
         config: RenderConfig[P],
         limit: Option[Long])
-        : Stream[IO, DataEvent[OffsetKey.Actual[A], P]] = {
+        : Stream[IO, DataEvent[P, OffsetKey.Actual[A]]] = {
       val creates: Stream[IO, DataEvent.Create[P]] =
         config match {
           case (r: RenderConfig.Csv) =>
@@ -262,7 +262,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         case OffsetKey.RealKey(_) =>
           // emits offsets equal to the number of bytes emitted
           creates
-            .scan((0, Stream.empty: Stream[IO, DataEvent[OffsetKey.Actual[A], P]])) {
+            .scan((0, Stream.empty: Stream[IO, DataEvent[P, OffsetKey.Actual[A]]])) {
               case ((acc, _), c) =>
                 val total = acc + c.records.size
                 val out = Stream(c, DataEvent.Commit(OffsetKey.Actual.real(total)))
