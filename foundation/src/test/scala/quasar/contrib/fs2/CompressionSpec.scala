@@ -62,8 +62,7 @@ object CompressionSpec extends Specification with CatsIO {
       unzipped.map(_ mustEqual "{\"foo\":1}\n")
     }
 
-    // FIXME this isn't ideal; we should error in this case
-    "return empty stream when bytes are not zipped" in {
+    "error when bytes are not zipped" in {
       val file = new File("foundation/src/test/resources/data.json")
       val bytes = Files.readAllBytes(file.toPath())
       val byteStream: Stream[IO, Byte] = Stream.chunk(Chunk.array(bytes))
@@ -72,9 +71,8 @@ object CompressionSpec extends Specification with CatsIO {
         .through(compression.unzip[IO](blocker, 2048))
         .compile
         .toList
-        .map(s => new String(s.toArray, "UTF-8"))
 
-      unzipped.map(_ mustEqual "")
+      unzipped.attempt.map(_ must beLeft)
     }
   }
 }

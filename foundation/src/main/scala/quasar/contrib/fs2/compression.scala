@@ -18,24 +18,48 @@ package quasar.contrib.fs2
 
 import slamdata.Predef._
 
-import java.util.zip.ZipInputStream
+import java.util.zip.{ZipException, ZipInputStream}
 
+import cats.ApplicativeError
 import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, ContextShift}
 import cats.effect.Blocker
 
-import fs2.{Stream, Pipe}
+import fs2.{Stream, Pipe, Pull}
 import fs2.io
 
 object compression {
 
-   def unzip[F[_]](blocker: Blocker, chunkSize: Int)(
-       implicit F: ConcurrentEffect[F],
-       cs: ContextShift[F])
-       : Pipe[F, Byte, Byte] =
-     unzipEach[F](blocker, chunkSize).andThen(_.flatMap(_._2))
+  def unzip[F[_]](blocker: Blocker, chunkSize: Int)(
+      implicit F: ConcurrentEffect[F],
+      cs: ContextShift[F])
+      : Pipe[F, Byte, Byte] =
+    isZip(_).through(
+      unzipEach[F](blocker, chunkSize).andThen(_.flatMap(_._2)))
 
   ////
+
+   /* https://pkware.cachefly.net/webdocs/APPNOTE/APPNOTE-6.3.9.TXT
+    *
+    * A ZIP file must begin with a "local file header" signature or
+    * the "end of central directory record" signature.
+    */
+  private def isZip[F[_]: ApplicativeError[?[_], Throwable]](
+      bytes: Stream[F, Byte])
+      : Stream[F, Byte] = {
+    val back = bytes.pull.unconsN(4) flatMap {
+      case Some((chunk, rest)) =>
+        val list = chunk.toList
+        if (list == List[Byte](80, 75, 3, 4) || list == List[Byte](80, 75, 5, 6))
+          Pull.output(chunk) >> rest.pull.echo
+        else
+          Pull.raiseError(new ZipException("Not in zip format"))
+
+      case None => Pull.done
+    }
+
+    back.stream
+  }
 
   /* unzipEach comes from https://gist.github.com/nmehitabel/a7c976ef8f0a41dfef88e981b9141075#file-fs2zip-scala-L18
    *
