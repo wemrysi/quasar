@@ -39,13 +39,13 @@ object PushConfig {
   type OutputColumn = Column[(ColumnType.Scalar, SelectedType)]
   type Columns = NonEmptyList[OutputColumn]
 
-  final case class Full[O, Q](
+  final case class Full[O, +Q](
       path: ResourcePath,
       query: Q,
       columns: Columns)
       extends PushConfig[O, Q]
 
-  final case class Incremental[O, Q](
+  final case class Incremental[O, +Q](
       path: ResourcePath,
       query: Q,
       outputColumns: List[OutputColumn],
