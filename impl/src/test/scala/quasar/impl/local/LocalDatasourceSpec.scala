@@ -18,7 +18,7 @@ package quasar.impl.local
 
 import slamdata.Predef._
 
-import cats.effect.{IO, Resource}
+import cats.effect.{Blocker, IO, Resource}
 import fs2.Stream
 
 import java.nio.file.Paths
@@ -27,7 +27,7 @@ import scala.concurrent.ExecutionContext
 import quasar.ScalarStages
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.common.data.RValue
-import quasar.{concurrent => qc}
+import quasar.concurrent._
 import quasar.connector._
 import quasar.connector.datasource._
 import quasar.contrib.scalaz.MonadError_
@@ -46,10 +46,9 @@ abstract class LocalDatasourceSpec
 
   implicit val tmr = IO.timer(ExecutionContext.Implicits.global)
 
-  def local: Datasource[Resource[IO, ?], Stream[IO, ?], InterpretedRead[ResourcePath], QueryResult[IO], ResourcePathType.Physical]
+  def local: Resource[IO, Datasource[Resource[IO, ?], Stream[IO, ?], InterpretedRead[ResourcePath], QueryResult[IO], ResourcePathType.Physical]]
 
-  def datasource =
-    Resource.pure[IO, Datasource[Resource[IO, ?], Stream[IO, ?], _, _, ResourcePathType.Physical]](local)
+  def datasource = local
 
   val nonExistentPath =
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")
@@ -81,15 +80,14 @@ abstract class LocalDatasourceSpec
     val tio = ResourcePath.root() / ResourceName("..") / ResourceName("scala")
 
     "prevents escaping root directory during discovery" >>* {
-      local.prefixedChildPaths(tio)
+      local.flatMap(_.prefixedChildPaths(tio))
         .use(o => IO.pure(o must beNone))
     }
 
     "prevents escaping root directory during evaluation" >>* {
       val load =
         local
-          .loadFull(InterpretedRead(tio, ScalarStages.Id))
-          .value
+          .flatMap(_.loadFull(InterpretedRead(tio, ScalarStages.Id)).value)
           .use(IO.pure(_))
 
       MonadResourceErr[IO].attempt(load).map(_.toEither must beLeft.like {
@@ -100,93 +98,80 @@ abstract class LocalDatasourceSpec
 
   "returns data from a nonempty file" >>* {
     local
-      .loadFull(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.ldjson"), ScalarStages.Id))
-      .semiflatMap(qr => Resource.liftF(compileData(qr)))
-      .value
+      .flatMap(
+        _.loadFull(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.ldjson"), ScalarStages.Id))
+          .semiflatMap(qr => Resource.liftF(compileData(qr)))
+          .value)
       .use(r => IO.pure(r must beSome(be_>(0))))
   }
 }
 
 object LocalDatasourceSpec extends LocalDatasourceSpec {
-  val blocker = qc.Blocker.cached("local-datasource-spec")
-
   val local =
-    LocalDatasource[IO](
-      Paths.get("./impl/src/test/resources"),
-      1024,
-      DataFormat.precise(DataFormat.ldjson),
-      blocker)
+    Blocker.cached[IO]("local-datasource-spec")
+      .map(LocalDatasource[IO](
+        Paths.get("./impl/src/test/resources"),
+        1024,
+        DataFormat.precise(DataFormat.ldjson),
+        _))
 }
 
 object LocalStatefulDatasourceSpec extends LocalDatasourceSpec {
-  val blocker = qc.Blocker.cached("local-stateful-datasource-spec")
-
   val local =
-    LocalStatefulDatasource[IO](
-      Paths.get("./impl/src/test/resources"),
-      1024,
-      DataFormat.precise(DataFormat.ldjson),
-      10,
-      blocker)
+    Blocker.cached[IO]("local-stateful-datasource-spec")
+      .map(LocalStatefulDatasource[IO](
+        Paths.get("./impl/src/test/resources"),
+        1024,
+        DataFormat.precise(DataFormat.ldjson),
+        10,
+        _))
 }
 
 object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
-  val blocker = qc.Blocker.cached("local-parsed-datasource-spec")
 
-  val local =
-    LocalParsedDatasource[IO, RValue](
-      Paths.get("./impl/src/test/resources"),
-      1024,
-      DataFormat.precise(DataFormat.ldjson),
-      blocker)
-
-  "parses array-wrapped JSON" >>* {
-    val ds =
-      LocalParsedDatasource[IO, RValue](
+  def make(format: DataFormat) =
+    Blocker.cached[IO]("local-parsed-datasource-spec")
+      .map(LocalParsedDatasource[IO, RValue](
         Paths.get("./impl/src/test/resources"),
         1024,
-        DataFormat.precise(DataFormat.json),
-        blocker)
+        format,
+        _))
 
+  val local = make(DataFormat.precise(DataFormat.ldjson))
+
+  "parses array-wrapped JSON" >>* {
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json"), ScalarStages.Id)
 
-    ds.loadFull(iread)
-      .semiflatMap(qr => Resource.liftF(compileData(qr)))
-      .value
+    make(DataFormat.precise(DataFormat.json))
+      .flatMap(
+        _.loadFull(iread)
+          .semiflatMap(qr => Resource.liftF(compileData(qr)))
+          .value)
       .use(r => IO.pure(r must_=== Some(100)))
   }
 
   "decompresses gzipped resources" >>* {
-    val ds =
-      LocalParsedDatasource[IO, RValue](
-        Paths.get("./impl/src/test/resources"),
-        1024,
-        DataFormat.gzipped(DataFormat.precise(DataFormat.json)),
-        blocker)
-
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.gz"), ScalarStages.Id)
 
-    ds.loadFull(iread)
-      .semiflatMap(qr => Resource.liftF(compileData(qr)))
-      .value
+    make(DataFormat.gzipped(DataFormat.precise(DataFormat.json)))
+      .flatMap(
+        _.loadFull(iread)
+          .semiflatMap(qr => Resource.liftF(compileData(qr)))
+          .value)
       .use(r => IO.pure(r must_=== Some(100)))
   }
 
   "parses csv" >>* {
-    val ds = LocalParsedDatasource[IO, RValue](
-      Paths.get("./impl/src/test/resources"),
-      1024,
-      DataFormat.SeparatedValues.Default,
-      blocker)
-
     val iread =
       InterpretedRead(ResourcePath.root() / ResourceName("smallZips.csv"), ScalarStages.Id)
 
-    ds.loadFull(iread)
-      .semiflatMap(qr => Resource.liftF(compileData(qr)))
-      .value
+    make(DataFormat.SeparatedValues.Default)
+      .flatMap(
+        _.loadFull(iread)
+          .semiflatMap(qr => Resource.liftF(compileData(qr)))
+          .value)
       .use(r => IO.pure(r must_=== Some(100)))
   }
 }

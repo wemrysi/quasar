@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
 import quasar.api.scheduler._, SchedulerError._
 import quasar.api.intentions.IntentionError, IntentionError._
+import quasar.concurrent.unsafe._
 import quasar.connector._
 import quasar.connector.scheduler._
 import quasar.contrib.scalaz.MonadError_
@@ -41,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.UUID
 
 class DefaultSchedulersSpec(implicit ec: ExecutionContext) extends EffectfulQSpec[IO] with ConditionMatchers {
-  val blocker: Blocker = quasar.concurrent.Blocker.cached("default-schedulers-spec")
+  val blocker: Blocker = Blocker.unsafeCached("default-schedulers-spec")
 
   implicit val timer = IO.timer(ec)
 
