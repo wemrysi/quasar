@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.{Condition, ConditionMatchers}
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
-import quasar.{concurrent => qc}
+import quasar.concurrent.unsafe._
 import quasar.connector.ResourceError
 import quasar.connector.destination.{Destination, PushmiPullyu}
 import quasar.contrib.scalaz.MonadError_
@@ -72,7 +72,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         }
     }
 
-  val blocker: Blocker = qc.Blocker.cached("rdestinations-spec")
+  val blocker: Blocker = Blocker.unsafeCached("rdestinations-spec")
 
   val pushPull: PushmiPullyu[IO] = _ => _ => Stream.empty[IO]
 

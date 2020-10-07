@@ -18,7 +18,7 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 import quasar.contrib.cats.effect.stateT.catsStateTEffect
-import quasar.{concurrent => qc}
+import quasar.concurrent._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
@@ -34,14 +34,15 @@ final class ConcurrentMapIndexedStoreSpec extends
 
   type M[A] = StateT[IO, Int, A]
 
-  val blocker: Blocker = qc.Blocker.cached("concurrent-map-indexed-store-spec")
-
   val freshIndex: M[Int] = StateT.liftF(IO(Random.nextInt))
 
   val commit: M[Unit] = StateT.modify { (x: Int) => x + 1 }
 
   val emptyStore: Resource[M, IndexedStore[M, Int, String]] =
-    Resource.liftF(Sync[M].delay { new ConcurrentHashMap[Int, String]() } map { ConcurrentMapIndexedStore(_, commit, blocker) })
+    Blocker.cached[M]("concurrent-map-indexed-store-spec") evalMap { blocker =>
+      Sync[M].delay(new ConcurrentHashMap[Int, String]())
+        .map(ConcurrentMapIndexedStore(_, commit, blocker))
+    }
 
   val valueA = "A"
   val valueB = "B"

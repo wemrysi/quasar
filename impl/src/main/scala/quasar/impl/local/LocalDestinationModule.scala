@@ -20,6 +20,7 @@ import quasar.api.destination.DestinationError.{
   InitializationError,
   malformedConfiguration
 }
+import quasar.concurrent._
 import quasar.connector.MonadResourceErr
 import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 
@@ -29,8 +30,6 @@ import argonaut.Json
 import cats.effect.{Blocker, ContextShift, ConcurrentEffect, Resource, Timer}
 
 trait LocalDestinationModule extends DestinationModule {
-  def blocker: Blocker
-
   val destinationType = LocalDestinationType
 
   def sanitizeDestinationConfig(config: Json): Json = config
@@ -38,18 +37,19 @@ trait LocalDestinationModule extends DestinationModule {
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json,
       pushPull: PushmiPullyu[F])
-      : Resource[F, Either[InitializationError[Json], Destination[F]]] = {
-    val dest = for {
-      ld <- attemptConfig[F, LocalDestinationConfig, InitializationError[Json]](
-        config,
-        "Failed to decode LocalDestination config: ")(
-        (c, d) => malformedConfiguration((destinationType, c, d)))
+      : Resource[F, Either[InitializationError[Json], Destination[F]]] =
+    Blocker.cached[F]("local-destination") evalMap { blocker =>
+      val dest = for {
+        ld <- attemptConfig[F, LocalDestinationConfig, InitializationError[Json]](
+          config,
+          "Failed to decode LocalDestination config: ")(
+          (c, d) => malformedConfiguration((destinationType, c, d)))
 
-      root <- validatedPath(ld.rootDir, "Invalid destination path: ") { d =>
-        malformedConfiguration((destinationType, config, d))
-      }
-    } yield LocalDestination[F](root, blocker): Destination[F]
+        root <- validatedPath(ld.rootDir, "Invalid destination path: ") { d =>
+          malformedConfiguration((destinationType, config, d))
+        }
+      } yield LocalDestination[F](root, blocker): Destination[F]
 
-    Resource.liftF(dest.value)
-  }
+      dest.value
+    }
 }
