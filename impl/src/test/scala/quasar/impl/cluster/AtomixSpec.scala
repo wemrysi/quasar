@@ -18,10 +18,10 @@ package quasar.impl.cluster
 
 import slamdata.Predef._
 
-import quasar.{concurrent => qc}
+import quasar.concurrent.unsafe._
 import quasar.EffectfulQSpec
 
-import cats.effect.{IO, Resource, Timer, Concurrent}
+import cats.effect.{Blocker, IO, Resource, Timer, Concurrent}
 import cats.effect.concurrent.Ref
 import cats.syntax.functor._
 import cats.syntax.flatMap._
@@ -83,7 +83,7 @@ class AtomixSpec (implicit ec: ExecutionContext) extends EffectfulQSpec[IO]{
     }
   }
   "atomix cluster" >> {
-    val blocker = qc.Blocker.cached("atomix-spec-pool")
+    val blocker = Blocker.unsafeCached("atomix-spec-pool")
     def resource(me: NodeInfo, seeds: List[NodeAddress]): Resource[IO, Cluster[IO, String]] =
       Atomix.resource[IO](me, seeds).map(Atomix.cluster(_, blocker))
     def threeNodeCluster: Resource[IO, List[Cluster[IO, String]]] = {

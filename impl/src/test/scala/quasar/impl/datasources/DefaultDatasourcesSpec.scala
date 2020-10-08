@@ -22,7 +22,7 @@ import quasar.{RateLimiter, RateLimiting, ScalarStages, ConditionMatchers, Condi
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
-import quasar.{concurrent => qc}
+import quasar.concurrent.unsafe._
 import quasar.connector._
 import quasar.connector.datasource._
 import quasar.contrib.scalaz._
@@ -157,7 +157,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
     }
   }
 
-  val blocker: Blocker = qc.Blocker.cached("rdatasources-spec")
+  val blocker: Blocker = Blocker.unsafeCached("rdatasources-spec")
 
   def datasources: Resource[IO, Self] = prepare(Map()).map(_._1)
 

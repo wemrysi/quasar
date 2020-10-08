@@ -18,10 +18,10 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import quasar.{concurrent => qc}
+import quasar.concurrent.unsafe._
 import quasar.impl.cluster.{Timestamped, Atomix, Message}, Atomix.NodeInfo, Message._
 
-import cats.effect.{IO, Resource, Timer}
+import cats.effect.{Blocker, IO, Resource, Timer}
 import cats.effect.concurrent.Ref
 import cats.implicits._
 
@@ -45,7 +45,7 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
     port <- portRef.modify((x: Int) => (x + 1, x + 1))
   } yield NodeInfo(id, "localhost", port)
 
-  val blocker = qc.Blocker.cached("antientropy-spec-pool")
+  val blocker = Blocker.unsafeCached("antientropy-spec-pool")
   val sleep: IO[Unit] = timer.sleep(new FiniteDuration(4000, MILLISECONDS))
 
   type Persistence = ConcurrentHashMap[String, Timestamped[String]]
