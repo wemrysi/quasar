@@ -49,7 +49,7 @@ private[mvstore] object ByteArrayDataType extends DataType {
     }
 
   def getMemory(x: Object): Int =
-    x.asInstanceOf[Array[Byte]].length
+    4 + x.asInstanceOf[Array[Byte]].length
 
   def read(buffer: ByteBuffer): Object = {
     val len = buffer.getInt()

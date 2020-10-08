@@ -33,5 +33,4 @@ object IsPrefix {
       implicit tailIsPrefix: IsPrefix[L, M])
       : IsPrefix[H :: L, H :: M] =
     new IsPrefix[H :: L, H :: M] {}
-
 }
