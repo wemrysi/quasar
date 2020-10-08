@@ -23,6 +23,7 @@ import java.util.{Map => JMap}
 import scala.collection.JavaConverters._
 
 import cats.effect.{Blocker, ContextShift, Sync}
+import cats.implicits._
 
 import fs2.Stream
 
@@ -70,8 +71,10 @@ final class MVPrefixableStore[F[_]: Sync: ContextShift, K, V] private (
     optStream.unNone.translate(blocker.blockOnK[F])
   }
 
-  def deletePrefixed(prefix: Key): F[Unit] =
-    prefixedEntries(prefix).evalMap(x => delete(x._1)).compile.drain
+  def deletePrefixed(prefix: Key): F[Unit] = for {
+    _ <- prefixedEntries(prefix).evalMap(x => blocker.delay(store.remove(x._1))).compile.drain
+    _ <- blocker.delay(db.commit())
+  } yield ()
 
   private def jmapEntryTuple[A, B](entry: JMap.Entry[A, B]): (A, B) =
     (entry.getKey, entry.getValue)
@@ -79,12 +82,10 @@ final class MVPrefixableStore[F[_]: Sync: ContextShift, K, V] private (
 
 object MVPrefixableStore {
   def apply[F[_]: Sync: ContextShift, K, V](
-      db: MVStore,
-      name: String,
+      store: MVMap[Array[K], V],
       blocker: Blocker)
       : F[PrefixableStore[F, Array[K], V]] =
     blocker.delay[F, PrefixableStore[F, Array[K], V]] {
-      val store: MVMap[Array[K], V] = db.openMap(name)
       new MVPrefixableStore[F, K, V](store, blocker)
     }
 }

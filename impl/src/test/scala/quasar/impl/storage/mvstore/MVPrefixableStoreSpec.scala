@@ -27,6 +27,8 @@ import cats._
 import cats.effect.{Blocker, IO, Resource}
 import cats.implicits._
 
+import org.h2.mvstore._
+
 import scala.util.Random
 import java.util.UUID
 
@@ -35,12 +37,14 @@ import MVPrefixableStoreSpec._
 final class MVPrefixableStoreSpec extends IndexedStoreSpec[IO, Array[String], Int] {
   val emptyStore: Resource[IO, PrefixableStore[IO, Array[String], Int]] = {
     storage.offheapMVStore[IO].evalMap { db =>
-      MVPrefixableStore[IO, String, Int](db, "testing", Blocker.liftExecutionContext(global))
+      val store: MVMap[Array[String], Int] = db.openMap("test")
+      MVPrefixableStore[IO, String, Int](store, Blocker.liftExecutionContext(global))
     }
   }
   val freshIndex: IO[Array[String]] = for {
     len <- IO(Random.nextInt(10))
-    emptyList = List.fill(len)(0)
+    // 1/100 chance to fail w/o `+ 1`
+    emptyList = List.fill(len + 1)(0)
     list <- emptyList.traverse { _ => IO(UUID.randomUUID.toString) }
   } yield Array(list:_*)
   val valueA = 12

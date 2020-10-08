@@ -19,7 +19,7 @@ package quasar.impl.storage.mvstore
 import slamdata.Predef._
 
 import quasar.contrib.scalaz.MonadError_
-import quasar.impl.storage.{CodecPrefixStore, PrefixStore, StoreError}
+import quasar.impl.storage.{CodecPrefixStore, PrefixStore, LinearCodec, StoreError}
 
 import cats.effect.{Blocker, ContextShift, Sync}
 import cats.implicits._
@@ -31,10 +31,13 @@ import shapeless._
 import scodec.Codec
 
 object MVPrefixStore {
-  def apply[F[_]: MonadError_[?[_], StoreError]: Sync: ContextShift, K <: HList: Codec, V: Codec](
+  def apply[F[_]: MonadError_[?[_], StoreError]: Sync: ContextShift, K <: HList: LinearCodec, V: Codec](
       db: MVStore,
       name: String,
       blocker: Blocker)
-      : F[PrefixStore.SCodec[F, K, V]] =
-    MVPrefixableStore[F, Byte, Array[Byte]](db, name, blocker).map(CodecPrefixStore[F, K, V](_))
+      : F[PrefixStore.SCodec[F, K, V]] = {
+    val builder = (new MVMap.Builder[Array[Byte], Array[Byte]]()).keyType(ByteArrayDataType).valueType(ByteArrayDataType)
+    val store = db.openMap(name, builder)
+    MVPrefixableStore[F, Byte, Array[Byte]](store, blocker).map(CodecPrefixStore[F, K, V](_))
+  }
 }

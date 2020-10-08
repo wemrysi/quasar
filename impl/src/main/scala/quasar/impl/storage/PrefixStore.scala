@@ -26,8 +26,6 @@ import fs2.Stream
 import shapeless._
 import shapeless.ops.hlist._
 
-import scodec._
-
 trait PrefixStore[F[_], K <: HList, V] extends IndexedStore[F, K, V] {
   type Constraint[P <: HList]
 
@@ -52,7 +50,7 @@ object PrefixStore {
   }
 
   type Legacy[F[_], K <: HList, V] = Aux[F, K, V, ToArray]
-  type SCodec[F[_], K <: HList, V] = Aux[F, K, V, Codec]
+  type SCodec[F[_], K <: HList, V] = Aux[F, K, V, LinearCodec]
 
   def xmapValueF[F[_]: Monad, K <: HList, V1, V2](
       s: PrefixStore[F, K, V1])(

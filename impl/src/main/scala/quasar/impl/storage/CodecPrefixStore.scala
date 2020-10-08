@@ -30,15 +30,15 @@ import shapeless._
 import scodec._
 import scodec.bits.BitVector
 
-final class CodecPrefixStore[F[_]: Monad: MonadError_[?[_], StoreError], K <: HList: Codec, V: Codec] private (
+final class CodecPrefixStore[F[_]: Monad: MonadError_[?[_], StoreError], K <: HList: LinearCodec, V: Codec] private (
     val underlying: PrefixableStore[F, Array[Byte], Array[Byte]])
     extends PrefixStore[F, K, V] {
-  type Constraint[P <: HList] = Codec[P]
+  type Constraint[P <: HList] = LinearCodec[P]
 
-  def prefixedEntries[P <: HList: IsPrefix[?, K]: Codec](p: P): Stream[F, (K, V)] =
+  def prefixedEntries[P <: HList: IsPrefix[?, K]: LinearCodec](p: P): Stream[F, (K, V)] =
     underlying.prefixedEntries(encode(p)).evalMap(decodePair)
 
-  def deletePrefixed[P <: HList: IsPrefix[?, K]: Codec](p: P): F[Unit] =
+  def deletePrefixed[P <: HList: IsPrefix[?, K]: LinearCodec](p: P): F[Unit] =
     underlying.deletePrefixed(encode(p))
 
   def entries: Stream[F, (K, V)] =
@@ -56,7 +56,7 @@ final class CodecPrefixStore[F[_]: Monad: MonadError_[?[_], StoreError], K <: HL
   private def encode[A: Codec](a: A): Array[Byte] =
     Codec[A].encode(a) match {
       case Attempt.Successful(bs) => bs.toByteArray
-      case _ => new Array(0)
+      case _ => quasar.contrib.std.errorImpossible
     }
 
   private def decode[A: Codec](errMsg: String, bytes: Array[Byte]): F[A] = {
@@ -83,7 +83,7 @@ final class CodecPrefixStore[F[_]: Monad: MonadError_[?[_], StoreError], K <: HL
 }
 
 object CodecPrefixStore {
-  def apply[F[_]: Monad: MonadError_[?[_], StoreError], K <: HList: Codec, V: Codec](
+  def apply[F[_]: Monad: MonadError_[?[_], StoreError], K <: HList: LinearCodec, V: Codec](
       underlying: PrefixableStore[F, Array[Byte], Array[Byte]])
       : PrefixStore.SCodec[F, K, V] =
     new CodecPrefixStore(underlying)
