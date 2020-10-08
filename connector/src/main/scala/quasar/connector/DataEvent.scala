@@ -75,7 +75,7 @@ object DataEvent {
       case Commit(o) => (None, None, Some(o))
     }
 
-  implicit def dataEventShow[P: Show, O: Show]: Show[DataEvent[P, O]] =
+  implicit def dataEventShow[P, O: Show]: Show[DataEvent[P, O]] =
     Show show {
       case Create(rs) => s"Create(${rs.size} elements)"
       case Delete(ids) => s"Delete(${ids.show})"
