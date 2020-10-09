@@ -192,7 +192,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       val iread =
         InterpretedRead(ResourcePath.root() / ResourceName("multiArrayLdjsonSmallZipsInDir.zip"), ScalarStages.Id)
 
-      make(DataFormat.zipped(DataFormat.precise(DataFormat.json)))
+      make(DataFormat.zipped(DataFormat.precise(DataFormat.ldjson)))
         .flatMap(
           _.loadFull(iread)
             .semiflatMap(qr => Resource.liftF(compileData(qr)))
@@ -204,7 +204,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       val iread =
         InterpretedRead(ResourcePath.root() / ResourceName("multiArrayLdjsonSmallZips.zip"), ScalarStages.Id)
 
-      make(DataFormat.zipped(DataFormat.precise(DataFormat.json)))
+      make(DataFormat.zipped(DataFormat.precise(DataFormat.ldjson)))
         .flatMap(
           _.loadFull(iread)
             .semiflatMap(qr => Resource.liftF(compileData(qr)))
@@ -216,7 +216,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       val iread =
         InterpretedRead(ResourcePath.root() / ResourceName("multiLdjsonSmallZips.zip"), ScalarStages.Id)
 
-      make(DataFormat.zipped(DataFormat.precise(DataFormat.json)))
+      make(DataFormat.zipped(DataFormat.precise(DataFormat.ldjson)))
         .flatMap(
           _.loadFull(iread)
             .semiflatMap(qr => Resource.liftF(compileData(qr)))
@@ -228,7 +228,7 @@ object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
       val iread =
         InterpretedRead(ResourcePath.root() / ResourceName("multiLdjsonSmallZipsInDir.zip"), ScalarStages.Id)
 
-      make(DataFormat.zipped(DataFormat.precise(DataFormat.json)))
+      make(DataFormat.zipped(DataFormat.precise(DataFormat.ldjson)))
         .flatMap(
           _.loadFull(iread)
             .semiflatMap(qr => Resource.liftF(compileData(qr)))

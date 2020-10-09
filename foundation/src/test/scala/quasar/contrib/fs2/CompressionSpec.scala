@@ -89,5 +89,21 @@ object CompressionSpec extends Specification with CatsIO {
 
       output.attempt.unsafeRunSync() must beLeft
     }
+
+    "error when bytes are not zipped and there are fewer than 4 bytes" in {
+      val byteStream: Stream[IO, Byte] = Stream.eval(IO(42: Byte))
+
+      val unzipped =
+        Stream.resource(compress).flatMap(blocker =>
+          byteStream.through(compression.unzip[IO](blocker, 2048)))
+
+      val output =
+        unzipped
+          .compile
+          .toList
+          .map(s => new String(s.toArray, "UTF-8"))
+
+      output.attempt.unsafeRunSync() must beLeft
+    }
   }
 }

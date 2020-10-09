@@ -47,15 +47,16 @@ object compression {
   private def isZip[F[_]: ApplicativeError[?[_], Throwable]](
       bytes: Stream[F, Byte])
       : Stream[F, Byte] = {
-    val back = bytes.pull.unconsN(4) flatMap {
+    val back: Pull[F, Byte, Unit] = bytes.pull.unconsN(4) flatMap {
       case Some((chunk, rest)) =>
-        val list = chunk.toList
+        val list: List[Byte] = chunk.toList
         if (list == List[Byte](80, 75, 3, 4) || list == List[Byte](80, 75, 5, 6))
-          Pull.output(chunk) >> rest.pull.echo
+          Pull.output[F, Byte](chunk) >> rest.pull.echo
         else
-          Pull.raiseError(new ZipException("Not in zip format"))
+          Pull.raiseError[F](new ZipException("Not in zip format"))
 
-      case None => Pull.done
+      case None =>
+        Pull.raiseError[F](new ZipException("Not in zip format"))
     }
 
     back.stream
