@@ -34,12 +34,12 @@ trait ResultRender[F[_], I] {
       rowLimit: Option[Long])
       : Stream[F, A]
 
-  def renderUpserts[A](
+  def renderUpserts[A, P](
       input: RenderInput[I],
       idColumn: Column[IdType],
       offsetColumn: Column[OffsetKey.Formal[Unit, A]],
       renderedColumns: NonEmptyList[Column[ColumnType.Scalar]],
-      config: RenderConfig.Csv,
+      config: RenderConfig[P],
       rowLimit: Option[Long])
-      : Stream[F, DataEvent[OffsetKey.Actual[A]]]
+      : Stream[F, DataEvent[P, OffsetKey.Actual[A]]]
 }
