@@ -27,7 +27,7 @@ import quasar.api.datasource.DatasourceError.{
   malformedConfiguration
 }
 import quasar.common.data.RValue
-import quasar.{concurrent => qc}
+import quasar.concurrent._
 import quasar.connector._
 import quasar.connector.datasource.{LightweightDatasourceModule, Reconfiguration}
 
@@ -43,10 +43,6 @@ import cats.implicits._
 import java.util.UUID
 
 object LocalParsedDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
-  // FIXME this is side effecting
-  override lazy val blocker: Blocker =
-    qc.Blocker.cached("local-datasource")
-
   val kind: DatasourceType = LocalParsedType
 
   def sanitizeConfig(config: Json): Json = config
@@ -73,24 +69,25 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
       stateStore: ByteStore[F],
       auth: UUID => F[Option[ExternalCredentials[F]]])(
       implicit ec: ExecutionContext)
-      : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]] = {
-    val ds = for {
-      lc <- attemptConfig[F, LocalConfig, InitializationError[Json]](
-        config,
-        "Failed to decode LocalDatasource config: ")(
-        (c, d) => malformedConfiguration((kind, c, d)))
+      : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]] =
+    Blocker.cached[F]("local-parsed-datasource") evalMap { blocker =>
+      val ds = for {
+        lc <- attemptConfig[F, LocalConfig, InitializationError[Json]](
+          config,
+          "Failed to decode LocalDatasource config: ")(
+          (c, d) => malformedConfiguration((kind, c, d)))
 
-      root <- validatedPath(lc.rootDir, "Invalid path: ") { d =>
-        malformedConfiguration((kind, config, d))
+        root <- validatedPath(lc.rootDir, "Invalid path: ") { d =>
+          malformedConfiguration((kind, config, d))
+        }
+      } yield {
+        LocalParsedDatasource[F, RValue](
+          root,
+          lc.readChunkSizeBytes,
+          lc.format,
+          blocker)
       }
-    } yield {
-      LocalParsedDatasource[F, RValue](
-        root,
-        lc.readChunkSizeBytes,
-        lc.format,
-        blocker)
-    }
 
-    Resource.liftF(ds.value)
-  }
+      ds.value
+    }
 }
