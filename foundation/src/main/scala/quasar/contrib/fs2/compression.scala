@@ -34,8 +34,9 @@ object compression {
       implicit F: ConcurrentEffect[F],
       cs: ContextShift[F])
       : Pipe[F, Byte, Byte] =
-    isZip(_).through(
-      unzipEach[F](blocker, chunkSize).andThen(_.flatMap(_._2)))
+    isZip
+      .andThen(unzipEach[F](blocker, chunkSize))
+      .andThen(_.flatten)
 
   ////
 
@@ -44,9 +45,8 @@ object compression {
     * A ZIP file must begin with a "local file header" signature or
     * the "end of central directory record" signature.
     */
-  private def isZip[F[_]: ApplicativeError[?[_], Throwable]](
-      bytes: Stream[F, Byte])
-      : Stream[F, Byte] = {
+  private def isZip[F[_]: ApplicativeError[?[_], Throwable]]
+     : Pipe[F, Byte, Byte] = bytes => {
     val back: Pull[F, Byte, Unit] = bytes.pull.unconsN(4) flatMap {
       case Some((chunk, rest)) =>
         val list: List[Byte] = chunk.toList
@@ -72,18 +72,18 @@ object compression {
       chunkSize: Int)(
       implicit F: ConcurrentEffect[F],
       cs: ContextShift[F])
-      : Pipe[F, Byte, (String, Stream[F, Byte])] = {
+      : Pipe[F, Byte, Stream[F, Byte]] = {
 
-    def unzipEntry(zis: ZipInputStream): OptionT[F, (String, Stream[F, Byte])] = {
+    def unzipEntry(zis: ZipInputStream): OptionT[F, Stream[F, Byte]] = {
       val next = OptionT(blocker.delay(Option(zis.getNextEntry())))
 
-      next map { entry =>
+      next map { _ =>
         val str = io.readInputStream[F](F.pure(zis), chunkSize, blocker, closeAfterUse = false)
-        (entry.getName, str.onFinalize(blocker.delay(zis.closeEntry())))
+        str.onFinalize(blocker.delay(zis.closeEntry()))
       }
     }
 
-    def unzipEntries(zis: ZipInputStream): Stream[F, (String, Stream[F, Byte])] =
+    def unzipEntries(zis: ZipInputStream): Stream[F, Stream[F, Byte]] =
       Stream.unfoldEval(zis) { zis0 =>
         unzipEntry(zis0).map((_, zis0)).value
       }
