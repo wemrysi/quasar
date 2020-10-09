@@ -14,19 +14,20 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.concurrent
 
 import slamdata.Predef.String
 
 import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext
 
-import cats.effect.{Blocker, Resource, Sync}
+import cats.effect.Blocker
 
-package object concurrent {
-  implicit class BlockerCompanionOps(blocker: Blocker.type) {
-    def cached[F[_]: Sync](name: String): Resource[F, Blocker] =
-      blocker.fromExecutorService[F](Sync[F] delay {
-        Executors.newCachedThreadPool(NamedDaemonThreadFactory(name))
-      })
+object unsafe {
+  implicit class UnsafeBlockerCompanionOps(blocker: Blocker.type) {
+    def unsafeCached(name: String): Blocker = {
+      val tf = NamedDaemonThreadFactory(name)
+      blocker.liftExecutionContext(ExecutionContext.fromExecutor(Executors.newCachedThreadPool(tf)))
+    }
   }
 }

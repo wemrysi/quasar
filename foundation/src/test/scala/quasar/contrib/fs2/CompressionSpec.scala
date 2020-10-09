@@ -18,10 +18,12 @@ package quasar.contrib.fs2
 
 import slamdata.Predef._
 
+import quasar.concurrent._
+
 import java.io.File
 import java.nio.file.Files
 
-import cats.effect.IO
+import cats.effect.{Blocker, IO}
 import cats.effect.testing.specs2.CatsIO
 
 import fs2.{Chunk, Stream}
@@ -30,7 +32,7 @@ import org.specs2.mutable.Specification
 
 object CompressionSpec extends Specification with CatsIO {
 
-  val blocker = quasar.concurrent.Blocker.cached("fs2-compression-spec")
+  val compress = Blocker.cached[IO]("fs2-compression-spec")
 
   "ZIP decompression" should {
 
@@ -39,13 +41,17 @@ object CompressionSpec extends Specification with CatsIO {
       val bytes = Files.readAllBytes(file.toPath())
       val byteStream: Stream[IO, Byte] = Stream.chunk(Chunk.array(bytes))
 
-      val unzipped = byteStream
-        .through(compression.unzip[IO](blocker, 2048))
-        .compile
-        .toList
-        .map(s => new String(s.toArray, "UTF-8"))
+      val unzipped =
+        Stream.resource(compress).flatMap(blocker =>
+          byteStream.through(compression.unzip[IO](blocker, 2048)))
 
-      unzipped.map(_ mustEqual "{\"foo\":1}\n")
+      val output =
+        unzipped
+          .compile
+          .toList
+          .map(s => new String(s.toArray, "UTF-8"))
+
+      output.map(_ mustEqual "{\"foo\":1}\n")
     }
 
     "decompressed zipped json with chunk size smaller than number of bytes" in {
@@ -53,13 +59,17 @@ object CompressionSpec extends Specification with CatsIO {
       val bytes = Files.readAllBytes(file.toPath())
       val byteStream: Stream[IO, Byte] = Stream.chunk(Chunk.array(bytes))
 
-      val unzipped = byteStream
-        .through(compression.unzip[IO](blocker, 8))
-        .compile
-        .toList
-        .map(s => new String(s.toArray, "UTF-8"))
+      val unzipped =
+        Stream.resource(compress).flatMap(blocker =>
+          byteStream.through(compression.unzip[IO](blocker, 8)))
 
-      unzipped.map(_ mustEqual "{\"foo\":1}\n")
+      val output =
+        unzipped
+          .compile
+          .toList
+          .map(s => new String(s.toArray, "UTF-8"))
+
+      output.map(_ mustEqual "{\"foo\":1}\n")
     }
 
     "error when bytes are not zipped" in {
@@ -67,12 +77,17 @@ object CompressionSpec extends Specification with CatsIO {
       val bytes = Files.readAllBytes(file.toPath())
       val byteStream: Stream[IO, Byte] = Stream.chunk(Chunk.array(bytes))
 
-      val unzipped = byteStream
-        .through(compression.unzip[IO](blocker, 2048))
-        .compile
-        .toList
+      val unzipped =
+        Stream.resource(compress).flatMap(blocker =>
+          byteStream.through(compression.unzip[IO](blocker, 2048)))
 
-      unzipped.attempt.map(_ must beLeft)
+      val output =
+        unzipped
+          .compile
+          .toList
+          .map(s => new String(s.toArray, "UTF-8"))
+
+      output.attempt.unsafeRunSync() must beLeft
     }
   }
 }
