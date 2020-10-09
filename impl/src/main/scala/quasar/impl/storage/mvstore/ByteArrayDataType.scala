@@ -19,53 +19,47 @@ package quasar.impl.storage.mvstore
 import slamdata.Predef._
 
 import java.nio.ByteBuffer
-import java.lang.{Byte => JByte, Object}
+import java.lang.Object
 
-import org.h2.mvstore.WriteBuffer
-import org.h2.mvstore.`type`.DataType
+import org.h2.mvstore.{DataUtils, WriteBuffer}
+import org.h2.mvstore.`type`.{DataType, ObjectDataType}
 
 private[mvstore] object ByteArrayDataType extends DataType {
   def compare(a: Object, b: Object): Int = {
     val arr = a.asInstanceOf[Array[Byte]]
     val brr = b.asInstanceOf[Array[Byte]]
-    val alen = arr.length
-    val blen = brr.length
-    compareImpl(arr, brr, alen, blen, 0)
+    ObjectDataType.compareNotNull(arr, brr)
   }
 
-  @scala.annotation.tailrec
-  private def compareImpl(as: Array[Byte], bs: Array[Byte], alen: Int, blen: Int, ix: Int): Int =
-    if (ix >= alen) {
-      if (ix >= blen) 0 else -1
-    } else {
-      if (ix >= blen) 1
-      else {
-        val a = as(ix)
-        val b = bs(ix)
-        val compared = JByte.compare(a, b)
-        if (compared != 0) compared
-        else compareImpl(as, bs, alen, blen, ix + 1)
-      }
-    }
-
   def getMemory(x: Object): Int =
-    4 + x.asInstanceOf[Array[Byte]].length
+    128 + 2 * x.asInstanceOf[Array[Byte]].length
 
   def read(buffer: ByteBuffer): Object = {
-    val len = buffer.getInt()
+    val len = DataUtils.readVarInt(buffer)
     val tgt = new Array[Byte](len)
     val bytes = buffer.get(tgt, 0, len)
     bytes.asInstanceOf[Object]
   }
 
-  def read(buffer: ByteBuffer, objs: Array[Object], len: Int, areKeys: Boolean): Unit =
-    for (i <- 0 until len) objs(i) = read(buffer)
+  def read(buffer: ByteBuffer, objs: Array[Object], len: Int, areKeys: Boolean): Unit = {
+    var ix = 0
+    while (ix < len) {
+      read(buffer)
+      ix += 1
+    }
+  }
 
   def write(buffer: WriteBuffer, obj: Object): Unit = {
     val arr = obj.asInstanceOf[Array[Byte]]
-    buffer.putInt(arr.length).put(arr)
+    buffer.putVarInt(arr.length).put(arr)
     ()
   }
-  def write(buffer: WriteBuffer, objs: Array[Object], len: Int, areKeys: Boolean): Unit =
-    for (i <- 0 until len) write(buffer, objs(i))
+
+  def write(buffer: WriteBuffer, objs: Array[Object], len: Int, areKeys: Boolean): Unit = {
+    var ix = 0
+    while (ix < len) {
+      write(buffer, objs(ix))
+      ix += 1
+    }
+  }
 }
