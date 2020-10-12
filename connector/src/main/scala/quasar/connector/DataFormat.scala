@@ -175,4 +175,8 @@ object DataFormat {
     case u: ParsingFormat => Compressed(CompressionScheme.Gzip, u)
     case _ => inp
   }
+  def zipped(inp: DataFormat): DataFormat = inp match {
+    case u: ParsingFormat => Compressed(CompressionScheme.Zip, u)
+    case _ => inp
+  }
 }

@@ -40,8 +40,10 @@ object LocalConfig {
 
   implicit val codecCompressionScheme: CodecJson[CompressionScheme] = CodecJson({
       case CompressionScheme.Gzip => "gzip".asJson
+      case CompressionScheme.Zip => "zip".asJson
     }, (c => c.as[String] flatMap {
       case "gzip" => DecodeResult.ok(CompressionScheme.Gzip)
+      case "zip" => DecodeResult.ok(CompressionScheme.Zip)
       case _ => DecodeResult.fail("CompressionScheme", c.history)
     }))
 

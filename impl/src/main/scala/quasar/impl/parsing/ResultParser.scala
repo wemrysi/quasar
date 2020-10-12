@@ -20,15 +20,17 @@ import slamdata.Predef._
 
 import quasar.ScalarStages
 import quasar.connector.{CompressionScheme, QueryResult, DataFormat}, DataFormat.JsonVariant
+import quasar.contrib.fs2.{compression => qcomp}
 
 import java.lang.IllegalArgumentException
 
 import scala.collection.mutable.ArrayBuffer
 
-import cats.effect.Sync
+import cats.effect.{Blocker, ConcurrentEffect, ContextShift, Sync}
 import cats.implicits._
 
-import fs2.{compression, Chunk, Stream, Pipe}
+import fs2.{Chunk, Stream, Pipe}
+import fs2.compression
 
 import qdata.{QData, QDataEncode}
 import qdata.tectonic.QDataPlate
@@ -47,7 +49,10 @@ object ResultParser {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def typed[F[_]: Sync, A: QDataEncode](format: DataFormat): Pipe[F, Byte, A] = {
+  def typed[F[_]: ConcurrentEffect: ContextShift, A: QDataEncode](
+      format: DataFormat,
+      blocker: Blocker)
+      : Pipe[F, Byte, A] = {
     format match {
       case DataFormat.Json(vnt, isPrecise) =>
         val mode: json.Parser.Mode = vnt match {
@@ -73,22 +78,29 @@ object ResultParser {
         compression
           .gunzip[F](DefaultDecompressionBufferSize)
           .andThen(_.flatMap(_.content))
-          .andThen(typed[F, A](pt))
+          .andThen(typed[F, A](pt, blocker))
+
+      case DataFormat.Compressed(CompressionScheme.Zip, pt) =>
+        qcomp.unzip[F](blocker, DefaultDecompressionBufferSize)
+          .andThen(typed[F, A](pt, blocker))
     }
   }
 
-  def apply[F[_]: Sync, A: QDataEncode](queryResult: QueryResult[F]): Stream[F, A] = {
+  def apply[F[_]: ConcurrentEffect: ContextShift, A: QDataEncode](
+      queryResult: QueryResult[F],
+      blocker: Blocker)
+      : Stream[F, A] = {
     def parsedStream(qr: QueryResult[F]): Stream[F, A] =
       qr match {
         case QueryResult.Parsed(qdd, data, _) =>
           data.map(QData.convert(_)(qdd, QDataEncode[A]))
 
         case QueryResult.Typed(pt, data, _) =>
-          data.through(typed[F, A](pt))
+          data.through(typed[F, A](pt, blocker))
 
         case QueryResult.Stateful(format, plateF, state, data, stages) =>
           Stream.eval(plateF) flatMap { plate =>
-            val pipe = stateful(format, plate, state, data)
+            val pipe = stateful(format, plate, state, data, blocker)
 
             data(None).through(pipe) ++
               recurseStateful(state(plate), data, pipe)
@@ -115,18 +127,23 @@ object ResultParser {
         Stream.empty
     }
 
-  private def stateful[F[_]: Sync, P <: Plate[Unit], S, A: QDataEncode](
+  private def stateful[F[_]: ConcurrentEffect: ContextShift, P <: Plate[Unit], S, A: QDataEncode](
       format: DataFormat,
       plate: P,
       state: P => F[Option[S]],
-      data: Option[S] => Stream[F, Byte])
+      data: Option[S] => Stream[F, Byte],
+      blocker: Blocker)
       : Pipe[F, Byte, A] =
     format match {
       case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
         compression
           .gunzip[F](DefaultDecompressionBufferSize)
           .andThen(_.flatMap(_.content))
-          .andThen(stateful(pt, plate, state, data))
+          .andThen(stateful(pt, plate, state, data, blocker))
+
+      case DataFormat.Compressed(CompressionScheme.Zip, pt) =>
+        qcomp.unzip[F](blocker, DefaultDecompressionBufferSize)
+          .andThen(stateful(pt, plate, state, data, blocker))
 
       case DataFormat.Json(vnt, isPrecise) =>
         val mode: json.Parser.Mode = vnt match {

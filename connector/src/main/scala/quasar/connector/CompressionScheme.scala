@@ -25,6 +25,7 @@ sealed trait CompressionScheme extends Product with Serializable
 
 object CompressionScheme {
   case object Gzip extends CompressionScheme
+  case object Zip extends CompressionScheme
 
   implicit val equal: Eq[CompressionScheme] =
     Eq.fromUniversalEquals
@@ -34,8 +35,10 @@ object CompressionScheme {
 
   implicit val codecCompressionScheme: CodecJson[CompressionScheme] = CodecJson({
     case Gzip => "gzip".asJson
+    case Zip => "zip".asJson
   }, (c => c.as[String].flatMap {
     case "gzip" => DecodeResult.ok(Gzip)
+    case "zip" => DecodeResult.ok(Zip)
     case other => DecodeResult.fail(s"Unrecognized compression scheme: $other", c.history)
   }))
 }
