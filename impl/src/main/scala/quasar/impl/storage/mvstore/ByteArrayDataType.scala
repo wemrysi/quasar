@@ -24,7 +24,7 @@ import java.lang.Object
 import org.h2.mvstore.{DataUtils, WriteBuffer}
 import org.h2.mvstore.`type`.{DataType, ObjectDataType}
 
-private[mvstore] object ByteArrayDataType extends DataType {
+private[impl] object ByteArrayDataType extends DataType {
   def compare(a: Object, b: Object): Int = {
     val arr = a.asInstanceOf[Array[Byte]]
     val brr = b.asInstanceOf[Array[Byte]]

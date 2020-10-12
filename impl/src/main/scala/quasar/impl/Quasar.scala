@@ -89,8 +89,6 @@ final class Quasar[F[_], R, C <: SchemaConfig](
 
 object Quasar extends Logging {
 
-  implicit val uuidCodec: Codec[UUID] = uuid
-
   type EvalResult[F[_]] = Either[QueryResult[F], AggregateResult[F, QSMap[Fix, QueryResult[F]]]]
 
   /** What it says on the tin. */
@@ -110,10 +108,13 @@ object Quasar extends Logging {
       maxConcurrentPushes: Int,
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
-      schedulerBuilders: List[SchedulerBuilder[F]])(
+      schedulerBuilders: List[SchedulerBuilder[F]],
+      uuidCodec: Codec[UUID])(
       implicit
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
+
+    implicit val uuidCodec: Codec[UUID] = uuid
 
     val destModules =
       DestinationModules[F](destinationModules, pushPull)

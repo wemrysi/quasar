@@ -23,6 +23,11 @@ import scodec.bits.BitVector
 
 import shapeless._
 
+/*
+ * An evidence that it's possible to find a codec for every element of HList.
+ * We use it to remove all possible incoherencies during encoding keys in prefix store.
+ * The codec puts and takes bits linearly.
+ */
 @implicitNotFound("Could not find LinearCodec for ${L}.")
 sealed trait LinearCodec[L <: HList] extends Codec[L]
 
