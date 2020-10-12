@@ -275,7 +275,7 @@ private[impl] final class DefaultResultPush[
       val C = Functor[Column]
 
       val upsertSink = dest.sinks collectFirst {
-        case sink @ ResultSink.UpsertSink(_, _) => sink
+        case sink @ ResultSink.UpsertSink(_) => sink
       }
 
       for {
@@ -300,6 +300,15 @@ private[impl] final class DefaultResultPush[
 
         offset = offsetValue.map(o => Offset(resumeConfig.sourceOffsetPath, ∃(o)))
 
+        upsertArgs =
+          ResultSink.UpsertSink.Args(
+            path,
+            idDestColumn,
+            nonIdDestColumns,
+            if (isUpdate) WriteMode.Append else WriteMode.Replace)
+
+        (renderConfig, toOffsets) = sink.consume(upsertArgs)
+
         dataEvents =
           Stream.resource(evaluator((query, offset))) flatMap { results =>
             val input =
@@ -313,19 +322,11 @@ private[impl] final class DefaultResultPush[
               idColumn,
               resumeConfig.resultOffsetColumn,
               NonEmptyList(idRenderColumn, nonIdRenderColumns),
-              sink.renderConfig,
+              renderConfig,
               limit)
           }
 
-        upsertArgs =
-          ResultSink.UpsertSink.Args(
-            path,
-            idDestColumn,
-            nonIdDestColumns,
-            if (isUpdate) WriteMode.Append else WriteMode.Replace,
-            dataEvents)
-
-      } yield sink.consume[A](upsertArgs)
+      } yield dataEvents.through(toOffsets[A])
     }
 
     for {
