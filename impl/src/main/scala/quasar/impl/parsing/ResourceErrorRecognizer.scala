@@ -30,6 +30,10 @@ object ResourceErrorRecognizer {
   object ZipException {
     def unapply(t: Throwable): Option[Throwable] = t match {
       case ex: j.ZipException => Some(ex)
+      case ex: fs2.CompositeFailure =>
+        ex.all.toList collectFirst {
+          case e: j.ZipException => e
+        }
       case _ => None
     }
   }
@@ -42,8 +46,8 @@ object ResourceErrorRecognizer {
       case IncompleteParseException(msg) =>
         ResourceError.malformedResource(path, typeSummary(tpe), Some(msg), Some(cause))
 
-      case ZipException(_) =>
-        ResourceError.malformedResource(path, typeSummary(tpe), Some(cause.getMessage), Some(cause))
+      case ZipException(throwable) =>
+        ResourceError.malformedResource(path, typeSummary(tpe), Some(throwable.getMessage), Some(cause))
     }
 
   val typeSummary: DataFormat => String = {
