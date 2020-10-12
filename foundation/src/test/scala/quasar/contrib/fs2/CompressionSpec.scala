@@ -87,7 +87,7 @@ object CompressionSpec extends Specification with CatsIO {
           .toList
           .map(s => new String(s.toArray, "UTF-8"))
 
-      output.attempt.unsafeRunSync() must beLeft
+      output.attempt.map(_ must beLeft)
     }
 
     "error when bytes are not zipped and there are fewer than 4 bytes" in {
@@ -103,7 +103,7 @@ object CompressionSpec extends Specification with CatsIO {
           .toList
           .map(s => new String(s.toArray, "UTF-8"))
 
-      output.attempt.unsafeRunSync() must beLeft
+      output.attempt.map(_ must beLeft)
     }
   }
 }
