@@ -74,7 +74,6 @@ import shapeless._
 import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, showToCats, equalToCats}
 
 import scodec.Codec
-import scodec.codecs.uuid
 
 import skolems.∃
 
@@ -114,7 +113,7 @@ object Quasar extends Logging {
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
 
-    implicit val uuidCodec: Codec[UUID] = uuid
+    implicit val uuidCodec0: Codec[UUID] = uuidCodec
 
     val destModules =
       DestinationModules[F](destinationModules, pushPull)
