@@ -52,6 +52,8 @@ import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 
 import pathy.Path
 
+import scodec.Codec
+
 import shapeless._
 import shapeless.HList.ListCompat._
 
@@ -61,13 +63,13 @@ import skolems.∃
 
 // TODO[clustering]: Need to decide how we'll ensure a job is only ever running on a single node.
 private[impl] final class DefaultResultPush[
-    F[_]: Concurrent: Timer, D <: AnyRef: Show, Q, R] private (
+    F[_]: Concurrent: Timer, D: Codec: Show, Q, R] private (
     lookupDestination: D => F[Option[Destination[F]]],
     evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), R],
     jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing],
     render: ResultRender[F, R],
     active: ConcurrentNavigableMap[D :: Option[ResourcePath] :: HNil, DefaultResultPush.ActiveState[F, Q]],
-    pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
+    pushes: PrefixStore.SCodec[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
     offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
     log: Logger[F])
     extends ResultPush[F, D, Q] {
@@ -621,12 +623,12 @@ private[impl] object DefaultResultPush {
         extends ActiveState[F, Q]
   }
 
-  def apply[F[_]: Concurrent: Timer, D <: AnyRef: Order: Show, Q, R](
+  def apply[F[_]: Concurrent: Timer, D: Codec: Order: Show, Q, R](
       maxConcurrentPushes: Int,
       lookupDestination: D => F[Option[Destination[F]]],
       evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), R],
       render: ResultRender[F, R],
-      pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
+      pushes: PrefixStore.SCodec[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
       offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
       : Resource[F, ResultPush[F, D, Q]] = {
 

@@ -73,6 +73,8 @@ import shapeless._
 
 import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz, showToCats, equalToCats}
 
+import scodec.Codec
+
 import skolems.∃
 
 final class Quasar[F[_], R, C <: SchemaConfig](
@@ -93,7 +95,7 @@ object Quasar extends Logging {
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       schedulerRefs: IndexedStore[F, UUID, SchedulerRef[Json]],
-      pushes: PrefixStore[F, UUID :: ResourcePath :: HNil, ∃[Push[?, SqlQuery]]],
+      pushes: PrefixStore.SCodec[F, UUID :: ResourcePath :: HNil, ∃[Push[?, SqlQuery]]],
       offsets: Store[F, UUID :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
       queryFederation: QueryFederation[Fix, Resource[F, ?], QueryAssociate[Fix, Resource[F, ?], EvalResult[F]], R],
       resultRender: ResultRender[F, R],
@@ -105,10 +107,13 @@ object Quasar extends Logging {
       maxConcurrentPushes: Int,
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
-      schedulerBuilders: List[SchedulerBuilder[F]])(
+      schedulerBuilders: List[SchedulerBuilder[F]],
+      uuidCodec: Codec[UUID])(
       implicit
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
+
+    implicit val uuidCodec0: Codec[UUID] = uuidCodec
 
     val destModules =
       DestinationModules[F](destinationModules, pushPull)

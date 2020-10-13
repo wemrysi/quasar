@@ -299,6 +299,7 @@ lazy val impl = project
       "io.atomix"      % "atomix"                    % atomixVersion,
       "org.scodec"     %% "scodec-bits"              % scodecBitsVersion,
       "org.mapdb"      % "mapdb"                     % mapdbVersion,
+      "com.h2database" % "h2-mvstore"                % h2Version,
       // The azure-core-http-netty dep is added here as a quick and dirty way to get azure working.
       // Azure relies on service provider mechanism to load an implementation of its HttpClientProvider.
       // The implementation class is available in the azure plugins, but

@@ -26,8 +26,10 @@ import shapeless._
 import shapeless.ops.hlist._
 
 object VoidStore {
-  def prefix[F[_], K <: HList, V](implicit F: Applicative[F]): PrefixStore[F, K, V] =
+  def prefix[F[_], K <: HList, V](implicit F: Applicative[F]): PrefixStore.Legacy[F, K, V] =
     new PrefixStore[F, K, V] {
+      type Constraint[P <: HList] = PrefixStore.ToArray[P]
+
       def prefixedEntries[P <: HList](p: P)(
           implicit
           pfx: IsPrefix[P, K],

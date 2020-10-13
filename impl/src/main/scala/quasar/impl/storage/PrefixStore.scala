@@ -27,37 +27,50 @@ import shapeless._
 import shapeless.ops.hlist._
 
 trait PrefixStore[F[_], K <: HList, V] extends IndexedStore[F, K, V] {
+  type Constraint[P <: HList]
+
   def prefixedEntries[P <: HList](p: P)(
       implicit
       pfx: IsPrefix[P, K],
-      toArray: ToTraversable.Aux[P, Array, AnyRef])
+      constraint: Constraint[P])
       : Stream[F, (K, V)]
 
   def deletePrefixed[P <: HList](p: P)(
       implicit
       pfx: IsPrefix[P, K],
-      toArray: ToTraversable.Aux[P, Array, AnyRef])
+      constraint: Constraint[P])
       : F[Unit]
 }
 
 object PrefixStore {
+  type ToArray[L <: HList] = ToTraversable.Aux[L, Array, AnyRef]
+
+  type Aux[F[_], K <: HList, V, C[P <: HList]] = PrefixStore[F, K, V] {
+    type Constraint[P <: HList] = C[P]
+  }
+
+  type Legacy[F[_], K <: HList, V] = Aux[F, K, V, ToArray]
+  type SCodec[F[_], K <: HList, V] = Aux[F, K, V, LinearCodec]
+
   def xmapValueF[F[_]: Monad, K <: HList, V1, V2](
       s: PrefixStore[F, K, V1])(
       f: V1 => F[V2])(
       g: V2 => F[V1])
-      : PrefixStore[F, K, V2] =
+      : PrefixStore.Aux[F, K, V2, s.Constraint] =
     new PrefixStore[F, K, V2] {
+      type Constraint[P <: HList] = s.Constraint[P]
+
       def prefixedEntries[P <: HList](p: P)(
           implicit
           pfx: IsPrefix[P, K],
-          toArray: ToTraversable.Aux[P, Array, AnyRef])
+          toArray: Constraint[P])
           : Stream[F, (K, V2)] =
         s.prefixedEntries(p).evalMap(_.traverse(f))
 
       def deletePrefixed[P <: HList](p: P)(
           implicit
           pfx: IsPrefix[P, K],
-          toArray: ToTraversable.Aux[P, Array, AnyRef])
+          toArray: Constraint[P])
           : F[Unit] =
         s.deletePrefixed(p)
 
@@ -73,4 +86,5 @@ object PrefixStore {
       def delete(k: K): F[Boolean] =
         s.delete(k)
     }
+
 }

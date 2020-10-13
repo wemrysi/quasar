@@ -18,7 +18,6 @@ package quasar.impl.push
 
 import slamdata.Predef._
 
-import cats._
 import cats.data.{Ior, NonEmptyList, NonEmptySet}
 import cats.derived.auto.order._
 import cats.effect.{Blocker, IO, Resource}
@@ -28,13 +27,9 @@ import cats.implicits._
 import fs2.{Pipe, Stream, text}
 import fs2.concurrent.{Enqueue, Queue}
 
-import java.lang.Integer
 import java.time.{Instant, ZoneOffset}
 
 import monocle.Prism
-
-import org.mapdb.{DBMaker, Serializer}
-import org.mapdb.serializer.GroupSerializer
 
 import monocle.Traversal
 
@@ -51,16 +46,19 @@ import quasar.api.resource.{ResourcePath, ResourceName}
 import quasar.connector.{DataEvent, Offset}
 import quasar.connector.destination._
 import quasar.connector.render._
-import quasar.impl.storage.RefIndexedStore
-import quasar.impl.storage.mapdb._
+import quasar.contrib.scalaz.MonadError_
+import quasar.impl.storage
+import quasar.impl.storage.{StoreError, RefIndexedStore}
 
 import shims.{applicativeToCats, eqToScalaz, orderToCats, orderToScalaz, showToCats, showToScalaz}
 
-import scala.Predef.classOf
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 import scalaz.IMap
+
+import scodec.Codec
+import scodec.codecs._
 
 import shapeless._
 
@@ -69,23 +67,25 @@ import skolems.{∃, ∀}
 import spire.math.Real
 
 object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
+
   import ResultPushError._
+
+  implicit val intCodec: Codec[Int] = int32
+  implicit val resourcePathCodec: Codec[ResourcePath] = SerializableStore.codec[ResourcePath]
+
 
   skipAllIf(true)
 
   addSections
 
+  implicit val ioMonadStoreError: MonadError_[IO, StoreError] =
+    MonadError_.facet[IO](StoreError.throwableP)
+
   implicit val tmr = IO.timer(global)
 
   val Timeout = 10.seconds
 
-  implicit val jintegerOrder: Order[Integer] =
-    Order.by(_.intValue)
-
-  implicit val jintegershow: Show[Integer] =
-    Show.fromToString
-
-  val DestinationId: Integer = new Integer(43)
+  val DestinationId = 43
   val QDestinationType = DestinationType("ref", 1)
 
   type Filesystem = Map[ResourcePath, String]
@@ -316,34 +316,32 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     Stream.fixedDelay[IO](100.millis).zipRight(Stream(W1, W2, W3))
 
   def mkResultPush(
-      destinations: Map[Integer, Destination[IO]],
+      destinations: Map[Int, Destination[IO]],
       evaluator: QueryEvaluator[Resource[IO, ?], (String, Option[Offset]), Stream[IO, String]],
       maxConcurrentPushes: Int = 10)
-      : Resource[IO, ResultPush[IO, Integer, String]] = {
+      : Resource[IO, ResultPush[IO, Int, String]] = {
 
-    val lookupDestination: Integer => IO[Option[Destination[IO]]] =
+    val lookupDestination: Int => IO[Option[Destination[IO]]] =
       destinationId => IO(destinations.get(destinationId))
 
     val render = new MockResultRender
 
     for {
-      db <- Resource.make(IO(DBMaker.memoryDB().make()))(db => IO(db.close()))
+      db <- storage.offheapMVStore[IO]
 
       pushes <- Resource liftF {
-        MapDbPrefixStore[IO](
-          "default-result-push-spec",
+        SerializableStore[IO, Int :: ResourcePath :: HNil, ∃[Push[?, String]]](
           db,
-          Serializer.INTEGER :: (ResourcePathSerializer: GroupSerializer[ResourcePath]) :: HNil,
-          Serializer.JAVA.asInstanceOf[GroupSerializer[∃[Push[?, String]]]],
+          "default-result-push-spec",
           Blocker.liftExecutionContext(global))
       }
 
-      ref <- Resource.liftF(Ref[IO].of(IMap.empty[Integer :: ResourcePath :: HNil, ∃[OffsetKey.Actual]]))
+      ref <- Resource.liftF(Ref[IO].of(IMap.empty[Int :: ResourcePath :: HNil, ∃[OffsetKey.Actual]]))
 
       offsets = RefIndexedStore(ref)
 
       resultPush <-
-        DefaultResultPush[IO, Integer, String, Stream[IO, String]](
+        DefaultResultPush[IO, Int, String, Stream[IO, String]](
           maxConcurrentPushes,
           lookupDestination,
           evaluator,
@@ -486,7 +484,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
 
     "allows concurrent push to a path in multiple destinations" >> forallConfigs { config =>
-      val dest2 = new Integer(DestinationId.intValue + 1)
+      val dest2 = DestinationId.intValue + 1
 
       for {
         (destination, _) <- QDestination()
@@ -1250,7 +1248,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
   "pushedTo" >> {
     def lookupPushed(
-        r: Either[DestinationNotFound[Integer], Map[ResourcePath, ∃[Push[?, String]]]],
+        r: Either[DestinationNotFound[Int], Map[ResourcePath, ∃[Push[?, String]]]],
         p: ResourcePath)
         : Option[Push[_, String]] =
       r.toOption.flatMap(_.get(p)).map(_.value)

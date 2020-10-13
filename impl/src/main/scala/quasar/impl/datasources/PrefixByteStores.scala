@@ -20,14 +20,16 @@ import quasar.connector.ByteStore
 import quasar.impl.storage.PrefixStore
 
 import java.lang.String
-import scala.{AnyRef, Array, Boolean, Byte, Option, Unit}
+import scala.{Array, Boolean, Byte, Option, Unit}
 
 import cats.Applicative
 
 import shapeless._
 
-final class PrefixByteStores[F[_]: Applicative, K <: AnyRef] private (
-    store: PrefixStore[F, K :: String :: HNil, Array[Byte]])
+import scodec._
+
+final class PrefixByteStores[F[_]: Applicative, K: Codec] private (
+    store: PrefixStore.SCodec[F, K :: String :: HNil, Array[Byte]])
     extends ByteStores[F, K] {
 
   private class PrefixByteStore(prefix: K) extends ByteStore[F] {
@@ -49,8 +51,8 @@ final class PrefixByteStores[F[_]: Applicative, K <: AnyRef] private (
 }
 
 object PrefixByteStores {
-  def apply[F[_]: Applicative, K <: AnyRef](
-      store: PrefixStore[F, K :: String :: HNil, Array[Byte]])
+  def apply[F[_]: Applicative, K: Codec](
+      store: PrefixStore.SCodec[F, K :: String :: HNil, Array[Byte]])
       : ByteStores[F, K] =
     new PrefixByteStores(store)
 }
