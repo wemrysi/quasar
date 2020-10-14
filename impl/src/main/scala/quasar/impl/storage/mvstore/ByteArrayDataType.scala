@@ -38,13 +38,13 @@ private[impl] object ByteArrayDataType extends DataType {
     val len = DataUtils.readVarInt(buffer)
     val tgt = new Array[Byte](len)
     val bytes = buffer.get(tgt, 0, len)
-    bytes.asInstanceOf[Object]
+    tgt.asInstanceOf[Object]
   }
 
   def read(buffer: ByteBuffer, objs: Array[Object], len: Int, areKeys: Boolean): Unit = {
     var ix = 0
     while (ix < len) {
-      read(buffer)
+      objs(ix) = read(buffer)
       ix += 1
     }
   }
