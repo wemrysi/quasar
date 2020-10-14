@@ -23,24 +23,23 @@ import cats.Applicative
 import fs2.Stream
 
 import shapeless._
-import shapeless.ops.hlist._
 
 object VoidStore {
-  def prefix[F[_], K <: HList, V](implicit F: Applicative[F]): PrefixStore.Legacy[F, K, V] =
+  def prefix[F[_], K <: HList, V](implicit F: Applicative[F]): PrefixStore.SCodec[F, K, V] =
     new PrefixStore[F, K, V] {
-      type Constraint[P <: HList] = PrefixStore.ToArray[P]
+      type Constraint[P <: HList] = LinearCodec[P]
 
       def prefixedEntries[P <: HList](p: P)(
           implicit
           pfx: IsPrefix[P, K],
-          toArray: ToTraversable.Aux[P, Array, AnyRef])
+          constraint: Constraint[P])
           : Stream[F, (K, V)] =
         Stream.empty
 
       def deletePrefixed[P <: HList](p: P)(
           implicit
           pfx: IsPrefix[P, K],
-          toArray: ToTraversable.Aux[P, Array, AnyRef])
+          constraint: Constraint[P])
           : F[Unit] =
         F.unit
 
