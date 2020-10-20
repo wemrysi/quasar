@@ -37,7 +37,6 @@ private[impl] object ByteArrayDataType extends DataType {
   def read(buffer: ByteBuffer): Object = {
     val len = DataUtils.readVarInt(buffer)
     val tgt = new Array[Byte](len)
-    val bytes = buffer.get(tgt, 0, len)
     tgt.asInstanceOf[Object]
   }
 
