@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef._
 
 import quasar.{IdStatus, Qspec, TreeMatchers}
+import quasar.contrib.cats.stateT._
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka.implicits._
 import quasar.ejson.{EJson, Fixed}
@@ -27,22 +28,25 @@ import quasar.fp._
 import quasar.qscript.{construction, MapFuncsCore, OnUndefined, PlannerError}
 import quasar.qsu.mra.{AutoJoin, ProvImpl}
 
+import cats.Eval
+import cats.data.StateT
+
 import matryoshka.data.Fix
 import matryoshka.data.freeEqual
 import matryoshka.delayEqual
 
 import pathy.Path
 import pathy.Path.Sandboxed
-import scalaz.{EitherT, Need, StateT}
+import scalaz.EitherT
 
-import shims.{eqToScalaz, orderToCats, orderToScalaz}
+import shims.{eqToScalaz, monadToScalaz, orderToCats, orderToScalaz}
 
 object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
   import ApplyProvenance.AuthenticatedQSU
   import IdStatus.ExcludeId
 
-  type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
+  type F[A] = EitherT[StateT[Eval, Long, ?], PlannerError, A]
 
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
@@ -143,7 +147,7 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
     val resultsF =
       ApplyProvenance[Fix, F](qprov, qgraph).flatMap(ReifyAutoJoins[Fix, F](qprov))
 
-    val results = resultsF.run.eval(0L).value.toEither
+    val results = resultsF.run.runA(0L).value.toEither
     results must beRight
 
     results.right.get

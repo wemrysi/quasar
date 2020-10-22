@@ -43,6 +43,7 @@ import quasar.qscript.{
   RightSide3
 }
 
+import cats.Eval
 import cats.data.{NonEmptyList, StateT}
 
 import matryoshka._
@@ -54,7 +55,7 @@ import monocle.macros.Lenses
 
 import pathy.Path
 
-import scalaz.{Applicative, Equal, Free, Functor, IList, Monad, Need, Show, ValidationNel}
+import scalaz.{Applicative, Equal, Free, Functor, IList, Monad, Show, ValidationNel}
 import scalaz.Scalaz._
 
 import shims.{eqToScalaz, equalToCats, monadToCats, monadToScalaz}
@@ -344,8 +345,12 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
       QAuthS[F].modify(_.addDims(g.root, ds)) as ds
     }
 
-  private def computeFuncProvenance[A](fm: FreeMapA[A])(f: A => P): P =
-    fm.paraM(ginterpretM(f.andThen(Need(_)), computeFuncProvenanceƒ[A].andThen(Need(_)))).value
+  private def computeFuncProvenance[A](fm: FreeMapA[A])(f: A => P): P = {
+    val galgM: GAlgebraM[(FreeMapA[A], ?), Eval, MapFunc, P] =
+      mf => Eval.later(computeFuncProvenanceƒ[A](mf))
+
+    fm.paraM(ginterpretM(f.andThen(Eval.now(_)), galgM)).value
+  }
 
   private def computeJoin2[F[_]: Monad: MonadPlannerErr: QAuthS](
       g: QSUGraph,

@@ -20,6 +20,7 @@ package quasar.qsu
 import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers, Type}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
+import quasar.contrib.cats.stateT._
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka.implicits._
 import quasar.ejson.{EJson, Fixed}
@@ -40,6 +41,9 @@ import quasar.qscript.{
 }
 import quasar.qsu.mra.{Dim, ProvImpl, Uop}
 
+import cats.Eval
+import cats.data.StateT
+
 import matryoshka.data.Fix
 
 import org.specs2.matcher.{Matcher, MatchersImplicits}
@@ -47,14 +51,14 @@ import org.specs2.matcher.{Matcher, MatchersImplicits}
 import pathy.Path
 import Path.Sandboxed
 
-import scalaz.{\/-, EitherT, Free, Need, StateT}
+import scalaz.{\/-, EitherT, Free}
 import scalaz.std.anyVal._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.equal._
 //import scalaz.syntax.show._
 import scalaz.syntax.tag._
 
-import shims.{monoidToCats, orderToCats, showToCats}
+import shims.{monadToScalaz, monoidToCats, orderToCats, showToCats}
 
 object MinimizeAutoJoinsSpec
     extends Qspec
@@ -67,7 +71,7 @@ object MinimizeAutoJoinsSpec
   import QScriptUniform.{DTrans, Retain, Rotation}
   import ProvImpl.Vecs
 
-  type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
+  type F[A] = EitherT[StateT[Eval, Long, ?], PlannerError, A]
 
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
@@ -2461,7 +2465,7 @@ object MinimizeAutoJoinsSpec
         .flatMap(ReifyBuckets[Fix, F](qprov))
         .flatMap(MinimizeAutoJoins[Fix, F](qprov))
 
-    val results = resultsF.run.eval(0L).value.toEither
+    val results = resultsF.run.runA(0L).value.toEither
     results must beRight
 
     results.right.get

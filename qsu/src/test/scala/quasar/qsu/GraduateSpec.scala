@@ -21,10 +21,11 @@ import quasar.Qspec
 import quasar.IdStatus.{ExcludeId, IncludeId}
 import quasar.api.resource.ResourcePath
 import quasar.common.{JoinType, SortDir}
+import quasar.contrib.cats.stateT._
+import quasar.contrib.iota._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
-import quasar.contrib.iota._
 import quasar.qscript.{
   construction,
   educatedToTotal,
@@ -44,6 +45,10 @@ import quasar.qscript.{
 import quasar.qscript.PlannerError.InternalError
 import quasar.qscript.MapFuncsCore.{IntLit, RecIntLit}
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
+
+import cats.Eval
+import cats.data.StateT
+
 import matryoshka.EqualT
 import matryoshka.data.Fix
 import Fix._
@@ -51,13 +56,15 @@ import org.specs2.matcher.{Expectable, MatchResult, Matcher}
 import pathy.Path
 import Path.{Sandboxed, file}
 
-import scalaz.{EitherT, Free, Need, StateT, \/, \/-, NonEmptyList => NEL}
+import scalaz.{EitherT, Free, \/, \/-, NonEmptyList => NEL}
 import scalaz.Scalaz._
+
+import shims.monadToScalaz
 
 object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   import QScriptUniform.Rotation
 
-  type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
+  type F[A] = EitherT[StateT[Eval, Long, ?], PlannerError, A]
 
   type QSU[A] = QScriptUniform[A]
   type QSE[A] = QScriptEducated[A]
@@ -269,5 +276,5 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
     }
   }
 
-  def evaluate[A](fa: F[A]): PlannerError \/ A = fa.run.eval(0L).value
+  def evaluate[A](fa: F[A]): PlannerError \/ A = fa.run.runA(0L).value
 }

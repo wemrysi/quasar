@@ -29,6 +29,7 @@ import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.time.TemporalPart
 
+import cats.Eval
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -476,13 +477,13 @@ object MapFuncCore {
         // nullary
         case (Constant(v1), Constant(v2)) =>
           // FIXME: Ensure we’re using _structural_ equality here.
-          Need(v1 ≟ v2)
-        case (JoinSideName(n1), JoinSideName(n2)) => Need(n1 ≟ n2)
-        case (Undefined(), Undefined()) => Need(true)
-        case (Now(), Now()) => Need(true)
-        case (NowTime(), NowTime()) => Need(true)
-        case (NowDate(), NowDate()) => Need(true)
-        case (CurrentTimeZone(), CurrentTimeZone()) => Need(true)
+          Eval.later(v1 ≟ v2)
+        case (JoinSideName(n1), JoinSideName(n2)) => Eval.later(n1 ≟ n2)
+        case (Undefined(), Undefined()) => Eval.now(true)
+        case (Now(), Now()) => Eval.now(true)
+        case (NowTime(), NowTime()) => Eval.now(true)
+        case (NowDate(), NowDate()) => Eval.now(true)
+        case (CurrentTimeZone(), CurrentTimeZone()) => Eval.now(true)
         // unary
         case (ExtractCentury(a1), ExtractCentury(a2)) => in.equal(a1, a2)
         case (ExtractDayOfMonth(a1), ExtractDayOfMonth(a2)) => in.equal(a1, a2)
@@ -513,7 +514,7 @@ object MapFuncCore {
         case (LocalDate(a1), LocalDate(b1)) => in.equal(a1, b1)
         case (Interval(a1), Interval(b1)) => in.equal(a1, b1)
         case (StartOfDay(a1), StartOfDay(b1)) => in.equal(a1, b1)
-        case (TemporalTrunc(a1, a2), TemporalTrunc(b1, b2)) => Need(a1 ≟ b1) && in.equal(a2, b2)
+        case (TemporalTrunc(a1, a2), TemporalTrunc(b1, b2)) => Eval.later(a1 ≟ b1) && in.equal(a2, b2)
         case (TimeOfDay(a1), TimeOfDay(b1)) => in.equal(a1, b1)
         case (ToTimestamp(a1), ToTimestamp(b1)) => in.equal(a1, b1)
         case (TypeOf(a1), TypeOf(b1)) => in.equal(a1, b1)
@@ -570,9 +571,9 @@ object MapFuncCore {
         case (Search(a1, a2, a3), Search(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Like(a1, a2, a3), Like(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Substring(a1, a2, a3), Substring(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
-        case (Guard(a1, atpe, a2, a3), Guard(b1, btpe, b2, b3)) => Need(atpe ≟ btpe) && in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
+        case (Guard(a1, atpe, a2, a3), Guard(b1, btpe, b2, b3)) => Eval.later(atpe ≟ btpe) && in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
 
-        case (_, _) => Need(false)
+        case (_, _) => Eval.now(false)
       }
     }
 
