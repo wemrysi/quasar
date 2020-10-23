@@ -477,8 +477,8 @@ object MapFuncCore {
         // nullary
         case (Constant(v1), Constant(v2)) =>
           // FIXME: Ensure we’re using _structural_ equality here.
-          Eval.later(v1 ≟ v2)
-        case (JoinSideName(n1), JoinSideName(n2)) => Eval.later(n1 ≟ n2)
+          Eval.always(v1 ≟ v2)
+        case (JoinSideName(n1), JoinSideName(n2)) => Eval.always(n1 ≟ n2)
         case (Undefined(), Undefined()) => Eval.now(true)
         case (Now(), Now()) => Eval.now(true)
         case (NowTime(), NowTime()) => Eval.now(true)
@@ -514,7 +514,7 @@ object MapFuncCore {
         case (LocalDate(a1), LocalDate(b1)) => in.equal(a1, b1)
         case (Interval(a1), Interval(b1)) => in.equal(a1, b1)
         case (StartOfDay(a1), StartOfDay(b1)) => in.equal(a1, b1)
-        case (TemporalTrunc(a1, a2), TemporalTrunc(b1, b2)) => Eval.later(a1 ≟ b1) && in.equal(a2, b2)
+        case (TemporalTrunc(a1, a2), TemporalTrunc(b1, b2)) => Eval.always(a1 ≟ b1) && in.equal(a2, b2)
         case (TimeOfDay(a1), TimeOfDay(b1)) => in.equal(a1, b1)
         case (ToTimestamp(a1), ToTimestamp(b1)) => in.equal(a1, b1)
         case (TypeOf(a1), TypeOf(b1)) => in.equal(a1, b1)
@@ -571,7 +571,7 @@ object MapFuncCore {
         case (Search(a1, a2, a3), Search(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Like(a1, a2, a3), Like(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Substring(a1, a2, a3), Substring(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
-        case (Guard(a1, atpe, a2, a3), Guard(b1, btpe, b2, b3)) => Eval.later(atpe ≟ btpe) && in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
+        case (Guard(a1, atpe, a2, a3), Guard(b1, btpe, b2, b3)) => Eval.always(atpe ≟ btpe) && in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
 
         case (_, _) => Eval.now(false)
       }

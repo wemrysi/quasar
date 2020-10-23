@@ -347,7 +347,7 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
 
   private def computeFuncProvenance[A](fm: FreeMapA[A])(f: A => P): P = {
     val galgM: GAlgebraM[(FreeMapA[A], ?), Eval, MapFunc, P] =
-      mf => Eval.later(computeFuncProvenanceƒ[A](mf))
+      mf => Eval.always(computeFuncProvenanceƒ[A](mf))
 
     fm.paraM(ginterpretM(f.andThen(Eval.now(_)), galgM)).value
   }

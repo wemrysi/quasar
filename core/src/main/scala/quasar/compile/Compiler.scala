@@ -830,7 +830,7 @@ object Compiler {
     val KS = MonadState_[State[KeyState, ?], KeyState]
 
     def makeKey(tree: T, flp: ZFree[LP, Unit]): T =
-      flp.cataM(interpretM[Eval, LP, Unit, T](_ => Eval.now(tree), fa => Eval.later(fa.embed))).value
+      flp.cataM(interpretM[Eval, LP, Unit, T](_ => Eval.now(tree), fa => Eval.always(fa.embed))).value
 
     // Step 1: annotate nodes containing the keys.
     val ann: State[KeyState, Cofree[LP, Boolean]] = tree.transAnaM {

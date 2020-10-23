@@ -36,5 +36,5 @@ object LazyEqual {
     }
 
   def recursive[T, F[_]: Functor](implicit T: Recursive.Aux[T, F], F: Delay[LazyEqual, F]): LazyEqual[T] =
-    lazyEqual((x, y) => Eval.later(F(recursive[T, F])).flatMap(_.equal(T.project(x), T.project(y))))
+    lazyEqual((x, y) => Eval.always(F(recursive[T, F])).flatMap(_.equal(T.project(x), T.project(y))))
 }
