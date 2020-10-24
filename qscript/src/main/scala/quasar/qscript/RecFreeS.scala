@@ -18,8 +18,11 @@ package quasar.qscript
 
 import slamdata.Predef._
 
-import quasar.{RenderTree, NonTerminal}
+import quasar.{RenderTree, RenderedTree, NonTerminal}
 import quasar.fp.ski.κ
+
+import cats.Eval
+import cats.implicits._
 
 import matryoshka._
 import matryoshka.data._
@@ -102,18 +105,24 @@ object RecFreeS {
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def recRenderTree[F[_]: Traverse](implicit FR: Delay[RenderTree, F]): Delay[RenderTree, RecFreeS[F, ?]] =
-    Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ RecFreeS[F, ?])#λ](rt =>
-      RenderTree.make {
-        case Leaf(a) => rt.render(a)
-        case Suspend(fa) => FR.apply(rt).render(fa)
-        case Fix(form, body) =>
-          NonTerminal(
-            List("Let"),
-            none,
-            List(
-              recRenderTree[F].apply(rt).render(form),
-              RenderTree.free[RecFreeS[F, ?]].apply(RenderTree[Hole]).render(body)))
-      }))
+    new Delay[RenderTree, RecFreeS[F, ?]] {
+      def apply[A](ra: RenderTree[A]): RenderTree[RecFreeS[F, A]] = {
+        def go(rec: RecFreeS[F, A]): Eval[RenderedTree] =
+          rec match {
+            case Leaf(a) =>
+              Eval.always(ra.render(a))
+
+            case Suspend(fa) =>
+              Eval.always(FR.apply(ra).render(fa))
+
+            case Fix(form, body) =>
+              (go(form), Eval.always(RenderTree[Free[RecFreeS[F, ?], Hole]].render(body)))
+                .mapN((fm, bd) => NonTerminal(List("Let"), None, List(fm, bd)))
+          }
+
+        RenderTree.make(go(_).value)
+      }
+    }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def show[F[_]: Traverse](implicit S: Delay[Show, F]): Delay[Show, RecFreeS[F, ?]] =

@@ -19,12 +19,15 @@ package quasar
 import slamdata.Predef._
 import quasar.fp._
 
+import cats.Eval
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
+import matryoshka.patterns.{CoEnv, EnvT}
 import scalaz._, Scalaz._
 import simulacrum.typeclass
 import iotaz.{CopK, TListK}
+import shims.monadToScalaz
 
 @typeclass trait RenderTree[A] {
   def render(a: A): RenderedTree
@@ -69,8 +72,10 @@ object RenderTree extends RenderTreeInstances {
   def print[A: RenderTree](label: String, a: A): Unit =
     println(label + ":\n" + a.render.shows)
 
-  def recursive[T, F[_]](implicit T: Recursive.Aux[T, F], FD: Delay[RenderTree, F], FF: Functor[F]): RenderTree[T] =
-    make(_.cata(FD(RenderTree[RenderedTree]).render))
+  def recursive[T, F[_]](implicit T: Recursive.Aux[T, F], FD: Delay[RenderTree, F], FF: Traverse[F]): RenderTree[T] = {
+    val rt = FD(RenderTree[RenderedTree])
+    make(_.cataM[Eval, RenderedTree](frt => Eval.always(rt.render(frt))).value)
+  }
 }
 
 sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
@@ -84,15 +89,23 @@ sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
   implicit def delay[F[_], A: RenderTree](implicit F: Delay[RenderTree, F]): RenderTree[F[A]] =
     F(RenderTree[A])
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  implicit def free[F[_]: Functor](implicit F: Delay[RenderTree, F]): Delay[RenderTree, Free[F, ?]] =
-    Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ Free[F, ?])#λ](rt =>
-      make(_.resume.fold(F(free[F].apply(rt)).render, rt.render))))
+  implicit def coEnvRenderTree[E, F[_]](implicit rt: RenderTree[E], delay: Delay[RenderTree, F]): Delay[RenderTree, CoEnv[E, F, ?]] = {
+    def inst[A](rtA: RenderTree[A]): RenderTree[CoEnv[E, F, A]] = {
+      val rtF = delay(rtA)
+      make(_.run.fold(rt.render, rtF.render))
+    }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  implicit def cofree[F[_]](implicit F: Delay[RenderTree, F]): Delay[RenderTree, Cofree[F, ?]] =
-    Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ Cofree[F, ?])#λ](rt =>
-      make(t => NonTerminal(List("Cofree"), None, List(rt.render(t.head), F(cofree(F)(rt)).render(t.tail))))))
+    Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ CoEnv[E, F, ?])#λ](rta => inst(rta)))
+  }
+
+  implicit def envTRenderTree[E, F[_]](implicit rt: RenderTree[E], delay: Delay[RenderTree, F]): Delay[RenderTree, EnvT[E, F, ?]] = {
+    def inst[A](rtA: RenderTree[A]): RenderTree[EnvT[E, F, A]] = {
+      val rtF = delay(rtA)
+      make(et => NonTerminal(Nil, None, List(rt.render(et.ask), rtF.render(et.lower))))
+    }
+
+    Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ EnvT[E, F, ?])#λ](rta => inst(rta)))
+  }
 
   implicit def these[A: RenderTree, B: RenderTree]: RenderTree[A \&/ B] =
     make {
@@ -107,7 +120,7 @@ sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
   implicit lazy val unit: RenderTree[Unit] =
     make(_ => Terminal(List("()", "Unit"), None))
 
-  implicit def renderTreeT[T[_[_]], F[_]: Functor](implicit T: RenderTreeT[T], F: Delay[RenderTree, F]): RenderTree[T[F]] =
+  implicit def renderTreeT[T[_[_]], F[_]: Traverse](implicit T: RenderTreeT[T], F: Delay[RenderTree, F]): RenderTree[T[F]] =
     T.renderTree(F)
 
   implicit def copKRenderTree[LL <: TListK](implicit M: RenderTreeKMaterializer[LL]): Delay[RenderTree, CopK[LL, ?]] = M.materialize(offset = 0)
@@ -189,13 +202,23 @@ sealed abstract class RenderTreeInstances0 extends RenderTreeInstances1 {
         NonTerminal("Key" :: "Map" :: Nil, Some(k.shows), RV.render(v) :: Nil)
       }))
 
-  implicit def fix[F[_]: Functor](implicit F: Delay[RenderTree, F]): RenderTree[Fix[F]] =
+  implicit def cofreeRenderTree[F[_]: Traverse, A: RenderTree](implicit F: Delay[RenderTree, F])
+      : RenderTree[Cofree[F, A]] = {
+    val rt = RenderTree.recursive[Cofree[F, A], EnvT[A, F, ?]]
+    RenderTree.make[Cofree[F, A]](cf => rt.render(cf).retype(_ => List("Cofree")))
+  }
+
+  implicit def freeRenderTree[F[_]: Traverse, A: RenderTree](implicit F: Delay[RenderTree, F])
+      : RenderTree[Free[F, A]] =
+    RenderTree.recursive[Free[F, A], CoEnv[A, F, ?]]
+
+  implicit def fix[F[_]: Traverse](implicit F: Delay[RenderTree, F]): RenderTree[Fix[F]] =
     RenderTree.recursive
 
-  implicit def mu[F[_]: Functor](implicit F: Delay[RenderTree, F]): RenderTree[Mu[F]] =
+  implicit def mu[F[_]: Traverse](implicit F: Delay[RenderTree, F]): RenderTree[Mu[F]] =
     RenderTree.recursive
 
-  implicit def nu[F[_]: Functor](implicit F: Delay[RenderTree, F]): RenderTree[Nu[F]] =
+  implicit def nu[F[_]: Traverse](implicit F: Delay[RenderTree, F]): RenderTree[Nu[F]] =
     RenderTree.recursive
 }
 

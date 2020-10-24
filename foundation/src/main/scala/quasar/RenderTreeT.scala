@@ -16,27 +16,32 @@
 
 package quasar
 
+import cats.Eval
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._
+import shims.monadToScalaz
 import simulacrum.typeclass
 
 /** Analogous to `ShowT`; allows construction of `Delay[RenderTree, F]` for
   * an `F` that refers to `T[... F ...]`.
   */
 @typeclass trait RenderTreeT[T[_[_]]] {
-  def render[F[_]: Functor](t: T[F])(implicit delay: Delay[RenderTree, F])
+  def render[F[_]: Traverse](t: T[F])(implicit delay: Delay[RenderTree, F])
       : RenderedTree
 
-  def renderTree[F[_]: Functor](delay: Delay[RenderTree, F]): RenderTree[T[F]] =
-    RenderTree.make[T[F]](t => render(t)(Functor[F], delay))
+  def renderTree[F[_]: Traverse](delay: Delay[RenderTree, F]): RenderTree[T[F]] =
+    RenderTree.make[T[F]](t => render(t)(Traverse[F], delay))
 }
+
 object RenderTreeT {
   def recursiveT[T[_[_]]: RecursiveT]: RenderTreeT[T] =
     new RenderTreeT[T] {
-      def render[F[_]: Functor](t: T[F])(implicit delay: Delay[RenderTree, F]) =
-        delay(renderTree[F](delay)).render(t.project)
+      def render[F[_]: Traverse](t: T[F])(implicit delay: Delay[RenderTree, F]) = {
+        val rt = delay(RenderTree[RenderedTree])
+        t.cataM[Eval, RenderedTree](frt => Eval.always(rt.render(frt))).value
+      }
     }
 
   implicit val fix: RenderTreeT[Fix] = recursiveT
