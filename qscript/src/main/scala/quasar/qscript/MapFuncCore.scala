@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar._
 import quasar.RenderTree.ops._
 import quasar.contrib.matryoshka._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.matryoshka.implicits._
 import quasar.ejson._
 import quasar.ejson.implicits._
@@ -32,7 +33,6 @@ import quasar.time.TemporalPart
 import cats.Eval
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
@@ -265,7 +265,7 @@ object MapFuncCore {
   }
 
   def normalize[T[_[_]]: BirecursiveT: EqualT, A: Equal]
-      : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
+      : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] => CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] =
     repeatedly(rewrite[T, A])
 
   def normalized[T[_[_]]: BirecursiveT: EqualT, A: Equal: Show](
@@ -273,7 +273,7 @@ object MapFuncCore {
       : FreeMapA[T, A] = {
 
     def norm(fa: FreeMapA[T, A]): Option[FreeMapA[T, A]] = {
-      val next = fa.transCata[Free[MapFunc[T, ?], A]](normalize[T, A])
+      val next = safe.transCata(fa)(normalize[T, A])
       (next =/= fa) option next
     }
 

@@ -96,7 +96,7 @@ sealed abstract class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: Re
       case (MinimizationState(auth), graph) => AuthenticatedQSU[T, P](graph, auth)
     }
 
-    lifted.runA(agraph.graph.generateRevIndex)
+    lifted.runA(agraph.graph.reverseIndex)
   }
 
   // the Ints are indices into branches

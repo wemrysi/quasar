@@ -77,7 +77,7 @@ final class PruneSymmetricDimEdits[T[_[_]]] private () extends QSUTTypes[T] {
         }
     }
 
-    backM.runA(g.generateRevIndex).runA(SMap())
+    backM.runA(g.reverseIndex).runA(SMap())
   }
 
   // does not return Unreferenced()

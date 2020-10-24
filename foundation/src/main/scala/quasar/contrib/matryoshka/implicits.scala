@@ -18,15 +18,34 @@ package quasar.contrib.matryoshka
 
 import scala.Boolean
 
-import matryoshka.Delay
+import matryoshka.{Algebra, Coalgebra, Corecursive, Delay, Recursive}
 import matryoshka.data.free._
+import matryoshka.implicits.{AlgebraOps, CoalgebraOps}
 import matryoshka.patterns.CoEnv
 
 import cats.Eval
 import scalaz.{-\/, \/-, Equal, Free, Functor}
+import scalaz.Liskov._
 import scalaz.syntax.equal._
 
 object implicits {
+  implicit final class RecursiveOps[T, F[_]](val t: T)(implicit T: Recursive.Aux[T, F]) {
+    def project(implicit F: Functor[F]): F[T] =
+      T.project(t)
+  }
+
+  implicit final class CorecursiveOps[T, F[_], FF[_]](
+      val ft: F[T])(
+      implicit T: Corecursive.Aux[T, FF], Sub: F[T] <~< FF[T]) {
+    def embed(implicit F: Functor[FF]): T = T.embed(Sub(ft))
+  }
+
+  implicit def toAlgebraOps[F[_], A](a: Algebra[F, A]): AlgebraOps[F, A] =
+    matryoshka.implicits.toAlgebraOps[F, A](a)
+
+  implicit def toCoalgebraOps[F[_], A](a: Coalgebra[F, A]): CoalgebraOps[F, A] =
+    matryoshka.implicits.toCoalgebraOps[F, A](a)
+
   implicit def lazyEqualEqual[A: LazyEqual]: Equal[A] =
     Equal((x, y) => LazyEqual[A].equal(x, y).value)
 

@@ -16,9 +16,11 @@
 
 package quasar.fp
 
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
+
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._
 
@@ -38,8 +40,8 @@ package object tree {
     case object _1 extends UnaryArg
   }
   implicit class UnaryOps[F[_]](self: Unary[F]) {
-    def eval[T](arg: T)(implicit T: Corecursive.Aux[T, F], F: Functor[F]): T =
-      self.cata(interpret[F, UnaryArg, T](_.fold(arg), _.embed))
+    def eval[T](arg: T)(implicit T: Corecursive.Aux[T, F], F: Traverse[F]): T =
+      safe.cata(self)(interpret[F, UnaryArg, T](_.fold(arg), _.embed))
   }
 
   /** A tree structure with two kinds of holes. See [[BinaryOps.eval]]. */
@@ -61,9 +63,9 @@ package object tree {
   implicit class BinaryOps[F[_]](self: Binary[F]) {
     def eval[T]
       (arg1: T, arg2: T)
-      (implicit T: Corecursive.Aux[T, F], F: Functor[F])
+      (implicit T: Corecursive.Aux[T, F], F: Traverse[F])
         : T =
-      self.cata(interpret[F, BinaryArg, T](_.fold(arg1, arg2), _.embed))
+      safe.cata(self)(interpret[F, BinaryArg, T](_.fold(arg1, arg2), _.embed))
   }
 
   /** A tree structure with three kinds of holes. See [[TernaryOps.eval]]. */
@@ -88,8 +90,8 @@ package object tree {
   implicit class TernaryOps[F[_]](self: Ternary[F]) {
     def eval[T]
       (arg1: T, arg2: T, arg3: T)
-      (implicit T: Corecursive.Aux[T, F], F: Functor[F])
+      (implicit T: Corecursive.Aux[T, F], F: Traverse[F])
         : T =
-      self.cata(interpret[F, TernaryArg, T](_.fold(arg1, arg2, arg3), _.embed))
+      safe.cata(self)(interpret[F, TernaryArg, T](_.fold(arg1, arg2, arg3), _.embed))
   }
 }

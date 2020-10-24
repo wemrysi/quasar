@@ -18,6 +18,8 @@ package quasar.sql
 
 import slamdata.Predef._
 import quasar.common.{CIName, JoinType}
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.fp.ski._
 import quasar.fp._
 
@@ -26,7 +28,6 @@ import scala.util.parsing.combinator.lexical._
 import scala.util.parsing.combinator.syntactical._
 import scala.util.parsing.input.CharArrayReader.EofCh
 import matryoshka._
-import matryoshka.implicits._
 import pathy.Path
 import pathy.Path._
 
@@ -510,5 +511,6 @@ class SQLParser[T[_[_]]: BirecursiveT]
   val parseExpr: String => ParsingError \/ T[Sql] = query =>
     parseWithParser(query, expr).map(normalize)
 
-  private def normalize: T[Sql] => T[Sql] = _.transAna[T[Sql]](repeatedly(normalizeƒ)).makeTables(Nil)
+  private def normalize: T[Sql] => T[Sql] =
+    safe.transAna(_)(repeatedly(normalizeƒ)).makeTables(Nil)
 }

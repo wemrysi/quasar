@@ -18,12 +18,12 @@ package quasar.ejson
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka.{project => projectg, _}
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.iota.{copkTraverse, copkOrder}
 
 import qdata.{QDataDecode, QDataEncode}
 
 import matryoshka._
-import matryoshka.implicits._
 import scalaz.{==>>, Equal, Order}
 import scalaz.std.list._
 import scalaz.syntax.equal._
@@ -41,8 +41,8 @@ object implicits {
     Order.order { (x, y) =>
       implicit val ordExt = Extension.structuralOrder
       OrderR.order[T, EJson](
-        x.transCata[T](EJson.elideMetadata[T]),
-        y.transCata[T](EJson.elideMetadata[T]))
+        safe.transCata(x)(EJson.elideMetadata[T]),
+        safe.transCata(y)(EJson.elideMetadata[T]))
     }
 
   implicit def ejsonQDataDecode[J](implicit T: Recursive.Aux[J, EJson]): QDataDecode[J] =

@@ -16,11 +16,15 @@
 
 package quasar.qsu
 
-import slamdata.Predef.{Int, List, Map => SMap, Symbol}
+import slamdata.Predef.{Map => SMap, _}
+
+import quasar.contrib.iota._
+import quasar.contrib.matryoshka.safe
 import quasar.fp._
 import quasar.qscript.{
   construction,
   Center,
+  Hole,
   LeftSide,
   LeftSide3,
   RightSide,
@@ -29,20 +33,28 @@ import quasar.qscript.{
 import quasar.qscript.RecFreeS._
 import quasar.qsu.{QScriptUniform => QSU}
 
+import cats.{Monoid, MonoidK}
+import cats.instances.map._
+
+import matryoshka.BirecursiveT
+import matryoshka.data.free._
+import matryoshka.patterns.CoEnv
+
 import scalaz.syntax.bind._
 import scalaz.syntax.equal._
 
-import matryoshka.BirecursiveT
+import shims.monoidToScalaz
 
 /** Coalesces adjacent mappable regions of a single root. */
 final class CoalesceUnaryMappable[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
   import MappableRegion.MaximalUnary
 
-  val mf = construction.Func[T]
+  private val mf = construction.Func[T]
+  private implicit val vertsMonoid: Monoid[QSUVerts[T]] = MonoidK[SMap[Symbol, ?]].algebra
 
-  def apply(graph: QSUGraph): QSUGraph =
-    graph rewrite {
+  def apply(graph: QSUGraph): QSUGraph = {
+    val coalesced = graph rewrite {
       case g @ MaximalUnary(src, fm) if g.root =/= src.root =>
         g.overwriteAtRoot(QScriptUniform.Map(src.root, fm.asRec))
 
@@ -82,6 +94,24 @@ final class CoalesceUnaryMappable[T[_[_]]: BirecursiveT] private () extends QSUT
           g.overwriteAtRoot(QSU.AutoJoin3(l, c, r, cmb))
         }
     }
+
+    // Make all coalesced FreeMaps strict, eliminating all lazy nodes that may refer to a
+    // QSUGraph due to how `MaximumUnary` works. This is necessary to prevent loops in
+    // QSUGraph#reverseIndex when we attempt to compute `Free#hashCode`.
+    val strictVerts = coalesced foldMapDown { g =>
+      g.vertices(g.root) match {
+        case QScriptUniform.Map(src, fm) =>
+          val strictFm =
+            safe.transCata(fm.linearize)((ft: CoEnv[Hole, MapFunc, FreeMap]) => ft)
+
+          SMap(g.root -> QScriptUniform.Map(src, strictFm.asRec))
+
+        case other => SMap(g.root -> other)
+      }
+    }
+
+    QSUGraph(coalesced.root, strictVerts)
+  }
 
   def mapNodes(gs: List[QSUGraph]): SMap[Int, (Symbol, FreeMap)] =
     gs.zipWithIndex.foldLeft(SMap[Int, (Symbol, FreeMap)]()) {

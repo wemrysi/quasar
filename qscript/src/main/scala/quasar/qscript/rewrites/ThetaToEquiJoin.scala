@@ -19,12 +19,13 @@ package quasar.qscript.rewrites
 import quasar.fp._
 import quasar.RenderTreeT
 import quasar.contrib.iota._
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.qscript.RecFreeS._
 import quasar.qscript._
 import slamdata.Predef.{Map => _, _}
 
 import matryoshka.{Hole => _, _}
-import matryoshka.implicits._
 import scalaz._, Scalaz._
 import iotaz.{TListK, CopK, TNilK}
 import iotaz.TListK.:::
@@ -58,8 +59,9 @@ object ThetaToEquiJoin {
   def apply[T[_[_]], F[_], G[_]](implicit ev: ThetaToEquiJoin.Aux[T, F, G]) = ev
 
   def applyToBranch[T[_[_]]: BirecursiveT: RenderTreeT: ShowT](branch: FreeQS[T]): FreeQS[T] = {
+    type TF = T[CoEnvQS[T, ?]]
     val modify: T[CoEnvQS[T, ?]] => T[CoEnvQS[T, ?]] =
-      _.transCata[T[CoEnvQS[T, ?]]](
+      safe.transCata[TF, CoEnvQS[T, ?], TF, CoEnvQS[T, ?]](_)(
         liftCo(ThetaToEquiJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].rewrite(coenvPrism.reverseGet)))
 
     applyCoEnvFrom[T, QScriptTotal[T, ?], Hole](modify).apply(branch)

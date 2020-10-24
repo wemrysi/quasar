@@ -29,6 +29,8 @@ import quasar.{
 import quasar.common.data.Data
 import quasar.common.effect.NameGenerator
 import quasar.contrib.cats.stateT._
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
@@ -58,17 +60,17 @@ import quasar.qscript.{
 import quasar.qscript.PlannerError.NonRepresentableData
 import quasar.qsu.{QScriptUniform => QSU}
 
+import cats.Eval
 import cats.data.StateT
 
 import iotaz.CopK
 
 import matryoshka.{AlgebraM, BirecursiveT}
-import matryoshka.implicits._
 import matryoshka.patterns.{interpretM, CoEnv}
 
 import pathy.Path.{rootDir, Sandboxed}
 
-import scalaz.{\/, Free, Monad, Scalaz}, Scalaz._   // monad/traverse conflict
+import scalaz.{\/, EitherT, Free, Monad, Scalaz}, Scalaz._   // monad/traverse conflict
 
 import shapeless.Sized
 
@@ -277,11 +279,11 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
     QSUGraph.withName[T, G]("rlp")(node)
 
   private def fromData(data: Data): Data \/ T[EJson] = {
-    data.hyloM[Data \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
-      interpretM[Data \/ ?, EJson, Data, T[EJson]](
-        _.left,
-        _.embed.right),
-      Data.toEJson[EJson].apply(_).right)
+    safe.hyloM[EitherT[Eval, Data, ?], CoEnv[Data, EJson, ?], Data, T[EJson]](data)(
+      interpretM[EitherT[Eval, Data, ?], EJson, Data, T[EJson]](
+        EitherT.pureLeft(_),
+        ej => EitherT.pure(ej.embed)),
+      Data.toEJson[EJson].apply(_).pure[EitherT[Eval, Data, ?]]).run.value
   }
 }
 

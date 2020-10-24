@@ -55,7 +55,7 @@ final class RewriteGroupByArrays[T[_[_]]: BirecursiveT: ShowT] private () extend
         nestedM.map(nested => qgraph.overwriteAtRoot(nested.unfold.map(_.root)) :++ nested)
     }
 
-    back.runA(qgraph.generateRevIndex)
+    back.runA(qgraph.reverseIndex)
   }
 
   object NAryArray {

@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{JoinType, SortDir}
 import quasar.common.data.Data
+import quasar.contrib.matryoshka.implicits._
 import quasar.contrib.pathy.{FPath, refineTypeAbs}
 import quasar.contrib.shapeless._
 import quasar.fp._
@@ -30,7 +31,6 @@ import scala.Symbol
 import scala.Predef.$conforms
 
 import matryoshka._
-import matryoshka.implicits._
 import scalaz._, Scalaz._
 import shapeless.{Nat, Sized}
 import pathy.Path.posixCodec

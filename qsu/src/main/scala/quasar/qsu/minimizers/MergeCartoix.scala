@@ -25,7 +25,6 @@ import cats.implicits._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data.free._
-import matryoshka.implicits._
 import matryoshka.patterns.interpret
 
 import quasar.RenderTreeT
@@ -33,6 +32,7 @@ import quasar.RenderTreeT
 import quasar.common.effect.NameGenerator
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.scalaz.free._
 import quasar.contrib.std.errorImpossible
 import quasar.fp.ski.κ2
@@ -289,7 +289,7 @@ sealed abstract class MergeCartoix[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
         FreeF(other)
     }
 
-    fm.cata(interpret(fa, ff)).map(_.map(_.reverse))
+    safe.cata(fm)(interpret(fa, ff)).map(_.map(_.reverse))
   }
 
   // Returns an expression where all projections of `Hole` have been
