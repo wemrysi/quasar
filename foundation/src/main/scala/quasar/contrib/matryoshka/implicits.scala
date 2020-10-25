@@ -22,7 +22,8 @@ import matryoshka.Delay
 import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
 
-import scalaz.{-\/, \/-, Equal, Free, Functor, Monad, Need}
+import cats.Eval
+import scalaz.{-\/, \/-, Equal, Free, Functor}
 import scalaz.syntax.equal._
 
 object implicits {
@@ -33,9 +34,9 @@ object implicits {
       : LazyEqual[F[A]] =
     F(A)
 
-  implicit class LazyEqualIdOps(val x: Need[Boolean]) extends scala.AnyVal {
-    def && (y: => Need[Boolean]): Need[Boolean] =
-      N.bind(x)(b => if (b) y else Need(false))
+  implicit class LazyEqualIdOps(val x: Eval[Boolean]) extends scala.AnyVal {
+    def && (y: => Eval[Boolean]): Eval[Boolean] =
+      x.flatMap(b => if (b) y else Eval.now(false))
   }
 
   implicit def coEnvLazyEqual[E: Equal, F[_]](implicit F: Delay[LazyEqual, F])
@@ -43,17 +44,13 @@ object implicits {
     new Delay[LazyEqual, CoEnv[E, F, ?]] {
       def apply[A](eql: LazyEqual[A]) =
         LazyEqual.lazyEqual((x, y) => (x.run, y.run) match {
-          case (-\/(e1), -\/(e2)) => Need(e1 ≟ e2)
+          case (-\/(e1), -\/(e2)) => Eval.now(e1 ≟ e2)
           case (\/-(f1), \/-(f2)) => F(eql).equal(f1, f2)
-          case _ => Need(false)
+          case _ => Eval.now(false)
         })
     }
 
   implicit def freeLazyEqual[F[_]: Functor, A: Equal](implicit F: Delay[LazyEqual, F])
       : LazyEqual[Free[F, A]] =
     LazyEqual.recursive[Free[F, A], CoEnv[A, F, ?]]
-
-  ////
-
-  private val N = Monad[Need]
 }

@@ -21,19 +21,25 @@ import slamdata.Predef._
 import quasar.Qspec
 import quasar.IdStatus.ExcludeId
 import quasar.common.SortDir
+import quasar.contrib.cats.stateT._
 import quasar.qscript.{construction, MapFuncsCore, PlannerError}
 import quasar.qsu.{QScriptUniform => QSU}
+
+import cats.Eval
+import cats.data.StateT
 
 import matryoshka.data.Fix
 
 import pathy.Path, Path._
 
-import scalaz.{EitherT, StateT, Need, NonEmptyList => NEL}
+import scalaz.{EitherT, NonEmptyList => NEL}
+
+import shims.monadToScalaz
 
 object PruneSymmetricDimEditsSpec extends Qspec with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
 
-  type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
+  type F[A] = EitherT[StateT[Eval, Long, ?], PlannerError, A]
 
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
@@ -175,7 +181,7 @@ object PruneSymmetricDimEditsSpec extends Qspec with QSUTTypes[Fix] {
   private def runOn(g: QSUGraph): QSUGraph = {
     val resultsF = PruneSymmetricDimEdits[Fix, F](g)
 
-    val results = resultsF.run.eval(0L).value.toEither
+    val results = resultsF.run.runA(0L).value.toEither
     results must beRight
 
     results.right.get

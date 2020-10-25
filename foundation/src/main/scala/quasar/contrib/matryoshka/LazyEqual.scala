@@ -20,21 +20,21 @@ import scala.Boolean
 
 import matryoshka.{Delay, Recursive}
 
-import scalaz.{Functor, Need}
-import scalaz.syntax.bind._
+import cats.Eval
+import scalaz.Functor
 
 trait LazyEqual[A] {
-  def equal(x: A, y: A): Need[Boolean]
+  def equal(x: A, y: A): Eval[Boolean]
 }
 
 object LazyEqual {
   def apply[A](implicit ev: LazyEqual[A]): LazyEqual[A] = ev
 
-  def lazyEqual[A](f: (A, A) => Need[Boolean]): LazyEqual[A] =
+  def lazyEqual[A](f: (A, A) => Eval[Boolean]): LazyEqual[A] =
     new LazyEqual[A] {
       def equal(x: A, y: A) = f(x, y)
     }
 
   def recursive[T, F[_]: Functor](implicit T: Recursive.Aux[T, F], F: Delay[LazyEqual, F]): LazyEqual[T] =
-    lazyEqual((x, y) => Need(F(recursive[T, F])).flatMap(_.equal(T.project(x), T.project(y))))
+    lazyEqual((x, y) => Eval.always(F(recursive[T, F])).flatMap(_.equal(T.project(x), T.project(y))))
 }

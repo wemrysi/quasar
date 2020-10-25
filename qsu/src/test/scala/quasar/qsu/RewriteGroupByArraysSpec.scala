@@ -18,18 +18,22 @@ package quasar.qsu
 
 import quasar.{ejson, IdStatus, Qspec}
 import quasar.common.data.Data
+import quasar.contrib.cats.stateT._
 import quasar.qscript.{construction, Hole, LeftSide, MapFuncsCore, MFC, RightSide, SrcHole}
 import slamdata.Predef._
 
+import cats.Eval
+import cats.data.StateT
 import matryoshka.data.Fix
 import pathy.Path, Path.Sandboxed
-import scalaz.{Need, StateT}
+
+import shims.monadToScalaz
 
 object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
   import IdStatus.ExcludeId
 
-  type F[A] = StateT[Need, Long, A]
+  type F[A] = StateT[Eval, Long, A]
 
   val qsu = QScriptUniform.DslT[Fix]
   val json = ejson.Fixed[Fix[ejson.EJson]]
@@ -282,5 +286,5 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
     }
   }
 
-  def eval[A](fa: F[A]): A = fa.eval(0L).value
+  def eval[A](fa: F[A]): A = fa.runA(0L).value
 }

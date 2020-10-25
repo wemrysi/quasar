@@ -40,6 +40,7 @@ import quasar.sql._
 import quasar.std.StdLib, StdLib._
 import quasar.time.TemporalPart
 
+import cats.Eval
 import cats.data.{EitherT, State, StateT}
 
 import matryoshka._
@@ -49,7 +50,7 @@ import matryoshka.patterns._
 
 import pathy.Path._
 
-import scalaz.{\/, -\/, \/-, Cofree, Equal, Functor, Free => ZFree, Monad, Need, Scalaz, Show}, Scalaz._
+import scalaz.{\/, -\/, \/-, Cofree, Equal, Functor, Free => ZFree, Monad, Scalaz, Show}, Scalaz._
 
 import shapeless.{Annotations => _, Data => _, :: => _, _}
 
@@ -789,7 +790,7 @@ object Compiler {
      TC: Corecursive.Aux[T, LP],
      S: Show[T])
      : SemanticError \/ T =
-    apply[StateT[EitherT[cats.Eval, SemanticError, ?], CompilerState[T], ?], T]
+    apply[StateT[EitherT[Eval, SemanticError, ?], CompilerState[T], ?], T]
       .compile(tree)
       .runA(CompilerState(Nil, Context(Nil, Nil), 0))
       .value.value.disjunction
@@ -829,7 +830,7 @@ object Compiler {
     val KS = MonadState_[State[KeyState, ?], KeyState]
 
     def makeKey(tree: T, flp: ZFree[LP, Unit]): T =
-      flp.cataM(interpretM[Need, LP, Unit, T](_ => Need(tree), fa => Need(fa.embed))).value
+      flp.cataM(interpretM[Eval, LP, Unit, T](_ => Eval.now(tree), fa => Eval.always(fa.embed))).value
 
     // Step 1: annotate nodes containing the keys.
     val ann: State[KeyState, Cofree[LP, Boolean]] = tree.transAnaM {

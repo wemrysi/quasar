@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef._
 import quasar.{IdStatus, Qspec, TreeMatchers}
 import quasar.common.{SortDir, JoinType}
+import quasar.contrib.cats.stateT._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.implicits._
 import quasar.contrib.pathy.AFile
@@ -30,18 +31,22 @@ import quasar.qscript.construction
 import quasar.qscript.{MapFuncsCore, JoinSide, LeftSide, PlannerError, RightSide}
 import quasar.{Qspec, TreeMatchers}
 
+import cats.Eval
+import cats.data.StateT
 import matryoshka._
 import matryoshka.data._
 import pathy.Path
-import scalaz.{\/, \/-, EitherT, ICons, INil, Need, NonEmptyList => NEL, StateT, Free}
+import scalaz.{\/, \/-, EitherT, ICons, INil, NonEmptyList => NEL, Free}
 import scalaz.Scalaz._
+
+import shims.monadToScalaz
 
 object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   import QScriptUniform.{DTrans, Retain, Rotation}
   import QSUGraph.Extractors._
   import IdStatus.ExcludeId
 
-  type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
+  type F[A] = EitherT[StateT[Eval, Long, ?], PlannerError, A]
   type QSU[A] = QScriptUniform[A]
 
   val ejs = Fixed[Fix[EJson]]
@@ -464,5 +469,5 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
     }
   }
 
-  def evaluate[A](fa: F[A]): PlannerError \/ A = fa.run.eval(0L).value
+  def evaluate[A](fa: F[A]): PlannerError \/ A = fa.run.runA(0L).value
 }

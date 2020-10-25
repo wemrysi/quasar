@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.{IdStatus, Qspec}
 import quasar.common.data.{Data, DataGenerators}
 import quasar.common.{JoinType, SortDir}
+import quasar.contrib.cats.stateT._
 import quasar.contrib.scalaz.{NonEmptyListE => NELE}
 import quasar.frontend.logicalplan.{JoinCondition, LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.{
@@ -49,19 +50,26 @@ import quasar.std.{
 }
 import quasar.time.TemporalPart
 
+import cats.Eval
+import cats.data.StateT
+
+import iotaz.CopK
+
 import matryoshka.data.Fix
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
-import scalaz.{\/, EitherT, Need, NonEmptyList => NEL, StateT}
+import pathy.Path, Path.{file, Sandboxed}
+
+import scalaz.{\/, EitherT, NonEmptyList => NEL}
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.show._
-import pathy.Path, Path.{file, Sandboxed}
-import iotaz.CopK
+
+import shims.monadToScalaz
 
 object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
   import IdStatus.ExcludeId
 
-  type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
+  type F[A] = EitherT[StateT[Eval, Long, ?], PlannerError, A]
 
   val reader = ReadLP[Fix, F] _
   val root = Path.rootDir[Sandboxed]
@@ -386,5 +394,5 @@ object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with
     }
   }
 
-  def evaluate[A](fa: F[A]): PlannerError \/ A = fa.run.eval(0L).value
+  def evaluate[A](fa: F[A]): PlannerError \/ A = fa.run.runA(0L).value
 }

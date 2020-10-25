@@ -23,6 +23,7 @@ import quasar.IdStatus.ExcludeId
 import quasar.api.resource.ResourcePath
 import quasar.common.PhaseResults
 import quasar.common.data.Data
+import quasar.contrib.cats.stateT._
 import quasar.contrib.matryoshka._
 import quasar.contrib.iota._
 import quasar.ejson.{EJson, Fixed}
@@ -35,6 +36,9 @@ import quasar.std.{AggLib, IdentityLib, StructuralLib}
 
 import iotaz.CopK
 
+import cats.Eval
+import cats.data.StateT
+
 import matryoshka._
 import matryoshka.implicits._
 import matryoshka.data.Fix
@@ -45,13 +49,13 @@ import org.specs2.matcher.MatchersImplicits._
 import pathy.Path
 import Path.{Sandboxed, file}
 
-import scalaz.{\/-, -\/, EitherT, Equal, Free, Need, StateT, WriterT}
+import scalaz.{\/-, -\/, EitherT, Equal, Free, WriterT}
 import scalaz.syntax.show._
 
-import shims.{eqToScalaz, orderToCats, showToCats, showToScalaz}
+import shims.{eqToScalaz, monadToScalaz, orderToCats, showToCats, showToScalaz}
 
 object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
-  type F[A] = WriterT[EitherT[StateT[Need, Long, ?], PlannerError, ?], PhaseResults, A]
+  type F[A] = WriterT[EitherT[StateT[Eval, Long, ?], PlannerError, ?], PhaseResults, A]
 
   val qsu = LPtoQS[Fix]
 
@@ -152,7 +156,7 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
     compileToMatch(Equal[Fix[QScriptEducated]].equal(_, qs))
 
   def compileToMatch(pred: Fix[QScriptEducated] => Boolean): Matcher[Fix[LogicalPlan]] = { lp: Fix[LogicalPlan] =>
-    val result = qsu[F](lp).run.map(_._2).run.eval(0L).value
+    val result = qsu[F](lp).value.run.runA(0L).value
 
     result match {
       case -\/(errs) =>

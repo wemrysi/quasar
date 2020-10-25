@@ -20,6 +20,8 @@ import slamdata.Predef._
 
 import quasar.contrib.matryoshka.LazyEqual
 
+import cats.Eval
+
 import iotaz.TListK.:::
 import iotaz.{CopK, TListK, TNilK}
 
@@ -43,7 +45,7 @@ object LazyEqualKMaterializer {
         override def apply[A](eql: LazyEqual[A]): LazyEqual[CopK[F ::: TNilK, A]] = {
           LazyEqual lazyEqual {
             case (I(left), I(right)) => F(eql).equal(left, right)
-            case _ => Need(false)
+            case _ => Eval.now(false)
           }
         }
       })
