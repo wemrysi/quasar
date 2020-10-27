@@ -57,6 +57,17 @@ package object matryoshka {
   def project[T, F[_]: Functor](implicit T: Recursive.Aux[T, F]): Getter[T, F[T]] =
     Getter(T.project(_))
 
+  /** An implementation of paraM that is as stack-safe as `M`. */
+  def safeParaM[T, M[_]: Monad, F[_]: Traverse, A](
+      t: T)(
+      f: GAlgebraM[(T, ?), M, F, A])(
+      implicit T: Recursive.Aux[T, F])
+      : M[A] =
+    hylo[λ[α => F[(T, α)]], T, M[A]](t)(
+      _.map(_.sequence).sequence >>= f,
+      T.project(_) ∘ (_.squared))(
+      Functor[F].compose[(T, ?)])
+
   /** Make a partial endomorphism total by returning the argument when undefined. */
   def totally[A](pf: PartialFunction[A, A]): A => A =
     orOriginal(pf.lift)
