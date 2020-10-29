@@ -23,7 +23,6 @@ import quasar.EffectfulQSpec
 
 import cats.effect.{Blocker, IO, Resource, Timer, Concurrent}
 import cats.effect.concurrent.Ref
-import cats.syntax.functor._
 import cats.syntax.flatMap._
 import cats.syntax.traverse._
 import cats.instances.list._

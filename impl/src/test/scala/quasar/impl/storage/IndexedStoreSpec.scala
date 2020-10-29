@@ -27,7 +27,7 @@ import cats.syntax.functor._
 import cats.syntax.flatMap._
 import scalaz.std.option._
 
-import shims.{eqToScalaz, showToScalaz}
+import shims._
 
 abstract class IndexedStoreSpec[F[_]: Effect, I: Eq: Show, V: Eq: Show](
     implicit ec: ExecutionContext)

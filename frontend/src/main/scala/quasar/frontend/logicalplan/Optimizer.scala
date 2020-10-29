@@ -41,8 +41,6 @@ import matryoshka.patterns._
 import scalaz.{State => _, Free => Freez, _}, Scalaz.{ToIdOps => _, _}
 import shapeless.{Data => _, :: => _, _}
 
-import shims.monadToScalaz
-
 sealed abstract class Component[T, A] {
   def run(l: T, r: T): A = this match {
     case EquiCond(run0)  => run0(l, r)
@@ -103,6 +101,10 @@ final class Optimizer[T: Equal]
   import quasar.std.StdLib._
   import set._
   import structural._
+
+  // Import shims.monadToScalaz results in ambiguous implicits for other types
+  private implicit def catsStateTScalazMonad[A] = shims.monadToScalaz[State[A, ?]]
+  private implicit def catsEvalScalazMonad[A] = shims.monadToScalaz[Eval]
 
   val lpr = new LogicalPlanR[T]
 

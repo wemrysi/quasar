@@ -55,8 +55,6 @@ import scalaz.{\/, -\/, \/-, Cofree, Equal, Functor, Free => ZFree, Monad, Scala
 
 import shapeless.{Annotations => _, Data => _, :: => _, _}
 
-import shims.monadToScalaz
-
 final case class TableContext[T]
   (root: Option[T], full: () => T, subtables: Map[String, T])
   (implicit T: Corecursive.Aux[T, LP]) {
@@ -874,4 +872,14 @@ object Compiler {
       rewriteƒ)
   }
 
+  ////
+
+  // Importing shims.monadToScalaz results in ambiguous implicits for other types, so we make these explicit
+
+  private implicit def catsStateTEitherTMonadToScalaz[S, E]: scalaz.Monad[StateT[EitherT[Eval, E, ?], S, ?]] =
+    shims.monadToScalaz[StateT[EitherT[Eval, E, ?], S, ?]]
+
+  private implicit def catsEvalMonadToScalaz: scalaz.Monad[Eval] = shims.monadToScalaz[Eval]
+
+  private implicit def catsStateMonadToScalaz[S]: scalaz.Monad[State[S, ?]] = shims.monadToScalaz[State[S, ?]]
 }

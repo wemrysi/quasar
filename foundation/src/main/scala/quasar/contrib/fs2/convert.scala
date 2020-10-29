@@ -22,13 +22,15 @@ import java.util.Iterator
 import java.util.stream.{Stream => JStream}
 import scala.util.{Either, Left}
 
+import cats._
 import cats.effect.{Concurrent, Resource, Sync}
-import cats.syntax.monadError._
+import cats.implicits._
 import fs2.concurrent.{NoneTerminatedQueue, Queue, SignallingRef}
 import fs2.{Chunk, Stream}
-import scalaz.{Functor, StreamT, Scalaz}, Scalaz._
+import scalaz.StreamT
+import scalaz.syntax.std.boolean._
 
-import shims.monadToScalaz
+import shims.{functorToScalaz, monadToScalaz}
 
 object convert {
 
@@ -60,8 +62,8 @@ object convert {
     Resource(chunkQ(s)) map { startQ =>
       StreamT.wrapEffect(startQ.map(q =>
         for {
-          c <- StreamT.unfoldM(q)(_.dequeue1.map(_.sequence).rethrow.map(_.strengthR(q)))
-          a <- StreamT.unfoldM(0)(i => (i < c.size).option((c(i), i + 1)).point[F])
+          c <- StreamT.unfoldM(q)(_.dequeue1.map(_.sequence).rethrow.map(_.tupleRight(q)))
+          a <- StreamT.unfoldM(0)(i => (i < c.size).option((c(i), i + 1)).pure[F])
         } yield a))
     }
 

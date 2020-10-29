@@ -23,7 +23,6 @@ import org.specs2.mutable.Specification
 import cats.effect.concurrent.Ref
 import cats.effect.testing.specs2.CatsIO
 import cats.effect.IO
-import cats.implicits._
 import fs2.{Chunk, Stream}
 
 import scala.{Stream => _, _}
