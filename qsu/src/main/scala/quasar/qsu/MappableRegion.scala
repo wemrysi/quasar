@@ -19,6 +19,8 @@ package quasar.qsu
 import slamdata.Predef.{Boolean, Option, None, Set, Symbol}
 import quasar.fp._
 import quasar.contrib.iota._
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.fp.ski.κ
 import quasar.qscript.{
   Center,
@@ -37,7 +39,6 @@ import quasar.qscript.{
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{Kleisli, Foldable, Free, Scalaz, Traverse}, Scalaz._
 
@@ -47,8 +48,7 @@ object MappableRegion {
   import QSUGraph.QSUPattern
 
   def apply[T[_[_]]](halt: Symbol => Boolean, g: QSUGraph[T]): FreeMapA[T, QSUGraph[T]] =
-    Free.joinF[MapFunc[T, ?], QSUGraph[T]](
-      g.ana[Free[FreeMapA[T, ?], QSUGraph[T]]](mappableRegionƒ[T](halt, _)))
+    Free.joinF[MapFunc[T, ?], QSUGraph[T]](safe.ana(g)(mappableRegionƒ[T](halt, _)))
 
   def binaryOf[T[_[_]]](left: Symbol, right: Symbol, g: QSUGraph[T]): Option[JoinFunc[T]] =
     funcOf(Kleisli(replaceWith[JoinSide](left, LeftSide)) <+> Kleisli(replaceWith(right, RightSide)), g)

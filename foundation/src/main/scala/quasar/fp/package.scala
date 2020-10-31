@@ -19,9 +19,10 @@ package quasar
 import slamdata.Predef._
 
 import quasar.contrib.iota.{:<<:, ACopK}
+import quasar.contrib.matryoshka.safe
+
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.PLens
 import scalaz.{Lens => _, PLens => _, _}, BijectionT._, Kleisli._, Liskov._, Scalaz._
@@ -189,18 +190,6 @@ package object fp
       : G[A] => Option[G[A]] =
     ga => prism.get(ga).flatMap(f).map(prism.reverseGet(_))
 
-  def liftR[T[_[_]]: BirecursiveT, F[_]: Traverse, G[_]: Traverse](orig: T[F] => T[F])(implicit F: F:<: G):
-      T[G] => T[G] =
-    tg => prjR[T, F, G](tg).fold(tg)(orig.andThen(injR[T, F, G]))
-
-  def injR[T[_[_]]: BirecursiveT, F[_]: Functor, G[_]: Functor](orig: T[F])(implicit F: F :<: G):
-      T[G] =
-    orig.transCata[T[G]](F.inj)
-
-  def prjR[T[_[_]]: BirecursiveT, F[_]: Traverse, G[_]: Traverse](orig: T[G])(implicit F: F :<: G):
-      Option[T[F]] =
-    orig.transAnaM[Option, T[F], F](F.prj)
-
   implicit final class ListOps[A](val self: List[A]) extends scala.AnyVal {
     final def mapAccumM[B, C, M[_]: Monad](c: C)(f: (C, A) => M[(C, B)]): M[(C, List[B])] =
       self.foldLeftM((c, List.empty[B])){ case ((c, resultList), a) =>
@@ -273,16 +262,16 @@ package object fp
 
   def coenvPrism[F[_], A] = PrismNT.coEnv[F, A]
 
-  def coenvBijection[T[_[_]]: BirecursiveT, F[_]: Functor, A]:
+  def coenvBijection[T[_[_]]: BirecursiveT, F[_]: Traverse, A]:
       Bijection[Free[F, A], T[CoEnv[A, F, ?]]] =
     bijection[Id, Id, Free[F, A], T[CoEnv[A, F, ?]]](
-      _.convertTo[T[CoEnv[A, F, ?]]],
-      _.convertTo[Free[F, A]])
+      safe.convert[Free[F, A], CoEnv[A, F, ?], T[CoEnv[A, F, ?]]](_),
+      safe.convert[T[CoEnv[A, F, ?]], CoEnv[A, F, ?], Free[F, A]](_))
 
   def applyFrom[A, B](bij: Bijection[A, B])(modify: B => B): A => A =
     (bij.toK >>> kleisli[Id, B, B](modify) >>> bij.fromK).run
 
-  def applyCoEnvFrom[T[_[_]]: BirecursiveT, F[_]: Functor, A](
+  def applyCoEnvFrom[T[_[_]]: BirecursiveT, F[_]: Traverse, A](
     modify: T[CoEnv[A, F, ?]] => T[CoEnv[A, F, ?]]):
       Free[F, A] => Free[F, A] =
     applyFrom[Free[F, A], T[CoEnv[A, F, ?]]](coenvBijection[T, F, A])(modify)

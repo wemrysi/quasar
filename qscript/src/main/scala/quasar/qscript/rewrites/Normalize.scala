@@ -19,12 +19,12 @@ package quasar.qscript.rewrites
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
 import quasar.contrib.iota._
+import quasar.contrib.matryoshka.safe
 import quasar.fp.{coenvBijection, coenvPrism, idPrism, liftCo, PrismNT}
 import quasar.qscript._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{~>, Functor, NaturalTransformation}
 import scalaz.syntax.either._
@@ -61,5 +61,5 @@ abstract class Normalize[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] {
   }
 
   def branchNorm(branch: FreeQS[T]): FreeQS[T] =
-    branch.transCata[FreeQS[T]](liftCo(normQSCoEnv))
+    safe.transCata(branch)(liftCo(normQSCoEnv))
 }

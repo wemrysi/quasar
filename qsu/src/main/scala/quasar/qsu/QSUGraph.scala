@@ -20,6 +20,7 @@ import slamdata.Predef.{Map => SMap, _}
 import quasar.IdStatus
 import quasar.common.effect.NameGenerator
 import quasar.contrib.cats.stateT._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.iota._
 import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
@@ -34,7 +35,6 @@ import monocle.macros.Lenses
 
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns.EnvT
 
 import scalaz.{\/-, -\/, Cofree, DList, Id, Monad, Monoid, Scalaz, Show}, Scalaz._
@@ -368,7 +368,7 @@ object QSUGraph extends QSUGraphInstances {
 
     type F[A] = StateT[State[Long, ?], (NodeNames[T], Renames), A]
 
-    qsu.cataM(fromTreeƒ[T, F]).run((SMap(), SMap())).map {
+    safe.cataM(qsu)(fromTreeƒ[T, F]).run((SMap(), SMap())).map {
       case ((_, s), r) => (s, r)
     }.runA(0).value
   }
@@ -378,7 +378,7 @@ object QSUGraph extends QSUGraphInstances {
     */
   def fromTree[T[_[_]]: RecursiveT](qsu: T[QSU[T, ?]]): QSUGraph[T] =
     fromAnnotatedTree[T](
-      qsu.cata(attributeAlgebra[QSU[T, ?], Option[Symbol]](κ(None))))._2
+      safe.cata(qsu)(attributeAlgebra[QSU[T, ?], Option[Symbol]](κ(None))))._2
 
   private def fromTreeƒ[T[_[_]], F[_]: Monad: NameGenerator: NameState[T, ?[_]]]
       : AlgebraM[F, EnvT[Option[Symbol], QSU[T, ?], ?], QSUGraph[T]] = {
@@ -610,7 +610,7 @@ object QSUGraph extends QSUGraphInstances {
           implicit IC: MapFuncCore[T, ?] :<<: MapFunc[T, ?]): Option[Data] = qgraph match {
 
         case Unary(Unreferenced(), IC(MapFuncsCore.Constant(ejson))) =>
-          Some(ejson.cata(Data.fromEJson))
+          Some(safe.cata(ejson)(Data.fromEJson))
         case _ => None
       }
     }
@@ -620,7 +620,7 @@ object QSUGraph extends QSUGraphInstances {
           implicit IC: MapFuncCore[T, ?] :<<: MapFunc[T, ?]): Option[Data] = qgraph match {
 
         case Map(Unreferenced(), FMFC1(MapFuncsCore.Constant(ejson))) =>
-          Some(ejson.cata(Data.fromEJson))
+          Some(safe.cata(ejson)(Data.fromEJson))
         case _ => None
       }
     }

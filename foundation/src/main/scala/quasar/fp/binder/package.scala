@@ -17,8 +17,11 @@
 package quasar.fp
 
 import slamdata.Predef._
+
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
+
 import matryoshka._
-import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 package object binder {
@@ -26,7 +29,7 @@ package object binder {
     * "bound" nodes. The function is also applied to the bindings themselves
     * to determine their annotation.
     */
-  def boundAttribute[T, F[_]: Functor, A]
+  def boundAttribute[T, F[_]: Traverse, A]
     (t: T)
     (f: T => A)
     (implicit TR: Recursive.Aux[T, F], TC: Corecursive.Aux[T, F], B: Binder[F])
@@ -38,7 +41,7 @@ package object binder {
         val m: F[(T, Cofree[F, A])] = t.map(x => loop(x.project, newB))
         val t1 = m.map(_._1).embed
         (t1, Cofree(f(t1), m.map(_._2)))
-      } { case (x, _) => (x, t.embed.cata(attrK(f(x)))) }
+      } { case (x, _) => (x, safe.cata[T, F, Cofree[F, A]](t.embed)(attrK(f(x)))) }
     }
     loop(t.project, B.initial)._2
   }

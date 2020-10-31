@@ -16,12 +16,11 @@
 
 package quasar
 
-import cats.Eval
+import quasar.contrib.matryoshka.safe
+
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import scalaz._
-import shims.monadToScalaz
 import simulacrum.typeclass
 
 /** Analogous to `ShowT`; allows construction of `Delay[RenderTree, F]` for
@@ -40,7 +39,7 @@ object RenderTreeT {
     new RenderTreeT[T] {
       def render[F[_]: Traverse](t: T[F])(implicit delay: Delay[RenderTree, F]) = {
         val rt = delay(RenderTree[RenderedTree])
-        t.cataM[Eval, RenderedTree](frt => Eval.always(rt.render(frt))).value
+        safe.cata[T[F], F, RenderedTree](t)(rt.render)
       }
     }
 

@@ -19,6 +19,7 @@ package quasar.qscript
 import slamdata.Predef._
 
 import quasar.{RenderTree, RenderedTree, NonTerminal}
+import quasar.contrib.matryoshka.safe
 import quasar.fp.ski.κ
 
 import cats.Eval
@@ -26,7 +27,6 @@ import cats.implicits._
 
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns.{interpretM, interpret, CoEnv}
 import scalaz._, Scalaz._
 
@@ -57,7 +57,7 @@ object RecFreeS {
       case Fix(form, rec) =>
         recInterpretM[M, F, A](susint, fixint).apply(form) >>= (fixint(_)) >>= {
           case (hole, cont) =>
-            rec.cataM[M, A](
+            safe.cataM(rec)(
               interpretM[M, RecFreeS[F, ?], Hole, A](
                 κ(hole.point[M]),
                 recInterpretM[M, F, A](susint, fixint).apply(_))) >>= (cont(_))
@@ -137,7 +137,7 @@ object RecFreeS {
           val alg: Algebra[CoEnv[Hole, RecFreeS[F, ?], ?], String] =
             interpret[RecFreeS[F, ?], Hole, String](_.shows, RecFreeS.recInterpret(_.shows, frm => ("SrcHole", c => mkLet(frm, c))))
 
-          mkLet(RecFreeS.show[F].apply(sh).shows(form), body.cata(alg))
+          mkLet(RecFreeS.show[F].apply(sh).shows(form), safe.cata(body)(alg))
         }
       }))
 

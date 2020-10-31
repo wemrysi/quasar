@@ -19,10 +19,10 @@ package quasar.impl
 import quasar._
 import quasar.common.PhaseResultTell
 import quasar.contrib.iota._
+import quasar.contrib.matryoshka.safe
 import quasar.qscript._
 
 import matryoshka.{Hole => _, _}
-import matryoshka.implicits._
 
 import cats.Monad
 import cats.syntax.applicative._
@@ -33,5 +33,5 @@ final class RegressionQScriptEvaluator[
     extends CountingQScriptEvaluator[T, F] {
 
   def optimize(norm: T[QScriptNormalized[T, ?]]): F[T[QSM]] =
-    norm.transCata[T[QSM]](QSNormToQSM.inject(_)).pure[F]
+    safe.transCata(norm)(QSNormToQSM.inject(_)).pure[F]
 }

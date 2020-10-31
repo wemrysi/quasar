@@ -22,6 +22,8 @@ import quasar.common.JoinType
 import quasar.common.data.Data
 import quasar.common.effect.NameGenerator
 import quasar.contrib.cats.stateT._
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.binder._
@@ -30,11 +32,11 @@ import quasar.frontend.logicalplan.{LogicalPlan => LP}
 
 import scala.Predef.$conforms
 
+import cats.Eval
 import cats.data.State
 
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{State => _, Free => Freez, _}, Scalaz.{ToIdOps => _, _}
 import shapeless.{Data => _, :: => _, _}
@@ -110,9 +112,7 @@ final class Optimizer[T: Equal]
     case x => x.fold
   }
 
-  private def inlineƒ[A](target: Symbol, repl: LP[T]):
-      LP[(T, T)] => LP[T] =
-  {
+  private def inlineƒ(target: Symbol, repl: LP[T]): AlgebraicGTransform[(T, ?), T, LP, LP] = {
     case Free(symbol) if symbol ≟ target => repl
     case Let(ident, form, body) if ident ≟ target =>
       Let(ident, form._2, body._1)
@@ -123,24 +123,24 @@ final class Optimizer[T: Equal]
     case inv @ Invoke(func, _) => func.simplify(inv)
     case Let(ident, form, in) => form.project match {
       case Constant(_) | Free(_) =>
-        in.transPara[T](inlineƒ(ident, form.project)).project.some
-      case _ => in.cata(countUsageƒ(ident)) match {
+        safe.transPara(in)(inlineƒ(ident, form.project)).project.some
+      case _ => safe.cata(in)(countUsageƒ(ident)) match {
         case 0 => in.project.some
-        case 1 => in.transPara[T](inlineƒ(ident, form.project)).project.some
+        case 1 => safe.transPara(in)(inlineƒ(ident, form.project)).project.some
         case _ => None
       }
     }
     case _ => None
   }
 
-  def simplify(t: T): T = t.transCata[T](repeatedly(simplifyƒ))
+  def simplify(t: T): T = safe.transCata(t)(repeatedly(simplifyƒ))
 
   /** Like `simplifyƒ`, but eliminates _all_ `Let` (and any bound `Free`) nodes.
     */
   val elideLets:
       LP[T] => Option[LP[T]] = {
     case Let(ident, form, in) =>
-      in.transPara[T](inlineƒ(ident, form.project)).project.some
+      safe.transPara(in)(inlineƒ(ident, form.project)).project.some
     case _ => None
   }
 
@@ -152,7 +152,7 @@ final class Optimizer[T: Equal]
   def uniqueName[F[_]: Functor: Foldable](
     prefix: String, plans: F[T]):
       Symbol = {
-    val existingNames = plans.map(_.cata(namesƒ)).fold
+    val existingNames = plans.map(safe.cata(_)(namesƒ)).fold
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(pre: String): Symbol =
       if (existingNames.contains(Symbol(prefix)))
@@ -219,7 +219,7 @@ final class Optimizer[T: Equal]
   }
 
   def preferProjections(t: T): T =
-    boundPara(t)(preferProjectionsƒ)._1.transCata[T](repeatedly(simplifyƒ))
+    safe.transCata(boundPara(t)(preferProjectionsƒ)._1)(repeatedly(simplifyƒ))
 
   /** Rewrite joins and subsequent filtering so that:
     * 1) Filtering that is equivalent to an equi-join is rewritten into the join condition.
@@ -311,8 +311,8 @@ final class Optimizer[T: Equal]
 
     node match {
       case InvokeUnapply(Filter, Sized((src, Embed(Join(joinL, joinR, JoinType.Inner, JoinCondition(lName, rName, joinCond0)))), (cond0, _))) =>
-        val joinCond = joinCond0.transCata[T](orOriginal(elideLets))
-        val cond = cond0.transCata[T](orOriginal(elideLets))
+        val joinCond = safe.transCata(joinCond0)(orOriginal(elideLets))
+        val cond = safe.transCata(cond0)(orOriginal(elideLets))
         val comps =
           flattenAnd(joinCond).traverse(toComp(lpr.joinSideName(lName), lpr.joinSideName(rName))).bifoldMap(ι)(ι) ++
           flattenAnd(cond).traverse(toComp(
@@ -321,7 +321,7 @@ final class Optimizer[T: Equal]
         newJoin(joinL, joinR, comps)
 
       case Join((srcL, _), (srcR, _), JoinType.Inner, JoinCondition(lName, rName, (_, joinCond0))) =>
-        val joinCond = joinCond0.transCata[T](orOriginal(elideLets))
+        val joinCond = safe.transCata(joinCond0)(orOriginal(elideLets))
         newJoin(srcL, srcR, flattenAnd(joinCond).traverse(toComp(lpr.joinSideName(lName), lpr.joinSideName(rName))(_)).bifoldMap(ι)(ι))
 
       case _ => node.map(preserveFree).embed.point[F]
@@ -390,14 +390,14 @@ final class Optimizer[T: Equal]
     (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
       : T = {
 
-    val paritionArbitraryƒ: T => Option[CoEnv[(T, T), LP, T]] = _.project match {
+    val partitionArbitraryƒ: T => Option[CoEnv[(T, T), LP, T]] = _.project match {
       case InvokeUnapply(agg.Arbitrary, Sized(_)) => none
       case InvokeUnapply(set.GroupBy, Sized(src, keys)) => some(CoEnv(-\/((src, keys))))
       case other => some(CoEnv(\/-(other)))
     }
 
     val partitionArbitrary: T => Option[Freez[LP, (T, T)]] =
-      _.anaM[Freez[LP, (T, T)]](paritionArbitraryƒ)
+      safe.anaM(_)(partitionArbitraryƒ.andThen(v => OptionT(Eval.now(v)))).run.value
 
     def unfold: LP[T] => LP[T] = {
       case InvokeUnapply(agg.Arbitrary, Sized(arg)) =>
@@ -415,7 +415,7 @@ final class Optimizer[T: Equal]
           partitioned.flatMap(part => part.findLeft(_ => true) map {
             case (src, keys) =>
               Invoke(set.GroupBy, Func.Input2(
-                part.cata(interpret(_ => src, (_: LP[T]).embed)),
+                safe.cata(part)(interpret[LP, (T, T), T](_ => src, (_: LP[T]).embed)),
                 keys))
           }).fold(arg)(_.embed)
         } else {
@@ -427,6 +427,6 @@ final class Optimizer[T: Equal]
       case other => other
     }
 
-    tree.transAna[T](unfold)
+    safe.transAna(tree)(unfold)
   }
 }

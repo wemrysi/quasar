@@ -17,12 +17,11 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.contrib.matryoshka.safe
 import quasar.fp._
 
-import cats.Eval
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns.{CoEnv, EnvT}
 import scalaz._, Scalaz._
 import simulacrum.typeclass
@@ -74,7 +73,7 @@ object RenderTree extends RenderTreeInstances {
 
   def recursive[T, F[_]](implicit T: Recursive.Aux[T, F], FD: Delay[RenderTree, F], FF: Traverse[F]): RenderTree[T] = {
     val rt = FD(RenderTree[RenderedTree])
-    make(_.cataM[Eval, RenderedTree](frt => Eval.always(rt.render(frt))).value)
+    make(safe.cata[T, F, RenderedTree](_)(rt.render))
   }
 }
 

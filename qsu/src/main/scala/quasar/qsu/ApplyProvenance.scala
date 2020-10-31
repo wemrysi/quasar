@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.IdStatus, IdStatus.IncludeId
 import quasar.contrib.cats.stateT._
-import quasar.contrib.matryoshka.safeParaM
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
 import quasar.ejson.EJson
@@ -44,12 +44,11 @@ import quasar.qscript.{
   RightSide3
 }
 
-import cats.Eval
 import cats.data.{NonEmptyList, StateT}
 
 import matryoshka._
 import matryoshka.data.free._
-import matryoshka.patterns.{ginterpretM, CoEnv}
+import matryoshka.patterns.CoEnv
 
 import monocle.macros.Lenses
 
@@ -345,13 +344,8 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
       QAuthS[F].modify(_.addDims(g.root, ds)) as ds
     }
 
-  private def computeFuncProvenance[A](fm: FreeMapA[A])(f: A => P): P = {
-    val galgM: GAlgebraM[(FreeMapA[A], ?), Eval, MapFunc, P] =
-      mf => Eval.always(computeFuncProvenanceƒ[A](mf))
-
-    safeParaM[FreeMapA[A], Eval, CoEnv[A, MapFunc, ?], P](fm)(
-      ginterpretM(f.andThen(Eval.now(_)), galgM)).value
-  }
+  private def computeFuncProvenance[A](fm: FreeMapA[A])(f: A => P): P =
+    safe.para[FreeMapA[A], CoEnv[A, MapFunc, ?], P](fm)(_.run.fold(f, computeFuncProvenanceƒ[A]))
 
   private def computeJoin2[F[_]: Monad: MonadPlannerErr: QAuthS](
       g: QSUGraph,

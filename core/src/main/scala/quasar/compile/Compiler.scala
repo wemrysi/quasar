@@ -27,6 +27,8 @@ import quasar.{
   VarName
 }
 import quasar.contrib.cats.stateT._
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
@@ -45,7 +47,6 @@ import cats.data.{EitherT, State, StateT}
 
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns._
 
 import pathy.Path._
@@ -566,7 +567,7 @@ final class Compiler[M[_], T: Equal]
                                 ord.keys.map(p => (nu, p._1)).point[M])(
                                 na => CompilerState.addFields(na.unite)(ord.keys.traverse {
                                   case (ot, key) =>
-                                    compile0(key).map(_.transApoT(substitute(preSorted, nu))) strengthR ot
+                                    compile0(key).map(safe.transApoT[T, LP](_)(substitute(preSorted, nu))) strengthR ot
                                 })) ∘
                                 (ks =>
                                   lpr.sort(nu,
@@ -812,7 +813,7 @@ object Compiler {
       def groupedKeys(t: LP[T]): Option[List[K]] = {
         Some(t) collect {
           case InvokeUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
-            keys.map(_.transAna[ZFree[LP, Unit]]{ lp =>
+            keys.map(safe.transAna[T, LP, ZFree[LP, Unit], CoEnv[Unit, LP, ?]](_) { lp =>
               if (lp.embed ≟ src) CoEnv[Unit, LP, T](-\/(()))
               else CoEnv[Unit, LP, T](\/-(lp))
             }) strengthL t.embed
@@ -823,34 +824,35 @@ object Compiler {
       (tf.embed, groupedKeys(tf).getOrElse(t.foldMap(_._2)))
     }
 
-    val sources: List[K] = tree.cata(keysƒ)._2
+    val sources: List[K] = safe.cata[T, LP, (T, List[K])](tree)(keysƒ)._2
 
     type KeyState = (List[K], List[T])
 
     val KS = MonadState_[State[KeyState, ?], KeyState]
 
     def makeKey(tree: T, flp: ZFree[LP, Unit]): T =
-      flp.cataM(interpretM[Eval, LP, Unit, T](_ => Eval.now(tree), fa => Eval.always(fa.embed))).value
+      safe.cata(flp)(interpret[LP, Unit, T](_ => tree, fa => fa.embed))
 
     // Step 1: annotate nodes containing the keys.
-    val ann: State[KeyState, Cofree[LP, Boolean]] = tree.transAnaM {
-      case let @ LPLet(name, expr, _) =>
-        for {
-          ks <- KS.get
-          (srcs, keys) = ks
-          srcs2 = srcs.map { case (t, flp) =>
-            val l = if (t ≟ expr) Free[T](name).embed else t
-            (l, flp)
-          }
-          keys2 = srcs2.map { case (t, flp) => makeKey(t,flp) }
-          _ <- KS.put((srcs2, keys2))
-        } yield EnvT((keys.element(let.embed), let: LP[T]))
+    val ann: State[KeyState, Cofree[LP, Boolean]] =
+      safe.transAnaM[State[KeyState, ?], T, LP, Cofree[LP, Boolean], EnvT[Boolean, LP, ?]](tree) {
+        case let @ LPLet(name, expr, _) =>
+          for {
+            ks <- KS.get
+            (srcs, keys) = ks
+            srcs2 = srcs.map { case (t, flp) =>
+              val l = if (t ≟ expr) Free[T](name).embed else t
+              (l, flp)
+            }
+            keys2 = srcs2.map { case (t, flp) => makeKey(t,flp) }
+            _ <- KS.put((srcs2, keys2))
+          } yield EnvT((keys.element(let.embed), let: LP[T]))
 
-      case other =>
-        KS.gets { case (_, k) =>
-          EnvT((k.element(other.embed), other))
-        }
-    }
+        case other =>
+          KS.gets { case (_, k) =>
+            EnvT((k.element(other.embed), other))
+          }
+      }
 
     // Step 2: transform from the top, inserting Arbitrary where a key is not
     // otherwise reduced.
@@ -867,7 +869,9 @@ object Compiler {
       }
     }
 
-    ann.runA((sources, sources.map { case (t, flp) => makeKey(t,flp) })).value.ana[T](rewriteƒ)
+    safe.ana[T, LP, Cofree[LP, Boolean]](
+      ann.runA((sources, sources.map { case (t, flp) => makeKey(t,flp) })).value)(
+      rewriteƒ)
   }
 
 }

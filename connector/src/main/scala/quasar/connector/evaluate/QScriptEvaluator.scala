@@ -20,6 +20,7 @@ import quasar.{RenderTree, RenderTreeT}
 import quasar.common.PhaseResultTell
 import quasar.common.phase
 import quasar.contrib.iota._
+import quasar.contrib.matryoshka.safe
 import quasar.fp.idPrism
 import quasar.qscript._
 import quasar.qscript.rewrites.{
@@ -36,7 +37,6 @@ import cats.syntax.functor._
 import iotaz.{CopK, TListK}
 
 import matryoshka.{Hole => _, _}
-import matryoshka.implicits._
 
 /** Provides for evaluating QScript to a result. */
 abstract class QScriptEvaluator[
@@ -88,7 +88,7 @@ abstract class QScriptEvaluator[
 
   private def toEquiJoin(qs: T[QSEd]): T[QSNorm] = {
     val J = ThetaToEquiJoin[T, QSEd, QSNorm]
-    qs.transCata[T[QSNorm]](J.rewrite[J.G](idPrism.reverseGet))
+    safe.transCata(qs)(J.rewrite[J.G](idPrism.reverseGet))
   }
 
   private final implicit def _QSMFunctor: Functor[QSM] = QSMFunctor

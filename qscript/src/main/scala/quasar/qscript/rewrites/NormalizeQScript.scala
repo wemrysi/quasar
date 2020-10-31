@@ -18,6 +18,8 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.free._
 import quasar.fp.PrismNT
@@ -25,7 +27,6 @@ import quasar.qscript._
 
 import iotaz.CopK
 import matryoshka.{Hole => _, _}
-import matryoshka.implicits._
 import scalaz.{~>, Functor}
 import scalaz.syntax.monad._
 
@@ -88,6 +89,6 @@ object NormalizeQScript {
       qs: T[QScriptNormalized[T, ?]])
       : T[QScriptNormalized[T, ?]] = {
     val N = new NormalizeQScript[T]
-    qs.transCata[T[QScriptNormalized[T, ?]]](N.normQS)
+    safe.transCata(qs)(N.normQS)
   }
 }
