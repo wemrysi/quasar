@@ -33,5 +33,6 @@ final class RegressionQScriptEvaluator[
     extends CountingQScriptEvaluator[T, F] {
 
   def optimize(norm: T[QScriptNormalized[T, ?]]): F[T[QSM]] =
-    safe.transCata(norm)(QSNormToQSM.inject(_)).pure[F]
+    safe.transCata[T[QScriptNormalized[T, ?]], QScriptNormalized[T, ?], T[QSM], QSM](norm)(
+      QSNormToQSM.inject(_)).pure[F]
 }

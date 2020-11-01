@@ -69,7 +69,7 @@ final class CoalesceSquashedMappable[T[_[_]]: BirecursiveT: EqualT] private () e
 
             g.overwriteAtRoot(QSU.Map(
               src.root,
-              MapFuncCore.normalized(outer.linearize.elgotApo[FreeMap](indexedSubst(inner1, ds, sm))).asRec))
+              MapFuncCore.normalized(safe.elgotApo(outer.linearize)(indexedSubst(inner1, ds, sm))).asRec))
 
           case _ =>
             g.overwriteAtRoot(QSU.Map(

@@ -18,7 +18,19 @@ package quasar.contrib.matryoshka
 
 import cats.Eval
 
-import matryoshka.{∘, Algebra, AlgebraM, AlgebraicGTransform, Coalgebra, CoalgebraM, Corecursive, ElgotAlgebraM, GAlgebra, Recursive}
+import matryoshka.{
+  ∘,
+  Algebra,
+  AlgebraM,
+  AlgebraicGTransform,
+  Coalgebra,
+  CoalgebraM,
+  Corecursive,
+  ElgotAlgebraM,
+  ElgotCoalgebra,
+  GAlgebra,
+  Recursive
+}
 
 import scalaz.{\/, Functor, Traverse, Monad}
 import scalaz.std.tuple._
@@ -84,15 +96,14 @@ object safe {
       T.project(_) ∘ (_.squared))(
       F.compose[(T, ?)])
 
-  def elgotApo[T, F[_]: Traverse, A]
-    (a: A)
-    (f: ElgotCoalgebra[T \/ ?, Base, A])
-    (implicit BF: Functor[Base])
+  def elgotApo[T, F[_]: Traverse, A](
+      a: A)(
+      f: ElgotCoalgebra[T \/ ?, F, A])(
+      implicit T: Corecursive.Aux[T, F])
       : T =
-    hylo[λ[α => T \/ Base[α]], A, T](
-      a)(
-      _.map(embed).merge, f)(
-      \/.DisjunctionInstances1 compose BF)
+    hylo[λ[α => T \/ F[α]], A, T](a)(
+      _.map(T.embed(_)).merge, f)(
+      Traverse[T \/ ?].compose[F])
 
   def transCata[T, F[_]: Traverse, U, G[_]: Functor](
       t: T)(
