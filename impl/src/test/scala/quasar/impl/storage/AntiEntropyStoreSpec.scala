@@ -36,6 +36,9 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
+
+  sequential
+
   implicit val ec: ExecutionContext = ExecutionContext.global
   implicit val strCodec: Codec[String] = utf8_32
   implicit val timer: Timer[IO] = IO.timer(ec)
