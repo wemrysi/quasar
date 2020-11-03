@@ -23,6 +23,7 @@ import quasar.api.resource.ResourcePathType
 import quasar.connector.{ByteStore, QueryResult}
 import quasar.qscript.{MonadPlannerErr, QScriptEducated}
 
+import scala.Long
 import scala.concurrent.ExecutionContext
 import scala.util.Either
 
@@ -35,6 +36,9 @@ trait HeavyweightDatasourceModule {
   def kind: DatasourceType
 
   def sanitizeConfig(config: Json): Json
+
+  def minVersion: Long =
+    kind.version
 
   def migrateConfig[F[_]: Sync](config: Json)
       : F[Either[ConfigurationError[Json], Json]]

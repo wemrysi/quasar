@@ -27,19 +27,16 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.impl.{CachedGetter, IndexedSemaphore, QuasarDatasource, ResourceManager}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 
-import cats.{~>, Applicative}
+import cats.~>
+import cats.data.{EitherT, OptionT}
 import cats.effect.{Concurrent, ContextShift, Sync, Resource}
+import cats.implicits._
 
 import fs2.Stream
 
-import scalaz.{\/, -\/, \/-, ISet, EitherT, Equal, OptionT}
-import scalaz.syntax.either._
-import scalaz.syntax.equal._
-import scalaz.syntax.monad._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.option._
+import scalaz.{\/, ISet, Equal}
 
-import shims.{monadToScalaz, equalToCats}
+import shims.{equalToCats, functorToCats}
 
 private[impl] final class DefaultDatasources[
     T[_[_]],
@@ -71,19 +68,21 @@ private[impl] final class DefaultDatasources[
 
   def datasourceRef(i: I): F[ExistentialError[I] \/ DatasourceRef[C]] =
     EitherT(lookupRef[ExistentialError[I]](i))
-      .map(modules.sanitizeRef(_))
-      .run
+      .semiflatMap(modules.sanitizeRef(_))
+      .value
+      .map(\/.fromEither(_))
 
   def datasourceStatus(i: I): F[ExistentialError[I] \/ Condition[Exception]] =
     EitherT(lookupRef[ExistentialError[I]](i))
-      .flatMap(_ => EitherT.rightT(errors.datasourceError(i)))
+      .flatMap(_ => EitherT.right[ExistentialError[I]](errors.datasourceError(i)))
       .map(Condition.optionIso.reverseGet(_))
-      .run
+      .value
+      .map(\/.fromEither(_))
 
   def removeDatasource(i: I): F[Condition[ExistentialError[I]]] =
     refs.delete(i).ifM(
       dispose(i, true).as(Condition.normal[ExistentialError[I]]()),
-      Condition.abnormal(datasourceNotFound[I, ExistentialError[I]](i)).point[F])
+      Condition.abnormal(datasourceNotFound[I, ExistentialError[I]](i)).pure[F])
 
   def replaceDatasource(i: I, ref: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] =
     replaceDatasourceImpl(i, Reconfiguration.Reset, ref)
@@ -94,7 +93,7 @@ private[impl] final class DefaultDatasources[
 
     def doReplace(prev: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] =
       if (ref === prev)
-        Condition.normal[DatasourceError[I, C]]().point[F]
+        Condition.normal[DatasourceError[I, C]]().pure[F]
       else if (DatasourceRef.atMostRenamed(ref, prev))
         setRef(i, ref)
       else
@@ -104,7 +103,7 @@ private[impl] final class DefaultDatasources[
       getter(i).flatMap {
         // We're replacing, emit abnormal condition if there was no ref
         case Empty =>
-          notFound.point[F]
+          notFound.pure[F]
 
         // it's removed, but resource hasn't been finalized
         case Removed(_) =>
@@ -125,10 +124,10 @@ private[impl] final class DefaultDatasources[
   def reconfigureDatasource(datasourceId: I, patch: C)
       : F[Condition[DatasourceError[I, C]]] =
     lookupRef[DatasourceError[I, C]](datasourceId) flatMap {
-      case -\/(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
-      case \/-(ref) => modules.reconfigureRef(ref, patch) match {
+      case Left(err) => Condition.abnormal(err: DatasourceError[I, C]).pure[F]
+      case Right(ref) => modules.reconfigureRef(ref, patch).value flatMap {
         case Left(err) =>
-          Condition.abnormal(err: DatasourceError[I, C]).point[F]
+          Condition.abnormal(err: DatasourceError[I, C]).pure[F]
 
         case Right((reconf, patched)) =>
           replaceDatasourceImpl(datasourceId, reconf, patched)
@@ -138,17 +137,17 @@ private[impl] final class DefaultDatasources[
   def renameDatasource(datasourceId: I, name: DatasourceName)
       : F[Condition[DatasourceError[I, C]]] =
     lookupRef[DatasourceError[I, C]](datasourceId) flatMap {
-      case -\/(err) => Condition.abnormal(err: DatasourceError[I, C]).point[F]
-      case \/-(ref) => replaceDatasource(datasourceId, ref.copy(name = name))
+      case Left(err) => Condition.abnormal(err: DatasourceError[I, C]).pure[F]
+      case Right(ref) => replaceDatasource(datasourceId, ref.copy(name = name))
     }
 
   def copyDatasource(datasourceId: I, modifyName: DatasourceName => DatasourceName): F[DatasourceError[I, C] \/ I] = {
     val action = for {
       ref <- EitherT(lookupRef[DatasourceError[I, C]](datasourceId))
       ref0 = ref.copy(name = modifyName(ref.name))
-      id <- EitherT(addDatasource(ref0)).leftMap(x => x: DatasourceError[I, C])
+      id <- EitherT(addDatasource(ref0).map(_.toEither)).leftMap(x => x: DatasourceError[I, C])
     } yield id
-    action.run
+    action.value.map(\/.fromEither(_))
   }
 
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
@@ -192,54 +191,54 @@ private[impl] final class DefaultDatasources[
       case Reconfiguration.Preserve => false
     }
 
-    val action = for {
+    val action: EitherT[F, E, Unit] = for {
       _ <- verifyNameUnique[E](ref.name, i)
       // Grab managed ds and if it's presented shut it down
-      mbCurrent <- EitherT.rightT(cache.get(i))
-      _ <- EitherT.rightT(mbCurrent.fold(().point[F])(_ => dispose(i, clearBS)))
-      allocated <- EitherT(modules.create(i, ref).run.allocated map {
-        case (-\/(e), _) => -\/(e: E)
-        case (\/-(a), finalize) => \/-((a, finalize))
+      mbCurrent <- EitherT.right(cache.get(i))
+      _ <- EitherT.right(mbCurrent.fold(().pure[F])(_ => dispose(i, clearBS)))
+      allocated <- EitherT(modules.create(i, ref).value.allocated map {
+        case (Left(e), _) => Left(e: E)
+        case (Right(a), finalize) => Right((a, finalize))
       })
-      _ <- EitherT.rightT(refs.insert(i, ref))
-      _ <- EitherT.rightT(cache.manage(i, allocated))
+      _ <- EitherT.right(refs.insert(i, ref))
+      _ <- EitherT.right(cache.manage(i, allocated))
     } yield ()
 
-    action.run.map(Condition.disjunctionIso.reverseGet(_))
+    action.value.map(Condition.eitherIso.reverseGet(_))
   }
 
   private def setRef(i: I, ref: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] = {
-    val action = for {
+    val action: EitherT[F, DatasourceError[I, C], Unit] = for {
       _ <- verifyNameUnique[DatasourceError[I, C]](ref.name, i)
-      _ <- EitherT.rightT(refs.insert(i, ref))
+      _ <- EitherT.right(refs.insert(i, ref))
     } yield ()
 
-    action.run.map(Condition.disjunctionIso.reverseGet(_))
+    action.value.map(Condition.eitherIso.reverseGet(_))
   }
 
-  private def lookupRef[E >: ExistentialError[I] <: DatasourceError[I, C]](i: I): F[E \/ DatasourceRef[C]] =
+  private def lookupRef[E >: ExistentialError[I] <: DatasourceError[I, C]](i: I): F[Either[E, DatasourceRef[C]]] =
     refs.lookup(i).map {
-      case None => datasourceNotFound[I, E](i).left
-      case Some(a) => a.right
+      case None => datasourceNotFound[I, E](i).asLeft
+      case Some(a) => a.asRight
     }
 
   private def verifyNameUnique[E >: CreateError[C] <: DatasourceError[I, C]](name: DatasourceName, i: I): EitherT[F, E, Unit] =
     EitherT {
       refs.entries
-        .exists(t => t._2.name === name && t._1 =/= i)
+        .exists(t => t._2.name === name && t._1 =!= i)
         .compile
         .fold(false)(_ || _)
-        .map(_ ? datasourceNameExists[E](name).left[Unit] | ().right)
+        .map((x: Boolean) => if (x) datasourceNameExists[E](name).asLeft[Unit] else ().asRight)
     }
 
   private def dispose(i: I, clear: Boolean): F[Unit] =
-    cache.shutdown(i) >> (if (clear) byteStores.clear(i) else Applicative[F].unit)
+    cache.shutdown(i) >> byteStores.clear(i).whenA(clear)
 
   private val createErrorHandling: EitherT[Resource[F, ?], CreateError[C], ?] ~> Resource[F, ?] =
     λ[EitherT[Resource[F, ?], CreateError[C], ?] ~> Resource[F, ?]]( inp =>
-      inp.run.flatMap(_.fold(
+      inp.value.flatMap(_.fold(
         (x: CreateError[C]) => Resource.liftF(MonadError_[F, CreateError[C]].raiseError(x)),
-        _.point[Resource[F, ?]])))
+        _.pure[Resource[F, ?]])))
 
   private def throughSemaphore(i: I): F ~> F =
     λ[F ~> F](fa => semaphore.get(i).use(_ => fa))
