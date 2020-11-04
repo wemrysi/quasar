@@ -146,7 +146,7 @@ object DatasourceModules {
 
     def findModule(ref: DatasourceRef[Json]): Option[DatasourceModule] =
       modules.find { (m: DatasourceModule) =>
-        m.kind.name === ref.kind.name && m.kind.version >= ref.kind.version
+        m.kind.name === ref.kind.name && m.kind.version >= ref.kind.version && ref.kind.version >= m.minVersion
       }
 
     def findAndMigrate(ref: DatasourceRef[Json])

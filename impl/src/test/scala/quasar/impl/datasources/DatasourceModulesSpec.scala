@@ -281,12 +281,14 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     val heavyType = DatasourceType("heavy", 2)
     val incompatType = DatasourceType("incompat", 3)
     val tooNewType = DatasourceType("light", 2)
+    val tooOldType = DatasourceType("light", 0)
     val migrationType = DatasourceType("heavy", 1)
 
     val lightRef = DatasourceRef(lightType, DatasourceName("light-name"), jString("light-config"))
     val heavyRef = DatasourceRef(heavyType, DatasourceName("heavy-name"), jString("heavy-config"))
     val incompatRef = DatasourceRef(incompatType, DatasourceName("incompat-name"), jString("incompat-config"))
     val tooNew = DatasourceRef(tooNewType, DatasourceName("too-new"), jString("too-new"))
+    val tooOld = DatasourceRef(tooOldType, DatasourceName("too-old"), jString("too-old"))
     val migrationRef = DatasourceRef(migrationType, DatasourceName("migration-name"), jString("migration-config"))
 
 
@@ -321,11 +323,14 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
         modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(lightType), heavyMod(heavyType)), rl, ByteStores.void[IO, Int], x => IO(None))
         (res, fin0) <- modules.create(0, incompatRef).value.allocated
         (tooRes, fin1) <- modules.create(1, tooNew).value.allocated
+        (oldRes, fin2) <- modules.create(2, tooOld).value.allocated
+        _ <- fin2
         _ <- fin1
         _ <- fin0
       } yield {
         res must beLeft(DatasourceUnsupported(incompatType, ISet.singleton(lightType).insert(heavyType)))
         tooRes must beLeft(DatasourceUnsupported(tooNewType, ISet.singleton(lightType).insert(heavyType)))
+        oldRes must beLeft(DatasourceUnsupported(tooOldType, ISet.singleton(lightType).insert(heavyType)))
       }
     }
     "errors with initialization error" >>* {
