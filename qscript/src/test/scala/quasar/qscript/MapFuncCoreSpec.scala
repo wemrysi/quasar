@@ -26,7 +26,6 @@ import quasar.contrib.matryoshka.implicits._
 import matryoshka.delayShow
 import matryoshka.data.Fix
 import matryoshka.data.free._
-import matryoshka.implicits._
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.tuple._

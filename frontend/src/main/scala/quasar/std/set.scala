@@ -19,10 +19,10 @@ package quasar.std
 import slamdata.Predef._
 import quasar._
 import quasar.common.data.Data
+import quasar.contrib.matryoshka.implicits._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
-import matryoshka.implicits._
 import scalaz._, Scalaz._
 import shapeless.{Data => _, _}
 

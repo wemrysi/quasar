@@ -48,7 +48,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
   def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](graph: QSUGraph)
       : F[QSUGraph] = {
     type G[A] = StateT[F, RevIdx, A]
-    graph.rewriteM[G](extract[G]).runA(graph.generateRevIndex)
+    graph.rewriteM[G](extract[G]).runA(graph.reverseIndex)
   }
 
   ////

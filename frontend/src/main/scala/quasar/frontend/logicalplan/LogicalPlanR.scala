@@ -21,6 +21,8 @@ import quasar._
 import quasar.common.{CIName, JoinType, SortDir}
 import quasar.common.data.Data
 import quasar.contrib.cats.stateT._
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.pathy._
 import quasar.fp.ski._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
@@ -30,7 +32,6 @@ import scala.Symbol
 import cats.data.State
 
 import matryoshka._
-import matryoshka.implicits._
 
 import scalaz.{State => _, _}, Scalaz._
 
@@ -110,13 +111,13 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
   }
 
   def rename[M[_]: Monad](f: Symbol => M[Symbol])(t: T): M[T] =
-    (Map[Symbol, Symbol](), t).anaM[T](renameƒ(f))
+    safe.anaM((Map[Symbol, Symbol](), t))(renameƒ(f))
 
   def normalizeTempNames(t: T): T =
     rename(κ(freshSym[State[Long, ?]]("tmp")))(t).runA(0).value
 
   def bindFree(vars: Map[CIName, T])(t: T): T =
-    t.cata[T] {
+    safe.cata[T, LP, T](t) {
       case Free(sym) => vars.get(CIName(sym.name)).getOrElse((Free(sym):LP[T]).embed)
       case other     => other.embed
     }
@@ -181,11 +182,12 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
     case t => None
   }
 
-  def normalizeLets(t: T) = t.transAna[T](repeatedly(normalizeLetsƒ))
+  def normalizeLets(t: T) = safe.transAna(t)(repeatedly(normalizeLetsƒ))
 
   /** The set of paths referenced in the given plan. */
   def paths(lp: T): ISet[FPath] =
-    lp.foldMap(_.cata[ISet[FPath]] {
+    // Recursive#foldMap uses a trampoline, should be safe
+    TR.foldMap(lp)(safe.cata[T, LP, ISet[FPath]](_) {
       case Read(p) => ISet singleton p
       case other   => other.fold
     })

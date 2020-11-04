@@ -85,7 +85,7 @@ sealed abstract class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
         }
     }
 
-    bucketsReified.run(aqsu.auth).runA(aqsu.graph.generateRevIndex) map {
+    bucketsReified.run(aqsu.auth).runA(aqsu.graph.reverseIndex) map {
       case (auth, graph) => ApplyProvenance.AuthenticatedQSU(graph, auth)
     }
   }

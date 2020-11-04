@@ -19,15 +19,18 @@ package quasar.compile
 import slamdata.Predef._
 import quasar.{NonTerminal, RenderTree, RenderedTree, Terminal, VarName},
   RenderTree.ops._
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.pathy.prettyPrint
 import quasar.compile.SemanticError._
 import quasar.sql._
 
 import scala.AnyRef
 
+import cats.Eval
+
 import matryoshka._
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import scalaz.{Select => _,_}, Scalaz._, Validation.{success, failure, failureNel}
 
 object SemanticAnalysis {
@@ -343,26 +346,30 @@ object SemanticAnalysis {
   def addAnnotations[T](implicit T: Corecursive.Aux[T, Sql]):
       ElgotAlgebraM[
         ((Scope, T), ?),
-        SemanticErrors \/ ?,
+        EitherT[Eval, SemanticErrors, ?],
         Sql,
         Cofree[Sql, Annotations]] =
-    e => attributeElgotM[(Scope, ?), ValidSem][Sql, Annotations](
-      ElgotAlgebraMZip[(Scope, ?), ValidSem, Sql].zip(
-        synthElgotMƒ,
-        inferProvenanceƒ)).apply(e.leftMap(_._1)).disjunction
+    e => EitherT(
+      Eval.now(attributeElgotM[(Scope, ?), ValidSem][Sql, Annotations](
+        ElgotAlgebraMZip[(Scope, ?), ValidSem, Sql]
+          .zip(synthElgotMƒ, inferProvenanceƒ))
+        .apply(e.leftMap(_._1))
+        .disjunction))
 
   def projectSortKeys[T: Equal](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql]): T =
-    expr.transCata[T](orOriginal(projectSortKeysƒ[T]))
+    safe.transCata(expr)(orOriginal(projectSortKeysƒ[T]))
 
   // NB: identifySynthetics &&& (scopeTables >>> inferProvenance)
   def annotate[F[_]: Applicative: MonadSemanticErrs, T](expr: T)(
       implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
       : F[Cofree[Sql, Annotations]] = {
+    import shims.monadToScalaz
 
     val emptyScope: Scope = Scope(TableScope(Map()), BindingScope(Map()))
 
-    (emptyScope, expr)
-      .coelgotM[SemanticErrors \/ ?](addAnnotations, scopeTablesƒ.apply(_).disjunction)
+    safe.coelgotM[EitherT[Eval, SemanticErrors, ?]]((emptyScope, expr))(
+      addAnnotations, x => EitherT(Eval.now(scopeTablesƒ.apply(x).disjunction)))
+      .run.value
       .fold(MonadSemanticErrs[F].raiseError(_), _.point[F])
   }
 }

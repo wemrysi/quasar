@@ -21,13 +21,14 @@ import quasar.common.JoinType
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.common.CIName
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadError_
 
 import contextual._
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import monocle.Prism
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -97,7 +98,8 @@ package object sql {
 
   implicit class SqlOps[T[_[_]]: BirecursiveT](q: T[Sql]) {
     def mkPathsAbsolute(basePath: ADir): T[Sql] =
-      q.transCata[T[Sql]](mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
+      safe.transCata[T[Sql], Sql, T[Sql], Sql](q)(
+        mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def makeTables(bindings: List[String]): T[Sql] = q.project match {
@@ -143,7 +145,8 @@ package object sql {
       a.map(st => st.map(b => sql.pprint(b)).pprint).mkString(";\n")
   }
 
-  def pprint[T](sql: T)(implicit T: Recursive.Aux[T, Sql]) = sql.para(pprintƒ)
+  def pprint[T](sql: T)(implicit T: Recursive.Aux[T, Sql]) =
+    safe.para[T, Sql, String](sql)(pprintƒ)
 
   private val SimpleNamePattern = "[a-zA-Z][_a-zA-Z0-9]*".r
 

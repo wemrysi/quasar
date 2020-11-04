@@ -19,12 +19,12 @@ package quasar.qscript.rewrites
 import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
 import quasar.contrib.iota._
+import quasar.contrib.matryoshka.safe
 import quasar.fp.PrismNT
 import quasar.qscript._
 
 import iotaz.CopK
 import matryoshka.{Hole => _, _}
-import matryoshka.implicits._
 import scalaz.{~>, Functor}
 import scalaz.syntax.functor._
 
@@ -107,6 +107,6 @@ object NormalizeQScriptFreeMap {
       qs: T[QScriptNormalized[T, ?]])
       : T[QScriptNormalized[T, ?]] = {
     val N = new NormalizeQScriptFreeMap[T]
-    qs.transCata[T[QScriptNormalized[T, ?]]](N.normQS)
+    safe.transCata(qs)(N.normQS)
   }
 }

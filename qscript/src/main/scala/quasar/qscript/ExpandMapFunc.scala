@@ -18,12 +18,12 @@ package quasar.qscript
 
 import slamdata.Predef._
 
+import quasar.contrib.matryoshka.safe
 import quasar.ejson.EJson
 import quasar.qscript.{MapFuncsDerived => D}, MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{Divide => _, _}, Scalaz._
 import simulacrum._
@@ -44,8 +44,8 @@ object ExpandMapFunc extends ExpandMapFuncInstances {
       derived: AlgebraM[(Option ∘ F)#λ, MapFuncDerived[T, ?], A])
       : AlgebraM[F, MapFuncDerived[T, ?], A] = { f =>
     derived(f).getOrElse(
-      Free.roll(mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM[F, A](
-        interpretM[F, MapFuncCore[T, ?], A, A](scala.Predef.implicitly[Monad[F]].point[A](_), core)))
+      safe.cataM(Free.roll(mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)))(
+        interpretM[F, MapFuncCore[T, ?], A, A](_.point[F], core)))
   }
 }
 

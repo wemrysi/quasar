@@ -22,6 +22,8 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.contrib.iota._
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.scalaz.free._
 import quasar.qscript.{
   ExtractFunc,
@@ -40,7 +42,6 @@ import cats.data.State
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns._
 
 import scalaz.{\/, Foldable, Scalaz}, Scalaz._
@@ -68,7 +69,7 @@ final class CoalesceSquashedMappable[T[_[_]]: BirecursiveT: EqualT] private () e
 
             g.overwriteAtRoot(QSU.Map(
               src.root,
-              MapFuncCore.normalized(outer.linearize.elgotApo[FreeMap](indexedSubst(inner1, ds, sm))).asRec))
+              MapFuncCore.normalized(safe.elgotApo(outer.linearize)(indexedSubst(inner1, ds, sm))).asRec))
 
           case _ =>
             g.overwriteAtRoot(QSU.Map(
@@ -213,7 +214,7 @@ object CoalesceSquashedMappable {
         case other => MapFuncCore.rollMF(other).embed
       }
 
-      val fm1 = fm.cata(interpret(algA, algF))
+      val fm1 = safe.cata(fm)(interpret(algA, algF))
       val keys = Foldable[FreeMapA[T, ?]].foldMap(fm1)(_._1.toSet)
 
       keys.headOption collect {

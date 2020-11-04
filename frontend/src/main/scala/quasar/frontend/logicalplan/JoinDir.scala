@@ -18,10 +18,10 @@ package quasar.frontend.logicalplan
 
 import slamdata.Predef._
 import quasar.common.data.Data
+import quasar.contrib.matryoshka.implicits._
 import quasar.std.StdLib._
 
 import matryoshka._
-import matryoshka.implicits._
 
 sealed abstract class JoinDir(val name: String) {
   import structural.MapProject

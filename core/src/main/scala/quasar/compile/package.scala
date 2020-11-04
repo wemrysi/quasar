@@ -20,6 +20,8 @@ import slamdata.Predef._
 import quasar.CIString._
 import quasar.common.{phase, phaseM, PhaseResultTell}
 import quasar.common.data.Data
+import quasar.contrib.matryoshka.implicits._
+import quasar.contrib.matryoshka.safe
 import quasar.contrib.pathy.ADir
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp._
@@ -29,7 +31,6 @@ import quasar.sql._
 import quasar.std.SetLib.{Drop, Take}
 
 import matryoshka._
-import matryoshka.implicits._
 import pathy.Path.posixCodec
 import scalaz.{Failure => _, Select => _, _}, Scalaz._
 
@@ -245,7 +246,7 @@ package object compile {
       : F[T[Sql]] = {
 
     val allVars =
-      expr.cata(allVariables)
+      safe.cata(expr)(allVariables)
 
     val errors =
       allVars.map(binding(parser, variables, _))
@@ -254,7 +255,7 @@ package object compile {
     errors.cata(
       MonadSemanticErrs[F].raiseError(_),
       MonadSemanticErrs[F].unattempt(
-        expr.cataM[SemanticError \/ ?, T[Sql]](substVarsƒ(parser, variables))
+        safe.cataM(expr)(substVarsƒ(parser, variables))
           .leftMap(_.wrapNel).point[F]))
   }
 
