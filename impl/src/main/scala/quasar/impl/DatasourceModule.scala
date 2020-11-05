@@ -20,6 +20,7 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.ConfigurationError
 import quasar.connector.datasource.{HeavyweightDatasourceModule, LightweightDatasourceModule, Reconfiguration}
 
+import scala.Long
 import scala.util.Either
 
 import argonaut.Json
@@ -30,6 +31,8 @@ sealed trait DatasourceModule {
   def kind: DatasourceType
 
   def sanitizeConfig(config: Json): Json
+
+  def minVersion: Long
 
   def migrateConfig[F[_]: Sync](config: Json)
       : F[Either[ConfigurationError[Json], Json]]
@@ -44,6 +47,9 @@ object DatasourceModule {
 
     def sanitizeConfig(config: Json): Json = lw.sanitizeConfig(config)
 
+    def minVersion: Long =
+      lw.minVersion
+
     def migrateConfig[F[_]: Sync](config: Json)
         : F[Either[ConfigurationError[Json], Json]] =
       lw.migrateConfig(config)
@@ -55,6 +61,9 @@ object DatasourceModule {
 
   final case class Heavyweight(hw: HeavyweightDatasourceModule) extends DatasourceModule {
     def kind = hw.kind
+
+    def minVersion: Long =
+      hw.minVersion
 
     def sanitizeConfig(config: Json): Json = hw.sanitizeConfig(config)
 

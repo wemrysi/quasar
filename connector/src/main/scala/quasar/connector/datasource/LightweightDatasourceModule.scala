@@ -33,11 +33,15 @@ import cats.effect.{ConcurrentEffect, ContextShift, Timer, Resource, Sync}
 import cats.kernel.Hash
 import fs2.Stream
 import java.util.UUID
+import scala.Long
 
 trait LightweightDatasourceModule {
   def kind: DatasourceType
 
   def sanitizeConfig(config: Json): Json
+
+  def minVersion: Long =
+    kind.version
 
   def migrateConfig[F[_]: Sync](config: Json)
       : F[Either[ConfigurationError[Json], Json]]

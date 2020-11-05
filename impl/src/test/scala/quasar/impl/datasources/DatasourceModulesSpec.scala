@@ -45,7 +45,7 @@ import cats.syntax.applicativeError._
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
 
-import scalaz.{ISet, NonEmptyList, \/-, -\/}
+import scalaz.{ISet, NonEmptyList}
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext
@@ -99,10 +99,12 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
         ScalarStages.Id))
   }
 
-  def lightMod(k: DatasourceType, err: Option[InitializationError[Json]] = None)
+  def lightMod(k: DatasourceType, err: Option[InitializationError[Json]] = None, minV: Option[Long] = None)
       : DatasourceModule =
     DatasourceModule.Lightweight(new LightweightDatasourceModule {
       val kind = k
+
+      override def minVersion = minV getOrElse k.version
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
@@ -133,10 +135,12 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       }
     })
 
-  def heavyMod(k: DatasourceType, err: Option[InitializationError[Json]] = None)
+  def heavyMod(k: DatasourceType, err: Option[InitializationError[Json]] = None, minV: Option[Long] = None)
       : DatasourceModule =
     DatasourceModule.Heavyweight(new HeavyweightDatasourceModule {
       val kind = k
+
+      override def minVersion = minV getOrElse k.version
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
@@ -196,30 +200,44 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     val aType = DatasourceType("a", 1)
     val bType = DatasourceType("b", 2)
     val cType = DatasourceType("c", 3)
+    val bType3 = DatasourceType("b", 3)
 
     val aRef = DatasourceRef(aType, DatasourceName("a-name"), jString("a-config"))
     val bRef = DatasourceRef(bType, DatasourceName("b-name"), jString("b-config"))
     val cRef = DatasourceRef(cType, DatasourceName("c-name"), jString("c-config"))
+    val bRef3 = DatasourceRef(bType3, DatasourceName("b-name-3"), jString("b-config"))
 
     val aExpected = aRef.copy(config = jString("sanitized"))
     val bExpected = bRef.copy(config = jString("sanitized"))
     val cExpected = cRef.copy(config = jEmptyObject)
+    val bExpected3 = bRef3.copy(config = jEmptyObject)
 
-    RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]) map { (rl: RateLimiting[IO, UUID]) =>
-      val modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(aType), heavyMod(bType)), rl, ByteStores.void[IO, Int], x => IO(None))
-      modules.sanitizeRef(aRef) === aExpected
-      modules.sanitizeRef(bRef) === bExpected
-      modules.sanitizeRef(cRef) === cExpected
+    for {
+      rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID])
+      modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(aType), heavyMod(bType)), rl, ByteStores.void[IO, Int], x => IO(None))
+      aRes <- modules.sanitizeRef(aRef)
+      bRes <- modules.sanitizeRef(bRef)
+      cRes <- modules.sanitizeRef(cRef)
+      bRes3 <- modules.sanitizeRef(bRef3)
+    } yield {
+      aRes === aExpected
+      bRes === bExpected
+      cRes === cExpected
+      bRes3 === bExpected3
     }
   }
 
   "reconfigure refs" >>* {
     val aType = DatasourceType("a", 1)
-    val bType = DatasourceType("b", 2)
+    val aType2 = DatasourceType("a", 2)
+    val bType = DatasourceType("b", 1)
+    val bType2 = DatasourceType("b", 2)
     val cType = DatasourceType("c", 3)
 
     val aRef = DatasourceRef(aType, DatasourceName("a-name"), jString("a-config"))
+    val aRef2 = DatasourceRef(aType2, DatasourceName("a-name"), jString("a-config"))
     val bRef = DatasourceRef(bType, DatasourceName("b-name"), jString("b-config"))
+    val bRef2 = DatasourceRef(bType2, DatasourceName("b-name"), jString("b-config"))
     val cRef = DatasourceRef(cType, DatasourceName("c-name"), jString("c-config"))
 
     val aPatch = jString("a-patch")
@@ -227,15 +245,31 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     val cPatch = jString("c-patch")
 
     val aExpected = aRef.copy(config = jArray(List(jString("a-config"), jString("a-patch"))))
-    val bExpected = bRef.copy(config = jArray(List(jString("b-config"), jString("b-patch"))))
+    val bExpected = bRef2.copy(config = jArray(List(jString("b-config"), jString("b-patch"))))
+    val migratedExpected = bRef2.copy(config = jArray(List(jString("migrated"), jString("b-patch"))))
     val cExpected = cRef.copy(config = jEmptyObject)
 
-    RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]) map { (rl: RateLimiting[IO, UUID]) =>
-      val modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(aType), heavyMod(bType)), rl, ByteStores.void[IO, Int], x => IO(None))
-      modules.reconfigureRef(aRef, aPatch) must beRight((Reconfiguration.Reset, aExpected))
-      modules.reconfigureRef(bRef, bPatch) must beRight((Reconfiguration.Reset, bExpected))
-
-      modules.reconfigureRef(cRef, cPatch) must beLike {
+    for {
+      rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID])
+      modules = DatasourceModules[Fix, IO, Int, UUID](
+        List(lightMod(aType), heavyMod(bType2, None, Some(1))),
+        rl,
+        ByteStores.void[IO, Int],
+        x => IO(None))
+      aRes <- modules.reconfigureRef(aRef, aPatch).value
+      aRes2 <- modules.reconfigureRef(aRef2, aPatch).value
+      bRes <- modules.reconfigureRef(bRef, bPatch).value
+      bRes2 <- modules.reconfigureRef(bRef2, bPatch).value
+      cRes <- modules.reconfigureRef(cRef, cPatch).value
+    } yield {
+      aRes must beRight((Reconfiguration.Reset, aExpected))
+      bRes must beRight((Reconfiguration.Reset, migratedExpected))
+      bRes2 must beRight((Reconfiguration.Reset, bExpected))
+      aRes2 must beLike {
+        case Left(DatasourceError.DatasourceUnsupported(kind, _)) =>
+          kind mustEqual aRef2.kind
+      }
+      cRes must beLike {
         case Left(DatasourceError.DatasourceUnsupported(kind, _)) =>
           kind mustEqual cRef.kind
       }
@@ -246,32 +280,58 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     val lightType = DatasourceType("light", 1)
     val heavyType = DatasourceType("heavy", 2)
     val incompatType = DatasourceType("incompat", 3)
+    val tooNewType = DatasourceType("light", 2)
+    val tooOldType = DatasourceType("light", 0)
+    val migrationType = DatasourceType("heavy", 1)
 
     val lightRef = DatasourceRef(lightType, DatasourceName("light-name"), jString("light-config"))
     val heavyRef = DatasourceRef(heavyType, DatasourceName("heavy-name"), jString("heavy-config"))
     val incompatRef = DatasourceRef(incompatType, DatasourceName("incompat-name"), jString("incompat-config"))
+    val tooNew = DatasourceRef(tooNewType, DatasourceName("too-new"), jString("too-new"))
+    val tooOld = DatasourceRef(tooOldType, DatasourceName("too-old"), jString("too-old"))
+    val migrationRef = DatasourceRef(migrationType, DatasourceName("migration-name"), jString("migration-config"))
 
 
     "works with provided modules" >>* {
       for {
         rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
         modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(lightType), heavyMod(heavyType)), rl, ByteStores.void[IO, Int], x => IO(None))
-        (lightRes, finalizer1) <- modules.create(0, lightRef).run.allocated
-        (heavyRes, finalizer2) <- modules.create(1, heavyRef).run.allocated
+        (lightRes, finalizer1) <- modules.create(0, lightRef).value.allocated
+        (heavyRes, finalizer2) <- modules.create(1, heavyRef).value.allocated
         _ <- finalizer1
         _ <- finalizer2
       } yield {
-        lightRes must beLike { case \/-(QuasarDatasource.Lightweight(lw)) => lw.kind === lightType }
-        heavyRes must beLike { case \/-(QuasarDatasource.Heavyweight(hw)) => hw.kind === heavyType }
+        lightRes must beLike { case Right(QuasarDatasource.Lightweight(lw)) => lw.kind === lightType }
+        heavyRes must beLike { case Right(QuasarDatasource.Heavyweight(hw)) => hw.kind === heavyType }
       }
     }
+
+    "works with modules supported by version range" >>* {
+      for {
+        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        modules = DatasourceModules[Fix, IO, Int, UUID](List(heavyMod(heavyType, None, Some(1))), rl, ByteStores.void[IO, Int], x => IO(None))
+        (res, fin) <- modules.create(0, migrationRef).value.allocated
+        _ <- fin
+      } yield {
+        res must beLike { case Right(QuasarDatasource.Heavyweight(hw)) => hw.kind === heavyType }
+      }
+    }
+
     "errors with incompatible refs" >>* {
       for {
         rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
         modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(lightType), heavyMod(heavyType)), rl, ByteStores.void[IO, Int], x => IO(None))
-        (res, fin) <- modules.create(0, incompatRef).run.allocated
-        _ <- fin
-      } yield res must be_-\/(DatasourceUnsupported(incompatType, ISet.singleton(lightType).insert(heavyType)))
+        (res, fin0) <- modules.create(0, incompatRef).value.allocated
+        (tooRes, fin1) <- modules.create(1, tooNew).value.allocated
+        (oldRes, fin2) <- modules.create(2, tooOld).value.allocated
+        _ <- fin2
+        _ <- fin1
+        _ <- fin0
+      } yield {
+        res must beLeft(DatasourceUnsupported(incompatType, ISet.singleton(lightType).insert(heavyType)))
+        tooRes must beLeft(DatasourceUnsupported(tooNewType, ISet.singleton(lightType).insert(heavyType)))
+        oldRes must beLeft(DatasourceUnsupported(tooOldType, ISet.singleton(lightType).insert(heavyType)))
+      }
     }
     "errors with initialization error" >>* {
       val malformed =
@@ -303,20 +363,20 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
           x => IO(None)
         )
 
-        (malformedDs, finM) <- modules.create(0, malformedRef).run.allocated
-        (invalidDs, finI) <- modules.create(1, invalidRef).run.allocated
-        (connFailedDs, finC) <- modules.create(2, connFailedRef).run.allocated
-        (accessDeniedDs, finA) <- modules.create(3, accessDeniedRef).run.allocated
+        (malformedDs, finM) <- modules.create(0, malformedRef).value.allocated
+        (invalidDs, finI) <- modules.create(1, invalidRef).value.allocated
+        (connFailedDs, finC) <- modules.create(2, connFailedRef).value.allocated
+        (accessDeniedDs, finA) <- modules.create(3, accessDeniedRef).value.allocated
         _ <- finM
         _ <- finI
         _ <- finC
         _ <- finA
       } yield {
-        malformedDs must be_-\/(MalformedConfiguration(malformed, jString("a"), "malformed configuration"))
-        invalidDs must be_-\/(InvalidConfiguration(invalid, jString("b"), NonEmptyList("invalid configuration")))
-        accessDeniedDs must be_-\/(AccessDenied(accessDenied, jString("d"), "access denied"))
+        malformedDs must beLeft(MalformedConfiguration(malformed, jString("a"), "malformed configuration"))
+        invalidDs must beLeft(InvalidConfiguration(invalid, jString("b"), NonEmptyList("invalid configuration")))
+        accessDeniedDs must beLeft(AccessDenied(accessDenied, jString("d"), "access denied"))
         connFailedDs must beLike {
-          case -\/(ConnectionFailed(kind, config, cause)) =>
+          case Left(ConnectionFailed(kind, config, cause)) =>
             kind === connFailed
             config === jString("c")
             cause.getMessage === "conn failed"

@@ -109,6 +109,8 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
     new LightweightDatasourceModule {
       val kind = supportedType
 
+      override def minVersion = 1
+
       def sanitizeConfig(config: Json): Json =
         sanitize match {
           case None => config
@@ -117,7 +119,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
 
       def migrateConfig[F[_]: Sync](config: Json)
           : F[Either[ConfigurationError[Json], Json]] = {
-        val back: Either[ConfigurationError[Json], Json] = Right(config)
+        val back: Either[ConfigurationError[Json], Json] = Right(jString("migrated"))
         back.pure[F]
       }
 
@@ -204,9 +206,12 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
     } yield (result, byteStores, refs, starts, shuts)
   }
 
+  def migrationType = DatasourceType("test-type", 1)
   def supportedType = DatasourceType("test-type", 3)
   def validConfigs = (jString("one"), jString("two"))
   def gatherMultiple[A](as: Stream[IO, A]) = as.compile.toList
+  def migrationRef: IO[DatasourceRef[Json]] =
+    randomName map (DatasourceRef(migrationType, _, validConfigs._1))
 
   "implementation specific" >> {
     "add datasource" >> {
@@ -217,7 +222,19 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           i0 <- dses.addDatasource(b)
           _ <- finalize
           started <- starts.get
+        } yield {
+          i0 must beLike {
+            case \/-(i) => List(i) === started
+          }
+        }
+      }
+      "works for supported versions" >>* {
+        for {
+          ((dses, _, _, starts, _), finalize) <- prepare(Map()).allocated
+          m <- migrationRef
+          i0 <- dses.addDatasource(m)
           _ <- finalize
+          started <- starts.get
         } yield {
           i0 must beLike {
             case \/-(i) => List(i) === started
@@ -249,6 +266,21 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           started.size === 1
           ended0.size === 0
           ended1.size === 1
+        }
+      }
+
+      "implicitly migrates supported versions" >>* {
+        for {
+          ((dses, _, _, starts, shuts), finalize) <- prepare(Map()).allocated
+          m <- migrationRef
+          di0 <- dses.addDatasource(m)
+          i0 = di0.toOption.get
+          m0 <- dses.datasourceRef(i0)
+          _ <- finalize
+        } yield m0 must beLike {
+          case \/-(m) =>
+            m.kind === supportedType
+            m.config === jString("migrated")
         }
       }
       "doesn't store config when initialization fails" >>* {
@@ -368,8 +400,47 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           l must be_\/-(a.copy(config = sanitize(a.config)))
         }
       }
+      "ref is sanitized and migrated" >>* {
+        val sanitize: Json => Json = x => jArray(List(x, jString("sanitized")))
+        for {
+          m <- migrationRef
+          ((dses, _, _, _, _), finalize) <- prepare(Map(), None, Some(sanitize), None).allocated
+          r <- dses.addDatasource(m)
+          i = r.toOption.get
+          l <- dses.datasourceRef(i)
+          _ <- finalize
+        } yield {
+          l must beLike {
+            case \/-(res) =>
+              res.kind === supportedType
+              res.config === jArray(List(jString("migrated"), jString("sanitized")))
+
+          }
+        }
+      }
     }
     "reconfigure config" >> {
+      "ref is implicitly migrated during reconfiguration" >>* {
+        val reconfigure: (Json, Json) => Either[ConfigurationError[Json], (Reconfiguration, Json)] = {
+          case (j1, j2) => Right((Reconfiguration.Reset, jArray(List(j1, j2))))
+        }
+        val patchConfig = jString("patchconfig")
+
+        for {
+          m <- migrationRef
+          ((dses, bs, _, _, _), finalize) <- prepare(Map(), None, None, Some(reconfigure)).allocated
+          r <- dses.addDatasource(m)
+          i = r.toOption.get
+          _ <- dses.reconfigureDatasource(i, patchConfig)
+          l <- dses.datasourceRef(i)
+          _ <- finalize
+        } yield l must beLike {
+          case \/-(res) =>
+            res.kind === supportedType
+            res.config === jArray(List(jString("migrated"), patchConfig))
+        }
+      }
+
       "ref is reconfigured resetting state" >>* {
         val reconfigure: (Json, Json) => Either[ConfigurationError[Json], (Reconfiguration, Json)] = {
           case (j1, j2) => Right((Reconfiguration.Reset, jArray(List(j1, j2))))
