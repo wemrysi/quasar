@@ -15,7 +15,7 @@
  */
 
 package quasar.impl
-package datasources.middleware
+package logging
 
 import scala._, Predef._
 

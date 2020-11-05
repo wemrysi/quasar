@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.impl.datasources.middleware
+package quasar.impl
+package logging
 
 import scala.{Stream => _, _}, Predef._
 import java.nio.charset.StandardCharsets
