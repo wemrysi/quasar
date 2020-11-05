@@ -39,5 +39,5 @@ object LoggingUtils {
 
   def logFirstNDrain[F[_]: Sync](s: Stream[F, Byte], max: Int, log: String => F[Unit])
       : F[Unit] =
-    logFirstN[F](s.take(max.toLong), max, log).compile.drain
+    logFirstN[F](s, max, log).compile.drain
 }
