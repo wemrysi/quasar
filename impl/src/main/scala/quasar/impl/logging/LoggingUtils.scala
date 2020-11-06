@@ -19,9 +19,10 @@ package logging
 
 import java.nio.charset.StandardCharsets
 
-import scala._
-import Predef._
+import scala._, Predef._
+
 import cats.effect.Sync
+
 import fs2.{Chunk, Stream}
 
 object LoggingUtils {

@@ -30,7 +30,7 @@ import scala.{Stream => _, _}
 import scala.Predef._
 
 class LoggingUtilsSpec extends Specification with CatsIO {
-  val stream: Stream[IO, Byte] = Stream.emits("abcdefg".getBytes(StandardCharsets.UTF_8)).chunkN(1).flatMap(Stream.chunk)
+  val stream: Stream[IO, Byte] = Stream.emits("abcdefg".getBytes(StandardCharsets.UTF_8)).chunkN(2).flatMap(Stream.chunk)
   "logFirstNChunks" >> {
     def update(ref: Ref[IO, String])(bytes: Chunk[Byte]): IO[Unit] =
       ref.getAndUpdate(_ ++ new String(bytes.toArray, StandardCharsets.UTF_8)).void
@@ -48,7 +48,7 @@ class LoggingUtilsSpec extends Specification with CatsIO {
         ref <- Ref.of[IO, String]("")
         lst <- LoggingUtils.logFirstNChunks(stream, 1, update(ref)).compile.toList
         res <- ref.get
-      } yield (res must_=== "a") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
+      } yield (res must_=== "ab") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
     }
 
     "log two chunks" >> {
@@ -56,7 +56,7 @@ class LoggingUtilsSpec extends Specification with CatsIO {
         ref <- Ref.of[IO, String]("")
         lst <- LoggingUtils.logFirstNChunks(stream, 2, update(ref)).compile.toList
         res <- ref.get
-      } yield (res must_=== "ab") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
+      } yield (res must_=== "abcd") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
     }
 
     "log three chunks" >> {
@@ -64,7 +64,7 @@ class LoggingUtilsSpec extends Specification with CatsIO {
         ref <- Ref.of[IO, String]("")
         lst <- LoggingUtils.logFirstNChunks(stream, 3, update(ref)).compile.toList
         res <- ref.get
-      } yield (res must_=== "abc") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
+      } yield (res must_=== "abcdef") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
     }
   }
 
@@ -84,7 +84,7 @@ class LoggingUtilsSpec extends Specification with CatsIO {
         ref <- Ref.of[IO, String]("")
         lst <- LoggingUtils.logFirstN(stream, 1, update(ref)).compile.toList
         res <- ref.get
-      } yield (res must_=== "a") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
+      } yield (res must_=== "ab") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
     }
 
     "log two chunks" >> {
@@ -92,7 +92,7 @@ class LoggingUtilsSpec extends Specification with CatsIO {
         ref <- Ref.of[IO, String]("")
         lst <- LoggingUtils.logFirstN(stream, 2, update(ref)).compile.toList
         res <- ref.get
-      } yield (res must_=== "ab") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
+      } yield (res must_=== "abcd") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
     }
 
     "log three chunks" >> {
@@ -100,7 +100,7 @@ class LoggingUtilsSpec extends Specification with CatsIO {
         ref <- Ref.of[IO, String]("")
         lst <- LoggingUtils.logFirstN(stream, 3, update(ref)).compile.toList
         res <- ref.get
-      } yield (res must_=== "abc") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
+      } yield (res must_=== "abcdef") && (lst must_=== "abcdefg".getBytes(StandardCharsets.UTF_8).toList)
     }
   }
 
@@ -113,7 +113,7 @@ class LoggingUtilsSpec extends Specification with CatsIO {
         ref <- Ref.of[IO, String]("")
         _ <- LoggingUtils.logFirstNDrain(stream, 3, update(ref))
         res <- ref.get
-      } yield res must_=== "abc"
+      } yield res must_=== "abcdef"
     }
 
     "eval all chunks" >> {
