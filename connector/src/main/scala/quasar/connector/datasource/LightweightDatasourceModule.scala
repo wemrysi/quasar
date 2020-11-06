@@ -45,7 +45,7 @@ trait LightweightDatasourceModule {
 
   // Can not instantiate using such configurations, but still can migrate from them
   def supportedVersion: Long =
-    0
+    minVersion
 
   def migrateConfig[F[_]: Sync](from: Long, to: Long, config: Json)
       : F[Either[ConfigurationError[Json], Json]]
