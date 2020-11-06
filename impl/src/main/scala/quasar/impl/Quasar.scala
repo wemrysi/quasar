@@ -105,6 +105,7 @@ object Quasar extends Logging {
       pushPull: PushmiPullyu[F],
       getAuth: UUID => F[Option[ExternalCredentials[F]]])(
       maxConcurrentPushes: Int,
+      maxOutstandingPushes: Int,
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
       schedulerBuilders: List[SchedulerBuilder[F]],
@@ -163,6 +164,7 @@ object Quasar extends Logging {
       resultPush <-
         DefaultResultPush[F, UUID, SqlQuery, R](
           maxConcurrentPushes,
+          maxOutstandingPushes,
           destinations.destinationOf(_).map(_.toOption),
           sqlEvaluator,
           resultRender,

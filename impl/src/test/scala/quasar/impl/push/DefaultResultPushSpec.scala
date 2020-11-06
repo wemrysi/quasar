@@ -343,6 +343,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       resultPush <-
         DefaultResultPush[IO, Int, String, Stream[IO, String]](
           maxConcurrentPushes,
+          maxConcurrentPushes,
           lookupDestination,
           evaluator,
           render,

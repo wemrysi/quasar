@@ -625,6 +625,7 @@ private[impl] object DefaultResultPush {
 
   def apply[F[_]: Concurrent: Timer, D: Codec: Order: Show, Q, R](
       maxConcurrentPushes: Int,
+      maxOutstandingPushes: Int,
       lookupDestination: D => F[Option[Destination[F]]],
       evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), R],
       render: ResultRender[F, R],
@@ -754,7 +755,8 @@ private[impl] object DefaultResultPush {
 
     val jm =
       JobManager[F, D :: ResourcePath :: HNil, Nothing](
-        jobLimit = maxConcurrentPushes,
+        jobConcurrency = maxConcurrentPushes,
+        jobLimit = maxOutstandingPushes,
         eventsLimit = maxConcurrentPushes)
 
     jm.flatMap(acquire)
