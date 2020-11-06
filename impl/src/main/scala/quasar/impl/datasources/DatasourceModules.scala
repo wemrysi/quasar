@@ -155,7 +155,7 @@ object DatasourceModules {
         case Some(m) if m.kind.version === ref.kind.version =>
           EitherT.pure((m, ref))
         case Some(m) if m.kind.version > ref.kind.version =>
-          EitherT(m.migrateConfig(ref.config))
+          EitherT(m.migrateConfig(ref.kind.version, m.kind.version, ref.config))
             .leftMap((e: ConfigurationError[Json]) => e: CreateError[Json])
             .map((newConf => (m, ref.copy(config = newConf, kind = m.kind))))
         case _ =>
