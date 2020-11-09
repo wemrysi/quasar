@@ -17,6 +17,8 @@
 package quasar.impl
 package logging
 
+import java.nio.charset.StandardCharsets
+
 import scala._, Predef._
 
 import cats.effect.Sync
@@ -27,8 +29,12 @@ object LoggingUtils {
   def logFirstN[F[_]: Sync](s: Stream[F, Byte], max: Int, log: String => F[Unit])
       : Stream[F, Byte] = {
     def logChunk(bytes: Chunk[Byte]) =
-      log(new String(bytes.toArray, "utf-8"))
+      log(new String(bytes.toArray, StandardCharsets.UTF_8))
 
+    logFirstNChunks(s, max, logChunk)
+  }
+
+  def logFirstNChunks[F[_]: Sync](s: Stream[F, Byte], max: Int, logChunk: Chunk[Byte] => F[Unit]): Stream[F, Byte] = {
     s.chunks.zipWithIndex flatMap {
       case (bytes, i) if i < max =>
         Stream.eval_(logChunk(bytes)) ++ Stream.chunk(bytes)
