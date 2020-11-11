@@ -9,7 +9,7 @@ import scala.collection.Seq
 
 import Versions._
 
-ThisBuild / scalaVersion := "2.12.10"
+ThisBuild / scalaVersion := "2.12.12"
 
 ThisBuild / githubRepository := "quasar"
 
@@ -105,9 +105,9 @@ lazy val foundation = project
     libraryDependencies ++= Seq(
       "com.slamdata"               %% "slamdata-predef"           % "0.1.2",
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
-      "com.codecommit"             %% "shims"                     % "2.1.0",
+      "com.codecommit"             %% "shims"                     % "2.2.0",
       "com.codecommit"             %% "skolems"                   % skolemsVersion,
-      "com.codecommit"             %% "cats-effect-testing-specs2" % "0.4.0" % Test,
+      "com.codecommit"             %% "cats-effect-testing-specs2" % "0.4.1" % Test,
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
       "org.typelevel"              %% "cats-effect-laws"          % catsEffectVersion % Test,
       "co.fs2"                     %% "fs2-core"                  % fs2Version,
@@ -127,10 +127,9 @@ lazy val foundation = project
       "io.frees"                   %% "iotaz-core"                % iotaVersion,
       "io.frees"                   %% "iota-core"                 % iotaVersion,
       "com.github.markusbernhardt"  % "proxy-vole"                % "1.0.5",
-      "org.typelevel"              %% "simulacrum"                % "1.0.0",
+      "org.typelevel"              %% "simulacrum"                % "1.0.1",
       "io.higherkindness"          %% "droste-core"               % drosteVersion,
       "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
-      "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
       "org.scalacheck"             %% "scalacheck"                % scalacheckVersion                    % Test,
       "org.typelevel"              %% "spire-laws"                % spireVersion                         % Test,
       "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
@@ -242,9 +241,9 @@ lazy val qsu = project
   .settings(
     libraryDependencies ++= Seq(
       "org.slf4s" %% "slf4s-api" % slf4sVersion,
-      "org.typelevel" %% "cats-laws"        % catsVersion       % Test,
-      "org.typelevel" %% "cats-kernel-laws" % catsVersion       % Test,
-      "org.typelevel" %% "discipline"       % disciplineVersion % Test))
+      "org.typelevel" %% "cats-laws"         % catsVersion       % Test,
+      "org.typelevel" %% "cats-kernel-laws"  % catsVersion       % Test,
+      "org.typelevel" %% "discipline-specs2" % disciplineVersion % Test))
   .settings(scalacOptions ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, 12)) => Seq("-Ypatmat-exhaust-depth", "40")
@@ -290,7 +289,7 @@ lazy val impl = project
       "com.precog"     %% "fs2-job"                  % fs2JobVersion.value,
       "com.precog"     %% "qdata-tectonic"           % qdataVersion.value,
       "com.precog"     %% "tectonic-fs2"             % tectonicVersion.value,
-      "com.precog"     %% "http4s-async-http-client" % http4sVersion,
+      "org.http4s"     %% "http4s-async-http-client" % http4sVersion,
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
       "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
       "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
@@ -308,6 +307,7 @@ lazy val impl = project
       // if it is not added here then no HttpClientProvider implementation can be found.
       // See ch11286.
       "com.azure" % "azure-core-http-netty" % "1.5.1",
-      "org.typelevel" %% "kittens"    % kittensVersion % Test,
-      "com.precog"    %% "http4s-dsl" % http4sVersion  % Test))
+      "org.http4s"    %% "http4s-dsl" % http4sVersion  % Test,
+      "org.typelevel" %% "discipline-specs2" % disciplineVersion % Test,
+      "org.typelevel" %% "kittens" % kittensVersion % Test))
   .evictToLocal("FS2_JOB_PATH", "core")

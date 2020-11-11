@@ -43,7 +43,6 @@ import cats.kernel.Hash
 import cats.kernel.instances.uuid._
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
-import cats.syntax.functor._
 import cats.syntax.traverse._
 
 import fs2.Stream

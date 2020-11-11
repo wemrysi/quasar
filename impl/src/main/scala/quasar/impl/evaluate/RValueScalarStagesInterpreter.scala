@@ -35,8 +35,6 @@ import fs2.{Chunk, Pipe, Stream}
 
 import scalaz.{NonEmptyList, Scalaz}, Scalaz._
 
-import shims.monadToScalaz
-
 object RValueScalarStagesInterpreter {
 
   /** The chunk size used when `minUnit` isn't specified. */

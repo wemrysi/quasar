@@ -53,7 +53,8 @@ object ResponseBodyLoggingMiddlewareSpec extends Specification
   "log zero chunks" >> {
     Ref.of[IO, String]("") flatMap { ref =>
       for {
-        _ <- client(0, ref).fetch(GET(Uri.uri("")))(_.as[String])
+        req <- GET(uri"")
+        _ <- client(0, ref).run(req).use(_.as[String])
         res <- ref.get
       } yield {
         res mustEqual("")
@@ -64,7 +65,8 @@ object ResponseBodyLoggingMiddlewareSpec extends Specification
   "log one chunk" >> {
     Ref.of[IO, String]("") flatMap { ref =>
       for {
-        _ <- client(1, ref).fetch(GET(Uri.uri("")))(_.as[String])
+        req <- GET(uri"")
+        _ <- client(1, ref).run(req).use(_.as[String])
         res <- ref.get
       } yield {
         res mustEqual("a")
@@ -75,7 +77,8 @@ object ResponseBodyLoggingMiddlewareSpec extends Specification
   "log two chunks" >> {
     Ref.of[IO, String]("") flatMap { ref =>
       for {
-        _ <- client(2, ref).fetch(GET(Uri.uri("")))(_.as[String])
+        req <- GET(uri"")
+        _ <- client(2, ref).run(req).use(_.as[String])
         res <- ref.get
       } yield {
         res mustEqual("ab")
@@ -86,7 +89,8 @@ object ResponseBodyLoggingMiddlewareSpec extends Specification
   "log three chunks" >> {
     Ref.of[IO, String]("") flatMap { ref =>
       for {
-        _ <- client(3, ref).fetch(GET(Uri.uri("")))(_.as[String])
+        req <- GET(uri"")
+        _ <- client(3, ref).run(req).use(_.as[String])
         res <- ref.get
       } yield {
         res mustEqual("abc")
