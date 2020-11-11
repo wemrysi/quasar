@@ -53,7 +53,7 @@ object ResponseBodyLoggingMiddlewareSpec extends Specification
   "log zero chunks" >> {
     Ref.of[IO, String]("") flatMap { ref =>
       for {
-        req <- GET(Uri.uri(""))
+        req <- GET(uri"")
         _ <- client(0, ref).run(req).use(_.as[String])
         res <- ref.get
       } yield {
@@ -65,7 +65,7 @@ object ResponseBodyLoggingMiddlewareSpec extends Specification
   "log one chunk" >> {
     Ref.of[IO, String]("") flatMap { ref =>
       for {
-        req <- GET(Uri.uri(""))
+        req <- GET(uri"")
         _ <- client(1, ref).run(req).use(_.as[String])
         res <- ref.get
       } yield {
@@ -77,7 +77,7 @@ object ResponseBodyLoggingMiddlewareSpec extends Specification
   "log two chunks" >> {
     Ref.of[IO, String]("") flatMap { ref =>
       for {
-        req <- GET(Uri.uri(""))
+        req <- GET(uri"")
         _ <- client(2, ref).run(req).use(_.as[String])
         res <- ref.get
       } yield {
@@ -89,7 +89,7 @@ object ResponseBodyLoggingMiddlewareSpec extends Specification
   "log three chunks" >> {
     Ref.of[IO, String]("") flatMap { ref =>
       for {
-        req <- GET(Uri.uri(""))
+        req <- GET(uri"")
         _ <- client(3, ref).run(req).use(_.as[String])
         res <- ref.get
       } yield {
