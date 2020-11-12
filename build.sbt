@@ -289,7 +289,7 @@ lazy val impl = project
       "com.precog"     %% "fs2-job"                  % fs2JobVersion.value,
       "com.precog"     %% "qdata-tectonic"           % qdataVersion.value,
       "com.precog"     %% "tectonic-fs2"             % tectonicVersion.value,
-      "org.http4s"     %% "http4s-async-http-client" % http4sVersion,
+      "org.http4s"     %% "http4s-client"            % http4sVersion,
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
       "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
       "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
