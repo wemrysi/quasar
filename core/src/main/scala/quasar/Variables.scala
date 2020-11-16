@@ -34,6 +34,7 @@ final case class Variables(value: Map[VarName, VarValue]) {
 
   def ++(vs: Variables): Variables =
     Variables(value ++ vs.value)
+
 }
 
 final case class VarName(value: String) {
