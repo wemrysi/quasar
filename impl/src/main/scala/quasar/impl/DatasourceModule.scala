@@ -34,7 +34,7 @@ sealed trait DatasourceModule {
 
   def minVersion: Long
 
-  def migrateConfig[F[_]: Sync](config: Json)
+  def migrateConfig[F[_]: Sync](from: Long, to: Long, config: Json)
       : F[Either[ConfigurationError[Json], Json]]
 
   def reconfigure(original: Json, patch: Json)
@@ -50,9 +50,9 @@ object DatasourceModule {
     def minVersion: Long =
       lw.minVersion
 
-    def migrateConfig[F[_]: Sync](config: Json)
+    def migrateConfig[F[_]: Sync](from: Long, to: Long, config: Json)
         : F[Either[ConfigurationError[Json], Json]] =
-      lw.migrateConfig(config)
+      lw.migrateConfig(from, to, config)
 
     def reconfigure(original: Json, patch: Json)
         : Either[ConfigurationError[Json], (Reconfiguration, Json)] =
@@ -67,9 +67,9 @@ object DatasourceModule {
 
     def sanitizeConfig(config: Json): Json = hw.sanitizeConfig(config)
 
-    def migrateConfig[F[_]: Sync](config: Json)
+    def migrateConfig[F[_]: Sync](from: Long, to: Long, config: Json)
         : F[Either[ConfigurationError[Json], Json]] =
-      hw.migrateConfig(config)
+      hw.migrateConfig(from, to, config)
 
     def reconfigure(original: Json, patch: Json)
         : Either[ConfigurationError[Json], (Reconfiguration, Json)] =

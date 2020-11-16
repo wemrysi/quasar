@@ -46,7 +46,7 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
 
   def sanitizeConfig(config: Json): Json = config
 
-  def migrateConfig[F[_]: Sync](config: Json)
+  def migrateConfig[F[_]: Sync](from: Long, to: Long, config: Json)
       : F[Either[ConfigurationError[Json], Json]] = {
     val back = config.as[LocalConfig].toOption match {
       case None => Left(MalformedConfiguration(kind, config, s"Failed to migrate config: $config"): ConfigurationError[Json])

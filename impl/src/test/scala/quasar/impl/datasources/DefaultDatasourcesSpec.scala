@@ -32,7 +32,7 @@ import quasar.qscript.{PlannerError, InterpretedRead}
 
 import argonaut.Json
 import argonaut.JsonScalaz._
-import argonaut.Argonaut.{jArray, jString}
+import argonaut.Argonaut.{jArray, jString, jNumber}
 
 import cats.Show
 import cats.effect.{Blocker, ConcurrentEffect, ContextShift, IO, Resource, Sync, Timer}
@@ -116,9 +116,10 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           case Some(f) => f(config)
         }
 
-      def migrateConfig[F[_]: Sync](config: Json)
+      def migrateConfig[F[_]: Sync](from: Long, to: Long, config: Json)
           : F[Either[ConfigurationError[Json], Json]] = {
-        val back: Either[ConfigurationError[Json], Json] = Right(jString("migrated"))
+        val back: Either[ConfigurationError[Json], Json] =
+          Right(jArray(List(jNumber(from), jNumber(to), jString("migrated"))))
         back.pure[F]
       }
 
@@ -279,7 +280,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
         } yield m0 must beLike {
           case \/-(m) =>
             m.kind === supportedType
-            m.config === jString("migrated")
+            m.config === jArray(List(jNumber(1), jNumber(3), jString("migrated")))
         }
       }
       "doesn't store config when initialization fails" >>* {
@@ -412,8 +413,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           l must beLike {
             case \/-(res) =>
               res.kind === supportedType
-              res.config === jArray(List(jString("migrated"), jString("sanitized")))
-
+              res.config === jArray(List(jArray(List(jNumber(1), jNumber(3), jString("migrated"))), jString("sanitized")))
           }
         }
       }
@@ -436,7 +436,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
         } yield l must beLike {
           case \/-(res) =>
             res.kind === supportedType
-            res.config === jArray(List(jString("migrated"), patchConfig))
+            res.config === jArray(List(jArray(List(jNumber(1), jNumber(3), jString("migrated"))), patchConfig))
         }
       }
 

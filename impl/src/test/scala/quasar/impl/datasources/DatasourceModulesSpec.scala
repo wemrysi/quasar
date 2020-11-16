@@ -32,7 +32,7 @@ import fs2.Stream
 
 import argonaut.Json
 import argonaut.JsonScalaz._
-import argonaut.Argonaut.{jArray, jEmptyObject, jString}
+import argonaut.Argonaut.{jArray, jEmptyObject, jString, jNumber}
 
 import cats.{Monad, Show}
 import cats.effect.{ContextShift, ConcurrentEffect, IO, Resource, Sync, Timer}
@@ -108,9 +108,9 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def migrateConfig[F[_]: Sync](config: Json)
+      def migrateConfig[F[_]: Sync](from: Long, to: Long, config: Json)
           : F[Either[ConfigurationError[Json], Json]] = {
-        val back: Either[ConfigurationError[Json], Json] = Right(jString("migrated"))
+        val back: Either[ConfigurationError[Json], Json] = Right(jArray(List(jNumber(from), jNumber(to), jString("migrated"))))
         back.pure[F]
       }
 
@@ -144,9 +144,9 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def migrateConfig[F[_]: Sync](config: Json)
+      def migrateConfig[F[_]: Sync](from: Long, to: Long, config: Json)
           : F[Either[ConfigurationError[Json], Json]] = {
-        val back: Either[ConfigurationError[Json], Json] = Right(jString("migrated"))
+        val back: Either[ConfigurationError[Json], Json] = Right(jArray(List(jNumber(from), jNumber(to), jString("migrated"))))
         back.pure[F]
       }
 
@@ -246,7 +246,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
     val aExpected = aRef.copy(config = jArray(List(jString("a-config"), jString("a-patch"))))
     val bExpected = bRef2.copy(config = jArray(List(jString("b-config"), jString("b-patch"))))
-    val migratedExpected = bRef2.copy(config = jArray(List(jString("migrated"), jString("b-patch"))))
+    val migratedExpected = bRef2.copy(config = jArray(List(jArray(List(jNumber(1), jNumber(2), jString("migrated"))), jString("b-patch"))))
     val cExpected = cRef.copy(config = jEmptyObject)
 
     for {
