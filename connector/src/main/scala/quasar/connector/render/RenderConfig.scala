@@ -16,7 +16,7 @@
 
 package quasar.connector.render
 
-import scala.{Boolean, Byte, Option, None, Product, Serializable}
+import scala._
 
 import java.lang.{CharSequence, String}
 import java.time.format.DateTimeFormatter
@@ -33,6 +33,7 @@ object RenderConfig {
       nullSentinel: Option[String] = None,
       includeBom: Boolean = true,
       booleanFormat: Boolean => String = if (_) "true" else "false",
+      numericScale: Option[Int] = None, // None means render the value as-is
       offsetDateTimeFormat: DateTimeFormatter = ISO_DATE_TIME,
       offsetDateFormat: DateTimeFormatter = ISO_OFFSET_DATE,
       offsetTimeFormat: DateTimeFormatter = ISO_OFFSET_TIME,
