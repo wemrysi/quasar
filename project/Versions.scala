@@ -18,7 +18,7 @@ object Versions {
   val shapelessVersion    = "2.3.3"
   val specsVersion        = "4.10.5"
   val spireVersion        = "0.17.0"
-  val fs2Version          = "2.4.4"
+  val fs2Version          = "2.4.5"
   val slf4sVersion        = "1.7.25"
   val atomixVersion       = "3.0.11" // This is frozen, because atomix changed discovery service somehow
   val mapdbVersion        = "3.0.8"
