@@ -155,7 +155,7 @@ lazy val foundation = project
           "transport",
           "transport-native-epoll",
           "transport-native-kqueue",
-          "transport-native-unix-common").map(n => "io.netty" % s"netty-$n" % "4.1.52.Final"))
+          "transport-native-unix-common").map(n => "io.netty" % s"netty-$n" % "4.1.53.Final"))
   .enablePlugins(BuildInfoPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
