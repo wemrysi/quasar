@@ -155,7 +155,7 @@ lazy val foundation = project
           "transport",
           "transport-native-epoll",
           "transport-native-kqueue",
-          "transport-native-unix-common").map(n => "io.netty" % s"netty-$n" % "4.1.50.Final"))
+          "transport-native-unix-common").map(n => "io.netty" % s"netty-$n" % "4.1.53.Final"))
   .enablePlugins(BuildInfoPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
@@ -306,7 +306,7 @@ lazy val impl = project
       // somehow the wrong class loader is trying to load the implementation and
       // if it is not added here then no HttpClientProvider implementation can be found.
       // See ch11286.
-      "com.azure" % "azure-core-http-netty" % "1.5.1",
+      "com.azure" % "azure-core-http-netty" % "1.6.3",
       "com.precog"    %% "http4s-dsl" % http4sVersion  % Test,
       "org.typelevel" %% "discipline-specs2" % disciplineVersion % Test,
       "org.typelevel" %% "kittens" % kittensVersion % Test))
