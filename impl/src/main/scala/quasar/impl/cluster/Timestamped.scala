@@ -18,7 +18,7 @@ package quasar.impl.cluster
 
 import slamdata.Predef._
 
-import cats.Functor
+import cats.{Applicative, Eval, Functor, Traverse}
 import cats.effect.Timer
 import cats.syntax.functor._
 
@@ -27,7 +27,9 @@ import scodec.codecs.{either, bool, int64}
 
 import scala.concurrent.duration._
 
-trait Timestamped[+A] extends Product with Serializable
+trait Timestamped[+A] extends Product with Serializable {
+  def timestamp: Long
+}
 
 object Timestamped {
   final case class Tombstone(timestamp: Long) extends Timestamped[Nothing]
@@ -44,10 +46,8 @@ object Timestamped {
     case Tagged(raw, _) => Some(raw)
   }
 
-  def timestamp(v: Timestamped[_]): Long = v match {
-    case Tombstone(ts) => ts
-    case Tagged(_, ts) => ts
-  }
+  def timestamp(v: Timestamped[_]): Long =
+    v.timestamp
 
   implicit def mapValueCodec[A](implicit a: Codec[A]): Codec[Timestamped[A]] =
     either(bool, int64, a ~ int64).xmapc({
@@ -57,4 +57,25 @@ object Timestamped {
       case Tombstone(t) => Left(t)
       case Tagged(v, t) => Right((v, t))
     })
+
+  implicit val timestampedTraverse: Traverse[Timestamped] =
+    new Traverse[Timestamped] {
+      def traverse[F[_]: Applicative, A, B](fa: Timestamped[A])(f: A => F[B]) =
+        fa match {
+          case Tombstone(ts) => Applicative[F].pure[Timestamped[B]](Tombstone(ts))
+          case Tagged(a, ts) => f(a).map(Tagged(_, ts))
+        }
+
+      def foldLeft[A, B](fa: Timestamped[A], b: B)(f: (B, A) => B): B =
+        fa match {
+          case Tombstone(_) => b
+          case Tagged(a, _) => f(b, a)
+        }
+
+      def foldRight[A, B](fa: Timestamped[A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
+        fa match {
+          case Tombstone(_) => lb
+          case Tagged(a, _) => f(a, lb)
+        }
+    }
 }
