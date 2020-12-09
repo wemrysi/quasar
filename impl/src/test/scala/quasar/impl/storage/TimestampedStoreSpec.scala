@@ -39,6 +39,9 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
   type Persistence = ConcurrentHashMap[String, Timestamped[String]]
   type UnderlyingStore = IndexedStore[IO, String, Timestamped[String]]
 
+  def timestampedStore(of: IndexedStore[IO, String, Timestamped[String]]) =
+    TimestampedStore.bounded(of, 64)
+
   val underlying: Resource[IO, IndexedStore[IO, String, Timestamped[String]]] =
     Blocker.cached[IO]("timestamped-spec-pool") evalMap { blocker =>
       IO(new ConcurrentHashMap[String, Timestamped[String]]())
@@ -47,7 +50,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
 
   val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = for {
     u <- underlying
-    res <- TimestampedStore(u)
+    res <- timestampedStore(u)
   } yield res
 
   val valueA = "A"
@@ -60,7 +63,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
         us <- underlying
         bar <- Resource.liftF(Timestamped.tagged[IO, String]("bar"))
         _ <- Resource.liftF(us.insert("foo", bar))
-        ts <- TimestampedStore(us)
+        ts <- timestampedStore(us)
         res <- Resource.liftF(ts.lookup("foo"))
       } yield {
         res mustEqual Some("bar")
@@ -70,7 +73,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
     "inserted values are timestamps" >>* {
       val resource = for {
         us <- underlying
-        ts <- TimestampedStore(us)
+        ts <- timestampedStore(us)
         _ <- Resource.liftF(ts.insert("foo", "bar"))
         bar <- Resource.liftF(us.lookup("foo"))
       } yield {
@@ -82,7 +85,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
       val resource = for {
         us <- underlying
         start <- Resource.liftF(timer.clock.realTime(MILLISECONDS))
-        ts <- TimestampedStore(us)
+        ts <- timestampedStore(us)
         _ <- Resource.liftF(ts.insert("foo", "bar"))
         _ <- Resource.liftF(ts.delete("foo"))
         t <- Resource.liftF(us.lookup("foo"))
@@ -99,7 +102,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
     "timestamps works" >>* {
       val resource = for {
         us <- underlying
-        ts <- TimestampedStore(us)
+        ts <- timestampedStore(us)
         _ <- Resource.liftF(for {
           _ <- ts.insert("foo", "bar")
           _ <- ts.delete("foo")
@@ -118,7 +121,7 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
     }
     "updates stream works" >>* {
       for {
-        (ts, finish) <- underlying.flatMap(TimestampedStore(_)).allocated
+        (ts, finish) <- underlying.flatMap(timestampedStore(_)).allocated
         ref <- Ref.of[IO, List[(String, Timestamped[String])]](List())
         streamIsFinished <- Deferred[IO, Unit]
         _ <- ts.updates.evalMap(x => ref.modify(lst => (x :: lst, ()))).onFinalize(streamIsFinished.complete(())).compile.drain.start

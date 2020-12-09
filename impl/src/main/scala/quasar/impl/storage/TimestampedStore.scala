@@ -18,62 +18,95 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import quasar.impl.cluster.Timestamped, Timestamped._
+import quasar.impl.cluster.Timestamped
 
-import cats.effect.{Timer, Concurrent, Sync, Resource}
-import cats.effect.concurrent.Ref
-import cats.syntax.functor._
-import cats.syntax.flatMap._
+import cats.Monad
+import cats.effect.{Concurrent, Resource, Sync, Timer}
+import cats.effect.concurrent.{Deferred, Ref}
+import cats.implicits._
 
 import fs2.Stream
-import fs2.concurrent.{Queue, NoneTerminatedQueue}
+import fs2.concurrent.{Enqueue, Queue}
 
-final class TimestampedStore[F[_]: Sync: Timer, K, V](
+final class TimestampedStore[F[_]: Monad: Timer, K, V](
     val underlying: IndexedStore[F, K, Timestamped[V]],
-    ref: Ref[F, Map[K, Long]],
-    private val queue: NoneTerminatedQueue[F, (K, Timestamped[V])])
+    val updates: Stream[F, (K, Timestamped[V])],
+    tstamps: Ref[F, Map[K, Long]],
+    enqueue: Enqueue[F, (K, Timestamped[V])])
     extends IndexedStore[F, K, V] {
 
   def entries: Stream[F, (K, V)] =
-    underlying.entries.map({ case (k, v) => raw(v).map((k, _))}).unNone
+    underlying.entries.map(_.traverse(Timestamped.raw(_))).unNone
 
   def lookup(k: K): F[Option[V]] =
-    underlying.lookup(k).map(_.flatMap(raw(_)))
+    underlying.lookup(k).map(_.flatMap(Timestamped.raw(_)))
 
   def insert(k: K, v: V): F[Unit] = for {
-    toInsert <- tagged[F, V](v)
+    toInsert <- Timestamped.tagged[F, V](v)
     _ <- underlying.insert(k, toInsert)
-    _ <- ref.modify((mp: Map[K, Long]) => (mp.updated(k, timestamp(toInsert)), ()))
-    _ <- queue.enqueue1(Some((k, toInsert)))
+    _ <- tstamps.update(_ + (k -> toInsert.timestamp))
+    _ <- enqueue.enqueue1((k, toInsert))
   } yield ()
 
   def delete(k: K): F[Boolean] = for {
     was <- underlying.lookup(k)
-    tmb <- tombstone[F, V]
+    tmb <- Timestamped.tombstone[F, V]
     res <- underlying.insert(k, tmb)
-    _ <- ref.modify((mp: Map[K, Long]) => (mp.updated(k, timestamp(tmb)), ()))
-    _ <- queue.enqueue1(Some((k, tmb)))
-  } yield was.flatMap(raw(_)).nonEmpty
+    _ <- tstamps.update(_ + (k -> tmb.timestamp))
+    _ <- enqueue.enqueue1((k, tmb))
+  } yield was.flatMap(Timestamped.raw(_)).nonEmpty
 
-  def timestamps: F[Map[K, Long]] = ref.get
-  def updates: Stream[F, (K, Timestamped[V])] = queue.dequeue
+  def timestamps: F[Map[K, Long]] =
+    tstamps.get
 }
 
 object TimestampedStore {
-  val QueueSize: Int = 4096
-  def apply[F[_]: Concurrent: Timer, K, V](
+  /** A `TimestampedStore` based on a bounded queue, `insert` and `delete`
+    * will block if `updates` is consumed too slowly and the queue fills up.
+    */
+  def bounded[F[_]: Concurrent: Timer, K, V](
+      underlying: IndexedStore[F, K, Timestamped[V]],
+      maxSize: Int)
+      : Resource[F, TimestampedStore[F, K, V]] =
+    Resource.suspend(Queue.boundedNoneTerminated[F, (K, Timestamped[V])](maxSize) map { q =>
+      val enq = new Enqueue[F, (K, Timestamped[V])] {
+        def enqueue1(a: (K, Timestamped[V])) = q.enqueue1(Some(a))
+        def offer1(a: (K, Timestamped[V])) = q.offer1(Some(a))
+      }
+
+      val alloc = for {
+        currentStamps <- initialStamps(underlying)
+        tstamps <- Ref[F].of(currentStamps)
+      } yield new TimestampedStore(underlying, q.dequeue, tstamps, enq)
+
+      Resource.make(alloc)(_ => Concurrent[F].start(q.enqueue1(None)).void)
+    })
+
+  /** A `TimestampedStore` that never emits any updates. */
+  def silent[F[_]: Concurrent: Timer, K, V](
       underlying: IndexedStore[F, K, Timestamped[V]])
-      : Resource[F, TimestampedStore[F, K, V]] = {
-    val make: F[TimestampedStore[F, K, V]] = for {
-      entries <- underlying.entries.compile.toList.map(_.toMap)
-      q <- Queue.boundedNoneTerminated[F, (K, Timestamped[V])](QueueSize)
-      r <- Ref.of[F, Map[K, Long]](entries.map {
-        case (k, v) => (k, timestamp(v))
-      })
-    } yield new TimestampedStore(underlying, r, q)
-    val release: TimestampedStore[F, K, V] => F[Unit] = { ts =>
-      ts.queue.enqueue1(None)
-    }
-    Resource.make(make)(release)
-  }
+      : Resource[F, TimestampedStore[F, K, V]] =
+    Resource.suspend(Deferred[F, Unit] map { ipt =>
+      val enq = new Enqueue[F, (K, Timestamped[V])] {
+        def enqueue1(a: (K, Timestamped[V])) = Concurrent[F].unit
+        def offer1(a: (K, Timestamped[V])) = Concurrent[F].pure(true)
+      }
+
+      val alloc = for {
+        currentStamps <- initialStamps(underlying)
+        tstamps <- Ref[F].of(currentStamps)
+        updates = Stream.never[F].interruptWhen(ipt.get.attempt)
+      } yield new TimestampedStore(underlying, updates, tstamps, enq)
+
+      Resource.make(alloc)(_ => ipt.complete(()))
+    })
+
+  ////
+
+  private def initialStamps[F[_]: Sync, K, V](
+      underlying: IndexedStore[F, K, Timestamped[V]])
+      : F[Map[K, Long]] =
+    underlying.entries
+      .map(_.map(_.timestamp))
+      .compile.to(Map)
 }
