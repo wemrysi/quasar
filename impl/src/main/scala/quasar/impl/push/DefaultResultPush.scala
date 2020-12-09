@@ -37,7 +37,7 @@ import java.util.concurrent.{ConcurrentMap, ConcurrentNavigableMap, ConcurrentSk
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
-import cats.{Applicative, Functor, Order, Show, Traverse}
+import cats.{Functor, Order, Show, Traverse}
 import cats.data.{Const, EitherT, Ior, OptionT, NonEmptyList, ValidatedNel}
 import cats.effect.{Concurrent, Resource, Sync, Timer}
 import cats.effect.concurrent.Deferred
@@ -633,9 +633,6 @@ private[impl] object DefaultResultPush {
       offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
       : Resource[F, ResultPush[F, D, Q]] = {
 
-    def epochToInstant(e: FiniteDuration): Instant =
-      Instant.ofEpochMilli(e.toMillis)
-
     def acceptedAsOf(acceptedAt: Instant, startedAt: JobStarted): SBoolean =
       acceptedAt.compareTo(epochToInstant(startedAt.epoch)) <= 0
 
@@ -663,7 +660,7 @@ private[impl] object DefaultResultPush {
       }
 
       {
-        case JobEvent.Completed(id, start, duration) =>
+        case jev @ JobEvent.Completed(id, start, duration) =>
           Sync[F].delay(active.get(liftKey(id))) flatMap {
             case s @ ActiveState.PushRunning(p, _, acceptedAt, limit, deferred)
                 if acceptedAsOf(acceptedAt, start) =>
@@ -676,10 +673,11 @@ private[impl] object DefaultResultPush {
               complete(s, id, p.value, finished, limit, deferred)
                 .productR(log.debug(debugTerminal("finished", id, finished)))
 
-            case _ => Applicative[F].unit
+            case other =>
+              log.debug(debugIgnored(id, jev, Option(other)))
           }
 
-        case JobEvent.Failed(id, start, duration, ex) =>
+        case jev @ JobEvent.Failed(id, start, duration, ex) =>
           Sync[F].delay(active.get(liftKey(id))) flatMap {
             case s @ ActiveState.PushRunning(p, _, acceptedAt, limit, deferred)
                 if acceptedAsOf(acceptedAt, start) =>
@@ -693,7 +691,8 @@ private[impl] object DefaultResultPush {
               complete(s, id, p.value, failed, limit, deferred)
                 .productR(log.error(ex)(debugTerminal("failed", id, failed)))
 
-            case _ => Applicative[F].unit
+            case other =>
+              log.debug(debugIgnored(id, jev, Option(other)))
           }
       }
     }
@@ -768,6 +767,33 @@ private[impl] object DefaultResultPush {
   private def liftKey[D, T](key: D :: T :: HNil): D :: Option[T] :: HNil =
     key.updateWith(Option(_: T))
 
+  private def epochToInstant(e: FiniteDuration): Instant =
+    Instant.ofEpochMilli(e.toMillis)
+
+  private def debugActiveState[F[_]](st: ActiveState[F, _]): String =
+    st match {
+      case ActiveState.StartAccepted(_, at, _, _) =>
+        s"StartAccepted[$at]"
+
+      case ActiveState.UpdateAccepted(_, at, _) =>
+        s"UpdateAccepted[$at]"
+
+      case ActiveState.PushRunning(_, st, ac, _, _) =>
+        s"PushRunning[started=$st, accepted=$ac]"
+    }
+
+  private val debugJobEvent: JobEvent[_] => String = {
+    case JobEvent.Completed(_, start, dur) =>
+      val st = epochToInstant(start.epoch)
+      val ed = epochToInstant(start.epoch + dur)
+      s"Completed[start=$st, end=$ed]"
+
+    case JobEvent.Failed(_, start, dur, err) =>
+      val st = epochToInstant(start.epoch)
+      val ed = epochToInstant(start.epoch + dur)
+      s"Failed[start=$st, end=$ed, err=$err]"
+  }
+
   private def debugKey[D: Show](k: D :: ResourcePath :: HNil): String =
     s"[${k.select[D].show}:${Path.posixCodec.printPath(k.select[ResourcePath].toPath)}]"
 
@@ -777,4 +803,13 @@ private[impl] object DefaultResultPush {
       status: Status.Terminal)
       : String =
     s"${debugKey(id)} Push $desc (elapsed ${Status.elapsed(status)})"
+
+  private def debugIgnored[F[_], D: Show](
+      id: D :: ResourcePath :: HNil,
+      event: JobEvent[D :: ResourcePath :: HNil],
+      astate: Option[ActiveState[F, _]])
+      : String = {
+    val stateStr = astate.fold("None")(debugActiveState)
+    s"${debugKey(id)} Ignored push termination event: event=${debugJobEvent(event)}, activeState=$stateStr"
+  }
 }
