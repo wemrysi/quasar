@@ -85,6 +85,7 @@ private[impl] final class DefaultResultPush[
 
       _ <- jobManager.cancel(key)
 
+      // FIXME: Transition to "Cancelling"
       state <- Sync[F].delay(Option(active.remove(liftKey(key))))
 
       _ <- state traverse_ {
@@ -694,6 +695,8 @@ private[impl] object DefaultResultPush {
             case other =>
               log.debug(debugIgnored(id, jev, Option(other)))
           }
+
+        // FIXME: case JobEvent.Canceled
       }
     }
 
@@ -756,7 +759,7 @@ private[impl] object DefaultResultPush {
       JobManager[F, D :: ResourcePath :: HNil, Nothing](
         jobConcurrency = maxConcurrentPushes,
         jobLimit = maxOutstandingPushes,
-        eventsLimit = maxConcurrentPushes)
+        eventsLimit = maxOutstandingPushes)
 
     jm.flatMap(acquire)
   }
@@ -792,6 +795,11 @@ private[impl] object DefaultResultPush {
       val st = epochToInstant(start.epoch)
       val ed = epochToInstant(start.epoch + dur)
       s"Failed[start=$st, end=$ed, err=$err]"
+
+    case JobEvent.Canceled(_, start, dur) =>
+      val st = epochToInstant(start.epoch)
+      val ed = epochToInstant(start.epoch + dur)
+      s"Canceled[start=$st, end=$ed]"
   }
 
   private def debugKey[D: Show](k: D :: ResourcePath :: HNil): String =
