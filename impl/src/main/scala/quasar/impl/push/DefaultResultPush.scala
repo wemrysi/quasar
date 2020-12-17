@@ -660,6 +660,8 @@ private[impl] object DefaultResultPush {
           .guarantee(terminate.uncancelable)
       }
 
+      // with cancelling, do we need acceptedAsOf? I don't think so as we'll never
+      // terminate a push outside of this handler.
       {
         case jev @ JobEvent.Completed(id, start, duration) =>
           Sync[F].delay(active.get(liftKey(id))) flatMap {

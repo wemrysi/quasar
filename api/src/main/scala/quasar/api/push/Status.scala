@@ -37,6 +37,8 @@ object Status {
       extends Active
   final case class Running(startedAt: Instant, limit: Option[Long])
       extends Active
+  final case class Cancelling(startedAt: Instant, limit: Option[Long], runningAt: Option[Instant])
+      extends Active
 
   sealed trait Terminal extends Status
 
@@ -64,6 +66,8 @@ object Status {
         s"Accepted($startedAt, $limit)"
       case Running(startedAt, limit) =>
         s"Running($startedAt, $limit)"
+      case Running(startedAt, limit, runningAt) =>
+        s"Cancelling($startedAt, $limit, $runningAt)"
       case Finished(startedAt, finishedAt, limit) =>
         s"Finished($startedAt, $finishedAt, $limit)"
       case Canceled(startedAt, canceledAt, limit) =>
