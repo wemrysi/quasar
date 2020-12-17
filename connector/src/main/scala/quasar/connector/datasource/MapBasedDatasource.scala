@@ -22,31 +22,32 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector._
 
-import cats.{Applicative, ApplicativeError, MonoidK}
+import cats.{Applicative, ApplicativeError, MonadError, MonoidK}
 import cats.data.NonEmptyList
 import cats.syntax.applicative._
+import cats.syntax.flatMap._
 
 import scalaz.{ICons, IList, IMap, INil, ISet}
 import scalaz.std.option._
 import scalaz.std.tuple._
 import scalaz.syntax.foldable._
 
-final class MapBasedDatasource[F[_], G[_]: Applicative, R] private(
+final class MapBasedDatasource[F[_], G[_]: Applicative, I, R] private (
     val kind: DatasourceType,
-    content: IMap[ResourcePath, F[R]])(
+    content: IMap[ResourcePath, F[I]],
+    loader: (ResourcePath => F[I]) => BatchLoader[F, ResourcePath, R])(
     implicit RE: ApplicativeError[F, ResourceError], G: MonoidK[G])
     extends PhysicalDatasource[F, G, ResourcePath, R] {
 
   import ResourceError._
 
-  val loaders = NonEmptyList.of(
-    Loader.Batch(BatchLoader.Full { (rp: ResourcePath) =>
-      content.lookup(rp) getOrElse {
-        RE.raiseError(
-          if (prefixes.contains(rp)) notAResource(rp)
-          else pathNotFound(rp))
-      }
-    }))
+  val loaders = NonEmptyList.of(Loader.Batch(loader { rp =>
+    content.lookup(rp) getOrElse {
+      RE.raiseError(
+        if (prefixes.contains(rp)) notAResource(rp)
+        else pathNotFound(rp))
+    }
+  }))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
     content.member(path).pure[F]
@@ -115,7 +116,7 @@ object MapBasedDatasource {
         G0: Applicative[G],
         G1: MonoidK[G])
         : PhysicalDatasource[F, G, ResourcePath, R] =
-      new MapBasedDatasource[F, G, R](kind, content)
+      full[F, G](kind, content)
   }
 
   def pure[F[_], G[_]]: PartiallyAppliedPure[F, G] =
@@ -129,7 +130,45 @@ object MapBasedDatasource {
         G0: Applicative[G],
         G1: MonoidK[G])
         : PhysicalDatasource[F, G, ResourcePath, R] =
-      new MapBasedDatasource[F, G, R](kind, content.map(_.pure[F]))
+      full[F, G](kind, content.map(_.pure[F]))
   }
 
+  def full[F[_], G[_]]: PartiallyAppliedFull[F, G] =
+    new PartiallyAppliedFull[F, G]
+
+  final class PartiallyAppliedFull[F[_], G[_]] {
+    def apply[R](
+        kind: DatasourceType, content: IMap[ResourcePath, F[R]])(
+        implicit
+        F: ApplicativeError[F, ResourceError],
+        G0: Applicative[G],
+        G1: MonoidK[G])
+        : PhysicalDatasource[F, G, ResourcePath, R] = {
+
+      val loader: (ResourcePath => F[R]) => BatchLoader[F, ResourcePath, R] =
+        BatchLoader.Full(_)
+
+      new MapBasedDatasource[F, G, R, R](kind, content, loader)
+    }
+  }
+
+  def seek[F[_], G[_]]: PartiallyAppliedSeek[F, G] =
+    new PartiallyAppliedSeek[F, G]
+
+  final class PartiallyAppliedSeek[F[_], G[_]] {
+    def apply[R](
+        kind: DatasourceType,
+        content: IMap[ResourcePath, F[Option[Offset] => F[R]]])(
+        implicit
+        F: MonadError[F, ResourceError],
+        G0: Applicative[G],
+        G1: MonoidK[G])
+        : PhysicalDatasource[F, G, ResourcePath, R] = {
+
+      val loader: (ResourcePath => F[Option[Offset] => F[R]]) => BatchLoader[F, ResourcePath, R] =
+        f => BatchLoader.Seek((rp: ResourcePath, o: Option[Offset]) => f(rp).flatMap(_(o)))
+
+      new MapBasedDatasource[F, G, Option[Offset] => F[R], R](kind, content, loader)
+    }
+  }
 }
