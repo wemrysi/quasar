@@ -66,7 +66,7 @@ object Status {
         s"Accepted($startedAt, $limit)"
       case Running(startedAt, limit) =>
         s"Running($startedAt, $limit)"
-      case Running(startedAt, limit, runningAt) =>
+      case Cancelling(startedAt, limit, runningAt) =>
         s"Cancelling($startedAt, $limit, $runningAt)"
       case Finished(startedAt, finishedAt, limit) =>
         s"Finished($startedAt, $finishedAt, $limit)"
