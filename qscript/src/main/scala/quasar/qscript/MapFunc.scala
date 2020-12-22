@@ -26,6 +26,7 @@ object MapFunc {
       (implicit MFC: MapFuncCore[T, ?] :<<: MF)
       : scala.PartialFunction[NullaryFunc, MF[A]] = {
     case date.Now => MFC(C.Now())
+    case date.NowUTC => MFC(C.NowUTC())
     case date.NowTime => MFC(C.NowTime())
     case date.NowDate => MFC(C.NowDate())
     case date.CurrentTimeZone => MFC(C.CurrentTimeZone())

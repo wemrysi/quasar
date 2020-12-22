@@ -237,6 +237,7 @@ final class Compiler[M[_], T: Equal]
       CIName("now")                       -> date.Now, // MySQL, Postgres (trans start)
       CIName("statement_timestamp")       -> date.Now, // Postgres (statement start)
       CIName("transaction_timestamp")     -> date.Now, // Postgres (trans start)
+      CIName("now_utc")                   -> date.NowUTC,
       CIName("timestamp")                 -> date.OffsetDateTime,
       CIName("interval")                  -> date.Interval,
       CIName("start_of_day")              -> date.StartOfDay,

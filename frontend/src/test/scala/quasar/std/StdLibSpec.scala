@@ -1742,6 +1742,11 @@ abstract class StdLibSpec extends Qspec {
           nullary(Subtract(now.embed, now.embed).embed, Data.Interval(DateTimeInterval.zero))
         }
 
+        "NowUTC" >> prop { (_: Int) =>
+          val now = NowUTC[Fix[LogicalPlan]]
+          nullary(Subtract(now.embed, now.embed).embed, Data.Interval(DateTimeInterval.zero))
+        }
+
         "NowTime" >> prop { (_: Int) =>
           val now = NowTime[Fix[LogicalPlan]]
           nullary(Subtract(now.embed, now.embed).embed, Data.Interval(DateTimeInterval.zero))

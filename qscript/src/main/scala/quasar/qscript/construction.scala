@@ -52,6 +52,9 @@ object construction {
     def Now[A]: RecFreeMapA[T, A] =
       rollCore(MapFuncsCore.Now())
 
+    def NowUTC[A]: RecFreeMapA[T, A] =
+      rollCore(MapFuncsCore.NowUTC())
+
     def NowDate[A]: RecFreeMapA[T, A] =
       rollCore(MapFuncsCore.NowDate())
 
@@ -385,6 +388,9 @@ object construction {
 
     def Now[A]: FreeMapA[T, A] =
       rollCore(MapFuncsCore.Now())
+
+    def NowUTC[A]: FreeMapA[T, A] =
+      rollCore(MapFuncsCore.NowUTC())
 
     def NowDate[A]: FreeMapA[T, A] =
       rollCore(MapFuncsCore.NowDate())
