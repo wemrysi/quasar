@@ -375,6 +375,7 @@ object MapFuncCore {
         case Undefined() => G.point(Undefined[T, B]())
         case JoinSideName(n) => G.point(JoinSideName[T, B](n))
         case Now() => G.point(Now[T, B]())
+        case NowUTC() => G.point(NowUTC[T, B]())
         case NowTime() => G.point(NowTime[T, B]())
         case NowDate() => G.point(NowDate[T, B]())
         case CurrentTimeZone() => G.point(CurrentTimeZone[T, B]())
@@ -481,6 +482,7 @@ object MapFuncCore {
         case (JoinSideName(n1), JoinSideName(n2)) => Eval.always(n1 ≟ n2)
         case (Undefined(), Undefined()) => Eval.now(true)
         case (Now(), Now()) => Eval.now(true)
+        case (NowUTC(), NowUTC()) => Eval.now(true)
         case (NowTime(), NowTime()) => Eval.now(true)
         case (NowDate(), NowDate()) => Eval.now(true)
         case (CurrentTimeZone(), CurrentTimeZone()) => Eval.now(true)
@@ -589,6 +591,7 @@ object MapFuncCore {
           case Undefined() => "Undefined()"
           case JoinSideName(n) => "JoinSideName(" + n.shows + ")"
           case Now() => "Now()"
+          case NowUTC() => "NowUTC()"
           case NowTime() => "NowTime()"
           case NowDate() => "NowDate()"
           case CurrentTimeZone() => "CurrentTimeZone()"
@@ -707,6 +710,7 @@ object MapFuncCore {
           case Undefined() => Terminal("Undefined" :: nt, None)
           case JoinSideName(n) => Terminal("JoinSideName(" ::nt, n.shows.some)
           case Now() => Terminal("Now" :: nt, None)
+          case NowUTC() => Terminal("NowUTC" :: nt, None)
           case NowTime() => Terminal("NowTime" :: nt, None)
           case NowDate() => Terminal("NowDate" :: nt, None)
           case CurrentTimeZone() => Terminal("CurrentTimeZone" :: nt, None)
@@ -869,11 +873,14 @@ object MapFuncsCore {
   @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToLocal[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class ToOffset[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  /** Fetches the [[quasar.Type.OffsetDateTime]] for the current instant in time, in UTC. */
+
+  /** Fetches the [[quasar.Type.LocalDateTime]] for the current instant in time, in the local timezone. */
   @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
-  /** Fetches the [[quasar.Type.OffsetTime]] for the current instant in time, in UTC. */
+  /** Fetches the [[quasar.Type.OffsetDateTime]] for the current instant in time, in UTC. */
+  @Lenses final case class NowUTC[T[_[_]], A]() extends Nullary[T, A]
+  /** Fetches the [[quasar.Type.OffsetTime]] for the current instant in time, in the local timezone. */
   @Lenses final case class NowTime[T[_[_]], A]() extends Nullary[T, A]
-  /** Fetches the [[quasar.Type.OffsetDate]] for the current instant in time, in UTC. */
+  /** Fetches the [[quasar.Type.OffsetDate]] for the current instant in time, in the local timezone. */
   @Lenses final case class NowDate[T[_[_]], A]() extends Nullary[T, A]
   @Lenses final case class CurrentTimeZone[T[_[_]], A]() extends Nullary[T, A]
 

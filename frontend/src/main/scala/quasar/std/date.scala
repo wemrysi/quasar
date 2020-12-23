@@ -166,6 +166,11 @@ trait DateLib extends Library with Serializable {
     "Returns the current datetime in the current time zone – this must always return the same value within the same execution of a query.",
     noSimplification)
 
+  val NowUTC = NullaryFunc(
+    Mapping,
+    "Returns the current datetime in UTC as an OffsetDateTime – this must always return the same value within the same execution of a query.",
+    noSimplification)
+
   val NowTime = NullaryFunc(
     Mapping,
     "Returns the current time in the current time zone – this must always return the same value within the same execution of a query.",
