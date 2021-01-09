@@ -18,9 +18,11 @@ package quasar.connector
 
 import scala._
 
+import cats.data.NonEmptyList
+
 trait ExternalCredentials[F[_]] extends Product with Serializable
 
 object ExternalCredentials {
-  final case class Perpetual[F[_]](get: Array[Byte]) extends ExternalCredentials[F]
+  final case class Perpetual[F[_]](get: NonEmptyList[Array[Byte]]) extends ExternalCredentials[F]
   final case class Temporary[F[_]](get: F[Array[Byte]], renew: F[Unit]) extends ExternalCredentials[F]
 }
