@@ -16,15 +16,17 @@
 
 package quasar.api.push
 
-import slamdata.Predef.{Eq => _, _}
+import slamdata.Predef._
 
-import quasar.api.Column
+import cats.data.NonEmptyList
 
-import monocle.macros.Lenses
-
-/** Configuration required to resume an incremental push. */
-@Lenses
-final case class ResumeConfig[O](
-    resultIdColumn: Column[(IdType, SelectedType)],
-    resultOffsetColumn: Column[InternalKey.Formal[Unit, O]],
-    sourceOffsetPath: OffsetPath)
+final class PushColumnsSpec extends quasar.Qspec {
+  "primary" >> {
+    "None for NoPrimary" >> {
+      PushColumns.NoPrimary(NonEmptyList.of(1)).primary must beNone
+    }
+    "Some for HasPrimary" >> {
+      PushColumns.HasPrimary(List(), 1, List()).primary must beSome(1)
+    }
+  }
+}

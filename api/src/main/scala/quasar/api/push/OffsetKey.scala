@@ -32,25 +32,18 @@ sealed trait OffsetKey[F[_], A] extends Product with Serializable {
   val value: F[A]
   val reify: A === Repr
 }
+sealed trait InternalKey[F[_], A] extends OffsetKey[F, A]
 
-object OffsetKey {
-  type Actual[A] = OffsetKey[Id, A]
-  type Formal[T, A] = OffsetKey[Const[T, ?], A]
+object InternalKey {
+  type Actual[A] = InternalKey[Id, A]
+  type Formal[T, A] = InternalKey[Const[T, ?], A]
 
-  final case class RealKey[F[_]](value: F[Real]) extends OffsetKey[F, Real] {
-    type Repr = Real
-    val reify = Is.refl
-  }
-
-  final case class StringKey[F[_]](value: F[String]) extends OffsetKey[F, String] {
-    type Repr = String
-    val reify = Is.refl
-  }
-
-  final case class DateTimeKey[F[_]](value: F[OffsetDateTime]) extends OffsetKey[F, OffsetDateTime] {
-    type Repr = OffsetDateTime
-    val reify = Is.refl
-  }
+  type RealKey[F[_]] = OffsetKey.RealKey[F]
+  val RealKey = OffsetKey.RealKey
+  type StringKey[F[_]] = OffsetKey.StringKey[F]
+  val StringKey = OffsetKey.StringKey
+  type DateTimeKey[F[_]] = OffsetKey.DateTimeKey[F]
+  val DateTimeKey = OffsetKey.DateTimeKey
 
   object Actual {
     def real(k: Real): Actual[Real] =
@@ -74,11 +67,69 @@ object OffsetKey {
       DateTimeKey(Const[T, OffsetDateTime](t))
   }
 
+  def fromOffset[F[_], A](inp: OffsetKey[F, A]): Option[InternalKey[F, A]] = inp match {
+    case i: InternalKey[F, A] => Some(i)
+    case _ => None
+  }
+}
+object OffsetKey {
+  type Actual[A] = OffsetKey[Id, A]
+  type Formal[T, A] = OffsetKey[Const[T, ?], A]
+
+  final case class RealKey[F[_]](value: F[Real]) extends InternalKey[F, Real] {
+    type Repr = Real
+    val reify = Is.refl
+  }
+
+  final case class StringKey[F[_]](value: F[String]) extends InternalKey[F, String] {
+    type Repr = String
+    val reify = Is.refl
+  }
+
+  final case class DateTimeKey[F[_]](value: F[OffsetDateTime]) extends InternalKey[F, OffsetDateTime] {
+    type Repr = OffsetDateTime
+    val reify = Is.refl
+  }
+
+  final case class ExternalKey[F[_]](value: F[ExternalOffsetKey]) extends OffsetKey[F, ExternalOffsetKey] {
+    type Repr = ExternalOffsetKey
+    val reify = Is.refl
+  }
+
+  object Actual {
+    def real(k: Real): Actual[Real] =
+      RealKey[Id](k)
+
+    def string(k: String): Actual[String] =
+      StringKey[Id](k)
+
+    def dateTime(k: OffsetDateTime): Actual[OffsetDateTime] =
+      DateTimeKey[Id](k)
+
+    def external(k: ExternalOffsetKey): Actual[ExternalOffsetKey] =
+      ExternalKey[Id](k)
+  }
+
+  object Formal {
+    def real[T](t: T): Formal[T, Real] =
+      RealKey(Const[T, Real](t))
+
+    def string[T](t: T): Formal[T, String] =
+      StringKey(Const[T, String](t))
+
+    def dateTime[T](t: T): Formal[T, OffsetDateTime] =
+      DateTimeKey(Const[T, OffsetDateTime](t))
+
+    def external[T](t: T): Formal[T, ExternalOffsetKey] =
+      ExternalKey(Const[T, ExternalOffsetKey](t))
+  }
+
   implicit def offsetKeyActualShow[A]: Show[Actual[A]] =
     Show show {
       case RealKey(k) => s"RealKey($k)"
       case StringKey(k) => s"StringKey($k)"
       case DateTimeKey(k) => s"DateTimeKey($k)"
+      case ExternalKey(k) => s"ExternalKey(${k.show})"
     }
 
   implicit def offsetKeyFormalShow[T: Show, A]: Show[Formal[T, A]] =
@@ -86,16 +137,18 @@ object OffsetKey {
       case k: RealKey[Const[T, ?]] => s"RealKey(${k.value.getConst.show})"
       case k: StringKey[Const[T, ?]] => s"StringKey(${k.value.getConst.show})"
       case k: DateTimeKey[Const[T, ?]] => s"DateTimeKey(${k.value.getConst.show})"
+      case k: ExternalKey[Const[T, ?]] => s"ExternalKey(${k.value.getConst.show})"
     }
 
   implicit def offsetKeyActualEq[A]: Eq[Actual[A]] = {
     implicit val realEq: Eq[Real] = Eq.fromUniversalEquals
     implicit val offsetDateTimeEq: Eq[OffsetDateTime] = Eq.fromUniversalEquals
 
-    Eq.by[Actual[A], (Option[Real], Option[String], Option[OffsetDateTime])] {
-      case k: RealKey[Id] => (Some(k.value), None, None)
-      case k: StringKey[Id] => (None, Some(k.value), None)
-      case k: DateTimeKey[Id] => (None, None, Some(k.value))
+    Eq.by[Actual[A], (Option[Real], Option[String], Option[OffsetDateTime], Option[ExternalOffsetKey])] {
+      case k: RealKey[Id] => (Some(k.value), None, None, None)
+      case k: StringKey[Id] => (None, Some(k.value), None, None)
+      case k: DateTimeKey[Id] => (None, None, Some(k.value), None)
+      case k: ExternalKey[Id] => (None, None, None, Some(k.value))
     }
   }
 
@@ -104,5 +157,6 @@ object OffsetKey {
       case k: RealKey[Const[T, ?]] => (0, k.value.getConst)
       case k: StringKey[Const[T, ?]] => (1, k.value.getConst)
       case k: DateTimeKey[Const[T, ?]] => (2, k.value.getConst)
+      case k: ExternalKey[Const[T, ?]] => (3, k.value.getConst)
     }
 }

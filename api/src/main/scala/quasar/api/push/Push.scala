@@ -16,30 +16,9 @@
 
 package quasar.api.push
 
-import slamdata.Predef._
-
 import java.time.Instant
 
-import cats.{Eq, Show}
-import cats.implicits._
-
-import monocle.macros.Lenses
-
-import shims.{equalToCats, showToCats}
-
-@Lenses
 final case class Push[O, Q](
     config: PushConfig[O, Q],
     createdAt: Instant,
     status: Status)
-
-object Push {
-  implicit def pushEq[O, Q: Eq]: Eq[Push[O, Q]] = {
-    implicit val instantEq = Eq.fromUniversalEquals[Instant]
-    Eq.by(p => (p.config, p.createdAt, p.status))
-  }
-
-  implicit def pushShow[O, Q: Show]: Show[Push[O, Q]] =
-    Show.show(p =>
-      s"Push(${p.config.show}, ${p.createdAt}, ${p.status.show})")
-}

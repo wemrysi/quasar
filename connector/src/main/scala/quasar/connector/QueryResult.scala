@@ -44,25 +44,24 @@ sealed trait QueryResult[F[_]] extends Product with Serializable {
 }
 
 object QueryResult extends QueryResultInstances {
-
   final case class Parsed[F[_], A](
       decode: QDataDecode[A],
-      data: Stream[F, A],
+      data: ResultData[F, A],
       stages: ScalarStages)
       extends QueryResult[F] {
 
     def mapK[G[_]](f: F ~> G): QueryResult[G] =
-      Parsed[G, A](decode, data.translate[F, G](f), stages)
+      Parsed[G, A](decode, data.mapK(f), stages)
   }
 
   final case class Typed[F[_]](
       format: DataFormat,
-      data: Stream[F, Byte],
+      data: ResultData[F, Byte],
       stages: ScalarStages)
       extends QueryResult[F] {
 
     def mapK[G[_]](f: F ~> G): QueryResult[G] =
-      Typed[G](format, data.translate[F, G](f), stages)
+      Typed[G](format, data.mapK(f), stages)
   }
 
   final case class Stateful[F[_], P <: Plate[Unit], S](
@@ -78,15 +77,15 @@ object QueryResult extends QueryResultInstances {
         format,
         f(plateF),
         p => f(state(p)),
-        data(_).translate[F, G](f),
+        data.map(_.translate[F, G](f)),
         stages)
   }
 
-  def parsed[F[_], A](q: QDataDecode[A], d: Stream[F, A], ss: ScalarStages)
+  def parsed[F[_], A](q: QDataDecode[A], data: ResultData[F, A], ss: ScalarStages)
       : QueryResult[F] =
-    Parsed(q, d, ss)
+    Parsed(q, data, ss)
 
-  def typed[F[_]](tpe: DataFormat, data: Stream[F, Byte], ss: ScalarStages)
+  def typed[F[_]](tpe: DataFormat, data: ResultData[F, Byte], ss: ScalarStages)
       : QueryResult[F] =
     Typed(tpe, data, ss)
 

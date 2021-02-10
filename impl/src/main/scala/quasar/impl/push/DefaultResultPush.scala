@@ -174,7 +174,6 @@ private[impl] final class DefaultResultPush[
       : F[Either[NonEmptyList[ResultPushError[D]], F[Status.Terminal]]] = {
 
     val key = destinationId :: path :: HNil
-
     def resume[A](inc: PushConfig.Incremental[A, Q], createdAt: Instant)
         : Option[∃[OffsetKey.Actual]] => EitherT[F, Errs, F[Status.Terminal]] = {
 
@@ -202,28 +201,53 @@ private[impl] final class DefaultResultPush[
             }
         }
 
+       case None =>
+         EitherT.right[Errs](log.warn(s"${debugKey(key)} Offset not found, updating from initial"))
+           .productR(runPush(destinationId, inc, None, createdAt, None))
+     }
+
+    def appendData[A](conf: PushConfig.SourceDriven[Q], createdAt: Instant)
+        : Option[∃[OffsetKey.Actual]] => EitherT[F, Errs, F[Status.Terminal]] = {
+      case Some(resumeFrom) =>
+        val actualKey: OffsetKey.Actual[_] = resumeFrom.value
+        actualKey match {
+          case exKey @ OffsetKey.ExternalKey(_) =>
+            runPush(destinationId, conf, None, createdAt, Some(exKey))
+          case _ =>
+            val ex = new IllegalStateException(
+              s"${actualKey} is invalid offset, append pushes can work only with external encoded keys")
+
+            EitherT {
+              log.error(ex)(s"${debugKey(key)} Unable to resume source driven push")
+                .productR(Concurrent[F].raiseError[Either[Errs, F[Status.Terminal]]](ex))
+            }
+        }
       case None =>
         EitherT.right[Errs](log.warn(s"${debugKey(key)} Offset not found, updating from initial"))
-          .productR(runPush(destinationId, inc, None, createdAt, None))
+          .productR(runPush(destinationId, conf, None, createdAt, None))
     }
+
 
     OptionT(pushes.lookup(key))
       .toRight(err(PushNotFound(destinationId, path)))
       .flatMap { push0 =>
-        val push = push0.value
+        val push: Push[_, Q] = push0.value
 
         push.config match {
           case full @ PushConfig.Full(_, _, _) =>
             runPush(destinationId, full, None, push.createdAt, None)
-
           case inc @ PushConfig.Incremental(_, _, _, _, _) =>
             EitherT.right[Errs](offsets.lookup(key))
               .flatMap(resume(inc, push.createdAt))
+          case bySource @ PushConfig.SourceDriven(_, _, _) =>
+            EitherT.right[Errs](offsets.lookup(key))
+              .flatMap(appendData(bySource, push.createdAt))
         }
       }
       .productL(EitherT.right[Errs](log.debug(s"${debugKey(key)} Update push accepted")))
       .value
   }
+
 
 
   ////
@@ -269,7 +293,7 @@ private[impl] final class DefaultResultPush[
         query: Q,
         nonIdOutputColumns: List[Column[(ColumnType.Scalar, dest.Type)]],
         resumeConfig: ResumeConfig[A],
-        actualOffset: Either[Option[OffsetKey.Actual[A]], OffsetKey.Actual[A]])
+        actualOffset: Either[Option[InternalKey.Actual[A]], OffsetKey.Actual[A]])
         : EitherT[F, Errs, Stream[F, OffsetKey.Actual[A]]] = {
 
       val C = Functor[Column]
@@ -289,44 +313,79 @@ private[impl] final class DefaultResultPush[
           typedColumn(destinationId, dest, idOutputColumn)
             .bimap(err, C.unzip)
         }
-
-        (nonIdRenderColumns, nonIdDestColumns) =
+      } yield {
+        val (nonIdRenderColumns, nonIdDestColumns) =
           Functor[List].compose[Column].unzip(nonIdOutputColumns)
 
-        (offsetValue, isUpdate) = actualOffset match {
+        val (offsetValue, isUpdate) = actualOffset match {
           case Left(initial) => (initial, false)
-          case Right(resume) => (Some(resume), true)
+          case Right(resume) => (InternalKey.fromOffset(resume), true)
         }
 
-        offset = offsetValue.map(o => Offset(resumeConfig.sourceOffsetPath, ∃(o)))
+        val offset = offsetValue.map(o => Offset.Internal(resumeConfig.sourceOffsetPath, ∃(o)))
 
-        upsertArgs =
+        val upsertArgs =
           ResultSink.UpsertSink.Args(
             path,
             idDestColumn,
             nonIdDestColumns,
             if (isUpdate) WriteMode.Append else WriteMode.Replace)
 
-        (renderConfig, toOffsets) = sink.consume(upsertArgs)
+        val (renderConfig, toOffsets) = sink.consume(upsertArgs)
 
-        dataEvents =
-          Stream.resource(evaluator((query, offset))) flatMap { results =>
-            val input =
-              if (isUpdate)
-                RenderInput.Incremental(results)
-              else
-                RenderInput.Initial(results)
+        Stream.resource(evaluator((query, offset))) flatMap { results =>
+          val input =
+            if (isUpdate)
+              RenderInput.Incremental(results)
+            else
+              RenderInput.Initial(results)
 
-            render.renderUpserts(
-              input,
-              idColumn,
-              resumeConfig.resultOffsetColumn,
-              NonEmptyList(idRenderColumn, nonIdRenderColumns),
-              renderConfig,
-              limit)
-          }
+          val rendered = render.renderUpserts(
+            input,
+            idColumn,
+            resumeConfig.resultOffsetColumn,
+            NonEmptyList(idRenderColumn, nonIdRenderColumns),
+            renderConfig,
+            limit)
 
-      } yield dataEvents.through(toOffsets[A])
+          rendered.through(toOffsets[A])
+        }
+      }
+    }
+
+    def handleAppend(
+        dest: Destination[F])(
+        path: ResourcePath,
+        query: Q,
+        actualOffset: Option[ExternalOffsetKey],
+        columns: PushColumns[Column[(ColumnType.Scalar, dest.Type)]])
+        : EitherT[F, Errs, Stream[F, OffsetKey.Actual[ExternalOffsetKey]]] = {
+      val C = Functor[Column]
+
+      val appendSink = dest.sinks collectFirst {
+        case sink @ ResultSink.AppendSink(_) => sink
+      }
+      EitherT.fromOption[F](appendSink, err(IncrementalNotSupported(destinationId))) map { sink =>
+        val (renderColumns, destColumns) =
+          Functor[PushColumns].compose[Column].unzip(columns)
+
+        val offset = actualOffset.map(o => Offset.External(o))
+
+        val args = ResultSink.AppendSink.Args(path, destColumns, offset match {
+          case None => WriteMode.Replace
+          case Some(_) => WriteMode.Append
+        })
+        val consumer = sink.consume(args)
+
+        Stream.resource(evaluator((query, offset))) flatMap { results =>
+          val dataEvents = render.renderAppend[consumer.A](
+            results,
+            renderColumns,
+            consumer.renderConfig,
+            limit)
+          dataEvents.through(consumer.pipe[ExternalOffsetKey])
+        }
+      }
     }
 
     for {
@@ -353,6 +412,24 @@ private[impl] final class DefaultResultPush[
           EitherT.fromEither[F](typedColumns(destinationId, dest, otherCols))
             .flatMap(handleIncremental(dest)(path, q, _, resumeCfg, offset))
             .map(_.evalMap(o => offsets.insert(key, ∃(o))))
+
+        case PushConfig.SourceDriven(path, q, columns) =>
+          val resume: EitherT[F, Errs, Option[ExternalOffsetKey]] = resumeFrom.traverse {
+            case OffsetKey.ExternalKey(ek) => EitherT.rightT[F, Errs](ek)
+            case _ =>
+              val ex = new IllegalStateException(
+                s"${resumeFrom} is invalid offset, append pushes can work only with external encoded keys")
+
+              EitherT {
+                log.error(ex)(s"${debugKey(key)} Unable to resume source driven push")
+                  .productR(Concurrent[F].raiseError[Either[Errs, ExternalOffsetKey]](ex))
+              }
+          }
+          for {
+            r <- resume
+            cols <- EitherT.fromEither[F](typedColumns(destinationId, dest, columns))
+            str <- handleAppend(dest)(path, q, r, cols)
+          } yield str.evalMap(o => offsets.insert(key, ∃(o)))
       }
 
       terminal <- EitherT.right[Errs](Deferred[F, Status.Terminal])

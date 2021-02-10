@@ -16,15 +16,10 @@
 
 package quasar.api.push
 
-import slamdata.Predef.{Eq => _, _}
+import slamdata.Predef._
 
-import quasar.api.Column
-
-import monocle.macros.Lenses
-
-/** Configuration required to resume an incremental push. */
-@Lenses
-final case class ResumeConfig[O](
-    resultIdColumn: Column[(IdType, SelectedType)],
-    resultOffsetColumn: Column[InternalKey.Formal[Unit, O]],
-    sourceOffsetPath: OffsetPath)
+final class ExternalOffsetKeySpec extends quasar.Qspec {
+  "empty value is empty array" >> {
+    ExternalOffsetKey.empty.value must_== Array()
+  }
+}
