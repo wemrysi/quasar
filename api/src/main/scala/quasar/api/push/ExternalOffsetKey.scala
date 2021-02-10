@@ -16,15 +16,22 @@
 
 package quasar.api.push
 
-import slamdata.Predef.{Eq => _, _}
+import slamdata.Predef._
 
-import quasar.api.Column
+import cats.{Eq, Show}
 
-import monocle.macros.Lenses
+import scodec.bits.BitVector
 
-/** Configuration required to resume an incremental push. */
-@Lenses
-final case class ResumeConfig[O](
-    resultIdColumn: Column[(IdType, SelectedType)],
-    resultOffsetColumn: Column[InternalKey.Formal[Unit, O]],
-    sourceOffsetPath: OffsetPath)
+final case class ExternalOffsetKey(value: Array[Byte])
+
+object ExternalOffsetKey {
+  implicit val eqExternalOffsetKey: Eq[ExternalOffsetKey] = new Eq[ExternalOffsetKey] {
+    def eqv(x: ExternalOffsetKey, y: ExternalOffsetKey): Boolean =
+      java.util.Arrays.equals(x.value, y.value)
+  }
+
+  implicit val showExternalOffsetKey: Show[ExternalOffsetKey] =
+    Show.show { x => BitVector(x.value).toHex }
+
+  def empty: ExternalOffsetKey = ExternalOffsetKey(Array.emptyByteArray)
+}
