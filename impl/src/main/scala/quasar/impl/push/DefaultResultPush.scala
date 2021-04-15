@@ -771,6 +771,9 @@ private[impl] object DefaultResultPush {
             case other =>
               log.debug(debugIgnored(id, jev, Option(other)))
           }
+
+        case jev @ JobEvent.Canceled(id, _, _) =>
+          log.debug(debugIgnored(id, jev, None))
       }
     }
 
@@ -865,7 +868,12 @@ private[impl] object DefaultResultPush {
       val ed = epochToInstant(start.epoch + dur)
       s"Completed[start=$st, end=$ed]"
 
-    case JobEvent.Failed(_, start, dur, err) =>
+    case JobEvent.Canceled(_, start, dur) =>
+      val st = epochToInstant(start.epoch)
+      val ed = epochToInstant(start.epoch + dur)
+      s"Canceled[start=$st, end=$ed]"
+
+      case JobEvent.Failed(_, start, dur, err) =>
       val st = epochToInstant(start.epoch)
       val ed = epochToInstant(start.epoch + dur)
       s"Failed[start=$st, end=$ed, err=$err]"
