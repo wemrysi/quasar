@@ -76,6 +76,7 @@ lazy val publishSettings = Seq(
 // Build and publish a project, excluding its tests.
 lazy val commonSettings =
   buildSettings ++ publishSettings ++ Seq(
+    testFrameworks := Seq(TestFrameworks.Specs2),
     // TODO: Should be able to remove once using modern versions of pathy/matryoshka
     excludeDependencies += ExclusionRule("org.typelevel", "scala-library"))
 
