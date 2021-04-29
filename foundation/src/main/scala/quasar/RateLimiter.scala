@@ -76,7 +76,7 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
       now <- nowF
       modified <- stateRef modify[F[Unit]] {
         case State(s, queue) =>
-          //println(s"state when backoff: $s sleeping ${window}")
+          //println(s">>>>1 state when backoff: $s sleeping ${window}")
           val state = State(Waiting(now + window), queue)
           val effect = Timer[F].sleep(window) >> drain(config, stateRef)
           (state, effect)
@@ -88,14 +88,11 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
 
   /* Recursively drains the queue of deferred requests until it is empty.
    *
-   * If we are currently in the waiting state, we check to see if we've waited long
-   * enough. If we have, we continue processing, advancing to the next window if
-   * necessary. If we have not, we sleep. We have to check that we've waited long
-   * enough because there are two ways the waiting state can be initiated (when we
-   * backoff and when the request is limit reached).
+   * If we are currently in the waiting state, we assume we've already slept long
+   * enough and thus transition into the processing state.
    *
-   * If we are currently in the processing state, we check which window we're in and
-   * if we're within the request limit.
+   * If we are currently in the processing state, we check which window we're in
+   * and if we're within the request limit.
    */
   private def drain(config: RateLimiterConfig, stateRef: Ref[F, State[F]]): F[Unit] = {
     val window = config.window
@@ -104,47 +101,37 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
     val back = for {
       now <- nowF
       modified <- stateRef modify[F[Unit]] {
-        // nothing available to drain
+        // nothing available to drain, reset to processing and stop the recursion
         case State(Waiting(next), Nil) =>
-          //println(s"drain nil")
+          //println(s">>>>2 drain nil")
           (State(Processing(next, 0), List()), ().pure[F])
 
+        // nothing available to drain, stop the recusion
         case State(s @ Processing(_, _), Nil) =>
-          //println(s"drain nil 2")
+          //println(s">>>>3 drain nil 2")
           (State(s, List()), ().pure[F])
 
         // we know we've already slept if we reach this point
         case State(Waiting(next), queue) =>
-          //println(s"drain wait next $next")
-          //// TODO can we delete this case? it it reachable?
-          //if (now < next) { // keep waiting
-          //  val effect = Timer[F].sleep(next - now) >> drain(stateRef)
-          //  (s, effect)
-          //// TODO can we delete this case? we know we slept exactly the right amount of time
-          //} else if (next + window < now) { // past current window, reset the state and loop
-          //  val state = State(Processing(next + window, 0), queue)
-          //  val effect = drain(stateRef)
-          //  (state, effect)
-          //} else { // continue processing
-            val state = State(Processing(next, 1), queue.dropRight(1))
-            val effect = queue.last.complete(()) >> drain(config, stateRef)
-            (state, effect)
-          //}
+          //println(s">>>>4 drain wait next $next")
+          val state = State(Processing(next, 1), queue.dropRight(1))
+          val effect = queue.last.complete(()) >> drain(config, stateRef)
+          (state, effect)
 
         // something available to drain
         case State(Processing(current, count), queue) =>
-          if (current + window <= now) { // past current window, reset the state and loop
-            //println(s"drain next ${current + window}")
+          if (current + window <= now) { // outside current window, reset the state and loop
+            //println(s">>>>5 drain next ${current + window}")
             val state = State(Processing(current + window, 0), queue)
             val effect = drain(config, stateRef)
             (state, effect)
           } else if (count < max) { // in current window, and within the limit
-            //println(s"drain within count $count with queue size ${queue.length}")
+            //println(s">>>>6 drain within count $count with queue size ${queue.length}")
             val state = State(Processing(current, count + 1), queue.dropRight(1))
             val effect = queue.last.complete(()) >> drain(config, stateRef)
             (state, effect)
           } else { // in current window, limit exceeded
-            //println(s"drain exceeded next ${current + window} sleeping ${(current + window) - now}")
+            //println(s">>>>7 drain exceeded next ${current + window} sleeping ${(current + window) - now}")
             val state = State(Waiting(current + window), queue)
             val effect = Timer[F].sleep((current + window) - now) >> drain(config, stateRef)
             (state, effect)
@@ -165,7 +152,7 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
         // always enqueue when waiting
         // we don't need to check the time because we know we'll drain when it's time
         case State(wait @ Waiting(_), queue) =>
-          //println(s"waiting")
+          //println(s">>>>8 waiting")
           val deferred = Deferred.unsafe[F, Unit]
           val state = State[F](wait, deferred :: queue)
           (state, deferred.get)
@@ -173,15 +160,15 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
         // the queue is empty, so attempt to continue
         case State(Processing(current, count), Nil) =>
           if (current + window <= now) { // past current window, reset the state and loop
-            //println(s"processing nil next")
+            //println(s">>>>9 processing nil next")
             val state = State[F](Processing(current + window, 0), Nil)
             (state, limit(config, stateRef))
           } else if (count < max) { // in the current window and within the limit
-            //println(s"processing nil within with current $current and now $now and count $count")
+            //println(s">>>>10 processing nil within with current $current and now $now and count $count")
             val state = State[F](Processing(current, count + 1), Nil)
             (state, ().pure[F])
           } else { // in current window and limit is exceeded
-            //println(s"processing nil wait with current $current and now $now and count $count sleeping ${(current + window) - now}")
+            //println(s">>>>11 processing nil wait with current $current and now $now and count $count sleeping ${(current + window) - now}")
             val deferred = Deferred.unsafe[F, Unit]
             val state = State[F](Waiting(current + window), List(deferred))
             val sleep = Timer[F].sleep((current + window) - now)
@@ -194,7 +181,7 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
 
         // when the queue is non-empty, we enqueue all new requests
         case State(p @ Processing(current, count), queue) =>
-          //println(s"processing queue")
+          //println(s">>>>12 processing queue")
           val deferred = Deferred.unsafe[F, Unit]
           val state = State(p, deferred :: queue)
           (state, deferred.get)

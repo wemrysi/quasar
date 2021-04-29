@@ -247,6 +247,168 @@ object RateLimiterSpec extends Specification {
         a mustEqual(8)
       }
 
+      "extra sleep so that we don't fill the full request quota" in {
+        val ctx = TestContext()
+        val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
+        val timer = ctx.timer[IO]
+
+        val RateLimiting(rl, key) =
+          RateLimiter[IO, UUID](freshKey)(concurrent, timer, Hash[UUID]).unsafeRunSync()
+
+        val RateLimiterEffects(limit, _) =
+          key.flatMap(k => rl(k, 3, 1.seconds)).unsafeRunSync()
+
+        var a: Int = 0
+
+        val run =
+          limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            timer.sleep(1.seconds) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1)
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(2)
+
+        ctx.tick(1.seconds)
+        a mustEqual(5)
+
+        ctx.tick(1.seconds)
+        a mustEqual(8)
+      }
+
+      "concurrently make fewer requests than the limit per window" in {
+        val ctx = TestContext()
+        val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
+
+        val RateLimiting(rl, key) =
+          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+
+        val RateLimiterEffects(limit, _) =
+          key.flatMap(k => rl(k, 4, 1.seconds)).unsafeRunSync()
+
+        var a: Int = 0
+
+        val run1 =
+          limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1)
+
+        val run2 =
+          limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1)
+
+        val run3 =
+          limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1)
+
+        val run = concurrent.start(run1) >> concurrent.start(run2) >> run3
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(4)
+
+        ctx.tick(1.seconds)
+        a mustEqual(8)
+
+        ctx.tick(1.seconds)
+        a mustEqual(12)
+
+        ctx.tick(1.seconds)
+        a mustEqual(16)
+
+        ctx.tick(1.seconds)
+        a mustEqual(19)
+      }
+
+      "concurrently make more requests than the limit per window" in {
+        val ctx = TestContext()
+        val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
+
+        val RateLimiting(rl, key) =
+          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+
+        val RateLimiterEffects(limit, _) =
+          key.flatMap(k => rl(k, 2, 1.seconds)).unsafeRunSync()
+
+        var a: Int = 0
+
+        val run1 =
+          limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1)
+
+        val run2 =
+          limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1)
+
+        val run3 =
+          limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1) >>
+            limit >> IO.delay(a += 1)
+
+        val run = concurrent.start(run1) >> concurrent.start(run2) >> run3
+
+        run.unsafeRunAsyncAndForget()
+
+        a mustEqual(2)
+
+        ctx.tick(1.seconds)
+        a mustEqual(4)
+
+        ctx.tick(1.seconds)
+        a mustEqual(6)
+
+        ctx.tick(1.seconds)
+        a mustEqual(8)
+
+        ctx.tick(1.seconds)
+        a mustEqual(10)
+
+        ctx.tick(1.seconds)
+        a mustEqual(12)
+
+        ctx.tick(1.seconds)
+        a mustEqual(14)
+
+        ctx.tick(1.seconds)
+        a mustEqual(16)
+
+        ctx.tick(1.seconds)
+        a mustEqual(18)
+
+        ctx.tick(1.seconds)
+        a mustEqual(19)
+      }
+
       "do not overwrite configs (use existing config)" in {
         val ctx = TestContext()
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
@@ -385,7 +547,7 @@ object RateLimiterSpec extends Specification {
       }
     }
 
-    "foobar respect backoff effect" in {
+    "respect backoff effect" in {
       val ctx = TestContext()
       val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
