@@ -174,7 +174,6 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
             val sleep = Timer[F].sleep((current + window) - now)
             // start draining so we can get the deferred
             val started = Concurrent[F].start(sleep >> drain(config, stateRef))
-            //val started = sleep >> drain(config, stateRef)
             val effect = started >> deferred.get
             (state, effect)
           }
