@@ -45,7 +45,7 @@ object RateLimiterSpec extends Specification {
     "output events with real time" >> {
       "one event in one window" in {
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) =
           key.flatMap(k => rl(k, 1, 1.seconds)).unsafeRunSync()
@@ -57,7 +57,7 @@ object RateLimiterSpec extends Specification {
 
       "two events in one window" in {
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) =
           key.flatMap(k => rl(k, 2, 1.seconds)).unsafeRunSync()
@@ -71,7 +71,7 @@ object RateLimiterSpec extends Specification {
 
       "two events in two windows" in {
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) =
           key.flatMap(k => rl(k, 1, 1.seconds)).unsafeRunSync()
@@ -85,7 +85,7 @@ object RateLimiterSpec extends Specification {
 
       "events from two keys" in {
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit1, _) =
           key.flatMap(k => rl(k, 1, 1.seconds)).unsafeRunSync()
@@ -112,7 +112,7 @@ object RateLimiterSpec extends Specification {
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) =
           key.flatMap(k => rl(k, 1, 1.seconds)).unsafeRunSync()
@@ -144,7 +144,7 @@ object RateLimiterSpec extends Specification {
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) =
           key.flatMap(k => rl(k, 1, 2.seconds)).unsafeRunSync()
@@ -188,7 +188,7 @@ object RateLimiterSpec extends Specification {
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) =
           key.flatMap(k => rl(k, 2, 1.seconds)).unsafeRunSync()
@@ -219,7 +219,7 @@ object RateLimiterSpec extends Specification {
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) =
           key.flatMap(k => rl(k, 3, 1.seconds)).unsafeRunSync()
@@ -253,7 +253,7 @@ object RateLimiterSpec extends Specification {
         val timer = ctx.timer[IO]
 
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, timer, Hash[UUID]).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey)(concurrent, timer, Hash[UUID]).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) =
           key.flatMap(k => rl(k, 3, 1.seconds)).unsafeRunSync()
@@ -287,7 +287,7 @@ object RateLimiterSpec extends Specification {
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) =
           key.flatMap(k => rl(k, 4, 1.seconds)).unsafeRunSync()
@@ -343,7 +343,7 @@ object RateLimiterSpec extends Specification {
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit, _) =
           key.flatMap(k => rl(k, 2, 1.seconds)).unsafeRunSync()
@@ -414,7 +414,7 @@ object RateLimiterSpec extends Specification {
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
 
         val k1 = key.unsafeRunSync()
 
@@ -447,7 +447,7 @@ object RateLimiterSpec extends Specification {
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit1, _) =
           key.flatMap(k => rl(k, 2, 1.seconds)).unsafeRunSync()
@@ -496,7 +496,7 @@ object RateLimiterSpec extends Specification {
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
         val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
 
         val RateLimiterEffects(limit1, _) =
           key.flatMap(k => rl(k, 2, 1.seconds)).unsafeRunSync()
@@ -552,7 +552,7 @@ object RateLimiterSpec extends Specification {
       val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
       val RateLimiting(rl, key) =
-        RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).unsafeRunSync()
+        RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
 
       val RateLimiterEffects(limit, backoff) =
         key.flatMap(k => rl(k, 1, 2.seconds)).unsafeRunSync()

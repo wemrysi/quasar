@@ -169,7 +169,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       }
     })
 
-  def makeRateLimiter = RateLimiter[IO, UUID](IO.delay(UUID.randomUUID()))
+  def makeRateLimiter = RateLimiter[IO, UUID](IO.delay(UUID.randomUUID())).use(IO(_))
 
   "supported types" >> {
     "empty" >>* {

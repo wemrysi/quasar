@@ -186,7 +186,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
     }
 
     for {
-      rateLimiting <- Resource.liftF(RateLimiter[IO, UUID](IO.delay(UUID.randomUUID())))
+      rateLimiting <-RateLimiter[IO, UUID](IO.delay(UUID.randomUUID()))
       starts <- Resource.liftF(Ref.of[IO, List[String]](List()))
       shuts <- Resource.liftF(Ref.of[IO, List[String]](List()))
 
