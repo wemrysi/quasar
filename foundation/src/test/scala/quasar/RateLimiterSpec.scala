@@ -28,10 +28,11 @@ import fs2.Stream
 
 import cats.effect._
 import cats.effect.laws.util.TestContext
+import cats.effect.testing.specs2.CatsIO
 import cats.kernel.Hash
 import cats.implicits._
 
-object RateLimiterSpec extends Specification {
+object RateLimiterSpec extends Specification with CatsIO {
 
   import cats.effect.IO._
 
@@ -44,65 +45,77 @@ object RateLimiterSpec extends Specification {
   "rate limiter" should {
     "output events with real time" >> {
       "one event in one window" in {
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey).use(IO(_)).unsafeRunSync()
+        RateLimiter[IO, UUID](freshKey) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
 
-        val RateLimiterEffects(limit, _) =
-          key.flatMap(k => rl(k, 1, 1.seconds)).unsafeRunSync()
-
-        val back = Stream.eval_(limit) ++ Stream.emit(1)
-
-        back.compile.toList.unsafeRunSync() mustEqual(List(1))
+          for {
+            effects <- key.flatMap(k => rl(k, 1, 1.seconds))
+            stream = Stream.eval_(effects.limit) ++ Stream.emit(1)
+            values <- stream.compile.toList
+          } yield {
+            values mustEqual(List(1))
+          }
+        }
       }
 
       "two events in one window" in {
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey).use(IO(_)).unsafeRunSync()
+        RateLimiter[IO, UUID](freshKey) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
 
-        val RateLimiterEffects(limit, _) =
-          key.flatMap(k => rl(k, 2, 1.seconds)).unsafeRunSync()
-
-        val back =
-          Stream.eval_(limit) ++ Stream.emit(1) ++
-            Stream.eval_(limit) ++ Stream.emit(2)
-
-        back.compile.toList.unsafeRunSync() mustEqual(List(1, 2))
+          for {
+            effects <- key.flatMap(k => rl(k, 2, 1.seconds))
+            stream =
+              Stream.eval_(effects.limit) ++ Stream.emit(1) ++
+                Stream.eval_(effects.limit) ++ Stream.emit(2)
+            values <- stream.compile.toList
+          } yield {
+            values mustEqual(List(1, 2))
+          }
+        }
       }
 
       "two events in two windows" in {
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey).use(IO(_)).unsafeRunSync()
+        RateLimiter[IO, UUID](freshKey) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
 
-        val RateLimiterEffects(limit, _) =
-          key.flatMap(k => rl(k, 1, 1.seconds)).unsafeRunSync()
-
-        val back =
-          Stream.eval_(limit) ++ Stream.emit(1) ++
-            Stream.eval_(limit) ++ Stream.emit(2)
-
-        back.compile.toList.unsafeRunSync() mustEqual(List(1, 2))
+          for {
+            effects <- key.flatMap(k => rl(k, 1, 1.seconds))
+            stream =
+              Stream.eval_(effects.limit) ++ Stream.emit(1) ++
+                Stream.eval_(effects.limit) ++ Stream.emit(2)
+            values <- stream.compile.toList
+          } yield {
+            values mustEqual(List(1, 2))
+          }
+        }
       }
 
       "events from two keys" in {
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey).use(IO(_)).unsafeRunSync()
+        RateLimiter[IO, UUID](freshKey) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
 
-        val RateLimiterEffects(limit1, _) =
-          key.flatMap(k => rl(k, 1, 1.seconds)).unsafeRunSync()
+          for {
+            effects1 <- key.flatMap(k => rl(k, 1, 1.seconds))
+            effects2 <- key.flatMap(k => rl(k, 1, 1.seconds))
 
-        val RateLimiterEffects(limit2, _) =
-          key.flatMap(k => rl(k, 1, 1.seconds)).unsafeRunSync()
+            stream1 =
+              Stream.eval_(effects1.limit) ++ Stream.emit(1) ++
+                Stream.eval_(effects1.limit) ++ Stream.emit(2)
+            stream2 =
+              Stream.eval_(effects2.limit) ++ Stream.emit(3) ++
+                Stream.eval_(effects2.limit) ++ Stream.emit(4)
 
-        val back1 =
-          Stream.eval_(limit1) ++ Stream.emit(1) ++
-            Stream.eval_(limit1) ++ Stream.emit(2)
-
-        val back2 =
-          Stream.eval_(limit2) ++ Stream.emit(3) ++
-            Stream.eval_(limit2) ++ Stream.emit(4)
-
-        back1.compile.toList.unsafeRunSync() mustEqual(List(1, 2))
-        back2.compile.toList.unsafeRunSync() mustEqual(List(3, 4))
+            values1 <- stream1.compile.toList
+            values2 <- stream2.compile.toList
+          } yield {
+            values1 mustEqual(List(1, 2))
+            values2 mustEqual(List(3, 4))
+          }
+        }
       }
     }
 
