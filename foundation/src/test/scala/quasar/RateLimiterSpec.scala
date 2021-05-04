@@ -525,7 +525,7 @@ object RateLimiterSpec extends Specification with CatsIO {
 
         run.unsafeRunAsyncAndForget()
 
-        ctx.tick(0.seconds) // allow the concurrent fibers to start
+        ctx.tick(0.seconds) // allow the concurrent fibers to start, see comments in https://github.com/precog/quasar/pull/4743
         a1 mustEqual(2)
         a2 mustEqual(3)
 
@@ -578,7 +578,7 @@ object RateLimiterSpec extends Specification with CatsIO {
 
         run.unsafeRunAsyncAndForget()
 
-        ctx.tick(0.seconds) // allow the concurrent fibers to start
+        ctx.tick(0.seconds) // allow the concurrent fibers to start, see comments in https://github.com/precog/quasar/pull/4743
         a1 mustEqual(2)
         a2 mustEqual(2)
 
