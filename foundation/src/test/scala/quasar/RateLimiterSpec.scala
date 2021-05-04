@@ -124,19 +124,22 @@ object RateLimiterSpec extends Specification with CatsIO {
         val ctx = TestContext()
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
-
-        val RateLimiterEffects(limit, _) =
-          key.flatMap(k => rl(k, 1, 1.seconds)).unsafeRunSync()
-
         var a: Int = 0
 
-        val run =
-          limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1)
+        val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
+
+          for {
+            effects <- key.flatMap(k => rl(k, 1, 1.seconds))
+            limit = effects.limit
+            back <-
+               limit >> IO.delay(a += 1) >>
+                 limit >> IO.delay(a += 1) >>
+                 limit >> IO.delay(a += 1) >>
+                 limit >> IO.delay(a += 1)
+          } yield back
+        }
 
         run.unsafeRunAsyncAndForget()
 
@@ -156,19 +159,22 @@ object RateLimiterSpec extends Specification with CatsIO {
         val ctx = TestContext()
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
-
-        val RateLimiterEffects(limit, _) =
-          key.flatMap(k => rl(k, 1, 2.seconds)).unsafeRunSync()
-
         var a: Int = 0
 
-        val run =
-          limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1)
+        val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
+
+          for {
+            effects <- key.flatMap(k => rl(k, 1, 2.seconds))
+            limit = effects.limit
+            back <-
+              limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1)
+          } yield back
+        }
 
         run.unsafeRunAsyncAndForget()
 
@@ -200,21 +206,24 @@ object RateLimiterSpec extends Specification with CatsIO {
         val ctx = TestContext()
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
-
-        val RateLimiterEffects(limit, _) =
-          key.flatMap(k => rl(k, 2, 1.seconds)).unsafeRunSync()
-
         var a: Int = 0
 
-        val run =
-          limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1)
+        val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
+
+          for {
+            effects <- key.flatMap(k => rl(k, 2, 1.seconds))
+            limit = effects.limit
+            back <-
+              limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1)
+          } yield back
+        }
 
         run.unsafeRunAsyncAndForget()
 
@@ -231,23 +240,26 @@ object RateLimiterSpec extends Specification with CatsIO {
         val ctx = TestContext()
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
-
-        val RateLimiterEffects(limit, _) =
-          key.flatMap(k => rl(k, 3, 1.seconds)).unsafeRunSync()
-
         var a: Int = 0
 
-        val run =
-          limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1)
+        val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
+
+          for {
+            effects <- key.flatMap(k => rl(k, 3, 1.seconds))
+            limit = effects.limit
+            back <-
+              limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1)
+          } yield back
+        }
 
         run.unsafeRunAsyncAndForget()
 
@@ -265,24 +277,27 @@ object RateLimiterSpec extends Specification with CatsIO {
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
         val timer = ctx.timer[IO]
 
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, timer, Hash[UUID]).use(IO(_)).unsafeRunSync()
-
-        val RateLimiterEffects(limit, _) =
-          key.flatMap(k => rl(k, 3, 1.seconds)).unsafeRunSync()
-
         var a: Int = 0
 
-        val run =
-          limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            timer.sleep(1.seconds) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1)
+        val run = RateLimiter[IO, UUID](freshKey)(concurrent, timer, Hash[UUID]) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
+
+          for {
+            effects <- key.flatMap(k => rl(k, 3, 1.seconds))
+            limit = effects.limit
+            back <-
+              limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                timer.sleep(1.seconds) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1)
+          } yield back
+        }
 
         run.unsafeRunAsyncAndForget()
 
@@ -299,40 +314,44 @@ object RateLimiterSpec extends Specification with CatsIO {
         val ctx = TestContext()
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
-
-        val RateLimiterEffects(limit, _) =
-          key.flatMap(k => rl(k, 4, 1.seconds)).unsafeRunSync()
-
         var a: Int = 0
 
-        val run1 =
-          limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1)
+        val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
 
-        val run2 =
-          limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1)
+          for {
+            effects <- key.flatMap(k => rl(k, 4, 1.seconds))
+            limit = effects.limit
 
-        val run3 =
-          limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1)
+            run1 =
+              limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1)
 
-        val run = concurrent.start(run1) >> concurrent.start(run2) >> run3
+            run2 =
+              limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1)
+
+            run3 =
+              limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1)
+
+            run <- concurrent.start(run1) >> concurrent.start(run2) >> run3
+          } yield run
+        }
 
         run.unsafeRunAsyncAndForget()
 
@@ -355,40 +374,44 @@ object RateLimiterSpec extends Specification with CatsIO {
         val ctx = TestContext()
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
-
-        val RateLimiterEffects(limit, _) =
-          key.flatMap(k => rl(k, 2, 1.seconds)).unsafeRunSync()
-
         var a: Int = 0
 
-        val run1 =
-          limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1)
+        val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
 
-        val run2 =
-          limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1)
+          for {
+            effects <- key.flatMap(k => rl(k, 2, 1.seconds))
+            limit = effects.limit
 
-        val run3 =
-          limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1) >>
-            limit >> IO.delay(a += 1)
+            run1 =
+              limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1)
 
-        val run = concurrent.start(run1) >> concurrent.start(run2) >> run3
+            run2 =
+              limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1)
+
+            run3 =
+              limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1)
+
+            run <- concurrent.start(run1) >> concurrent.start(run2) >> run3
+          } yield run
+        }
 
         run.unsafeRunAsyncAndForget()
 
@@ -426,23 +449,28 @@ object RateLimiterSpec extends Specification with CatsIO {
         val ctx = TestContext()
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
-
-        val k1 = key.unsafeRunSync()
-
-        val RateLimiterEffects(limit1, _) = rl(k1, 2, 1.seconds).unsafeRunSync()
-        val RateLimiterEffects(limit2, _) = rl(k1, 3, 1.seconds).unsafeRunSync()
-
         var a: Int = 0
 
-        val run =
-          limit2 >> IO.delay(a += 1) >>
-            limit2 >> IO.delay(a += 1) >>
-            limit2 >> IO.delay(a += 1) >>
-            limit2 >> IO.delay(a += 1) >>
-            limit2 >> IO.delay(a += 1) >>
-            limit2 >> IO.delay(a += 1)
+        val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
+
+          for {
+            k1 <- key
+
+            _ <- rl(k1, 2, 1.seconds)
+            effects <- rl(k1, 3, 1.seconds)
+
+            limit = effects.limit
+            back <-
+              limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1) >>
+                limit >> IO.delay(a += 1)
+          } yield back
+        }
 
         run.unsafeRunAsyncAndForget()
 
@@ -459,39 +487,45 @@ object RateLimiterSpec extends Specification with CatsIO {
         val ctx = TestContext()
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
-
-        val RateLimiterEffects(limit1, _) =
-          key.flatMap(k => rl(k, 2, 1.seconds)).unsafeRunSync()
-
-        val RateLimiterEffects(limit2, _) =
-          key.flatMap(k => rl(k, 3, 1.seconds)).unsafeRunSync()
-
         var a1: Int = 0
         var a2: Int = 0
 
-        val run1 =
-          limit1 >> IO.delay(a1 += 1) >>
-            limit1 >> IO.delay(a1 += 1) >>
-            limit1 >> IO.delay(a1 += 1) >>
-            limit1 >> IO.delay(a1 += 1) >>
-            limit1 >> IO.delay(a1 += 1) >>
-            limit1 >> IO.delay(a1 += 1)
+        val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
 
-        val run2 =
-          limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1)
+          for {
+            effects1 <- key.flatMap(k => rl(k, 2, 1.seconds))
+            effects2 <- key.flatMap(k => rl(k, 3, 1.seconds))
 
-        run1.unsafeRunAsyncAndForget()
-        run2.unsafeRunAsyncAndForget()
+            limit1 = effects1.limit
+            limit2 = effects2.limit
 
+            run1 =
+              limit1 >> IO.delay(a1 += 1) >>
+                limit1 >> IO.delay(a1 += 1) >>
+                limit1 >> IO.delay(a1 += 1) >>
+                limit1 >> IO.delay(a1 += 1) >>
+                limit1 >> IO.delay(a1 += 1) >>
+                limit1 >> IO.delay(a1 += 1)
+
+            run2 =
+              limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1)
+
+            run <- concurrent.start(run1) >> run2
+          } yield run
+        }
+
+        run.unsafeRunAsyncAndForget()
+
+        ctx.tick(0.seconds)
         a1 mustEqual(2)
         a2 mustEqual(3)
 
@@ -508,37 +542,43 @@ object RateLimiterSpec extends Specification with CatsIO {
         val ctx = TestContext()
         val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
-        val RateLimiting(rl, key) =
-          RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
-
-        val RateLimiterEffects(limit1, _) =
-          key.flatMap(k => rl(k, 2, 1.seconds)).unsafeRunSync()
-
-        val RateLimiterEffects(limit2, _) =
-          key.flatMap(k => rl(k, 2, 2.seconds)).unsafeRunSync()
-
         var a1: Int = 0
         var a2: Int = 0
 
-        val run1 =
-          limit1 >> IO.delay(a1 += 1) >>
-            limit1 >> IO.delay(a1 += 1) >>
-            limit1 >> IO.delay(a1 += 1) >>
-            limit1 >> IO.delay(a1 += 1) >>
-            limit1 >> IO.delay(a1 += 1) >>
-            limit1 >> IO.delay(a1 += 1)
+        val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+          val rl = limiting.limiter
+          val key = limiting.freshKey
 
-        val run2 =
-          limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1) >>
-            limit2 >> IO.delay(a2 += 1)
+          for {
+            effects1 <- key.flatMap(k => rl(k, 2, 1.seconds))
+            effects2 <- key.flatMap(k => rl(k, 2, 2.seconds))
 
-        run1.unsafeRunAsyncAndForget()
-        run2.unsafeRunAsyncAndForget()
+            limit1 = effects1.limit
+            limit2 = effects2.limit
 
+            run1 =
+              limit1 >> IO.delay(a1 += 1) >>
+                limit1 >> IO.delay(a1 += 1) >>
+                limit1 >> IO.delay(a1 += 1) >>
+                limit1 >> IO.delay(a1 += 1) >>
+                limit1 >> IO.delay(a1 += 1) >>
+                limit1 >> IO.delay(a1 += 1)
+
+            run2 =
+              limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1) >>
+                limit2 >> IO.delay(a2 += 1)
+
+            run <- concurrent.start(run1) >> run2
+          } yield run
+        }
+
+        run.unsafeRunAsyncAndForget()
+
+        ctx.tick(0.seconds)
         a1 mustEqual(2)
         a2 mustEqual(2)
 
@@ -564,21 +604,27 @@ object RateLimiterSpec extends Specification with CatsIO {
       val ctx = TestContext()
       val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
 
-      val RateLimiting(rl, key) =
-        RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]).use(IO(_)).unsafeRunSync()
-
-      val RateLimiterEffects(limit, backoff) =
-        key.flatMap(k => rl(k, 1, 2.seconds)).unsafeRunSync()
-
       var a: Int = 0
 
-      val run =
-        backoff >>
-        limit >> IO.delay(a += 1) >>
-        backoff >>
-        limit >> IO.delay(a += 1) >>
-        backoff >>
-        limit >> IO.delay(a += 1)
+      val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+        val rl = limiting.limiter
+        val key = limiting.freshKey
+
+        for {
+          effects <- key.flatMap(k => rl(k, 1, 2.seconds))
+
+          limit = effects.limit
+          backoff = effects.backoff
+
+          back <-
+            backoff >>
+            limit >> IO.delay(a += 1) >>
+            backoff >>
+            limit >> IO.delay(a += 1) >>
+            backoff >>
+            limit >> IO.delay(a += 1)
+        } yield back
+      }
 
       run.unsafeRunAsyncAndForget()
 
