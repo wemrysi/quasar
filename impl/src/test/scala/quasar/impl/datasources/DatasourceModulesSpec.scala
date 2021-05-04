@@ -18,7 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.{EffectfulQSpec, RateLimiter, RateLimiting, RenderTreeT, ScalarStages, NoopRateLimitUpdater, RateLimitUpdater}
+import quasar.{EffectfulQSpec, RateLimiter, RateLimiting, RenderTreeT, ScalarStages}
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
@@ -169,10 +169,12 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       }
     })
 
+  def makeRateLimiter = RateLimiter[IO, UUID](IO.delay(UUID.randomUUID())).use(IO(_))
+
   "supported types" >> {
     "empty" >>* {
       for {
-        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        rl <- makeRateLimiter
         modules = DatasourceModules[Fix, IO, Int, UUID](List(), rl, ByteStores.void[IO, Int], x => IO(None) )
         tys <- modules.supportedTypes
       } yield {
@@ -181,7 +183,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     }
     "non-empty" >>* {
       for {
-        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        rl <- makeRateLimiter
         modules = DatasourceModules[Fix, IO, Int, UUID](List(
           lightMod(DatasourceType("a", 1)),
           lightMod(DatasourceType("b", 2)),
@@ -213,7 +215,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     val bExpected3 = bRef3.copy(config = jEmptyObject)
 
     for {
-      rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID])
+      rl <- makeRateLimiter
       modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(aType), heavyMod(bType)), rl, ByteStores.void[IO, Int], x => IO(None))
       aRes <- modules.sanitizeRef(aRef)
       bRes <- modules.sanitizeRef(bRef)
@@ -250,7 +252,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
     val cExpected = cRef.copy(config = jEmptyObject)
 
     for {
-      rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID])
+      rl <- makeRateLimiter
       modules = DatasourceModules[Fix, IO, Int, UUID](
         List(lightMod(aType), heavyMod(bType2, None, Some(1))),
         rl,
@@ -294,7 +296,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
     "works with provided modules" >>* {
       for {
-        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        rl <- makeRateLimiter
         modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(lightType), heavyMod(heavyType)), rl, ByteStores.void[IO, Int], x => IO(None))
         (lightRes, finalizer1) <- modules.create(0, lightRef).value.allocated
         (heavyRes, finalizer2) <- modules.create(1, heavyRef).value.allocated
@@ -308,7 +310,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
     "works with modules supported by version range" >>* {
       for {
-        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        rl <- makeRateLimiter
         modules = DatasourceModules[Fix, IO, Int, UUID](List(heavyMod(heavyType, None, Some(1))), rl, ByteStores.void[IO, Int], x => IO(None))
         (res, fin) <- modules.create(0, migrationRef).value.allocated
         _ <- fin
@@ -319,7 +321,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
 
     "errors with incompatible refs" >>* {
       for {
-        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        rl <- makeRateLimiter
         modules = DatasourceModules[Fix, IO, Int, UUID](List(lightMod(lightType), heavyMod(heavyType)), rl, ByteStores.void[IO, Int], x => IO(None))
         (res, fin0) <- modules.create(0, incompatRef).value.allocated
         (tooRes, fin1) <- modules.create(1, tooNew).value.allocated
@@ -352,7 +354,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
         DatasourceRef(accessDenied, DatasourceName("doesn't matter"), jString("access-denied-config"))
 
       for {
-        rl <- RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]: RateLimitUpdater[IO, UUID])
+        rl <- makeRateLimiter
         modules = DatasourceModules[Fix, IO, Int, UUID](List(
           lightMod(malformed, Some(MalformedConfiguration(malformed, jString("a"), "malformed configuration"))),
           heavyMod(invalid, Some(InvalidConfiguration(invalid, jString("b"), NonEmptyList("invalid configuration")))),

@@ -18,7 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.{RateLimiter, RateLimiting, ScalarStages, ConditionMatchers, Condition, NoopRateLimitUpdater}
+import quasar.{RateLimiter, RateLimiting, ScalarStages, ConditionMatchers, Condition}
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
@@ -186,7 +186,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
     }
 
     for {
-      rateLimiting <- Resource.liftF(RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]))
+      rateLimiting <-RateLimiter[IO, UUID](IO.delay(UUID.randomUUID()))
       starts <- Resource.liftF(Ref.of[IO, List[String]](List()))
       shuts <- Resource.liftF(Ref.of[IO, List[String]](List()))
 

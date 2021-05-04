@@ -24,143 +24,188 @@ import quasar.contrib.cats.eqv.toEquiv
 import java.util.concurrent.TimeUnit
 
 import scala.collection.concurrent.TrieMap
+import scala.collection.immutable.Queue
 import scala.concurrent.duration._
 
-import cats.effect.{Sync, Timer}
-import cats.effect.concurrent.Ref
+import cats.effect.{Concurrent, Resource, Timer}
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.kernel.Hash
 import cats.implicits._
 
-final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
-    caution: Double,
-    updater: RateLimitUpdater[F, A]) {
+final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
 
   // TODO make this clustering-aware
   private val configs: TrieMap[A, RateLimiterConfig] =
     new TrieMap[A, RateLimiterConfig](toHashing[A], toEquiv[A])
 
   // TODO make this clustering-aware
-  private val states: TrieMap[A, Ref[F, State]] =
-    new TrieMap[A, Ref[F, State]](toHashing[A], toEquiv[A])
+  private val states: TrieMap[A, Ref[F, State[F]]] =
+    new TrieMap[A, Ref[F, State[F]]](toHashing[A], toEquiv[A])
 
-  def configure(key: A, config: RateLimiterConfig)
-      : F[Option[RateLimiterConfig]] =
-    Sync[F].delay(configs.putIfAbsent(key, config))
-
-  // TODO implement with TrieMap#updateWith when we're on Scala 2.13
-  def plusOne(key: A): F[Unit] =
-    for {
-      ref <- Sync[F].delay(states.get(key))
-      now <- nowF
-      _ <- ref match {
-        case Some(r) =>
-          r.modify(s => (s.copy(count = s.count + 1), ()))
-        case None =>
-          for {
-            now <- nowF
-            ref <- Ref.of[F, State](State(1, now))
-            put <- Sync[F].delay(states.putIfAbsent(key, ref))
-            _ <- put match {
-              case Some(_) => plusOne(key) // retry
-              case None => ().pure[F]
-            }
-          } yield ()
-      }
-    } yield ()
-
-  // TODO implement with TrieMap#updateWith when we're on Scala 2.13
-  def wait(key: A, duration: FiniteDuration): F[Unit] =
-    for {
-      ref <- Sync[F].delay(states.get(key))
-      now <- nowF
-      _ <- ref match {
-        case Some(r) =>
-          r.update(_ => State(0, now + duration))
-        case None =>
-          for {
-            ref <- Ref.of[F, State](State(0, now + duration))
-            put <- Sync[F].delay(states.putIfAbsent(key, ref))
-              _ <- put match {
-                case Some(_) => wait(key, duration) // retry
-                case None => ().pure[F]
-              }
-          } yield ()
-      }
-    } yield ()
+  val cancelAll: F[Unit] = states.values.foldLeft(().pure[F]) {
+    case (eff, ref) => (ref.modify[F[Unit]] {
+      case Active(_, _, _, cancel) => (Done(), eff >> cancel)
+      case Done() => (Done(), eff)
+    }).flatten
+  }
 
   def apply(key: A, max: Int, window: FiniteDuration)
       : F[RateLimiterEffects[F]] =
     for {
-      config <- Sync[F] delay {
+      config <- Concurrent[F] delay {
         val c = RateLimiterConfig(max, window)
         configs.putIfAbsent(key, c).getOrElse(c)
       }
 
-      _ <- updater.config(key, config)
-
       now <- nowF
-      maybeR <- Ref.of[F, State](State(0, now))
-      stateRef <- Sync[F] delay {
+      maybeR <- Ref.of[F, State[F]](Active[F](now, 0, Queue(), ().pure[F]))
+      stateRef <- Concurrent[F] delay {
         states.putIfAbsent(key, maybeR).getOrElse(maybeR)
       }
     } yield {
       RateLimiterEffects[F](
-        limit(key, config, stateRef),
-        backoff(key, config, stateRef))
+        limit(config, stateRef),
+        backoff(config, stateRef))
     }
 
-  // TODO wait smarter (i.e. not for an entire window)
-  // the server's window falls in our previous window between
-  // max and max+1 requests prior to the server-throttled request
-  private def backoff(key: A, config: RateLimiterConfig, stateRef: Ref[F, State])
-      : F[Unit] =
-    nowF.flatMap(now =>
-      stateRef.update(_ => State(0, now + config.window)) >>
-        updater.wait(key, config.window))
-
-  private def limit(key: A, config: RateLimiterConfig, stateRef: Ref[F, State])
+  /* The backoff function is as a damage control measure, providing a way for
+   * information to be communicated back to the rate limiter.
+   *
+   * It sets the state as if it has reached the rate limit for a window starting
+   * now. This will trigger any subsequent limits or drains to sleep.
+   */
+  private def backoff(config: RateLimiterConfig, stateRef: Ref[F, State[F]])
       : F[Unit] = {
-    import config._
+    val max = config.max
 
     for {
       now <- nowF
-      state <- stateRef.get
-      back <-
-        if (state.start > now) { // waiting
-          Timer[F].sleep(state.start - now) >>
-            limit(key, config, stateRef)
-        } else if (state.start + window < now) { // in the next window
-          stateRef.update(_ => State(0, state.start + window)) >>
-            limit(key, config, stateRef)
-        } else { // in the current window
-          stateRef.modify(s => (s.copy(count = s.count + 1), s.count)) flatMap { count =>
-            if (count >= max * caution) { // max exceeded
-              val duration = (state.start + window) - now
-              updater.wait(key, duration) >>
-                Timer[F].sleep(duration) >>
-                stateRef.update(_ => State(0, state.start + window)) >>
-                limit(key, config, stateRef)
-            } else { // continue
-              updater.plusOne(key)
-            }
+      modified <- stateRef update {
+        case Active(_, _, queue, cancel) => Active(now, max, queue, cancel)
+        case Done() => Done()
+      }
+    } yield modified
+  }
+
+  /* Recursively drains the queue of deferred requests until it is empty.
+   *
+   * We check which window we're in and determine if we're within the request limit.
+   */
+  private def drain(config: RateLimiterConfig, stateRef: Ref[F, State[F]]): F[Unit] = {
+    val window = config.window
+    val max = config.max
+
+    val back = for {
+      now <- nowF
+      modified <- stateRef modify[F[Unit]] {
+        case Done() => (Done(), ().pure[F])
+
+        // nothing available to drain, stop the recusion
+        case Active(current, count, queue, _) if queue.isEmpty =>
+          (Active(current, count, Queue(), ().pure[F]), ().pure[F])
+
+        // something available to drain
+        case Active(current, count, queue, cancel) =>
+          if (current + window <= now) { // outside current window, reset the state and loop
+            val state = Active(current + window, 0, queue, cancel)
+            val effect = drain(config, stateRef)
+            (state, effect)
+          } else if (count < max) { // in current window, and within the limit
+            val (elem, remaining) = queue.dequeue
+            val state = Active(current, count + 1, remaining, cancel)
+            val effect = elem.complete(()) >> drain(config, stateRef)
+            (state, effect)
+          } else { // in current window, limit exceeded
+            val state = Active(current + window, 0, queue, cancel)
+            val effect = Timer[F].sleep((current + window) - now) >> drain(config, stateRef)
+            (state, effect)
           }
-        }
-    } yield back
+      }
+    } yield modified
+
+    back.flatten
+  }
+
+  /* If the queue is empty, we check which window we're in and determine if we're within the
+   * request limit.
+   *
+   * If the queue is not empty, we enqueue the new request.
+   */
+  private def limit(config: RateLimiterConfig, stateRef: Ref[F, State[F]]): F[Unit] = {
+    val window = config.window
+    val max = config.max
+
+    val back = for {
+      now <- nowF
+      modified <- stateRef modify[F[Unit]] {
+        case Done() => (Done(), ().pure[F])
+
+        // the queue is empty, so attempt to continue
+        case Active(current, count, queue, cancel) if queue.isEmpty =>
+          if (current + window <= now) { // outside current window, reset the state and loop
+            val state = Active[F](current + window, 0, queue, cancel)
+            (state, limit(config, stateRef))
+          } else if (count < max) { // in current window, within the limit
+            val state = Active[F](current, count + 1, queue, cancel)
+            (state, ().pure[F])
+          } else { // in current window, limit exceeded
+            val deferred = Deferred.unsafe[F, Unit]
+            val state = Active[F](current + window, 0, queue.enqueue(deferred), cancel)
+            val sleep = Timer[F].sleep((current + window) - now)
+            // start draining so we can get the deferred
+            val started =
+              Concurrent[F].start(sleep >> drain(config, stateRef)).flatMap(fib =>
+                stateRef modify[F[Unit]] {
+                  case Active(start, count, queue, cancel) =>
+                    // we shouldn't need to actually run the old cancel, but we do anyways
+                    (Active(start, count, queue, fib.cancel), cancel)
+                  case Done() =>
+                    // avoid the race condition of starting a new fiber post-shutdown
+                    (Done(), fib.cancel)
+                }).flatten
+            val effect = started >> deferred.get
+            (state, effect)
+          }
+
+        // when the queue is non-empty, we enqueue all new requests
+        case Active(current, count, queue, cancel) =>
+          val deferred = Deferred.unsafe[F, Unit]
+          val state = Active(current, count, queue.enqueue(deferred), cancel)
+          (state, deferred.get)
+
+      }
+    } yield modified
+
+    back.flatten
   }
 
   private val nowF: F[FiniteDuration] =
     Timer[F].clock.realTime(TimeUnit.MILLISECONDS).map(_.millis)
 
-  private case class State(count: Int, start: FiniteDuration)
+  private sealed trait State[F[_]]
+
+  /* @param start the start time of the current window
+   * @param count the number of requests made during the current window
+   * @param queue the queue of requests deferred while rate limiting
+   */
+  private case class Active[F[_]](
+      start: FiniteDuration,
+      count: Int,
+      queue: Queue[Deferred[F, Unit]],
+      cancel: F[Unit]) extends State[F]
+
+  private case class Done[F[_]]() extends State[F]
 }
 
 object RateLimiter {
-  def apply[F[_]: Sync: Timer, A: Hash](
-      caution: Double,
-      freshKey: F[A],
-      updater: RateLimitUpdater[F, A])
-      : F[RateLimiting[F, A]] =
-    Sync[F].delay(RateLimiting[F, A](
-      new RateLimiter[F, A](caution, updater),
-      freshKey))
+  def apply[F[_]: Concurrent: Timer, A: Hash](freshKey: F[A])
+      : Resource[F, RateLimiting[F, A]] = {
+
+    val acquire = Concurrent[F].delay(RateLimiting[F, A](
+      new RateLimiter[F, A](), freshKey))
+
+    def release(rl: RateLimiting[F, A]): F[Unit] = rl.limiter.cancelAll
+
+    Resource.make[F, RateLimiting[F, A]](acquire)(release)
+  }
 }
