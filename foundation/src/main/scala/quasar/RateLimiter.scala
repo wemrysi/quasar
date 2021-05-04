@@ -76,20 +76,15 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
    */
   private def backoff(config: RateLimiterConfig, stateRef: Ref[F, State[F]])
       : F[Unit] = {
-    val window = config.window
     val max = config.max
 
-    val back = for {
+    for {
       now <- nowF
-      modified <- stateRef modify[F[Unit]] {
-        case Active(_, _, queue, cancel) =>
-          val state = Active(now, max, queue, cancel)
-          (state, ().pure[F])
-        case Done() => (Done(), ().pure[F])
+      modified <- stateRef update {
+        case Active(_, _, queue, cancel) => Active(now, max, queue, cancel)
+        case Done() => Done()
       }
     } yield modified
-
-    back.flatten
   }
 
   /* Recursively drains the queue of deferred requests until it is empty.
@@ -106,7 +101,7 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
         case Done() => (Done(), ().pure[F])
 
         // nothing available to drain, stop the recusion
-        case Active(current, count, Nil, _) =>
+        case Active(current, count, queue, _) if queue.isEmpty =>
           (Active(current, count, Queue(), ().pure[F]), ().pure[F])
 
         // something available to drain
