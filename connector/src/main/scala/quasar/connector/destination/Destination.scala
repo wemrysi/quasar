@@ -16,13 +16,14 @@
 
 package quasar.connector.destination
 
+import scala.{Option, None}
 import cats.data.NonEmptyList
 
 import monocle.Prism
 
 import quasar.api.{ColumnType, Label}
 import quasar.api.destination.DestinationType
-import quasar.api.push.TypeCoercion
+import quasar.api.push.{SelectedType, TypeCoercion}
 
 import scala.Int
 import scala.util.Either
@@ -45,4 +46,6 @@ trait Destination[F[_]] {
   def destinationType: DestinationType
 
   def sinks: NonEmptyList[ResultSink[F, Type]]
+
+  def defaultSelected(tpe: ColumnType.Scalar): Option[SelectedType] = None
 }

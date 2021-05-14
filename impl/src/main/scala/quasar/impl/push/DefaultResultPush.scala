@@ -122,6 +122,12 @@ private[impl] final class DefaultResultPush[
       .map(coerceWith(_, scalar))
       .value
 
+  def defaultSelected(destinationId: D)
+      : F[Either[DestinationNotFound[D], ColumnType.Scalar => Option[SelectedType]]] =
+    destination[DestinationNotFound[D]](destinationId)
+      .map(d => scalar => d.defaultSelected(scalar))
+      .value
+
   def pushedTo(destinationId: D)
       : F[Either[DestinationNotFound[D], Map[ResourcePath, ∃[Push[?, Q]]]]] = {
 
