@@ -76,6 +76,9 @@ trait ResultPush[F[_], DestinationId, Query] {
   def update(destinationId: DestinationId, path: ResourcePath)
       : F[Either[NonEmptyList[ResultPushError[DestinationId]], F[Status.Terminal]]]
 
+  def defaultSelected(destinationId: DestinationId)
+      : F[Either[DestinationNotFound[DestinationId], ColumnType.Scalar => Option[SelectedType]]]
+
   /** Returns a map enumerating how every scalar type may be represented in the
     * specified destination.
     */
