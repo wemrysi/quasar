@@ -16,25 +16,25 @@
 
 package quasar.connector
 
-import java.time.LocalDateTime
-
-import cats.Functor
-import cats.effect.Sync
-import cats.implicits._
-import cats.Apply
+import java.time.Instant
+import java.util.concurrent.TimeUnit
 import scala._
 
-final case class Expires[A](value: A, expiresAt: Option[LocalDateTime]) {
-  private def now[F[_]: Sync]: F[LocalDateTime] = 
-    Sync[F].delay(LocalDateTime.now())
+import cats.{Applicative, Apply, Functor}
+import cats.effect.Clock
+import cats.implicits._
 
-  def isExpired[F[_]: Sync]: F[Boolean] = 
+final case class Expires[A](value: A, expiresAt: Option[Instant]) {
+  private def now[F[_]: Clock: Functor]: F[Instant] =
+    Clock[F].realTime(TimeUnit.MILLISECONDS).map(Instant.ofEpochMilli(_))
+
+  def isExpired[F[_]: Clock: Applicative]: F[Boolean] =
     expiresAt match {
       case None => false.pure[F]
       case Some(exp) => now.map(exp.isBefore(_))
     }
-    
-  def nonExpired[F[_]: Sync]: F[Option[A]] = 
+
+  def nonExpired[F[_]: Clock: Applicative]: F[Option[A]] =
     Apply[F].ifF(isExpired)(None, Some(value))
 }
 
