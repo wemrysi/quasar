@@ -26,6 +26,6 @@ object ExternalCredentials {
       extends ExternalCredentials[F]
 
   /** Credentials that may expire, along with a way to renew them. */
-  final case class Temporary[F[_]](credentials: F[Credentials], renew: F[Unit])
+  final case class Temporary[F[_]](credentials: F[Expires[Credentials]], renew: F[Unit])
       extends ExternalCredentials[F]
 }
