@@ -458,6 +458,7 @@ object MapFuncCore {
         case DeleteKey(a1, a2) => (f(a1) ⊛ f(a2))(DeleteKey(_, _))
         case ContainsKey(a1, a2) => (f(a1) ⊛ f(a2))(ContainsKey(_, _))
         case ConcatArrays(a1, a2) => (f(a1) ⊛ f(a2))(ConcatArrays(_, _))
+        case ConcatStrings(a1, a2) => (f(a1) ⊛ f(a2))(ConcatStrings(_, _))
         case Range(a1, a2) => (f(a1) ⊛ f(a2))(Range(_, _))
         case Split(a1, a2) => (f(a1) ⊛ f(a2))(Split(_, _))
 
@@ -564,6 +565,7 @@ object MapFuncCore {
         case (DeleteKey(a1, a2), DeleteKey(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ContainsKey(a1, a2), ContainsKey(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ConcatArrays(a1, a2), ConcatArrays(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (ConcatStrings(a1, a2), ConcatStrings(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Range(a1, a2), Range(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Split(a1, a2), Split(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
 
@@ -671,6 +673,7 @@ object MapFuncCore {
           case DeleteKey(a1, a2) => shz("DeleteKey", a1, a2)
           case ContainsKey(a1, a2) => shz("ContainsKey", a1, a2)
           case ConcatArrays(a1, a2) => shz("ConcatArrays", a1, a2)
+          case ConcatStrings(a1, a2) => shz("ConcatStrings", a1, a2)
           case Range(a1, a2) => shz("Range", a1, a2)
           case SetTimeZone(a1, a2) => shz("SetTimeZone", a1, a2)
           case SetTimeZoneHour(a1, a2) => shz("SetTimeZoneHour", a1, a2)
@@ -790,6 +793,7 @@ object MapFuncCore {
           case DeleteKey(a1, a2) => nAry("DeleteKey", a1, a2)
           case ContainsKey(a1, a2) => nAry("ContainsKey", a1, a2)
           case ConcatArrays(a1, a2) => nAry("ConcatArrays", a1, a2)
+          case ConcatStrings(a1, a2) => nAry("ConcatStrings", a1, a2)
           case Range(a1, a2) => nAry("Range", a1, a2)
           case SetTimeZone(a1, a2) => nAry("SetTimeZone", a1, a2)
           case SetTimeZoneHour(a1, a2) => nAry("SetTimeZoneHour", a1, a2)
@@ -950,6 +954,7 @@ object MapFuncsCore {
   }
   @Lenses final case class ConcatArrays[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class ConcatMaps[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class ConcatStrings[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class ProjectIndex[T[_[_]], A](src: A, index: A) extends Binary[T, A] {
     def a1 = src
     def a2 = index

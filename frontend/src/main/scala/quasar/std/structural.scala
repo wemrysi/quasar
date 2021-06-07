@@ -54,13 +54,6 @@ trait StructuralLib extends Library {
     "A merge of two arrays into one array",
     noSimplification)
 
-  // TODO can we delete this now that we don't type-check?
-  // NB: Used only during type-checking, and then compiled into either (string) Concat or ArrayConcat.
-  val ConcatOp = BinaryFunc(
-    Mapping,
-    "A merge of two arrays/strings.",
-    noSimplification)
-
   val MapProject = BinaryFunc(
     Mapping,
     "Extracts a specified key of an object",

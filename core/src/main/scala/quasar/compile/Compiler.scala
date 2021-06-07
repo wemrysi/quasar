@@ -648,7 +648,7 @@ final class Compiler[M[_], T: Equal]
           case Gt            => relations.Gt.left
           case Le            => relations.Lte.left
           case Lt            => relations.Lt.left
-          case Concat        => structural.ConcatOp.left
+          case Concat        => string.Concat.left
           case Plus          => math.Add.left
           case Minus         => math.Subtract.left
           case Mult          => math.Multiply.left

@@ -3801,27 +3801,6 @@ abstract class StdLibSpec extends Qspec {
       //        demands it and can't seem to find one in this context.
       implicit def listToTraversable[A](as: List[A]): Traversable[A] = as
 
-      "ConcatOp" >> {
-        "array  || array" >> prop { (xs: List[BigInt], ys: List[BigInt]) =>
-          val (xints, yints) = (xs map (Data._int(_)), ys map (Data._int(_)))
-          binary(ConcatOp(_, _).embed, Data._arr(xints), Data._arr(yints), Data._arr(xints ::: yints))
-        }
-
-        "array  || string" >> prop { (xs: List[BigInt], y: String) =>
-          val (xints, ystrs) = (xs map (Data._int(_)), y.toList map (c => Data._str(c.toString)))
-          binary(ConcatOp(_, _).embed, Data._arr(xints), Data._str(y), Data._arr(xints ::: ystrs))
-        }
-
-        "string || array" >> prop { (x: String, ys: List[BigInt]) =>
-          val (xstrs, yints) = (x.toList map (c => Data._str(c.toString)), ys map (Data._int(_)))
-          binary(ConcatOp(_, _).embed, Data._str(x), Data._arr(yints), Data._arr(xstrs ::: yints))
-        }
-
-        "string || string" >> prop { (x: String, y: String) =>
-          binary(ConcatOp(_, _).embed, Data._str(x), Data._str(y), Data._str(x + y))
-        }
-      }
-
       "MapProject" >> {
         """({"a":1}).a""" >> {
           binary(

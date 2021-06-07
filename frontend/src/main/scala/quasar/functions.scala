@@ -221,7 +221,6 @@ trait GenericFuncInstances {
       case structural.Meta                => "Meta"
       case structural.MapConcat           => "MapConcat"
       case structural.ArrayConcat         => "ArrayConcat"
-      case structural.ConcatOp            => "ConcatOp"
       case structural.MapProject          => "MapProject"
       case structural.ArrayProject        => "ArrayProject"
       case structural.DeleteKey           => "DeleteKey"
